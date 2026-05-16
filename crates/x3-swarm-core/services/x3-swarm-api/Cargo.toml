@@ -11,6 +11,6 @@ description = "X3 swarm API service for agent orchestration"
 axum = { version = "~0.7.9", features = ["macros"] }
 axum-server = "~0.8.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
-serde = { version = "=1.0.222", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "=1.0.143"
 chrono = { version = "~0.4.42", features = ["serde"] }
