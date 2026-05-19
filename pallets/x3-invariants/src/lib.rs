@@ -947,3 +947,88 @@ pub fn get_canonical_source<T: crate::pallet::Config>(
 ) -> Option<TruthSourceRecord> {
     crate::pallet::CanonicalTruthMap::<T>::get(domain_id)
 }
+
+// ── InvariantCheck — SignedExtension that gates transactions when halted ──────
+//
+// When `Halted` is true (set by `on_finalize` when a constitutional invariant
+// is violated and `HaltOnViolation` is enabled) this extension rejects all
+// incoming transactions, freezing the mempool until governance calls
+// `set_halt_on_violation(false)` + `clear_halted`.
+//
+// Wire this into `SignedExtra` *before* `AgentLawCheck` so that a halted chain
+// stops even calls that would normally be privileged.
+
+use codec::{Decode, DecodeWithMemTracking, Encode};
+use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
+use sp_runtime::{
+    traits::Dispatchable,
+    transaction_validity::{
+        InvalidTransaction, TransactionValidity, TransactionValidityError, ValidTransaction,
+    },
+};
+
+/// Custom `InvalidTransaction` code emitted when the chain is halted due to an
+/// invariant violation.  Code `1` avoids clashing with FRAME built-ins (0).
+pub const INVARIANT_HALT_CODE: u8 = 1;
+
+/// Transaction-pipeline guard: rejects all extrinsics while the constitutional
+/// halt flag (`Halted`) is active.
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Eq, PartialEq, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct InvariantCheck<T: pallet::Config>(core::marker::PhantomData<T>);
+
+impl<T: pallet::Config> InvariantCheck<T> {
+    pub fn new() -> Self {
+        Self(core::marker::PhantomData)
+    }
+}
+
+impl<T: pallet::Config> Default for InvariantCheck<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: pallet::Config + Send + Sync> sp_std::fmt::Debug for InvariantCheck<T> {
+    fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
+        write!(f, "InvariantCheck")
+    }
+}
+
+impl<T: pallet::Config + Send + Sync> sp_runtime::traits::SignedExtension for InvariantCheck<T>
+where
+    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+{
+    const IDENTIFIER: &'static str = "InvariantCheck";
+    type AccountId = T::AccountId;
+    type Call = T::RuntimeCall;
+    type AdditionalSigned = ();
+    type Pre = ();
+
+    fn additional_signed(&self) -> Result<(), TransactionValidityError> {
+        Ok(())
+    }
+
+    fn validate(
+        &self,
+        _who: &Self::AccountId,
+        _call: &Self::Call,
+        _info: &DispatchInfo,
+        _len: usize,
+    ) -> TransactionValidity {
+        if pallet::Halted::<T>::get() {
+            return Err(InvalidTransaction::Custom(INVARIANT_HALT_CODE).into());
+        }
+        Ok(ValidTransaction::default())
+    }
+
+    fn pre_dispatch(
+        self,
+        who: &Self::AccountId,
+        call: &Self::Call,
+        info: &DispatchInfo,
+        len: usize,
+    ) -> Result<(), TransactionValidityError> {
+        self.validate(who, call, info, len).map(|_| ())
+    }
+}

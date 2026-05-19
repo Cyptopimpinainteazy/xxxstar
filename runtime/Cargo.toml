@@ -154,6 +154,13 @@ substrate-wasm-builder = { workspace = true }
 [features]
 default = ["std"]
 dev = ["pallet-sudo"]
+
+# Narrow pallet set for first public testnet / mainnet-rc1 release.
+# Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
+# swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
+# DePIN marketplace, private execution).
+# Use `--features mainnet-rc1` to build the RC1 runtime WASM.
+mainnet-rc1 = []
 # Enable post-quantum crypto primitives on native (non-WASM) builds.
 # quantum-crypto depends on thiserror/anyhow/rand which require std; never enable in WASM.
 pq = ["quantum-crypto"]
