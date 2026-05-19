@@ -44,5 +44,11 @@
 
 ## Live Context (Auto-synced)
 <!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- The below code snippet is automatically added from ./docs/_autodocs/PENDING_SYNC.md -->
+```md
+> Auto-doc placeholder: this section is managed by markdown-autodocs.
+>
+> Next update: replace this shared placeholder with a file-specific snippet source once the related implementation lands.
+```
 <!-- MARKDOWN-AUTO-DOCS:END -->
 
