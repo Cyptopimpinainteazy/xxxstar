@@ -12,7 +12,7 @@ eth-typing>=3.0.0
 eth-utils>=2.0.0
 
 # Cryptography
-ecdsa>=0.18.0
+ecdsa>=0.19.2
 pycryptodome>=3.18.0
 
 # HTTP Client
@@ -25,7 +25,7 @@ pandas>=2.0.0
 numpy>=1.24.0
 
 # Utilities
-python-dotenv>=1.0.0
+python-dotenv>=1.2.2
 python-multipart>=0.0.6
 pyyaml>=6.0
 
