@@ -437,3 +437,7 @@ A: No. Each proof is independent. Running them separately helps isolate failures
 **Document Version**: 1.0  
 **Last Updated**: 2026-04-26  
 **Next Review**: Before genesis ceremony
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->

@@ -27,27 +27,215 @@ This file adds the missing end-to-end program for:
 
 ### Band 0 — cannot ship testnet trustfully without these
 
-- Atomic cross-VM invariants are defined with stable IDs and mapped to runtime enforcement points plus off-chain verification checks; no testnet promotion without replay and double-finalization coverage.
-- Every swarm role has an enforced capability envelope covering allowed actions, budget ceilings, kill-switch behavior, and revocation semantics.
-- Emergency powers are codified with explicit authority, evidence thresholds, scope limits, expiry rules, and mandatory audit events.
-- Every swarm task is assigned a determinism tier (`deterministic`, `bounded-deterministic`, `review-required`, or `non-consensus-only`) and policy gates enforce that classification.
-- Proof and receipt schemas are standardized end-to-end so execution, challenge, slashing, and forensics consume one evidence model.
-- Operators have a single live control surface that joins chain health, cross-VM state, swarm jobs, alerts, proofs, and emergency actions for incident-time decisions.
+- Atomic cross-VM invariants must be written as enforceable runtime and off-chain verification rules, not only implied by code paths.
+- Swarm roles must have capability envelopes, budgets, kill switches, and revocation semantics.
+- Emergency powers must be explicit: who can stop what, under which evidence threshold, with what expiration rules and audit trail.
+- Determinism tiers must be defined for every swarm task: deterministic, bounded-deterministic, review-required, or non-consensus-only.
+- Proof and receipt formats must be standardized so execution, challenge, slashing, and forensics all refer to the same evidence model.
+- The system needs a single operator view that joins chain health, cross-VM state, swarm jobs, alerts, proofs, and emergency actions.
 
 ### Band 1 — required before open participation or real economic exposure
 
-- Reputation, bonding, slashing, and dispute flows are implemented for each swarm node and agent class, with on-chain evidence and appeal windows.
-- Governance delays, constitutional limits, challenger rights, and post-incident review mechanics are enforced in proposal and execution paths.
-- A policy compiler is live for outbound content, outreach, autonomous messaging, and external actions, and blocks non-compliant actions by default.
-- The invariant registry is operational with runtime checks, simulation checks, and evidence links for every high-risk rule.
-- Environment promotion gates are enforced across local devnet, internal testnet, and public testnet with measurable entry and exit criteria.
+- Reputation, bonding, slashing, and dispute flow for swarm nodes and agents.
+- Governance delays, constitutional limits, challenger rights, and post-incident review mechanics.
+- Policy compiler for outbound content, outreach, autonomous messaging, and external actions.
+- Formal invariant registry with runtime checks, simulation checks, and evidence links.
+- Multi-stage environment promotion gates from local devnet to internal testnet to public testnet.
 
 ### Band 2 — required for scale, growth, and durable operator leverage
 
-- Content pipeline orchestration supports multilingual workflows with full asset provenance, approval lineage, and usage-rights metadata.
-- Partner and contributor recruitment funnels include attribution integrity, review checkpoints, and reputation feedback loops.
-- Research swarm, capital scouting, ecosystem intelligence, and founder-media support systems are instrumented with policy boundaries and audit traces.
-- Local and cloud execution routing is policy-driven across CPU, GPU, trusted operators, and sandboxed tools with sensitivity and cost controls.
+- Content pipeline orchestration with multilingual support and asset provenance.
+- Partner and contributor recruitment funnels with attribution, review, and reputation feedback.
+- Research swarm, capital scouting, ecosystem intelligence, and founder-media support systems.
+- Local and cloud execution routing across CPU, GPU, trusted operators, and sandboxed tools.
+
+## Verification corrections and enforcement updates
+
+This section converts recent verification feedback into explicit requirements. These are release gates, not optional guidance.
+
+### V1. Delivery scope integrity (process gate)
+
+If the stated objective is chain throughput, finality, atomic hub behavior, or consensus correctness, then desktop-only diffs cannot be marked as complete.
+
+Required separation:
+
+- Chain deliverable must touch node/runtime/consensus/pool/execution paths.
+- Desktop deliverable must be scoped as UX/control-plane only.
+- If scope changes midstream, rename the task and rewrite acceptance criteria before merge.
+
+Required completion evidence for any "phase complete" claim:
+
+- before/after benchmark evidence,
+- test evidence,
+- diff touching the claimed subsystem.
+
+### V2. Registry drift prevention for app IDs
+
+Unregistered IDs in nav/panel wiring are release bugs.
+
+Enforcement:
+
+- `DEFAULT_APPLICATIONS` is the single source of truth for app IDs.
+- `panelRegistry` and nav shortcuts must reference only registered IDs.
+- Add a dev-startup assertion that every `BottomNavBar` target resolves to `DEFAULT_APPLICATIONS`.
+- Startup must fail fast on registry drift with a clear error.
+
+### V3. Desktop shell and CSP hardening (security gate)
+
+Broad shell execution plus permissive CSP is a critical risk.
+
+Minimum hardening bar:
+
+- replace broad shell permissions with strict allowlisted commands (exact binary and exact args),
+- remove `unsafe-eval` if at all feasible,
+- minimize wildcard origins in `connect-src`, `frame-src`, and `img-src`,
+- add CI policy checks blocking new shell privilege expansion or reintroduction of unsafe CSP directives without explicit approval.
+
+### V4. Finality model completeness for Flash Finality
+
+Flash Finality work is incomplete without an explicit protocol model.
+
+Must define:
+
+- fork-choice behavior before finalization,
+- equivocation safety rules,
+- view-change and timeout behavior under leader failure,
+- network asynchrony assumptions and liveness conditions.
+
+No implementation should be considered production-candidate without explicit safety/liveness specification and adversarial tests.
+
+### V5. PoH commitment contract
+
+PoH in header requires bounded, verifiable commitments.
+
+Must define:
+
+- digest/commitment format,
+- tick cadence and skipped-slot behavior,
+- tx-order mix-in proof contract,
+- verification cost bounds enforced in runtime/import path.
+
+### V6. Parallel execution correctness model
+
+ML-guided scheduling is optimization only, never correctness.
+
+Required model:
+
+- formal conflict definition across state domains,
+- hard conflict detection path,
+- deterministic fallback (serial or deterministic re-exec) on conflict,
+- repeatable multi-node determinism tests.
+
+### V7. Atomic kernel execution authority model
+
+`finalize_atomic_bundle` requires explicit authorized execution responsibility and anti-griefing economics.
+
+Must define:
+
+- permitted submitter set,
+- deposits/bonds per bundle,
+- invalid-proof and spam slashing rules,
+- fee and refund semantics for failed paths.
+
+### V8. PoAE evidence realism
+
+Runtime iteration over validator lists is not a signing protocol.
+
+PoAE must be derived from:
+
+- finality certificate output, or
+- explicit validator-signed certificate with aggregation and anti-equivocation rules.
+
+### V9. Cross-chain latency claims
+
+Claims must distinguish:
+
+- intent finality on X3,
+- external settlement finality on destination chain.
+
+Do not present sub-second global settlement as a protocol guarantee for external L1s.
+
+### V10. Transaction pool throughput model
+
+Pool tuning must include sender and nonce policy, not only size limits.
+
+Required controls:
+
+- per-sender queue policy,
+- max in-flight per sender,
+- eviction policy (fee/age),
+- sender-side nonce guidance in client SDK/tooling.
+
+### V11. Test matrix as release gate
+
+Each major phase must pass a defined matrix:
+
+- pool stress/rejection distribution,
+- deterministic proposer checks under randomized transaction sets,
+- finality safety/liveness under partitions and equivocations,
+- PoAE verification fixtures,
+- atomic rollback invariants and replay checks.
+
+### V12. Buildable plan format requirement
+
+Every phase must carry:
+
+- definition of done,
+- files expected to change,
+- benchmark deltas,
+- required tests,
+- runtime upgrade and compatibility notes (`spec_version`, migration impact),
+- rollback and kill-switch behavior.
+
+### V13. Immediate focus order
+
+If only three items can be fixed first, prioritize:
+
+1. finality gadget specification and view-change safety,
+2. parallel execution deterministic conflict model and fallback,
+3. desktop shell/CSP hardening.
+
+These are existential safety gates; other work is secondary until these are explicit and tested.
+
+## CI automation mapping for V1-V13
+
+This mapping converts the verification gates above into machine-checkable CI checks. A phase cannot be marked complete unless all required checks for its scope pass and required artifacts are attached.
+
+| Gate | CI check name | Command or check | Required artifact(s) | Fail condition |
+|---|---|---|---|---|
+| V1 | `scope-integrity` | Diff path classifier over changed files | `reports/verify/scope_integrity.json` | Chain milestone PR has no chain-path changes or scope label mismatch |
+| V2 | `app-registry-integrity` | App ID cross-check (`DEFAULT_APPLICATIONS` vs panel/nav refs) | `reports/verify/app_registry_integrity.txt` | Any nav/panel ID missing from canonical registry |
+| V3 | `desktop-security-policy` | CSP and shell permission lint | `reports/verify/desktop_security_policy.txt` | `unsafe-*` reintroduced without approval marker or shell allowlist expanded |
+| V4 | `finality-spec-gate` | Presence + schema validation of finality spec docs and tests | `docs/specs/finality_model.md`, `reports/verify/finality_spec_gate.txt` | Missing fork-choice/view-change safety model or missing adversarial test evidence |
+| V5 | `poh-commitment-gate` | PoH digest/verification contract check + bounded-cost proof tests | `docs/specs/poh_commitment.md`, `reports/verify/poh_commitment_gate.txt` | Missing format/tick/skip-slot rules or unbounded verification path |
+| V6 | `parallel-determinism-gate` | Determinism replay tests with conflict fallback assertions | `reports/verify/parallel_determinism_gate.txt` | Nondeterministic state merge or missing canonical fallback path |
+| V7 | `atomic-kernel-authority-gate` | Ensure finalize actor model + bond/slash rules are enforced | `reports/verify/atomic_kernel_authority_gate.txt` | Finalize path callable without declared actor economics and anti-grief protections |
+| V8 | `poae-evidence-gate` | Verify PoAE evidence source (finality cert or signed cert) | `reports/verify/poae_evidence_gate.txt` | Runtime-only synthetic validator signing path used as production evidence |
+| V9 | `latency-claim-gate` | Docs claim linter for intent vs settlement latency split | `reports/verify/latency_claim_gate.txt` | Global sub-second settlement claims on external L1s |
+| V10 | `txpool-policy-gate` | Pool config + nonce policy check | `reports/verify/txpool_policy_gate.txt` | Missing per-sender queue/inflight/eviction guidance and implementation hooks |
+| V11 | `phase-test-matrix-gate` | Required matrix command bundle execution | `reports/verify/phase_test_matrix_gate.txt` | Any required matrix item missing or failing |
+| V12 | `phase-dod-gate` | Validate per-phase DoD block in planning artifact | `reports/verify/phase_dod_gate.txt` | Missing files touched, bench delta, tests, compat/rollback notes |
+| V13 | `existential-priority-gate` | Ensure top-3 existential fixes are tracked as blocking items | `reports/verify/existential_priority_gate.txt` | Finality spec, parallel determinism, or desktop hardening not in active blocking set |
+
+### Required CI command bundle (baseline)
+
+At minimum, CI for chain-facing phases should execute:
+
+- `cargo check --manifest-path node/Cargo.toml`
+- `cargo test --manifest-path crates/x3-readiness-report/Cargo.toml`
+- `cargo test --manifest-path pallets/x3-supply-ledger/Cargo.toml --tests`
+
+For full-chain promotions, also execute:
+
+- `cargo check --workspace --all-targets`
+
+If the full workspace check fails for known dependency graph conflicts, the run must be marked `PARTIAL_PASS` with explicit blocker evidence and owner assignment; no silent green conversion is allowed.
+
+### CI evidence policy
+
+- Every gate check writes a text artifact in `reports/verify/`.
+- Every release/promotion PR must link the artifact bundle in its checklist.
+- Any gate bypass requires a named approver and expiration window in the PR description.
 
 ## Section 1: Missing chain/runtime law
 
@@ -273,98 +461,47 @@ Each stage needs hard gates: incident rate ceilings, review latency, proof verif
 
 Before public testnet messaging ramps up, run launch rehearsals that combine chain load, swarm job load, dashboard operations, emergency pauses, content pipeline review, and rollback tests. The test should simulate realistic operator stress rather than isolated happy-path jobs.
 
-### 11.4 Stage-to-phase gate mapping
-
-Use this mapping to prevent stage promotion without the required phase exits in Section 12.
-
-| Rollout stage | Minimum required phase exits | Promotion gate summary |
-| --- | --- | --- |
-| Stage 1 — internal operator-only swarm use | Phase A and Phase B | Runtime law, proof model, role envelopes, and control-plane policy enforcement are complete and auditable before any external automation exposure. |
-| Stage 2 — supervised external assistance | Phase C | Unified cockpit, approval queues, and incident evidence workflows are live so human operators can safely supervise external-facing assistance. |
-| Stage 3 — limited public automation | Phase D | Bonding/slashing, outcome-linked reputation, and governance/challenger protections are active so incentives and constitutional controls constrain public automation risk. |
-| Stage 4 — broader open participation | Phase E | Outbound systems run under enforced policy gates, provenance, and emergency-stop controls with measured safety and trust outcomes. |
-
-Promotion rule: no stage promotion is valid unless the listed phase exits are complete and the Section 11.2 metrics are within threshold.
-
 ## Section 12: Concrete build order
 
 This section converts the above gaps into a practical sequence.
 
 ### Phase A — law first
 
-Build scope:
 1. Build the invariant registry.
 2. Define proof/receipt schemas.
 3. Write the emergency powers table.
 4. Define determinism classes.
 5. Draft capability envelopes for all swarm roles.
 
-Phase A exit criteria:
-- Every Band 0 invariant has a stable ID, enforcement owner, and evidence reference.
-- Proof and receipt schemas are versioned and consumed by execution, challenge, and forensics paths.
-- Emergency powers are mapped to explicit authority, evidence threshold, expiry, and audit event requirements.
-- Every swarm task class has an assigned determinism tier and policy rule.
-- Capability envelopes are defined per role with budget, revocation, and kill semantics.
-
 ### Phase B — control plane first pass
 
-Build scope:
 1. Implement the three-plane interface boundaries.
 2. Build the job policy engine around the scheduler.
 3. Add agent genesis records and lineage.
 4. Implement strike/quarantine/kill mechanics.
 5. Wire intent-to-action trace storage.
 
-Phase B exit criteria:
-- User plane, control plane, and runtime plane interfaces are typed, authenticated, and audited.
-- Scheduler decisions are policy-explainable from persisted logs.
-- Durable agents cannot execute without genesis metadata and lineage.
-- Strike, quarantine, and kill paths are enforceable and test-covered.
-- Every sensitive action has end-to-end intent-to-action traceability.
-
 ### Phase C — operator safety surfaces
 
-Build scope:
 1. Ship the unified swarm cockpit.
 2. Add approval queues with diff-style review context.
 3. Add cost/latency/rejection telemetry.
 4. Add incident snapshot and evidence export.
 
-Phase C exit criteria:
-- Operators can view chain health, cross-VM status, swarm jobs, proofs, and emergency state in one control surface.
-- Sensitive workflows are blocked pending structured human approval.
-- QoS and cost telemetry supports routing and automation-governance decisions.
-- Incident workflows automatically preserve reconstruction-grade evidence.
-
 ### Phase D — economics and governance
 
-Build scope:
 1. Launch bonding and role-specific slashing.
 2. Add outcome-linked reputation.
 3. Add proof-carrying governance metadata.
 4. Add challenger rights and constitutional limits.
 
-Phase D exit criteria:
-- Bonding and slashing are live by role class with dispute and appeal handling.
-- Reputation scoring is outcome-based and resistant to activity farming.
-- Sensitive governance proposals require simulation, invariant impact, and rollback evidence.
-- Challenger rights and constitutional limits are enforced by governance execution paths.
-
 ### Phase E — outward systems under constraint
 
-Build scope:
 1. Build the content asset pipeline.
 2. Build founder-led media support tools.
 3. Add partner/contributor pipeline tooling.
 4. Add campaign memory and performance feedback.
 5. Keep all publishing and direct outreach behind policy gates and approvals until measured safe.
-
-Phase E exit criteria:
-- Content assets carry source provenance, approval lineage, and usage-rights metadata.
-- Founder-led workflows preserve human ownership for final outward voice.
-- Outreach and recruitment tooling enforces attribution integrity and do-not-contact policy.
-- Campaign optimization is based on trust and outcome quality, not raw output volume.
-- No autonomous publishing or direct outreach can bypass policy gates, approval queues, or emergency stop controls.
 
 ## Section 13: Definition of done for this document
 
@@ -392,3 +529,7 @@ The first concrete scaffold for the security-specific portion of this plan now e
 The current recommended implementation sequence across the multichain adapter, proving pipeline, security swarm, treasury backbone, omnichain token layer, auctions, launchpads, dApp hub, and user surfaces is tracked in [GO_MODE_EXECUTION_ORDER.md](GO_MODE_EXECUTION_ORDER.md). Use that file as the practical order-of-operations document when choosing what to ship next.
 
 The operator-grade specification for the liquidity, inventory, and solvency layer described in `Phase 4.5` now lives in [docs/specs/X3_LIQUIDITY_INVENTORY_SOLVENCY_SPEC.md](docs/specs/X3_LIQUIDITY_INVENTORY_SOLVENCY_SPEC.md). Use it when implementing route reservation, vault policy, rebalance logic, partner capacity, solvency gates, and lane freeze behavior.
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->

@@ -1,14 +1,26 @@
 # TODO — X3 Funding Swarm (Grant Hunter OS)
 
+## Execution order (current)
+1. Step 2 backend public ledger + seed data.
+2. Step 3 admin routes with approval gates.
+3. Step 4 compliant swarm state-machine split.
+4. Step 5 frontend integration.
+5. Step 6 tests.
+6. Step 7 run verification.
+
 ## Step 1 — Locate integration points
 - [x] Reviewed existing swarm control-plane scaffold (`x3-swarm-api`).
-- [ ] Find Next.js app/router + static vs dynamic site integration.
-- [ ] Find/confirm which Rust service serves the site + API base path.
+- [x] Find Next.js app/router + static vs dynamic site integration.
+- [x] Find/confirm which Rust service serves the site + API base path.
+
+### Step 1 findings (verified)
+- Next.js app/router exists at `apps/dex` (App Router). No `site/funding-swarm.html` file currently exists.
+- Gateway API base path is `/api/v1` in `crates/x3-gateway/src/rest.rs`; `x3-swarm-api` exists as a separate service in `crates/x3-swarm-core/services/x3-swarm-api/src/main.rs`.
 
 ## Step 2 — Backend: Funding Swarm public ledger endpoints
-- [ ] Add DB migrations + tables for grant/ledger/event/publication.
-- [ ] Add REST routes under existing gateway: `/api/public/funding-swarm/{scoreboard,grants,timeline}`.
-- [ ] Implement demo/seed responses so `site/funding-swarm.html` boot() works immediately.
+- [x] Add DB migrations + tables for grant/ledger/event/publication.
+- [x] Add REST routes under existing gateway: `/api/public/funding-swarm/{scoreboard,grants,timeline}`.
+- [x] Implement demo/seed responses so `site/funding-swarm.html` boot() works immediately.
 
 ## Step 3 — Backend: Admin endpoints (stub + auth placeholder)
 - [ ] Add admin routes for discovery/research/draft/approve/submit-award-paid/publication.
@@ -29,4 +41,8 @@
 ## Step 7 — Run verification
 - [ ] Start gateway + Postgres; apply migrations; seed demo rows.
 - [ ] Smoke test with curl for the three public endpoints.
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->
 

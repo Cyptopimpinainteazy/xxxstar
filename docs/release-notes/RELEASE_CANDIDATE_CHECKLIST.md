@@ -51,3 +51,7 @@ Provide a repeatable, artifact-backed release candidate (RC) rehearsal checklist
 - [ ] All required gates passed in one rehearsal run.
 - [ ] Evidence pack published and immutable.
 - [ ] Sign-off template completed with no unresolved blockers.
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->

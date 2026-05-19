@@ -393,3 +393,7 @@ launch-gates/
 *Setup Date: April 24, 2026*  
 *Framework: Repomix + AI-driven evidence-based audit*  
 *Goal: ZERO guessing. ZERO surprises. MAINNET READY.*
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->

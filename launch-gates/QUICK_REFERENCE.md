@@ -276,3 +276,7 @@ If audit doesn't generate expected output:
 ---
 
 *Ready to execute. Run script to start.*
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->

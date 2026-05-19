@@ -423,3 +423,7 @@ Date: _______________________
 | 1.0 | 2026-04-26 | X3 Team | Initial genesis checklist |
 
 **Next Review Date:** After each dry run or significant configuration change
+
+## Live Context (Auto-synced)
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->
