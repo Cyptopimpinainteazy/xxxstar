@@ -1095,15 +1095,7 @@ impl Database {
         &self,
         input: NewFundingSwarmGrant,
     ) -> Result<FundingSwarmGrant> {
-        if input.external_id.trim().is_empty() {
-            return Err(GatewayError::BadRequest("external_id must not be empty".into()));
-        }
-        if input.title.trim().is_empty() {
-            return Err(GatewayError::BadRequest("title must not be empty".into()));
-        }
-        if input.sponsor.trim().is_empty() {
-            return Err(GatewayError::BadRequest("sponsor must not be empty".into()));
-        }
+        validate_new_funding_swarm_grant(&input)?;
 
         let grant_id = Uuid::new_v4().to_string();
         sqlx::query_as(
@@ -1156,12 +1148,7 @@ impl Database {
         grant_id: &str,
         input: NewFundingSwarmPublication,
     ) -> Result<FundingSwarmPublicationRecord> {
-        if input.kind.trim().is_empty() {
-            return Err(GatewayError::BadRequest("kind must not be empty".into()));
-        }
-        if input.title.trim().is_empty() {
-            return Err(GatewayError::BadRequest("title must not be empty".into()));
-        }
+        validate_new_funding_swarm_publication(&input)?;
 
         let publication_id = Uuid::new_v4().to_string();
         sqlx::query_as(
@@ -1686,6 +1673,54 @@ fn integration_tier_as_str(value: &BenchmarkIntegrationTier) -> &'static str {
     }
 }
 
+// ─── Funding Swarm: standalone validators ────────────────────────────────────
+
+pub(crate) fn validate_new_funding_swarm_grant(input: &NewFundingSwarmGrant) -> Result<()> {
+    if input.external_id.trim().is_empty() {
+        return Err(GatewayError::BadRequest("external_id must not be empty".into()));
+    }
+    if input.title.trim().is_empty() {
+        return Err(GatewayError::BadRequest("title must not be empty".into()));
+    }
+    if input.sponsor.trim().is_empty() {
+        return Err(GatewayError::BadRequest("sponsor must not be empty".into()));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_new_funding_swarm_publication(input: &NewFundingSwarmPublication) -> Result<()> {
+    if input.kind.trim().is_empty() {
+        return Err(GatewayError::BadRequest("kind must not be empty".into()));
+    }
+    if input.title.trim().is_empty() {
+        return Err(GatewayError::BadRequest("title must not be empty".into()));
+    }
+    Ok(())
+}
+
+// ─── Funding Swarm: pure scoring / dedup / visibility helpers ────────────────
+
+/// Grants with a score at or above this threshold are considered high-priority.
+pub const FUNDING_SWARM_HIGH_SCORE_THRESHOLD: f64 = 70.0;
+
+/// Returns `true` when a grant's AI score meets the high-priority threshold.
+pub fn is_high_priority_grant(grant: &FundingSwarmGrant) -> bool {
+    grant.score >= FUNDING_SWARM_HIGH_SCORE_THRESHOLD
+}
+
+/// Remove duplicate grants that share the same `external_id`, keeping the
+/// first occurrence (lowest index).  Does not touch the database.
+pub fn dedupe_grants_by_external_id(grants: Vec<FundingSwarmGrant>) -> Vec<FundingSwarmGrant> {
+    let mut seen = std::collections::HashSet::new();
+    grants.into_iter().filter(|g| seen.insert(g.external_id.clone())).collect()
+}
+
+/// Returns `true` for timeline items that are safe to expose publicly
+/// (visibility == "public" **or** status == "published").
+pub fn is_public_timeline_item(item: &FundingSwarmTimelineItem) -> bool {
+    item.status == "public" || item.status == "published"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1731,5 +1766,164 @@ mod tests {
         });
 
         assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    // ── Funding Swarm unit tests ──────────────────────────────────────────────
+
+    #[test]
+    fn funding_swarm_grant_validator_rejects_empty_external_id() {
+        let result = validate_new_funding_swarm_grant(&NewFundingSwarmGrant {
+            external_id: "  ".to_string(),
+            title: "My Grant".to_string(),
+            sponsor: "NLNet".to_string(),
+            amount_usd: None,
+            metadata: None,
+        });
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[test]
+    fn funding_swarm_grant_validator_rejects_empty_title() {
+        let result = validate_new_funding_swarm_grant(&NewFundingSwarmGrant {
+            external_id: "ext-1".to_string(),
+            title: "".to_string(),
+            sponsor: "NLNet".to_string(),
+            amount_usd: None,
+            metadata: None,
+        });
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[test]
+    fn funding_swarm_grant_validator_rejects_empty_sponsor() {
+        let result = validate_new_funding_swarm_grant(&NewFundingSwarmGrant {
+            external_id: "ext-1".to_string(),
+            title: "My Grant".to_string(),
+            sponsor: "\t".to_string(),
+            amount_usd: None,
+            metadata: None,
+        });
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[test]
+    fn funding_swarm_grant_validator_accepts_valid_input() {
+        let result = validate_new_funding_swarm_grant(&NewFundingSwarmGrant {
+            external_id: "ext-1".to_string(),
+            title: "My Grant".to_string(),
+            sponsor: "NLNet".to_string(),
+            amount_usd: Some(50_000.0),
+            metadata: None,
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn funding_swarm_publication_validator_rejects_empty_kind() {
+        let result = validate_new_funding_swarm_publication(&NewFundingSwarmPublication {
+            kind: "".to_string(),
+            title: "Press release".to_string(),
+            body: "Body text".to_string(),
+        });
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[test]
+    fn funding_swarm_publication_validator_rejects_empty_title() {
+        let result = validate_new_funding_swarm_publication(&NewFundingSwarmPublication {
+            kind: "press_release".to_string(),
+            title: "  ".to_string(),
+            body: "Body text".to_string(),
+        });
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[test]
+    fn scoring_classifies_grant_above_threshold_as_high_priority() {
+        use chrono::Utc;
+        let grant = FundingSwarmGrant {
+            grant_id: "g-1".into(),
+            external_id: "ext-1".into(),
+            title: "test".into(),
+            sponsor: "NLNet".into(),
+            status: "open".into(),
+            stage: "research".into(),
+            score: 85.0,
+            amount_usd: 0.0,
+            metadata: serde_json::json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        assert!(is_high_priority_grant(&grant));
+    }
+
+    #[test]
+    fn scoring_classifies_grant_below_threshold_as_normal() {
+        use chrono::Utc;
+        let grant = FundingSwarmGrant {
+            grant_id: "g-2".into(),
+            external_id: "ext-2".into(),
+            title: "low score".into(),
+            sponsor: "Unknown".into(),
+            status: "open".into(),
+            stage: "discovery".into(),
+            score: 55.0,
+            amount_usd: 0.0,
+            metadata: serde_json::json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        assert!(!is_high_priority_grant(&grant));
+    }
+
+    #[test]
+    fn dedupe_removes_grants_with_duplicate_external_ids() {
+        use chrono::Utc;
+        let make_grant = |id: &str, ext: &str| FundingSwarmGrant {
+            grant_id: id.into(),
+            external_id: ext.into(),
+            title: "t".into(),
+            sponsor: "s".into(),
+            status: "open".into(),
+            stage: "discovery".into(),
+            score: 0.0,
+            amount_usd: 0.0,
+            metadata: serde_json::json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let grants = vec![
+            make_grant("g-1", "ext-A"),
+            make_grant("g-2", "ext-A"), // duplicate external_id
+            make_grant("g-3", "ext-B"),
+        ];
+        let deduped = dedupe_grants_by_external_id(grants);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].grant_id, "g-1"); // first wins
+        assert_eq!(deduped[1].grant_id, "g-3");
+    }
+
+    #[test]
+    fn public_filter_keeps_only_published_or_public_visibility_items() {
+        use chrono::Utc;
+        let make_item = |status: &str| FundingSwarmTimelineItem {
+            item_id: status.into(),
+            item_type: "event".into(),
+            title: "t".into(),
+            status: status.into(),
+            grant_id: None,
+            data: serde_json::json!({}),
+            occurred_at: Utc::now(),
+        };
+        let items = vec![
+            make_item("public"),
+            make_item("published"),
+            make_item("internal"),
+            make_item("draft"),
+        ];
+        let visible: Vec<_> = items.iter().filter(|i| is_public_timeline_item(i)).collect();
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].item_id, "public");
+        assert_eq!(visible[1].item_id, "published");
     }
 }

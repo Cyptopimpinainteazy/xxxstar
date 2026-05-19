@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { generateSecret, calculateTimeLocks } from "../htlc/base";
+import { generateSecret, calculateTimeLocks } from "../../htlc/base";
 
 // ─── Minimal inline re-test of core orchestration logic ────────────────────
 // We test the pure logic portions of the orchestrator without network calls.

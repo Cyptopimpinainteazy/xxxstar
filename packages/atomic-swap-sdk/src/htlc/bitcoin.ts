@@ -365,7 +365,7 @@ export class BitcoinHTLCAdapter implements IHTLCAdapter {
     const bitcoin = await import("bitcoinjs-lib");
     const ecc = await import("tiny-secp256k1");
     const ecpairMod = await import("ecpair");
-    const ECPair = ecpairMod.ECPairFactory(ecc.default);
+    const ECPair = ecpairMod.ECPairFactory(ecc);
 
     const network = this.getBitcoinNetwork(bitcoin);
     const keyPair = signerKey.startsWith("K") || signerKey.startsWith("L") || signerKey.startsWith("c")
@@ -383,7 +383,7 @@ export class BitcoinHTLCAdapter implements IHTLCAdapter {
     const bitcoin = await import("bitcoinjs-lib");
     const ecc = await import("tiny-secp256k1");
     const ecpairMod = await import("ecpair");
-    const ECPair = ecpairMod.ECPairFactory(ecc.default);
+    const ECPair = ecpairMod.ECPairFactory(ecc);
 
     const network = this.getBitcoinNetwork(bitcoin);
     const senderAddress = await this.addressFromPrivateKey(signerKey);
@@ -463,7 +463,7 @@ export class BitcoinHTLCAdapter implements IHTLCAdapter {
     const bitcoin = await import("bitcoinjs-lib");
     const ecc = await import("tiny-secp256k1");
     const ecpairMod = await import("ecpair");
-    const ECPair = ecpairMod.ECPairFactory(ecc.default);
+    const ECPair = ecpairMod.ECPairFactory(ecc);
 
     const network = this.getBitcoinNetwork(bitcoin);
     const utxos = await this.fetchJson<Array<{ txid: string; vout: number; value: number }>>(
