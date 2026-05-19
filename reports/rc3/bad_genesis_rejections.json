@@ -1,0 +1,45 @@
+{
+  "phase": "bad_genesis_rejection",
+  "timestamp": "2026-05-14T00:02:29.941616Z",
+  "total_tests": 7,
+  "passed": 7,
+  "failed": 0,
+  "checks": [
+    {
+      "test": "missing_authorities",
+      "expected": "rejected",
+      "result": "PASS"
+    },
+    {
+      "test": "missing_treasury_signers",
+      "expected": "rejected",
+      "result": "PASS"
+    },
+    {
+      "test": "missing_council",
+      "expected": "rejected",
+      "result": "PASS"
+    },
+    {
+      "test": "zero_evm_escrow",
+      "expected": "rejected",
+      "result": "PASS"
+    },
+    {
+      "test": "zero_svm_escrow",
+      "expected": "rejected",
+      "result": "PASS"
+    },
+    {
+      "test": "dev_seed_in_live_config",
+      "expected": "rejected",
+      "result": "PASS"
+    },
+    {
+      "test": "empty_bootnodes_live_config",
+      "expected": "rejected",
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS"
+}

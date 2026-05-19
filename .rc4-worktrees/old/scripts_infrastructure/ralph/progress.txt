@@ -1,0 +1,13 @@
+# Ralph Progress Log
+
+## Codebase Patterns
+- This codebase uses dual-VM architecture (EVM + SVM) for decentralized AI
+- Agent identities are stored on-chain with SS58/EVM addresses
+- ZK proofs verify AI model execution without revealing model weights
+- Job marketplace uses economic incentives (bonds, slashing, reputation)
+- Cross-chain bridges enable model portability between VMs
+- Integration tests required for all cross-chain workflows
+- Unit tests required for all pallet logic with 100% coverage target
+
+Started: Fri Mar 27 02:19:03 PM MDT 2026
+---

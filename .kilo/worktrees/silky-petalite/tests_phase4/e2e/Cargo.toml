@@ -1,0 +1,32 @@
+[package]
+name = "e2e_tests"
+version = "0.1.0"
+edition = "2021"
+description = "End-to-end integration tests for X3 Chain"
+license = "MIT"
+repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
+
+# No lib target - we only have integration tests
+[lib]
+path = "src/lib.rs"
+test = false
+doctest = false
+bench = false
+
+[[test]]
+name = "cross_vm_real_chain_test"
+path = "cross_vm_real_chain_test.rs"
+
+[features]
+default = []
+full_e2e = []
+
+[dependencies]
+tokio = { version = "1.0", features = ["full", "net", "time"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+tokio-tungstenite = "0.20"
+hex = "0.4"
+
+[dev-dependencies]

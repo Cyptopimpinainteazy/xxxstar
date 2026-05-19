@@ -1,0 +1,53 @@
+{{- $name := include "explorer.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      containers:
+        - name: explorer
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              name: http
+          env:
+            - name: NEXT_PUBLIC_NETWORK
+              value: "{{ .Values.env.NEXT_PUBLIC_NETWORK }}"
+            - name: NEXT_PUBLIC_SUBSTRATE_WS_ENDPOINT
+              value: "{{ .Values.env.NEXT_PUBLIC_SUBSTRATE_WS_ENDPOINT }}"
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthPath | quote }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthPath | quote }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - "sleep {{ .Values.lifecycle.preStopSleepSeconds }}"
+      nodeSelector: {{ toYaml .Values.nodeSelector | default "{}" | nindent 6 }}
+      tolerations: {{ toYaml .Values.tolerations | default "[]" | nindent 6 }}
+      affinity: {{ toYaml .Values.affinity | default "{}" | nindent 6 }}

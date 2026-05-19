@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Network Pulse</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --bg:#000510;--panel:rgba(0,8,24,0.92);
+  --border:rgba(0,200,255,0.15);--cyan:#00C8FF;
+  --green:#00FF88;--gold:#FFD700;--red:#FF3055;
+  --purple:#AA44FF;--orange:#FF8C00;
+  --text:#C8E8FF;--muted:#1A3A5A;--dim:#0A1A2A;
+  --font:'Exo 2',sans-serif;--mono:'Share Tech Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden;height:100vh;width:100vw;}
+
+/* SCANLINE OVERLAY */
+body::before{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,200,255,0.008) 2px,rgba(0,200,255,0.008) 4px);}
+
+/* GLOBE CANVAS */
+#globe-canvas{position:fixed;inset:0;z-index:0;}
+
+/* TOP BAR */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:20;height:56px;
+  display:flex;align-items:center;padding:0 20px;gap:20px;
+  background:linear-gradient(180deg,rgba(0,5,16,0.98),rgba(0,5,16,0.7));
+  border-bottom:1px solid var(--border);}
+.logo{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:4px;
+  color:var(--cyan);text-shadow:0 0 20px rgba(0,200,255,0.6);}
+.logo span{color:var(--gold);}
+.tb-sep{width:1px;height:28px;background:var(--border);}
+.tb-stat{display:flex;align-items:center;gap:8px;font-size:12px;}
+.tb-label{color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.tb-val{font-family:var(--mono);font-weight:700;}
+.tb-blink{width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:blink 1.5s ease-in-out infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 8px var(--green)}50%{opacity:0.3;box-shadow:none}}
+.nav-links{display:flex;gap:0;margin-left:auto;}
+.nav-link{padding:0 16px;font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;transition:color 0.2s;text-decoration:none;
+  border-left:1px solid var(--border);height:56px;display:flex;align-items:center;}
+.nav-link:hover,.nav-link.active{color:var(--cyan);}
+
+/* LEFT PANEL */
+.panel-left{position:fixed;top:56px;left:0;bottom:0;width:280px;z-index:10;
+  background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;}
+.panel-section{border-bottom:1px solid var(--border);padding:16px;}
+.ps-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+  margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.ps-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.kpi{background:rgba(0,200,255,0.04);border:1px solid var(--border);
+  border-radius:8px;padding:10px;text-align:center;}
+.kpi-val{font-family:var(--mono);font-size:16px;font-weight:700;line-height:1;}
+.kpi-key{font-size:8px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:3px;}
+
+/* VALIDATOR LIST */
+.validator-list{flex:1;overflow-y:auto;padding:12px 16px;}
+.validator-list::-webkit-scrollbar{width:3px;}
+.validator-list::-webkit-scrollbar-track{background:transparent;}
+.validator-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.val-item{display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.2s;}
+.val-item:hover{background:rgba(0,200,255,0.04);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:6px;}
+.val-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.val-name{font-size:12px;flex:1;font-family:var(--mono);}
+.val-status{font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:100px;}
+.vs-active{background:rgba(0,255,136,0.12);color:var(--green);border:1px solid rgba(0,255,136,0.25);}
+.vs-warn{background:rgba(255,140,0,0.12);color:var(--orange);border:1px solid rgba(255,140,0,0.25);}
+.val-tps{font-family:var(--mono);font-size:10px;color:var(--muted);width:40px;text-align:right;}
+
+/* RIGHT PANEL */
+.panel-right{position:fixed;top:56px;right:0;bottom:0;width:320px;z-index:10;
+  background:var(--panel);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;}
+
+/* TX FEED */
+.tx-feed{flex:1;overflow:hidden;position:relative;}
+.tx-feed-inner{position:absolute;inset:0;overflow-y:auto;padding:12px 16px;}
+.tx-feed-inner::-webkit-scrollbar{width:3px;}
+.tx-feed-inner::-webkit-scrollbar-thumb{background:var(--border);}
+.tx-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03);
+  animation:txSlide 0.4s ease;}
+@keyframes txSlide{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+.tx-type{font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:4px;
+  font-family:var(--mono);font-weight:700;flex-shrink:0;align-self:flex-start;margin-top:1px;}
+.tt-transfer{background:rgba(0,200,255,0.1);color:var(--cyan);border:1px solid rgba(0,200,255,0.2);}
+.tt-stake{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.2);}
+.tt-vote{background:rgba(170,68,255,0.1);color:var(--purple);border:1px solid rgba(170,68,255,0.2);}
+.tt-buy{background:rgba(255,215,0,0.1);color:var(--gold);border:1px solid rgba(255,215,0,0.2);}
+.tt-burn{background:rgba(255,48,85,0.1);color:var(--red);border:1px solid rgba(255,48,85,0.2);}
+.tx-body{flex:1;min-width:0;}
+.tx-hash{font-family:var(--mono);font-size:10px;color:var(--cyan);margin-bottom:2px;}
+.tx-detail{font-size:11px;color:var(--text);}
+.tx-meta{font-size:9px;color:var(--muted);margin-top:2px;}
+.tx-amount{font-family:var(--mono);font-size:12px;font-weight:700;text-align:right;
+  flex-shrink:0;align-self:center;}
+
+/* BOTTOM BAR */
+.bottom-bar{position:fixed;bottom:0;left:280px;right:320px;z-index:10;
+  height:180px;background:var(--panel);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background-color:var(--border);}
+.bb-panel{background:var(--panel);padding:14px 16px;}
+.bb-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+/* MINI CHARTS */
+.mini-chart{width:100%;height:80px;position:relative;}
+canvas.spark{position:absolute;inset:0;width:100%;height:100%;}
+
+/* TPS METER */
+.tps-meter{display:flex;flex-direction:column;gap:6px;}
+.tm-bar-wrap{height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+.tm-bar{height:100%;border-radius:100px;transition:width 0.8s ease;}
+.tm-label{display:flex;justify-content:space-between;font-size:10px;}
+.tm-name{color:var(--muted);}
+.tm-val{font-family:var(--mono);}
+
+/* CENTER OVERLAY INFO */
+.globe-info{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:5;pointer-events:none;text-align:center;}
+.gi-tps{font-family:var(--mono);font-size:48px;font-weight:700;
+  color:var(--cyan);text-shadow:0 0 40px rgba(0,200,255,0.5);
+  animation:tpsPulse 2s ease-in-out infinite;}
+@keyframes tpsPulse{0%,100%{text-shadow:0 0 40px rgba(0,200,255,0.5)}50%{text-shadow:0 0 80px rgba(0,200,255,0.9)}}
+.gi-label{font-size:11px;letter-spacing:4px;color:rgba(0,200,255,0.5);text-transform:uppercase;margin-top:4px;}
+
+/* NODE POPUP */
+.node-popup{position:fixed;z-index:30;background:rgba(0,8,24,0.97);
+  border:1px solid var(--cyan);border-radius:12px;padding:16px;width:220px;
+  display:none;pointer-events:none;font-size:12px;}
+.node-popup::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);}
+.np-name{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--cyan);margin-bottom:8px;}
+.np-row{display:flex;justify-content:space-between;padding:3px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.np-key{color:var(--muted);}
+.np-val{font-family:var(--mono);font-weight:700;}
+
+/* ALERT STRIP */
+.alert-strip{position:fixed;top:56px;left:280px;right:320px;z-index:15;
+  padding:6px 16px;background:rgba(255,140,0,0.08);border-bottom:1px solid rgba(255,140,0,0.2);
+  display:flex;align-items:center;gap:10px;font-size:11px;color:var(--orange);
+  animation:slideDown 0.3s ease;}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.alert-dot{width:6px;height:6px;border-radius:50%;background:var(--orange);animation:blink 1s infinite;}
+#alert-close{margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px;}
+</style>
+</head>
+<body>
+
+<!-- GLOBE -->
+<canvas id="globe-canvas"></canvas>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">X3<span>STAR</span></div>
+  <div class="tb-sep"></div>
+  <div class="tb-blink"></div>
+  <div class="tb-stat">
+    <span class="tb-label">Network</span>
+    <span class="tb-val" style="color:var(--green)">LIVE MAINNET</span>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-stat">
+    <span class="tb-label">TPS</span>
+    <span class="tb-val" style="color:var(--cyan)" id="tb-tps">4,218</span>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-stat">
+    <span class="tb-label">Block</span>
+      <span class="tb-val" id="tb-block">--</span>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-stat">
+    <span class="tb-label">Validators</span>
+    <span class="tb-val" style="color:var(--gold)">--</span>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-stat">
+    <span class="tb-label">X3S</span>
+    <span class="tb-val" style="color:var(--gold)">$0.0842</span>
+    <span style="font-size:10px;color:var(--green)">▲+12.4%</span>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link active">Pulse</a>
+    <a class="nav-link" href="x3star-dashboard.html">Dashboard</a>
+    <a class="nav-link" href="x3star-token-presale.html">Presale</a>
+    <a class="nav-link" href="x3star-validator-presale.html">Nodes</a>
+  </div>
+</div>
+
+<!-- ALERT -->
+<div class="alert-strip" id="alert-bar">
+  <div class="alert-dot"></div>
+  <strong>Network Notice:</strong> Validator slot #154 just came online in Singapore — 46 Genesis slots remaining in presale
+  <span id="alert-close" onclick="document.getElementById('alert-bar').style.display='none'">×</span>
+</div>
+
+<!-- LEFT PANEL -->
+<div class="panel-left">
+  <div class="panel-section">
+    <div class="ps-title">Network Health</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-val" style="color:var(--green)" id="kpi-tps">4,218</div><div class="kpi-key">TPS</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--cyan)">--</div><div class="kpi-key">Uptime</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--gold)">--</div><div class="kpi-key">Finality</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--purple)" id="kpi-blocks">--</div><div class="kpi-key">Block Height</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--text)">$0.0001</div><div class="kpi-key">Avg Fee</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--green)" id="kpi-vals">--</div><div class="kpi-key">Validators</div></div>
+    </div>
+  </div>
+  <div class="panel-section">
+    <div class="ps-title">Top Validators</div>
+  </div>
+  <div class="validator-list" id="val-list">
+    <!-- populated by JS -->
+  </div>
+</div>
+
+<!-- GLOBE CENTER OVERLAY -->
+<div class="globe-info">
+  <div class="gi-tps" id="center-tps">4,218</div>
+  <div class="gi-label">Transactions Per Second</div>
+</div>
+
+<!-- NODE POPUP -->
+<div class="node-popup" id="node-popup">
+  <div class="np-name" id="np-name">SG-NODE-01</div>
+  <div class="np-row"><span class="np-key">Location</span><span class="np-val" id="np-loc">Singapore</span></div>
+  <div class="np-row"><span class="np-key">TPS</span><span class="np-val" id="np-tps" style="color:var(--green)">284</span></div>
+  <div class="np-row"><span class="np-key">Uptime</span><span class="np-val" id="np-uptime" style="color:var(--green)">99.9%</span></div>
+  <div class="np-row"><span class="np-key">Stake</span><span class="np-val" id="np-stake" style="color:var(--gold)">50,000 X3S</span></div>
+  <div class="np-row"><span class="np-key">Tier</span><span class="np-val" id="np-tier" style="color:var(--purple)">Genesis</span></div>
+  <div class="np-row"><span class="np-key">Status</span><span class="np-val" id="np-status" style="color:var(--green)">● Active</span></div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="panel-right">
+  <div class="panel-section" style="border-bottom:1px solid var(--border);">
+    <div class="ps-title">Live Transaction Feed</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <span style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(0,200,255,0.08);color:var(--cyan);border:1px solid rgba(0,200,255,0.2);cursor:pointer;">ALL</span>
+      <span style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(0,255,136,0.06);color:var(--green);border:1px solid rgba(0,255,136,0.15);cursor:pointer;">STAKE</span>
+      <span style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(255,215,0,0.06);color:var(--gold);border:1px solid rgba(255,215,0,0.15);cursor:pointer;">BUY</span>
+      <span style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(170,68,255,0.06);color:var(--purple);border:1px solid rgba(170,68,255,0.15);cursor:pointer;">VOTE</span>
+    </div>
+  </div>
+  <div class="tx-feed">
+    <div class="tx-feed-inner" id="tx-feed"></div>
+  </div>
+  <div style="padding:12px 16px;border-top:1px solid var(--border);">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);">
+      <span>Total Today</span>
+      <span class="kpi-val" style="font-size:12px;color:var(--cyan)" id="total-tx">2,841,204</span>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <div class="bb-panel">
+    <div class="bb-title">TPS History (60s)</div>
+    <div class="mini-chart"><canvas id="tps-chart"></canvas></div>
+  </div>
+  <div class="bb-panel">
+    <div class="bb-title">Node Distribution by Region</div>
+    <div class="tps-meter" id="region-bars">
+      <div class="tm-bar-wrap"><div class="tm-bar" style="width:38%;background:var(--cyan)"></div></div>
+      <div class="tm-label"><span class="tm-name">Asia Pacific</span><span class="tm-val" style="color:var(--cyan)">38% · 701</span></div>
+      <div class="tm-bar-wrap"><div class="tm-bar" style="width:28%;background:var(--gold)"></div></div>
+      <div class="tm-label"><span class="tm-name">North America</span><span class="tm-val" style="color:var(--gold)">28% · 517</span></div>
+      <div class="tm-bar-wrap"><div class="tm-bar" style="width:22%;background:var(--green)"></div></div>
+      <div class="tm-label"><span class="tm-name">Europe</span><span class="tm-val" style="color:var(--green)">22% · 406</span></div>
+      <div class="tm-bar-wrap"><div class="tm-bar" style="width:12%;background:var(--purple)"></div></div>
+      <div class="tm-label"><span class="tm-name">Other</span><span class="tm-val" style="color:var(--purple)">12% · 223</span></div>
+    </div>
+  </div>
+  <div class="bb-panel">
+    <div class="bb-title">Fee Market</div>
+    <div class="mini-chart"><canvas id="fee-chart"></canvas></div>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

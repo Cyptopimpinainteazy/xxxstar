@@ -1,0 +1,5 @@
+# CRITICAL: Never commit these keys to git!
+# These are cryptographic keys that control your testnet validators
+*
+!.gitignore
+!KEYS_MANIFEST.md

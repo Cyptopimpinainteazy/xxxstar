@@ -1,0 +1,13 @@
+[package]
+name = "x3-proof-envelope"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "External gateway proof envelope types for X3."
+
+[lib]
+name = "x3_proof_envelope"
+path = "src/lib.rs"
+
+[dependencies]
+x3-verification-router = { path = "../x3-verification-router" }

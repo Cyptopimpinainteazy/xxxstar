@@ -1,0 +1,151 @@
+# cargo-deny configuration for x3-chain
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "wasm32-unknown-unknown" },
+]
+
+# ── Licenses ─────────────────────────────────────────────────────────────────
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "BlueOak-1.0.0",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Zlib",
+    "OpenSSL",
+    "GPL-3.0",
+    "GPL-3.0-or-later",
+    "GPL-3.0-or-later WITH Classpath-exception-2.0",
+    "CDLA-Permissive-2.0",
+]
+unused-allowed-license = "warn"
+
+# keccak-hash and some Solana deps use GPL-3.0 — acceptable for this
+# open-source blockchain project.
+
+[[licenses.clarify]]
+name = "ring"
+version = "*"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[[licenses.clarify]]
+name = "webpki"
+version = "*"
+expression = "ISC"
+license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
+
+# ── Bans ────────────────────────────────────────────────────────────────────
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+# Known benign duplicate versions in Substrate/Polkadot ecosystems
+skip = [
+    { name = "syn", version = "1" },
+    { name = "hashbrown", version = "0.12" },
+    { name = "hashbrown", version = "0.13" },
+    { name = "hashbrown", version = "0.14" },
+    { name = "indexmap", version = "1" },
+    { name = "toml_edit", version = "0.19" },
+    { name = "toml_edit", version = "0.22" },
+    { name = "toml", version = "0.5" },
+    { name = "toml", version = "0.7" },
+    { name = "toml", version = "0.8" },
+    { name = "bitflags", version = "1" },
+    { name = "getrandom" },
+    { name = "rand_core" },
+    { name = "spin", version = "0.5" },
+    { name = "spin", version = "0.9" },
+]
+
+# ── Advisories ────────────────────────────────────────────────────────────────
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Tracked exceptions are documented in docs/root/DEPENDENCY_AUDIT.md with an
+# owner, rationale, and removal condition.
+# All entries below are pinned transitively by Substrate or Solana dependencies
+# that cannot be upgraded independently of the upstream SDK versions.
+ignore = [
+    # wasmtime wasi:http panic — not exposed in our RPC path
+    "RUSTSEC-2026-0021",
+    # atty unmaintained — pulled in by Substrate CLI
+    "RUSTSEC-2022-0093",
+    # bincode unmaintained — Solana serialization dep
+    "RUSTSEC-2024-0320",
+    # curve25519-dalek timing variability — Substrate crypto dep
+    "RUSTSEC-2024-0336",
+    # ed25519-dalek oracle attack — Substrate crypto dep
+    "RUSTSEC-2024-0344",
+    # derivative unmaintained — Substrate macro dep
+    "RUSTSEC-2024-0370",
+    # instant unmaintained — Substrate wasm timer dep
+    "RUSTSEC-2024-0384",
+    # number_prefix unmaintained — indicatif dep
+    "RUSTSEC-2024-0388",
+    # paste unmaintained — Substrate macro dep
+    "RUSTSEC-2024-0421",
+    # proc-macro-error unmaintained — Substrate macro dep
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2024-0437",
+    # h2 vulnerability — pinned by hyper/reqwest/Substrate RPC
+    "RUSTSEC-2025-0009",
+    "RUSTSEC-2025-0010",
+    "RUSTSEC-2025-0055",
+    "RUSTSEC-2025-0057",
+    "RUSTSEC-2025-0118",
+    "RUSTSEC-2025-0119",
+    "RUSTSEC-2025-0134",
+    "RUSTSEC-2025-0141",
+    # wasmtime (additional) — pinned by Substrate executor
+    "RUSTSEC-2026-0020",
+    # rustls-webpki CRL matching — pinned by Substrate/Polkadot TLS deps;
+    # no independent upgrade path without upstream SDK bump.
+    "RUSTSEC-2026-0049",
+    # tar unpack_in symlink chmod — pulled in by Solana/cargo tooling;
+    # async-std discontinued — Substrate indirect dep; no direct usage in node.
+    "RUSTSEC-2025-0052",
+    # libsecp256k1 unmaintained — pulled in by Substrate; no direct usage.
+    "RUSTSEC-2025-0161",
+    # rustls-webpki name constraints for URI — pinned by Substrate/Polkadot TLS;
+    # no independent upgrade path without upstream SDK bump.
+    "RUSTSEC-2026-0098",
+    # rustls-webpki wildcard name constraints — same dep and rationale.
+    "RUSTSEC-2026-0099",
+    # rustls-webpki reachable panic in CRL parsing — same dep and rationale.
+    "RUSTSEC-2026-0104",
+    # wasmtime f64.copysign segfault — pinned by Substrate executor; node does
+    # not expose user-controlled f64.copysign paths in public RPC.
+    "RUSTSEC-2026-0006",
+    # wasmtime flags component panic — same executor pin; component model not
+    # used in x3-chain runtime.
+    "RUSTSEC-2026-0085",
+    # wasmtime additional vulnerabilities (0086-0096) — all pinned by Substrate executor;
+    # component model / Winch / Cranelift paths not used in x3-chain runtime.
+    "RUSTSEC-2026-0086",
+    "RUSTSEC-2026-0087",
+    "RUSTSEC-2026-0088",
+    "RUSTSEC-2026-0089",
+    "RUSTSEC-2026-0091",
+    "RUSTSEC-2026-0092",
+    "RUSTSEC-2026-0093",
+    "RUSTSEC-2026-0094",
+    "RUSTSEC-2026-0095",
+    "RUSTSEC-2026-0096",
+]

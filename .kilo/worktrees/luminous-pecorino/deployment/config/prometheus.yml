@@ -1,0 +1,73 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'x3-chain'
+    environment: 'production'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  - '/etc/prometheus/alert-rules.yml'
+
+scrape_configs:
+  # ===== PROMETHEUS SELF-MONITORING =====
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ===== ALERTMANAGER =====
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  # ===== NODE EXPORTER (Host Metrics) =====
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node_exporter:9100']
+
+  # ===== GPU SWARM COORDINATOR =====
+  - job_name: 'gpu-swarm-coordinator'
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['localhost:9000']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'coordinator'
+
+  # ===== GPU NODES =====
+  - job_name: 'gpu-nodes'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['localhost:9001', 'localhost:9002', 'localhost:9003']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: node_id
+        regex: 'localhost:900([0-9])'
+        replacement: 'node-$1'
+
+  # ===== X3 KERNEL RPC =====
+  - job_name: 'kernel-rpc'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['localhost:9944']
+
+  # ===== APPLICATION METRICS =====
+  - job_name: 'application'
+    metrics_path: '/api/metrics'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:8080']
+
+  # ===== REDIS =====
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']

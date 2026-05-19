@@ -1,0 +1,60 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # X3 Node Metrics
+  - job_name: 'x3-node'
+    static_configs:
+      - targets: ['x3-node:9933']
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Redis Metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+
+  # PostgreSQL Metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+
+  # Mock Services Metrics
+  - job_name: 'mock-dns-server'
+    static_configs:
+      - targets: ['mock-dns-server:8080']
+    scrape_interval: 30s
+
+  - job_name: 'mock-gpu-swarm'
+    static_configs:
+      - targets: ['mock-gpu-swarm:8081']
+    scrape_interval: 30s
+
+  - job_name: 'mock-external-chains'
+    static_configs:
+      - targets: ['mock-external-chains:8082']
+    scrape_interval: 30s
+
+  # Test Runner Metrics
+  - job_name: 'e2e-test-runner'
+    static_configs:
+      - targets: ['e2e-test-runner:9090']
+    scrape_interval: 15s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

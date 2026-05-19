@@ -1,0 +1,74 @@
+{
+  "rounds": [
+    {
+      "stage": "baseline",
+      "metrics": {
+        "baseline_compile_us": 246,
+        "baseline_tps": 32520.33,
+        "bytes": 1040,
+        "gas": 771,
+        "instr": 155,
+        "mode": "Baseline",
+        "optimized_compile_us": 319,
+        "optimized_tps": 25078.37,
+        "samples": 8
+      }
+    },
+    {
+      "stage": "round-1",
+      "metrics": {
+        "baseline_compile_us": 339,
+        "baseline_tps": 23598.82,
+        "bytes": 888,
+        "gas": 610,
+        "instr": 112,
+        "mode": "YOLO Pass",
+        "optimized_compile_us": 9516,
+        "optimized_tps": 840.69,
+        "samples": 8
+      }
+    },
+    {
+      "stage": "round-2",
+      "metrics": {
+        "baseline_compile_us": 340,
+        "baseline_tps": 23529.41,
+        "bytes": 888,
+        "gas": 610,
+        "instr": 112,
+        "mode": "YOLO Pass",
+        "optimized_compile_us": 9413,
+        "optimized_tps": 849.89,
+        "samples": 8
+      }
+    },
+    {
+      "stage": "round-3",
+      "metrics": {
+        "baseline_compile_us": 307,
+        "baseline_tps": 26058.63,
+        "bytes": 888,
+        "gas": 610,
+        "instr": 112,
+        "mode": "YOLO Pass",
+        "optimized_compile_us": 8863,
+        "optimized_tps": 902.63,
+        "samples": 8
+      }
+    },
+    {
+      "stage": "round-4",
+      "metrics": {
+        "baseline_compile_us": 273,
+        "baseline_tps": 29304.03,
+        "bytes": 888,
+        "gas": 610,
+        "instr": 112,
+        "mode": "YOLO Pass",
+        "optimized_compile_us": 8573,
+        "optimized_tps": 933.16,
+        "samples": 8
+      }
+    }
+  ]
+}

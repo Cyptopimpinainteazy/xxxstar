@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  swarm-node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.nvidia
+    image: x3/gpu-swarm-node:latest
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - RUST_LOG=info
+      - GPU_BACKEND=cuda
+    volumes:
+      - /etc/gpu-swarm:/etc/gpu-swarm:ro
+    ports:
+      - "9000:9000"

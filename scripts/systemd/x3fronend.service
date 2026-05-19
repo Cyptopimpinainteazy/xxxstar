@@ -1,0 +1,19 @@
+[Unit]
+Description=X3 HTML frontend site
+After=network.target
+Requires=x3-desktop.service
+Wants=x3-desktop.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+ExecStart=/usr/bin/env bash /home/lojak/Desktop/X3_ATOMIC_STAR/scripts/systemd/start-x3fronend.sh
+Environment=CI=
+StandardOutput=journal
+StandardError=journal
+KillMode=process
+
+[Install]
+WantedBy=default.target

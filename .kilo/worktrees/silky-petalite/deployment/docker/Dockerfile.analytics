@@ -1,0 +1,63 @@
+# ============================================================================
+# X3 Chain Analytics Service - Production Dockerfile
+# ============================================================================
+# Purpose: Analytics service with PostgreSQL connection
+# Target: Rust analytics backend
+# ============================================================================
+
+FROM rust:1.85-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy analytics service source
+COPY apps/analytics/analytics-service ./
+
+# Build release binary
+RUN cargo build --release --locked && \
+    strip target/release/analytics-service
+
+# ============================================================================
+# Runtime stage
+# ============================================================================
+FROM ubuntu:22.04
+
+LABEL maintainer="X3 Chain DevOps <devops@x3-chain.io>" \
+      description="X3 Chain Analytics Service" \
+      version="1.0.0"
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r analytics && \
+    useradd -r -g analytics -m -d /analytics analytics
+
+# Copy binary
+COPY --from=builder /build/target/release/analytics-service /usr/local/bin/
+
+# Set ownership
+RUN chown analytics:analytics /usr/local/bin/analytics-service
+
+USER analytics
+WORKDIR /analytics
+
+# Expose service port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/analytics-service"]

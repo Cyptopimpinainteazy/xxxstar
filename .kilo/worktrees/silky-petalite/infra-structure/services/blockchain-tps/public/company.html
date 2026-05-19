@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sign Up — Blockchain TPS Test</title>
+  <style>body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#071024;color:#e8f1fb;padding:2rem}.card{max-width:900px;margin:2rem auto;padding:2rem;border-radius:12px;background:rgba(255,255,255,.02)}label{display:block;margin-top:.6rem}input,select{width:100%;padding:.6rem;margin:.3rem 0;border-radius:6px;border:1px solid rgba(255,255,255,.06);background:transparent;color:inherit}button{padding:.7rem 1rem;border-radius:8px;border:none;background:#06b6d4;color:#012}</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Company Signup</h1>
+    <p>Register your company so prospects can run tests and appear on the leaderboard.</p>
+    <label>Company name</label><input id="name" />
+    <label>Blockchain</label><select id="blockchain"><option>EVM</option><option>Solana</option><option>Polkadot</option><option>Other</option></select>
+    <label>Role</label><select id="role"><option>Trader</option><option>Validator</option><option>Miner</option><option>RPC Provider</option><option>Bridge</option><option>Other</option></select>
+    <label>RPC Endpoint</label><input id="rpc" placeholder="https://your-rpc" />
+    <label>Contact email</label><input id="contact" placeholder="name@company.com" />
+    <div style="margin-top:1rem"><button id="submit">Register & Run Test</button></div>
+
+    <h3>Response</h3>
+    <pre id="out">None yet</pre>
+  </div>
+  <script>
+    document.getElementById('submit').addEventListener('click', async () => {
+      const payload = { name: document.getElementById('name').value, blockchain: document.getElementById('blockchain').value, role: document.getElementById('role').value, rpc: document.getElementById('rpc').value, contact: document.getElementById('contact').value };
+      const r = await fetch('/api/company', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j = await r.json();
+      document.getElementById('out').textContent = 'Registered ID: ' + j.id + '\n\nYou can now run a benchmark from main page and supply company_id=' + j.id + '\n\nWant early access? <a href="/presale.html">Join our presale</a> and request a demo.';
+    });
+  </script>
+</body>
+</html>

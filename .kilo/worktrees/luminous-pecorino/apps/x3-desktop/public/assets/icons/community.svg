@@ -1,0 +1,22 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="communityGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#26c6da;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00838f;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Center person -->
+  <circle cx="64" cy="36" r="10" fill="url(#communityGrad)"/>
+  <path d="M48 60 Q48 48 64 48 Q80 48 80 60 L80 72 L48 72Z" fill="url(#communityGrad)" opacity="0.85"/>
+  <!-- Left person -->
+  <circle cx="32" cy="52" r="8" fill="url(#communityGrad)" opacity="0.7"/>
+  <path d="M20 72 Q20 62 32 62 Q44 62 44 72 L44 82 L20 82Z" fill="url(#communityGrad)" opacity="0.6"/>
+  <!-- Right person -->
+  <circle cx="96" cy="52" r="8" fill="url(#communityGrad)" opacity="0.7"/>
+  <path d="M84 72 Q84 62 96 62 Q108 62 108 72 L108 82 L84 82Z" fill="url(#communityGrad)" opacity="0.6"/>
+  <!-- Connection lines -->
+  <line x1="48" y1="48" x2="38" y2="52" stroke="url(#communityGrad)" stroke-width="2" opacity="0.4"/>
+  <line x1="80" y1="48" x2="90" y2="52" stroke="url(#communityGrad)" stroke-width="2" opacity="0.4"/>
+  <!-- Globe arc -->
+  <path d="M16 100 Q64 80 112 100" fill="none" stroke="url(#communityGrad)" stroke-width="2" opacity="0.4"/>
+</svg>

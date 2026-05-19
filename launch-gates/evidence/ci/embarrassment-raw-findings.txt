@@ -1,0 +1,48 @@
+=== Scan Results ===
+
+--- PANIC ---
+✅ No matches
+
+--- UNWRAP ---
+✅ No matches
+
+--- TODO ---
+✅ No matches
+
+--- HARDCODED ---
+✅ No matches
+
+--- KEYS ---
+✅ No matches
+
+--- DEV ---
+✅ No matches
+
+--- MEMORY ---
+✅ No matches
+Suppressed 1 occurrences via launch-gates/embarrassment-suppressions.conf
+
+--- LOCALHOST ---
+✅ No matches
+Suppressed 3 occurrences via launch-gates/embarrassment-suppressions.conf
+
+--- ALICE ---
+✅ No matches
+
+--- SUDOS ---
+Found 2 occurrences:
+pallets/x3-cross-vm-router/src/lib.rs:473:            ensure_root(origin)?;
+pallets/x3-cross-vm-router/src/lib.rs:515:            ensure_root(origin)?;
+[1;33mSEVERITY: P2 (MEDIUM - Review governance origin usage)[0m
+
+--- Additional Checks ---
+
+=== Embarrassment Scanner Summary ===
+P0 (CRITICAL): 0
+P1 (HIGH): 0
+P2 (MEDIUM): 2
+P2 blocked by policy: 0
+Suppressed: 4
+Suppressed findings log: launch-gates/evidence/ci/embarrassment-suppressed-findings.txt
+Total: 2
+

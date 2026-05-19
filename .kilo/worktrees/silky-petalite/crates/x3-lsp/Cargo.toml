@@ -1,0 +1,46 @@
+[package]
+name = "x3-lsp"
+version = "0.1.0"
+edition = "2021"
+description = "Language Server Protocol implementation for X3 Chain"
+authors = ["X3 Chain Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/x3-chain/x3-chain"
+keywords = ["lsp", "language-server", "blockchain", "substrate"]
+categories = ["development-tools", "text-editors"]
+
+[[bin]]
+name = "x3-lsp"
+path = "src/main.rs"
+
+[dependencies]
+# LSP
+tower-lsp = "0.20"
+lsp-types = "0.94"
+
+# Async runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "io-std"] }
+
+# Serialization
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Parsing
+tree-sitter = "0.20"
+ropey = "1.6"
+
+# Utilities
+dashmap = "5.5"
+url = "2.5"
+regex = "1.10"
+
+[dev-dependencies]
+tokio-test = "0.4"

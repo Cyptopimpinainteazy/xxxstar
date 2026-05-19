@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Atomic Star Grants Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#0f1720;--surface2:#111827;--text:#f8fafc;--muted:#94a3b8;--accent:#5eead4;--accent2:#38bdf8;--border:#334155;--card:#111827;--danger:#fb7185;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:radial-gradient(circle at top, rgba(94,234,212,0.08), transparent 28%), #070b11;color:var(--text);font-family:'Roboto Mono',monospace;line-height:1.7;}
+nav{display:flex;align-items:center;justify-content:space-between;padding:22px 32px;background:rgba(4,8,15,0.95);backdrop-filter:blur(12px);position:sticky;top:0;z-index:50;border-bottom:1px solid rgba(148,163,184,0.12);}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:22px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;}
+nav a{color:var(--muted);text-decoration:none;font-size:12px;text-transform:uppercase;letter-spacing:0.18em;}
+nav a:hover{color:var(--text);}
+.hero{padding:84px 32px 40px;max-width:1200px;margin:0 auto;}
+.hero-kicker{font-size:11px;text-transform:uppercase;letter-spacing:0.3em;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size: clamp(48px, 6vw, 96px);line-height:0.95;letter-spacing:-0.06em;max-width:880px;margin-bottom:24px;color:#fff;}
+.hero-title span{color:var(--accent2);}
+.hero-copy{max-width:760px;font-size:16px;color:var(--muted);margin-bottom:32px;}
+.hero-actions{display:flex;flex-wrap:wrap;gap:14px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 26px;border-radius:999px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;font-size:12px;cursor:pointer;border:1px solid transparent;transition:transform 0.2s ease,background 0.2s ease;color:var(--text);}
+.btn:hover{transform:translateY(-1px);}
+.btn-primary{background:linear-gradient(135deg,#22d3ee,#38bdf8);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.04);border-color:rgba(148,163,184,0.16);color:var(--text);}
+.status-grid{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:18px;margin:44px auto 0;max-width:1200px;}
+.status-card{background:var(--surface);border:1px solid var(--border);padding:24px;border-radius:20px;}
+.status-card h3{font-family:'Big Shoulders Display',sans-serif;font-size:14px;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
+.status-card p{font-size:14px;color:var(--muted);}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin:48px auto 0;max-width:1200px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:26px;display:flex;flex-direction:column;gap:18px;transition:transform 0.2s ease,background 0.25s ease;}
+.card:hover{transform:translateY(-3px);background:rgba(255,255,255,0.03);}
+.card h4{font-family:'Big Shoulders Display',sans-serif;font-size:18px;color:#fff;}
+.card p{color:var(--muted);font-size:14px;}
+.card a{margin-top:auto;text-decoration:none;font-size:12px;text-transform:uppercase;font-weight:700;color:var(--accent2);letter-spacing:0.14em;}
+.section{padding:40px 32px;max-width:1200px;margin:0 auto;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:18px;color:#fff;}
+.section p{color:var(--muted);font-size:15px;max-width:860px;}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:30px;}
+.feature{background:var(--card);border:1px solid rgba(148,163,184,0.08);border-radius:18px;padding:24px;}
+.feature h3{font-size:16px;color:#fff;margin-bottom:10px;}
+.feature p{color:var(--muted);font-size:14px;}
+.cta-panel{background:linear-gradient(180deg,rgba(15,23,42,0.95),rgba(9,12,17,0.95));border:1px solid rgba(56,189,248,0.14);border-radius:24px;padding:36px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px;align-items:center;}
+.cta-panel h3{font-family:'Big Shoulders Display',sans-serif;font-size:24px;color:#fff;max-width:680px;}
+.cta-panel .cta-links{display:flex;flex-wrap:wrap;gap:14px;}
+.footer{padding:32px;max-width:1200px;margin:0 auto;color:var(--muted);font-size:13px;text-align:center;}
+@media(max-width:840px){.status-grid,.grid{grid-template-columns:1fr;}nav{flex-direction:column;align-items:start;gap:16px;} }
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links">
+    <a href="/x3star-landing.html">Home</a>
+    <a href="/x3star-grant-hub.html">Grant Hub</a>
+    <a href="/grants/index.html">Funding Lanes</a>
+    <a href="/x3star-transparency-ledger.html">Ledger</a>
+  </div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">X3 Atomic Star Funding Portal</div>
+  <h1 class="hero-title">Support proof-driven infrastructure for <span>BTC settlement, multi-VM execution, AI routing,</span> and post-quantum readiness.</h1>
+  <p class="hero-copy">This portal routes reviewers to focused grant lanes. Each lane is built for technical funders, not token hype: infrastructure, security, benchmarking, interoperability, and cloud testnet support.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="/grants/cloud-credits.html">Cloud Credits</a>
+    <a class="btn btn-secondary" href="/grants/public-goods-security.html">ProofForge Security</a>
+    <a class="btn btn-secondary" href="/grants/blockchain-interoperability.html">Atomic Gateway</a>
+  </div>
+</section>
+<section class="section">
+  <div class="status-grid">
+    <div class="status-card"><h3>Built</h3><p>ProofForge readiness framework, Atomic Kernel design, STARDEX integration spec, benchmark methodology.</p></div>
+    <div class="status-card"><h3>In Progress</h3><p>AI routing model prototype, GPU Reactor benchmark runner, xBTC settlement route, validator lab infrastructure.</p></div>
+    <div class="status-card"><h3>Funding Needed</h3><p>Cloud credits, open-source security dashboard, interoperability adapters, post-quantum proof integration.</p></div>
+    <div class="status-card"><h3>Audit / Review</h3><p>Independent readiness reports, PQC prototype review, validator and route security assessment.</p></div>
+  </div>
+</section>
+<section class="section">
+  <h2>Funding lanes</h2>
+  <p>Each lane is a separate grant page for a targeted funder: AI, quantum-security, GPU benchmarks, interoperability, public-goods, Bitcoin settlement, SBIR/defense, and cloud credits.</p>
+  <div class="grid">
+    <div class="card"><h4>AI Infrastructure</h4><p>StarSignal AI-assisted routing, risk scoring, validator monitoring, and execution intelligence.</p><a href="/grants/ai-infrastructure.html">View page →</a></div>
+    <div class="card"><h4>Post-Quantum Security</h4><p>Quantum-readiness program for validator identity, bridge attestations, wallet signing, and long-lived settlement.</p><a href="/grants/post-quantum-security.html">View page →</a></div>
+    <div class="card"><h4>GPU Validator Infrastructure</h4><p>X3 Reactor benchmark and validator stress infrastructure for reproducible performance proof.</p><a href="/grants/gpu-validator-infra.html">View page →</a></div>
+    <div class="card"><h4>Blockchain Interoperability</h4><p>Atomic Gateway cross-chain routing for BTC, EVM, SVM, and X3VM settlement.</p><a href="/grants/blockchain-interoperability.html">View page →</a></div>
+    <div class="card"><h4>Public Goods Security</h4><p>ProofForge readiness gates and open-source launch integrity tooling.</p><a href="/grants/public-goods-security.html">View page →</a></div>
+    <div class="card"><h4>BTC Settlement</h4><p>BTC Fortress xBTC liquidity and settlement path for multi-VM DeFi.</p><a href="/grants/btc-settlement.html">View page →</a></div>
+    <div class="card"><h4>SBIR / Defense</h4><p>Secure distributed infrastructure funding for critical systems, resilience, and proof reports.</p><a href="/grants/sbir-defense-infra.html">View page →</a></div>
+    <div class="card"><h4>Cloud Credits</h4><p>Infrastructure credits for validator/testnet nodes, RPC, monitoring, AI workloads, and benchmark grids.</p><a href="/grants/cloud-credits.html">View page →</a></div>
+  </div>
+</section>
+<section class="section">
+  <h2>Why X3</h2>
+  <div class="feature-grid">
+    <div class="feature"><h3>BTC + EVM + SVM + X3VM</h3><p>Four execution domains under one canonical settlement engine.</p></div>
+    <div class="feature"><h3>Atomic Kernel</h3><p>Canonical asset accounting prevents supply drift across cross-domain routes.</p></div>
+    <div class="feature"><h3>STARDEX DeFi layer</h3><p>Native liquidity and settlement support for BTC-derived assets and cross-chain routes.</p></div>
+    <div class="feature"><h3>Proof-driven launch</h3><p>Readiness gates, benchmark reports, invariant dashboards, and audit-focused deliverables.</p></div>
+  </div>
+</section>
+<section class="section">
+  <h2>What funding unlocks</h2>
+  <div class="feature-grid">
+    <div class="feature"><h3>Public Testnet</h3><p>Reliable validator and RPC infrastructure for real-world developer access.</p></div>
+    <div class="feature"><h3>Security Review</h3><p>Independent audit-readiness reports for PQC, settlement, and validator tooling.</p></div>
+    <div class="feature"><h3>Benchmark Reports</h3><p>Reproducible performance proof for validator and route infrastructure.</p></div>
+    <div class="feature"><h3>Developer SDKs</h3><p>Integration support and docs for ecosystem adapters and cross-chain tooling.</p></div>
+  </div>
+</section>
+<section class="section">
+  <div class="cta-panel">
+    <h3>Build the funding lanes that turn X3 Atomic Star into a public infrastructure program, not a single token narrative.</h3>
+    <div class="cta-links">
+      <a class="btn btn-primary" href="mailto:funding@x3star.io">Request grant packet</a>
+      <a class="btn btn-secondary" href="mailto:funding@x3star.io">Schedule technical review</a>
+    </div>
+  </div>
+</section>
+<footer class="footer">X3 Atomic Star | Grant pages for infrastructure, security, and validator funding. No mainnet claims unless explicitly configured. Post-quantum readiness is a roadmap and prototype track.</footer>
+</body>
+</html>

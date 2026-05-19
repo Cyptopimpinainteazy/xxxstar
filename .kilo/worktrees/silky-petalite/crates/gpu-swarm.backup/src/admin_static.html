@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>GPU Swarm - Local Node</title>
+    <style>
+      body { background:#0b0f14; color:#e6f0ff; font-family:Inter, sans-serif; padding:20px }
+      .card{background:#071021;padding:16px;border-radius:8px;margin-bottom:12px}
+      .row{display:flex;gap:8px;align-items:center}
+      button{background:#0aa; color:#001; padding:8px 12px;border-radius:6px;border:none}
+      input,select{padding:8px;border-radius:6px;border:1px solid #233}
+    </style>
+  </head>
+  <body>
+    <h1>GPU Swarm - Local Node</h1>
+    <div class="card">
+      <div class="row">
+        <div><strong>Enabled</strong></div>
+        <div><button id="toggle">Toggle</button></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div><strong>GPU Level</strong></div>
+        <div>
+          <select id="level"><option>low</option><option selected>medium</option><option>high</option></select>
+        </div>
+        <div><button id="apply">Apply</button></div>
+      </div>
+      <div style="margin-top:12px">
+        <div><strong>Schedule</strong></div>
+        <div class="row" style="margin-top:6px"><input id="sch_on" placeholder="on (HH:MM)" /><input id="sch_off" placeholder="off (HH:MM)" /><button id="sched_apply">Save</button></div>
+      </div>
+    </div>
+    <div class="card" id="metrics">
+      <div><strong>Rewards:</strong> <span id="rewards">0</span> X3</div>
+      <div><strong>Uptime:</strong> <span id="uptime">0s</span></div>
+      <div><strong>Score:</strong> <span id="score">0</span></div>
+    </div>
+
+    <script>
+      async function refresh(){
+        const res=await fetch('/api/state');
+        const s=await res.json();
+        document.getElementById('rewards').innerText = s.rewards.toFixed(2);
+        document.getElementById('uptime').innerText = s.uptime_seconds + 's';
+        document.getElementById('score').innerText = s.score;
+        document.getElementById('level').value = s.gpu_level || 'medium';
+      }
+      document.getElementById('toggle').addEventListener('click', async ()=>{
+        const res=await fetch('/api/state'); const s=await res.json(); s.enabled = !s.enabled; await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)}); refresh();
+      });
+      document.getElementById('apply').addEventListener('click', async ()=>{
+        const res=await fetch('/api/state'); const s=await res.json(); s.gpu_level = document.getElementById('level').value; await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)}); refresh();
+      });
+      document.getElementById('sched_apply').addEventListener('click', async ()=>{
+        const res=await fetch('/api/state'); const s=await res.json(); s.schedule_on = document.getElementById('sch_on').value || null; s.schedule_off = document.getElementById('sch_off').value || null; await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)}); refresh();
+      });
+      setInterval(refresh,2000); refresh();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,468 @@
+[workspace]
+exclude = [
+    "quantum-kernel-voyager/src-tauri",
+    "apps/x3-desktop/src-tauri",
+    "apps/inferstructor-dashboard/src-tauri",
+    # X3-contracts is a separate dual-stack contracts workspace
+    # (Foundry for EVM, Anchor for SVM). Excluding it prevents the parent
+    # cargo from picking up SVM program crates and confusing build graphs.
+    "X3-contracts",
+]
+members = [
+    "pallets/x3-kernel",
+    "pallets/atomic-trade-engine",
+    "pallets/governance",
+    "pallets/treasury",
+    "pallets/agent-accounts",
+    "pallets/agent-memory",
+    "pallets/svm-runtime",
+    "pallets/evolution-core",
+    "pallets/x3-verifier",
+    "pallets/x3-domain-registry",
+    "pallets/x3-settlement-engine",
+    "pallets/meme-overlord",
+    "pallets/swarm",
+    "pallets/x3-wallet-pallet",
+    "crates/x3-parallel-executor",
+    "crates/x3-appzone-factory",
+    "crates/x3-pq",
+    "crates/evm-integration",
+    "crates/svm-integration",
+    "crates/svm-counter",
+    "crates/cross-vm-bridge",
+    "crates/external-chains",
+    "crates/x3-bridge",
+    "crates/x3-atomic-trade",
+    "crates/x3-sdk",
+    "crates/x3-cli",
+    "crates/x3-wallet",
+    "crates/x3-indexer",
+    "crates/x3-gateway",
+    "crates/x3-circuit-breaker",
+    "crates/x3-lsp",
+    "crates/x3-integration",
+    "crates/x3-gpu-validator-swarm",
+    "crates/x3-swarm-core",
+    "crates/x3-sidecar",
+    "crates/x3-readiness",
+    "crates/x3-evolution-core",
+    "crates/x3-swarm-core/services/x3-swarm-api",
+    "crates/x3-swarm-core/services/x3-swarm-worker",
+    "crates/x3-evolution",
+    "crates/quantum-swarm",
+    "crates/chronos-flash",
+    "crates/voice-to-x3",
+    "crates/dream-mining",
+    "crates/quantum-crypto",
+    "crates/apotheosis-tx",
+    "crates/tps-tracker",
+    "runtime",
+    "node",
+    "apps/analytics/analytics-service",
+    "crates/x3-common",
+    "crates/x3-lexer",
+    "crates/x3-ast",
+    "crates/x3-parser",
+    "crates/x3-hir",
+    "crates/x3-mir",
+    "crates/x3-semantics",
+    "crates/x3-typeck",
+    "crates/x3-backend",
+    "crates/x3-vm",
+    "crates/x3-opt",
+    "crates/x3-bench",
+    "crates/x3-compiler",
+    "crates/x3-verifier",
+    "crates/x3-dns-server",
+    "crates/invariant-macros",
+    "crates/x3-proof",
+    "crates/x3-slash",
+    "crates/x3-fees",
+    "crates/x3-intent",
+    "crates/x3-agent",
+    "crates/x3-court",
+    "crates/x3-flashloan",
+    "crates/x3-dex",
+    "crates/x3-swap-router",
+    "pallets/depin-marketplace",
+    "pallets/private-execution",
+    "crates/contention-predictor",
+    "crates/parallel-proposer",
+    "crates/private-mempool",
+    "crates/confidential-gpu",
+    "crates/x3-bot",
+    "crates/atomic-swap-orchestrator",
+    "crates/x3-turbine",
+    # Phase 3-6: Audit implementation — Flash Finality, PoH, Atomic Kernel, Parallel Proposer
+    "crates/flash-finality",
+    "crates/poh-generator",
+    "pallets/x3-atomic-kernel",
+    "pallets/x3-sequencer",
+    "pallets/x3-da",
+    "pallets/fraud-proofs",
+    "pallets/x3-slash",
+    "crates/x3-atomic-client",
+    "crates/cross-vm-coordinator",
+    "crates/cross-chain-gpu-validator",
+    # vΩ-1.0 Master Architecture additions — constitutional engine, epoch proofs, launch validator
+    "crates/x3-constitution",
+    "crates/x3-launch-validator",
+    # On-chain invariant enforcement pallet (Article IV / checklist §10)
+    "pallets/x3-invariants",
+    # Native oracle pallet for decentralized price feeds
+    "pallets/x3-oracle",
+    # VRF pallet for verifiable randomness
+    "pallets/x3-vrf",
+    # Automation pallet for keeper network
+    "pallets/x3-automation",
+    # DEX pallet for AMM operations
+    "pallets/x3-dex",
+    # Concrete implementations of x3-vm BalanceProvider + CrossVmEscrow for node use
+    "crates/x3-bridge-adapters",
+    "crates/cross-chain-position-manager",
+    "crates/custody-service",
+    "crates/x3-orchestra-control-plane",
+    "crates/x3-orchestrator",
+    "crates/x3-rpc",
+    # Phase 4: Unified RPC operational policy layer (health scoring + failover)
+    "crates/x3-rpc-policy",
+    "crates/x3-relayer",
+    "crates/x3-bridge-security-council",
+    "crates/x3-finality-oracle",
+    "crates/x3-verification-router",
+    "crates/x3-validator-attestation",
+    "crates/x3-proof-dispute",
+    "crates/x3-gateway-risk-engine",
+    "crates/x3-vrf",
+    "crates/x3-automation",
+    "crates/x3-swap-router",
+    "crates/x3-genesis-builder",
+    "tests/e2e",
+        # Phase 4.5: Liquidity, Inventory, and Solvency control plane
+        "pallets/x3-inventory",
+        "pallets/x3-reservation",
+        "pallets/x3-solvency",
+        "pallets/x3-rebalance",
+        "pallets/x3-partner",
+        "pallets/x3-treasury-policy",
+        # Universal Asset Kernel (MVP / Level 1 — cross-VM only)
+        "crates/x3-asset-kernel-types",
+        "pallets/x3-asset-registry",
+        "pallets/x3-account-registry",
+        "pallets/x3-supply-ledger",
+        "crates/x3-packet-schema",
+        "pallets/x3-cross-vm-router",
+        "pallets/x3-token-factory",
+        "tools/launchops",
+        # Dispute resolution (Article III: Deterministic Court)
+        "pallets/x3-jury-anchor",
+        # Phase 0: Sprint 0 Infrastructure
+        "crates/x3-readiness-report",
+        # v0.4 internal-mainnet path: packet lifecycle + IXL instruction layer
+        "crates/x3-packet-standard",
+        "crates/x3-ixl",
+        "crates/x3-parallel-executor",
+        "crates/x3-appzone-factory",
+        "crates/x3-liquidity-core",
+        "crates/x3-universal-contracts",
+        # On-chain custody map and signer separation (validator key vs. treasury key)
+        "pallets/x3-custody",
+        # Phase 3: Canonical accounting event types for the X3 revenue spine
+        "crates/x3-accounting-events",
+        # Phase 9: Canonical truth types — identity, asset, and treasury models (shared types lib)
+        "crates/x3-canonical-truth",
+        # Phase 2: Canonical security event types for the security swarm spine
+        "crates/x3-security-events",
+        # ProofForge: Complete proof system for X3 blockchain (v0-v7)
+        "proof-forge",
+        # Phase 1: Testnet proving harness binary
+        "proving",
+        # Note: crates/dylint-determinism is intentionally NOT listed here.
+    # It is a standalone workspace (has its own [workspace] and rust-toolchain.toml)
+    # compiled by `cargo dylint` with nightly+rustc-dev via workspace.metadata.dylint.
+        # Phase 5: Supply reconciliation and governance power mapping
+        "pallets/x3-reconciliation",
+        # Phase 5: On-chain wrapped X3 token — cross-chain mint/burn + governance power
+        "pallets/x3-wrapped",
+        # Phase 6: English auction pallet
+        "pallets/x3-auction",
+        # Phase 7: Token launchpad/presale pallet
+        "pallets/x3-launchpad",
+        # Phase 8: On-chain dApp hub — listing, compliance tier, throttle, revenue share
+        "pallets/x3-dapp-hub",
+        # Phase 8: Revenue-split types crate (shared by dApp hub and marketplace)
+        "crates/x3-revenue-sharing",
+        # Phase 10: AI compute marketplace — bot rental, premium execution, swarm sessions
+        "pallets/x3-compute-market",
+        # Phase 11: Weekly chain proving cycle — onboarding pipeline types and scoring model
+        "crates/x3-chain-onboarding",
+        # Phase 12: A-tier hard metrics tracking — throughput, TVL, routes, DAU, incidents
+        "crates/x3-metrics-tracker",
+        # Flash loan pallet: atomic borrow-use-repay with repay-or-revert invariant
+        "pallets/x3-flashloan",
+]
+default-members = ["node"]
+resolver = "2"
+
+# Patch multiple crates to use wasm32-compatible versions:
+# - ahash 0.8.11: uses getrandom 0.2 (instead of 0.3)
+# - rustix 0.38.21: patched to use errno 0.2 (instead of 0.3)
+# - tempfile 3.8.1: uses compatible rustix
+# - errno 0.3.14: patched to provide stub implementation for wasm32
+
+# Unified Substrate patch block is defined further down in this file
+# (auto-generated from cargo metadata). Removed earlier compact/duplicate
+# patch entries to avoid duplicate-key errors; keep the comprehensive
+# `[patch.crates-io]` block below which pins the workspace to rev 948fbd2.
+
+[workspace.metadata.dylint]
+libraries = [
+    { path = "crates/dylint-determinism" },
+]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+
+# SCALE codec & metadata (workspace shared deps)
+[workspace.dependencies]
+parity-scale-codec = { version = "3.6.5", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false, features = ["derive"] }
+scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
+curve25519-dalek = "3.2.1"
+hex = { version = "0.4.3", default-features = false }
+uuid = { version = "1.8.0", features = ["v4"], default-features = false }
+tracing = { version = "0.1.37", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false }
+anyhow = { version = "1.0", default-features = false }
+tokio = { version = "1.0", features = ["full"], default-features = false }
+
+
+
+# Common FRAME & Substrate workspace deps (referenced with `workspace = true` in members)
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false, features = ["experimental"] }
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+frame-system-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+frame-benchmarking-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+frame-try-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+frame-executive = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-scheduler = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-preimage = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-transaction-payment = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-collective = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-sudo = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-offchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-runtime-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false, features = ["disable_target_static_assertions"] }
+sp-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-version = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-weights = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+log = { version = "0.4.20", default-features = false }
+serde = { version = "1.0.195", features = ["derive"], default-features = false }
+substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-staking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-offences = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+
+# Substrate client (node) workspace deps used by `node` member
+sc-basic-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-chain-spec = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-executor = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-keystore = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-network = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-network-gossip = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-rpc-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-service = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-telemetry = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sc-transaction-pool-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+
+# Utilities
+futures = "0.3.30"
+hex-literal = "0.4.1"
+once_cell = "1.19.0"
+serde_json = "1.0.111"
+thiserror = "1.0.51"
+
+# X3 Chain new pallets & crates (DEPIN-GPU-001, EXEC-PREDICT-002, PRIV-ENCLAVE-003)
+pallet-depin-marketplace = { path = "pallets/depin-marketplace", default-features = false }
+pallet-private-execution = { path = "pallets/private-execution", default-features = false }
+contention-predictor = { path = "crates/contention-predictor" }
+private-mempool = { path = "crates/private-mempool" }
+confidential-gpu = { path = "crates/confidential-gpu" }
+
+# SputnikVM — no-std EVM interpreter (used by x3-evm-integration WASM path)
+evm = { git = "https://github.com/rust-blockchain/evm", rev = "b7b82c7e1fc57b7449d6dfa6826600de37cc1e65", default-features = false }
+
+# Frontier EVM dependencies for real EVM execution
+pallet-evm = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+pallet-ethereum = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+pallet-base-fee = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+pallet-evm-precompile-simple = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+pallet-evm-precompile-modexp = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+pallet-evm-precompile-sha3fips = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fp-rpc = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fp-evm = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false, features = ["serde"] }
+fp-ethereum = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fp-self-contained = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fc-rpc = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fc-rpc-core = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fc-db = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fc-mapping-sync = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+fc-storage = { git = "https://github.com/polkadot-evm/frontier", branch = "stable2512", default-features = false }
+
+# Solana BPF/SVM dependencies for real SVM execution
+solana_rbpf = { version = "0.8", default-features = false }
+
+# Align proc-macro2 across workspace to avoid cargo feature-resolution mismatches
+proc-macro2 = { version = "1.0.103", features = ["span-locations"] }
+
+# Force versions that use getrandom 0.2 (wasm32-compatible)
+# Note: getrandom 0.2 doesn't exist in dependencies, but constraining these
+# prevents newer versions from being pulled in
+ahash = { version = "0.8.11" }
+tempfile = { version = "3.8.1" }
+# Pin base64ct to avoid edition2024 requirement in newer versions
+base64ct = { version = "=1.6.0" }
+
+# CLI & RPC ecosystem
+clap = { version = "4.4.18", features = ["derive"] }
+jsonrpsee = { version = "0.24.10", default-features = false, features = ["macros", "client", "server"] }
+
+# Build profiles - reduce codegen-units to avoid LLVM SIGSEGV crashes in 1.85
+[profile.release]
+codegen-units = 1
+lto = false
+opt-level = 2
+
+[profile.release.build-override]
+opt-level = 1
+codegen-units = 1
+
+# [package.metadata.tarpaulin]
+# run-types = ["Tests"]
+# ignore-tests = []
+# output-dir = "target/tarpaulin"
+
+# [package.metadata.cargo-tarpaulin]
+# fail-under = 80
+
+# [package.metadata.cargo-tarpaulin.coverage]
+# formats = ["Html", "Xml", "Json"]
+
+# Patches for Substrate dependencies - using consistent git rev
+[patch.crates-io]
+# Pin home to a rustc 1.85 compatible release (local patch).
+home = { path = "patches/home" }
+# Enable bulk-memory opcode parsing (0xFC prefix) so Substrate can deserialize rustc-generated WASM.
+parity-wasm = { path = "patches/parity-wasm" }
+# Make wasm-instrument compatible with bulk instructions when parity-wasm/bulk is enabled.
+wasm-instrument = { path = "patches/wasm-instrument" }
+# Override wasmtime to v42.0.2 to fix CRITICAL security vulnerabilities (RUSTSEC-2026-*)
+# polkadot-stable2512 released March 31, 2026 before April 9, 2026 CVE disclosures
+# Note: wasmtime override removed due to patch conflicts - manual update needed
+# Fix environmental macro compatibility
+environmental = { path = "patches/environmental" }
+# Fix substrate-prometheus-endpoint protobuf type mismatch (Vec -> RepeatedField)
+substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+# Fix errno WASM compatibility by providing stub implementation for wasm32 targets
+errno = { path = "patches/errno" }
+# Pin ar_archive_writer to a rustc 1.85 compatible implementation.
+# NOTE: currently unused in the active dependency graph.
+# ar_archive_writer = { path = "patches/ar_archive_writer" }
+# Fix getrandom for wasm32-unknown-unknown (Substrate WASM runtime)
+getrandom = { path = "patches/getrandom" }
+# core2 0.4.0 was yanked from crates.io; pin to local copy.
+core2 = { path = "patches/core2" }
+# Patch native crates that pulled getrandom 0.3/0.4 back down to 0.2.17
+fastbloom = { path = "patches/fastbloom" }
+jobserver = { path = "patches/jobserver" }
+quinn-proto = { path = "patches/quinn-proto" }
+rand_core = { path = "patches/rand_core" }
+tempfile = { path = "patches/tempfile" }
+uuid = { path = "patches/uuid" }
+memfd = { path = "patches/memfd" }
+# Fix ahash to use getrandom 0.2 instead of 0.3 (0.3 doesn't support wasm32-unknown-unknown)
+ahash = { path = "patches/ahash" }
+# Stub icu_properties to avoid rustc ICE on string literal unescaping.
+# Disabled until the lockfile resolves a crate graph that actually uses it,
+# otherwise cargo warns on every workspace invocation that the patch is unused.
+# icu_properties = { path = "patches/icu_properties_stub" }
+# Patch idna_adapter to work with our icu_properties_stub GeneralCategory newtype
+idna_adapter = { path = "patches/idna_adapter" }
+# Force sp-io to use patched Substrate git version (don't use crates.io 23.0.0 which lacks wasm support)
+# NOTE: [patch] entries do not support default-features/features — those fields are silently ignored.
+sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+
+# Experimental: attempt to unify `curve25519-dalek` across workspace to satisfy Solana and Substrate consumers
+# REVERTED: workspace unification proved incompatible with pinned Substrate deps — keeping isolated SVM integration test instead
+# (was: curve25519-dalek = { git = "https://github.com/dalek-cryptography/curve25519-dalek", tag = "3.2.1" })
+# Also patch getrandom 0.1.16 to version alias - leave upstream (substrate uses it differently)
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+# sc-service = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+# NOTE: currently unused in the active dependency graph (sc-service is resolved from polkadot-stable2512).
+# Redirect crates.io sp-* references (pulled by Frontier/WASM build) to the git
+# version so that workspace feature `disable_target_static_assertions` propagates
+# and prevents host-target assert_eq_size!(usize, u32) failures on x86_64.
+sp-runtime-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-runtime-interface-proc-macro = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-storage = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-tracing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-wasm-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+
+# Patch polkadot-sdk with local modifications for prometheus fix and executor bulk-memory support
+[patch."https://github.com/paritytech/polkadot-sdk"]
+substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+# X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
+# that the BuildGenesisConfig trait bound `MaybeSerializeDeserialize` is satisfied in no_std
+# wasm32 builds when sp-runtime/serde is enabled. Required for clean wasm runtime build under
+# polkadot-sdk stable2512.
+frame-support-procedural = { path = "patches/frame-support-procedural" }
+# sc-network patches removed due to SDK version mismatches (stable2603 vs stable2512)
+# Using SDK versions directly instead
+# sc-network = { path = "patches/sc-network" }
+# sc-network-common = { path = "patches/sc-network/common" }
+# sc-network-light = { path = "patches/sc-network/light" }
+# sc-network-sync = { path = "patches/sc-network/sync" }
+# sc-network-transactions = { path = "patches/sc-network/transactions" }
+
+[patch."https://github.com/polkadot-evm/frontier"]
+# trie-db is not in the frontier git repo so no patch needed here
+cumulus-primitives-storage-weight-reclaim = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+cumulus-primitives-proof-size-hostfunction = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+
+# Patch Frontier (polkadot-evm) sp-io to match workspace version and avoid duplicate panic_impl

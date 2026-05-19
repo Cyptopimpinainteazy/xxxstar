@@ -1,0 +1,30 @@
+agent:
+  name: Sentinel-Watcher
+  class: Sentinel
+  role: Threat Detection
+  permissions:
+    - read_mempool
+    - read_contracts
+    - read_wallet_graphs
+    - read_validator_telemetry
+    - read_orchestrator_events
+  constraints:
+    - no_write_access
+    - no_external_calls
+    - no_direct_actions
+    - evidence_required
+  thresholds:
+    anomaly_score: 0.70
+    escalation_min: 0.80
+  outputs:
+    format: json
+    destination: Sentinel-Judge
+  lifecycle:
+    immutable_identity: true
+    ephemeral_instance: true
+    renewal_required: true
+    kill_switch_enabled: true
+  reward_model:
+    false_positive_penalty: high
+    restraint_bonus: true
+    early_detection_bonus: moderate

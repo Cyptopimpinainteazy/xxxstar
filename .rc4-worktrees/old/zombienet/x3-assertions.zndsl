@@ -1,0 +1,29 @@
+Description: X3 chain - 3-validator finality and block production
+
+Network: zombienet/x3-local-testnet.toml
+Creds: config
+
+# ── Alice must be producing blocks ────────────────────────────────────────────
+alice: is up
+alice: reports node_roles is 4
+alice: reports best block height is at least 1 within 60 secs
+alice: reports finalized block height is at least 1 within 120 secs
+
+# ── Bob must be producing blocks ──────────────────────────────────────────────
+bob: is up
+bob: reports best block height is at least 1 within 60 secs
+bob: reports finalized block height is at least 1 within 120 secs
+
+# ── Charlie must be producing blocks ─────────────────────────────────────────
+charlie: is up
+charlie: reports best block height is at least 1 within 60 secs
+charlie: reports finalized block height is at least 1 within 120 secs
+
+# ── All peers connected ────────────────────────────────────────────────────────
+alice: reports peers count is at least 2 within 30 secs
+bob: reports peers count is at least 2 within 30 secs
+charlie: reports peers count is at least 2 within 30 secs
+
+# ── Chain advancing (not stalled) ─────────────────────────────────────────────
+alice: reports best block height is at least 5 within 180 secs
+alice: reports finalized block height is at least 3 within 180 secs

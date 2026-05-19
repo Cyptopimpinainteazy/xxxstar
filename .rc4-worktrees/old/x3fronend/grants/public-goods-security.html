@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Atomic Star ProofForge</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#111827;--text:#eef2ff;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;--card:#0f1720;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 32px;background:rgba(5,10,18,0.96);border-bottom:1px solid rgba(148,163,184,0.12);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:20px;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;}
+nav a{font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);text-decoration:none;}
+.hero{padding:72px 32px 24px;max-width:1120px;margin:0 auto;}
+.hero-kicker{font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(48px,6vw,86px);line-height:0.92;max-width:860px;margin-bottom:22px;color:#fff;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;text-decoration:none;transition:transform 0.2s ease,background 0.2s ease;}
+.btn-primary{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(148,163,184,0.14);}
+.btn:hover{transform:translateY(-1px);}
+.container{max-width:1120px;margin:0 auto;padding:0 32px;}
+.section{margin-top:36px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:30px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:900px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px;}
+.card{background:var(--card);border:1px solid rgba(148,163,184,0.08);border-radius:20px;padding:24px;}
+.card h3{font-size:18px;color:#fff;margin-bottom:10px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card ul{margin-top:12px;list-style:none;padding-left:0;display:grid;gap:10px;}
+.card li{padding-left:18px;position:relative;color:var(--muted);font-size:14px;}
+.card li:before{content:'▹';position:absolute;left:0;top:0;color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:18px;margin-top:28px;}
+.status{background:#0f1720;border:1px solid rgba(56,189,248,0.14);border-radius:18px;padding:22px;}
+.status h4{font-size:13px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:12px;}
+.status p{color:var(--muted);font-size:14px;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/grants/index.html">Grants Portal</a><a href="/x3star-grant-hub.html">Grant Hub</a><a href="/x3star-landing.html">Home</a></div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">ProofForge</div>
+  <h1 class="hero-title">Open-source readiness gates for safer blockchain launches.</h1>
+  <p class="hero-copy">ProofForge is the X3 system for comparing claims to code, tests, configs, and launch readiness. It is designed for public-goods funders and security-first reviewers who want machine-verifiable proof, not marketing assertions.</p>
+  <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Fund ProofForge</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request demo report</a></div>
+</section>
+<div class="container">
+  <div class="section">
+    <h2>Problem</h2>
+    <p>Crypto projects routinely overclaim readiness. Docs drift from code. Tests rot. Security gaps hide behind polished marketing language. Grant committees need evidence, not promises.</p>
+  </div>
+  <div class="section">
+    <h2>X3 solution</h2>
+    <p>ProofForge generates machine-readable readiness reports by comparing feature claims against code, tests, configs, and launch gate data. It creates an honest audit trail for what is built, what is missing, and what still needs funding.</p>
+    <div class="row">
+      <div class="card"><h3>Claim-to-code matrix</h3><p>Track every launch claim back to a code pointer, test, or audit artifact. This is the basis for credible grant applications.</p></div>
+      <div class="card"><h3>Docs drift detector</h3><p>Detect when documentation and public messaging fall out of sync with implementation, then generate remediation tasks.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Technical architecture</h2>
+    <div class="row">
+      <div class="card"><h3>Feature matrix engine</h3><p>Structured model that maps launch criteria to code, runtime invariants, and documentation references.</p></div>
+      <div class="card"><h3>Invariant readiness dashboard</h3><p>Displays build status, test coverage, panic/unwrap audit results, and GO/NO-GO signal quality.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>What is already built</h2>
+    <div class="card"><ul><li>Launch gate scorecards and feature claim tracking in X3 site.</li><li>ProofForge concept for audit-readiness reporting.</li><li>Initial readiness data from the grant hub and benchmark dashboard.</li></ul></div>
+  </div>
+  <div class="section">
+    <h2>What funding unlocks</h2>
+    <div class="row">
+      <div class="card"><h3>Open-source CLI</h3><p>Grant the community direct access to readiness reports and evidence packs.</p></div>
+      <div class="card"><h3>Dashboard</h3><p>Publish an interactive readiness scorecard for external reviewers and funders.</p></div>
+      <div class="card"><h3>GitHub Action</h3><p>Automate proof updates for pull requests and release candidates.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Milestone roadmap</h2>
+    <div class="row">
+      <div class="card"><h3>Phase 1</h3><p>Build the claim-to-code matrix, docs drift detector, and readiness report schema.</p></div>
+      <div class="card"><h3>Phase 2</h3><p>Ship the open-source CLI and dashboard with grant-ready evidence packs.</p></div>
+      <div class="card"><h3>Phase 3</h3><p>Publish launch integrity reports and integrate with X3 testnet readiness gating.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Funding use breakdown</h2>
+    <div class="status-grid">
+      <div class="status"><h4>Open-source toolchain</h4><p>40% for CLI, dashboard, and automation.</p></div>
+      <div class="status"><h4>Evidence packs</h4><p>30% for structured reports, templates, and grant-ready deliverables.</p></div>
+      <div class="status"><h4>Security review</h4><p>20% for external validation and audit support.</p></div>
+      <div class="status"><h4>Community publishing</h4><p>10% for public release, docs, and outreach.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proof / demo</h2>
+    <p>ProofForge will deliver an honest readiness report for X3 Atomic Star with green/yellow/red status, supporting artifacts, and a public launch integrity summary.</p>
+  </div>
+  <div class="section">
+    <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Fund ProofForge</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request demo report</a></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Funding Admin — X3 Funding Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#111827;--text:#eef2ff;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;--card:#0f1720;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;line-height:1.75;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:24px 32px;background:rgba(5,10,18,0.96);border-bottom:1px solid rgba(148,163,184,0.14);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:22px;letter-spacing:0.18em;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;flex-wrap:wrap;}
+nav a{color:var(--muted);text-decoration:none;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;}
+nav a:hover{color:#fff;}
+.container{max-width:1080px;margin:0 auto;padding:40px 32px;}
+.hero{margin-bottom:24px;}
+.hero-kicker{font-size:11px;text-transform:uppercase;letter-spacing:0.3em;color:var(--accent);margin-bottom:16px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(42px,5vw,68px);line-height:1.0;margin-bottom:22px;color:#fff;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:28px;}
+.card{background:var(--card);border:1px solid rgba(56,189,248,0.14);border-radius:20px;padding:26px;}
+.card h3{font-size:18px;color:#fff;margin-bottom:12px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.table-wrapper{overflow-x:auto;margin-top:28px;}
+.table{width:100%;border-collapse:collapse;}
+.table th,.table td{padding:14px 16px;text-align:left;border-bottom:1px solid rgba(148,163,184,0.12);}
+.table th{font-size:12px;text-transform:uppercase;letter-spacing:0.13em;color:var(--accent);}
+.table td{font-size:14px;color:var(--muted);}
+.badge{display:inline-flex;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;background:rgba(56,189,248,0.14);color:#dbeafe;}
+.btn{display:inline-flex;align-items:center;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;border:none;cursor:pointer;transition:opacity 0.15s;}
+.btn:hover{opacity:0.75;}
+.btn-approve{background:rgba(34,197,94,0.18);color:#86efac;}
+.btn-reject{background:rgba(239,68,68,0.18);color:#fca5a5;}
+.btn-changes{background:rgba(234,179,8,0.18);color:#fde047;}
+.btn-note{background:rgba(148,163,184,0.12);color:var(--muted);}
+.note-input{background:#0d1520;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);width:110px;font-family:inherit;}
+.actions-cell{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:220px;}
+.notes-cell{max-width:160px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.footer{margin-top:40px;padding:24px 32px;color:var(--muted);font-size:13px;text-align:center;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/funding/index.html">Funding Home</a><a href="/funding/portal.html">Portal</a><a href="/funding/provider.html">Provider</a><a href="/funding/scoreboard.html">Scoreboard</a><a href="/funding/email-reputation.html">Email Ops</a></div>
+</nav>
+<div class="container">
+  <section class="hero">
+    <div class="hero-kicker">Admin Dashboard</div>
+    <h1 class="hero-title">Review funding applications and intake submissions.</h1>
+    <p class="hero-copy">This dashboard illustrates how the admin workflow can consume funding applications, program status, and service provider intake data.</p>
+  </section>
+  <div class="stats" id="stats"></div>
+  <div class="card" style="margin-top:30px;"><h3>Recent application intake</h3><div class="table-wrapper"><table class="table" id="applications-table"><thead><tr><th>ID</th><th>Project</th><th>Org</th><th>Lane</th><th>Amount</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+  <div class="card" style="margin-top:24px;"><h3>Recent provider intakes</h3><div class="table-wrapper"><table class="table" id="intakes-table"><thead><tr><th>ID</th><th>Company</th><th>Email</th><th>Lane</th><th>Created</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+<footer class="footer">This admin interface is a proof-of-concept for internal funding review workflows.</footer>
+<script>
+async function fetchData() {
+  const [scoreboardResponse, applicationsResponse, intakesResponse] = await Promise.all([
+    fetch('/api/site/funding/scoreboard'),
+    fetch('/api/site/funding/applications'),
+    fetch('/api/site/funding/intakes'),
+  ]);
+  const scoreboard = await scoreboardResponse.json();
+  const apps = await applicationsResponse.json();
+  const intakes = await intakesResponse.json();
+  renderMetrics(scoreboard.data.summary);
+  renderApplications(apps.data.applications);
+  renderIntakes(intakes.data.intakes);
+}
+
+function renderMetrics(summary) {
+  const container = document.getElementById('stats');
+  container.innerHTML = ['totalPrograms','totalApplications','totalIntakes'].map((key) => {
+    const label = {
+      totalPrograms: 'Programs',
+      totalApplications: 'Applications',
+      totalIntakes: 'Intakes',
+    }[key];
+    return `<div class="card"><h3>${label}</h3><p>${summary[key].toLocaleString()}</p></div>`;
+  }).join('');
+}
+
+function renderApplications(items) {
+  const body = document.querySelector('#applications-table tbody');
+  body.innerHTML = items.slice(0, 20).map((item) => {
+    const lastNote = (item.reviewerNotes || []).slice(-1)[0] || '';
+    return `<tr>
+      <td>${item.id}</td>
+      <td>${item.projectName || item.name || 'N/A'}</td>
+      <td>${item.organization || '—'}</td>
+      <td>${item.fundingLane || 'N/A'}</td>
+      <td>${item.requestedUsd ? '$' + Number(item.requestedUsd).toLocaleString() : '—'}</td>
+      <td><span class="badge">${String(item.status).toUpperCase()}</span></td>
+      <td class="notes-cell" title="${lastNote}">${lastNote || '—'}</td>
+      <td class="actions-cell">
+        <button class="btn btn-approve" onclick="patchApplication('${item.id}','approved')">✓ Approve</button>
+        <button class="btn btn-reject" onclick="patchApplication('${item.id}','rejected')">✗ Reject</button>
+        <button class="btn btn-changes" onclick="patchApplication('${item.id}','changes_requested')">↩ Changes</button>
+        <input class="note-input" id="anote-${item.id}" placeholder="Add note…">
+        <button class="btn btn-note" onclick="addApplicationNote('${item.id}')">Note</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderIntakes(items) {
+  const body = document.querySelector('#intakes-table tbody');
+  body.innerHTML = items.slice(0, 20).map((item) => {
+    const lastNote = (item.reviewerNotes || []).slice(-1)[0] || '';
+    return `<tr>
+      <td>${item.id}</td>
+      <td>${item.company || item.organization || 'N/A'}</td>
+      <td>${item.contactEmail || item.email || '—'}</td>
+      <td>${item.fundingLane || 'N/A'}</td>
+      <td>${new Date(item.createdAt).toLocaleDateString()}</td>
+      <td><span class="badge">${String(item.status).toUpperCase()}</span></td>
+      <td class="notes-cell" title="${lastNote}">${lastNote || '—'}</td>
+      <td class="actions-cell">
+        <button class="btn btn-approve" onclick="patchIntake('${item.id}','approved')">✓ Approve</button>
+        <button class="btn btn-reject" onclick="patchIntake('${item.id}','rejected')">✗ Reject</button>
+        <button class="btn btn-changes" onclick="patchIntake('${item.id}','changes_requested')">↩ Changes</button>
+        <input class="note-input" id="inote-${item.id}" placeholder="Add note…">
+        <button class="btn btn-note" onclick="addIntakeNote('${item.id}')">Note</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function patchApplication(id, status) {
+  await fetch(`/api/site/funding/applications/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  fetchData();
+}
+
+async function addApplicationNote(id) {
+  const input = document.getElementById(`anote-${id}`);
+  const note = input ? input.value.trim() : '';
+  if (!note) return;
+  await fetch(`/api/site/funding/applications/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ reviewerNotes: note }),
+  });
+  fetchData();
+}
+
+async function patchIntake(id, status) {
+  await fetch(`/api/site/funding/intakes/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  fetchData();
+}
+
+async function addIntakeNote(id) {
+  const input = document.getElementById(`inote-${id}`);
+  const note = input ? input.value.trim() : '';
+  if (!note) return;
+  await fetch(`/api/site/funding/intakes/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ reviewerNotes: note }),
+  });
+  fetchData();
+}
+
+fetchData().catch((error) => {
+  const container = document.querySelector('.container');
+  container.insertAdjacentHTML('beforeend', `<div class="card"><p style="color:#f87171;">Admin dashboard load error: ${error.message}</p></div>`);
+});
+</script>
+</body>
+</html>

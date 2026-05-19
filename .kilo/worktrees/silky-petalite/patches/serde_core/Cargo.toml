@@ -1,0 +1,15 @@
+[package]
+name = "serde_core"
+version = "1.0.228"
+edition = "2021"
+description = "Local stub: redirects serde_core to the real serde crate"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", default-features = false }
+
+[features]
+default = ["std"]
+std = ["serde/std"]
+alloc = ["serde/alloc"]
+derive = ["serde/derive"]

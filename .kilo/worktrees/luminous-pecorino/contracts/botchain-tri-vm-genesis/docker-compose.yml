@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # === HARDHAT LOCAL BLOCKCHAIN ===
+  hardhat:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./hardhat:/app
+      - hardhat_modules:/app/node_modules
+    command: sh -c "npm install && npx hardhat node --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8545"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - botchain
+
+  # === IPFS NODE ===
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - "4001:4001"      # P2P
+      - "5001:5001"      # API
+      - "8080:8080"      # Gateway
+    volumes:
+      - ipfs_data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - botchain
+
+  # === BITCOIN REGTEST NODE ===
+  bitcoin:
+    image: ruimarinho/bitcoin-core:22
+    command:
+      - -regtest
+      - -rpcallowip=0.0.0.0/0
+      - -rpcbind=0.0.0.0
+      - -rpcuser=bitcoin
+      - -rpcpassword=bitcoin
+      - -fallbackfee=0.0001
+      - -txindex=1
+    ports:
+      - "18443:18443"    # RPC
+      - "18444:18444"    # P2P
+    volumes:
+      - bitcoin_data:/home/bitcoin/.bitcoin
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=bitcoin", "-rpcpassword=bitcoin", "getblockchaininfo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - botchain
+
+  # === PYTHON SERVICES (Checker, Trainer, CLI) ===
+  python-service:
+    build:
+      context: .
+      dockerfile: infra/docker/python/Dockerfile
+    volumes:
+      - ./python:/app/python
+      - ./compiler:/app/compiler
+      - python_tmp:/app/python/tmp
+    ports:
+      - "8001:8001"      # Checker API
+    environment:
+      - HARDHAT_RPC_URL=http://hardhat:8545
+      - IPFS_API=http://ipfs:5001
+      - BITCOIN_RPC_URL=http://bitcoin:18443
+      - BITCOIN_RPC_USER=bitcoin
+      - BITCOIN_RPC_PASS=bitcoin
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      hardhat:
+        condition: service_healthy
+      ipfs:
+        condition: service_healthy
+      bitcoin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - botchain
+
+  # === CONTRACT DEPLOYER (one-shot) ===
+  deployer:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./hardhat:/app
+      - hardhat_modules:/app/node_modules
+    command: sh -c "npm install && npx hardhat run scripts/deploy.js --network localhost"
+    environment:
+      - HARDHAT_NETWORK=localhost
+    depends_on:
+      hardhat:
+        condition: service_healthy
+    profiles:
+      - deploy
+    networks:
+      - botchain
+
+volumes:
+  ipfs_data:
+  bitcoin_data:
+  hardhat_modules:
+  python_tmp:
+
+networks:
+  botchain:
+    driver: bridge

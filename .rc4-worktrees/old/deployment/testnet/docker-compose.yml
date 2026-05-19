@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # Validator Node 1
+  validator-1:
+    image: x3-chain:latest
+    container_name: x3-validator-1
+    ports:
+      - "30333:30333"    # P2P Port
+      - "9944:9944"      # RPC Port
+      - "9615:9615"      # Prometheus Metrics
+    environment:
+      - RUST_LOG=info
+      - VALIDATOR_NAME=validator-1
+    volumes:
+      - ./data/validator-1:/chain/data
+      - ./genesis.json:/chain/genesis.json
+    command: >
+      /usr/local/bin/x3-chain
+      --validator
+      --name validator-1
+      --rpc-external
+      --rpc-methods Unsafe
+      --rpc-port 9944
+      --port 30333
+      --base-path /chain/data
+      --chain /chain/genesis.json
+      --enable-prometheus-external
+      --prometheus-port 9615
+    networks:
+      - x3-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9944/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Validator Node 2
+  validator-2:
+    image: x3-chain:latest
+    container_name: x3-validator-2
+    ports:
+      - "30334:30333"
+      - "9945:9944"
+      - "9616:9615"
+    environment:
+      - RUST_LOG=info
+      - VALIDATOR_NAME=validator-2
+    volumes:
+      - ./data/validator-2:/chain/data
+      - ./genesis.json:/chain/genesis.json
+    command: >
+      /usr/local/bin/x3-chain
+      --validator
+      --name validator-2
+      --rpc-external
+      --rpc-methods Unsafe
+      --rpc-port 9944
+      --port 30333
+      --base-path /chain/data
+      --chain /chain/genesis.json
+      --bootnodes /ip4/validator-1/tcp/30333/p2p/$(VALIDATOR_1_PEER_ID)
+    networks:
+      - x3-network
+    depends_on:
+      - validator-1
+
+  # Validator Node 3
+  validator-3:
+    image: x3-chain:latest
+    container_name: x3-validator-3
+    ports:
+      - "30335:30333"
+      - "9946:9944"
+      - "9617:9615"
+    environment:
+      - RUST_LOG=info
+      - VALIDATOR_NAME=validator-3
+    volumes:
+      - ./data/validator-3:/chain/data
+      - ./genesis.json:/chain/genesis.json
+    command: >
+      /usr/local/bin/x3-chain
+      --validator
+      --name validator-3
+      --rpc-external
+      --rpc-methods Unsafe
+      --rpc-port 9944
+      --port 30333
+      --base-path /chain/data
+      --chain /chain/genesis.json
+      --bootnodes /ip4/validator-1/tcp/30333/p2p/$(VALIDATOR_1_PEER_ID)
+    networks:
+      - x3-network
+    depends_on:
+      - validator-1
+
+  # RPC Node (High-capacity, no block production)
+  rpc-node:
+    image: x3-chain:latest
+    container_name: x3-rpc-node
+    ports:
+      - "30336:30333"
+      - "9947:9944"
+      - "9618:9615"
+      - "9933:9933" # WS port
+    environment:
+      - RUST_LOG=info
+      - VALIDATOR_NAME=rpc-node
+    volumes:
+      - ./data/rpc-node:/chain/data
+      - ./genesis.json:/chain/genesis.json
+    command: >
+      /usr/local/bin/x3-chain
+      --name rpc-node
+      --rpc-external
+      --rpc-methods Unsafe
+      --rpc-port 9944
+      --ws-external
+      --ws-port 9933
+      --port 30333
+      --base-path /chain/data
+      --chain /chain/genesis.json
+      --enable-prometheus-external
+      --prometheus-port 9615
+      --bootnodes /ip4/validator-1/tcp/30333/p2p/$(VALIDATOR_1_PEER_ID)
+    networks:
+      - x3-network
+    depends_on:
+      - validator-1
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: x3-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./data/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - x3-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: x3-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INST_LOG_CONSOLE_LEVEL=info
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    networks:
+      - x3-network
+    depends_on:
+      - prometheus
+
+networks:
+  x3-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

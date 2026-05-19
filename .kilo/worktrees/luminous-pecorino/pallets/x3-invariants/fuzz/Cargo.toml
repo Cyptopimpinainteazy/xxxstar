@@ -1,0 +1,26 @@
+[package]
+name = "pallet-x3-invariants-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Exclude from root workspace to allow nightly fuzz builds
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+parity-scale-codec = { version = "3", features = ["derive"] }
+sp-core = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk", tag = "polkadot-stable2603" }
+
+[dependencies.pallet-x3-invariants]
+path = ".."
+
+[[bin]]
+name = "fuzz_codec_parsing"
+path = "fuzz_targets/fuzz_codec_parsing.rs"
+test = false
+doc = false
+bench = false

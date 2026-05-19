@@ -1,0 +1,7 @@
+{
+  "verdict": "FAIL",
+  "error": "Error: FATAL: Unable to initialize the API: fetch failed\n    at ApiPromise._onProviderConnect2 (/home/lojak/Desktop/X3_ATOMIC_STAR/packages/blockchain-connector/node_modules/@polkadot/api/cjs/base/Init.js:394:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)",
+  "blockers": [
+    "FATAL: Unable to initialize the API: fetch failed"
+  ]
+}

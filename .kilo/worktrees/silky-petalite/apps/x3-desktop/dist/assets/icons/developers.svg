@@ -1,0 +1,23 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="devGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0097a7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Terminal window -->
+  <rect x="16" y="20" width="96" height="88" rx="8" fill="none" stroke="url(#devGrad)" stroke-width="3"/>
+  <!-- Title bar -->
+  <line x1="16" y1="36" x2="112" y2="36" stroke="url(#devGrad)" stroke-width="2" opacity="0.4"/>
+  <circle cx="28" cy="28" r="3" fill="#ef5350" opacity="0.6"/>
+  <circle cx="38" cy="28" r="3" fill="#ffd740" opacity="0.6"/>
+  <circle cx="48" cy="28" r="3" fill="#69f0ae" opacity="0.6"/>
+  <!-- Code brackets -->
+  <text x="32" y="60" fill="url(#devGrad)" font-size="20" font-weight="bold" opacity="0.8">&lt;/&gt;</text>
+  <!-- Code lines -->
+  <rect x="28" y="72" width="40" height="3" rx="1.5" fill="url(#devGrad)" opacity="0.5"/>
+  <rect x="36" y="80" width="32" height="3" rx="1.5" fill="url(#devGrad)" opacity="0.4"/>
+  <rect x="28" y="88" width="48" height="3" rx="1.5" fill="url(#devGrad)" opacity="0.5"/>
+  <!-- Cursor -->
+  <rect x="80" y="72" width="2" height="20" fill="url(#devGrad)" opacity="0.8"/>
+</svg>

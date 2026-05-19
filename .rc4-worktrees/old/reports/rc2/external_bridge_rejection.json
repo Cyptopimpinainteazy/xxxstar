@@ -1,0 +1,10 @@
+[
+  {
+    "test": "external Ethereum route rejected",
+    "expected": "reject",
+    "result": "PASS",
+    "error": null,
+    "new_transfers": [],
+    "ledger_unchanged": true
+  }
+]

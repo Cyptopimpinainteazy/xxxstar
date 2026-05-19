@@ -1,0 +1,91 @@
+# Dockerfile for x3-indexer (GraphQL service)
+# Multi-stage build for minimal image size
+# Usage: docker build -f Dockerfile.indexer -t x3-indexer:latest .
+
+ARG RUST_VERSION=1.80
+ARG DEBIAN_VERSION=bookworm
+
+# ── Stage 1: Builder ────────────────────────────────────────────────────────
+FROM rust:${RUST_VERSION}-slim-${DEBIAN_VERSION} as builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    clang \
+    cmake \
+    git \
+    pkg-config \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy source code
+COPY . .
+
+# Build x3-indexer release binary
+RUN cargo build --release -p x3-indexer \
+    && ls -lh target/release/x3-indexer
+
+# ── Stage 2: Runtime Image ──────────────────────────────────────────────────
+FROM ubuntu:24.04 as runtime
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for indexer process
+RUN useradd -m -u 2001 indexer
+
+WORKDIR /home/indexer
+
+# Copy binary from builder
+COPY --from=builder --chown=indexer:indexer /build/target/release/x3-indexer /usr/local/bin/x3-indexer
+
+# Create configuration directory
+RUN mkdir -p /etc/x3-indexer && \
+    chown -R indexer:indexer /etc/x3-indexer
+
+USER indexer
+
+# ── Health Check ─────────────────────────────────────────────────────────
+# Queries GraphQL endpoint for readiness
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f -s -X POST http://localhost:4000/graphql \
+        -H "Content-Type: application/json" \
+        -d '{"query":"{ __typename }"}' || exit 1
+
+# ── Port ────────────────────────────────────────────────────────────────
+# 4000 - GraphQL endpoint
+EXPOSE 4000
+
+# ── Environment Variables ──────────────────────────────────────────────────
+# Default values; override with docker run -e VAR=value
+ENV LISTEN_ADDR=0.0.0.0:4000 \
+    LOG_LEVEL=info \
+    DB_HOST=postgres \
+    DB_PORT=5432 \
+    DB_USER=indexer \
+    DB_PASSWORD=indexer \
+    DB_NAME=x3_indexer
+
+# ── Default Command ──────────────────────────────────────────────────────
+# Expects RPC endpoints as arguments
+# Example: docker run x3-indexer \
+#   x3-indexer \
+#   --listen 0.0.0.0:4000 \
+#   --rpc-urls http://validator-0:9933 http://validator-1:9933 http://validator-2:9933 \
+#   --db-host postgres \
+#   --db-user indexer \
+#   --db-password indexer \
+#   --log-level info
+
+CMD ["x3-indexer"]
+
+# ── Metadata ─────────────────────────────────────────────────────────────
+LABEL org.opencontainers.image.title="X3 Chain Indexer" \
+      org.opencontainers.image.description="GraphQL indexer service for X3 blockchain events" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.source="https://github.com/x3-chain/x3-atomic-star"

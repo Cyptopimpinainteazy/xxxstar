@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 NEXUS — Cross-Chain Command Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --bg:#02020D;
+  --nexus:#00FFB2;
+  --btc:#F7931A;
+  --evm:#5C7CF5;
+  --svm:#9945FF;
+  --x3vm:#FF2D78;
+  --text:#D0E4FF;
+  --dim:rgba(208,228,255,0.42);
+  --glass:rgba(2,5,22,0.72);
+  --gb:rgba(0,255,178,0.1);
+  --pw:290px;
+  --hh:58px;
+  --dh:68px;
+}
+
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;}
+
+#c{position:fixed;inset:0;z-index:0;}
+
+.scanlines{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,255,178,0.006) 3px,rgba(0,255,178,0.006) 4px);
+}
+
+.vignette{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(2,2,13,0.7) 100%);
+}
+
+.ui{
+  position:fixed;inset:0;z-index:2;pointer-events:none;
+  display:grid;
+  grid-template-rows:var(--hh) 1fr var(--dh);
+  grid-template-columns:var(--pw) 1fr var(--pw);
+}
+
+/* ═══ HEADER ═══ */
+.hdr{
+  grid-column:1/-1;grid-row:1;
+  pointer-events:all;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;
+  background:linear-gradient(180deg,rgba(2,2,13,0.96) 0%,rgba(2,2,13,0) 100%);
+  border-bottom:1px solid rgba(0,255,178,0.07);
+}
+
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.lmark{
+  width:30px;height:30px;flex-shrink:0;
+  background:var(--nexus);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  animation:lp 3s ease-in-out infinite;
+}
+@keyframes lp{0%,100%{filter:brightness(1) drop-shadow(0 0 4px var(--nexus));}50%{filter:brightness(1.5) drop-shadow(0 0 14px var(--nexus));}}
+.ltext{font-family:'Orbitron',monospace;font-weight:900;font-size:17px;letter-spacing:.18em;color:var(--nexus);text-shadow:0 0 18px rgba(0,255,178,.45);}
+.lsub{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;margin-top:1px;}
+
+.hnav{display:flex;gap:2px;}
+.ni{
+  font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.15em;text-transform:uppercase;
+  padding:5px 13px;border-radius:4px;cursor:pointer;
+  color:var(--dim);border:1px solid transparent;
+  transition:all .2s;
+}
+.ni:hover,.ni.on{color:var(--nexus);border-color:rgba(0,255,178,.2);background:rgba(0,255,178,.05);}
+
+.hrgt{display:flex;align-items:center;gap:14px;}
+.ticker{display:flex;gap:16px;}
+.tk{font-family:'Share Tech Mono',monospace;font-size:11px;}
+.tkl{color:var(--dim);margin-right:3px;}
+.tkv{color:var(--text);}
+.tkv.up{color:var(--nexus);}
+.tkv.dn{color:#FF4D6D;}
+
+.bw{
+  font-family:'Orbitron',monospace;font-size:9px;font-weight:700;
+  letter-spacing:.12em;padding:7px 15px;
+  background:transparent;border:1px solid var(--nexus);
+  color:var(--nexus);cursor:pointer;border-radius:4px;
+  transition:all .25s;text-transform:uppercase;
+}
+.bw:hover{background:rgba(0,255,178,.1);box-shadow:0 0 18px rgba(0,255,178,.25);}
+
+/* ═══ PANELS ═══ */
+.lp,.rp{
+  padding:14px;
+  background:linear-gradient(180deg,rgba(2,2,13,.9) 0%,rgba(2,2,13,.45) 100%);
+  display:flex;flex-direction:column;gap:11px;
+  overflow-y:auto;overflow-x:hidden;
+}
+.lp{grid-column:1;grid-row:2;pointer-events:all;border-right:1px solid rgba(0,255,178,.07);}
+.rp{grid-column:3;grid-row:2;pointer-events:all;border-left:1px solid rgba(0,255,178,.07);}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,255,178,.18);border-radius:2px;}
+
+.ptitle{
+  font-family:'Orbitron',monospace;font-size:8px;font-weight:600;
+  letter-spacing:.32em;color:var(--nexus);text-transform:uppercase;
+  padding-bottom:7px;border-bottom:1px solid rgba(0,255,178,.12);
+  display:flex;align-items:center;gap:7px;
+}
+.ptitle::before{content:'';width:5px;height:5px;background:var(--nexus);border-radius:50%;animation:bl 2.2s infinite;}
+@keyframes bl{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+/* chain cards */
+.cc{
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.055);
+  border-radius:7px;padding:11px 13px;
+  cursor:pointer;transition:all .22s;
+  position:relative;overflow:hidden;
+}
+.cc::after{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:var(--cc,var(--nexus));opacity:0;transition:opacity .22s;
+}
+.cc:hover::after,.cc.on::after{opacity:1;}
+.cc:hover,.cc.on{
+  background:rgba(255,255,255,.05);
+  border-color:var(--cc,var(--nexus));
+  box-shadow:inset 0 0 20px rgba(0,0,0,.2),0 0 15px rgba(0,0,0,.3);
+}
+
+.cch{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.ccnr{display:flex;align-items:center;gap:7px;}
+.cdot{
+  width:9px;height:9px;border-radius:50%;
+  background:var(--cc);box-shadow:0 0 7px var(--cc);
+  animation:cp 2.2s ease-in-out infinite;
+}
+@keyframes cp{0%,100%{transform:scale(1);}50%{transform:scale(1.35);box-shadow:0 0 13px var(--cc);}}
+.cname{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;}
+.cbadge{
+  font-family:'Share Tech Mono',monospace;font-size:7px;
+  padding:2px 5px;border-radius:3px;
+  background:rgba(255,255,255,.07);color:var(--dim);letter-spacing:.12em;
+}
+.cstats{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.cs{display:flex;flex-direction:column;gap:1px;}
+.csl{font-size:7px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
+.csv{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text);}
+.chbar{margin-top:7px;height:2px;background:rgba(255,255,255,.07);border-radius:1px;overflow:hidden;}
+.chfill{height:100%;background:var(--cc);border-radius:1px;box-shadow:0 0 5px var(--cc);}
+
+/* missions */
+.mi{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:9px 10px;border-radius:6px;
+  background:rgba(255,255,255,.018);
+  border:1px solid rgba(255,255,255,.045);
+  margin-bottom:7px;cursor:pointer;transition:all .2s;
+}
+.mi:hover{background:rgba(0,255,178,.04);border-color:rgba(0,255,178,.18);}
+.mico{font-size:15px;flex-shrink:0;margin-top:1px;}
+.min{font-size:11px;font-weight:600;margin-bottom:2px;color:var(--text);}
+.mid{font-size:9px;color:var(--dim);letter-spacing:.05em;line-height:1.4;}
+.mxp{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--nexus);flex-shrink:0;}
+
+/* center col */
+.cc2{
+  grid-column:2;grid-row:2;
+  pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:space-between;padding:16px 20px;
+}
+.ctop{display:flex;gap:10px;}
+.hm{
+  background:rgba(2,2,13,.75);
+  border:1px solid rgba(0,255,178,.1);
+  border-radius:6px;padding:7px 14px;text-align:center;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.hmv{
+  font-family:'Orbitron',monospace;font-size:17px;font-weight:700;
+  color:var(--nexus);text-shadow:0 0 12px rgba(0,255,178,.45);
+}
+.hml{font-family:'Share Tech Mono',monospace;font-size:7px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;margin-top:2px;}
+
+/* route forge */
+.rf{display:flex;flex-direction:column;gap:11px;}
+.asel{
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:7px;padding:11px 13px;cursor:pointer;transition:all .2s;
+}
+.asel:hover{border-color:rgba(0,255,178,.28);background:rgba(0,255,178,.035);}
+.albl{font-size:7px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;margin-bottom:7px;}
+.avr{display:flex;align-items:center;justify-content:space-between;}
+.aamt{font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--text);}
+.atok{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border-radius:18px;padding:3px 9px 3px 5px;cursor:pointer;}
+.tdot{width:16px;height:16px;border-radius:50%;}
+.tnm{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;}
+.acvt{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:3px;}
+
+.rarr{display:flex;align-items:center;justify-content:center;gap:7px;padding:2px 0;}
+.rline{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--nexus),transparent);opacity:.3;}
+.raico{
+  width:26px;height:26px;border-radius:50%;
+  border:1px solid rgba(0,255,178,.28);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;cursor:pointer;transition:all .2s;
+  background:rgba(0,255,178,.055);color:var(--nexus);
+}
+.raico:hover{background:rgba(0,255,178,.14);border-color:var(--nexus);box-shadow:0 0 9px rgba(0,255,178,.28);}
+
+.rtypes{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.rtb{
+  padding:7px 5px;border-radius:6px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.018);
+  cursor:pointer;transition:all .2s;text-align:center;
+}
+.rtb:hover,.rtb.on{border-color:var(--nexus);background:rgba(0,255,178,.07);}
+.rtbi{font-size:14px;margin-bottom:2px;}
+.rtbl{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;}
+.rtb.on .rtbl{color:var(--nexus);}
+
+.rprev{
+  background:rgba(0,255,178,.04);
+  border:1px solid rgba(0,255,178,.14);
+  border-radius:7px;padding:11px;
+}
+.rpr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.rpr:last-child{margin-bottom:0;}
+.rpl{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:.15em;text-transform:uppercase;}
+.rpv{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text);}
+.rpv.g{color:var(--nexus);}
+.rpv.w{color:#F7931A;}
+
+.rpath{display:flex;align-items:center;gap:3px;margin-bottom:9px;flex-wrap:wrap;}
+.rh{
+  font-family:'Share Tech Mono',monospace;font-size:8px;
+  padding:2px 6px;border-radius:3px;
+  border:1px solid rgba(255,255,255,.09);
+  background:rgba(255,255,255,.035);
+}
+.rh.ah{border-color:var(--nexus);color:var(--nexus);background:rgba(0,255,178,.07);}
+.rha{font-size:9px;color:var(--dim);}
+
+.blnch{
+  width:100%;padding:13px;
+  font-family:'Orbitron',monospace;font-size:11px;font-weight:700;
+  letter-spacing:.2em;text-transform:uppercase;
+  background:linear-gradient(135deg,rgba(0,255,178,.13) 0%,rgba(0,255,178,.04) 100%);
+  border:1px solid var(--nexus);color:var(--nexus);
+  border-radius:7px;cursor:pointer;transition:all .3s;
+  position:relative;overflow:hidden;
+}
+.blnch:hover{
+  box-shadow:0 0 28px rgba(0,255,178,.35),0 0 55px rgba(0,255,178,.08);
+  transform:translateY(-1px);
+}
+.blnch:active{transform:translateY(0);}
+
+/* live feed */
+.lf{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;min-height:0;}
+.fi{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 9px;border-radius:5px;
+  background:rgba(255,255,255,.018);
+  border:1px solid rgba(255,255,255,.035);
+  font-size:9px;
+  animation:fin .3s ease;
+}
+@keyframes fin{from{opacity:0;transform:translateX(8px);}to{opacity:1;transform:translateX(0);}}
+.fdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.ft{flex:1;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.04em;}
+.ft span{color:var(--text);}
+.ftm{color:rgba(208,228,255,.2);font-family:'Share Tech Mono',monospace;font-size:8px;}
+
+/* bottom dock */
+.dock{
+  grid-column:1/-1;grid-row:3;
+  pointer-events:all;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 18px;
+  background:linear-gradient(0deg,rgba(2,2,13,.97) 0%,rgba(2,2,13,0) 100%);
+  border-top:1px solid rgba(0,255,178,.07);
+}
+.db{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:7px 18px;border-radius:7px;cursor:pointer;
+  transition:all .2s;border:1px solid transparent;background:transparent;
+}
+.db:hover,.db.on{background:rgba(0,255,178,.06);border-color:rgba(0,255,178,.18);}
+.di{font-size:17px;line-height:1;}
+.dl{font-family:'Orbitron',monospace;font-size:7px;letter-spacing:.15em;color:var(--dim);text-transform:uppercase;}
+.db.on .dl,.db:hover .dl{color:var(--nexus);}
+.ddiv{width:1px;height:32px;background:rgba(255,255,255,.055);}
+
+.fps{display:flex;gap:4px;}
+.fp{
+  font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:.1em;
+  padding:4px 9px;border-radius:18px;
+  border:1px solid rgba(255,255,255,.09);color:var(--dim);cursor:pointer;transition:all .2s;
+}
+.fp:hover,.fp.on{
+  background:var(--fc,var(--nexus));border-color:var(--fc,var(--nexus));
+  color:#02020D;box-shadow:0 0 10px var(--fc,var(--nexus));
+}
+
+/* rank badge */
+.rank-badge{
+  position:fixed;top:66px;left:calc(var(--pw) + 16px);
+  z-index:10;pointer-events:none;
+  display:flex;align-items:center;gap:7px;
+  background:rgba(2,2,13,.88);
+  border:1px solid rgba(0,255,178,.18);
+  border-radius:6px;padding:6px 12px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  animation:fdin .5s ease 2s both;
+}
+@keyframes fdin{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.rbstar{color:#F7931A;font-size:12px;}
+.rbtext{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.1em;}
+.rbval{color:var(--nexus);}
+
+/* toast */
+.toast{
+  position:fixed;top:68px;right:18px;z-index:100;
+  background:rgba(2,2,13,.97);
+  border:1px solid var(--nexus);border-radius:9px;
+  padding:13px 16px;min-width:230px;
+  pointer-events:none;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:0 0 28px rgba(0,255,178,.18);
+  transform:translateX(115%);
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.toast.show{transform:translateX(0);}
+.th{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+.tico{font-size:16px;}
+.ttitle{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--nexus);text-transform:uppercase;}
+.tbody{font-size:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.04em;line-height:1.5;}
+
+/* chain label hud elements */
+.cl{
+  position:fixed;font-family:'Share Tech Mono',monospace;font-size:8px;
+  letter-spacing:.18em;text-transform:uppercase;z-index:3;
+  pointer-events:none;padding:3px 8px;
+  border-radius:3px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  background:rgba(2,2,13,.65);
+  transition:opacity .4s;
+}
+#cl-btc{color:var(--btc);border:1px solid rgba(247,147,26,.25);top:42%;left:8%;}
+#cl-evm{color:var(--evm);border:1px solid rgba(92,124,245,.25);top:38%;right:8%;}
+#cl-svm{color:var(--svm);border:1px solid rgba(153,69,255,.25);top:20%;left:50%;transform:translateX(-50%);}
+#cl-x3vm{color:var(--x3vm);border:1px solid rgba(255,45,120,.25);bottom:22%;left:50%;transform:translateX(-50%);}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- chain labels floating -->
+<div class="cl" id="cl-btc">BTC FORTRESS</div>
+<div class="cl" id="cl-evm">EVM MEGACITY</div>
+<div class="cl" id="cl-svm">SVM VELOCITY</div>
+<div class="cl" id="cl-x3vm">X3VM LAB</div>
+
+<!-- rank badge -->
+<div class="rank-badge">
+  <span class="rbstar">★</span>
+  <span class="rbtext">RANK: <span class="rbval">ELITE ROUTER</span></span>
+  <span class="rbtext" style="margin-left:6px;color:var(--dim)">2,840 XP</span>
+</div>
+
+<div class="ui">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <a class="logo" href="#">
+      <div class="lmark"></div>
+      <div><div class="ltext">X3 NEXUS</div><div class="lsub">Cross-Chain Command Deck</div></div>
+    </a>
+    <nav class="hnav">
+      <div class="ni on" onclick="setNav(this)">Command</div>
+      <div class="ni" onclick="setNav(this)">Markets</div>
+      <div class="ni" onclick="setNav(this)">Routes</div>
+      <div class="ni" onclick="setNav(this)">Arena</div>
+      <div class="ni" onclick="setNav(this)">Vault</div>
+    </nav>
+    <div class="hrgt">
+      <div class="ticker">
+        <div class="tk"><span class="tkl">BTC</span><span class="tkv up" id="tp-btc">$97,441</span></div>
+        <div class="tk"><span class="tkl">ETH</span><span class="tkv up" id="tp-eth">$3,882</span></div>
+        <div class="tk"><span class="tkl">SOL</span><span class="tkv dn" id="tp-sol">$188.42</span></div>
+      </div>
+      <button class="bw" id="wbtn" onclick="connectWallet()">Connect Wallet</button>
+    </div>
+  </header>
+
+  <!-- LEFT PANEL -->
+  <div class="lp">
+    <div class="ptitle">Chain Networks</div>
+
+    <div class="cc on" style="--cc:var(--btc)" onclick="selectChain(this,'BTC')">
+      <div class="cch">
+        <div class="ccnr"><div class="cdot" style="--cc:var(--btc)"></div><div class="cname">BTC</div></div>
+        <div class="cbadge">FORTRESS</div>
+      </div>
+      <div class="cstats">
+        <div class="cs"><div class="csl">TVL</div><div class="csv">$847B</div></div>
+        <div class="cs"><div class="csl">Speed</div><div class="csv">~10 min</div></div>
+        <div class="cs"><div class="csl">Fee</div><div class="csv">18 sat/vB</div></div>
+        <div class="cs"><div class="csl">Routes</div><div class="csv" id="rt-btc">142</div></div>
+      </div>
+      <div class="chbar"><div class="chfill" style="width:94%;--cc:var(--btc)"></div></div>
+    </div>
+
+    <div class="cc" style="--cc:var(--evm)" onclick="selectChain(this,'EVM')">
+      <div class="cch">
+        <div class="ccnr"><div class="cdot" style="--cc:var(--evm);animation-delay:.3s"></div><div class="cname">EVM</div></div>
+        <div class="cbadge">MEGACITY</div>
+      </div>
+      <div class="cstats">
+        <div class="cs"><div class="csl">TVL</div><div class="csv">$312B</div></div>
+        <div class="cs"><div class="csl">Speed</div><div class="csv">~12 sec</div></div>
+        <div class="cs"><div class="csl">Gas</div><div class="csv">28 gwei</div></div>
+        <div class="cs"><div class="csl">Routes</div><div class="csv" id="rt-evm">847</div></div>
+      </div>
+      <div class="chbar"><div class="chfill" style="width:78%;--cc:var(--evm)"></div></div>
+    </div>
+
+    <div class="cc" style="--cc:var(--svm)" onclick="selectChain(this,'SVM')">
+      <div class="cch">
+        <div class="ccnr"><div class="cdot" style="--cc:var(--svm);animation-delay:.6s"></div><div class="cname">SVM</div></div>
+        <div class="cbadge">VELOCITY</div>
+      </div>
+      <div class="cstats">
+        <div class="cs"><div class="csl">TVL</div><div class="csv">$89B</div></div>
+        <div class="cs"><div class="csl">Speed</div><div class="csv">400ms</div></div>
+        <div class="cs"><div class="csl">Fee</div><div class="csv">$0.0002</div></div>
+        <div class="cs"><div class="csl">Routes</div><div class="csv" id="rt-svm">339</div></div>
+      </div>
+      <div class="chbar"><div class="chfill" style="width:99%;--cc:var(--svm)"></div></div>
+    </div>
+
+    <div class="cc" style="--cc:var(--x3vm)" onclick="selectChain(this,'X3VM')">
+      <div class="cch">
+        <div class="ccnr"><div class="cdot" style="--cc:var(--x3vm);animation-delay:.9s"></div><div class="cname">X3VM</div></div>
+        <div class="cbadge">LAB</div>
+      </div>
+      <div class="cstats">
+        <div class="cs"><div class="csl">TVL</div><div class="csv">$22B</div></div>
+        <div class="cs"><div class="csl">Speed</div><div class="csv">~2 sec</div></div>
+        <div class="cs"><div class="csl">Fee</div><div class="csv">$0.08</div></div>
+        <div class="cs"><div class="csl">Routes</div><div class="csv" id="rt-x3vm">88</div></div>
+      </div>
+      <div class="chbar"><div class="chfill" style="width:87%;--cc:var(--x3vm)"></div></div>
+    </div>
+
+    <div class="ptitle" style="margin-top:2px;">Active Missions</div>
+    <div class="mi">
+      <div class="mico">⚡</div>
+      <div><div class="min">First Bridge Run</div><div class="mid">Complete a cross-chain route via X3VM</div></div>
+      <div class="mxp">+250 XP</div>
+    </div>
+    <div class="mi">
+      <div class="mico">🔮</div>
+      <div><div class="min">Route Master</div><div class="mid">Use manual routing 3× this week</div></div>
+      <div class="mxp">+500 XP</div>
+    </div>
+    <div class="mi">
+      <div class="mico">🏦</div>
+      <div><div class="min">BTC Vault Access</div><div class="mid">Settle any asset to Bitcoin chain</div></div>
+      <div class="mxp">+750 XP</div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="cc2">
+    <div class="ctop">
+      <div class="hm"><div class="hmv" id="hm-routes">1,416</div><div class="hml">Active Routes</div></div>
+      <div class="hm"><div class="hmv" id="hm-vol">$4.2B</div><div class="hml">24h Volume</div></div>
+      <div class="hm"><div class="hmv" id="hm-br">38</div><div class="hml">Bridges Live</div></div>
+    </div>
+    <div></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="rp">
+    <div class="ptitle">Route Forge</div>
+
+    <div class="rf">
+      <div class="asel">
+        <div class="albl">FROM</div>
+        <div class="avr">
+          <div class="aamt" id="from-amt">1.000</div>
+          <div class="atok">
+            <div class="tdot" style="background:var(--btc)"></div>
+            <div class="tnm">BTC</div>
+            <span style="color:var(--dim);font-size:11px">▾</span>
+          </div>
+        </div>
+        <div class="acvt" id="from-usd">≈ $97,441.00</div>
+      </div>
+
+      <div class="rarr">
+        <div class="rline"></div>
+        <div class="raico" onclick="swapDir()">⇅</div>
+        <div class="rline"></div>
+      </div>
+
+      <div class="asel">
+        <div class="albl">TO</div>
+        <div class="avr">
+          <div class="aamt" id="to-amt">51,204</div>
+          <div class="atok">
+            <div class="tdot" style="background:var(--svm)"></div>
+            <div class="tnm">SOL</div>
+            <span style="color:var(--dim);font-size:11px">▾</span>
+          </div>
+        </div>
+        <div class="acvt">≈ $96,889.33</div>
+      </div>
+
+      <div class="rtypes">
+        <div class="rtb on" onclick="setRt(this)"><div class="rtbi">⚡</div><div class="rtbl">Fastest</div></div>
+        <div class="rtb" onclick="setRt(this)"><div class="rtbi">💰</div><div class="rtbl">Cheapest</div></div>
+        <div class="rtb" onclick="setRt(this)"><div class="rtbi">🛡️</div><div class="rtbl">Safest</div></div>
+        <div class="rtb" onclick="setRt(this)"><div class="rtbi">📈</div><div class="rtbl">Max Yield</div></div>
+      </div>
+
+      <div class="rprev">
+        <div class="rpath">
+          <div class="rh ah">BTC</div>
+          <div class="rha">→</div>
+          <div class="rh ah">X3VM</div>
+          <div class="rha">→</div>
+          <div class="rh ah">SVM</div>
+        </div>
+        <div class="rpr"><div class="rpl">Est. Output</div><div class="rpv g">51,204.88 SOL</div></div>
+        <div class="rpr"><div class="rpl">Bridge Fee</div><div class="rpv">0.05% · $48.72</div></div>
+        <div class="rpr"><div class="rpl">Settle Time</div><div class="rpv">~4 min 20 sec</div></div>
+        <div class="rpr"><div class="rpl">Slippage</div><div class="rpv g">0.12%</div></div>
+        <div class="rpr"><div class="rpl">Route Risk</div><div class="rpv g">LOW</div></div>
+      </div>
+
+      <button class="blnch" onclick="launchRoute()">⚡ Launch Route</button>
+    </div>
+
+    <div class="ptitle" style="margin-top:2px;">Live Routes</div>
+    <div class="lf" id="lfeed">
+      <div class="fi"><div class="fdot" style="background:var(--svm)"></div><div class="ft"><span>0x7f2a</span> routed 12.4 ETH → SOL via X3VM</div><div class="ftm">2s</div></div>
+      <div class="fi"><div class="fdot" style="background:var(--btc)"></div><div class="ft"><span>bc1q9r</span> settled 0.5 BTC to fortress</div><div class="ftm">8s</div></div>
+      <div class="fi"><div class="fdot" style="background:var(--evm)"></div><div class="ft"><span>0xA142</span> opened bridge EVM → X3VM</div><div class="ftm">15s</div></div>
+      <div class="fi"><div class="fdot" style="background:var(--nexus)"></div><div class="ft"><span>SVM_jkr</span> completed route in 380ms</div><div class="ftm">22s</div></div>
+      <div class="fi"><div class="fdot" style="background:var(--x3vm)"></div><div class="ft"><span>x3_arb</span> X3VM arbitrage +$2,840</div><div class="ftm">31s</div></div>
+    </div>
+  </div>
+
+  <!-- DOCK -->
+  <div class="dock">
+    <div class="db on" onclick="setDock(this)"><div class="di">🌐</div><div class="dl">Trade</div></div>
+    <div class="db" onclick="setDock(this)"><div class="di">🔗</div><div class="dl">Bridge</div></div>
+    <div class="db" onclick="setDock(this)"><div class="di">🏛️</div><div class="dl">Vaults</div></div>
+    <div class="ddiv"></div>
+    <div class="db" onclick="setDock(this)"><div class="di">⚔️</div><div class="dl">Arena</div></div>
+    <div class="db" onclick="setDock(this)"><div class="di">▶️</div><div class="dl">Replay</div></div>
+    <div class="ddiv"></div>
+    <div class="fps">
+      <div class="fp on" style="--fc:var(--btc)" onclick="setFaction(this)">BTC Fortress</div>
+      <div class="fp" style="--fc:var(--evm)" onclick="setFaction(this)">EVM Syndicate</div>
+      <div class="fp" style="--fc:var(--svm)" onclick="setFaction(this)">SVM Velocity</div>
+      <div class="fp" style="--fc:var(--x3vm)" onclick="setFaction(this)">X3 Architects</div>
+    </div>
+  </div>
+
+</div><!-- /ui -->
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="th"><div class="tico" id="t-ico">⚡</div><div class="ttitle" id="t-title">X3 NEXUS ONLINE</div></div>
+  <div class="tbody" id="t-body">Command deck initialized · All chains nominal</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ══════════════════════════════════════
+//  THREE.JS SCENE
+// ══════════════════════════════════════
+const canvas = document.getElementById('c');
+const W = window.innerWidth, H = window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(W, H);
+renderer.setClearColor(0x02020D, 1);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x02020D, 0.015);
+
+const camera = new THREE.PerspectiveCamera(52, W/H, 0.1, 600);
+camera.position.set(0, 5, 40);
+camera.lookAt(0, 0, 0);
+
+// ── LIGHTS ──────────────────────────
+scene.add(new THREE.AmbientLight(0x08082a, 3));
+const nexLight = new THREE.PointLight(0x00FFB2, 4, 50);
+scene.add(nexLight);
+
+const chainCols = [0xF7931A, 0x5C7CF5, 0x9945FF, 0xFF2D78];
+const cLights = chainCols.map(c => {
+  const l = new THREE.PointLight(c, 2, 24);
+  scene.add(l);
+  return l;
+});
+
+// ── STARFIELD ───────────────────────
+const sGeo = new THREE.BufferGeometry();
+const sN = 5000;
+const sPos = new Float32Array(sN * 3);
+for(let i = 0; i < sN * 3; i++) sPos[i] = (Math.random() - .5) * 500;
+sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+const stars = new THREE.Points(sGeo, new THREE.PointsMaterial({color:0xffffff, size:0.1, transparent:true, opacity:.55, sizeAttenuation:true}));
+scene.add(stars);
+
+// ── CENTRAL NEXUS ───────────────────
+const nexG = new THREE.Group();
+scene.add(nexG);
+
+const nexCore = new THREE.Mesh(
+  new THREE.SphereGeometry(2.2, 64, 64),
+  new THREE.MeshStandardMaterial({color:0x00FFB2, emissive:0x00FF88, emissiveIntensity:2.2, metalness:.85, roughness:.1})
+);
+nexG.add(nexCore);
+
+// wireframe shell
+nexG.add(new THREE.Mesh(
+  new THREE.SphereGeometry(2.35, 18, 18),
+  new THREE.MeshBasicMaterial({color:0x00FFB2, wireframe:true, transparent:true, opacity:.06})
+));
+
+// rings
+[[3.8, .06, Math.PI/3, 0], [4.4, .05, -Math.PI/5, .4], [3.2, .04, Math.PI/2, -.3]].forEach(([r, t, rx, rz]) => {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(r, t, 16, 100),
+    new THREE.MeshBasicMaterial({color:0x00FFB2, transparent:true, opacity:.28})
+  );
+  ring.rotation.x = rx; ring.rotation.z = rz;
+  nexG.add(ring);
+});
+const nexRings = nexG.children.filter(c => c.geometry && c.geometry.type === 'TorusGeometry');
+
+// ── CHAIN NODES ─────────────────────
+const chainDefs = [
+  {name:'BTC', color:0xF7931A, pos:[-14, 1, -3],  geo:'oct'},
+  {name:'EVM', color:0x5C7CF5, pos:[14, 2, -3],   geo:'ico'},
+  {name:'SVM', color:0x9945FF, pos:[0, 11, -5],   geo:'sph'},
+  {name:'X3VM',color:0xFF2D78, pos:[2, -10, -2],  geo:'dod'},
+];
+
+const chainGroups = chainDefs.map((cd, i) => {
+  const g = new THREE.Group();
+  g.position.set(...cd.pos);
+  cLights[i].position.set(...cd.pos);
+  scene.add(g);
+
+  const r = 1.45;
+  let geo;
+  if(cd.geo==='oct') geo = new THREE.OctahedronGeometry(r, 0);
+  else if(cd.geo==='ico') geo = new THREE.IcosahedronGeometry(r, 0);
+  else if(cd.geo==='dod') geo = new THREE.DodecahedronGeometry(r, 0);
+  else geo = new THREE.SphereGeometry(r, 32, 32);
+
+  const mesh = new THREE.Mesh(geo,
+    new THREE.MeshStandardMaterial({color:cd.color, emissive:cd.color, emissiveIntensity:1.6, metalness:.8, roughness:.15})
+  );
+  g.add(mesh);
+
+  g.add(new THREE.Mesh(geo.clone(),
+    new THREE.MeshBasicMaterial({color:cd.color, wireframe:true, transparent:true, opacity:.16})
+  ));
+
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(r*1.9, 0.035, 16, 64),
+    new THREE.MeshBasicMaterial({color:cd.color, transparent:true, opacity:.38})
+  );
+  halo.rotation.x = Math.PI / 2;
+  g.add(halo);
+
+  return {g, mesh, halo, data:cd, basePos:[...cd.pos]};
+});
+
+// ── ROUTE LINES ─────────────────────
+const routes = chainDefs.map((cd, i) => {
+  const start = new THREE.Vector3(...cd.pos);
+  const end = new THREE.Vector3(0, 0, 0);
+  const mid = new THREE.Vector3(
+    (start.x*.4 + end.x*.6) + (i%2===0?-2:2),
+    (start.y + end.y)*.5 + (i<2?1:-1),
+    (start.z + end.z)*.5 - 3
+  );
+  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+  const pts = curve.getPoints(70);
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({color:cd.color, transparent:true, opacity:.15});
+  scene.add(new THREE.Line(geo, mat));
+  return {curve, color:cd.color, mat};
+});
+
+// ── ROUTE PARTICLES ─────────────────
+const routeParticles = routes.map(({curve, color}) => {
+  const n = 14;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo,
+    new THREE.PointsMaterial({color, size:.22, transparent:true, opacity:.85, sizeAttenuation:true})
+  );
+  scene.add(pts);
+  const offsets = Array.from({length:n}, (_,i)=>i/n);
+  return {pts, curve, offsets, speed:.0028 + Math.random()*.002};
+});
+
+// ── AMBIENT NEBULA PARTICLES ─────────
+{
+  const n = 400;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3);
+  for(let i=0;i<n;i++){
+    pos[i*3]=(Math.random()-.5)*80;
+    pos[i*3+1]=(Math.random()-.5)*50;
+    pos[i*3+2]=(Math.random()-.5)*25-8;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(geo,
+    new THREE.PointsMaterial({color:0x00FFB2, size:.055, transparent:true, opacity:.22, sizeAttenuation:true})
+  ));
+}
+
+// ── MOUSE PARALLAX ───────────────────
+let mx = 0, my = 0;
+document.addEventListener('mousemove', e => {
+  mx = (e.clientX/W - .5) * 2;
+  my = (e.clientY/H - .5) * 2;
+});
+
+// ── ANIMATE ─────────────────────────
+let t = 0;
+(function loop() {
+  requestAnimationFrame(loop);
+  t += .01;
+
+  // nexus
+  nexG.rotation.y += .005;
+  nexG.rotation.x = Math.sin(t*.35)*.04;
+  const p = 1 + Math.sin(t*2)*.055;
+  nexCore.scale.setScalar(p);
+  nexLight.intensity = 3 + Math.sin(t*2)*.9;
+  nexRings[0].rotation.z += .009;
+  nexRings[1].rotation.y += .007;
+  nexRings[2].rotation.x += .011;
+
+  // chain nodes
+  chainGroups.forEach(({g, halo, data, basePos}, i) => {
+    g.rotation.y += .008 + i*.003;
+    g.rotation.x += .004 + i*.001;
+    g.position.y = basePos[1] + Math.sin(t*.75 + i*1.6)*.5;
+    halo.scale.setScalar(1 + Math.sin(t*1.4+i*.8)*.1);
+    cLights[i].intensity = 1.4 + Math.sin(t*2+i*.9)*.6;
+    cLights[i].position.y = basePos[1] + Math.sin(t*.75+i*1.6)*.5;
+  });
+
+  // particles along routes
+  routeParticles.forEach(({pts, curve, offsets, speed}) => {
+    offsets.forEach((v,i)=>{offsets[i]=(v+speed)%1;});
+    const p = pts.geometry.attributes.position;
+    offsets.forEach((v,i)=>{
+      const pt = curve.getPoint(v);
+      p.setXYZ(i, pt.x, pt.y, pt.z);
+    });
+    p.needsUpdate = true;
+  });
+
+  // camera parallax
+  camera.position.x += (mx*4 - camera.position.x)*.018;
+  camera.position.y += (-my*2.5 - camera.position.y + 5)*.018;
+  camera.lookAt(0, 0, 0);
+
+  stars.rotation.y += .00008;
+  renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+  const W2=innerWidth, H2=innerHeight;
+  camera.aspect=W2/H2;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W2, H2);
+});
+
+// ══════════════════════════════════════
+//  UI INTERACTIONS
+// ══════════════════════════════════════
+function setNav(el){document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));el.classList.add('on');}
+function setDock(el){document.querySelectorAll('.db').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function setFaction(el){document.querySelectorAll('.fp').forEach(p=>p.classList.remove('on'));el.classList.add('on');}
+function setRt(el){document.querySelectorAll('.rtb').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function selectChain(el){document.querySelectorAll('.cc').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+
+function swapDir(){
+  const ico = document.querySelector('.raico');
+  ico.style.transition='transform .3s';
+  ico.style.transform='rotate(180deg)';
+  setTimeout(()=>{ico.style.transform='';},320);
+}
+
+function connectWallet(){
+  const btn=document.getElementById('wbtn');
+  btn.textContent='0x7f2a...B3c9';
+  btn.style.color='var(--nexus)';
+  btn.style.borderColor='var(--nexus)';
+  showToast('🔐','Wallet Connected','Welcome back, Commander · Rank: Elite Router');
+}
+
+function launchRoute(){
+  routes.forEach(r=>{
+    r.mat.opacity=.75;
+    setTimeout(()=>{r.mat.opacity=.15;},1400);
+  });
+  addFeed();
+  showToast('🚀','Route Launched!','BTC → X3VM → SVM · Est. 4m 20s · Tracking mission...');
+}
+
+const fData=[
+  ['var(--svm)','routed 2.1 BTC → SOL via X3VM'],
+  ['var(--evm)','swapped 8,400 USDC → ETH direct'],
+  ['var(--btc)','settled 0.32 BTC to fortress vault'],
+  ['var(--nexus)','completed SVM route in 380ms'],
+  ['var(--x3vm)','X3VM arb route +$1,480'],
+  ['var(--evm)','opened bridge EVM → BTC'],
+];
+const fAddr=['0x8a4f','sol_xr9','0xB2f1','bc1q7a','x3_new','0xD904'];
+
+function addFeed(){
+  const feed=document.getElementById('lfeed');
+  const d=fData[Math.floor(Math.random()*fData.length)];
+  const a=fAddr[Math.floor(Math.random()*fAddr.length)];
+  const el=document.createElement('div');
+  el.className='fi';
+  el.innerHTML=`<div class="fdot" style="background:${d[0]}"></div><div class="ft"><span>${a}</span> ${d[1]}</div><div class="ftm">now</div>`;
+  feed.insertBefore(el,feed.firstChild);
+  if(feed.children.length>9) feed.removeChild(feed.lastChild);
+}
+
+function showToast(ico, title, body){
+  document.getElementById('t-ico').textContent=ico;
+  document.getElementById('t-title').textContent=title;
+  document.getElementById('t-body').textContent=body;
+  const t=document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),4200);
+}
+
+// live ticker
+function updateTicker(){
+  const tks=[
+    {id:'tp-btc', base:97441, r:300, dec:0},
+    {id:'tp-eth', base:3882,  r:40,  dec:0},
+    {id:'tp-sol', base:188.4, r:4,   dec:2},
+  ];
+  tks.forEach(({id,base,r,dec})=>{
+    const el=document.getElementById(id);
+    const v=base+(Math.random()-.5)*r;
+    const wasUp=el.classList.contains('up');
+    const nv=v.toFixed(dec);
+    const ov=parseFloat(el.textContent.replace(/[$,]/g,''));
+    el.classList.toggle('up', nv>ov);
+    el.classList.toggle('dn', nv<=ov);
+    el.textContent='$'+parseFloat(nv).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+  });
+}
+setInterval(updateTicker, 2200);
+
+// active routes counter
+setInterval(()=>{
+  document.getElementById('hm-routes').textContent=(1390+Math.floor(Math.random()*60)).toLocaleString();
+},4500);
+
+// feed loop
+setInterval(addFeed, 3800);
+
+// initial toast
+setTimeout(()=>showToast('⚡','X3 Nexus Online','Command deck initialized · All chains nominal'), 1600);
+</script>
+</body>
+</html>

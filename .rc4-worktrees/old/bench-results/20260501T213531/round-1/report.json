@@ -1,0 +1,13 @@
+{
+  "global": {
+    "baseline_compile_us": 339,
+    "baseline_tps": 23598.82,
+    "bytes": 888,
+    "gas": 610,
+    "instr": 112,
+    "mode": "YOLO Pass",
+    "optimized_compile_us": 9516,
+    "optimized_tps": 840.69,
+    "samples": 8
+  }
+}

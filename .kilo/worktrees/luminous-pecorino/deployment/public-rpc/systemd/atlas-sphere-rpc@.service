@@ -1,0 +1,47 @@
+[Unit]
+Description=X3 Chain RPC Node (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=x3
+Group=x3
+
+# Instance env file (create one per network):
+# - /etc/x3-chain/rpc/dev.env
+# - /etc/x3-chain/rpc/local.env
+# - /etc/x3-chain/rpc/staging.env
+# - /etc/x3-chain/rpc/testnet.env
+EnvironmentFile=/etc/x3-chain/rpc/%i.env
+
+# Keep RPC node stable.
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# Run from the repo checkout or adjust node_bin in the env file.
+WorkingDirectory=/opt/x3-chain
+ExecStart=/opt/x3-chain/deployment/public-rpc/run-public-rpc.sh
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+# No special capabilities required.
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/x3-chain
+
+[Install]
+WantedBy=multi-user.target

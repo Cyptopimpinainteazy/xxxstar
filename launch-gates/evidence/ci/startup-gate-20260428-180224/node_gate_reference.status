@@ -1,0 +1,4 @@
+result=FAIL
+exit_code=143
+duration_sec=538
+log_file=node_gate_reference.rerun.log

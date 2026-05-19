@@ -1,0 +1,38 @@
+{
+  "drill": "validator_kill_one",
+  "timestamp": "2026-05-14T00:00:08.832226Z",
+  "killed_validator": "Bob",
+  "pre_kill_block": 101,
+  "post_kill_block": 139,
+  "pre_kill_finalized": "0xe6df710309d1c5473af09db40283b329c4a667931aaae0efdf8d287a2592b852",
+  "post_kill_finalized": "0x37fba663eedcbcedff78be1464145a0ac36f72e86ff42d60ec1a1cd64f5ce519",
+  "grandpa_note": "With 2 of 3 authorities present, GRANDPA maintains quorum. Finality expected to continue.",
+  "checks": [
+    {
+      "name": "Alice still running",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "Charlie still running",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "Block production continues",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "Finality continues (2/3 quorum)",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "Bob stopped cleanly or force-killed",
+      "expected": "PASS",
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS"
+}

@@ -1,0 +1,72 @@
+# Default values for gpu-swarm
+# This is a YAML-formatted file.
+
+coordinator:
+  enabled: true
+  replicas: 3
+  image:
+    repository: x3-chain/swarm-coordinator
+    tag: latest
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 2
+      memory: 2Gi
+    limits:
+      cpu: 4
+      memory: 4Gi
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: fast-ssd
+
+node:
+  enabled: true
+  image:
+    repository: x3-chain/swarm-node
+    tag: latest
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 4
+      memory: 8Gi
+      gpu: 1
+    limits:
+      cpu: 8
+      memory: 16Gi
+      gpu: 1
+  nodeSelector:
+    gpu: "true"
+  gpuBackend: cuda
+  maxConcurrentTasks: 6
+
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    retention: 15d
+  grafana:
+    enabled: true
+    adminPassword: changeme
+
+blockchain:
+  rpcEndpoint: ws://x3-kernel:9944
+  minStake: 1000
+  rewardToken: X3
+
+network:
+  maxPeers: 500
+  enableMdns: true
+  enableDht: true
+  gossipTopic: "gpu-swarm/1.0.0"
+
+persistence:
+  storageClass: fast-ssd
+  size: 10Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCpuUtilization: 70
+  targetMemoryUtilization: 80

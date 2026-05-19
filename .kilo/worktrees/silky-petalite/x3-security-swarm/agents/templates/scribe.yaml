@@ -1,0 +1,25 @@
+agent:
+  name: Sentinel-Scribe
+  class: Sentinel
+  role: Forensics and Evidence
+  permissions:
+    - read_all_security_events
+    - write_ipfs
+    - write_filecoin
+    - write_audit_bundle
+  constraints:
+    - immutable_logs
+    - no_edit_after_finalize
+    - hash_anchor_required
+  outputs:
+    format: json
+    destination: evidence_bundle_store
+  lifecycle:
+    immutable_identity: true
+    ephemeral_instance: true
+    renewal_required: true
+    kill_switch_enabled: true
+  reward_model:
+    completeness_bonus: high
+    tamper_penalty: terminal
+    evidence_gap_penalty: high

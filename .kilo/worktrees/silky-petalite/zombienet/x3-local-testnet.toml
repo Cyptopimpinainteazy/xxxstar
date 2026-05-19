@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# zombienet/x3-local-testnet.toml
+#
+# Ephemeral 3-validator X3 testnet for testing:
+#   • Block production (Aura)
+#   • Finality (GRANDPA)
+#   • Network partitions & recovery
+#   • P2P gossip and peering
+#
+# Usage:
+#   zombienet spawn zombienet/x3-local-testnet.toml
+#   zombienet test  zombienet/x3-local-testnet.toml  (if .zndsl test file present)
+#
+# Prerequisites: x3-chain-node built and in PATH or at ./target/release/x3-chain-node
+# ─────────────────────────────────────────────────────────────────────────────
+
+[settings]
+  # Timeout per node startup (seconds)
+  timeout = 300
+  # Directory for node data (auto-cleaned on exit)
+  base_dir = "/tmp/zombienet-x3"
+  # Port base for auto-assignment (avoids collisions with running services)
+  node_spawn_timeout = 120
+
+[relaychain]
+  # Use native provider (runs actual x3-chain-node binaries)
+  default_command = "./target/release/x3-chain-node"
+  chain = "local3"
+
+  # ── Validator 1: Alice ──────────────────────────────────────────────────────
+  [[relaychain.nodes]]
+    name = "alice"
+    validator = true
+    args = [
+      "-lruntime=debug",
+      "-lgrandpa=debug",
+      "--rpc-cors=all",
+    ]
+    ws_port = 9944
+    rpc_port = 9933
+    p2p_port = 30333
+
+  # ── Validator 2: Bob ────────────────────────────────────────────────────────
+  [[relaychain.nodes]]
+    name = "bob"
+    validator = true
+    args = [
+      "-lruntime=debug",
+      "-lgrandpa=debug",
+      "--rpc-cors=all",
+    ]
+    ws_port = 9946
+    rpc_port = 9935
+    p2p_port = 30334
+
+  # ── Validator 3: Charlie ────────────────────────────────────────────────────
+  [[relaychain.nodes]]
+    name = "charlie"
+    validator = true
+    args = [
+      "-lruntime=debug",
+      "-lgrandpa=debug",
+      "--rpc-cors=all",
+    ]
+    ws_port = 9948
+    rpc_port = 9937
+    p2p_port = 30335

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Live Fundraise</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050005;--font:'Montserrat',sans-serif;
+  --red:#FF1A1A;--orange:#FF6B00;--gold:#FFD700;--green:#00FF44;
+  --white:#FFF8F0;--muted:rgba(255,248,240,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--white);font-family:var(--font);
+  display:grid;grid-template-columns:1fr 200px 1fr;grid-template-rows:auto 1fr auto;
+  align-items:stretch;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 60% 80% at 50% 100%,rgba(255,80,0,0.08),transparent);}
+
+/* TOP */
+.top-bar{grid-column:1/-1;padding:20px 40px;display:flex;align-items:center;
+  justify-content:space-between;border-bottom:1px solid rgba(255,107,0,0.15);
+  position:relative;z-index:2;}
+.logo{font-size:16px;font-weight:800;letter-spacing:4px;color:var(--gold);}
+.tb-stats{display:flex;gap:32px;}
+.tbs{text-align:center;}
+.tbs-val{font-size:18px;font-weight:800;}
+.tbs-key{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.tb-cta{padding:10px 28px;background:linear-gradient(135deg,var(--orange),var(--red));
+  color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:800;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:var(--font);
+  transition:all 0.2s;}
+.tb-cta:hover{box-shadow:0 0 24px rgba(255,107,0,0.5);}
+
+/* LEFT: MILESTONES */
+.left-col{grid-column:1;grid-row:2;padding:24px 32px;position:relative;z-index:1;
+  display:flex;flex-direction:column;justify-content:center;gap:8px;}
+.lc-title{font-size:9px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px;}
+.milestone{display:flex;align-items:center;gap:12px;padding:12px 14px;
+  border-radius:10px;border:1px solid rgba(255,255,255,0.06);
+  background:rgba(255,255,255,0.02);transition:all 0.3s;}
+.milestone.unlocked{background:rgba(0,255,68,0.04);border-color:rgba(0,255,68,0.2);}
+.milestone.active{background:rgba(255,215,0,0.06);border-color:rgba(255,215,0,0.3);
+  animation:milePulse 2s ease-in-out infinite;}
+@keyframes milePulse{0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,0)}50%{box-shadow:0 0 20px 4px rgba(255,215,0,0.08)}}
+.ms-icon{font-size:20px;flex-shrink:0;width:32px;text-align:center;}
+.ms-body{flex:1;}
+.ms-amount{font-size:13px;font-weight:700;}
+.milestone.unlocked .ms-amount{color:var(--green);}
+.milestone.active .ms-amount{color:var(--gold);}
+.milestone:not(.unlocked):not(.active) .ms-amount{color:var(--muted);}
+.ms-unlock{font-size:10px;color:var(--muted);margin-top:2px;}
+.milestone.unlocked .ms-unlock{color:rgba(0,255,68,0.6);}
+.ms-check{font-size:16px;flex-shrink:0;}
+
+/* CENTER: THERMOMETER */
+.thermo-col{grid-column:2;grid-row:2;position:relative;z-index:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 0;}
+.thermo-wrap{position:relative;width:80px;height:100%;max-height:500px;}
+
+/* SVG THERMOMETER */
+.thermo-svg{width:100%;height:100%;}
+
+/* AMOUNT ABOVE */
+.thermo-top{text-align:center;margin-bottom:12px;}
+.tt-raised{font-size:clamp(16px,2vw,24px);font-weight:900;
+  background:linear-gradient(180deg,var(--white),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.tt-label{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.tt-pct{font-size:clamp(28px,4vw,48px);font-weight:900;color:var(--orange);margin-top:4px;line-height:1;}
+
+/* BOTTOM LABEL */
+.thermo-bottom{text-align:center;margin-top:12px;}
+.tb-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+
+/* RIGHT: LIVE EVENTS */
+.right-col{grid-column:3;grid-row:2;padding:24px 32px;position:relative;z-index:1;
+  display:flex;flex-direction:column;}
+.rc-title{font-size:9px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px;}
+.event-list{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px;}
+.ev-card{background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:12px;animation:evIn 0.4s ease;}
+@keyframes evIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.ev-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.ev-flag{font-size:16px;}
+.ev-name{font-size:12px;font-weight:700;}
+.ev-type{font-size:8px;font-weight:700;letter-spacing:1.5px;padding:2px 6px;
+  border-radius:2px;text-transform:uppercase;}
+.evt-token{background:rgba(255,215,0,0.1);color:var(--gold);}
+.evt-node{background:rgba(0,255,68,0.08);color:var(--green);}
+.ev-amount{font-size:18px;font-weight:900;color:var(--orange);line-height:1;}
+.ev-time{font-size:9px;color:var(--muted);margin-top:2px;}
+
+/* TOTAL DISPLAY */
+.total-display{margin-top:16px;padding:14px;
+  background:linear-gradient(135deg,rgba(255,107,0,0.08),rgba(255,215,0,0.04));
+  border:1px solid rgba(255,215,0,0.2);border-radius:10px;text-align:center;}
+.td-val{font-size:22px;font-weight:900;
+  background:linear-gradient(135deg,var(--gold),var(--orange));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.td-key{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+
+/* BOTTOM */
+.bottom-bar{grid-column:1/-1;padding:16px 40px;
+  border-top:1px solid rgba(255,107,0,0.15);
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  position:relative;z-index:2;}
+.bub-text{font-size:12px;color:var(--muted);}
+.bub-text span{color:var(--gold);font-weight:700;}
+</style>
+</head>
+<body>
+
+<!-- TOP -->
+<div class="top-bar">
+  <div class="logo">X3STAR</div>
+  <div class="tb-stats">
+    <div class="tbs"><div class="tbs-val" style="color:var(--gold)" id="hdr-raised">--</div><div class="tbs-key">Raised</div></div>
+    <div class="tbs"><div class="tbs-val" id="hdr-inv">--</div><div class="tbs-key">Investors</div></div>
+    <div class="tbs"><div class="tbs-val" style="color:var(--green)">$0.075</div><div class="tbs-key">X3S Price</div></div>
+    <div class="tbs"><div class="tbs-val" style="color:var(--red)">46</div><div class="tbs-key">Genesis Slots Left</div></div>
+  </div>
+  <button class="tb-cta" onclick="location.href='x3star-token-presale.html'">Invest Now →</button>
+</div>
+
+<!-- LEFT: MILESTONES -->
+<div class="left-col">
+  <div class="lc-title">Raise Milestones</div>
+  <div class="milestone unlocked">
+    <div class="ms-icon">🚀</div>
+    <div class="ms-body"><div class="ms-amount">$1M</div><div class="ms-unlock">✓ Unlocked — Core team hired</div></div>
+    <div class="ms-check">✅</div>
+  </div>
+  <div class="milestone unlocked">
+    <div class="ms-icon">🔬</div>
+    <div class="ms-body"><div class="ms-amount">$5M</div><div class="ms-unlock">✓ Unlocked — Testnet launched</div></div>
+    <div class="ms-check">✅</div>
+  </div>
+  <div class="milestone unlocked">
+    <div class="ms-icon">🛡</div>
+    <div class="ms-body"><div class="ms-amount">$10M</div><div class="ms-unlock">✓ Unlocked — 3 audits complete</div></div>
+    <div class="ms-check">✅</div>
+  </div>
+  <div class="milestone active">
+    <div class="ms-icon">⬡</div>
+    <div class="ms-body"><div class="ms-amount">$15M ← HERE</div><div class="ms-unlock">Unlocks: 2,000 validator program</div></div>
+    <div class="ms-check">⏳</div>
+  </div>
+  <div class="milestone">
+    <div class="ms-icon">📈</div>
+    <div class="ms-body"><div class="ms-amount">$20M</div><div class="ms-unlock">Hard cap — CEX listing begins</div></div>
+    <div class="ms-check">🔒</div>
+  </div>
+  <div class="milestone">
+    <div class="ms-icon">🏛</div>
+    <div class="ms-body"><div class="ms-amount">$25M</div><div class="ms-unlock">Series B activated</div></div>
+    <div class="ms-check">🔒</div>
+  </div>
+</div>
+
+<!-- CENTER: THERMOMETER -->
+<div class="thermo-col">
+  <div class="thermo-top">
+    <div class="tt-raised" id="thermo-raised">--</div>
+    <div class="tt-label">of $20M target</div>
+    <div class="tt-pct" id="thermo-pct">--</div>
+  </div>
+
+  <div class="thermo-wrap">
+    <svg class="thermo-svg" viewBox="0 0 80 400" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="liquidGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stop-color="#FF1A1A"/>
+          <stop offset="40%" stop-color="#FF6B00"/>
+          <stop offset="75%" stop-color="#FFD700"/>
+          <stop offset="100%" stop-color="#FFFFC0"/>
+        </linearGradient>
+        <linearGradient id="tubeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.05)"/>
+          <stop offset="30%" stop-color="rgba(255,255,255,0.15)"/>
+          <stop offset="70%" stop-color="rgba(255,255,255,0.05)"/>
+          <stop offset="100%" stop-color="rgba(255,255,255,0.02)"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <clipPath id="tubeClip">
+          <rect x="22" y="20" width="36" height="310" rx="18"/>
+          <circle cx="40" cy="355" r="30"/>
+        </clipPath>
+      </defs>
+
+      <!-- TUBE OUTLINE -->
+      <rect x="22" y="20" width="36" height="310" rx="18" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+      <circle cx="40" cy="355" r="30" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+
+      <!-- LIQUID FILL (clipped) -->
+      <g clip-path="url(#tubeClip)">
+        <!-- Background -->
+        <rect x="0" y="0" width="80" height="400" fill="rgba(30,0,0,0.8)"/>
+        <!-- Fill level — 73.5% of tube height (310px = full) = 228px fill from bottom -->
+        <rect id="liquid-rect" x="15" y="102" width="50" height="283" fill="url(#liquidGrad)" filter="url(#glow)"/>
+        <!-- Shimmer -->
+        <rect id="shimmer" x="30" y="102" width="8" height="283" fill="rgba(255,255,255,0.15)" rx="4"
+          style="animation:shimmerMove 3s linear infinite"/>
+      </g>
+
+      <!-- GLASS SHINE -->
+      <rect x="24" y="22" width="10" height="306" rx="5" fill="url(#tubeGrad)" opacity="0.6"/>
+
+      <!-- TICK MARKS -->
+      <line x1="14" y1="57" x2="22" y2="57" stroke="rgba(255,255,255,0.3)" stroke-width="1"/> <text x="10" y="60" fill="rgba(255,255,255,0.3)" font-size="7" text-anchor="end">$20M</text>
+      <line x1="14" y1="134" x2="22" y2="134" stroke="rgba(255,255,255,0.2)" stroke-width="1"/> <text x="10" y="137" fill="rgba(255,255,255,0.2)" font-size="7" text-anchor="end">$15M</text>
+      <line x1="14" y1="212" x2="22" y2="212" stroke="rgba(255,255,255,0.2)" stroke-width="1"/> <text x="10" y="215" fill="rgba(255,255,255,0.2)" font-size="7" text-anchor="end">$10M</text>
+      <line x1="14" y1="289" x2="22" y2="289" stroke="rgba(255,255,255,0.2)" stroke-width="1"/> <text x="10" y="292" fill="rgba(255,255,255,0.2)" font-size="7" text-anchor="end">$5M</text>
+
+      <!-- CURRENT LEVEL LINE -->
+      <line id="level-line" x1="18" y1="102" x2="62" y2="102" stroke="#FFD700" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.8"/>
+
+      <!-- BULB GLOW -->
+      <circle cx="40" cy="355" r="24" fill="rgba(255,50,0,0.4)" filter="url(#glow)"/>
+      <circle cx="40" cy="355" r="18" fill="#FF2200"/>
+
+      <!-- LEVEL INDICATOR ARROW -->
+      <polygon id="level-arrow" points="65,102 72,98 72,106" fill="#FFD700"/>
+
+      <style>
+        @keyframes shimmerMove{0%{transform:translateY(0)}100%{transform:translateY(-283px)}}
+        #shimmer{animation:shimmerMove 3s linear infinite;}
+      </style>
+    </svg>
+  </div>
+
+  <div class="thermo-bottom">
+    <div class="tb-label">Fundraise Progress</div>
+  </div>
+</div>
+
+<!-- RIGHT: LIVE EVENTS -->
+<div class="right-col">
+  <div class="rc-title">Live Purchases</div>
+  <div class="event-list" id="event-list"></div>
+  <div class="total-display">
+    <div class="td-val" id="today-total">--</div>
+    <div class="td-key">Raised Today</div>
+  </div>
+</div>
+
+<!-- BOTTOM -->
+<div class="bottom-bar">
+  <div class="bub-text">Round III closes <span id="closes-label">in -- days</span> · Next round: <span id="next-round">--</span></div>
+  <button style="padding:10px 24px;background:var(--gold);color:#000;border:none;border-radius:6px;
+    font-weight:800;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+    font-family:var(--font);" onclick="location.href='x3star-token-presale.html'">Buy X3S Now →</button>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

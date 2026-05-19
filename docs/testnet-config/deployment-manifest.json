@@ -1,0 +1,55 @@
+{
+  "project": "solana-gpu-accelerator",
+  "version": "1.0.0",
+  "release_date": "2026-02-12",
+  "components": [
+    {
+      "name": "solana-validator-runtime",
+      "version": "1.0.0",
+      "description": "Modified Solana validator with GPU accelerators",
+      "size_mb": "245",
+      "checksum": "sha256:a1b2c3d4e5f6..."
+    },
+    {
+      "name": "gpu-kernels",
+      "version": "1.0.0",
+      "description": "CUDA kernels (SigVerify, PoH, TX Validator)",
+      "size_mb": "18",
+      "checksum": "sha256:g7h8i9j0k1l2..."
+    },
+    {
+      "name": "monitoring-stack",
+      "version": "1.0.0",
+      "description": "Prometheus + Grafana configs",
+      "size_mb": "5",
+      "checksum": "sha256:m3n4o5p6q7r8..."
+    },
+    {
+      "name": "validator-configs",
+      "version": "1.0.0",
+      "description": "Testnet and mainnet validator configurations",
+      "size_mb": "1",
+      "checksum": "sha256:s9t0u1v2w3x4..."
+    }
+  ],
+  "installation_scripts": [
+    "install-validator.sh",
+    "install-monitoring.sh",
+    "install-gpu-kernels.sh"
+  ],
+  "documentation": [
+    "VALIDATOR-RUNBOOK.md",
+    "TROUBLESHOOTING.md",
+    "GPU-REQUIREMENTS.md",
+    "OPERATIONS-MANUAL.md",
+    "SECURITY-AUDIT-REPORT.md"
+  ],
+  "verification": {
+    "gpg_signature": "asc",
+    "sha256_checksums": "CHECKSUMS",
+    "signatures_verified": true
+  },
+  "total_size_mb": "269",
+  "format": "tar.gz",
+  "compression": "gzip"
+}

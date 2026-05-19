@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — The L1 Graveyard</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Roboto+Condensed:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0C0C0C;--card:rgba(16,14,12,0.98);
+  --stone:#2A2820;--grave:#1E1C18;
+  --bone:#D4C9A8;--bone2:#EDE3C4;--muted:#6B6350;
+  --red:#CC2A2A;--red2:#FF4444;--green:#2A8C4A;--green2:#3ECC6A;
+  --gold:#C8A020;--gold2:#F0C040;
+  --border:rgba(212,201,168,0.1);
+  --mono:'Courier Prime',monospace;--body:'Roboto Condensed',sans-serif;--display:'Special Elite',cursive;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--bone);font-family:var(--body);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;opacity:0.03;
+  background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23D4C9A8' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;height:54px;display:flex;align-items:center;
+  padding:0 40px;background:rgba(12,12,12,0.97);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(8px);}
+.logo{font-family:var(--display);font-size:18px;color:var(--bone2);letter-spacing:2px;}
+.nav-sub{font-size:11px;color:var(--muted);margin-left:16px;padding-left:16px;
+  border-left:1px solid var(--border);letter-spacing:2px;text-transform:uppercase;}
+.nav-right{margin-left:auto;display:flex;gap:10px;}
+.nb{padding:8px 18px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;border:none;font-family:var(--body);transition:all 0.2s;}
+.nb-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.nb-ghost:hover{color:var(--bone);}
+.nb-cta{background:var(--green2);color:#000;}
+.nb-cta:hover{background:var(--green2);box-shadow:0 0 16px rgba(62,204,106,0.3);}
+
+/* HERO */
+.hero{text-align:center;padding:60px 40px 40px;position:relative;z-index:1;}
+.h-top{font-family:var(--display);font-size:12px;letter-spacing:6px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px;}
+.h-title{font-family:var(--display);font-size:clamp(36px,6vw,72px);
+  color:var(--bone2);margin-bottom:12px;line-height:1.1;}
+.h-sub{font-size:15px;color:var(--muted);max-width:580px;margin:0 auto 20px;
+  line-height:1.7;font-family:var(--mono);}
+.h-note{font-size:11px;color:rgba(212,201,168,0.3);font-family:var(--mono);font-style:italic;}
+
+/* GRAVEYARD */
+.graveyard{max-width:1100px;margin:0 auto;padding:0 40px 20px;position:relative;z-index:1;}
+.gy-title{font-family:var(--display);font-size:14px;letter-spacing:4px;
+  text-transform:uppercase;color:var(--muted);margin-bottom:20px;
+  display:flex;align-items:center;gap:12px;}
+.gy-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.grave-row{display:grid;grid-template-columns:200px 120px 120px 1fr 160px;
+  gap:0;align-items:stretch;border-bottom:1px solid rgba(212,201,168,0.06);
+  transition:background 0.15s;cursor:default;}
+.grave-row:hover{background:rgba(255,255,255,0.015);}
+.grave-row.header{border-bottom:1px solid var(--border);margin-bottom:4px;}
+.gr-cell{padding:14px 12px;font-size:12px;display:flex;align-items:center;}
+.gr-cell.header-cell{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--muted);padding:8px 12px;font-family:var(--mono);}
+.gr-name{font-family:var(--display);font-size:15px;color:var(--bone2);}
+.gr-rip{font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px;}
+.gr-emoji{font-size:20px;margin-right:10px;}
+.gr-status{display:flex;flex-direction:column;gap:3px;}
+.gs-badge{font-size:8px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;
+  border-radius:2px;text-transform:uppercase;font-family:var(--mono);display:inline-block;}
+.gsb-dead{background:rgba(204,42,42,0.15);color:var(--red2);border:1px solid rgba(204,42,42,0.25);}
+.gsb-dying{background:rgba(200,160,32,0.12);color:var(--gold2);border:1px solid rgba(200,160,32,0.2);}
+.gsb-alive{background:rgba(42,140,74,0.15);color:var(--green2);border:1px solid rgba(42,140,74,0.25);}
+.gs-val{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px;}
+.gr-cause{font-size:11px;color:var(--muted);line-height:1.5;font-family:var(--mono);}
+.gr-cause strong{color:var(--bone);}
+.gr-peak{font-family:var(--mono);font-size:11px;}
+.gr-action{justify-content:flex-end;}
+
+/* X3STAR ROW - HIGHLIGHTED */
+.x3star-row{background:rgba(42,140,74,0.05);border:1px solid rgba(42,140,74,0.2) !important;
+  border-radius:8px;margin:8px 0;display:grid;grid-template-columns:200px 120px 120px 1fr 160px;}
+.x3star-row .gr-name{color:var(--green2);}
+
+/* LESSONS SECTION */
+.lessons{max-width:1100px;margin:40px auto 0;padding:0 40px 80px;position:relative;z-index:1;}
+.ls-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:40px;}
+.ls-card{background:var(--grave);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.lsc-emoji{font-size:24px;margin-bottom:12px;}
+.lsc-title{font-family:var(--display);font-size:15px;color:var(--bone2);margin-bottom:8px;}
+.lsc-body{font-size:11px;color:var(--muted);line-height:1.7;font-family:var(--mono);}
+.lsc-x3s{margin-top:12px;font-size:11px;color:var(--green2);font-family:var(--mono);}
+
+/* COMPARISON BAR */
+.comp-bar-section{background:var(--grave);border:1px solid var(--border);
+  border-radius:12px;padding:28px;margin-bottom:24px;}
+.cbs-title{font-family:var(--display);font-size:20px;color:var(--bone2);margin-bottom:20px;}
+.comp-rows{display:flex;flex-direction:column;gap:12px;}
+.comp-row{display:flex;align-items:center;gap:12px;}
+.cr-name{width:140px;font-size:12px;flex-shrink:0;}
+.cr-bar{flex:1;height:8px;background:rgba(255,255,255,0.04);border-radius:4px;overflow:hidden;}
+.cr-fill{height:100%;border-radius:4px;transition:width 1.5s ease;}
+.cr-val{font-family:var(--mono);font-size:11px;width:80px;text-align:right;flex-shrink:0;}
+.cr-note{font-size:10px;color:var(--muted);width:120px;text-align:right;flex-shrink:0;}
+
+/* CTA SECTION */
+.cta-banner{background:linear-gradient(135deg,rgba(42,140,74,0.12),rgba(42,140,74,0.04));
+  border:1px solid rgba(42,140,74,0.25);border-radius:12px;padding:32px;
+  text-align:center;max-width:700px;margin:0 auto;}
+.ctab-title{font-family:var(--display);font-size:28px;color:var(--bone2);margin-bottom:8px;}
+.ctab-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;font-family:var(--mono);}
+.ctab-btn{padding:16px 48px;background:var(--green2);color:#000;border:none;border-radius:6px;
+  font-family:var(--body);font-size:13px;font-weight:800;letter-spacing:3px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
+.ctab-btn:hover{box-shadow:0 0 30px rgba(62,204,106,0.4);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <div class="nav-sub">The L1 Graveyard</div>
+  <div class="nav-right">
+    <button class="nb nb-ghost" onclick="location.href='x3star-landing.html'">← Back</button>
+    <button class="nb nb-cta" onclick="location.href='x3star-token-presale.html'">Don't Be Buried</button>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="h-top">A cautionary record</div>
+  <h1 class="h-title">The L1 Graveyard</h1>
+  <p class="h-sub">Dozens of Layer 1 blockchains have launched, raised billions, and died. Here's exactly what killed them — and why X3STAR was built differently.</p>
+  <div class="h-note">* Peak market caps and raise figures sourced from public records. RIP dates approximate.</div>
+</div>
+
+<div class="graveyard">
+  <div class="gy-title">Deceased &amp; Declining Projects</div>
+
+  <!-- HEADER -->
+  <div class="grave-row header" style="cursor:default;">
+    <div class="gr-cell header-cell">Project</div>
+    <div class="gr-cell header-cell">Status</div>
+    <div class="gr-cell header-cell">Peak MCap</div>
+    <div class="gr-cell header-cell">Cause of Death</div>
+    <div class="gr-cell header-cell"></div>
+  </div>
+
+  <!-- DEAD ONES -->
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">⚰️</span><div><div class="gr-name">Terra/LUNA</div><div class="gr-rip">R.I.P. May 2022</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dead">DEAD</span><div class="gs-val">$0.000088</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--red2)">$41B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">at peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>Algorithmic stablecoin failure.</strong> UST death spiral wiped $40B in 72 hours. No real backing. 99.99% drawdown. Hundreds of thousands of retail investors destroyed.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">⚰️</span><div><div class="gr-name">FTX / FTT</div><div class="gr-rip">R.I.P. Nov 2022</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dead">DEAD</span><div class="gs-val">Delisted</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--red2)">$8B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">at peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>Fraud &amp; misuse of customer funds.</strong> Exchange and token collapse simultaneously. No multi-sig. No transparency. CEO sentenced to 25 years.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">⚰️</span><div><div class="gr-name">EOS</div><div class="gr-rip">R.I.P. 2021</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dead">ZOMBIE</span><div class="gs-val">-99.4% from ATH</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--red2)">$16B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">2018 peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>Raised $4B, delivered nothing.</strong> Largest ICO in history. Governance captured by 21 block producers. No decentralization. Developer exodus. Community voted to fire Block.one.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">⚰️</span><div><div class="gr-name">Harmony (ONE)</div><div class="gr-rip">R.I.P. 2022</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dead">DEAD</span><div class="gs-val">-98.1% from ATH</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--red2)">$3.8B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">at peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>$100M bridge hack. Team printed new tokens to compensate.</strong> Inflation killed confidence. Most developers left. Bridge never recovered. Core team quit.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">⚰️</span><div><div class="gr-name">Ronin / Axie</div><div class="gr-rip">R.I.P. 2022</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dead">DEAD</span><div class="gs-val">-97% from ATH</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--red2)">$3.7B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">at peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>$625M bridge hack — largest in crypto history.</strong> Only 9 validators secured a $3B ecosystem. North Korean state actors drained funds in a single transaction.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">🪦</span><div><div class="gr-name">Tron (TRX)</div><div class="gr-rip">Declining</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dying">DECLINING</span><div class="gs-val">-88% from ATH</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--gold2)">$11B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">2018 peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>Centralization &amp; founder indicted.</strong> 27 super representatives control everything. Justin Sun arrested in multiple jurisdictions. Plagiarized whitepaper.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <div class="grave-row">
+    <div class="gr-cell"><span class="gr-emoji">🪦</span><div><div class="gr-name">Cardano (ADA)</div><div class="gr-rip">Stagnating</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-dying">STAGNANT</span><div class="gs-val">-89% from ATH</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--gold2)">$94B</div><div class="gs-val" style="font-size:9px;color:var(--muted)">2021 peak</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>Perpetual research, no shipping.</strong> Took 5 years to launch smart contracts. By then, Ethereum L2s, Solana, and Cosmos had captured all developers. Under 200 active dApps today.</div></div>
+    <div class="gr-cell gr-action"></div>
+  </div>
+
+  <!-- X3STAR ROW -->
+  <div class="x3star-row">
+    <div class="gr-cell"><span class="gr-emoji">⬡</span><div><div class="gr-name">X3STAR</div><div class="gr-rip">Mainnet Q1 2025</div></div></div>
+    <div class="gr-cell"><div class="gr-status"><span class="gs-badge gsb-alive">BUILDING</span><div class="gs-val">Prefunding live</div></div></div>
+    <div class="gr-cell"><div class="gr-peak" style="color:var(--green2)">$84M FDV</div><div class="gs-val" style="font-size:9px;color:var(--muted)">current</div></div>
+    <div class="gr-cell"><div class="gr-cause"><strong>Built on the lessons of every grave above.</strong> 1,847 validators · 4-of-7 multi-sig · 3 audits · BVI legal · on-chain governance · full transparency ledger. Every failure above has a specific fix.</div></div>
+    <div class="gr-cell gr-action"><button class="nb nb-cta" style="font-size:10px;" onclick="location.href='x3star-token-presale.html'">Invest →</button></div>
+  </div>
+</div>
+
+<!-- LESSONS -->
+<div class="lessons">
+  <div class="gy-title">What killed them — and what X3STAR does differently</div>
+
+  <div class="ls-grid">
+    <div class="ls-card">
+      <div class="lsc-emoji">💀</div>
+      <div class="lsc-title">Centralization Kills</div>
+      <div class="lsc-body">Axie had 9 validators. EOS had 21 "elected" producers controlled by Block.one. Every major hack exploited a centralized bridge or custody point.</div>
+      <div class="lsc-x3s">✓ X3STAR: 1,847 validators at testnet. Target 10,000. No single point of failure. 4-of-7 multi-sig for all treasury movements.</div>
+    </div>
+    <div class="ls-card">
+      <div class="lsc-emoji">🕳</div>
+      <div class="lsc-title">Opacity is a Death Sentence</div>
+      <div class="lsc-body">FTX had no transparency. Terra's reserve was unknowable until it was too late. Every rug pull succeeded because no one could see what was happening.</div>
+      <div class="lsc-x3s">✓ X3STAR: Full transparency ledger. Every dollar on-chain. Live treasury balance. Monthly reports. Fireblocks custody with verifiable proof of reserves.</div>
+    </div>
+    <div class="ls-card">
+      <div class="lsc-emoji">⚗️</div>
+      <div class="lsc-title">Research Without Shipping</div>
+      <div class="lsc-body">Cardano spent 5 years in academic research. By launch, the market had moved on. Polkadot, NEAR, and Cosmos all suffered from "perfect is the enemy of shipped."</div>
+      <div class="lsc-x3s">✓ X3STAR: Testnet live Q3 2024. 48 funded grants building real dApps now. Mainnet in 47 days. Ship first, iterate fast.</div>
+    </div>
+    <div class="ls-card">
+      <div class="lsc-emoji">🔓</div>
+      <div class="lsc-title">Poor Security Architecture</div>
+      <div class="lsc-body">Ronin bridge had 9 validators, 4 controlled by Axie itself. Harmony had a 2-of-5 multi-sig on a $100M bridge. Security was an afterthought.</div>
+      <div class="lsc-x3s">✓ X3STAR: 3 independent audits (CertiK, Trail of Bits, OpenZeppelin). Quantum-resistant signatures in roadmap. ZK bridge with formal verification.</div>
+    </div>
+    <div class="ls-card">
+      <div class="lsc-emoji">💸</div>
+      <div class="lsc-title">No Real Utility</div>
+      <div class="lsc-body">Most failed L1s had tokens with no organic demand. Fees went to zero. Staking yields were hyperinflationary. The token was the product, not the network.</div>
+      <div class="lsc-x3s">✓ X3STAR: Fee burning built in. Governance utility. Staking yields funded by real transaction fees. Token demand scales with network usage.</div>
+    </div>
+    <div class="ls-card">
+      <div class="lsc-emoji">🏃</div>
+      <div class="lsc-title">Team Token Dumps</div>
+      <div class="lsc-body">Solana insiders dumped at launch. EOS VCs had no lockup. The exit was planned before the product was finished. Teams got rich, investors got wrecked.</div>
+      <div class="lsc-x3s">✓ X3STAR: No team token unlock at TGE. 12-month cliff, 24-month linear vesting. Team tokens locked in multi-sig with community observer signer.</div>
+    </div>
+  </div>
+
+  <!-- COMPARISON BARS -->
+  <div class="comp-bar-section">
+    <div class="cbs-title">Technical Comparison: X3STAR vs. the Graveyard</div>
+    <div class="comp-rows">
+      <div class="comp-row"><div class="cr-name">X3STAR</div><div class="cr-bar"><div class="cr-fill" style="width:84%;background:var(--green2)"></div></div><div class="cr-val" style="color:var(--green2)">4,200 TPS</div><div class="cr-note" style="color:var(--green2)">Live on testnet</div></div>
+      <div class="comp-row"><div class="cr-name">Solana</div><div class="cr-bar"><div class="cr-fill" style="width:60%;background:var(--muted)"></div></div><div class="cr-val">3,000 TPS</div><div class="cr-note" style="color:var(--muted)">Frequent outages</div></div>
+      <div class="comp-row"><div class="cr-name">Avalanche</div><div class="cr-bar"><div class="cr-fill" style="width:72%;background:var(--muted)"></div></div><div class="cr-val">3,400 TPS</div><div class="cr-note" style="color:var(--muted)">C-chain only</div></div>
+      <div class="comp-row"><div class="cr-name">EOS (peak)</div><div class="cr-bar"><div class="cr-fill" style="width:30%;background:var(--red)"></div></div><div class="cr-val" style="color:var(--red)">1,500 TPS</div><div class="cr-note" style="color:var(--red)">Now &lt; 100 TPS</div></div>
+      <div class="comp-row"><div class="cr-name">Terra (peak)</div><div class="cr-bar"><div class="cr-fill" style="width:18%;background:var(--red)"></div></div><div class="cr-val" style="color:var(--red)">~100 TPS</div><div class="cr-note" style="color:var(--red)">R.I.P.</div></div>
+      <div class="comp-row"><div class="cr-name">Ethereum</div><div class="cr-bar"><div class="cr-fill" style="width:1%;background:var(--muted)"></div></div><div class="cr-val">15 TPS</div><div class="cr-note" style="color:var(--muted)">Base layer</div></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-banner">
+    <div class="ctab-title">X3STAR was built on every failure above.</div>
+    <p class="ctab-sub">Decentralized from day one. Fully transparent. Audited three times. Real technology, real utility, real team accountability. The graveyard was our curriculum.</p>
+    <button class="ctab-btn" onclick="location.href='x3star-token-presale.html'">Invest in Round III — $0.075 →</button>
+  </div>
+</div>
+
+<script>
+// Animate bars on scroll
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.cr-fill,.ar-bar').forEach(b=>{
+        const w=b.style.width;b.style.width='0';
+        setTimeout(()=>b.style.width=w,100);
+      });
+      observer.unobserve(e.target);
+    }
+  });
+},{threshold:0.3});
+document.querySelectorAll('.comp-bar-section').forEach(el=>observer.observe(el));
+</script>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

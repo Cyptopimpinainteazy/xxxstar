@@ -1,0 +1,47 @@
+# Build artifacts
+target/
+/bin/x3-chain-node-fresh
+*.wasm
+*.o
+*.so
+*.rlib
+
+# Large packs  
+launch-gates/packs/
+launch-gates/repomix/*.md
+launch-gates/evidence/ci/
+repomix-output.md
+
+# Node
+node_modules/
+*.log
+
+# Misc
+.DS_Store
+.env
+.venv
+venv/
+.codex
+
+# Local validation/build outputs
+target_phase2_validation/
+target_phase3_test/
+target_phase3_validation/
+target_strict/
+target_warning_fix/
+
+# Next.js build artifacts
+**/.next/
+
+# Coq build artifacts
+*.vo
+*.vok
+*.vos
+*.glob
+.*.aux
+
+# K framework dump
+kore-exec.tar.gz
+
+# Embedded Cargo target dirs in vendored contracts
+X3-contracts/**/target/

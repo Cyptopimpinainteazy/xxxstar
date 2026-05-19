@@ -1,0 +1,541 @@
+{
+  "dashboards": [
+    {
+      "name": "GPU Swarm - Overview",
+      "description": "High-level swarm health and performance metrics",
+      "tags": ["gpu-swarm", "overview"],
+      "panels": [
+        {
+          "title": "Swarm Status",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "up{job='swarm-coordinator'}",
+              "legendFormat": "Coordinator Status"
+            },
+            {
+              "expr": "count(up{job='gpu-node'}==1)",
+              "legendFormat": "Active GPU Nodes"
+            },
+            {
+              "expr": "count(up{job='gpu-node'}==0)",
+              "legendFormat": "Offline GPU Nodes"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "Task Submission Rate (5m avg)",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "rate(swarm_tasks_submitted_total[5m])",
+              "legendFormat": "Tasks/sec"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+        },
+        {
+          "title": "Task Success Rate (24h)",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "100 * (1 - (increase(swarm_tasks_failed_total[24h]) / increase(swarm_tasks_completed_total[24h])))",
+              "legendFormat": "Success %"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+        },
+        {
+          "title": "Task Execution Time Distribution (p95)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_task_execution_time_seconds_bucket[5m]))",
+              "legendFormat": "p95 latency"
+            }
+          ],
+          "gridPos": {"h": 9, "w": 12, "x": 0, "y": 8}
+        },
+        {
+          "title": "GPU Utilization (avg across cluster)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "avg(gpu_utilization_percent)",
+              "legendFormat": "Avg GPU Util %"
+            }
+          ],
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 8}
+        },
+        {
+          "title": "Network Peers Connected",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "swarm_network_peers_connected",
+              "legendFormat": "Peer Count"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 17}
+        },
+        {
+          "title": "Average Network Latency (ms)",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "swarm_network_latency_milliseconds",
+              "legendFormat": "Latency (ms)"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 6, "y": 17}
+        },
+        {
+          "title": "Reward Distribution (24h)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(swarm_rewards_distributed_tokens[24h])",
+              "legendFormat": "Tokens Distributed"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 12, "y": 17}
+        },
+        {
+          "title": "Slashing Events (24h)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(swarm_slashing_events_total[24h])",
+              "legendFormat": "Slashing Events"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 18, "y": 17}
+        }
+      ]
+    },
+    {
+      "name": "GPU Swarm - GPU Resources",
+      "description": "Detailed GPU utilization, memory, temperature, and power metrics",
+      "tags": ["gpu-swarm", "gpu-resources"],
+      "panels": [
+        {
+          "title": "GPU Utilization by Backend",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "avg by (backend) (gpu_utilization_percent{backend=~'cuda|rocm|metal|webgpu'})",
+              "legendFormat": "{{backend}}"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "GPU Memory Usage (GB)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "gpu_memory_used_bytes / 1024 / 1024 / 1024",
+              "legendFormat": "{{device_id}} - Used"
+            },
+            {
+              "expr": "gpu_memory_total_bytes / 1024 / 1024 / 1024",
+              "legendFormat": "{{device_id}} - Total"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "title": "GPU Temperature (°C)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "gpu_temperature_celsius",
+              "legendFormat": "{{device_id}}"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 10}
+        },
+        {
+          "title": "GPU Power Usage (W)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "gpu_power_watts",
+              "legendFormat": "{{device_id}}"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 10}
+        },
+        {
+          "title": "GPU Memory Fragmentation",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "gpu_memory_fragmentation_ratio",
+              "legendFormat": "{{device_id}}"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+        },
+        {
+          "title": "GPU Device Health Status",
+          "type": "table",
+          "targets": [
+            {
+              "expr": "gpu_device_health_status",
+              "legendFormat": "{{device_id}} - {{status}}"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+        }
+      ]
+    },
+    {
+      "name": "GPU Swarm - Task Execution",
+      "description": "Task queue depth, execution times, failure analysis",
+      "tags": ["gpu-swarm", "tasks"],
+      "panels": [
+        {
+          "title": "Task Queue Depth",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "swarm_task_queue_depth",
+              "legendFormat": "{{task_type}}"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "Task Execution Time Percentiles (seconds)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(swarm_task_execution_time_seconds_bucket[5m]))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_task_execution_time_seconds_bucket[5m]))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(swarm_task_execution_time_seconds_bucket[5m]))",
+              "legendFormat": "p99"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "title": "Task Completion Rate (tasks/sec)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(swarm_tasks_completed_total[5m])",
+              "legendFormat": "Completed"
+            },
+            {
+              "expr": "rate(swarm_tasks_failed_total[5m])",
+              "legendFormat": "Failed"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 10}
+        },
+        {
+          "title": "Task Failure Rate by Type",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "100 * (increase(swarm_tasks_failed_total[1h]) / on(task_type) increase(swarm_tasks_completed_total[1h]))",
+              "legendFormat": "{{task_type}}"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 10}
+        },
+        {
+          "title": "Task Retry Count Distribution",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_task_retries_bucket[5m]))",
+              "legendFormat": "p95 retries"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+        },
+        {
+          "title": "Timeout Events (24h)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(swarm_task_timeout_total[24h])",
+              "legendFormat": "Timeout Events"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+        }
+      ]
+    },
+    {
+      "name": "GPU Swarm - Network Performance",
+      "description": "Peer connectivity, bandwidth, latency, gossip metrics",
+      "tags": ["gpu-swarm", "network"],
+      "panels": [
+        {
+          "title": "Network Peers Over Time",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "swarm_network_peers_connected",
+              "legendFormat": "Connected Peers"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "Peer Connection Latency Distribution",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(swarm_peer_latency_milliseconds_bucket[5m]))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_peer_latency_milliseconds_bucket[5m]))",
+              "legendFormat": "p95"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "title": "Gossip Messages Rate (msgs/sec)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(swarm_gossip_messages_sent_total[5m])",
+              "legendFormat": "Sent"
+            },
+            {
+              "expr": "rate(swarm_gossip_messages_received_total[5m])",
+              "legendFormat": "Received"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+        },
+        {
+          "title": "Network Bandwidth (MB/sec)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(swarm_network_bytes_sent_total[5m]) / 1024 / 1024",
+              "legendFormat": "Sent"
+            },
+            {
+              "expr": "rate(swarm_network_bytes_received_total[5m]) / 1024 / 1024",
+              "legendFormat": "Received"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+        },
+        {
+          "title": "Peer Connection Churn",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(swarm_peer_disconnected_total[5m])",
+              "legendFormat": "Disconnects/sec"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+        },
+        {
+          "title": "Network Errors (5m)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(swarm_network_errors_total[5m])",
+              "legendFormat": "Errors"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+        }
+      ]
+    },
+    {
+      "name": "GPU Swarm - Economics & Incentives",
+      "description": "Reward distribution, staking, slashing, economic metrics",
+      "tags": ["gpu-swarm", "economics"],
+      "panels": [
+        {
+          "title": "Rewards Distributed (24h rolling)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "increase(swarm_rewards_distributed_tokens[24h])",
+              "legendFormat": "Tokens/24h"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "Average Reward per Task",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "increase(swarm_rewards_distributed_tokens[1h]) / increase(swarm_tasks_completed_total[1h])",
+              "legendFormat": "Tokens/Task"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "title": "Total Staked Tokens",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "swarm_staking_total_tokens_staked",
+              "legendFormat": "Staked Tokens"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8}
+        },
+        {
+          "title": "Active Stakers",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "count(swarm_staking_node_stake_tokens > 0)",
+              "legendFormat": "Stakers"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 6, "y": 8}
+        },
+        {
+          "title": "Slashing Events (24h)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(swarm_slashing_events_total[24h])",
+              "legendFormat": "Events"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8}
+        },
+        {
+          "title": "Total Slashed Tokens (24h)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "increase(swarm_slashing_tokens_total[24h])",
+              "legendFormat": "Tokens Slashed"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8}
+        },
+        {
+          "title": "Slashing Events by Reason",
+          "type": "pie",
+          "targets": [
+            {
+              "expr": "increase(swarm_slashing_events_total{reason!=''}[24h])",
+              "legendFormat": "{{reason}}"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 0, "y": 16}
+        },
+        {
+          "title": "Verification Consensus Success Rate",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "100 * (1 - (increase(swarm_verification_failures_total[24h]) / increase(swarm_verifications_requested_total[24h])))",
+              "legendFormat": "Success %"
+            }
+          ],
+          "gridPos": {"h": 10, "w": 12, "x": 12, "y": 16}
+        }
+      ]
+    },
+    {
+      "name": "GPU Swarm - X3 Execution",
+      "description": "X3 bytecode compilation, execution, gas metrics",
+      "tags": ["gpu-swarm", "x3"],
+      "panels": [
+        {
+          "title": "X3 Bytecode Compilation Rate (ops/sec)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(swarm_x3_compiles_total[5m])",
+              "legendFormat": "Compiles/sec"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "X3 Execution Time (percentiles)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_x3_execution_time_seconds_bucket[5m]))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(swarm_x3_execution_time_seconds_bucket[5m]))",
+              "legendFormat": "p99"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "title": "Gas Usage Distribution",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(swarm_gas_used_bucket[5m]))",
+              "legendFormat": "p50 gas"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_gas_used_bucket[5m]))",
+              "legendFormat": "p95 gas"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+        },
+        {
+          "title": "Code Size Distribution (bytes)",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(swarm_code_size_bytes_bucket[5m]))",
+              "legendFormat": "p95 size"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+        },
+        {
+          "title": "Optimization Pass Success Rate",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "100 * (increase(swarm_optimization_successes_total[24h]) / increase(swarm_optimization_attempts_total[24h]))",
+              "legendFormat": "Success %"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+        },
+        {
+          "title": "Gas Reduction Achieved (24h avg)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "100 * avg(rate(swarm_gas_reduction_total[24h]))",
+              "legendFormat": "Reduction %"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+        }
+      ]
+    }
+  ]
+}

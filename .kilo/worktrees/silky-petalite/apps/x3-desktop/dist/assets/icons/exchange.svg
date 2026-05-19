@@ -1,0 +1,23 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="exchangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff8c42;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Left box -->
+  <rect x="16" y="40" width="36" height="48" rx="4" fill="url(#exchangeGrad)" opacity="0.9"/>
+  <!-- Right box -->
+  <rect x="76" y="40" width="36" height="48" rx="4" fill="url(#exchangeGrad)" opacity="0.9"/>
+  <!-- Left arrow body -->
+  <line x1="32" y1="56" x2="96" y2="56" stroke="#ff6b35" stroke-width="3" stroke-linecap="round"/>
+  <!-- Left arrow head -->
+  <polygon points="96,56 86,50 86,62" fill="#ff6b35"/>
+  <!-- Right arrow body -->
+  <line x1="96" y1="72" x2="32" y2="72" stroke="#ff6b35" stroke-width="3" stroke-linecap="round"/>
+  <!-- Right arrow head -->
+  <polygon points="32,72 42,66 42,78" fill="#ff6b35"/>
+  <!-- Connection nodes -->
+  <circle cx="32" cy="64" r="4" fill="#ff6b35" opacity="0.5"/>
+  <circle cx="96" cy="64" r="4" fill="#ff6b35" opacity="0.5"/>
+</svg>

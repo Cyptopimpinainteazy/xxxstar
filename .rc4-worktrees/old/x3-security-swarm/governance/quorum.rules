@@ -1,0 +1,11 @@
+# X3 Security Swarm Quorum Rules
+
+Watcher findings do not require quorum because they are observational.
+
+Judge recommendations require at least 2 of 3 judge instances to agree on the threat class and confidence band before a containment recommendation is emitted.
+
+Warden actions require 3 of 5 wardens to approve the same reversible action against the same target within the same evidence window. If the votes disagree on scope, the smallest common action wins. If there is no common action, the action fails closed.
+
+Emergency overrides that expand blast radius beyond a single contract, validator, or wallet segment require a second authorization layer from the existing governance and override machinery in [crates/gpu-swarm/src/warden/governance.rs](../../crates/gpu-swarm/src/warden/governance.rs).
+
+No quorum rule may authorize permanent penalties automatically.

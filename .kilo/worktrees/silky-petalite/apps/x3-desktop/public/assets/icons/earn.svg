@@ -1,0 +1,23 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="earnGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd740;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff8f00;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Gift box bottom -->
+  <rect x="28" y="60" width="72" height="44" rx="4" fill="none" stroke="url(#earnGrad)" stroke-width="3"/>
+  <!-- Gift box lid -->
+  <rect x="24" y="48" width="80" height="16" rx="4" fill="none" stroke="url(#earnGrad)" stroke-width="3"/>
+  <!-- Ribbon vertical -->
+  <line x1="64" y1="48" x2="64" y2="104" stroke="url(#earnGrad)" stroke-width="3" opacity="0.7"/>
+  <!-- Ribbon horizontal -->
+  <line x1="28" y1="80" x2="100" y2="80" stroke="url(#earnGrad)" stroke-width="3" opacity="0.7"/>
+  <!-- Bow -->
+  <path d="M64 48 Q50 28 40 38 Q34 44 48 48" fill="url(#earnGrad)" opacity="0.6"/>
+  <path d="M64 48 Q78 28 88 38 Q94 44 80 48" fill="url(#earnGrad)" opacity="0.6"/>
+  <!-- Stars -->
+  <circle cx="40" cy="24" r="3" fill="url(#earnGrad)" opacity="0.5"/>
+  <circle cx="88" cy="20" r="2" fill="url(#earnGrad)" opacity="0.4"/>
+  <circle cx="100" cy="32" r="2.5" fill="url(#earnGrad)" opacity="0.5"/>
+</svg>

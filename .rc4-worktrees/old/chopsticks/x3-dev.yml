@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# chopsticks/x3-dev.yml
+#
+# Chopsticks fork config for X3 chain
+#
+# Use cases:
+#   • Replay a specific block range to reproduce a bug
+#   • Mutate storage slots to test edge conditions
+#   • Test XCM-like cross-module message handling offline
+#   • Dry-run extrinsics without a live validator
+#
+# Usage:
+#   npx @acala-network/chopsticks@latest --config chopsticks/x3-dev.yml
+#   OR: ./scripts/run-chopsticks.sh fork
+# ─────────────────────────────────────────────────────────────────────────────
+
+# WebSocket endpoint of the node to fork from
+# Override with: CHOPSTICKS_ENDPOINT=ws://... ./scripts/run-chopsticks.sh fork
+endpoint: ws://127.0.0.1:9944
+
+# Block to fork at. "latest" forks at the current head.
+# Use a block hash to replay a specific historical state:
+#   block: "0xdeadbeef..."
+block: latest
+
+# Local port for chopsticks to serve the forked RPC
+port: 8000
+
+# Where to store the SQLite DB snapshot
+db: ./.chopsticks-db/x3-dev.db
+
+# Maximum number of blocks to keep in the fork DB
+# (older blocks are evicted; increase for longer replay windows)
+max-memory-block-count: 500
+
+# Import extra storage overrides at startup (SCALE-hex encoded)
+# Uncomment to inject test state before any block replay:
+# import-storage:
+#   System.Account:
+#     - ["5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY", { nonce: 0, consumers: 0, providers: 1, sufficients: 0, data: { free: 1000000000000, reserved: 0, miscFrozen: 0, feeFrozen: 0 } }]
+
+# Wasm override — point at a new runtime build to test upgrades:
+# wasm-override: ./target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm

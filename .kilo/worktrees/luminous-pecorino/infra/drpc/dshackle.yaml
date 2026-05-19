@@ -1,0 +1,28 @@
+# Dshackle template for X3 Chain / X3
+# Docs: https://github.com/drpcorg/dshackle
+
+version: v1
+port: 2449
+
+tls:
+  enabled: false
+
+proxy:
+  host: 0.0.0.0
+  port: 8545
+  routes:
+    - id: eth
+      blockchain: ethereum-mainnet
+
+cluster:
+  chains:
+    - ethereum-mainnet
+  upstreams:
+    # Default upstream works without DRPC key for local tests.
+    # You can override with DRPC key-based URLs later.
+    - id: ethereum-main
+      chain: ethereum-mainnet
+      connection:
+        ethereum:
+          rpc:
+            url: "http://nodecore:9090/queries/ethereum"

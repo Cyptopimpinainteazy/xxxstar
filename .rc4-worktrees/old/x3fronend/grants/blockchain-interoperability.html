@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Atomic Gateway</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#0f1720;--text:#eef2ff;--muted:#94a3b8;--accent:#7c3aed;--border:#334155;--card:#111827;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 32px;background:rgba(4,8,16,0.96);border-bottom:1px solid rgba(148,163,184,0.12);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:20px;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;}
+nav a{font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);text-decoration:none;}
+.hero{padding:72px 32px 24px;max-width:1120px;margin:0 auto;}
+.hero-kicker{font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(48px,6vw,86px);line-height:0.92;max-width:860px;margin-bottom:22px;color:#fff;}
+.hero-title span{color:#a78bfa;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;text-decoration:none;transition:transform 0.2s ease,background 0.2s ease;}
+.btn-primary{background:linear-gradient(135deg,#a78bfa,#818cf8);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(148,163,184,0.14);}
+.btn:hover{transform:translateY(-1px);}
+.container{max-width:1120px;margin:0 auto;padding:0 32px;}
+.section{margin-top:36px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:30px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:900px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px;}
+.card{background:var(--card);border:1px solid rgba(148,163,184,0.08);border-radius:20px;padding:24px;}
+.card h3{font-size:18px;color:#fff;margin-bottom:10px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card ul{margin-top:12px;list-style:none;padding-left:0;display:grid;gap:10px;}
+.card li{padding-left:18px;position:relative;color:var(--muted);font-size:14px;}
+.card li:before{content:'▹';position:absolute;left:0;top:0;color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:18px;margin-top:28px;}
+.status{background:#0f1720;border:1px solid rgba(124,58,237,0.14);border-radius:18px;padding:22px;}
+.status h4{font-size:13px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:12px;}
+.status p{color:var(--muted);font-size:14px;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/grants/index.html">Grants Portal</a><a href="/x3star-grant-hub.html">Grant Hub</a><a href="/x3star-landing.html">Home</a></div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">Atomic Gateway</div>
+  <h1 class="hero-title">One asset, multiple execution domains, atomic settlement.</h1>
+  <p class="hero-copy">Atomic Gateway makes BTC, EVM, SVM, and X3VM interoperable through a canonical asset accounting model. This page is for ecosystem funders who want practical cross-chain settlement, not speculative bridge language.</p>
+  <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Sponsor integration</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request adapter plan</a></div>
+</section>
+<div class="container">
+  <div class="section">
+    <h2>Problem</h2>
+    <p>Liquidity is fragmented across chains, bridge models are inconsistent, and execution domains are siloed. That creates supply drift, settlement risk, and poor predictability for funders looking for verifiable cross-domain infrastructure.</p>
+  </div>
+  <div class="section">
+    <h2>X3 solution</h2>
+    <p>X3 uses the Atomic Kernel to track canonical asset state across BTC, EVM, SVM, and X3VM. Atomic Gateway then routes liquidity and settlement decisions with proof receipts that show how the asset moved without creating multiple independent supply pools.</p>
+    <div class="row">
+      <div class="card"><h3>Atomic Kernel</h3><p>Canonical ledger layer that enforces a single source of truth for asset supply and settlement state.</p></div>
+      <div class="card"><h3>Domain adapters</h3><p>EVM, SVM, BTC/xBTC, and X3VM adapters keep each execution domain connected while preserving settlement invariants.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Technical architecture</h2>
+    <div class="row">
+      <div class="card"><h3>Atomic Gateway</h3><ul><li>Route planning with canonical settlement receipts</li><li>Interoperability contracts for EVM/SVM</li><li>BTC/xBTC watch and lock integration</li></ul></div>
+      <div class="card"><h3>StarPackets</h3><ul><li>Verifiable message format for cross-domain state</li><li>Receipt-backed reroute logic</li><li>Fault-tolerant retry semantics</li></ul></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>What is already built</h2>
+    <div class="card"><ul><li>Atomic Kernel design and settlement model documentation.</li><li>Integration plan for EVM/SVM adapters.</li><li>ProofForge and validator readiness tooling that support route audits.</li></ul></div>
+  </div>
+  <div class="section">
+    <h2>What funding unlocks</h2>
+    <div class="row">
+      <div class="card"><h3>Adapter implementation</h3><p>Fund the development of EVM, SVM, and BTC/xBTC adapters.</p></div>
+      <div class="card"><h3>Cross-chain tests</h3><p>Enable route verification and canonical supply test cases.</p></div>
+      <div class="card"><h3>SDK support</h3><p>Deliver developer docs, integration guides, and partner onboarding kit.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Milestone roadmap</h2>
+    <div class="row">
+      <div class="card"><h3>Phase 1</h3><p>Deliver adapter prototypes and cross-domain route proofs.</p></div>
+      <div class="card"><h3>Phase 2</h3><p>Run end-to-end demo from BTC testnet to STARDEX settlement.</p></div>
+      <div class="card"><h3>Phase 3</h3><p>Publish SDKs, integration reports, and developer onboarding artifacts.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Funding use breakdown</h2>
+    <div class="status-grid">
+      <div class="status"><h4>Adapter builds</h4><p>35% for EVM/SVM/BTC adapter implementation.</p></div>
+      <div class="status"><h4>Integration tests</h4><p>30% for cross-chain message tests and route receipts.</p></div>
+      <div class="status"><h4>Docs and SDKs</h4><p>20% for partner integration docs and sample code.</p></div>
+      <div class="status"><h4>Proof reporting</h4><p>15% for deliverable evidence and audit-ready artifacts.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proof / demo</h2>
+    <p>We will record a route from a BTC testnet lock through xBTC representation into STARDEX swap and settle it into another execution domain with a canonical proof receipt and invariant report.</p>
+  </div>
+  <div class="section">
+    <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Fund an adapter</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request integration plan</a></div>
+  </div>
+</div>
+</body>
+</html>

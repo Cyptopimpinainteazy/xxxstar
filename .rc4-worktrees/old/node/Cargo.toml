@@ -1,0 +1,116 @@
+[package]
+name = "x3-chain-node"
+version = "0.1.0"
+edition = "2021"
+publish = false
+authors = ["X3 Chain Core Engineering <engineering@x3-chain.io>"]
+license = "Apache-2.0"
+description = "X3 Chain L1 Substrate node binary with dual-VM readiness."
+repository = "https://github.com/x3-chain/core"
+default-run = "x3-chain-node"
+
+[[bin]]
+name = "x3-chain-node"
+path = "src/main.rs"
+
+[dependencies]
+x3-chain-runtime = { path = "../runtime", features = ["std", "native-real-vm-adapters"] }
+pallet-x3-kernel = { path = "../pallets/x3-kernel", features = ["std"] }
+pallet-atomic-trade-engine = { path = "../pallets/atomic-trade-engine", features = ["std"] }
+pallet-evolution-core = { path = "../pallets/evolution-core", features = ["std"] }
+pallet-x3-verifier = { path = "../pallets/x3-verifier", features = ["std"] }
+pallet-x3-domain-registry = { path = "../pallets/x3-domain-registry", features = ["std"] }
+flash-finality = { package = "x3-flash-finality", path = "../crates/flash-finality" }
+poh-generator = { package = "x3-poh-generator", path = "../crates/poh-generator" }
+x3-bridge-adapters = { path = "../crates/x3-bridge-adapters" }
+x3-rpc = { path = "../crates/x3-rpc" }
+x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
+x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge" }
+pallet-x3-settlement-engine = { path = "../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
+pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false, features = ["std"] }
+pallet-agent-memory = { path = "../pallets/agent-memory", default-features = false, features = ["std"] }
+x3-finality-oracle = { path = "../crates/x3-finality-oracle" }
+x3-verification-router = { path = "../crates/x3-verification-router" }
+x3-validator-attestation = { path = "../crates/x3-validator-attestation" }
+x3-proof-dispute = { path = "../crates/x3-proof-dispute" }
+x3-gateway-risk-engine = { path = "../crates/x3-gateway-risk-engine" }
+parallel-proposer = { path = "../crates/parallel-proposer" }
+contention-predictor = { path = "../crates/contention-predictor" }
+x3-gpu-validator-swarm = { path = "../crates/x3-gpu-validator-swarm", optional = true }
+
+clap = { version = "4.4", features = ["derive"] }
+futures = "0.3"
+futures-util = { version = "0.3", default-features = false }
+hex = "0.4"
+bs58 = "0.5"
+log = "0.4"
+env_logger = "0.10"
+serde = { workspace = true }
+serde_json = "1.0"
+codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }
+x3-common = { path = "../crates/x3-common" }
+jsonrpsee = { workspace = true }
+tokio = { version = "1.37", features = ["rt", "rt-multi-thread"] }
+pallet-evm = { workspace = true, default-features = false, features = ["std"] }
+
+
+sc-basic-authorship = { workspace = true }
+sc-cli = { workspace = true }
+sc-client-api = { workspace = true }
+sc-consensus = { workspace = true }
+sc-consensus-aura = { workspace = true }
+sc-consensus-grandpa = { workspace = true }
+sc-executor = { workspace = true }
+sc-network = { workspace = true }
+sc-network-gossip = { workspace = true }
+sc-rpc = { workspace = true }
+sc-rpc-api = { workspace = true }
+sc-service = { workspace = true }
+sc-telemetry = { workspace = true }
+sc-transaction-pool = { workspace = true }
+sc-transaction-pool-api = { workspace = true }
+substrate-prometheus-endpoint = { path = "../patches/substrate-prometheus-endpoint" }
+
+sp-api = { workspace = true }
+sp-block-builder = { workspace = true }
+sp-blockchain = { workspace = true }
+sp-consensus-aura = { workspace = true }
+sp-consensus-grandpa = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-io = { workspace = true }
+sp-timestamp = { workspace = true }
+sp-keystore = { workspace = true }
+
+substrate-frame-rpc-system = { workspace = true }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+
+frame-benchmarking-cli = { workspace = true, optional = true, default-features = false }
+
+[features]
+default = ["cli"]
+cli = []
+
+# GPU validator orchestrator feature (requires x3-gpu-validator-swarm crate).
+# Enable to spawn the GPU validator swarm orchestrator during node startup.
+gpu-validator = ["x3-gpu-validator-swarm", "x3-chain-runtime/gpu-validator"]
+
+# Optional flags to enable Frontier JSON-RPC and EVM runtime features.  
+# Enabling `frontier` will opt-in to Frontier crates and runtime adapters.
+frontier = []
+
+native = ["x3-chain-runtime/native"]
+
+runtime-benchmarks = [
+    "x3-chain-runtime/runtime-benchmarks",
+    "frame-benchmarking-cli/runtime-benchmarks",
+]
+
+# try-runtime feature enables runtime-level testing support
+# Note: try-runtime-cli tool has been removed in polkadot-stable2512
+# Use runtime benchmarks or tests for try-runtime functionality
+try-runtime = [
+    "x3-chain-runtime/try-runtime",
+]
+
+# Optional Frontier (EVM) JSON-RPC wiring

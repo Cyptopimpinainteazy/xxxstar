@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Staking</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#010308;--surface:rgba(4,8,20,0.95);
+  --border:rgba(0,255,136,0.12);--glow:rgba(0,255,136,0.3);
+  --green:#00ff88;--green2:#00cc66;--gold:#ffd700;
+  --cyan:#00d4ff;--red:#ff3366;--purple:#bb44ff;
+  --text:#e0fff2;--muted:#336655;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;}
+
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%,rgba(0,255,136,0.04),transparent),
+    radial-gradient(ellipse 60% 80% at 80% 80%,rgba(0,200,255,0.03),transparent);}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;
+  padding:0 60px;height:72px;background:rgba(1,3,8,0.95);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);}
+.nav-logo{font-family:'Orbitron',monospace;font-weight:900;font-size:22px;
+  background:linear-gradient(90deg,var(--gold),var(--green));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;letter-spacing:3px;}
+.nav-links{display:flex;gap:32px;margin:0 auto;}
+.nav-link{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:color 0.2s;text-decoration:none;}
+.nav-link:hover,.nav-link.active{color:var(--green);}
+.btn{padding:10px 24px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;
+  font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.2s;border:none;}
+.btn-outline{background:transparent;border:1px solid rgba(0,255,136,0.3);color:var(--green);}
+.btn-outline:hover{box-shadow:0 0 20px rgba(0,255,136,0.2);}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--green2));color:#000;font-weight:700;}
+.btn-primary:hover{box-shadow:0 0 30px rgba(0,255,136,0.4);transform:translateY(-1px);}
+
+/* HEADER */
+.page-header{padding:120px 60px 60px;position:relative;z-index:1;}
+.ph-top{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;}
+.ph-eyebrow{font-size:11px;letter-spacing:4px;color:var(--green);text-transform:uppercase;margin-bottom:12px;}
+.ph-title{font-family:'Orbitron',monospace;font-size:clamp(32px,5vw,56px);font-weight:900;
+  letter-spacing:-2px;}
+.ph-sub{font-size:16px;color:var(--muted);margin-top:12px;max-width:500px;line-height:1.6;}
+
+/* PROTOCOL STATS */
+.proto-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+  margin-bottom:40px;}
+.ps-item{background:rgba(1,3,8,0.95);padding:24px;text-align:center;transition:background 0.2s;}
+.ps-item:hover{background:rgba(0,255,136,0.04);}
+.ps-val{font-family:'Orbitron',monospace;font-size:24px;font-weight:800;margin-bottom:4px;}
+.ps-key{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.ps-change{font-size:11px;margin-top:4px;}
+
+/* CONTENT */
+.content{padding:0 60px 80px;position:relative;z-index:1;}
+.content-grid{display:grid;grid-template-columns:1fr 360px;gap:24px;}
+
+/* POOLS */
+.pools-section{display:flex;flex-direction:column;gap:16px;}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.section-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;}
+.filter-tabs{display:flex;gap:4px;background:rgba(255,255,255,0.04);padding:4px;border-radius:8px;}
+.filter-tab{padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;color:var(--muted);
+  border:none;background:transparent;font-family:'Rajdhani',sans-serif;letter-spacing:1px;
+  transition:all 0.2s;}
+.filter-tab.active{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.25);}
+
+/* POOL CARD */
+.pool-card{background:rgba(4,8,20,0.95);border:1px solid var(--border);border-radius:16px;
+  padding:24px;transition:all 0.3s;cursor:pointer;position:relative;overflow:hidden;}
+.pool-card:hover{border-color:rgba(0,255,136,0.3);box-shadow:0 8px 40px rgba(0,255,136,0.06);
+  transform:translateY(-2px);}
+.pool-card.featured{border-color:rgba(255,215,0,0.25);}
+.pool-card.featured::before{content:'FEATURED';position:absolute;top:16px;right:16px;
+  background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.3);color:var(--gold);
+  font-size:9px;letter-spacing:2px;padding:3px 10px;border-radius:100px;font-weight:700;}
+
+.pool-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.pool-identity{display:flex;align-items:center;gap:14px;}
+.pool-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;
+  justify-content:center;font-size:20px;flex-shrink:0;}
+.pool-name{font-family:'Orbitron',monospace;font-size:15px;font-weight:700;}
+.pool-pair{font-size:11px;color:var(--muted);margin-top:3px;}
+.pool-apy{text-align:right;}
+.pool-apy-val{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;line-height:1;}
+.pool-apy-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-top:4px;}
+
+.pool-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border-top:1px solid rgba(255,255,255,0.05);padding-top:16px;margin-bottom:16px;}
+.pool-stat{text-align:center;padding:0 8px;}
+.pool-stat:not(:last-child){border-right:1px solid rgba(255,255,255,0.05);}
+.pstat-val{font-size:14px;font-weight:700;font-family:'Orbitron',monospace;}
+.pstat-key{font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:3px;}
+
+.pool-actions{display:flex;gap:8px;}
+.pool-btn{flex:1;padding:12px;border-radius:10px;font-family:'Orbitron',monospace;
+  font-size:11px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;border:none;}
+.pool-btn-stake{background:linear-gradient(135deg,var(--green),var(--green2));color:#000;}
+.pool-btn-stake:hover{box-shadow:0 0 20px rgba(0,255,136,0.4);}
+.pool-btn-info{background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--muted);}
+.pool-btn-info:hover{color:var(--text);border-color:rgba(255,255,255,0.2);}
+
+/* RIGHT PANEL */
+.right-panel{display:flex;flex-direction:column;gap:16px;}
+
+/* CALCULATOR */
+.calc-card{background:rgba(4,8,20,0.95);border:1px solid var(--border);border-radius:16px;padding:24px;}
+.calc-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;margin-bottom:20px;
+  display:flex;align-items:center;gap:8px;}
+.calc-title::before{content:'';width:3px;height:16px;background:var(--green);border-radius:2px;}
+
+.calc-input-wrap{margin-bottom:16px;}
+.calc-label{font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;display:block;}
+.calc-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;font-family:'Orbitron',monospace;font-size:16px;
+  color:var(--text);outline:none;transition:all 0.2s;}
+.calc-input:focus{border-color:var(--green);box-shadow:0 0 16px rgba(0,255,136,0.1);}
+
+.calc-slider-wrap{margin-bottom:20px;}
+.calc-slider{width:100%;-webkit-appearance:none;height:4px;border-radius:100px;
+  background:linear-gradient(90deg,var(--green) 0%, var(--green) var(--pct,50%),rgba(255,255,255,0.1) var(--pct,50%));
+  outline:none;cursor:pointer;}
+.calc-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--green);box-shadow:0 0 10px rgba(0,255,136,0.5);}
+.calc-periods{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;}
+
+.calc-select{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;font-family:'Rajdhani',sans-serif;font-size:14px;
+  color:var(--text);outline:none;cursor:pointer;margin-bottom:20px;}
+
+.calc-results{background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.12);
+  border-radius:12px;padding:16px;margin-bottom:16px;}
+.calc-result-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;}
+.calc-result-row:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.04);}
+.cr-key{color:var(--muted);}
+.cr-val{font-family:'Orbitron',monospace;font-weight:700;}
+.cr-big{font-size:20px!important;color:var(--green);}
+
+/* MY POSITIONS */
+.positions-card{background:rgba(4,8,20,0.95);border:1px solid var(--border);border-radius:16px;padding:24px;}
+.pos-item{padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.pos-item:last-child{border:none;}
+.pos-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.pos-name{font-size:13px;font-weight:600;}
+.pos-val{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--green);}
+.pos-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+
+/* STATS MINI */
+.mini-stat{display:flex;align-items:center;gap:10px;padding:10px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;}
+.ms-icon{font-size:20px;}
+.ms-val{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;}
+.ms-key{font-size:10px;color:var(--muted);letter-spacing:1.5px;}
+
+.reveal{opacity:0;transform:translateY(20px);transition:all 0.6s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">X3STAR</div>
+  <div class="nav-links">
+    <a class="nav-link" href="x3star-token-presale.html">Presale</a>
+    <a class="nav-link" href="x3star-validator-presale.html">Validator</a>
+    <a class="nav-link" href="x3star-dashboard.html">Dashboard</a>
+    <a class="nav-link active">Staking</a>
+    <a class="nav-link" href="x3star-governance.html">Governance</a>
+  </div>
+  <div style="display:flex;gap:12px;">
+    <button class="btn btn-outline">My Portfolio</button>
+    <button class="btn btn-primary">Connect Wallet</button>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<div class="page-header">
+  <div class="ph-top">
+    <div>
+      <div class="ph-eyebrow">Earn With X3STAR</div>
+      <h1 class="ph-title">Staking <span style="color:var(--green)">Pools</span></h1>
+      <p class="ph-sub">Stake X3S and LP tokens to earn protocol rewards. APY updates live from on-chain data.</p>
+    </div>
+    <div style="display:flex;gap:12px;">
+      <button class="btn btn-outline">Claim All Rewards</button>
+      <button class="btn btn-primary">+ New Position</button>
+    </div>
+  </div>
+
+  <!-- PROTOCOL STATS -->
+  <div class="proto-stats reveal">
+    <div class="ps-item">
+      <div class="ps-val" style="color:var(--green)">--</div>
+      <div class="ps-key">Total Value Locked</div>
+      <div class="ps-change" style="color:var(--green)">Live</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-val" style="color:var(--gold)">--</div>
+      <div class="ps-key">Avg APY</div>
+      <div class="ps-change" style="color:var(--green)">Live</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-val" style="color:var(--cyan)">--</div>
+      <div class="ps-key">Stakers</div>
+      <div class="ps-change" style="color:var(--green)">Live</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-val" style="color:var(--purple)">--</div>
+      <div class="ps-key">Daily Rewards</div>
+      <div class="ps-change" style="color:var(--green)">Live</div>
+    </div>
+    <div class="ps-item">
+      <div class="ps-val" style="color:var(--text)">--</div>
+      <div class="ps-key">X3S Staked</div>
+      <div class="ps-change" style="color:var(--green)">Live</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+  <div class="content-grid">
+
+    <!-- POOLS -->
+    <div class="pools-section">
+      <div class="section-header">
+        <div class="section-title">Active Pools</div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="filterPools(this,'all')">All</button>
+          <button class="filter-tab" onclick="filterPools(this,'single')">Single Token</button>
+          <button class="filter-tab" onclick="filterPools(this,'lp')">LP Pools</button>
+          <button class="filter-tab" onclick="filterPools(this,'boost')">Boosted</button>
+        </div>
+      </div>
+
+      <!-- POOL: X3S Single -->
+      <div class="pool-card featured reveal" data-type="single boost">
+        <div class="pool-top">
+          <div class="pool-identity">
+            <div class="pool-icon" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,150,0,0.1))">⬡</div>
+            <div>
+              <div class="pool-name">X3S Staking</div>
+              <div class="pool-pair">Single Token • No IL Risk</div>
+            </div>
+          </div>
+          <div class="pool-apy">
+            <div class="pool-apy-val" style="color:var(--gold)">-- <span style="font-size:14px;color:rgba(255,215,0,0.5)">APY</span></div>
+            <div class="pool-apy-label" style="color:var(--gold)">+ 4% BOOST</div>
+          </div>
+        </div>
+        <div class="pool-stats">
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--cyan)">--</div><div class="pstat-key">TVL</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">30 Days</div><div class="pstat-key">Lock Period</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--green)">Daily</div><div class="pstat-key">Compound</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">X3S</div><div class="pstat-key">Reward Token</div></div>
+        </div>
+        <div class="pool-actions">
+          <button class="pool-btn pool-btn-stake" onclick="openStake('X3S Staking','x3s-solo')">STAKE X3S</button>
+          <button class="pool-btn pool-btn-info">DETAILS →</button>
+        </div>
+      </div>
+
+      <!-- POOL: X3S/ETH LP -->
+      <div class="pool-card reveal" data-type="lp boost">
+        <div class="pool-top">
+          <div class="pool-identity">
+            <div class="pool-icon" style="background:linear-gradient(135deg,rgba(0,200,255,0.2),rgba(0,100,200,0.1))">◎</div>
+            <div>
+              <div class="pool-name">X3S / ETH LP</div>
+              <div class="pool-pair">Liquidity Pool • Uniswap V3</div>
+            </div>
+          </div>
+          <div class="pool-apy">
+            <div class="pool-apy-val" style="color:var(--cyan)">-- <span style="font-size:14px;color:rgba(0,200,255,0.5)">APY</span></div>
+            <div class="pool-apy-label" style="color:var(--cyan)">LP REWARDS</div>
+          </div>
+        </div>
+        <div class="pool-stats">
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--cyan)">--</div><div class="pstat-key">TVL</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">7 Days</div><div class="pstat-key">Lock Period</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--green)">Hourly</div><div class="pstat-key">Compound</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">X3S+ETH</div><div class="pstat-key">Reward Token</div></div>
+        </div>
+        <div class="pool-actions">
+          <button class="pool-btn pool-btn-stake" style="background:linear-gradient(135deg,var(--cyan),#0066ff)" onclick="openStake('X3S/ETH LP','x3s-eth-lp')">STAKE LP</button>
+          <button class="pool-btn pool-btn-info">DETAILS →</button>
+        </div>
+      </div>
+
+      <!-- POOL: X3S/USDC -->
+      <div class="pool-card reveal" data-type="lp">
+        <div class="pool-top">
+          <div class="pool-identity">
+            <div class="pool-icon" style="background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,150,80,0.08))">◈</div>
+            <div>
+              <div class="pool-name">X3S / USDC LP</div>
+              <div class="pool-pair">Stable Pair • Low Volatility</div>
+            </div>
+          </div>
+          <div class="pool-apy">
+            <div class="pool-apy-val" style="color:var(--green)">-- <span style="font-size:14px;color:rgba(0,255,136,0.5)">APY</span></div>
+            <div class="pool-apy-label" style="color:var(--green)">STABLE POOL</div>
+          </div>
+        </div>
+        <div class="pool-stats">
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--cyan)">--</div><div class="pstat-key">TVL</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">None</div><div class="pstat-key">Lock Period</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--green)">Daily</div><div class="pstat-key">Compound</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">X3S</div><div class="pstat-key">Reward Token</div></div>
+        </div>
+        <div class="pool-actions">
+          <button class="pool-btn pool-btn-stake" style="background:linear-gradient(135deg,var(--green),var(--green2))" onclick="openStake('X3S/USDC LP','x3s-usdc-lp')">STAKE LP</button>
+          <button class="pool-btn pool-btn-info">DETAILS →</button>
+        </div>
+      </div>
+
+      <!-- POOL: Governance Vault -->
+      <div class="pool-card reveal" data-type="single">
+        <div class="pool-top">
+          <div class="pool-identity">
+            <div class="pool-icon" style="background:linear-gradient(135deg,rgba(187,68,255,0.2),rgba(100,30,200,0.1))">⟁</div>
+            <div>
+              <div class="pool-name">Governance Vault</div>
+              <div class="pool-pair">Lock X3S • Earn Voting Power</div>
+            </div>
+          </div>
+          <div class="pool-apy">
+            <div class="pool-apy-val" style="color:var(--purple)">-- <span style="font-size:14px;color:rgba(187,68,255,0.5)">APY</span></div>
+            <div class="pool-apy-label" style="color:var(--purple)">+ GOV WEIGHT</div>
+          </div>
+        </div>
+        <div class="pool-stats">
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--cyan)">--</div><div class="pstat-key">TVL</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">90 Days</div><div class="pstat-key">Lock Period</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--green)">Weekly</div><div class="pstat-key">Compound</div></div>
+          <div class="pool-stat"><div class="pstat-val" style="color:var(--text)">veX3S</div><div class="pstat-key">Reward Token</div></div>
+        </div>
+        <div class="pool-actions">
+          <button class="pool-btn pool-btn-stake" style="background:linear-gradient(135deg,var(--purple),#7722cc)" onclick="openStake('Governance Vault','gov-vault')">LOCK & VOTE</button>
+          <button class="pool-btn pool-btn-info">DETAILS →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+
+      <!-- PORTFOLIO MINI STATS -->
+      <div class="positions-card reveal">
+        <div style="font-family:'Orbitron',monospace;font-size:14px;font-weight:700;margin-bottom:16px;display:flex;gap:8px;align-items:center;">
+          <span style="width:3px;height:16px;background:var(--green);border-radius:2px;display:block"></span>
+          My Portfolio
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div class="mini-stat"><div><div class="ms-val" style="color:var(--green)">$2,840</div><div class="ms-key">STAKED VALUE</div></div></div>
+          <div class="mini-stat"><div><div class="ms-val" style="color:var(--gold)">$184</div><div class="ms-key">EARNED TOTAL</div></div></div>
+          <div class="mini-stat"><div><div class="ms-val" style="color:var(--cyan)">24.4%</div><div class="ms-key">AVG APY</div></div></div>
+          <div class="mini-stat"><div><div class="ms-val" style="color:var(--purple)">3</div><div class="ms-key">POSITIONS</div></div></div>
+        </div>
+        <div class="pos-item">
+          <div class="pos-top">
+            <span class="pos-name">X3S Staking</span>
+            <span class="pos-val">+$84.20</span>
+          </div>
+          <div class="pos-meta">
+            <span>1,200 X3S staked</span>
+            <span id="pool-apy-1">--</span>
+          </div>
+        </div>
+        <div class="pos-item">
+          <div class="pos-top">
+            <span class="pos-name">X3S/ETH LP</span>
+            <span class="pos-val">+$62.40</span>
+          </div>
+          <div class="pos-meta">
+            <span>0.12 ETH + 800 X3S</span>
+            <span id="pool-apy-2">--</span>
+          </div>
+        </div>
+        <div class="pos-item">
+          <div class="pos-top">
+            <span class="pos-name">Governance Vault</span>
+            <span class="pos-val">+$37.60</span>
+          </div>
+          <div class="pos-meta">
+            <span>400 X3S locked</span>
+            <span id="pool-apy-3">--</span>
+          </div>
+        </div>
+        <button class="pool-btn pool-btn-stake" style="width:100%;margin-top:16px;padding:12px;border-radius:10px;">CLAIM ALL</button>
+      </div>
+
+      <!-- CALCULATOR -->
+      <div class="calc-card reveal">
+        <div class="calc-title">Rewards Calculator</div>
+        <div class="calc-input-wrap">
+          <label class="calc-label">Amount to Stake</label>
+          <input class="calc-input" type="number" id="calc-amount" placeholder="10,000" value="10000" oninput="calcRewards()">
+        </div>
+        <div class="calc-slider-wrap">
+          <label class="calc-label">Duration</label>
+          <input type="range" class="calc-slider" id="calc-duration" min="1" max="365" value="180" oninput="calcRewards()">
+          <div class="calc-periods">
+            <span>1 Day</span><span>1 Month</span><span>6 Months</span><span>1 Year</span>
+          </div>
+        </div>
+        <label class="calc-label">Pool</label>
+        <select class="calc-select" id="calc-pool" onchange="calcRewards()">
+          <option value="">Loading pools…</option>
+        </select>
+        <div class="calc-results">
+          <div class="calc-result-row">
+            <span class="cr-key">Daily Earnings</span>
+            <span class="cr-val" id="cr-daily" style="color:var(--cyan)">$6.58</span>
+          </div>
+          <div class="calc-result-row">
+            <span class="cr-key">Monthly</span>
+            <span class="cr-val" id="cr-monthly" style="color:var(--green)">$200</span>
+          </div>
+          <div class="calc-result-row">
+            <span class="cr-key">Total Rewards</span>
+            <span class="cr-val cr-big" id="cr-total">$1,184</span>
+          </div>
+          <div class="calc-result-row">
+            <span class="cr-key">Final Value</span>
+            <span class="cr-val" id="cr-final" style="color:var(--gold)">$11,184</span>
+          </div>
+        </div>
+        <button class="pool-btn pool-btn-stake" style="width:100%;" onclick="openStake('Selected Pool', document.getElementById('calc-pool').value)">STAKE NOW</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STAKE MODAL -->
+<div id="stake-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);
+  z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:rgba(4,8,20,0.98);border:1px solid rgba(0,255,136,0.3);border-radius:20px;
+    padding:32px;width:420px;position:relative;">
+    <button onclick="closeModal()" style="position:absolute;top:16px;right:16px;
+      background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+    <div style="font-family:'Orbitron',monospace;font-size:16px;font-weight:700;margin-bottom:8px;">
+      Stake into <span id="modal-pool-name" style="color:var(--green)">X3S Staking</span>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">APY: <span id="modal-apy" style="color:var(--gold)">--</span></div>
+    <label class="calc-label">Amount</label>
+    <input class="calc-input" type="number" placeholder="Enter amount..." style="margin-bottom:16px;" id="modal-amount" oninput="calcModal()">
+    <div style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.1);border-radius:10px;padding:14px;margin-bottom:20px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--muted)">You receive</span><span id="modal-receive" style="color:var(--green);font-family:'Orbitron',monospace">0 X3S / yr</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted)">Lock period</span><span style="color:var(--text)">30 Days</span></div>
+    </div>
+    <button class="pool-btn pool-btn-stake" style="width:100%;padding:16px;" onclick="confirmStake()">CONFIRM STAKE</button>
+  </div>
+</div>
+
+<footer style="padding:40px 60px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">
+  <div style="font-family:'Orbitron',monospace;font-size:24px;font-weight:900;background:linear-gradient(90deg,var(--gold),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">X3STAR</div>
+  <div style="display:flex;gap:24px;font-size:12px;color:var(--muted);">
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-token-presale.html">Token Presale</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-validator-presale.html">Validator</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-governance.html">Governance</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-dashboard.html">Dashboard</a>
+  </div>
+  <div style="font-size:11px;color:var(--muted);opacity:0.5;">© 2025 X3STAR Protocol</div>
+</footer>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+function updatePoolCards() {
+  return;
+}
+
+// Calc rewards
+function calcRewards() {
+  const amount = parseFloat(document.getElementById('calc-amount').value) || 0;
+  const days = parseInt(document.getElementById('calc-duration').value) || 180;
+  const poolId = document.getElementById('calc-pool').value;
+  const pools = window.__x3StakingPools || [];
+  const pool = pools.find(p => p.id === poolId);
+  const apy = pool ? pool.apy / 100 : 0;
+  const daily = amount * apy / 365;
+  const total = daily * days;
+  document.getElementById('cr-daily').textContent = '$' + daily.toFixed(2);
+  document.getElementById('cr-monthly').textContent = '$' + (daily * 30).toFixed(0);
+  document.getElementById('cr-total').textContent = '$' + total.toFixed(0);
+  document.getElementById('cr-final').textContent = '$' + (amount + total).toFixed(0);
+  // Update slider gradient
+  const slider = document.getElementById('calc-duration');
+  const pct = (days / 365) * 100;
+  slider.style.setProperty('--pct', pct + '%');
+}
+calcRewards();
+
+// Modal
+function openStake(name, apy) {
+  const pools = window.__x3StakingPools || [];
+  const pool = pools.find(p => p.id === apy);
+  const poolApy = pool ? pool.apy : apy;
+  const modal = document.getElementById('stake-modal');
+  modal.style.display = 'flex';
+  document.getElementById('modal-pool-name').textContent = pool ? pool.name : name;
+  document.getElementById('modal-apy').textContent = poolApy ? poolApy + '%' : '--';
+  document.getElementById('modal-amount').value = '';
+  document.getElementById('modal-receive').textContent = '0 X3S / yr';
+}
+function closeModal() {
+  document.getElementById('stake-modal').style.display = 'none';
+}
+function calcModal() {
+  const v = parseFloat(document.getElementById('modal-amount').value) || 0;
+  const apy = parseFloat(document.getElementById('modal-apy').textContent) / 100;
+  const price = Number(window.__x3TokenPriceUsd || 0.0);
+  const tokens = price > 0 ? (v / price * apy).toFixed(0) : 0;
+  document.getElementById('modal-receive').textContent = parseInt(tokens).toLocaleString() + ' X3S / yr';
+}
+function confirmStake() {
+  closeModal();
+  alert('Connect wallet to confirm your stake!');
+}
+function filterPools(el, type) {
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  
+  // Filter pool cards
+  const cards = document.querySelectorAll('.pool-card');
+  cards.forEach(card => {
+    if (type === 'all' || card.dataset.type.includes(type)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+// Reveal
+const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); }), {threshold:0.05});
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+X3PageAdapters.start();
+</script>
+</body>
+</html>

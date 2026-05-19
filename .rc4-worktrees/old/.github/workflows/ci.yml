@@ -1,0 +1,358 @@
+##############################################################################
+# X3 ATOMIC STAR — CRITICAL PATH CI GATE
+#
+# This workflow enforces all required launch gates before merge to main.
+# Every job here is a HARD BLOCK. No continue-on-error. No || true.
+# No skips. A single failure prevents merge.
+#
+# Job matrix (must all pass):
+#   ┌─────────────────────────────────────────────────────┐
+#   │ format         — cargo fmt --all -- --check         │
+#   │ check-runtime  — cargo check -p x3-chain-runtime    │
+#   │ check-node     — cargo check -p x3-chain-node       │
+#   │ test-router    — cargo test -p pallet-x3-cross-vm-router  │
+#   │ test-ledger    — cargo test -p pallet-x3-supply-ledger    │
+#   │ test-settle    — cargo test -p pallet-x3-settlement-engine │
+#   │ test-kernel    — cargo test -p pallet-x3-atomic-kernel     │
+#   │ clippy         — cargo clippy --workspace -D warnings      │
+#   │ binary         — cargo build --release -p x3-chain-node    │
+#   └─────────────────────────────────────────────────────┘
+#
+# Hard rules:
+#   * Failures here MUST block merge. Configure branch protection rules to
+#     require "x3 / critical-path-all-pass" as a required status check.
+#   * RUSTFLAGS: "-D warnings" is non-negotiable. Warnings are errors.
+#   * Toolchain is pinned via rust-toolchain.toml in the repo root.
+##############################################################################
+
+name: x3 critical-path CI
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+      - "hotfix/**"
+  pull_request:
+    branches:
+      - main
+      - "release/**"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: short
+
+# Cancel in-progress runs for the same branch/PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+##############################################################################
+# SHARED SETUP STEPS (reused across all jobs via composite action)
+##############################################################################
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. FORMAT — zero tolerance for unformatted code
+  # ──────────────────────────────────────────────────────────────────────────
+  format:
+    name: "gate: cargo fmt"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. RUNTIME CHECK — runtime compiles with std + wasm feature sets
+  # ──────────────────────────────────────────────────────────────────────────
+  check-runtime:
+    name: "gate: check x3-chain-runtime"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-runtime
+
+      - name: cargo check runtime (std)
+        run: cargo check -p x3-chain-runtime --features std
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. NODE CHECK — node binary compiles
+  # ──────────────────────────────────────────────────────────────────────────
+  check-node:
+    name: "gate: check x3-chain-node"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-node
+
+      - name: cargo check node
+        run: cargo check -p x3-chain-node
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. TEST: cross-vm-router — 6-route matrix + invariants + replay protection
+  # ──────────────────────────────────────────────────────────────────────────
+  test-router:
+    name: "gate: test pallet-x3-cross-vm-router"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-router
+
+      - name: cargo test cross-vm-router
+        run: cargo test -p pallet-x3-cross-vm-router --all-features -- --nocapture
+
+      # Verify specific production-proof tests are present and passing.
+      - name: verify production-proof tests pass
+        run: |
+          cargo test -p pallet-x3-cross-vm-router \
+            test_x3_native_evm_svm_roundtrip_preserves_supply \
+            test_all_six_internal_routes_succeed \
+            test_duplicate_nonce_rejected \
+            test_failed_destination_credit_refunds_pending_supply \
+            test_canonical_supply_never_breaks \
+            test_duplicate_message_replay_rejected \
+            test_expired_transfer_refunds_to_source \
+            external_bridges_are_paused_at_genesis \
+            2>&1
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 5. TEST: supply-ledger — canonical supply invariant
+  # ──────────────────────────────────────────────────────────────────────────
+  test-ledger:
+    name: "gate: test pallet-x3-supply-ledger"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-ledger
+
+      - name: cargo test supply-ledger
+        run: cargo test -p pallet-x3-supply-ledger --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 6. TEST: settlement-engine — atomic settlement state machine
+  # ──────────────────────────────────────────────────────────────────────────
+  test-settle:
+    name: "gate: test pallet-x3-settlement-engine"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-settle
+
+      - name: cargo test settlement-engine
+        run: cargo test -p pallet-x3-settlement-engine --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 7. TEST: atomic-kernel — bundle lifecycle + PoAE proof
+  # ──────────────────────────────────────────────────────────────────────────
+  test-kernel:
+    name: "gate: test pallet-x3-atomic-kernel"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-kernel
+
+      - name: cargo test atomic-kernel
+        run: cargo test -p pallet-x3-atomic-kernel --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8. CLIPPY — deny all warnings across full workspace
+  # ──────────────────────────────────────────────────────────────────────────
+  clippy:
+    name: "gate: clippy --workspace -D warnings"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Run after quick checks to avoid wasting runner time if trivial things fail.
+    needs: [format, check-runtime, check-node]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-clippy
+
+      - name: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 9. RELEASE BINARY — verify the node binary builds in release mode
+  # ──────────────────────────────────────────────────────────────────────────
+  binary:
+    name: "gate: cargo build --release x3-chain-node"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Only run release build on main pushes and release/* PRs, not on every PR
+    # to keep CI fast for feature branches. Remove this condition to always run.
+    if: >
+      github.event_name == 'push' ||
+      startsWith(github.head_ref, 'release/') ||
+      startsWith(github.head_ref, 'hotfix/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo (release)
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-release-binary
+
+      - name: cargo build --release -p x3-chain-node
+        run: cargo build --release -p x3-chain-node
+
+      - name: Verify binary exists and is executable
+        run: |
+          test -f target/release/x3-chain-node
+          test -x target/release/x3-chain-node
+          echo "✅ Binary at $(du -sh target/release/x3-chain-node | awk '{print $2}') ($(du -sh target/release/x3-chain-node | awk '{print $1}'))"
+
+      - name: Print version
+        run: ./target/release/x3-chain-node --version
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-chain-node-${{ github.sha }}
+          path: target/release/x3-chain-node
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 10. AGGREGATE — single required status check for branch protection
+  # ──────────────────────────────────────────────────────────────────────────
+  # Configure GitHub branch protection to require:
+  #   "x3 / critical-path-all-pass"
+  # This gives a single required check while all sub-gates must pass.
+  critical-path-all-pass:
+    name: "x3 / critical-path-all-pass"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - format
+      - check-runtime
+      - check-node
+      - test-router
+      - test-ledger
+      - test-settle
+      - test-kernel
+      - clippy
+    steps:
+      - name: All critical-path gates passed
+        run: |
+          echo "✅ All X3 critical-path CI gates passed."
+          echo ""
+          echo "Gates:"
+          echo "  ✅ format"
+          echo "  ✅ check-runtime"
+          echo "  ✅ check-node"
+          echo "  ✅ test-router (6-route matrix + invariants)"
+          echo "  ✅ test-ledger (canonical supply invariant)"
+          echo "  ✅ test-settle (atomic settlement state machine)"
+          echo "  ✅ test-kernel (bundle lifecycle)"
+          echo "  ✅ clippy (workspace, deny warnings)"

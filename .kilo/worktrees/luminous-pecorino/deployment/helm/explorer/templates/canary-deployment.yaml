@@ -1,0 +1,43 @@
+{{- if .Values.canary.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "explorer.fullname" . }}-canary
+  labels:
+    app: {{ include "explorer.fullname" . }}-canary
+spec:
+  replicas: {{ .Values.canary.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "explorer.fullname" . }}-canary
+  template:
+    metadata:
+      labels:
+        app: {{ include "explorer.fullname" . }}-canary
+    spec:
+      containers:
+        - name: explorer-canary
+          image: "{{ .Values.image.repository }}:{{ .Values.canary.image.tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              name: http
+          env:
+            - name: NEXT_PUBLIC_NETWORK
+              value: "{{ .Values.env.NEXT_PUBLIC_NETWORK }}"
+            - name: NEXT_PUBLIC_SUBSTRATE_WS_ENDPOINT
+              value: "{{ .Values.env.NEXT_PUBLIC_SUBSTRATE_WS_ENDPOINT }}"
+          resources: {{ toYaml .Values.canary.resources | indent 12 | default (toYaml .Values.resources | indent 12) }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthPath | quote }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthPath | quote }}
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+{{- end -}}

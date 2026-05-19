@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Leaderboard Arena</title>
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@300;400;500;600;700&family=Barlow:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08030F;--card:rgba(12,5,20,0.98);
+  --neon:#CC00FF;--neon2:#FF00CC;--cyan:#00FFFF;
+  --gold:#FFD700;--green:#00FF88;--red:#FF2255;
+  --white:#F8F0FF;--muted:rgba(248,240,255,0.3);
+  --border:rgba(204,0,255,0.15);
+  --display:'Teko',sans-serif;--body:'Barlow',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--white);font-family:var(--body);min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(100,0,180,0.12),transparent),
+  radial-gradient(ellipse 40% 40% at 0% 100%,rgba(0,200,255,0.04),transparent);}
+
+/* SCOREBOARD TOP */
+.scoreboard-header{background:linear-gradient(180deg,rgba(20,0,40,0.98),rgba(8,3,15,0.98));
+  border-bottom:2px solid var(--neon);position:sticky;top:0;z-index:100;}
+.sh-top{display:flex;align-items:center;padding:12px 32px;gap:20px;
+  border-bottom:1px solid var(--border);}
+.logo{font-family:var(--display);font-size:28px;font-weight:600;letter-spacing:4px;
+  background:linear-gradient(90deg,var(--neon),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.arena-label{font-family:var(--display);font-size:14px;letter-spacing:4px;
+  color:var(--muted);text-transform:uppercase;}
+.live-pill{display:flex;align-items:center;gap:6px;padding:5px 14px;
+  background:rgba(204,0,255,0.1);border:1px solid rgba(204,0,255,0.3);
+  border-radius:100px;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--neon);}
+.lp-dot{width:6px;height:6px;border-radius:50%;background:var(--neon);
+  animation:neonPulse 1.5s infinite;}
+@keyframes neonPulse{0%,100%{box-shadow:0 0 6px var(--neon);opacity:1}50%{box-shadow:0 0 16px var(--neon);opacity:0.6}}
+.sh-cta{margin-left:auto;padding:9px 24px;background:linear-gradient(135deg,var(--neon),var(--neon2));
+  color:#fff;border:none;border-radius:6px;font-family:var(--body);
+  font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.2s;}
+.sh-cta:hover{box-shadow:0 0 24px rgba(204,0,255,0.5);}
+
+/* TABS */
+.tabs{display:flex;gap:0;padding:0 32px;border-bottom:1px solid var(--border);}
+.tab{padding:14px 20px;font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all 0.2s;font-family:var(--display);font-size:16px;}
+.tab.active{color:var(--neon);border-bottom-color:var(--neon);}
+.tab:hover{color:var(--white);}
+
+/* WEEK PRIZE BANNER */
+.prize-banner{margin:16px 32px;background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(204,0,255,0.08));
+  border:1px solid rgba(255,215,0,0.2);border-radius:12px;
+  padding:14px 20px;display:flex;align-items:center;gap:16px;}
+.pb-trophy{font-size:28px;}
+.pb-text{font-size:13px;font-weight:700;flex:1;}
+.pb-text span{color:var(--gold);}
+.pb-ends{font-size:11px;color:var(--muted);margin-top:2px;}
+.pb-timer{font-family:var(--display);font-size:22px;color:var(--gold);letter-spacing:2px;}
+
+/* MAIN GRID */
+.main{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;
+  background:var(--border);margin:0 32px 32px;border-radius:16px;overflow:hidden;border:1px solid var(--border);}
+.lb-col{background:var(--bg);}
+.col-head{padding:14px 16px;border-bottom:1px solid var(--border);
+  background:rgba(204,0,255,0.04);}
+.ch-emoji{font-size:18px;margin-right:6px;}
+.ch-title{font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:1px;}
+.ch-prize{font-size:10px;color:var(--gold);margin-top:2px;letter-spacing:1.5px;}
+
+/* LEADERBOARD ROW */
+.lb-row{display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-bottom:1px solid rgba(255,255,255,0.03);transition:background 0.15s;}
+.lb-row:hover{background:rgba(204,0,255,0.04);}
+.lb-row.rank-1{background:rgba(255,215,0,0.06);}
+.lb-row.rank-2{background:rgba(180,180,200,0.04);}
+.lb-row.rank-3{background:rgba(180,100,40,0.04);}
+.lb-rank{font-family:var(--display);font-size:18px;font-weight:600;
+  width:28px;flex-shrink:0;text-align:center;}
+.r1{color:var(--gold);}
+.r2{color:#C0C0C8;}
+.r3{color:#CD7F32;}
+.rn{color:var(--muted);}
+.lb-avatar{width:32px;height:32px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;
+  font-family:var(--display);}
+.lb-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lb-val{font-family:var(--display);font-size:16px;font-weight:600;
+  text-align:right;flex-shrink:0;}
+.lb-bar{height:2px;background:rgba(255,255,255,0.06);margin-top:2px;overflow:hidden;border-radius:1px;}
+.lb-bar-fill{height:100%;border-radius:1px;transition:width 0.5s ease;}
+.lb-badge{font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 6px;
+  border-radius:2px;flex-shrink:0;text-transform:uppercase;}
+.lbb-top{background:rgba(255,215,0,0.1);color:var(--gold);border:1px solid rgba(255,215,0,0.2);}
+.lbb-rising{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.2);}
+
+/* DELTA */
+.lb-delta{font-size:10px;margin-left:2px;}
+.delta-up{color:var(--green);}
+.delta-dn{color:var(--red);}
+
+/* MY POSITION */
+.my-position{margin:0 32px 32px;background:rgba(0,255,255,0.04);
+  border:1px solid rgba(0,255,255,0.2);border-radius:12px;padding:20px 24px;}
+.mp-title{font-family:var(--display);font-size:18px;letter-spacing:2px;
+  color:var(--cyan);margin-bottom:14px;}
+.mp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.mp-stat{text-align:center;}
+.mps-val{font-family:var(--display);font-size:28px;font-weight:600;line-height:1;}
+.mps-key{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:3px;}
+.mp-cta{margin-top:16px;width:100%;padding:14px;
+  background:linear-gradient(135deg,rgba(0,255,255,0.1),rgba(0,255,255,0.05));
+  border:1px solid rgba(0,255,255,0.2);color:var(--cyan);border-radius:8px;
+  font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:3px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
+.mp-cta:hover{background:rgba(0,255,255,0.12);box-shadow:0 0 20px rgba(0,255,255,0.1);}
+
+/* HOW TO EARN */
+.how{margin:0 32px 32px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.hw-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:16px;text-align:center;}
+.hw-icon{font-size:28px;margin-bottom:8px;}
+.hw-title{font-family:var(--display);font-size:15px;font-weight:600;margin-bottom:4px;}
+.hw-pts{font-size:11px;color:var(--neon);font-weight:700;letter-spacing:1px;}
+.hw-desc{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<div class="scoreboard-header">
+  <div class="sh-top">
+    <div class="logo">X3STAR</div>
+    <div class="arena-label">Arena Leaderboard</div>
+    <div class="live-pill"><div class="lp-dot"></div>Live Rankings</div>
+    <button class="sh-cta" onclick="location.href='x3star-token-presale.html'">Join Now →</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active">🏆 Investors</div>
+    <div class="tab">⬡ Staking Pools</div>
+    <div class="tab">🗳 Delegates</div>
+    <div class="tab">⚒ Validators</div>
+  </div>
+</div>
+
+<!-- PRIZE BANNER -->
+<div class="prize-banner">
+  <div class="pb-trophy">🏆</div>
+  <div>
+    <div class="pb-text">Live leaderboard data for community incentives and protocol participation.</div>
+    <div class="pb-ends"><span style="color:var(--neon)" id="arena-participants">--</span> active participants tracked</div>
+  </div>
+  <div class="pb-timer">LIVE</div>
+</div>
+
+<!-- LEADERBOARD COLUMNS -->
+<div class="main">
+
+  <!-- REFERRALS -->
+  <div class="lb-col">
+    <div class="col-head">
+      <div><span class="ch-emoji">💼</span><span class="ch-title">Top Investors</span></div>
+      <div class="ch-prize">Capital inflow leaders</div>
+    </div>
+    <div id="ref-board"></div>
+  </div>
+
+  <!-- STAKING -->
+  <div class="lb-col">
+    <div class="col-head" style="background:rgba(0,255,136,0.03);">
+      <div><span class="ch-emoji">⬡</span><span class="ch-title" style="color:var(--green)">Staking Pools</span></div>
+      <div class="ch-prize">Ranked by TVL</div>
+    </div>
+    <div id="stake-board"></div>
+  </div>
+
+  <!-- GOVERNANCE -->
+  <div class="lb-col">
+    <div class="col-head" style="background:rgba(0,200,255,0.03);">
+      <div><span class="ch-emoji">🗳</span><span class="ch-title" style="color:var(--cyan)">Delegates</span></div>
+      <div class="ch-prize">Ranked by voting power</div>
+    </div>
+    <div id="gov-board"></div>
+  </div>
+
+  <!-- VALIDATORS -->
+  <div class="lb-col">
+    <div class="col-head" style="background:rgba(255,215,0,0.03);">
+      <div><span class="ch-emoji">⚒</span><span class="ch-title" style="color:var(--gold)">Validator Score</span></div>
+      <div class="ch-prize">Uptime · TPS · Stake</div>
+    </div>
+    <div id="val-board"></div>
+  </div>
+
+</div>
+
+<!-- MY POSITION -->
+<div class="my-position">
+  <div class="mp-title">Your Season Stats</div>
+  <div class="mp-grid">
+    <div class="mp-stat"><div class="mps-val" style="color:var(--neon)">--</div><div class="mps-key">Referral Rank</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--green)">--</div><div class="mps-key">X3S Points</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--cyan)">--</div><div class="mps-key">Referrals</div></div>
+    <div class="mp-stat"><div class="mps-val" style="color:var(--gold)">--</div><div class="mps-key">This Week</div></div>
+  </div>
+  <button class="mp-cta" onclick="location.href='x3star-affiliate.html'">Climb the Leaderboard — Get Your Referral Link →</button>
+</div>
+
+<!-- HOW TO EARN -->
+<div class="how">
+  <div class="hw-card">
+    <div class="hw-icon">🔗</div>
+    <div class="hw-title">Refer Investors</div>
+    <div class="hw-pts">10% Commission + Points</div>
+    <div class="hw-desc">Earn points for every investor you bring in. Top referrer wins 150K X3S bonus.</div>
+  </div>
+  <div class="hw-card">
+    <div class="hw-icon">⬡</div>
+    <div class="hw-title">Stake X3S</div>
+    <div class="hw-pts">Points per X3S Staked</div>
+    <div class="hw-desc">Lock tokens in any pool. The more you stake, the higher you climb.</div>
+  </div>
+  <div class="hw-card">
+    <div class="hw-icon">🗳</div>
+    <div class="hw-title">Vote on Proposals</div>
+    <div class="hw-pts">500 pts per vote cast</div>
+    <div class="hw-desc">Participate in DAO governance. Every vote earns you season points.</div>
+  </div>
+  <div class="hw-card">
+    <div class="hw-icon">⚒</div>
+    <div class="hw-title">Run a Validator</div>
+    <div class="hw-pts">Uptime = Score</div>
+    <div class="hw-desc">Validators ranked by uptime × stake × TPS. Top validators earn massive bonus pools.</div>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

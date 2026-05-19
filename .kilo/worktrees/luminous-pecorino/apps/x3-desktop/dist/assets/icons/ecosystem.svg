@@ -1,0 +1,21 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ecoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e676;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00c853;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Globe circle -->
+  <circle cx="64" cy="64" r="40" fill="none" stroke="url(#ecoGrad)" stroke-width="3"/>
+  <!-- Latitude lines -->
+  <ellipse cx="64" cy="64" rx="40" ry="16" fill="none" stroke="url(#ecoGrad)" stroke-width="1.5" opacity="0.5"/>
+  <ellipse cx="64" cy="64" rx="16" ry="40" fill="none" stroke="url(#ecoGrad)" stroke-width="1.5" opacity="0.5"/>
+  <!-- Meridian -->
+  <line x1="64" y1="24" x2="64" y2="104" stroke="url(#ecoGrad)" stroke-width="1.5" opacity="0.4"/>
+  <line x1="24" y1="64" x2="104" y2="64" stroke="url(#ecoGrad)" stroke-width="1.5" opacity="0.4"/>
+  <!-- Orbiting nodes -->
+  <circle cx="28" cy="38" r="5" fill="url(#ecoGrad)" opacity="0.8"/>
+  <circle cx="100" cy="44" r="5" fill="url(#ecoGrad)" opacity="0.8"/>
+  <circle cx="44" cy="96" r="5" fill="url(#ecoGrad)" opacity="0.8"/>
+  <circle cx="92" cy="84" r="4" fill="url(#ecoGrad)" opacity="0.6"/>
+</svg>

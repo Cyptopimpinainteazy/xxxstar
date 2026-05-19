@@ -1,0 +1,71 @@
+name: Security Dashboard
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'  # Weekly on Monday at 11 AM UTC
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Rust Security Analysis
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit --format json --output cargo-audit-results.json || true
+
+      # NPM Security Analysis
+      - name: Run npm audit
+        run: |
+          find . -name "package.json" -not -path "./node_modules/*" -exec dirname {} \; | while read dir; do
+            echo "Auditing $dir"
+            cd "$dir" && npm audit --audit-level=moderate --json > "../../npm-audit-$(basename "$dir").json" 2>/dev/null || true
+            cd - > /dev/null
+          done
+
+      # Python Security Analysis
+      - name: Run safety (Python)
+        run: |
+          find . -name "requirements.txt" -exec python -m pip install safety \; -exec safety check --output json --file {} \; || true
+
+      # Create Security Report
+      - name: Generate Security Summary
+        run: |
+          echo "# X3 Security Dashboard Report" > security-report.md
+          echo "Generated: $(date)" >> security-report.md
+          echo "" >> security-report.md
+          echo "## Rust Dependencies" >> security-report.md
+          echo "\`\`\`json" >> security-report.md
+          cat cargo-audit-results.json 2>/dev/null || echo "{}" >> security-report.md
+          echo "\`\`\`" >> security-report.md
+          echo "" >> security-report.md
+          echo "## NPM Packages" >> security-report.md
+          ls npm-audit-*.json 2>/dev/null | head -5 | while read file; do
+            echo "### ${file%.json}" >> security-report.md
+            echo "\`\`\`json" >> security-report.md
+            cat "$file" | jq '.vulnerabilities // empty' 2>/dev/null || echo "No vulnerabilities found" >> security-report.md
+            echo "\`\`\`" >> security-report.md
+          done
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-dashboard-report
+          path: security-report.md

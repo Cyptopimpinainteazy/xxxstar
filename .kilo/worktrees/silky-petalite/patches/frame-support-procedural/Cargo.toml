@@ -1,0 +1,42 @@
+[package]
+name = "frame-support-procedural"
+version = "36.0.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2021"
+license = "Apache-2.0"
+homepage = "https://substrate.io"
+repository = "https://github.com/paritytech/polkadot-sdk"
+description = "Proc macro of Support code for the runtime. (X3 patched: unconditional GenesisConfig serde)"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+Inflector = { version = "0.11.4" }
+cfg-expr = { version = "0.15.5" }
+derive-syn-parse = { version = "0.2.0" }
+docify = { version = "0.2.9" }
+expander = { version = "2.0.0" }
+frame-support-procedural-tools = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = true }
+itertools = { version = "0.11" }
+macro_magic = { version = "0.5.1", features = ["proc_support"] }
+proc-macro-warning = { version = "1.0.0", default-features = false }
+proc-macro2 = { version = "1.0.86" }
+quote = { version = "1.0.37" }
+sp-crypto-hashing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+syn = { version = "2.0.87", features = ["full", "parsing", "visit-mut"] }
+
+[features]
+default = ["std"]
+std = [
+	"sp-crypto-hashing/std",
+]
+no-metadata-docs = []
+experimental = []
+# Generate impl-trait for tuples with the given number of tuples. Will be needed as the number of
+# pallets in a runtime grows. Does increase the compile time!
+tuples-96 = []
+tuples-128 = []

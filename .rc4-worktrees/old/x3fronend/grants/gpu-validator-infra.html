@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Reactor Benchmark Infrastructure</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#111827;--text:#eef2ff;--muted:#94a3b8;--accent:#f97316;--border:#334155;--card:#0f1720;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 32px;background:rgba(4,8,16,0.96);border-bottom:1px solid rgba(148,163,184,0.12);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:20px;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;}
+nav a{font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);text-decoration:none;}
+.hero{padding:72px 32px 24px;max-width:1120px;margin:0 auto;}
+.hero-kicker{font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(48px,6vw,86px);line-height:0.92;max-width:860px;margin-bottom:22px;color:#fff;}
+.hero-title span{color:#fb923c;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;text-decoration:none;transition:transform 0.2s ease,background 0.2s ease;}
+.btn-primary{background:linear-gradient(135deg,#fb923c,#f97316);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(148,163,184,0.14);}
+.btn:hover{transform:translateY(-1px);}
+.container{max-width:1120px;margin:0 auto;padding:0 32px;}
+.section{margin-top:36px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:30px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:900px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px;}
+.card{background:var(--card);border:1px solid rgba(148,163,184,0.08);border-radius:20px;padding:24px;}
+.card h3{font-size:18px;color:#fff;margin-bottom:10px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card ul{margin-top:12px;list-style:none;padding-left:0;display:grid;gap:10px;}
+.card li{padding-left:18px;position:relative;color:var(--muted);font-size:14px;}
+.card li:before{content:'▹';position:absolute;left:0;top:0;color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:18px;margin-top:28px;}
+.status{background:#0f1720;border:1px solid rgba(251,115,24,0.14);border-radius:18px;padding:22px;}
+.status h4{font-size:13px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:12px;}
+.status p{color:var(--muted);font-size:14px;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/grants/index.html">Grants Portal</a><a href="/x3star-grant-hub.html">Grant Hub</a><a href="/x3star-landing.html">Home</a></div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">X3 Reactor</div>
+  <h1 class="hero-title">Benchmarking the next generation of high-throughput validators.</h1>
+  <p class="hero-copy">X3 Reactor is the validator benchmark and acceleration infrastructure for X3 Atomic Star. It produces repeatable stress tests, latency profiles, and performance reports that funders can trust.</p>
+  <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Fund Reactor Bench</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request benchmark results</a></div>
+</section>
+<div class="container">
+  <div class="section">
+    <h2>Problem</h2>
+    <p>Chains often overclaim TPS and underprove performance. Validators need reproducible stress tests and transparent benchmark reports, not marketing numbers.</p>
+  </div>
+  <div class="section">
+    <h2>X3 solution</h2>
+    <p>X3 Reactor provides repeatable validator benchmarks, RPC latency testing, multi-region load tests, GPU-assisted workload experiments, and performance reports designed for technical reviewers.</p>
+    <div class="row">
+      <div class="card"><h3>Validator benchmark runner</h3><p>Automated and reproducible runs for validator throughput, signature processing, and chain readiness.</p></div>
+      <div class="card"><h3>RPC latency tester</h3><p>Measure real API response performance under load with realistic multi-region traffic.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Technical modules</h2>
+    <div class="card"><ul><li>Benchmark runner</li><li>RPC latency test</li><li>Multi-region load tester</li><li>Transaction throughput simulator</li><li>GPU-assisted workload experiments</li><li>Reproducible benchmark reports</li></ul></div>
+  </div>
+  <div class="section">
+    <h2>What is already built</h2>
+    <div class="card"><ul><li>Benchmark methodology for throughput and latency.</li><li>Initial validator and testnet metrics model.</li><li>ProofForge readiness integration for report delivery.</li></ul></div>
+  </div>
+  <div class="section">
+    <h2>What funding unlocks</h2>
+    <div class="row">
+      <div class="card"><h3>GPU nodes</h3><p>Dedicated compute for benchmark runs and AI-assisted workload experiments.</p></div>
+      <div class="card"><h3>Cloud regions</h3><p>Multi-zone testing for realistic validator behavior and performance reporting.</p></div>
+      <div class="card"><h3>Telemetry pipeline</h3><p>Collect validator health, failure modes, and performance signals for analysis.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Milestone roadmap</h2>
+    <div class="row">
+      <div class="card"><h3>Phase 1</h3><p>Deploy benchmark runner and publish baseline performance report.</p></div>
+      <div class="card"><h3>Phase 2</h3><p>Run GPU-assisted stress tests and refine validator health scoring.</p></div>
+      <div class="card"><h3>Phase 3</h3><p>Release signed Reactor reports and proof-backed validator readiness artifacts.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Funding use breakdown</h2>
+    <div class="status-grid">
+      <div class="status"><h4>GPU compute</h4><p>40% for benchmark and AI workload nodes.</p></div>
+      <div class="status"><h4>Cloud regions</h4><p>30% for multi-region stress test infrastructure.</p></div>
+      <div class="status"><h4>Telemetry</h4><p>20% for data collection and report generation.</p></div>
+      <div class="status"><h4>Open reporting</h4><p>10% for public benchmark artifacts and dashboard publishing.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proof / demo</h2>
+    <p>Run a fresh-machine stress test and publish a signed Reactor report showing throughput, latency, failure rate, and recovery behavior.</p>
+  </div>
+  <div class="section">
+    <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Sponsor Reactor node</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request benchmark results</a></div>
+  </div>
+</div>
+</body>
+</html>

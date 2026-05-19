@@ -1,0 +1,14 @@
+chain-specs/x3-local3-current-plain.json
+chain-specs/x3-local3-current-raw.json
+chain-specs/x3-local3-plain.json
+chain-specs/x3-local3-raw.json
+reports/rc2/backup_SHA256SUMS.txt
+reports/rc2/external_bridge_rejection.json
+reports/rc2/internal_settlement_smoke_report.json
+reports/rc2/internal_settlement_smoke_report.md
+reports/rc2/replay_rejection.json
+reports/rc2/six_route_results.json
+reports/rc2/supply_after.json
+reports/rc2/supply_before.json
+reports/rc2/trust_manifest.md
+scripts/mainnet/rc2_internal_settlement_smoke.sh

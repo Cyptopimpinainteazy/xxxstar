@@ -1,0 +1,126 @@
+{
+  "timestamp": "2026-02-08T22:30:03.508178",
+  "network": "solana-testnet",
+  "genesis_hash": "EtWTRABZaM94jYoKoi6yGiYJARSZwRhANgqJ7phuCFT",
+  "validators": [
+    {
+      "identity": "validator-0",
+      "vote_account": "vote-account-0",
+      "stake_account": "stake-account-0",
+      "rpc_port": 9944,
+      "gossip_port": 8001,
+      "entrypoint": "testnet-entrypoint.solana.com:8001",
+      "ledger_path": "./ledger-validator-0",
+      "accounts_db_cache_dir": "./accounts-cache-0",
+      "accounts_db_index_type": "mmap",
+      "accounts_db_mmap_accounts": true,
+      "snapshot_interval_slots": 100,
+      "maximum_memory_cache_slots": 100
+    },
+    {
+      "identity": "validator-1",
+      "vote_account": "vote-account-1",
+      "stake_account": "stake-account-1",
+      "rpc_port": 9945,
+      "gossip_port": 8002,
+      "entrypoint": "testnet-entrypoint.solana.com:8001",
+      "ledger_path": "./ledger-validator-1",
+      "accounts_db_cache_dir": "./accounts-cache-1",
+      "accounts_db_index_type": "mmap",
+      "accounts_db_mmap_accounts": true,
+      "snapshot_interval_slots": 100,
+      "maximum_memory_cache_slots": 100
+    },
+    {
+      "identity": "validator-2",
+      "vote_account": "vote-account-2",
+      "stake_account": "stake-account-2",
+      "rpc_port": 9946,
+      "gossip_port": 8003,
+      "entrypoint": "testnet-entrypoint.solana.com:8001",
+      "ledger_path": "./ledger-validator-2",
+      "accounts_db_cache_dir": "./accounts-cache-2",
+      "accounts_db_index_type": "mmap",
+      "accounts_db_mmap_accounts": true,
+      "snapshot_interval_slots": 100,
+      "maximum_memory_cache_slots": 100
+    }
+  ],
+  "topology": {
+    "validators": [
+      {
+        "id": 0,
+        "identity": "validator-0",
+        "gossip_addr": "127.0.0.1:8001",
+        "rpc_addr": "127.0.0.1:9944",
+        "peers": [
+          1,
+          2
+        ],
+        "gpu_accelerated": true,
+        "gpu_devices": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "id": 1,
+        "identity": "validator-1",
+        "gossip_addr": "127.0.0.1:8002",
+        "rpc_addr": "127.0.0.1:9945",
+        "peers": [
+          0,
+          2
+        ],
+        "gpu_accelerated": true,
+        "gpu_devices": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "id": 2,
+        "identity": "validator-2",
+        "gossip_addr": "127.0.0.1:8003",
+        "rpc_addr": "127.0.0.1:9946",
+        "peers": [
+          0,
+          1
+        ],
+        "gpu_accelerated": true,
+        "gpu_devices": [
+          0,
+          1,
+          2
+        ]
+      }
+    ],
+    "mesh_connection_style": "full",
+    "intended_node_size": "gpu_accelerated"
+  },
+  "performance_settings": {
+    "turbo_mode": true,
+    "gpu_acceleration": true,
+    "signature_verify_gpu": true,
+    "poh_gpu_acceleration": true,
+    "tx_validator_gpu": true
+  },
+  "verification": {
+    "min_peers": 3,
+    "peer_timeout_sec": 120,
+    "finality_window_sec": 12,
+    "max_finality_lag_mult": 2,
+    "check_telemetry": false,
+    "prom_host": "127.0.0.1",
+    "prom_port": 9090,
+    "grafana_host": "127.0.0.1",
+    "grafana_port": 3001,
+    "run_load": false,
+    "run_multiprocess": false,
+    "load_duration_sec": 1200,
+    "min_finalized_tps": 0,
+    "max_error_rate": 0.01
+  }
+}

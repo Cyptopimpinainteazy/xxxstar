@@ -1,0 +1,46 @@
+{
+  "name": "@x3-chain/x3-wallet",
+  "version": "0.1.0",
+  "description": "Polkawallet JS API plugin for X3 Chain x3chain — wraps @polkadot/api for x3vm, atomic trades, x3 lang, flashloans, governance, and all X3 Chain pallets",
+  "main": "dist/main.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "build:dev": "tsup --config tsup.config.ts --env.NODE_ENV development",
+    "dev": "tsup --config tsup.config.ts --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/ --ext .ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist/"
+  },
+  "dependencies": {
+    "@polkadot/api": "^14.0.1",
+    "@polkadot/keyring": "^13.0.0",
+    "@polkadot/types": "^14.0.1",
+    "@polkadot/util": "^13.0.0",
+    "@polkadot/util-crypto": "^13.0.0"
+  },
+  "devDependencies": {
+    "@polkadot/extension-dapp": "^0.50.1",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "docs/root/README.md"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/x3-chain/x3-chain",
+    "directory": "packages/polkawallet-plugin"
+  }
+}

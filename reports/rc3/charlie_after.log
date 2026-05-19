@@ -1,0 +1,376 @@
+
+[1;35m
+       ________          __                
+___  __\_____  \  ______/  |______ _______ 
+\  \/  / _(__  < /  ___|   __\__  \\_  __ \
+ >    < /       \\\___ \ |  |  / __ \|  | \/
+/__/\_Y______  /____  >|__| (____  /__|   
+     \/      \/     \/           \/       
+[0m[36m
+🚀  X3 Chain Node — syncing the mesh ⚡️[0m
+
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: X3 Chain Node
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: ✌️  version 0.1.0
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: ❤️  by X3 Chain Core Engineering <engineering@x3-chain.io>, 2024-2026
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: 📋 Chain specification: X3 Chain Local Testnet
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: 🏷  Node name: Charlie
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: 👤 Role: AUTHORITY
+2026-05-13 18:01:18.161  INFO main sc_cli::runner: 💾 Database: ParityDb at /tmp/x3-rc3-charlie/chains/x3_chain_local/paritydb/full
+2026-05-13 18:01:18.161  INFO main x3_chain_node::command: Starting X3 Chain node as Authority
+2026-05-13 18:01:18.161  INFO main x3_chain_node::service: 🌐 Network speed detected: Normal (set X3_NETWORK_SPEED=slow|normal|fast to override)
+2026-05-13 18:01:18.161  INFO main x3_chain_node::service: 🔗 TX Pool configured for Normal network: 100000 ready / 50000 future, 256 MiB
+2026-05-13 18:01:19.488  INFO main txpool: Creating transaction pool txpool_type=SingleState ready=Limit { count: 100000, total_bytes: 268435456 } future=Limit { count: 10000, total_bytes: 26843545 }
+2026-05-13 18:01:52.293  INFO main x3_chain_node::service: 🧩 Atomic kernel feature gate is disabled (default)
+2026-05-13 18:01:52.295  INFO main sub-libp2p: 🏷  Local node identity is: 12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x
+2026-05-13 18:01:52.296  INFO main sub-libp2p: Running libp2p network backend
+2026-05-13 18:01:52.298  INFO main libp2p_swarm: local_peer_id=12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x
+2026-05-13 18:01:52.300  INFO main x3_chain_node::service: 📊 X3 Prometheus metrics registered successfully
+2026-05-13 18:01:52.303  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD address=/ip4/172.18.0.1/tcp/30434/p2p/12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+2026-05-13 18:01:52.303  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD address=/ip4/172.17.0.1/tcp/30434/p2p/12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+2026-05-13 18:01:52.304  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp address=/ip4/192.168.0.8/tcp/30433/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+2026-05-13 18:01:52.304  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD address=/ip4/192.168.0.8/tcp/30434/p2p/12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+2026-05-13 18:01:52.304  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp address=/ip4/172.17.0.1/tcp/30433/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+2026-05-13 18:01:52.305  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp address=/ip4/172.18.0.1/tcp/30433/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 Operating system: linux
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 CPU architecture: x86_64
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 Target environment: gnu
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 CPU: AMD Ryzen Threadripper 1900X 8-Core Processor
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 CPU cores: 8
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 Memory: 64137MB
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 Kernel: 6.8.0-111-generic
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 Linux distribution: Ubuntu 22.04.5 LTS
+2026-05-13 18:01:52.481  INFO            main sc_sysinfo: 💻 Virtual machine: no
+2026-05-13 18:01:52.481  INFO            main sc_service::builder: 📦 Highest known block at #287
+2026-05-13 18:01:52.482  INFO            main sc_rpc_server: Running JSON-RPC server: addr=127.0.0.1:9946,[::1]:9946
+2026-05-13 18:01:52.487  INFO            main x3_chain_node::service: 🌉 Cross-VM bridge adapters wired (balance + escrow)
+2026-05-13 18:01:52.487  WARN            main x3_chain_node::service: ⚠️ Cross-VM Sidecar Service disabled via X3_ENABLE_SIDECAR=false
+2026-05-13 18:01:52.487  INFO            main x3_chain_node::service: ✨ X3 Chain node started successfully
+2026-05-13 18:01:52.487  INFO            main x3_chain_node::service: 🔗 Network: X3 Chain Local Testnet
+2026-05-13 18:01:52.487  INFO            main x3_chain_node::service: 👤 Node name: Charlie
+2026-05-13 18:01:52.487  INFO            main x3_chain_node::service: 📋 Role: Authority
+2026-05-13 18:01:52.551  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #292 — syncing state\x1b[0m
+2026-05-13 18:01:52.551  INFO tokio-rt-worker substrate: 🏆 Imported #292 (0x7449…0ba8 → 0x536a…1ebf)
+2026-05-13 18:01:52.596  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #285 ✅\x1b[0m
+2026-05-13 18:01:52.623  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #288 ✅\x1b[0m
+2026-05-13 18:01:52.721  INFO tokio-rt-worker substrate: 🏆 Imported #293 (0x536a…1ebf → 0x5cb6…4a1a)
+2026-05-13 18:01:52.721  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #293 — syncing state\x1b[0m
+2026-05-13 18:01:52.911  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #294 — syncing state\x1b[0m
+2026-05-13 18:01:52.911  INFO tokio-rt-worker substrate: 🏆 Imported #294 (0x5cb6…4a1a → 0xaa57…1c8b)
+2026-05-13 18:01:53.053  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #291 ✅\x1b[0m
+2026-05-13 18:01:53.165  INFO tokio-rt-worker substrate: 🏆 Imported #295 (0xaa57…1c8b → 0x9319…f0bf)
+2026-05-13 18:01:53.165  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #295 — syncing state\x1b[0m
+2026-05-13 18:01:53.370  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #296 — syncing state\x1b[0m
+2026-05-13 18:01:53.370  INFO tokio-rt-worker substrate: 🏆 Imported #296 (0x9319…f0bf → 0x3b00…c1d2)
+2026-05-13 18:01:53.481  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #293 ✅\x1b[0m
+2026-05-13 18:01:53.577  INFO tokio-rt-worker substrate: 🏆 Imported #297 (0x3b00…c1d2 → 0x9b65…c8ae)
+2026-05-13 18:01:53.577  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #297 — syncing state\x1b[0m
+2026-05-13 18:01:53.800  INFO tokio-rt-worker substrate: 🏆 Imported #298 (0x9b65…c8ae → 0x4bc2…ecc2)
+2026-05-13 18:01:53.800  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #298 — syncing state\x1b[0m
+2026-05-13 18:01:53.921  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #298 — syncing state\x1b[0m
+2026-05-13 18:01:53.921  INFO tokio-rt-worker substrate: 🆕 Imported #298 (0x9b65…c8ae → 0xfab1…4eee)
+2026-05-13 18:01:53.964  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #295 ✅\x1b[0m
+2026-05-13 18:01:54.167  INFO tokio-rt-worker substrate: 🏆 Imported #299 (0x4bc2…ecc2 → 0x70ee…66dd)
+2026-05-13 18:01:54.167  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #299 — syncing state\x1b[0m
+2026-05-13 18:01:54.361  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #300 — syncing state\x1b[0m
+2026-05-13 18:01:54.361  INFO tokio-rt-worker substrate: 🏆 Imported #300 (0x70ee…66dd → 0x190b…f70d)
+2026-05-13 18:01:54.449  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #297 ✅\x1b[0m
+2026-05-13 18:01:54.543  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #301 — syncing state\x1b[0m
+2026-05-13 18:01:54.543  INFO tokio-rt-worker substrate: 🏆 Imported #301 (0x190b…f70d → 0xd18f…63c6)
+2026-05-13 18:01:54.780  INFO tokio-rt-worker substrate: 🏆 Imported #302 (0xd18f…63c6 → 0x38c0…0133)
+2026-05-13 18:01:54.780  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #302 — syncing state\x1b[0m
+2026-05-13 18:01:54.952  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #299 ✅\x1b[0m
+2026-05-13 18:01:54.965  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #303 — syncing state\x1b[0m
+2026-05-13 18:01:54.965  INFO tokio-rt-worker substrate: 🏆 Imported #303 (0x38c0…0133 → 0x05ea…62dd)
+2026-05-13 18:01:55.163  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #304 — syncing state\x1b[0m
+2026-05-13 18:01:55.163  INFO tokio-rt-worker substrate: 🏆 Imported #304 (0x05ea…62dd → 0x005a…ce91)
+2026-05-13 18:01:55.351  INFO tokio-rt-worker substrate: 🏆 Imported #305 (0x005a…ce91 → 0x47c7…fea2)
+2026-05-13 18:01:55.351  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #305 — syncing state\x1b[0m
+2026-05-13 18:01:55.410  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #301 ✅\x1b[0m
+2026-05-13 18:01:55.548  INFO tokio-rt-worker substrate: 🏆 Imported #306 (0x47c7…fea2 → 0x00ab…461a)
+2026-05-13 18:01:55.548  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #306 — syncing state\x1b[0m
+2026-05-13 18:01:55.776  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #307 — syncing state\x1b[0m
+2026-05-13 18:01:55.776  INFO tokio-rt-worker substrate: 🏆 Imported #307 (0x00ab…461a → 0xc53f…e283)
+2026-05-13 18:01:55.902  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #304 ✅\x1b[0m
+2026-05-13 18:01:55.958  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #308 — syncing state\x1b[0m
+2026-05-13 18:01:55.958  INFO tokio-rt-worker substrate: 🏆 Imported #308 (0xc53f…e283 → 0xf413…1bd2)
+2026-05-13 18:01:56.175  INFO tokio-rt-worker substrate: 🏆 Imported #309 (0xf413…1bd2 → 0x30c8…6685)
+2026-05-13 18:01:56.176  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #309 — syncing state\x1b[0m
+2026-05-13 18:01:56.332  INFO tokio-rt-worker substrate: 🏆 Imported #310 (0x30c8…6685 → 0x7c4f…caa8)
+2026-05-13 18:01:56.332  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #310 — syncing state\x1b[0m
+2026-05-13 18:01:56.368  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #306 ✅\x1b[0m
+2026-05-13 18:01:56.572  INFO tokio-rt-worker substrate: 🏆 Imported #311 (0x7c4f…caa8 → 0x4216…e888)
+2026-05-13 18:01:56.572  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #311 — syncing state\x1b[0m
+2026-05-13 18:01:56.749  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #312 — syncing state\x1b[0m
+2026-05-13 18:01:56.749  INFO tokio-rt-worker substrate: 🏆 Imported #312 (0x4216…e888 → 0x2eba…f659)
+2026-05-13 18:01:56.849  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #309 ✅\x1b[0m
+2026-05-13 18:01:56.949  INFO tokio-rt-worker substrate: 🏆 Imported #313 (0x2eba…f659 → 0xf253…8655)
+2026-05-13 18:01:56.949  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #313 — syncing state\x1b[0m
+2026-05-13 18:01:57.155  INFO tokio-rt-worker substrate: 🏆 Imported #314 (0xf253…8655 → 0xca95…26fc)
+2026-05-13 18:01:57.155  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #314 — syncing state\x1b[0m
+2026-05-13 18:01:57.321  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #311 ✅\x1b[0m
+2026-05-13 18:01:57.349  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #315 — syncing state\x1b[0m
+2026-05-13 18:01:57.349  INFO tokio-rt-worker substrate: 🏆 Imported #315 (0xca95…26fc → 0xa1cf…9d44)
+2026-05-13 18:01:57.484  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #315 (0xa1cf…9d44), finalized #311 (0x4216…e888), ⬇ 10.5kiB/s ⬆ 6.7kiB/s
+2026-05-13 18:01:57.534  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #316 — syncing state\x1b[0m
+2026-05-13 18:01:57.534  INFO tokio-rt-worker substrate: 🏆 Imported #316 (0xa1cf…9d44 → 0x6133…ee81)
+2026-05-13 18:01:57.760  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #317 — syncing state\x1b[0m
+2026-05-13 18:01:57.760  INFO tokio-rt-worker substrate: 🏆 Imported #317 (0x6133…ee81 → 0x6add…2ad8)
+2026-05-13 18:01:57.784  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #313 ✅\x1b[0m
+2026-05-13 18:01:57.926  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #318 — syncing state\x1b[0m
+2026-05-13 18:01:57.926  INFO tokio-rt-worker substrate: 🏆 Imported #318 (0x6add…2ad8 → 0x01fd…eef5)
+2026-05-13 18:01:58.145  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #319 — syncing state\x1b[0m
+2026-05-13 18:01:58.145  INFO tokio-rt-worker substrate: 🏆 Imported #319 (0x01fd…eef5 → 0xf0ea…c1a8)
+2026-05-13 18:01:58.267  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #316 ✅\x1b[0m
+2026-05-13 18:01:58.327  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #320 — syncing state\x1b[0m
+2026-05-13 18:01:58.327  INFO tokio-rt-worker substrate: 🏆 Imported #320 (0xf0ea…c1a8 → 0xbe7f…7ea5)
+2026-05-13 18:01:58.564  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #321 — syncing state\x1b[0m
+2026-05-13 18:01:58.564  INFO tokio-rt-worker substrate: 🏆 Imported #321 (0xbe7f…7ea5 → 0xbfd6…ba96)
+2026-05-13 18:01:58.735  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #318 ✅\x1b[0m
+2026-05-13 18:01:58.748  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #322 — syncing state\x1b[0m
+2026-05-13 18:01:58.748  INFO tokio-rt-worker substrate: 🏆 Imported #322 (0xbfd6…ba96 → 0x8e49…5427)
+2026-05-13 18:01:58.952  INFO tokio-rt-worker substrate: 🏆 Imported #323 (0x8e49…5427 → 0x6ef9…f1b9)
+2026-05-13 18:01:58.952  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #323 — syncing state\x1b[0m
+2026-05-13 18:01:59.174  INFO tokio-rt-worker substrate: 🏆 Imported #324 (0x6ef9…f1b9 → 0x4e3c…b936)
+2026-05-13 18:01:59.174  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #324 — syncing state\x1b[0m
+2026-05-13 18:01:59.187  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #320 ✅\x1b[0m
+2026-05-13 18:01:59.343  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #325 — syncing state\x1b[0m
+2026-05-13 18:01:59.343  INFO tokio-rt-worker substrate: 🏆 Imported #325 (0x4e3c…b936 → 0x8ffe…ddaf)
+2026-05-13 18:01:59.540  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #326 — syncing state\x1b[0m
+2026-05-13 18:01:59.540  INFO tokio-rt-worker substrate: 🏆 Imported #326 (0x8ffe…ddaf → 0x9eb3…d2d6)
+2026-05-13 18:01:59.696  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #323 ✅\x1b[0m
+2026-05-13 18:01:59.724  INFO tokio-rt-worker substrate: 🏆 Imported #327 (0x9eb3…d2d6 → 0xbbf3…36bd)
+2026-05-13 18:01:59.724  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #327 — syncing state\x1b[0m
+2026-05-13 18:01:59.956  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #328 — syncing state\x1b[0m
+2026-05-13 18:01:59.956  INFO tokio-rt-worker substrate: 🏆 Imported #328 (0xbbf3…36bd → 0x0c6a…e118)
+2026-05-13 18:02:00.139  INFO tokio-rt-worker substrate: 🏆 Imported #329 (0x0c6a…e118 → 0xf766…cbf9)
+2026-05-13 18:02:00.139  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #329 — syncing state\x1b[0m
+2026-05-13 18:02:00.158  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #325 ✅\x1b[0m
+2026-05-13 18:02:00.359  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #330 — syncing state\x1b[0m
+2026-05-13 18:02:00.359  INFO tokio-rt-worker substrate: 🏆 Imported #330 (0xf766…cbf9 → 0x3760…e3c0)
+2026-05-13 18:02:00.581  INFO tokio-rt-worker substrate: 🏆 Imported #331 (0x3760…e3c0 → 0xa178…fb6f)
+2026-05-13 18:02:00.581  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #331 — syncing state\x1b[0m
+2026-05-13 18:02:00.620  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #327 ✅\x1b[0m
+2026-05-13 18:02:00.716  INFO tokio-rt-worker substrate: 🏆 Imported #332 (0xa178…fb6f → 0xb994…c2f4)
+2026-05-13 18:02:00.716  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #332 — syncing state\x1b[0m
+2026-05-13 18:02:00.945  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #333 — syncing state\x1b[0m
+2026-05-13 18:02:00.945  INFO tokio-rt-worker substrate: 🏆 Imported #333 (0xb994…c2f4 → 0x56f3…d71c)
+2026-05-13 18:02:01.110  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #330 ✅\x1b[0m
+2026-05-13 18:02:01.170  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #334 — syncing state\x1b[0m
+2026-05-13 18:02:01.170  INFO tokio-rt-worker substrate: 🏆 Imported #334 (0x56f3…d71c → 0xb174…5741)
+2026-05-13 18:02:01.349  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #335 — syncing state\x1b[0m
+2026-05-13 18:02:01.349  INFO tokio-rt-worker substrate: 🏆 Imported #335 (0xb174…5741 → 0x4015…2424)
+2026-05-13 18:02:01.549  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #336 — syncing state\x1b[0m
+2026-05-13 18:02:01.549  INFO tokio-rt-worker substrate: 🏆 Imported #336 (0x4015…2424 → 0x54db…601f)
+2026-05-13 18:02:01.606  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #332 ✅\x1b[0m
+2026-05-13 18:02:01.755  INFO tokio-rt-worker substrate: 🏆 Imported #337 (0x54db…601f → 0xfca4…a127)
+2026-05-13 18:02:01.755  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #337 — syncing state\x1b[0m
+2026-05-13 18:02:01.936  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #338 — syncing state\x1b[0m
+2026-05-13 18:02:01.936  INFO tokio-rt-worker substrate: 🏆 Imported #338 (0xfca4…a127 → 0x3481…105b)
+2026-05-13 18:02:02.080  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #335 ✅\x1b[0m
+2026-05-13 18:02:02.138  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #339 — syncing state\x1b[0m
+2026-05-13 18:02:02.138  INFO tokio-rt-worker substrate: 🏆 Imported #339 (0x3481…105b → 0x7d2a…3d45)
+2026-05-13 18:02:02.343  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #340 — syncing state\x1b[0m
+2026-05-13 18:02:02.343  INFO tokio-rt-worker substrate: 🏆 Imported #340 (0x7d2a…3d45 → 0x80f6…f3ce)
+2026-05-13 18:02:02.484  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #340 (0x80f6…f3ce), finalized #335 (0x4015…2424), ⬇ 7.1kiB/s ⬆ 4.7kiB/s
+2026-05-13 18:02:02.546  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #341 — syncing state\x1b[0m
+2026-05-13 18:02:02.546  INFO tokio-rt-worker substrate: 🏆 Imported #341 (0x80f6…f3ce → 0xb91d…2aae)
+2026-05-13 18:02:02.550  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #337 ✅\x1b[0m
+2026-05-13 18:02:02.742  INFO tokio-rt-worker substrate: 🏆 Imported #342 (0xb91d…2aae → 0xbbdd…1278)
+2026-05-13 18:02:02.742  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #342 — syncing state\x1b[0m
+2026-05-13 18:02:02.971  INFO tokio-rt-worker substrate: 🏆 Imported #343 (0xbbdd…1278 → 0x6e45…43a0)
+2026-05-13 18:02:02.971  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #343 — syncing state\x1b[0m
+2026-05-13 18:02:03.006  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #339 ✅\x1b[0m
+2026-05-13 18:02:03.125  INFO tokio-rt-worker substrate: 🏆 Imported #344 (0x6e45…43a0 → 0xfb3a…78d0)
+2026-05-13 18:02:03.125  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #344 — syncing state\x1b[0m
+2026-05-13 18:02:03.354  INFO tokio-rt-worker substrate: 🏆 Imported #345 (0xfb3a…78d0 → 0x806b…747f)
+2026-05-13 18:02:03.354  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #345 — syncing state\x1b[0m
+2026-05-13 18:02:03.480  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #342 ✅\x1b[0m
+2026-05-13 18:02:03.534  INFO tokio-rt-worker substrate: 🏆 Imported #346 (0x806b…747f → 0x11a1…5cac)
+2026-05-13 18:02:03.535  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #346 — syncing state\x1b[0m
+2026-05-13 18:02:03.765  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #347 — syncing state\x1b[0m
+2026-05-13 18:02:03.765  INFO tokio-rt-worker substrate: 🏆 Imported #347 (0x11a1…5cac → 0x945f…74c4)
+2026-05-13 18:02:03.948  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #348 — syncing state\x1b[0m
+2026-05-13 18:02:03.948  INFO tokio-rt-worker substrate: 🏆 Imported #348 (0x945f…74c4 → 0x5dc6…3cab)
+2026-05-13 18:02:03.957  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #344 ✅\x1b[0m
+2026-05-13 18:02:04.170  INFO tokio-rt-worker substrate: 🏆 Imported #349 (0x5dc6…3cab → 0x0d29…311f)
+2026-05-13 18:02:04.170  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #349 — syncing state\x1b[0m
+2026-05-13 18:02:04.348  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #350 — syncing state\x1b[0m
+2026-05-13 18:02:04.348  INFO tokio-rt-worker substrate: 🏆 Imported #350 (0x0d29…311f → 0xc49b…57fe)
+2026-05-13 18:02:04.445  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #346 ✅\x1b[0m
+2026-05-13 18:02:04.552  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #351 — syncing state\x1b[0m
+2026-05-13 18:02:04.552  INFO tokio-rt-worker substrate: 🏆 Imported #351 (0xc49b…57fe → 0xb302…e917)
+2026-05-13 18:02:04.738  INFO tokio-rt-worker substrate: 🏆 Imported #352 (0xb302…e917 → 0x1cce…6268)
+2026-05-13 18:02:04.738  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #352 — syncing state\x1b[0m
+2026-05-13 18:02:04.909  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #349 ✅\x1b[0m
+2026-05-13 18:02:04.931  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #353 — syncing state\x1b[0m
+2026-05-13 18:02:04.931  INFO tokio-rt-worker substrate: 🏆 Imported #353 (0x1cce…6268 → 0x82a1…8f42)
+2026-05-13 18:02:05.145  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #354 — syncing state\x1b[0m
+2026-05-13 18:02:05.145  INFO tokio-rt-worker substrate: 🏆 Imported #354 (0x82a1…8f42 → 0xce5a…160f)
+2026-05-13 18:02:05.351  INFO tokio-rt-worker substrate: 🏆 Imported #355 (0xce5a…160f → 0x7ea7…d730)
+2026-05-13 18:02:05.351  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #355 — syncing state\x1b[0m
+2026-05-13 18:02:05.386  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #351 ✅\x1b[0m
+2026-05-13 18:02:05.564  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #356 — syncing state\x1b[0m
+2026-05-13 18:02:05.564  INFO tokio-rt-worker substrate: 🏆 Imported #356 (0x7ea7…d730 → 0xe695…1b12)
+2026-05-13 18:02:05.744  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #357 — syncing state\x1b[0m
+2026-05-13 18:02:05.744  INFO tokio-rt-worker substrate: 🏆 Imported #357 (0xe695…1b12 → 0xc807…ac1b)
+2026-05-13 18:02:05.847  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #353 ✅\x1b[0m
+2026-05-13 18:02:05.910  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #358 — syncing state\x1b[0m
+2026-05-13 18:02:05.910  INFO tokio-rt-worker substrate: 🏆 Imported #358 (0xc807…ac1b → 0xed0a…6162)
+2026-05-13 18:02:06.157  INFO tokio-rt-worker substrate: 🏆 Imported #359 (0xed0a…6162 → 0xf358…4bed)
+2026-05-13 18:02:06.157  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #359 — syncing state\x1b[0m
+2026-05-13 18:02:06.335  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #356 ✅\x1b[0m
+2026-05-13 18:02:06.353  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #360 — syncing state\x1b[0m
+2026-05-13 18:02:06.353  INFO tokio-rt-worker substrate: 🏆 Imported #360 (0xf358…4bed → 0x26f3…e907)
+2026-05-13 18:02:06.543  INFO tokio-rt-worker substrate: 🏆 Imported #361 (0x26f3…e907 → 0xd336…a2c0)
+2026-05-13 18:02:06.543  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #361 — syncing state\x1b[0m
+2026-05-13 18:02:06.745  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #362 — syncing state\x1b[0m
+2026-05-13 18:02:06.745  INFO tokio-rt-worker substrate: 🏆 Imported #362 (0xd336…a2c0 → 0xfad9…fbb6)
+2026-05-13 18:02:06.814  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #358 ✅\x1b[0m
+2026-05-13 18:02:06.940  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #363 — syncing state\x1b[0m
+2026-05-13 18:02:06.940  INFO tokio-rt-worker substrate: 🏆 Imported #363 (0xfad9…fbb6 → 0x9298…cde7)
+2026-05-13 18:02:07.144  INFO tokio-rt-worker substrate: 🏆 Imported #364 (0x9298…cde7 → 0xa688…0d90)
+2026-05-13 18:02:07.144  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #364 — syncing state\x1b[0m
+2026-05-13 18:02:07.289  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #361 ✅\x1b[0m
+2026-05-13 18:02:07.362  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #365 — syncing state\x1b[0m
+2026-05-13 18:02:07.362  INFO tokio-rt-worker substrate: 🏆 Imported #365 (0xa688…0d90 → 0xde8e…c8e1)
+2026-05-13 18:02:07.485  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #365 (0xde8e…c8e1), finalized #361 (0xd336…a2c0), ⬇ 7.3kiB/s ⬆ 4.9kiB/s
+2026-05-13 18:02:07.559  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #366 — syncing state\x1b[0m
+2026-05-13 18:02:07.559  INFO tokio-rt-worker substrate: 🏆 Imported #366 (0xde8e…c8e1 → 0x1c4d…2a12)
+2026-05-13 18:02:07.768  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #367 — syncing state\x1b[0m
+2026-05-13 18:02:07.768  INFO tokio-rt-worker substrate: 🏆 Imported #367 (0x1c4d…2a12 → 0x91c0…c0a2)
+2026-05-13 18:02:07.772  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #363 ✅\x1b[0m
+2026-05-13 18:02:07.940  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #368 — syncing state\x1b[0m
+2026-05-13 18:02:07.940  INFO tokio-rt-worker substrate: 🏆 Imported #368 (0x91c0…c0a2 → 0x6cd2…c8d0)
+2026-05-13 18:02:08.179  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #369 — syncing state\x1b[0m
+2026-05-13 18:02:08.179  INFO tokio-rt-worker substrate: 🏆 Imported #369 (0x6cd2…c8d0 → 0x25fa…1793)
+2026-05-13 18:02:08.244  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #366 ✅\x1b[0m
+2026-05-13 18:02:08.314  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #370 — syncing state\x1b[0m
+2026-05-13 18:02:08.314  INFO tokio-rt-worker substrate: 🏆 Imported #370 (0x25fa…1793 → 0x989e…f3bc)
+2026-05-13 18:02:08.565  INFO tokio-rt-worker substrate: 🏆 Imported #371 (0x989e…f3bc → 0x25a9…5f1f)
+2026-05-13 18:02:08.565  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #371 — syncing state\x1b[0m
+2026-05-13 18:02:08.732  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #368 ✅\x1b[0m
+2026-05-13 18:02:08.743  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #372 — syncing state\x1b[0m
+2026-05-13 18:02:08.743  INFO tokio-rt-worker substrate: 🏆 Imported #372 (0x25a9…5f1f → 0x8706…83fc)
+2026-05-13 18:02:08.961  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #373 — syncing state\x1b[0m
+2026-05-13 18:02:08.961  INFO tokio-rt-worker substrate: 🏆 Imported #373 (0x8706…83fc → 0x8d4c…7386)
+2026-05-13 18:02:09.120  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #374 — syncing state\x1b[0m
+2026-05-13 18:02:09.120  INFO tokio-rt-worker substrate: 🏆 Imported #374 (0x8d4c…7386 → 0x6ea8…272f)
+2026-05-13 18:02:09.198  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #370 ✅\x1b[0m
+2026-05-13 18:02:09.351  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #375 — syncing state\x1b[0m
+2026-05-13 18:02:09.351  INFO tokio-rt-worker substrate: 🏆 Imported #375 (0x6ea8…272f → 0x1d59…7d3b)
+2026-05-13 18:02:09.578  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #376 — syncing state\x1b[0m
+2026-05-13 18:02:09.578  INFO tokio-rt-worker substrate: 🏆 Imported #376 (0x1d59…7d3b → 0x4cd6…b723)
+2026-05-13 18:02:09.678  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #373 ✅\x1b[0m
+2026-05-13 18:02:09.732  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #377 — syncing state\x1b[0m
+2026-05-13 18:02:09.732  INFO tokio-rt-worker substrate: 🏆 Imported #377 (0x4cd6…b723 → 0xa9d1…7a40)
+2026-05-13 18:02:09.949  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #378 — syncing state\x1b[0m
+2026-05-13 18:02:09.949  INFO tokio-rt-worker substrate: 🏆 Imported #378 (0xa9d1…7a40 → 0x3ce9…a1dc)
+2026-05-13 18:02:10.143  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #379 — syncing state\x1b[0m
+2026-05-13 18:02:10.143  INFO tokio-rt-worker substrate: 🏆 Imported #379 (0x3ce9…a1dc → 0x8b2e…133b)
+2026-05-13 18:02:10.167  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #375 ✅\x1b[0m
+2026-05-13 18:02:10.347  INFO tokio-rt-worker substrate: 🏆 Imported #380 (0x8b2e…133b → 0x81c2…6444)
+2026-05-13 18:02:10.347  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #380 — syncing state\x1b[0m
+2026-05-13 18:02:10.525  INFO tokio-rt-worker substrate: 🏆 Imported #381 (0x81c2…6444 → 0x66ae…6cd4)
+2026-05-13 18:02:10.525  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #381 — syncing state\x1b[0m
+2026-05-13 18:02:10.619  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #377 ✅\x1b[0m
+2026-05-13 18:02:10.744  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #382 — syncing state\x1b[0m
+2026-05-13 18:02:10.744  INFO tokio-rt-worker substrate: 🏆 Imported #382 (0x66ae…6cd4 → 0x480b…e844)
+2026-05-13 18:02:10.929  INFO tokio-rt-worker substrate: 🏆 Imported #383 (0x480b…e844 → 0x98d4…2662)
+2026-05-13 18:02:10.929  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #383 — syncing state\x1b[0m
+2026-05-13 18:02:11.108  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #380 ✅\x1b[0m
+2026-05-13 18:02:11.149  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #384 — syncing state\x1b[0m
+2026-05-13 18:02:11.149  INFO tokio-rt-worker substrate: 🏆 Imported #384 (0x98d4…2662 → 0xcec2…033b)
+2026-05-13 18:02:11.352  INFO tokio-rt-worker substrate: 🏆 Imported #385 (0xcec2…033b → 0xe000…71a6)
+2026-05-13 18:02:11.352  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #385 — syncing state\x1b[0m
+2026-05-13 18:02:11.526  INFO tokio-rt-worker substrate: 🏆 Imported #386 (0xe000…71a6 → 0x7915…1cc2)
+2026-05-13 18:02:11.526  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #386 — syncing state\x1b[0m
+2026-05-13 18:02:11.557  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #382 ✅\x1b[0m
+2026-05-13 18:02:11.761  INFO tokio-rt-worker substrate: 🏆 Imported #387 (0x7915…1cc2 → 0xfcd9…b3b0)
+2026-05-13 18:02:11.762  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #387 — syncing state\x1b[0m
+2026-05-13 18:02:11.929  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #388 — syncing state\x1b[0m
+2026-05-13 18:02:11.929  INFO tokio-rt-worker substrate: 🏆 Imported #388 (0xfcd9…b3b0 → 0xbab8…5521)
+2026-05-13 18:02:12.044  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #384 ✅\x1b[0m
+2026-05-13 18:02:12.150  INFO tokio-rt-worker substrate: 🏆 Imported #389 (0xbab8…5521 → 0x32d1…a50b)
+2026-05-13 18:02:12.150  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #389 — syncing state\x1b[0m
+2026-05-13 18:02:12.355  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #390 — syncing state\x1b[0m
+2026-05-13 18:02:12.355  INFO tokio-rt-worker substrate: 🏆 Imported #390 (0x32d1…a50b → 0x855e…2936)
+2026-05-13 18:02:12.486  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #390 (0x855e…2936), finalized #384 (0xcec2…033b), ⬇ 6.9kiB/s ⬆ 4.7kiB/s
+2026-05-13 18:02:12.508  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #387 ✅\x1b[0m
+2026-05-13 18:02:12.541  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #391 — syncing state\x1b[0m
+2026-05-13 18:02:12.541  INFO tokio-rt-worker substrate: 🏆 Imported #391 (0x855e…2936 → 0x13d2…9ff8)
+2026-05-13 18:02:12.737  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #392 — syncing state\x1b[0m
+2026-05-13 18:02:12.737  INFO tokio-rt-worker substrate: 🏆 Imported #392 (0x13d2…9ff8 → 0x3752…d7ca)
+2026-05-13 18:02:12.973  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #393 — syncing state\x1b[0m
+2026-05-13 18:02:12.973  INFO tokio-rt-worker substrate: 🏆 Imported #393 (0x3752…d7ca → 0x1917…f389)
+2026-05-13 18:02:12.982  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #389 ✅\x1b[0m
+2026-05-13 18:02:13.139  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #394 — syncing state\x1b[0m
+2026-05-13 18:02:13.139  INFO tokio-rt-worker substrate: 🏆 Imported #394 (0x1917…f389 → 0xb309…b1b4)
+2026-05-13 18:02:13.362  INFO tokio-rt-worker substrate: 🏆 Imported #395 (0xb309…b1b4 → 0x6814…b743)
+2026-05-13 18:02:13.362  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #395 — syncing state\x1b[0m
+2026-05-13 18:02:13.445  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #392 ✅\x1b[0m
+2026-05-13 18:02:13.531  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #396 — syncing state\x1b[0m
+2026-05-13 18:02:13.531  INFO tokio-rt-worker substrate: 🏆 Imported #396 (0x6814…b743 → 0x0bcc…0fe8)
+2026-05-13 18:02:13.730  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #397 — syncing state\x1b[0m
+2026-05-13 18:02:13.730  INFO tokio-rt-worker substrate: 🏆 Imported #397 (0x0bcc…0fe8 → 0x651b…94be)
+2026-05-13 18:02:13.921  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #394 ✅\x1b[0m
+2026-05-13 18:02:13.939  INFO tokio-rt-worker substrate: 🏆 Imported #398 (0x651b…94be → 0xc607…d42b)
+2026-05-13 18:02:13.939  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #398 — syncing state\x1b[0m
+2026-05-13 18:02:14.144  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #399 — syncing state\x1b[0m
+2026-05-13 18:02:14.144  INFO tokio-rt-worker substrate: 🏆 Imported #399 (0xc607…d42b → 0xc2ea…cb03)
+2026-05-13 18:02:14.348  INFO tokio-rt-worker substrate: 🏆 Imported #400 (0xc2ea…cb03 → 0x9bc9…160e)
+2026-05-13 18:02:14.348  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #400 — syncing state\x1b[0m
+2026-05-13 18:02:14.384  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #396 ✅\x1b[0m
+2026-05-13 18:02:14.553  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #401 — syncing state\x1b[0m
+2026-05-13 18:02:14.553  INFO tokio-rt-worker substrate: 🏆 Imported #401 (0x9bc9…160e → 0x3584…8761)
+2026-05-13 18:02:14.755  INFO tokio-rt-worker substrate: 🏆 Imported #402 (0x3584…8761 → 0x9efb…578d)
+2026-05-13 18:02:14.755  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #402 — syncing state\x1b[0m
+2026-05-13 18:02:14.867  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #399 ✅\x1b[0m
+2026-05-13 18:02:14.947  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #403 — syncing state\x1b[0m
+2026-05-13 18:02:14.947  INFO tokio-rt-worker substrate: 🏆 Imported #403 (0x9efb…578d → 0x41ed…dc9d)
+2026-05-13 18:02:15.168  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #404 — syncing state\x1b[0m
+2026-05-13 18:02:15.168  INFO tokio-rt-worker substrate: 🏆 Imported #404 (0x41ed…dc9d → 0x8d72…f873)
+2026-05-13 18:02:15.334  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #401 ✅\x1b[0m
+2026-05-13 18:02:15.346  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #405 — syncing state\x1b[0m
+2026-05-13 18:02:15.346  INFO tokio-rt-worker substrate: 🏆 Imported #405 (0x8d72…f873 → 0xea8c…64dc)
+2026-05-13 18:02:15.574  INFO tokio-rt-worker substrate: 🏆 Imported #406 (0xea8c…64dc → 0x6e8d…fe4d)
+2026-05-13 18:02:15.574  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #406 — syncing state\x1b[0m
+2026-05-13 18:02:15.746  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #407 — syncing state\x1b[0m
+2026-05-13 18:02:15.746  INFO tokio-rt-worker substrate: 🏆 Imported #407 (0x6e8d…fe4d → 0x2bdb…0d38)
+2026-05-13 18:02:15.824  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #403 ✅\x1b[0m
+2026-05-13 18:02:15.924  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #408 — syncing state\x1b[0m
+2026-05-13 18:02:15.924  INFO tokio-rt-worker substrate: 🏆 Imported #408 (0x2bdb…0d38 → 0x9b57…1008)
+2026-05-13 18:02:16.118  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #409 — syncing state\x1b[0m
+2026-05-13 18:02:16.118  INFO tokio-rt-worker substrate: 🏆 Imported #409 (0x9b57…1008 → 0x6447…064f)
+2026-05-13 18:02:16.281  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #406 ✅\x1b[0m
+2026-05-13 18:02:16.368  INFO tokio-rt-worker substrate: 🏆 Imported #410 (0x6447…064f → 0x7b9a…3906)
+2026-05-13 18:02:16.368  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #410 — syncing state\x1b[0m
+2026-05-13 18:02:16.573  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #411 — syncing state\x1b[0m
+2026-05-13 18:02:16.573  INFO tokio-rt-worker substrate: 🏆 Imported #411 (0x7b9a…3906 → 0x07a7…6b94)
+2026-05-13 18:02:16.737  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #412 — syncing state\x1b[0m
+2026-05-13 18:02:16.737  INFO tokio-rt-worker substrate: 🏆 Imported #412 (0x07a7…6b94 → 0x9687…6397)
+2026-05-13 18:02:16.754  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #408 ✅\x1b[0m
+2026-05-13 18:02:16.960  INFO tokio-rt-worker substrate: 🏆 Imported #413 (0x9687…6397 → 0x2dac…ba47)
+2026-05-13 18:02:16.960  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #413 — syncing state\x1b[0m
+2026-05-13 18:02:17.161  INFO tokio-rt-worker substrate: 🏆 Imported #414 (0x2dac…ba47 → 0x38d4…90fd)
+2026-05-13 18:02:17.161  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #414 — syncing state\x1b[0m
+2026-05-13 18:02:17.236  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #410 ✅\x1b[0m
+2026-05-13 18:02:17.359  INFO tokio-rt-worker substrate: 🏆 Imported #415 (0x38d4…90fd → 0x1cf7…108d)
+2026-05-13 18:02:17.359  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #415 — syncing state\x1b[0m
+2026-05-13 18:02:17.486  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #415 (0x1cf7…108d), finalized #410 (0x7b9a…3906), ⬇ 7.2kiB/s ⬆ 4.4kiB/s
+2026-05-13 18:02:17.572  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #416 — syncing state\x1b[0m
+2026-05-13 18:02:17.572  INFO tokio-rt-worker substrate: 🏆 Imported #416 (0x1cf7…108d → 0x3fb9…1989)
+2026-05-13 18:02:17.734  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #413 ✅\x1b[0m
+2026-05-13 18:02:17.767  INFO tokio-rt-worker substrate: 🏆 Imported #417 (0x3fb9…1989 → 0x88b2…9692)
+2026-05-13 18:02:17.767  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #417 — syncing state\x1b[0m
+2026-05-13 18:02:17.963  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #418 — syncing state\x1b[0m
+2026-05-13 18:02:17.963  INFO tokio-rt-worker substrate: 🏆 Imported #418 (0x88b2…9692 → 0x5df3…b389)
+2026-05-13 18:02:18.132  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #419 — syncing state\x1b[0m
+2026-05-13 18:02:18.132  INFO tokio-rt-worker substrate: 🏆 Imported #419 (0x5df3…b389 → 0xdcb4…2913)
+2026-05-13 18:02:18.217  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #415 ✅\x1b[0m
+2026-05-13 18:02:18.349  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #420 — syncing state\x1b[0m
+2026-05-13 18:02:18.349  INFO tokio-rt-worker substrate: 🏆 Imported #420 (0xdcb4…2913 → 0x201e…0d29)
+2026-05-13 18:02:18.557  INFO tokio-rt-worker substrate: 🏆 Imported #421 (0x201e…0d29 → 0x93dc…e61a)
+2026-05-13 18:02:18.557  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #421 — syncing state\x1b[0m
+2026-05-13 18:02:18.690  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #418 ✅\x1b[0m
+2026-05-13 18:02:18.756  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #422 — syncing state\x1b[0m
+2026-05-13 18:02:18.756  INFO tokio-rt-worker substrate: 🏆 Imported #422 (0x93dc…e61a → 0xd8cb…6fcc)

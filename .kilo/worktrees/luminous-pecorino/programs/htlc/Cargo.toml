@@ -1,0 +1,25 @@
+[package]
+name = "htlc"
+version = "0.1.0"
+description = "Hash Time-Locked Contract for X3 Chain (SVM/Solana)"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/x3-chain/x3-chain"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "htlc"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29"
+anchor-spl = "0.29"
+
+[dev-dependencies]
+anchor-client = "0.29"

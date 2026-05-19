@@ -1,0 +1,13 @@
+# Grafana Dashboard Provisioning
+apiVersion: 1
+
+providers:
+  - name: 'X3 Chain Dashboards'
+    orgId: 1
+    folder: 'X3 Chain'
+    folderUid: 'x3-chain'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/apps/dash-legacy-2-legacy-2boards

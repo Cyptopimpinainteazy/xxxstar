@@ -1,0 +1,60 @@
+{
+  "name": "@x3-chain/proof-relayer",
+  "version": "1.0.0",
+  "description": "Off-chain proof relayer for atomic swaps across Bitcoin, Ethereum, Solana, and X3VM",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node test-runner.js",
+    "test:watch": "mocha --require ts-node/register --watch tests/**/*.test.ts",
+    "lint": "eslint src/**/*.ts",
+    "start": "ts-node src/index.ts",
+    "serve": "ts-node src/http-server.ts"
+  },
+  "dependencies": {
+    "bip68": "^1.0.1",
+    "bitcoinjs-lib": "^7.0.0",
+    "body-parser": "^1.20.2",
+    "ethers": "^6.0.0",
+    "events": "^3.3.0",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.5",
+    "@types/express": "^4.17.21",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.11",
+    "@types/sinon": "^10.0.0",
+    "@types/supertest": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "chai": "4.3.7",
+    "ecpair": "^2.1.0",
+    "eslint": "^8.0.0",
+    "mocha": "^10.2.0",
+    "sinon": "^15.0.0",
+    "supertest": "^7.0.0",
+    "tiny-secp256k1": "^2.2.3",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "htlc",
+    "atomic-swap",
+    "proof-relay",
+    "spv",
+    "bitcoin",
+    "ethereum",
+    "solana",
+    "x3vm",
+    "cross-chain"
+  ],
+  "author": "X3 Chain Contributors",
+  "license": "Apache-2.0"
+}

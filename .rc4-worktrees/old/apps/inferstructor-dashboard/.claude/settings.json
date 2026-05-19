@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-git-add.sh"
+          }
+        ],
+        "matcher": "Edit|MultiEdit|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/build-on-change.sh"
+          }
+        ],
+        "matcher": "Edit"
+      }
+    ]
+  }
+}

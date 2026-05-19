@@ -1,0 +1,42 @@
+[
+  {
+    "test": "duplicate message rejected",
+    "expected": "reject",
+    "result": "PASS",
+    "error": null,
+    "new_transfers": [],
+    "ledger_unchanged": true
+  },
+  {
+    "test": "duplicate nonce rejected",
+    "expected": "reject",
+    "result": "PASS",
+    "error": null,
+    "new_transfers": [],
+    "ledger_unchanged": true
+  },
+  {
+    "test": "refund after finalized rejected",
+    "expected": "reject",
+    "result": "PASS",
+    "error": null,
+    "new_transfers": [],
+    "ledger_unchanged": true
+  },
+  {
+    "test": "refund before expiry rejected",
+    "expected": "reject",
+    "result": "PASS",
+    "error": null,
+    "new_transfers": [],
+    "ledger_unchanged": true
+  },
+  {
+    "test": "completion after refund rejected",
+    "expected": "reject",
+    "result": "PASS",
+    "error": null,
+    "new_transfers": [],
+    "ledger_unchanged": true
+  }
+]

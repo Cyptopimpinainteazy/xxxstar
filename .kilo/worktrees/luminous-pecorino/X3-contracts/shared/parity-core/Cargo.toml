@@ -1,0 +1,22 @@
+[package]
+name = "x3-parity-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure Rust source of truth for X3 flashloan parity math. Driven by shared/test-vectors/*.json against EVM (Foundry) and SVM (Anchor) implementations."
+publish = false
+
+[lib]
+name = "x3_parity_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# tests/parity_vectors.rs only uses the std lib + serde
+
+# Standalone crate (NOT a member of the root workspace) so that adding it
+# does not pull X3-contracts/svm (Anchor + Solana toolchain) into the parent
+# build graph.
+[workspace]

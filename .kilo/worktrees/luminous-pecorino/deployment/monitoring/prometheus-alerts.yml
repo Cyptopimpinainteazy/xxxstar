@@ -1,0 +1,334 @@
+# GPU Swarm Prometheus Alert Rules
+# Production-grade alerting for 24/7 operations
+
+groups:
+  - name: gpu_swarm_availability
+    interval: 30s
+    rules:
+      - alert: CoordinatorDown
+        expr: up{job='swarm-coordinator'} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: coordinator
+        annotations:
+          summary: "Swarm Coordinator is DOWN"
+          description: "Coordinator has been unreachable for 2+ minutes. Tasks cannot be distributed."
+          runbook: "https://wiki.x3-chain.io/runbooks/coordinator-down"
+
+      - alert: GPUNodeDown
+        expr: up{job='gpu-node'} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: gpu-node
+        annotations:
+          summary: "GPU Node {{ $labels.node_id }} is offline"
+          description: "GPU Node has been unreachable for 5+ minutes."
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-node-down"
+
+      - alert: HighGPUNodeFailureRate
+        expr: |
+          (count(up{job='gpu-node'} == 0) / count(up{job='gpu-node'})) > 0.10
+        for: 10m
+        labels:
+          severity: critical
+          component: gpu-cluster
+        annotations:
+          summary: ">=10% of GPU nodes are offline"
+          description: "{{ $value | humanizePercentage }} GPU nodes are down. Investigate immediately."
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-cluster-degradation"
+
+      - alert: CoordinatorQuorumLoss
+        expr: count(up{job='coordinator'} == 1) < 3
+        for: 5m
+        labels:
+          severity: critical
+          component: consensus
+        annotations:
+          summary: "Coordinator quorum lost"
+          description: "Fewer than 3 coordinators are healthy. Consensus may be compromised."
+          runbook: "https://wiki.x3-chain.io/runbooks/quorum-loss"
+
+  - name: gpu_swarm_performance
+    interval: 60s
+    rules:
+      - alert: HighTaskFailureRate
+        expr: |
+          (increase(swarm_tasks_failed_total[5m]) / increase(swarm_tasks_completed_total[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: task-execution
+        annotations:
+          summary: "Elevated task failure rate (>5%)"
+          description: "Task failure rate is {{ $value | humanizePercentage }} - investigate task executor"
+          runbook: "https://wiki.x3-chain.io/runbooks/high-task-failure"
+
+      - alert: TaskQueueBacklog
+        expr: swarm_task_queue_depth > 1000
+        for: 15m
+        labels:
+          severity: warning
+          component: task-queue
+        annotations:
+          summary: "Task queue backlog is high (>1000 tasks)"
+          description: "{{ $value }} tasks waiting. Add GPU capacity or investigate slow tasks."
+          runbook: "https://wiki.x3-chain.io/runbooks/task-queue-backlog"
+
+      - alert: SlowTaskExecution
+        expr: |
+          histogram_quantile(0.95, rate(swarm_task_execution_time_seconds_bucket[5m])) > 300
+        for: 10m
+        labels:
+          severity: warning
+          component: task-execution
+        annotations:
+          summary: "Task p95 execution time >5 minutes"
+          description: "Tasks are taking {{ $value }}s to execute. Investigate GPU load."
+          runbook: "https://wiki.x3-chain.io/runbooks/slow-tasks"
+
+      - alert: LowTaskCompletionRate
+        expr: |
+          rate(swarm_tasks_completed_total[5m]) < 10
+        for: 15m
+        labels:
+          severity: warning
+          component: task-execution
+        annotations:
+          summary: "Task completion rate is low (<10 tasks/sec)"
+          description: "Only {{ $value | humanize }} tasks/sec being completed."
+
+  - name: gpu_swarm_resources
+    interval: 60s
+    rules:
+      - alert: HighGPUUtilization
+        expr: avg(gpu_utilization_percent) > 95
+        for: 10m
+        labels:
+          severity: warning
+          component: gpu-resources
+        annotations:
+          summary: "GPU utilization critically high (>95%)"
+          description: "GPUs are nearly at capacity ({{ $value | humanize }}%)"
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-saturation"
+
+      - alert: GPUMemoryPressure
+        expr: |
+          (gpu_memory_used_bytes / gpu_memory_total_bytes) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+          component: gpu-memory
+        annotations:
+          summary: "GPU memory usage high (>90%)"
+          description: "GPU {{ $labels.device_id }} is {{ $value | humanizePercentage }} full"
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-memory-pressure"
+
+      - alert: GPUHighTemperature
+        expr: gpu_temperature_celsius > 85
+        for: 5m
+        labels:
+          severity: critical
+          component: gpu-thermal
+        annotations:
+          summary: "GPU temperature critical (>85°C)"
+          description: "GPU {{ $labels.device_id }} temperature is {{ $value }}°C"
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-thermal-throttle"
+
+      - alert: GPUHighFragmentation
+        expr: gpu_memory_fragmentation_ratio > 0.7
+        for: 15m
+        labels:
+          severity: warning
+          component: gpu-memory
+        annotations:
+          summary: "GPU memory fragmentation high (>70%)"
+          description: "GPU {{ $labels.device_id }} fragmentation ratio: {{ $value | humanizePercentage }}"
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-memory-fragmentation"
+
+      - alert: GPUDeviceError
+        expr: gpu_device_errors_total > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: gpu-device
+        annotations:
+          summary: "GPU device error detected"
+          description: "GPU {{ $labels.device_id }} has {{ $value }} errors"
+          runbook: "https://wiki.x3-chain.io/runbooks/gpu-device-error"
+
+  - name: gpu_swarm_network
+    interval: 60s
+    rules:
+      - alert: LowPeerConnectivity
+        expr: swarm_network_peers_connected < 10
+        for: 10m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Few peers connected (<10)"
+          description: "Node has only {{ $value }} peers. Check network connectivity."
+          runbook: "https://wiki.x3-chain.io/runbooks/low-peer-connectivity"
+
+      - alert: HighNetworkLatency
+        expr: |
+          histogram_quantile(0.95, rate(swarm_peer_latency_milliseconds_bucket[5m])) > 500
+        for: 10m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High peer latency (p95 >500ms)"
+          description: "Network latency is {{ $value | humanize }}ms"
+          runbook: "https://wiki.x3-chain.io/runbooks/high-latency"
+
+      - alert: PeerConnectionChurn
+        expr: |
+          rate(swarm_peer_disconnected_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Elevated peer disconnections (>1/sec)"
+          description: "{{ $value | humanize }} peers dropping per second"
+          runbook: "https://wiki.x3-chain.io/runbooks/peer-churn"
+
+      - alert: NetworkErrors
+        expr: |
+          increase(swarm_network_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Network errors detected (>10 in 5m)"
+          description: "{{ $value | humanize }} network errors in last 5 minutes"
+
+      - alert: HighBandwidthUsage
+        expr: |
+          (rate(swarm_network_bytes_sent_total[5m]) + rate(swarm_network_bytes_received_total[5m])) / 1024 / 1024 > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High bandwidth usage (>100 MB/sec)"
+          description: "Network usage is {{ $value | humanize }} MB/sec"
+
+  - name: gpu_swarm_economics
+    interval: 60s
+    rules:
+      - alert: HighSlashingRate
+        expr: |
+          increase(swarm_slashing_events_total[1h]) > 10
+        for: 15m
+        labels:
+          severity: warning
+          component: incentives
+        annotations:
+          summary: "Elevated slashing rate (>10 events/hour)"
+          description: "{{ $value | humanize }} slashing events in last hour"
+          runbook: "https://wiki.x3-chain.io/runbooks/high-slashing"
+
+      - alert: VerificationConsensusFailure
+        expr: |
+          (increase(swarm_verification_failures_total[1h]) / increase(swarm_verifications_requested_total[1h])) > 0.10
+        for: 15m
+        labels:
+          severity: critical
+          component: consensus
+        annotations:
+          summary: "Verification consensus failures >10%"
+          description: "{{ $value | humanizePercentage }} of verifications failing"
+          runbook: "https://wiki.x3-chain.io/runbooks/verification-failure"
+
+      - alert: RewardDistributionDelay
+        expr: |
+          time() - timestamp(increase(swarm_rewards_distributed_tokens[1m])) > 600
+        for: 10m
+        labels:
+          severity: warning
+          component: incentives
+        annotations:
+          summary: "Reward distribution delays detected"
+          description: "No rewards distributed in >10 minutes"
+          runbook: "https://wiki.x3-chain.io/runbooks/reward-delay"
+
+  - name: gpu_swarm_x3
+    interval: 60s
+    rules:
+      - alert: CompilationFailure
+        expr: |
+          (increase(swarm_x3_compile_failures_total[5m]) / increase(swarm_x3_compiles_total[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: x3-execution
+        annotations:
+          summary: "X3 compilation failure rate >5%"
+          description: "{{ $value | humanizePercentage }} X3 compilations failing"
+          runbook: "https://wiki.x3-chain.io/runbooks/x3-compile-failure"
+
+      - alert: SlowCompilation
+        expr: |
+          histogram_quantile(0.95, rate(swarm_x3_compilation_time_seconds_bucket[5m])) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: x3-execution
+        annotations:
+          summary: "X3 compilation slow (p95 >10s)"
+          description: "Compilation time: {{ $value | humanize }}s"
+          runbook: "https://wiki.x3-chain.io/runbooks/slow-compilation"
+
+      - alert: HighGasUsage
+        expr: |
+          histogram_quantile(0.95, rate(swarm_gas_used_bucket[5m])) > 1000000
+        for: 15m
+        labels:
+          severity: warning
+          component: x3-optimization
+        annotations:
+          summary: "High gas usage detected (p95 >1M)"
+          description: "Average gas per operation: {{ $value | humanize }}"
+
+  - name: gpu_swarm_system
+    interval: 60s
+    rules:
+      - alert: ProcessCrash
+        expr: |
+          increase(process_crashes_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Process crashed"
+          description: "{{ $labels.process }} crashed {{ $value }} times in last 5 minutes"
+          runbook: "https://wiki.x3-chain.io/runbooks/process-crash"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes / 1024 / 1024 / 1024) > 16
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Process memory usage high (>16GB)"
+          description: "{{ $labels.process }} using {{ $value | humanize }}GB"
+          runbook: "https://wiki.x3-chain.io/runbooks/memory-leak"
+
+      - alert: DiskSpaceRunningOut
+        expr: |
+          (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.10
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Disk space <10%"
+          description: "{{ $labels.mountpoint }} only {{ $value | humanizePercentage }} free"

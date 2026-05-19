@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Presale — X3 Performance</title>
+  <style>body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#041022;color:#e9f7ff;padding:2rem}.card{max-width:900px;margin:2rem auto;padding:2rem;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01))}input,select,textarea{width:100%;padding:.7rem;margin:.4rem 0;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:transparent;color:inherit}button{padding:.8rem 1rem;border-radius:8px;border:none;background:#06b6d4;color:#012;font-weight:700}</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Join X3 Presale & Early Access</h1>
+    <p>Thank you for your interest. Fill this form to join presale waitlist and request a demo. We'll run a free benchmark and show your improvement on the leaderboard.</p>
+
+    <label>Name</label><input id="name" />
+    <label>Company</label><input id="company" />
+    <label>Email</label><input id="email" />
+    <label>Role</label><select id="role"><option>Trader</option><option>Validator</option><option>RPC Provider</option><option>Bridge</option><option>Other</option></select>
+    <label>RPC Endpoint (optional)</label><input id="rpc" placeholder="https://your-rpc" />
+    <label>Message</label><textarea id="message"></textarea>
+    <label style="display:none">Honeypot (leave empty)<input id="hp" name="hp" /></label>
+    <label><input type="checkbox" id="request_demo" /> Request a demo benchmark</label>
+    <div style="margin-top:.8rem">
+      <div id="turnstile-container" style="margin-bottom:.6rem"></div>
+      <button id="submit">Join Presale</button>
+    </div>
+
+    <h3>Response</h3>
+    <pre id="out">No submissions yet.</pre>
+
+    <div style="margin-top:1rem">
+      <a id="calendar-link" href="#" target="_blank">Schedule a live demo</a>
+    </div>
+  </div>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script>
+    // Render Turnstile if site key is configured
+    async function init() {
+      const conf = await fetch('/api/config').then(r => r.json()).catch(()=>({}));
+      const site = conf.turnstile_sitekey;
+      const cal = conf.calendar_link;
+      if (cal) {
+        document.getElementById('calendar-link').href = cal;
+        document.getElementById('calendar-link').style.display = 'inline-block';
+      }
+      if (site && window.turnstile) {
+        window.turnstile.render('#turnstile-container', { sitekey: site });
+      } else {
+        // No captcha configured - hide container
+        document.getElementById('turnstile-container').style.display = 'none';
+      }
+
+      document.getElementById('submit').addEventListener('click', async () => {
+        document.getElementById('submit').disabled = true;
+        const payload = {
+          name: document.getElementById('name').value,
+          company: document.getElementById('company').value,
+          email: document.getElementById('email').value,
+          role: document.getElementById('role').value,
+          rpc: document.getElementById('rpc').value,
+          message: document.getElementById('message').value,
+          request_demo: document.getElementById('request_demo').checked,
+          hp: document.getElementById('hp').value || ''
+        };
+
+        // attach turnstile token if present
+        const tokenInput = document.querySelector('input[name="cf-turnstile-response"], textarea[name="cf-turnstile-response"]');
+        if (tokenInput && tokenInput.value) payload['cf-turnstile-response'] = tokenInput.value;
+
+        const r = await fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const j = await r.json();
+        if (r.status === 200) {
+          document.getElementById('out').textContent = 'Thanks — your ID: ' + j.id + '\nWe will contact you via email. Expect results in a few minutes.';
+          if (payload.request_demo && payload.rpc) {
+            document.getElementById('out').textContent += '\nA demo benchmark has been queued.';
+          }
+        } else {
+          document.getElementById('out').textContent = 'Error: ' + (j.error || 'unknown');
+        }
+        document.getElementById('submit').disabled = false;
+      });
+    }
+    init();
+  </script>
+</body>
+</html>

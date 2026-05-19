@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>X3 Mainnet Progress</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <h1>X3 Mainnet Progress</h1>
+        <p id="meta">Loading...</p>
+      </header>
+
+      <section class="stats">
+        <article class="card main">
+          <h2>Overall Progress</h2>
+          <div class="big" id="overall">0.0%</div>
+          <div class="sub" id="remaining">Remaining: 100.0%</div>
+        </article>
+        <article class="card">
+          <h3>Green</h3>
+          <div class="small" id="green">0</div>
+        </article>
+        <article class="card">
+          <h3>Yellow</h3>
+          <div class="small" id="yellow">0</div>
+        </article>
+        <article class="card">
+          <h3>Red</h3>
+          <div class="small" id="red">0</div>
+        </article>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Gate</th>
+              <th>Status</th>
+              <th>Score</th>
+              <th>Piece %</th>
+            </tr>
+          </thead>
+          <tbody id="gateRows"></tbody>
+        </table>
+      </section>
+
+      <section class="stats goals-stats">
+        <article class="card main">
+          <h2>Goals Completion</h2>
+          <div class="big" id="goalsOverall">0.0%</div>
+          <div class="sub" id="goalsCounts">Done: 0 | Open: 0 | Exempt: 0</div>
+        </article>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Done</th>
+              <th>Open</th>
+              <th>Exempt</th>
+              <th>Progress</th>
+            </tr>
+          </thead>
+          <tbody id="goalRows"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

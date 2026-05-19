@@ -1,0 +1,53 @@
+[package]
+description = "Substrate sync network protocol"
+name = "sc-network-sync"
+version = "0.10.0-dev"
+license = "GPL-3.0-or-later WITH Classpath-exception-2.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2021"
+homepage = "https://substrate.io"
+repository = "https://github.com/paritytech/substrate/"
+documentation = "https://docs.rs/sc-network-sync"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[build-dependencies]
+prost-build = "0.11"
+
+[dependencies]
+array-bytes = "6.1"
+async-channel = "1.8.0"
+async-trait = "0.1.58"
+codec = { package = "parity-scale-codec", version = "3.6.1", features = ["derive"] }
+futures = "0.3.21"
+futures-timer = "3.0.2"
+libp2p = "0.51.3"
+log = "0.4.17"
+mockall = "0.11.3"
+prost = "0.11"
+schnellru = "0.2.1"
+smallvec = "1.8.0"
+thiserror = "1.0"
+fork-tree = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+prometheus-endpoint = { package = "substrate-prometheus-endpoint", git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sc-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sc-network = { version = "0.10.0-dev", path = "../" }
+sc-network-common = { version = "0.10.0-dev", path = "../common" }
+sc-network-types = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sc-utils = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-arithmetic = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+
+[dev-dependencies]
+tokio = { version = "1.22.0", features = ["macros"] }
+quickcheck = { version = "1.0.3", default-features = false }
+sc-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-test-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+sp-tracing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+substrate-test-runtime-client = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }

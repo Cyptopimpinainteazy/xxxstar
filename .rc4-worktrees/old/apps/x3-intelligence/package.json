@@ -1,0 +1,48 @@
+{
+  "name": "@x3/intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "X3 Intelligence — Arbitrage jurisdiction control surface",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "echo \"No test suites configured for CI gate\"",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "express-session": "^1.18.1",
+    "node-fetch": "^2.7.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "recharts": "^3.7.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/express-session": "^1.18.1",
+    "@types/jest": "^29.5.10",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.1.0",
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "tinyexec": "^1.0.4",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3",
+    "vite": "^6.1.0",
+    "vitest": "^4.1.0"
+  },
+  "overrides": {
+    "path-to-regexp": "^0.1.10"
+  }
+}

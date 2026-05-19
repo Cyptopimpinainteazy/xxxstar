@@ -1,0 +1,191 @@
+# Full repository CI — fmt + clippy + workspace tests + proof gates + E2E.
+#
+# This workflow complements the focused v0.4 ship gate (`v04-ship-gate.yml`)
+# by running the full workspace surface. The ship gate fails fast on the
+# critical path; this workflow catches regressions anywhere in the tree.
+#
+# Hard rules:
+#   * Failures here MUST block merge.
+#   * No `continue-on-error: true`. No `|| true`. No silent skips.
+#   * fmt + clippy are deny-warnings across the entire workspace.
+
+name: full ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  fmt-clippy:
+    name: fmt + clippy (workspace, deny warnings)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc (substrate transitive dep)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-ci-fmt-clippy
+
+      - name: cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  workspace-tests:
+    name: cargo test (workspace)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc (substrate transitive dep)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-ci-tests
+
+      - name: cargo test --workspace
+        run: cargo test --workspace --all-targets
+
+  proof-gates:
+    name: launch-gates/run-all-proofs.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler jq
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-ci-proofs
+
+      - name: Run all proof-forge gates
+        run: bash launch-gates/run-all-proofs.sh
+
+      - name: Upload generated receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-receipts
+          path: proof/receipts/
+          if-no-files-found: warn
+
+      - name: Upload go/no-go report (if produced)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-no-go-report
+          path: launch-gates/reports/
+          if-no-files-found: ignore
+
+  swarm-ci:
+    name: x3-swarm — unit tests + self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [fmt-clippy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install prerequisites (jq, curl, python3)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl python3
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-ci-swarm
+
+      - name: cargo test -p x3-swarm-core
+        run: cargo test -p x3-swarm-core --all-targets
+
+      - name: Build swarm binaries (API + worker)
+        run: |
+          cargo build -p x3-swarm-api   --release
+          cargo build -p x3-swarm-worker --release
+
+      # Start the API server in the background; swarm_self_test.sh waits for
+      # it to become healthy before exercising the full task lifecycle.
+      - name: swarm self-test (end-to-end)
+        timeout-minutes: 10
+        run: |
+          # Launch the API and capture its PID for clean teardown.
+          SWARM_KILL_SWITCH_TOKEN=ci-test \
+            ./target/release/x3-swarm-api &
+          API_PID=$!
+          trap 'kill $API_PID 2>/dev/null || true' EXIT
+
+          # Give the server a moment to bind.
+          for i in $(seq 1 15); do
+            curl -sf http://127.0.0.1:8787/health && break
+            sleep 1
+          done
+
+          bash scripts/swarm/swarm_self_test.sh
+
+  e2e-internal-mainnet:
+    name: e2e — internal_mainnet_happy_path
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [fmt-clippy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc (substrate transitive dep)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: full-ci-e2e
+
+      # The E2E cross-VM test is the binding signal that the chain boots,
+      # accepts extrinsics on EVM and SVM execution paths, and finalizes
+      # cross-VM state through the router. A failure here is a launch blocker.
+      - name: cargo test e2e (cross_vm_real_chain_test)
+        run: |
+          cargo test -p e2e_tests --test cross_vm_real_chain_test -- --nocapture

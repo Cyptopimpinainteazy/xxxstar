@@ -1,0 +1,10 @@
+[package]
+name = "generate-node-keys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp-core = { path = "../../crates/substrate-primitives/sp-core", default-features = false, features = ["std"] }
+sp-runtime = { path = "../../crates/substrate-primitives/sp-runtime", default-features = false, features = ["std"] }
+ed25519-dalek = "1.0"
+rand = "0.8"

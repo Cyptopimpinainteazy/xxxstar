@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: jury-postgres-staging
+    environment:
+      POSTGRES_DB: jury_db
+      POSTGRES_USER: jury_admin
+      POSTGRES_PASSWORD: jury_password
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jury_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: jury-redis-staging
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  blockchain-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.blockchain
+    container_name: jury-blockchain-staging
+    environment:
+      RUST_LOG: debug
+      JURY_AUTHORITY: "0x0000000000000000000000000000000000000000000000000000000000000001"
+    volumes:
+      - blockchain_data_staging:/data
+    ports:
+      - "9944:9944"
+      - "9933:9933"
+      - "30333:30333"
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9944", "-X", "POST",
+             "-H", "Content-Type: application/json",
+             "-d", "{\"jsonrpc\":\"2.0\",\"method\":\"system_health\",\"params\":[],\"id\":1}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  jury-service:
+    image: x3-jury:latest
+    container_name: jury-service-staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      blockchain-node:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: jury_admin
+      DB_PASSWORD: jury_password
+      DB_NAME: jury_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: staging_secret_key
+      LOG_LEVEL: debug
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  jury-anchorer:
+    image: x3-jury-anchorer:latest
+    container_name: jury-anchorer-staging
+    depends_on:
+      jury-service:
+        condition: service_healthy
+      blockchain-node:
+        condition: service_healthy
+    environment:
+      RPC_URL: http://blockchain-node:9944
+      JURY_SERVICE_URL: http://jury-service:8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: jury_admin
+      DB_PASSWORD: jury_password
+      JURY_AUTHORITY: "0x0000000000000000000000000000000000000000000000000000000000000001"
+      LOG_LEVEL: debug
+    volumes:
+      - ./logs/anchorer:/app/logs
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: jury-prometheus-staging
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    restart: always
+
+volumes:
+  postgres_data_staging:
+  blockchain_data_staging:

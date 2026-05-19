@@ -1,0 +1,28 @@
+[package]
+name = "x3-packet-standard"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "X3 IBC-style packet lifecycle: commitments, receipts, acknowledgements, replay guard, timeouts."
+
+[dependencies]
+parity-scale-codec = { workspace = true, features = ["max-encoded-len"] }
+scale-info = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+blake2 = { version = "0.10", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "parity-scale-codec/std",
+    "scale-info/std",
+    "sp-core/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "blake2/std",
+]
+
+[dev-dependencies]
+proptest = "1.4"

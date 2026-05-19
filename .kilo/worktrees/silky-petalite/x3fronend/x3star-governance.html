@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Governance</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04020e;--surface:rgba(8,4,22,0.95);
+  --border:rgba(180,80,255,0.15);--glow:rgba(180,80,255,0.3);
+  --purple:#cc44ff;--purple2:#8822cc;--gold:#ffd700;
+  --cyan:#00d4ff;--green:#00ff88;--red:#ff3366;
+  --text:#f0e8ff;--muted:#664488;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(180,80,255,0.06),transparent);}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;
+  padding:0 60px;height:72px;background:rgba(4,2,14,0.95);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);}
+.nav-logo{font-family:'Orbitron',monospace;font-weight:900;font-size:22px;
+  background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;letter-spacing:3px;}
+.nav-links{display:flex;gap:32px;margin:0 auto;}
+.nav-link{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:color 0.2s;text-decoration:none;}
+.nav-link:hover,.nav-link.active{color:var(--purple);}
+.btn{padding:10px 24px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;
+  font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;border:none;}
+.btn-outline{background:transparent;border:1px solid rgba(180,80,255,0.35);color:var(--purple);}
+.btn-outline:hover{box-shadow:0 0 20px rgba(180,80,255,0.2);}
+.btn-primary{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;font-weight:700;}
+.btn-primary:hover{box-shadow:0 0 30px rgba(180,80,255,0.5);transform:translateY(-1px);}
+
+.page-header{padding:120px 60px 48px;position:relative;z-index:1;}
+.ph-top{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:36px;}
+.ph-eyebrow{font-size:11px;letter-spacing:4px;color:var(--purple);text-transform:uppercase;margin-bottom:12px;}
+.ph-title{font-family:'Orbitron',monospace;font-size:clamp(32px,5vw,56px);font-weight:900;letter-spacing:-2px;}
+
+/* DAO STATS */
+.dao-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px;}
+.dao-stat{background:rgba(8,4,22,0.9);border:1px solid var(--border);border-radius:16px;
+  padding:24px;text-align:center;transition:all 0.3s;}
+.dao-stat:hover{border-color:rgba(180,80,255,0.4);box-shadow:0 0 30px rgba(180,80,255,0.08);}
+.ds-icon{font-size:28px;margin-bottom:10px;}
+.ds-val{font-family:'Orbitron',monospace;font-size:26px;font-weight:800;margin-bottom:6px;}
+.ds-key{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+
+/* LAYOUT */
+.content{padding:0 60px 80px;position:relative;z-index:1;}
+.gov-grid{display:grid;grid-template-columns:1fr 340px;gap:24px;}
+
+/* PROPOSALS */
+.proposals-list{display:flex;flex-direction:column;gap:16px;}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.section-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;}
+.status-filters{display:flex;gap:8px;}
+.sf{padding:6px 14px;border-radius:100px;font-size:11px;cursor:pointer;letter-spacing:1px;
+  border:1px solid;transition:all 0.2s;background:transparent;font-family:'Rajdhani',sans-serif;}
+.sf-all{border-color:rgba(255,255,255,0.1);color:var(--muted);}
+.sf-all.active,.sf-all:hover{background:rgba(255,255,255,0.06);color:var(--text);}
+.sf-active{border-color:rgba(0,255,136,0.3);color:var(--green);}
+.sf-active.active{background:rgba(0,255,136,0.08);}
+.sf-passed{border-color:rgba(0,200,255,0.3);color:var(--cyan);}
+.sf-passed.active{background:rgba(0,200,255,0.08);}
+.sf-failed{border-color:rgba(255,50,100,0.3);color:var(--red);}
+
+/* PROPOSAL CARD */
+.prop-card{background:rgba(8,4,22,0.9);border:1px solid var(--border);border-radius:16px;
+  padding:24px;transition:all 0.3s;cursor:pointer;}
+.prop-card:hover{border-color:rgba(180,80,255,0.35);box-shadow:0 4px 30px rgba(180,80,255,0.06);}
+.prop-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;}
+.prop-id{font-family:'Orbitron',monospace;font-size:11px;color:var(--muted);}
+.prop-status{font-size:10px;letter-spacing:1.5px;padding:4px 12px;border-radius:100px;
+  font-weight:700;white-space:nowrap;}
+.ps-active{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.3);}
+.ps-passed{background:rgba(0,200,255,0.1);color:var(--cyan);border:1px solid rgba(0,200,255,0.3);}
+.ps-failed{background:rgba(255,50,100,0.1);color:var(--red);border:1px solid rgba(255,50,100,0.3);}
+.ps-pending{background:rgba(255,215,0,0.1);color:var(--gold);border:1px solid rgba(255,215,0,0.3);}
+
+.prop-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;margin-bottom:8px;
+  line-height:1.4;}
+.prop-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px;}
+
+.vote-bars{margin-bottom:16px;}
+.vb-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;}
+.vb-label{width:36px;font-weight:700;}
+.vb-label.yes{color:var(--green);}
+.vb-label.no{color:var(--red);}
+.vb-label.abs{color:var(--muted);}
+.vb-bar-wrap{flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+.vb-bar{height:100%;border-radius:100px;transition:width 1s ease;}
+.vb-pct{width:42px;text-align:right;font-family:'Orbitron',monospace;font-size:11px;}
+
+.prop-footer{display:flex;align-items:center;justify-content:space-between;}
+.prop-meta{font-size:11px;color:var(--muted);display:flex;gap:16px;}
+.prop-actions{display:flex;gap:8px;}
+.vote-btn{padding:8px 20px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:1px;
+  cursor:pointer;transition:all 0.2s;border:none;font-family:'Rajdhani',sans-serif;}
+.vb-yes{background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);color:var(--green);}
+.vb-yes:hover{background:rgba(0,255,136,0.2);box-shadow:0 0 16px rgba(0,255,136,0.2);}
+.vb-no{background:rgba(255,50,100,0.08);border:1px solid rgba(255,50,100,0.25);color:var(--red);}
+.vb-no:hover{background:rgba(255,50,100,0.16);}
+.vb-abs2{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--muted);}
+
+/* RIGHT PANEL */
+.right-panel{display:flex;flex-direction:column;gap:16px;}
+.panel-card{background:rgba(8,4,22,0.9);border:1px solid var(--border);border-radius:16px;padding:24px;}
+.panel-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;margin-bottom:20px;
+  display:flex;align-items:center;gap:8px;}
+.panel-title::before{content:'';width:3px;height:16px;background:var(--purple);border-radius:2px;display:block;}
+
+/* POWER METER */
+.power-meter{text-align:center;padding:8px 0;}
+.pm-rings{width:160px;height:160px;margin:0 auto 16px;position:relative;}
+.pm-svg{width:100%;height:100%;}
+.pm-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;}
+.pm-val{font-family:'Orbitron',monospace;font-size:24px;font-weight:800;color:var(--purple);}
+.pm-key{font-size:9px;color:var(--muted);letter-spacing:2px;}
+.pm-breakdown{display:flex;flex-direction:column;gap:10px;}
+.pb-item{display:flex;justify-content:space-between;font-size:12px;padding:8px;
+  background:rgba(255,255,255,0.02);border-radius:8px;}
+.pb-key{color:var(--muted);}
+.pb-val{font-family:'Orbitron',monospace;font-weight:700;}
+
+/* TREASURY */
+.treasury-chart{text-align:center;margin-bottom:16px;}
+.tc-val{font-family:'Orbitron',monospace;font-size:32px;font-weight:900;color:var(--gold);}
+.tc-sub{font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;}
+.treasury-alloc{display:flex;flex-direction:column;gap:10px;}
+.ta-item{display:flex;align-items:center;gap:10px;font-size:12px;}
+.ta-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.ta-label{flex:1;color:var(--muted);}
+.ta-bar-wrap{width:60px;height:4px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+.ta-bar{height:100%;border-radius:100px;}
+.ta-val{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;}
+
+/* DELEGATES */
+.delegate-item{display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.delegate-item:last-child{border:none;}
+.d-avatar{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.d-name{font-size:13px;font-weight:600;flex:1;}
+.d-power{font-family:'Orbitron',monospace;font-size:12px;color:var(--purple);}
+
+.reveal{opacity:0;transform:translateY(20px);transition:all 0.6s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">X3STAR</div>
+  <div class="nav-links">
+    <a class="nav-link" href="x3star-token-presale.html">Presale</a>
+    <a class="nav-link" href="x3star-validator-presale.html">Validator</a>
+    <a class="nav-link" href="x3star-dashboard.html">Dashboard</a>
+    <a class="nav-link" href="x3star-staking.html">Staking</a>
+    <a class="nav-link active">Governance</a>
+  </div>
+  <div style="display:flex;gap:12px;">
+    <button class="btn btn-outline">Submit Proposal</button>
+    <button class="btn btn-primary">Connect Wallet</button>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<div class="page-header">
+  <div class="ph-top">
+    <div>
+      <div class="ph-eyebrow">DAO Governance</div>
+      <h1 class="ph-title">Shape the <span style="color:var(--purple)">Protocol</span></h1>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Your Voting Power</div>
+      <div style="font-family:'Orbitron',monospace;font-size:28px;font-weight:800;color:var(--purple)" id="voting-power">-- <span style="font-size:14px;color:var(--muted)">veX3S</span></div>
+    </div>
+  </div>
+
+  <!-- DAO STATS -->
+  <div class="dao-stats reveal">
+    <div class="dao-stat">
+      <div class="ds-icon">🗳</div>
+      <div class="ds-val" style="color:var(--purple)" id="gov-total">--</div>
+      <div class="ds-key">Total Proposals</div>
+    </div>
+    <div class="dao-stat">
+      <div class="ds-icon">✅</div>
+      <div class="ds-val" style="color:var(--green)" id="gov-passed">--</div>
+      <div class="ds-key">Passed</div>
+    </div>
+    <div class="dao-stat">
+      <div class="ds-icon">👥</div>
+      <div class="ds-val" style="color:var(--cyan)" id="gov-voters">--</div>
+      <div class="ds-key">Active Voters</div>
+    </div>
+    <div class="dao-stat">
+      <div class="ds-icon">💎</div>
+      <div class="ds-val" style="color:var(--gold)" id="gov-treasury">--</div>
+      <div class="ds-key">Treasury</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+  <div class="gov-grid">
+
+    <!-- PROPOSALS -->
+    <div class="proposals-list">
+      <div class="section-header reveal">
+        <div class="section-title">Proposals</div>
+        <div class="status-filters">
+          <button class="sf sf-all active">All</button>
+          <button class="sf sf-active">Active</button>
+          <button class="sf sf-passed">Passed</button>
+          <button class="sf sf-failed">Failed</button>
+        </div>
+      </div>
+
+      <div id="proposal-list" class="prop-card reveal" style="margin-top:16px;">
+        <div class="prop-header">
+          <div><div class="prop-id">Loading</div></div>
+          <span class="prop-status ps-pending">⏳ Awaiting governance feed</span>
+        </div>
+        <div class="prop-title">No proposals available yet.</div>
+        <div class="prop-desc">Governance proposals will populate once the live feed is connected.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+
+      <!-- VOTING POWER -->
+      <div class="panel-card reveal">
+        <div class="panel-title">Your Voting Power</div>
+        <div class="power-meter">
+          <div class="pm-rings">
+            <svg class="pm-svg" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="68" fill="none" stroke="rgba(180,80,255,0.08)" stroke-width="16"/>
+              <circle cx="80" cy="80" r="68" fill="none" stroke="url(#pg)" stroke-width="16"
+                stroke-dasharray="320 427" stroke-dashoffset="107" stroke-linecap="round" transform="rotate(-90 80 80)"/>
+              <defs>
+                <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#cc44ff"/>
+                  <stop offset="100%" stop-color="#00d4ff"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="pm-center">
+              <div class="pm-val" id="gov-vp-total">--</div>
+              <div class="pm-key">veX3S</div>
+            </div>
+          </div>
+          <div class="pm-breakdown">
+            <div class="pb-item">
+              <span class="pb-key">From Staking</span>
+              <span class="pb-val" style="color:var(--purple)" id="gov-vp-staking">--</span>
+            </div>
+            <div class="pb-item">
+              <span class="pb-key">From Node</span>
+              <span class="pb-val" style="color:var(--gold)" id="gov-vp-node">--</span>
+            </div>
+            <div class="pb-item">
+              <span class="pb-key">Delegated</span>
+              <span class="pb-val" style="color:var(--cyan)" id="gov-vp-delegated">--</span>
+            </div>
+            <div class="pb-item">
+              <span class="pb-key">Network Rank</span>
+              <span class="pb-val" style="color:var(--green)" id="gov-vp-rank">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TREASURY -->
+      <div class="panel-card reveal">
+        <div class="panel-title">DAO Treasury</div>
+        <div class="treasury-chart">
+          <div class="tc-val" id="gov-treasury-total">--</div>
+          <div class="tc-sub">TOTAL VALUE</div>
+        </div>
+        <div class="treasury-alloc">
+          <div class="ta-item">
+            <div class="ta-dot" style="background:var(--gold)"></div>
+            <span class="ta-label">Development</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-dev-bar" style="width:0%;background:var(--gold)"></div></div>
+            <span class="ta-val" style="color:var(--gold)" id="treasury-dev">--</span>
+          </div>
+          <div class="ta-item">
+            <div class="ta-dot" style="background:var(--purple)"></div>
+            <span class="ta-label">Grants</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-grants-bar" style="width:0%;background:var(--purple)"></div></div>
+            <span class="ta-val" style="color:var(--purple)" id="treasury-grants">--</span>
+          </div>
+          <div class="ta-item">
+            <div class="ta-dot" style="background:var(--cyan)"></div>
+            <span class="ta-label">Marketing</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-marketing-bar" style="width:0%;background:var(--cyan)"></div></div>
+            <span class="ta-val" style="color:var(--cyan)" id="treasury-marketing">--</span>
+          </div>
+          <div class="ta-item">
+            <div class="ta-dot" style="background:var(--green)"></div>
+            <span class="ta-label">Reserve</span>
+            <div class="ta-bar-wrap"><div class="ta-bar" id="treasury-reserve-bar" style="width:0%;background:var(--green)"></div></div>
+            <span class="ta-val" style="color:var(--green)" id="treasury-reserve">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOP DELEGATES -->
+      <div class="panel-card reveal">
+        <div class="panel-title">Top Delegates</div>
+        <div id="delegate-list" style="font-size:11px;color:var(--muted);">Awaiting delegate feed.</div>
+        <button class="vote-btn" style="width:100%;margin-top:12px;padding:10px;border-radius:8px;
+          background:rgba(180,80,255,0.08);border:1px solid rgba(180,80,255,0.25);color:var(--purple);
+          font-family:'Rajdhani',sans-serif;cursor:pointer;letter-spacing:1px;font-size:12px;">
+          DELEGATE MY VOTES →
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- VOTE CONFIRMATION TOAST -->
+<div id="vote-toast" style="display:none;position:fixed;bottom:30px;right:30px;z-index:300;
+  background:rgba(8,4,22,0.98);border:1px solid rgba(0,255,136,0.4);border-radius:16px;
+  padding:20px 24px;min-width:280px;
+  box-shadow:0 8px 40px rgba(0,255,136,0.15);animation:slideIn 0.3s ease;">
+  <div id="toast-title" style="font-family:'Orbitron',monospace;font-size:14px;font-weight:700;
+    color:var(--green);margin-bottom:4px;"></div>
+  <div id="toast-body" style="font-size:12px;color:var(--muted);"></div>
+</div>
+
+<footer style="padding:40px 60px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">
+  <div style="font-family:'Orbitron',monospace;font-size:24px;font-weight:900;background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">X3STAR</div>
+  <div style="display:flex;gap:24px;font-size:12px;color:var(--muted);">
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-token-presale.html">Token Presale</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-validator-presale.html">Validator</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-staking.html">Staking</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-dashboard.html">Dashboard</a>
+  </div>
+  <div style="font-size:11px;color:var(--muted);opacity:0.5;">© 2025 X3STAR Protocol</div>
+</footer>
+
+<style>
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+</style>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+function castVote(id, vote) {
+  const toast = document.getElementById('vote-toast');
+  const color = vote === 'YES' ? '#00ff88' : vote === 'NO' ? '#ff3366' : '#664488';
+  const power = document.getElementById('gov-vp-total')?.textContent || '--';
+  document.getElementById('toast-title').style.color = color;
+  document.getElementById('toast-title').textContent = `Vote ${vote} cast for ${id}`;
+  document.getElementById('toast-body').textContent = `Using ${power} veX3S · Tx pending confirmation`;
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 4000);
+}
+
+X3PageAdapters.start();
+
+// Reveal
+const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); }), {threshold:0.05});
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "phase": "post_recovery_settlement",
+  "timestamp": "2026-05-14T00:02:29.303761Z",
+  "block_range": [
+    473,
+    474
+  ],
+  "routes": [
+    {
+      "route": "X3Native->X3Evm",
+      "source": "X3Native",
+      "dest": "X3Evm",
+      "pending_supply": "0x00",
+      "represented_supply": "0x00",
+      "canonical_supply": "0x00"
+    },
+    {
+      "route": "X3Evm->X3Svm",
+      "source": "X3Evm",
+      "dest": "X3Svm",
+      "pending_supply": "0x00",
+      "represented_supply": "0x00",
+      "canonical_supply": "0x00"
+    },
+    {
+      "route": "X3Svm->X3Native",
+      "source": "X3Svm",
+      "dest": "X3Native",
+      "pending_supply": "0x00",
+      "represented_supply": "0x00",
+      "canonical_supply": "0x00"
+    }
+  ],
+  "final_pending_supply": 0,
+  "checks": [
+    {
+      "name": "Chain advances during settlement",
+      "result": "PASS",
+      "blocks_advanced": 1
+    },
+    {
+      "name": "pending_supply == 0",
+      "result": "PASS"
+    },
+    {
+      "name": "represented_supply == canonical_supply",
+      "result": "verified_via_state_call"
+    },
+    {
+      "name": "canonical_supply unchanged",
+      "result": "verified_via_state_call"
+    }
+  ],
+  "verdict": "PASS"
+}

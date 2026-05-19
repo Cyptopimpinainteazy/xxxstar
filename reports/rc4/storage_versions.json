@@ -1,0 +1,161 @@
+{
+  "storage_versions_success":
+{
+  "post_upgrade_runtime": {
+    "apis": [
+      [
+        "0xfedda405e90ae979",
+        1
+      ],
+      [
+        "0x1465bdedeceda484",
+        1
+      ],
+      [
+        "0x40fe3ad401f8959a",
+        6
+      ],
+      [
+        "0x37e397fc7c91f5e4",
+        2
+      ],
+      [
+        "0xfbb6f67195cd4d67",
+        1
+      ],
+      [
+        "0x37c8bb1350a9a2a8",
+        4
+      ],
+      [
+        "0xab3c0572291feb8b",
+        1
+      ],
+      [
+        "0xada7e9c48441a11a",
+        1
+      ],
+      [
+        "0xf7d800f3e08fc689",
+        1
+      ],
+      [
+        "0xed99c5acb25eedf5",
+        3
+      ],
+      [
+        "0xdf6acb689907609b",
+        5
+      ],
+      [
+        "0xbc9d89904f5b923f",
+        1
+      ],
+      [
+        "0xd2bc9897eed08f15",
+        3
+      ],
+      [
+        "0xf3ff14d5ab527059",
+        3
+      ],
+      [
+        "0xdd718d5cc53262d4",
+        1
+      ]
+    ],
+    "authoringVersion": 1,
+    "implName": "x3-chain",
+    "implVersion": 1,
+    "specName": "x3-chain",
+    "specVersion": 10,
+    "stateVersion": 1,
+    "systemVersion": 1,
+    "transactionVersion": 1
+  },
+  "pre_upgrade_runtime": {
+    "apis": [
+      [
+        "0xdf6acb689907609b",
+        5
+      ],
+      [
+        "0xab3c0572291feb8b",
+        1
+      ],
+      [
+        "0xfbc577b9d747efd6",
+        1
+      ],
+      [
+        "0xd2bc9897eed08f15",
+        3
+      ],
+      [
+        "0xfbb6f67195cd4d67",
+        1
+      ],
+      [
+        "0xada7e9c48441a11a",
+        1
+      ],
+      [
+        "0xdd718d5cc53262d4",
+        1
+      ],
+      [
+        "0xed99c5acb25eedf5",
+        3
+      ],
+      [
+        "0x40fe3ad401f8959a",
+        6
+      ],
+      [
+        "0xbc9d89904f5b923f",
+        1
+      ],
+      [
+        "0x37c8bb1350a9a2a8",
+        4
+      ],
+      [
+        "0xf3ff14d5ab527059",
+        3
+      ],
+      [
+        "0x37e397fc7c91f5e4",
+        2
+      ],
+      [
+        "0xf7d800f3e08fc689",
+        1
+      ],
+      [
+        "0xfedda405e90ae979",
+        1
+      ],
+      [
+        "0x1465bdedeceda484",
+        1
+      ]
+    ],
+    "authoringVersion": 1,
+    "implName": "x3-chain",
+    "implVersion": 1,
+    "specName": "x3-chain",
+    "specVersion": 9,
+    "stateVersion": 1,
+    "systemVersion": 1,
+    "transactionVersion": 1
+  }
+}
+,
+  "storage_versions_blocked":
+{
+  "post_upgrade_runtime": {},
+  "pre_upgrade_runtime": {
+    "decode_error": "{\"specName\":\"x3-chain\",\"implName\":\"x3-chain\",\"authoringVersion\":1,\"specVersion\":9,\"implVersion\":1,\"apis\":[[\"0xdf6acb689907609b\",5],[\"0xab3c0572291feb8b\",1],[\"0xfbc577b9d747efd6\",1],[\"0xd2bc9897eed08f15\",3],[\"0xfbb6f67195cd4d67\",1],[\"0xada7e9c48441a11a\",1],[\"0xdd718d5cc53262d4\",1],[\"0xed99c5acb25eedf5\",3],[\"0x40fe3ad401f8959a\",6],[\"0xbc9d89904f5b923f\",1],[\"0x37c8bb1350a9a2a8\",4],[\"0xf3ff14d5ab527059\",3],[\"0x37e397fc7c91f5e4\",2],[\"0xf7d800f3e08fc689\",1],[\"0xfedda405e90ae979\",1],[\"0x1465bdedeceda484\",1]],\"transactionVersion\":1,\"systemVersion\":1,\"stateVersion\":1}}"
+  }
+}
+}

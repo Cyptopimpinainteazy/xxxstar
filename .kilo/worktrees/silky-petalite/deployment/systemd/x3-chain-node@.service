@@ -1,0 +1,36 @@
+[Unit]
+Description=X3 Chain Node (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=x3
+Group=x3
+
+EnvironmentFile=/etc/x3-chain/nodes/%i.env
+WorkingDirectory=/var/lib/x3-chain
+ExecStart=/opt/x3-chain/deployment/systemd/run-x3-node.sh
+
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/x3-chain /etc/x3-chain
+
+[Install]
+WantedBy=multi-user.target

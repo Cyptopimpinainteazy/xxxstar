@@ -1,0 +1,67 @@
+{
+  "network": "x3-testnet",
+  "generated_at": "2026-02-18",
+  "token": {
+    "asset_id": 1000,
+    "symbol": "X3",
+    "decimals": 18,
+    "total_supply": "8888888888",
+    "total_supply_base": "8888888888000000000000000000"
+  },
+  "treasury": {
+    "multisig_threshold": 4,
+    "multisig_signers": [
+      "5EaCLaiQm83XjbtfC9X75HFvBdiGJqBwLG8L696gwAvyWKph",
+      "5ERSgzasRe7oDHHCFbJf6fYH3bk7dD3SjzEqfJgPNzZbPhKh",
+      "5CamMYFngjHg3Dw3u57aTnAP2wBSSWnhLKSdXYAYTzMApMXU",
+      "5FRtvbownp9gQ3x2UPsEvS7kmxiEk8eGtfJ7BcfxMrKbtfv1",
+      "5HEx3QZCkdQVfsrUasg36ZvcoXsvs2tcsCN9PrHHBraipXRw",
+      "5HHLEct2KxZnYnr8svLZPwGpnkgk5LytKuAWwfxyQ2DvPWm5",
+      "5CtNJ4eqvM9m84eZCFKTxktJTTCfU1kVkTPXr4oHyASJ2gge"
+    ],
+    "address": "5Gm3cbEyVgrzTJghqvePTFkfP5Gyw8JxpQPv73r2ycWjc7DL",
+    "allocation": {
+      "amount": "2222222222",
+      "amount_base": "2222222222000000000000000000"
+    }
+  },
+  "allocations": [
+    {
+      "bucket": "validators_staking",
+      "address": "5DCNYZ4PPFZyCKZZkqFn5oiWd78zRAyG41L6SzkugAVE5uHV",
+      "amount": "1777777778",
+      "amount_base": "1777777778000000000000000000"
+    },
+    {
+      "bucket": "ecosystem_grants",
+      "address": "5G472MxRo1XGtWudyXtq2oh9uKGACRqFqv2QoH2ygTnNoDBR",
+      "amount": "1777777778",
+      "amount_base": "1777777778000000000000000000"
+    },
+    {
+      "bucket": "presale_early_investors",
+      "address": "5DPXVzc36fT9sEtHLb4Xo5e28xCVAx5exytFLxPAwrKbLBfL",
+      "amount": "1333333333",
+      "amount_base": "1333333333000000000000000000"
+    },
+    {
+      "bucket": "bonus_pool",
+      "address": "5CqSUtcWaxen8F5Q4XPhDPzFmPqVRyuPKMzrvnw932k2bdcT",
+      "amount": "888888889",
+      "amount_base": "888888889000000000000000000"
+    },
+    {
+      "bucket": "team_core_contributors",
+      "address": "5CzThhqqAD52z4qzdZE1Gk9DgfpnzoZfYZBNLSZcukjbJQep",
+      "amount": "888888888",
+      "amount_base": "888888888000000000000000000"
+    }
+  ],
+  "bonus_pool_breakdown": {
+    "gpu_hardware_contributors": "40%",
+    "validators_staking_spot_buyers": "20%",
+    "presale_traders": "10%",
+    "auditors_bug_hunters": "30%"
+  },
+  "note": "Testnet-only allocations. Do not reuse these keys for mainnet. Mainnet keys must be generated offline and shared as SS58 addresses only."
+}

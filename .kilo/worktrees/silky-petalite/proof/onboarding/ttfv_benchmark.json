@@ -1,0 +1,11 @@
+{
+  "measured_at": "2026-04-28T21:10:08Z",
+  "host": "Linux 6.8.0-107-generic x86_64",
+  "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+  "budget_seconds": 600,
+  "total_seconds": 24.252,
+  "within_budget": true,
+  "passed": true,
+  "first_value_definition": "build proof-forge from source and verify two real claim receipts (flashloans.attack_resistance + contracts.evm_svm_parity)",
+  "steps": [{"label":"cargo build -p proof-forge --release","seconds":22.924,"status":"ok"},{"label":"x3-proof verify x3.flashloans.attack_resistance","seconds":1.214,"status":"ok"},{"label":"x3-proof verify x3.contracts.evm_svm_parity","seconds":0.092,"status":"ok"}]
+}

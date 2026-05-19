@@ -1,0 +1,7502 @@
+# Panic Unwrap Audit
+
+Generated: 2026-05-01T16:40:44Z
+
+## Classification Rules
+
+- test-only: path includes tests, fuzz, benchmarking, mock
+- startup fail-fast: path includes node/src/main or startup gate
+- compiler/tooling-only: path includes build.rs, macros, or generated tooling
+- runtime hook: path and context include on_initialize, on_finalize, offchain_worker
+- extrinsic path: path and context include pallet call functions
+- production hot path: runtime, pallet, or node execution code not covered above
+
+## Findings
+
+- [production hot path] crates/apotheosis-tx/src/builder.rs:416
+  -         let tx = result.unwrap();
+- [production hot path] crates/apotheosis-tx/src/routes.rs:415
+  -         let hops = route.unwrap();
+- [production hot path] crates/apotheosis-tx/src/routes.rs:434
+  -         let hops = route.unwrap();
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:621
+  -         let req = req.unwrap();
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:652
+  -         let req = AtomicSwapOrchestrator::build_finalization_request(&result).unwrap();
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:712
+  -         let decoded_ns = u64::from_le_bytes(payload[32..40].try_into().expect("slice is 8 bytes"));
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:771
+  -             .expect("committed result with non-zero root must produce request");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:791
+  -             u64::from_le_bytes(payload[32..40].try_into().unwrap()),
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:800
+  -         let req = AtomicSwapOrchestrator::build_finalization_request(&result).unwrap();
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:802
+  -         let json = serde_json::to_string(&req).expect("must serialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:803
+  -         let decoded: FinalizationRequest = serde_json::from_str(&json).expect("must deserialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:815
+  -         let json = serde_json::to_string(&result).expect("must serialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:816
+  -         let decoded: ProcessResult = serde_json::from_str(&json).expect("must deserialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:901
+  -         let req = AtomicSwapOrchestrator::build_finalization_request(&result).unwrap();
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:942
+  -         let json = serde_json::to_string(&pair).expect("must serialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:943
+  -         let decoded: AtomicPair = serde_json::from_str(&json).expect("must deserialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:948
+  -         let json_none = serde_json::to_string(&pair_none).expect("must serialise");
+- [production hot path] crates/atomic-swap-orchestrator/src/lib.rs:949
+  -         let decoded_none: AtomicPair = serde_json::from_str(&json_none).expect("must deserialise");
+- [production hot path] crates/chronos-flash/src/oracle.rs:156
+  -         let best_route = routes.into_iter().next().unwrap();
+- [production hot path] crates/chronos-flash/src/router.rs:210
+  -         let current_token = *current.last().unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:176
+  -         enclave.initialize().unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:179
+  -         att.generate_report(&enclave).unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:181
+  -         let report = att.current_report().unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:184
+  -         let info = AttestationManager::verify_report(&report).unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:191
+  -         enclave.initialize().unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:194
+  -         att.generate_report(&enclave).unwrap();
+- [production hot path] crates/confidential-gpu/src/attestation.rs:197
+  -         let sig = att.sign_with_enclave_key(data).unwrap();
+- [production hot path] crates/confidential-gpu/src/enclave.rs:167
+  -         mgr.initialize().unwrap();
+- [production hot path] crates/confidential-gpu/src/enclave.rs:181
+  -         mgr.initialize().unwrap();
+- [production hot path] crates/confidential-gpu/src/enclave.rs:183
+  -         let result = mgr.execute_in_enclave(b"test transaction").unwrap();
+- [production hot path] crates/confidential-gpu/src/lib.rs:304
+  -         runtime.initialize().unwrap();
+- [production hot path] crates/confidential-gpu/src/threshold.rs:220
+  -             let _share = v.participate(&commitments).unwrap();
+- [production hot path] crates/contention-predictor/src/lib.rs:613
+  -         .unwrap()
+- [production hot path] crates/contention-predictor/src/lib.rs:641
+  -         let prediction = predictor.predict_contention(&tx).await.unwrap();
+- [production hot path] crates/contention-predictor/src/lib.rs:688
+  -         predictor.train_model(&training_data).await.unwrap();
+- [production hot path] crates/contention-predictor/src/lib.rs:706
+  -             .unwrap();
+- [production hot path] crates/contention-predictor/src/model.rs:147
+  -         let preds = model.predict_single(&fv).unwrap();
+- [production hot path] crates/contention-predictor/src/model.rs:163
+  -         let preds = model.predict_batch(&features).unwrap();
+- [production hot path] crates/contention-predictor/src/shard_planner.rs:181
+  -         let shards = planner.plan(&predictions).unwrap();
+- [production hot path] crates/contention-predictor/src/shard_planner.rs:206
+  -         let shards = planner.plan(&predictions).unwrap();
+- [production hot path] crates/contention-predictor/src/shard_planner.rs:231
+  -         let shards = planner.plan(&predictions).unwrap();
+- [production hot path] crates/contention-predictor/src/shard_planner.rs:261
+  -         let shards = planner.plan(&predictions).unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/evm_validator.rs:125
+  -         let result = validator.validate_state_root(&state).await.unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/evm_validator.rs:138
+  -         let (hashes, _) = validator.hasher.hash_batch_cpu(&tx_bytes).unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/evm_validator.rs:147
+  -         let result = validator.validate_state_root(&state).await.unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/evm_validator.rs:157
+  -         let root = validator.compute_merkle_root(&leaves).unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/failover.rs:126
+  -         let health = manager.check_gpu_health().await.unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/failover.rs:135
+  -         let (hashes, _, _used_gpu) = manager.hash_with_failover(&inputs).unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/kernels.rs:170
+  -         assert!(result.unwrap());
+- [production hot path] crates/cross-chain-gpu-validator/src/kernels.rs:178
+  -         let (hashes, _) = kernel.hash_batch_cpu(&inputs).unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/kernels.rs:203
+  -             .unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/svm_validator.rs:110
+  -         let result = validator.validate_transactions(&state).await.unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/svm_validator.rs:123
+  -         let result = validator.validate_transactions(&state).await.unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/svm_validator.rs:137
+  -         let result = validator.validate_block_hash(&state_valid).await.unwrap();
+- [production hot path] crates/cross-chain-gpu-validator/src/svm_validator.rs:146
+  -         let result = validator.validate_block_hash(&state_invalid).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:22
+  -         let (gpu_hashes, _gpu_time) = kernel.hash_batch_gpu(&inputs).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:23
+  -         let (cpu_hashes, _cpu_time) = kernel.hash_batch_cpu(&inputs).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:35
+  -         let parity_ok = kernel.verify_parity(&inputs).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:44
+  -         let (hashes1, _) = kernel.hash_batch_cpu(&[input]).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:45
+  -         let (hashes2, _) = kernel.hash_batch_cpu(&[input]).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:81
+  -         let (hashes, _) = validator.hasher.hash_batch_cpu(&tx_bytes).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:90
+  -         let result = validator.validate_state_root(&state).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:107
+  -         let result = validator.validate_state_root(&state).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:122
+  -         let tx_result = validator.validate_transactions(&state).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:125
+  -         let hash_result = validator.validate_block_hash(&state).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:139
+  -         let result = validator.validate_block_hash(&state).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:153
+  -             .unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:167
+  -         let evm_result = evm_validator.validate_state_root(&evm_state).await.unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:171
+  -             .unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:188
+  -         let (hashes, _) = kernel.hash_batch_cpu(&inputs[..256]).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:208
+  -                 let (hashes, _) = validator.hasher.hash_batch_cpu(&[tx.as_slice()]).unwrap();
+- [test-only] crates/cross-chain-gpu-validator/tests/integration_tests.rs:218
+  -         let _results = validator.validate_batch(&states).await.unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:753
+  -         let mut normalizer = UsdNormalizer::new().unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:760
+  -         let value = normalizer.normalize_to_usd(&asset, amount).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:767
+  -         let mut engine = AccountingEngine::new().unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:775
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:777
+  -         let balance = engine.get_balance(&position_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:810
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:813
+  -         let balance = inventory.balance(1, asset).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:817
+  -         inventory.release_reservation(&route_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:818
+  -         let balance = inventory.balance(1, asset).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:822
+  -             inventory.obligation(&route_id).unwrap().status,
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:850
+  -             other => panic!("unexpected error: {other:?}"),
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:873
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:875
+  -         inventory.mark_pending_out(&route_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:876
+  -         let source_balance = inventory.balance(1, source_asset).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:880
+  -         inventory.mark_pending_in(&route_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:881
+  -         let source_balance = inventory.balance(1, source_asset).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:882
+  -         let destination_balance = inventory.balance(8453, destination_asset).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:886
+  -         inventory.settle_inbound(&route_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:887
+  -         let destination_balance = inventory.balance(8453, destination_asset).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/accounting.rs:891
+  -             inventory.obligation(&route_id).unwrap().status,
+- [production hot path] crates/cross-chain-position-manager/src/adapters.rs:385
+  -         let registry = ChainRegistryAdapter::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/arbitrage.rs:499
+  -         let detector = ArbitrageDetector::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/arbitrage.rs:507
+  -         let executor = ArbitrageExecutor::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/lib.rs:453
+  -         Self::new().expect("default config should be valid")
+- [production hot path] crates/cross-chain-position-manager/src/migration.rs:397
+  -             position_id: PositionId::from_bytes(bundle.bundle_id.as_bytes().try_into().unwrap()),
+- [production hot path] crates/cross-chain-position-manager/src/migration.rs:821
+  -         let engine = MigrationEngine::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:397
+  -                 panic!("unexpected rejection: {:?}", reason)
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:402
+  -             mgr.partner("partner_a").unwrap().current_exposure,
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:487
+  -             mgr.partner("partner_f").unwrap().current_exposure,
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:493
+  -             mgr.partner("partner_f").unwrap().current_exposure,
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:515
+  -         let record = mgr.partner("partner_g").unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:528
+  -             mgr.partner("partner_h").unwrap().status,
+- [production hot path] crates/cross-chain-position-manager/src/partner.rs:534
+  -             mgr.partner("partner_h").unwrap().status,
+- [production hot path] crates/cross-chain-position-manager/src/rebalance.rs:285
+  -         self.plans.get(&request.request_id).unwrap()
+- [production hot path] crates/cross-chain-position-manager/src/rebalance.rs:418
+  -         assert_eq!(market_action.unwrap().amount, U256::from(70u64));
+- [production hot path] crates/cross-chain-position-manager/src/rebalancing.rs:596
+  -         let engine = RebalancingEngine::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/rebalancing.rs:605
+  -         let engine = RebalancingEngine::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/rebalancing.rs:607
+  -         let result = engine.is_rebalance_needed().unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/risk.rs:445
+  -         let manager = RiskManager::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/risk.rs:454
+  -         let mut manager = RiskManager::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:995
+  -         let optimizer = RouteOptimizer::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1026
+  -         let mut optimizer = RouteOptimizer::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1036
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1046
+  -         let mut optimizer = RouteOptimizer::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1056
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1059
+  -         let reservation = candidate.reservation.expect("reservation expected");
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1068
+  -         let mut optimizer = RouteOptimizer::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1078
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1080
+  -         let reservation_id = candidate.reservation.unwrap().reservation_id;
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1081
+  -         optimizer.release_reservation(&reservation_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1083
+  -             optimizer.reservation(&reservation_id).unwrap().status,
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1087
+  -         optimizer.expire_reservation(&reservation_id).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/router.rs:1089
+  -             optimizer.reservation(&reservation_id).unwrap().status,
+- [production hot path] crates/cross-chain-position-manager/src/state.rs:503
+  -         let mut manager = PositionStateManager::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/state.rs:511
+  -         let mut manager = PositionStateManager::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/state.rs:513
+  -         let snapshot = manager.create_snapshot().unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/state.rs:520
+  -         let mut manager = PositionStateManager::new(&config).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/state.rs:538
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/tracking.rs:479
+  -         Self::new(&PositionTrackerConfig::default()).unwrap()
+- [production hot path] crates/cross-chain-position-manager/src/types.rs:35
+  -         getrandom::getrandom(&mut bytes).expect("Failed to generate random bytes");
+- [production hot path] crates/cross-chain-position-manager/src/utils.rs:659
+  -         let result = math::percentage_of(value, 10.0).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/utils.rs:667
+  -         let result = math::percentage_diff(value1, value2).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/vault_controller.rs:365
+  -         controller.register_signer_policy(policy).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/vault_controller.rs:377
+  -             .unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/vault_controller.rs:388
+  -         controller.register_signer_policy(policy).unwrap();
+- [production hot path] crates/cross-chain-position-manager/src/vault_controller.rs:400
+  -             .unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:84
+  -     let mut manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:86
+  -     manager.start().await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:88
+  -     let positions = manager.track_positions().await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:91
+  -     let summary = manager.get_portfolio_summary().await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:94
+  -     manager.stop().await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:100
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:106
+  -         .unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:117
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:129
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:132
+  -     let result = manager.rebalance(&targets).await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:141
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:150
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:152
+  -     let opportunities = manager.evaluate_arbitrage().await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:164
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:166
+  -     let kill_switches = manager.check_kill_switches().await.unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:173
+  -     let manager = CrossChainPositionManager::new_with_config(config).unwrap();
+- [test-only] crates/cross-chain-position-manager/tests/integration_tests.rs:183
+  -         .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/canonical.rs:306
+  -         .expect("payload is within bound")
+- [production hot path] crates/cross-vm-bridge/src/canonical.rs:325
+  -         let decoded = CrossVmCall::decode(&mut &encoded[..]).expect("decode");
+- [production hot path] crates/cross-vm-bridge/src/canonical.rs:425
+  -         .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/canonical.rs:501
+  -         let decoded = CrossVmReceipt::decode(&mut &encoded[..]).expect("decode");
+- [production hot path] crates/cross-vm-bridge/src/canonical.rs:516
+  -             let decoded = CrossVmStatus::decode(&mut &encoded[..]).expect("decode");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2315
+  -                 let svm_commit = svm_commit.expect("checked above");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2593
+  -         let nonce = bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2608
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2609
+  -         let results = bridge.execute_pending().unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2629
+  -         bridge.queue_operation(op.clone()).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2659
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2661
+  -         let (results, events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2680
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2682
+  -         let (results, _events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2699
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2701
+  -         let (results, _events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2711
+  -         let decoded = VmType::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2724
+  -         let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2783
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2791
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2800
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2804
+  -         let (results, events) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2822
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2843
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2851
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2870
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2881
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:2958
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3011
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3014
+  -         let (nonces, prepare_events) = bridge.prepare(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3022
+  -         let (results, commit_events) = bridge.commit(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3043
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3045
+  -         let (nonces, _) = bridge.prepare(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3069
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3078
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3080
+  -         let (results, events) = bridge.atomic_execute(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3125
+  -                 .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3128
+  -         let (nonces, events) = bridge.prepare(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3161
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3164
+  -         let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3183
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3185
+  -         let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3204
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3206
+  -         let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3224
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3226
+  -         let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3247
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3249
+  -         let (results, _) = bridge.execute_with_dispatcher(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3297
+  -         let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3306
+  -         let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3315
+  -         let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3323
+  -         let decoded = CrossVmEvent::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3345
+  -         let decoded = PreparedOperation::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3359
+  -             let decoded = TwoPhaseCommitPhase::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3385
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3394
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3405
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3410
+  -         let (results, events) = bridge.atomic_execute(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3445
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3467
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3493
+  -         let queued_nonce = bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3496
+  -         let results = bridge.execute_pending().unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3528
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3529
+  -         let results = bridge.execute_pending().unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3598
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3599
+  -         let results = bridge.execute_pending().unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3617
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3626
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3635
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3642
+  -         let results = bridge.execute_pending().unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3660
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3661
+  -         bridge.execute_pending().unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3685
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3694
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3696
+  -         let (results, events) = bridge.atomic_execute(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3923
+  -             .expect("queue should succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3927
+  -             .expect("execute_with_dispatcher must not fail");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3956
+  -             .expect("queue should succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3960
+  -             .expect("execute must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3987
+  -             .expect("queue should succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:3991
+  -             .expect("execute must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4026
+  -             .expect("queue should succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4030
+  -             .expect("execute must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4072
+  -             .expect("queue should succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4076
+  -             .expect("execute_with_dispatcher should not panic");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4110
+  -         .expect("payload within bound")
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4121
+  -             .expect("noop x3vm call must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4136
+  -             .expect("receipt returned, not trait error");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4164
+  -         let r1 = d.execute_x3vm_tx(&caller, &call).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4165
+  -         let r2 = d.execute_x3vm_tx(&caller, &call).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4180
+  -         let receipt = d.execute_x3vm_tx(&caller, &call).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4205
+  -         .expect("payload within bound")
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4216
+  -             .expect("x3vm routing must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4220
+  -         let direct = d.execute_x3vm_tx(&caller, &call).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4235
+  -             .expect("evm routing must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4258
+  -             .expect("svm routing must succeed");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4274
+  -         let receipt = d.execute_call(&caller, &call).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4286
+  -         let receipt = d.execute_call(&caller, &call).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4346
+  -         .expect("bounded payload")
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4366
+  -         bridge.queue_operation(op).expect("valid triswap admits");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4440
+  -         bridge.queue_operation(op).expect("queue ok");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4450
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4452
+  -         let (prepared, _evs) = bridge.prepare(&dispatcher).expect("prepare ok");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4456
+  -         let (results, _evs) = bridge.commit(&dispatcher).expect("commit ok");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4485
+  -         bridge.queue_operation(op1).expect("first admits");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4518
+  -         .expect("bounded payload")
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4533
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4536
+  -         let (nonces, _evs) = bridge.prepare(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4540
+  -         let (results, _evs) = bridge.commit(&dispatcher).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4593
+  -         bridge.queue_operation(op1).expect("first admission OK");
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4619
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4625
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4642
+  -         bridge.admit_x3vm_call_hash(key).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4657
+  -         bridge.admit_x3vm_call_hash(key).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4670
+  -         bridge.admit_x3vm_call_hash(key).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4683
+  -         bridge.queue_operation(op.clone()).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4692
+  -         bridge.queue_operation(op).unwrap();
+- [production hot path] crates/cross-vm-bridge/src/lib.rs:4713
+  -             .unwrap();
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:523
+  -             other => panic!("Expected InvalidMerkleProof, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:534
+  -             other => panic!("Expected InvalidMerkleProof, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:559
+  -             other => panic!("Expected StateRootMismatch, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:569
+  -             other => panic!("Expected InvalidBlockNumber, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:583
+  -             other => panic!("Expected InvalidBlockNumber, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:607
+  -             other => panic!("Expected InsufficientValidatorSignatures, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_proof_validator.rs:627
+  -             other => panic!("Expected UnauthorizedValidator, got {other:?}"),
+- [production hot path] crates/cross-vm-bridge/src/merkle_settlement_bridge.rs:174
+  -         assert!(result.unwrap());
+- [production hot path] crates/cross-vm-bridge/src/merkle_settlement_bridge.rs:367
+  -         assert!(result.unwrap());
+- [production hot path] crates/cross-vm-bridge/src/merkle_settlement_bridge.rs:494
+  -             assert!(result.unwrap(), "Settlement {i} result should be true");
+- [production hot path] crates/cross-vm-bridge/src/merkle_settlement_bridge.rs:549
+  -             settlement.merkle_proof.as_ref().unwrap().metadata,
+- [test-only] crates/cross-vm-bridge/src/tests/attack_arbitrage.rs:17
+  -         .expect("operation should queue");
+- [test-only] crates/cross-vm-bridge/tests/integration.rs:35
+  -     bridge.queue_operation(t1).expect("queue t1");
+- [test-only] crates/cross-vm-bridge/tests/integration.rs:36
+  -     bridge.queue_operation(t2).expect("queue t2");
+- [test-only] crates/cross-vm-bridge/tests/integration.rs:37
+  -     bridge.queue_operation(swap).expect("queue swap");
+- [test-only] crates/cross-vm-bridge/tests/integration.rs:44
+  -         .expect("execute pending");
+- [production hot path] crates/cross-vm-coordinator/src/abi.rs:273
+  -         let (status, confs) = decode_htlc_status(&data).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/abi.rs:282
+  -         let (status, _) = decode_htlc_status(&data).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/bridge_integration_tests.rs:43
+  -         let retrieved = chain_registry.get(&sepolia_chain_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/bridge_integration_tests.rs:67
+  -         let retrieved = svm_registry.get("testnet").unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/bridge_integration_tests.rs:92
+  -         assert_eq!(result.unwrap().finality_threshold, 12u32);
+- [production hot path] crates/cross-vm-coordinator/src/bridge_integration_tests.rs:128
+  -             registry.get(&11155111u32).unwrap().finality_threshold,
+- [production hot path] crates/cross-vm-coordinator/src/bridge_integration_tests.rs:286
+  -         let status = proof_status.get(&proof_hash).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/bridge_integration_tests.rs:309
+  -         let status = proof_status.get(&proof_hash).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:72
+  -         let mut guard = self.inner.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:77
+  -         let guard = self.inner.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:82
+  -         let mut guard = self.inner.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:87
+  -         let guard = self.inner.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:92
+  -         let guard = self.inner.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:97
+  -         let mut guard = self.used_secrets.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:102
+  -         let guard = self.used_secrets.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:149
+  -         let value = serde_json::to_vec(session).expect("SwapSession serializes");
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:183
+  -         let value = serde_json::to_vec(secrets).expect("HashSet serializes");
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:232
+  -             let encoded = serde_json::to_vec(&keys).expect("index serializes");
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:244
+  -             let encoded = serde_json::to_vec(&keys).expect("index serializes");
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:255
+  -         let mut guard = self.inner.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:264
+  -         let guard = self.inner.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:269
+  -         let mut guard = self.inner.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:275
+  -         let guard = self.inner.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:317
+  -         let loaded = persistence.load("swap-abc123").unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:384
+  -                 let mut guard = self.store.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:389
+  -                 let guard = self.store.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:394
+  -                 let mut guard = self.store.write().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:399
+  -                 let guard = self.store.read().unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:418
+  -             let loaded = p.load("oc-swap-001").unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:487
+  -             let loaded = p.load("oc-overwrite").unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/persistence.rs:520
+  -             let loaded = p.load("oc-secrets-test").unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/rpc_client.rs:65
+  -             .expect("Failed to create RPC client with pooling");
+- [production hot path] crates/cross-vm-coordinator/src/rpc_client.rs:334
+  -         let decoded = base64_decode(encoded).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:52
+  -             panic!("CRITICAL-001: InMemoryPersistence forbidden in production. Use OffchainPersistence. Node crash = fund loss.");
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:292
+  -                 .expect("session id collected from map keys must exist");
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:326
+  -             let session = self.sessions.get_mut(session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:460
+  -             let session = self.sessions.get_mut(session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:626
+  -             let session = self.sessions.get_mut(session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:650
+  -             return Err(abort_error.unwrap());
+- [production hot path] crates/cross-vm-coordinator/src/state_machine.rs:653
+  -         let hash_lock = self.sessions.get(session_id).unwrap().hash_lock;
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:39
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:44
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:71
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:92
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:112
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:115
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:119
+  -     coordinator.begin_flash_execution(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:120
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:135
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:137
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:141
+  -     coordinator.begin_settlement(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:142
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:147
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:148
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:151
+  -     coordinator.record_slow_claim(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:152
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:177
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:198
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:218
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:221
+  -     coordinator.begin_flash_execution(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:233
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:244
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:264
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:284
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:291
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:389
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:391
+  -     coordinator.abort(&session_id, "manual abort", now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:392
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:395
+  -     coordinator.record_refunds(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:396
+  -     let session = coordinator.get_session(&session_id).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:409
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:414
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:417
+  -     coordinator.abort(&id1, "test", now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:418
+  -     coordinator.record_refunds(&id1, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:456
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:459
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:465
+  -     coordinator.abort(&id1, "test", now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:466
+  -     coordinator.record_refunds(&id1, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:478
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:481
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:484
+  -     coordinator.abort(&id1, "done", now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:485
+  -     coordinator.record_refunds(&id1, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:508
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:523
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:525
+  -     coordinator.abort(&id1, "test", now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:526
+  -     coordinator.record_refunds(&id1, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:572
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:574
+  -     let session_hash = coordinator.get_session(&session_id).unwrap().hash_lock;
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:593
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:612
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:613
+  -     coordinator.begin_flash_execution(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:614
+  -     if coordinator.get_session(&session_id).unwrap().phase == SwapPhase::ExecutingFlashLegs {
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:628
+  -     coordinator.begin_settlement(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:643
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:645
+  -     let session_hash = coordinator.get_session(&session_id).unwrap().hash_lock;
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:664
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:683
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:684
+  -     coordinator.begin_flash_execution(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:685
+  -     if coordinator.get_session(&session_id).unwrap().phase == SwapPhase::ExecutingFlashLegs {
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:699
+  -     coordinator.begin_settlement(&session_id, now).unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:704
+  -         .expect("First claim with correct secret must succeed");
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:737
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:752
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:756
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:776
+  -         .unwrap();
+- [production hot path] crates/cross-vm-coordinator/src/tests.rs:819
+  -         coordinator.get_session(&session_id).unwrap().phase,
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:110
+  -     let stored_hash = prepared_ops.get(&op_id).expect("Operation not prepared");
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:203
+  -         panic!("❌ Safety margin violated mid-execution!");
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:470
+  -     let success_json: serde_json::Value = serde_json::from_str(success_response).unwrap();
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:471
+  -     let error_json: serde_json::Value = serde_json::from_str(error_response).unwrap();
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:625
+  -     let json: serde_json::Value = serde_json::from_str(revert_response).unwrap();
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:819
+  -         _ => panic!("Relayer did not reconnect"),
+- [test-only] crates/cross-vm-coordinator/tests/security_regression.rs:1064
+  -             _ => panic!("Unknown chain"),
+- [production hot path] crates/custody-service/src/audit.rs:202
+  -             .unwrap();
+- [production hot path] crates/custody-service/src/client.rs:175
+  -             .unwrap();
+- [production hot path] crates/custody-service/src/client.rs:177
+  -         let snap = client.get_vault("vault-1").await.unwrap();
+- [production hot path] crates/custody-service/src/client.rs:186
+  -             .unwrap();
+- [production hot path] crates/custody-service/src/client.rs:203
+  -         let resp = client.execute(cmd).await.unwrap();
+- [production hot path] crates/custody-service/src/client.rs:206
+  -         let snap = client.get_vault("vault-1").await.unwrap();
+- [production hot path] crates/custody-service/src/hsm.rs:162
+  -         let key = hsm.generate_key("test-key-1", "ECDSA-P256").await.unwrap();
+- [production hot path] crates/custody-service/src/hsm.rs:171
+  -         let _ = hsm.generate_key("test-key-2", "ECDSA-P256").await.unwrap();
+- [production hot path] crates/custody-service/src/hsm.rs:174
+  -         let signature = hsm.sign("test-key-2", data).await.unwrap();
+- [production hot path] crates/custody-service/src/hsm.rs:175
+  -         let verified = hsm.verify("test-key-2", data, &signature).await.unwrap();
+- [production hot path] crates/custody-service/src/hsm.rs:182
+  -         let key1 = hsm.generate_key("test-key-3", "ECDSA-P256").await.unwrap();
+- [production hot path] crates/custody-service/src/hsm.rs:183
+  -         let key2 = hsm.rotate_key("test-key-3").await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:414
+  -         let service = CustodyServiceImpl::new().await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:422
+  -             .unwrap();
+- [production hot path] crates/custody-service/src/service.rs:424
+  -         let snapshot = service.get_vault_snapshot("vault-1").await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:431
+  -         let service = CustodyServiceImpl::new().await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:456
+  -         let decision = service.authorize_operation(request).await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:462
+  -         let service = CustodyServiceImpl::new().await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:470
+  -             .unwrap();
+- [production hot path] crates/custody-service/src/service.rs:487
+  -         let response = service.execute_operation(cmd).await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:494
+  -         let service = CustodyServiceImpl::new().await.unwrap();
+- [production hot path] crates/custody-service/src/service.rs:502
+  -             .unwrap();
+- [production hot path] crates/custody-service/src/service.rs:519
+  -         let response = service.execute_operation(cmd).await.unwrap();
+- [production hot path] crates/dream-mining/src/scheduler.rs:397
+  -         let task_id = scheduler.add_task(task).await.unwrap();
+- [production hot path] crates/dream-mining/src/scheduler.rs:400
+  -         let next = scheduler.next_task().await.unwrap();
+- [production hot path] crates/dream-mining/src/scheduler.rs:402
+  -         assert_eq!(next.unwrap().id, task_id);
+- [production hot path] crates/dream-mining/src/scheduler.rs:422
+  -         scheduler.add_task(low_task).await.unwrap();
+- [production hot path] crates/dream-mining/src/scheduler.rs:436
+  -         let high_id = scheduler.add_task(high_task).await.unwrap();
+- [production hot path] crates/dream-mining/src/scheduler.rs:439
+  -         let next = scheduler.next_task().await.unwrap().unwrap();
+- [production hot path] crates/dylint-determinism/src/lib.rs:8
+  - //! | `PANIC_IN_RUNTIME`            | warn | `panic!`/`unwrap()`/`expect()` crash nodes without reverts |
+- [production hot path] crates/dylint-determinism/src/lib.rs:53
+  -     /// `panic!`, `.unwrap()`, and `.expect()` in runtime dispatch code abort the
+- [production hot path] crates/dylint-determinism/src/lib.rs:158
+  -         // ── method-call checks: .unwrap(), .expect(), .unwrap_or_else … ──────
+- [production hot path] crates/dylint-determinism/src/lib.rs:163
+  -                     diag.help("return `Err(Error::<T>::...)` instead of calling .unwrap()/.expect() in runtime code");
+- [production hot path] crates/dylint-determinism/src/lib.rs:190
+  -             // panic!() desugars to a call through core::panicking
+- [production hot path] crates/dylint-determinism/src/lib.rs:235
+  -         .unwrap()
+- [production hot path] crates/evm-integration/src/lib.rs:418
+  -         let result = result.unwrap();
+- [production hot path] crates/evm-integration/src/lib.rs:436
+  -             .unwrap();
+- [production hot path] crates/evm-integration/src/lib.rs:466
+  -             .unwrap();
+- [production hot path] crates/evm-integration/src/lib.rs:578
+  -             .expect("estimate gas ok");
+- [production hot path] crates/evm-integration/src/mini_evm.rs:276
+  -     let hash: &[u8; 32] = padded[0..32].try_into().expect("32-byte slice");
+- [production hot path] crates/evm-integration/src/state.rs:363
+  -         meter.consume(50_000).unwrap();
+- [production hot path] crates/evm-integration/src/state.rs:399
+  -         let stored = db.code(&code_hash).unwrap();
+- [production hot path] crates/evm-integration/src/state.rs:401
+  -         assert_eq!(db.account(&addr).unwrap().code_hash, code_hash);
+- [test-only] crates/evm-integration/tests/erc20_integration.rs:45
+  -         .unwrap();
+- [test-only] crates/evm-integration/tests/erc20_integration.rs:66
+  -     .expect("call should succeed");
+- [test-only] crates/evm-integration/tests/integration.rs:29
+  -         .unwrap();
+- [test-only] crates/evm-integration/tests/integration.rs:38
+  -         .unwrap();
+- [production hot path] crates/external-chains/src/adapter.rs:449
+  -         let block = adapter.get_block_number().await.unwrap();
+- [production hot path] crates/external-chains/src/adapter.rs:476
+  -         .unwrap();
+- [production hot path] crates/external-chains/src/assets.rs:337
+  -         let asset = registry.get(&id).unwrap();
+- [production hot path] crates/external-chains/src/assets.rs:347
+  -         let asset = registry.lookup(8453, H160::zero()).unwrap();
+- [production hot path] crates/external-chains/src/assets.rs:370
+  -             .unwrap();
+- [production hot path] crates/external-chains/src/assets.rs:372
+  -         let asset = registry.get(&id).unwrap();
+- [production hot path] crates/external-chains/src/chains/base.rs:533
+  -         assert_eq!(BaseAdapter::parse_hex_u64("0x1").unwrap(), 1);
+- [production hot path] crates/external-chains/src/chains/base.rs:534
+  -         assert_eq!(BaseAdapter::parse_hex_u64("0xff").unwrap(), 255);
+- [production hot path] crates/external-chains/src/chains/base.rs:535
+  -         assert_eq!(BaseAdapter::parse_hex_u64("0x2105").unwrap(), 8453);
+- [production hot path] crates/external-chains/src/chains/base.rs:540
+  -         let val = BaseAdapter::parse_hex_u256("0x1").unwrap();
+- [production hot path] crates/external-chains/src/chains/base.rs:554
+  -         let text = String::from_utf8(req).unwrap();
+- [production hot path] crates/external-chains/src/chains/registry.rs:1209
+  -         let eth = get_chain(1).unwrap();
+- [production hot path] crates/external-chains/src/chains/registry.rs:1213
+  -         let x3 = get_chain(42).unwrap();
+- [production hot path] crates/external-chains/src/chains/universal.rs:318
+  -         let eth = adapter_for(1).unwrap();
+- [production hot path] crates/external-chains/src/chains/universal.rs:324
+  -         let zksync = adapter_for(324).unwrap();
+- [production hot path] crates/external-chains/src/chains/universal.rs:329
+  -         let ftm = adapter_for(250).unwrap();
+- [production hot path] crates/external-chains/src/chains/universal.rs:349
+  -         let adapter = adapter_for(137).unwrap(); // Polygon
+- [production hot path] crates/external-chains/src/chains/universal.rs:352
+  -         let balance = adapter.get_balance(H160::zero()).await.unwrap();
+- [production hot path] crates/external-chains/src/chains/universal.rs:365
+  -         .unwrap();
+- [production hot path] crates/external-chains/src/rpc.rs:359
+  -         assert_eq!(config.primary_rpc().unwrap().priority, 100);
+- [production hot path] crates/external-chains/src/rpc.rs:390
+  -         assert_eq!(arbitrum.unwrap().chain_id, 42161);
+- [production hot path] crates/external-chains/src/settlement_integration.rs:456
+  -             coord.binding(&H256::from_low_u64_be(1)).unwrap().route_id,
+- [production hot path] crates/external-chains/src/settlement_integration.rs:530
+  -         let obl = coord.pending_obligations().pop().unwrap();
+- [production hot path] crates/external-chains/src/settlement_integration.rs:580
+  -         let obl = coord.pending_obligations().pop().unwrap();
+- [production hot path] crates/flash-finality/src/gossip_bridge.rs:342
+  -         bridge.on_gossip_received(&encoded).await.unwrap();
+- [production hot path] crates/flash-finality/src/gossip_bridge.rs:375
+  -         let decoded = FlashGossipMessage::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/flash-finality/src/gossip_bridge.rs:386
+  -             _ => panic!("Wrong message type"),
+- [production hot path] crates/flash-finality/src/lib.rs:742
+  -         let proposal = gadget.on_new_block(block_hash, 1).await.unwrap();
+- [production hot path] crates/flash-finality/src/lib.rs:755
+  -         let cert = cert3.unwrap();
+- [production hot path] crates/flash-finality/src/lib.rs:778
+  -             other => panic!("Expected Agreement, got {:?}", other),
+- [production hot path] crates/flash-finality/src/lib.rs:802
+  -             other => panic!("Expected Divergence, got {:?}", other),
+- [production hot path] crates/flash-finality/src/lib.rs:878
+  -         assert_eq!(cert.unwrap().block_number, 42);
+- [production hot path] crates/flash-finality/src/lib.rs:894
+  -         let proposal = gadget.on_new_block(block_hash, block_number).await.unwrap();
+- [production hot path] crates/flash-finality/src/lib.rs:913
+  -         let cert = vote3.unwrap();
+- [production hot path] crates/flash-finality/src/lib.rs:962
+  -             let cert = gadget.on_vote(make_vote(hash, i, 0x22)).await.unwrap();
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:152
+  -         Ok(result.unwrap())
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:331
+  -         let result = verifier.verify_signature("valid_sig_123", b"test_data").await.unwrap();
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:335
+  -         let result = verifier.verify_signature("", b"").await.unwrap();
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:344
+  -         let results = verifier.verify_signatures(signatures).await.unwrap();
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:355
+  -         verifier.verify_signature("sig1", b"data1").await.unwrap();
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:356
+  -         verifier.verify_signature("sig2", b"data2").await.unwrap();
+- [production hot path] crates/gpu-sig-verifier/src/lib.rs:357
+  -         verifier.verify_signature("invalid", b"").await.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:248
+  -                         .unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:271
+  -                         Header::from_bytes(&b"Content-Type"[..], ct.as_bytes()).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:283
+  -                     Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:302
+  -                                     .unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:312
+  -                         Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:354
+  -                     Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:385
+  -                                     .unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:412
+  -                         Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:418
+  -                         Header::from_bytes(&b"Content-Type"[..], &b"text/plain"[..]).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/admin.rs:436
+  -         .unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/advanced/social_agents.rs:284
+  -         manager.register_agent(agent).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/agent_bridge.rs:395
+  -         let json = serde_json::to_string(&req).expect("serialize");
+- [production hot path] crates/gpu-swarm.backup/src/agent_bridge.rs:396
+  -         let parsed: AgentTaskRequest = serde_json::from_str(&json).expect("deserialize");
+- [production hot path] crates/gpu-swarm.backup/src/announcer.rs:981
+  -             panic!("Expected Funding payload");
+- [production hot path] crates/gpu-swarm.backup/src/billing.rs:239
+  -         let record = engine.finalize(&order_id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/billing.rs:253
+  -         let record = engine.finalize(&order_id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/bin/swarm-node.rs:64
+  -     let admin_addr: std::net::SocketAddr = "127.0.0.1:9101".parse().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/blockchain.rs:580
+  -             .unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/crown/auditor.rs:422
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/auditor.rs:483
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/mod.rs:795
+  -                 .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:375
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:406
+  -                 .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:453
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:632
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:654
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:678
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:719
+  -                     .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/crown/scrapyard.rs:833
+  -         let module = scrapyard.modules.get("test_module").unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/funding/novaflux.rs:574
+  -         let perf = nova.performance.get(hook).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/funding/orchestrator.rs:594
+  -         assert_eq!(campaign.unwrap().status, CampaignStatus::Scheduled);
+- [production hot path] crates/gpu-swarm.backup/src/funding/orchestrator.rs:622
+  -         let campaign = orch.get_campaign(&id).await.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/funding/orchestrator.rs:628
+  -         assert_eq!(results.unwrap().messages_sent, 3);
+- [production hot path] crates/gpu-swarm.backup/src/funding/orchestrator.rs:631
+  -         let campaign = orch.get_campaign(&id).await.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/funding/orchestrator.rs:658
+  -         let campaign = orch.get_campaign(&id).await.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/funding/webhook.rs:563
+  -         assert!(payload.content.as_ref().unwrap().novaflux_script.is_some());
+- [production hot path] crates/gpu-swarm.backup/src/funding/webhook.rs:582
+  -         assert_eq!(payload.prospect.as_ref().unwrap().name, "Alice Ventures");
+- [production hot path] crates/gpu-swarm.backup/src/funding/webhook.rs:615
+  -         assert!(url.unwrap().contains("lane3"));
+- [production hot path] crates/gpu-swarm.backup/src/gpu_backends/cuda.rs:72
+  -                 std::num::NonZeroUsize::new(512).unwrap(),
+- [production hot path] crates/gpu-swarm.backup/src/jobs/chain_indexing.rs:624
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/chain_indexing.rs:630
+  -             panic!("Wrong result type");
+- [production hot path] crates/gpu-swarm.backup/src/jobs/chain_indexing.rs:643
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/funding_campaign.rs:768
+  -         let result = job.execute_campaign().expect("Should execute");
+- [production hot path] crates/gpu-swarm.backup/src/jobs/mempool_analysis.rs:656
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/mev_discovery.rs:292
+  -                                     .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/jobs/mev_discovery.rs:343
+  -                                     .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/jobs/mev_discovery.rs:491
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/model_training.rs:369
+  -                 .unwrap_or_else(|| checkpoints.last().cloned().unwrap())
+- [production hot path] crates/gpu-swarm.backup/src/jobs/model_training.rs:567
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/model_training.rs:573
+  -             panic!("Wrong result type");
+- [production hot path] crates/gpu-swarm.backup/src/jobs/model_training.rs:596
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/x3_simulation.rs:381
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/x3_simulation.rs:387
+  -             panic!("Wrong result type");
+- [production hot path] crates/gpu-swarm.backup/src/jobs/zk_proving.rs:451
+  -         let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/jobs/zk_proving.rs:485
+  -             let result = job.execute().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/monitoring/logging.rs:53
+  -                 .unwrap_or_else(|_| "debug,tokio=info,hyper=info".parse().unwrap()),
+- [production hot path] crates/gpu-swarm.backup/src/monitoring/tracing.rs:30
+  -                 .unwrap_or_else(|_| "info".parse().unwrap()),
+- [production hot path] crates/gpu-swarm.backup/src/network.rs:965
+  -             .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/performance/batch_optimization.rs:61
+  -                     let batch = queue.pop_back().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/batch_optimization.rs:203
+  -         let batch = batch.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:120
+  -                     let pos = blocks.iter().position(|b| b.id == block.id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:177
+  -         let pos = block_pos.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:311
+  -         let block1 = pool.allocate(1024).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:314
+  -         let block2 = pool.allocate(2048).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:336
+  -         let b1 = pool.allocate(1024).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:337
+  -         let b2 = pool.allocate(2048).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:338
+  -         let b3 = pool.allocate(1024).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:340
+  -         pool.deallocate(b1.id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:341
+  -         pool.deallocate(b2.id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/memory_pooling.rs:343
+  -         let moved = pool.compact().unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/performance/mod.rs:56
+  -         let opts = opts.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:254
+  -             .unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:258
+  -         mgr.start(&id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:272
+  -             .unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:273
+  -         mgr.start(&id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:275
+  -         let checkpoint = mgr.checkpoint(&id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:278
+  -         mgr.resume(&id, &checkpoint).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:291
+  -         .unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:310
+  -             .unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/sandbox_manager.rs:312
+  -         mgr.destroy(&id).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/allocator.rs:441
+  -         let security = plan.get(ComputeLane::Security).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/allocator.rs:458
+  -         let normal_security = normal_plan.get(ComputeLane::Security).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/allocator.rs:459
+  -         let emergency_security = emergency_plan.get(ComputeLane::Security).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/governance.rs:588
+  -         let id = engine.submit_override(override_req).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/governance.rs:591
+  -         engine.approve_override(&id, "admin2").unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/metrics.rs:509
+  -             _ => panic!("Expected poor health with default metrics"),
+- [production hot path] crates/gpu-swarm.backup/src/warden/mod.rs:254
+  -                 .unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/warden/mod.rs:507
+  -         let decision = warden.decide().await.expect("should decide");
+- [production hot path] crates/gpu-swarm.backup/src/warden/predictor.rs:511
+  -         let research = forecast.get(ComputeLane::Research).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/signals.rs:433
+  -         let metrics = aggregator.get_metrics(ComputeLane::Research).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/warden/signals.rs:481
+  -         let alert = alert.unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/x3_vm.rs:507
+  -             X3VmExecutor::new(gpu_manager).await.unwrap()
+- [production hot path] crates/gpu-swarm.backup/src/x3_vm.rs:514
+  -         let profile = executor.analyze_bytecode(&bytecode).unwrap();
+- [production hot path] crates/gpu-swarm.backup/src/x3_vm.rs:524
+  -             X3VmExecutor::new(gpu_manager).await.unwrap()
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:14
+  -     let dir = tempdir().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:18
+  -     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:19
+  -     let port = listener.local_addr().unwrap().port();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:26
+  -     let addr = format!("127.0.0.1:{}", port).parse().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:29
+  -         let rt = tokio::runtime::Runtime::new().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:38
+  -     let token = ensure_local_token().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:46
+  -         .unwrap()
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:48
+  -         .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:53
+  -     let reg: serde_json::Value = client.post(&url2).send().unwrap().json().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/admin_api.rs:59
+  -     let state: serde_json::Value = client.get(&url3).send().unwrap().json().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:43
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:45
+  -         let block_num = client.get_block_number().await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:48
+  -         let block = client.get_block(block_num).await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:56
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:65
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:74
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:80
+  -         let tx = client.distribute_rewards(rewards).await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:88
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:101
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:110
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:112
+  -         let stake = client.get_stake("alice").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:120
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:122
+  -         let rewards = client.get_pending_rewards("alice").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:142
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:144
+  -         let history = client.get_reward_history("alice").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:166
+  -         let executor = X3VmExecutor::new(gpu_manager).await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:172
+  -         let p = profile.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:180
+  -         let executor = X3VmExecutor::new(gpu_manager).await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:191
+  -         let executor = X3VmExecutor::new(gpu_manager).await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/blockchain_tests.rs:233
+  -         let collector = MetricsCollector::new().unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/integration_tests.rs:59
+  -     let node = SwarmNode::new(&config, gpu.clone()).expect("Failed to create node");
+- [test-only] crates/gpu-swarm.backup/tests/integration_tests.rs:74
+  -     let mut node1 = SwarmNode::new(&config, gpu1).expect("Failed to create node1");
+- [test-only] crates/gpu-swarm.backup/tests/integration_tests.rs:77
+  -     let mut node2 = SwarmNode::new(&config, gpu2).expect("Failed to create node2");
+- [test-only] crates/gpu-swarm.backup/tests/integration_tests.rs:83
+  -     registry.register(node1).expect("Failed to register node1");
+- [test-only] crates/gpu-swarm.backup/tests/integration_tests.rs:84
+  -     registry.register(node2).expect("Failed to register node2");
+- [test-only] crates/gpu-swarm.backup/tests/integration_tests.rs:97
+  -         .expect("Failed to update status");
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:14
+  -         let mgr = manager.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:21
+  -         let mut manager = NetworkManager::new(config).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:22
+  -         manager.start().await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:24
+  -         let peer_id = manager.connect("/ip4/127.0.0.1/tcp/9000").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:33
+  -         let mut manager = NetworkManager::new(config).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:35
+  -         let peer_id = manager.connect("/ip4/127.0.0.1/tcp/9001").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:38
+  -         let info = manager.get_peer_info(&peer_id).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:46
+  -         let updated = manager.get_peer_info(&peer_id).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:53
+  -         let mut manager = NetworkManager::new(config).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:55
+  -         let peer_id = manager.connect("/ip4/127.0.0.1/tcp/9002").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:57
+  -         assert!(!manager.get_peer_info(&peer_id).unwrap().is_blacklisted);
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:60
+  -         assert!(manager.get_peer_info(&peer_id).unwrap().is_blacklisted);
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:64
+  -         assert!(!manager.get_peer_info(&peer_id).unwrap().is_blacklisted);
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:70
+  -         let mut manager = NetworkManager::new(config).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:73
+  -         let good_peer = manager.connect("/ip4/127.0.0.1/tcp/9003").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:80
+  -         let bad_peer = manager.connect("/ip4/127.0.0.1/tcp/9004").await.unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:93
+  -         let manager = NetworkManager::new(config).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:98
+  -             .unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/network_tests.rs:131
+  -         let conn = manager.get(&peer_id).unwrap();
+- [test-only] crates/gpu-swarm.backup/tests/wallet_derivation.rs:10
+  -     let kp1 = wallet::derive_ed25519_keypair(&seed64).expect("derive keypair");
+- [test-only] crates/gpu-swarm.backup/tests/wallet_derivation.rs:11
+  -     let kp2 = wallet::derive_ed25519_keypair(&seed64).expect("derive keypair again");
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:370
+  -         .unwrap()
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:409
+  -         queue.start().await.unwrap();
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:426
+  -         let entry_id = queue.submit_transaction(tx, 1).await.unwrap();
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:434
+  -         queue.stop().await.unwrap();
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:447
+  -         queue.start().await.unwrap();
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:477
+  -         queue.submit_transaction(tx1, 1).await.unwrap();
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:478
+  -         queue.submit_transaction(tx2, 5).await.unwrap();
+- [production hot path] crates/import-queue-wrapper/src/lib.rs:485
+  -         queue.stop().await.unwrap();
+- [production hot path] crates/invariant-macros/src/lib.rs:19
+  -     let id = parts.next().unwrap().trim().to_string();
+- [production hot path] crates/invariant-macros/src/lib.rs:28
+  -     let re = Regex::new(r"^[A-Z]+-[A-Z]+-[0-9]{3}$").unwrap();
+- [test-only] crates/invariant-macros/tests/registry_check.rs:6
+  -     let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+- [test-only] crates/invariant-macros/tests/registry_check.rs:10
+  -         .unwrap()
+- [test-only] crates/invariant-macros/tests/registry_check.rs:13
+  -     let toml = fs::read_to_string(&path).expect(&format!(
+- [production hot path] crates/orchestra/src/agent/off_chain.rs:315
+  -         let commitment = agent.vote_on_task("task-001", true).unwrap();
+- [production hot path] crates/orchestra/src/agent/off_chain.rs:332
+  -         let result = agent.run_stress_test("network-partition").unwrap();
+- [production hot path] crates/orchestra/src/jury/aggregation.rs:129
+  -         session.add_member(1, OrchestraSection::Strings, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/aggregation.rs:130
+  -         session.add_member(2, OrchestraSection::Brass, true).unwrap();
+- [production hot path] crates/orchestra/src/jury/aggregation.rs:131
+  -         session.add_member(3, OrchestraSection::Percussion, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/aggregation.rs:136
+  -         session.start_voting().unwrap();
+- [production hot path] crates/orchestra/src/jury/aggregation.rs:143
+  -         session.close_voting().unwrap();
+- [production hot path] crates/orchestra/src/jury/aggregation.rs:162
+  -         session.close_voting().unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:307
+  -         session.add_member(1, OrchestraSection::Strings, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:308
+  -         session.add_member(2, OrchestraSection::Brass, true).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:309
+  -         session.add_member(3, OrchestraSection::Percussion, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:326
+  -         session.add_member(1, OrchestraSection::Strings, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:335
+  -         session.add_member(1, OrchestraSection::Strings, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:336
+  -         session.add_member(2, OrchestraSection::Brass, true).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:337
+  -         session.add_member(3, OrchestraSection::Percussion, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:340
+  -         session.start_voting().unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:344
+  -         session.record_vote(0).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:345
+  -         session.record_vote(1).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:346
+  -         session.record_vote(2).unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:352
+  -         session.close_voting().unwrap();
+- [production hot path] crates/orchestra/src/jury/session.rs:362
+  -         session.add_member(1, OrchestraSection::Strings, false).unwrap();
+- [production hot path] crates/orchestra/src/jury/voting.rs:211
+  -             .unwrap();
+- [production hot path] crates/orchestra/src/jury/voting.rs:219
+  -             .unwrap();
+- [production hot path] crates/orchestra/src/jury/voting.rs:235
+  -             .unwrap();
+- [production hot path] crates/orchestra/src/jury/voting.rs:242
+  -             .unwrap();
+- [production hot path] crates/orchestra/src/jury/voting.rs:257
+  -             .unwrap();
+- [production hot path] crates/orchestra/src/scrap.rs:191
+  -         let record = yard.retired_records().first().unwrap();
+- [production hot path] crates/orchestra/src/task/executor.rs:202
+  -         let result = executor.process_task(&task, &mut agent, &mut log).unwrap();
+- [production hot path] crates/orchestra/src/task/executor.rs:227
+  -         let result = executor.process_task(&task, &mut agent, &mut log).unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:368
+  -         let dir = tempfile::tempdir().unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:380
+  -         let dir = tempfile::tempdir().unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:395
+  -         let dir = tempfile::tempdir().unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:405
+  -         let entry = queue.get("t1").unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:412
+  -         let dir = tempfile::tempdir().unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:423
+  -         let entry = queue.get("law-1").unwrap();
+- [production hot path] crates/orchestra/src/task/queue.rs:429
+  -         let dir = tempfile::tempdir().unwrap();
+- [production hot path] crates/orchestra/src/task/spec.rs:191
+  -             let idx = body.find("## Simulation Output").unwrap();
+- [production hot path] crates/orchestra/src/task/spec.rs:311
+  -         let spec = TaskSpec::parse(SAMPLE_TASK).unwrap();
+- [production hot path] crates/orchestra/src/task/spec.rs:333
+  -         let spec = TaskSpec::parse(md).unwrap();
+- [production hot path] crates/orchestra/src/task/spec.rs:339
+  -         let mut spec = TaskSpec::parse(SAMPLE_TASK).unwrap();
+- [production hot path] crates/orchestra/src/task/spec.rs:347
+  -         let spec = TaskSpec::parse(SAMPLE_TASK).unwrap();
+- [production hot path] crates/orchestra/src/task/spec.rs:349
+  -         let reparsed = TaskSpec::parse(&md).unwrap();
+- [production hot path] crates/parallel-proposer/src/integration.rs:101
+  -         let ctx = IntegrationContext::new(IntegrationConfig::default()).unwrap();
+- [production hot path] crates/parallel-proposer/src/integration.rs:111
+  -         .unwrap();
+- [production hot path] crates/parallel-proposer/src/integration.rs:113
+  -         let _ = ctx.build_next_proposal().await.unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1019
+  -             .unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1021
+  -         let proposal = proposer.create_proposal().await.unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1039
+  -             .unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1047
+  -             .unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1049
+  -         let proposal = proposer.create_proposal().await.unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1067
+  -             .unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1075
+  -             .unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1077
+  -         let proposal = proposer.create_proposal().await.unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1140
+  -                     .unwrap();
+- [production hot path] crates/parallel-proposer/src/lib.rs:1143
+  -             let proposal = proposer.create_proposal().await.unwrap();
+- [production hot path] crates/poh-generator/src/lib.rs:297
+  -             let last = *current.last().unwrap();
+- [production hot path] crates/poh-generator/src/lib.rs:428
+  -         let decoded = PoHDigest::decode(&encoded).unwrap();
+- [production hot path] crates/private-mempool/src/encryption.rs:193
+  -             .unwrap();
+- [production hot path] crates/private-mempool/src/encryption.rs:199
+  -         let decrypted = decrypt_transaction(&tx, &shared_secret).unwrap();
+- [production hot path] crates/private-mempool/src/lib.rs:234
+  -                 .unwrap()
+- [production hot path] crates/private-mempool/src/lib.rs:277
+  -         pool.submit(dummy_tx(1)).unwrap();
+- [production hot path] crates/private-mempool/src/queue.rs:120
+  -         q.push(tx).unwrap();
+- [production hot path] crates/private-mempool/src/queue.rs:123
+  -         let removed = q.remove(&[0x01; 32]).unwrap();
+- [production hot path] crates/private-mempool/src/queue.rs:131
+  -         q.push(make_tx(0x01, 1000)).unwrap();
+- [production hot path] crates/private-mempool/src/queue.rs:139
+  -         q.push(make_tx(0x01, 1000)).unwrap();
+- [production hot path] crates/private-mempool/src/queue.rs:140
+  -         q.push(make_tx(0x02, 1000)).unwrap();
+- [production hot path] crates/private-mempool/src/queue.rs:148
+  -         q.push(make_tx(0x01, 100)).unwrap(); // old
+- [production hot path] crates/private-mempool/src/queue.rs:149
+  -         q.push(make_tx(0x02, 500)).unwrap(); // newer
+- [production hot path] crates/private-mempool/src/queue.rs:150
+  -         q.push(make_tx(0x03, 900)).unwrap(); // newest
+- [production hot path] crates/quantum-crypto/src/kyber.rs:343
+  -         let shared_secret_dec = keypair.decapsulate(&ciphertext).unwrap();
+- [production hot path] crates/quantum-swarm/src/arena/archive.rs:94
+  -         sorted.sort_by(|a, b| b.final_elo.partial_cmp(&a.final_elo).unwrap());
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:169
+  -         rankings.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:266
+  -         active.sort_by(|a, b| a.elo.partial_cmp(&b.elo).unwrap());
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:306
+  -         winners.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:357
+  -         active.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:431
+  -         let id = arena.register(genome).unwrap();
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:448
+  -             arena.register(genome).unwrap();
+- [production hot path] crates/quantum-swarm/src/arena/mod.rs:451
+  -         let result = arena.run_tournament().unwrap();
+- [production hot path] crates/quantum-swarm/src/arena/scheduler.rs:112
+  -         sorted.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+- [production hot path] crates/quantum-swarm/src/arena/scheduler.rs:138
+  -         sorted.sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap());
+- [production hot path] crates/quantum-swarm/src/evolution/genome.rs:484
+  -         let val = gene.as_float().unwrap();
+- [production hot path] crates/quantum-swarm/src/evolution/population.rs:227
+  -         sorted.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
+- [production hot path] crates/quantum-swarm/src/evolution/population.rs:254
+  -                 let genome = self.genomes.get(&ids[idx]).unwrap();
+- [production hot path] crates/quantum-swarm/src/evolution/population.rs:255
+  -                 if best.is_none() || genome.fitness > best.unwrap().fitness {
+- [production hot path] crates/quantum-swarm/src/evolution/population.rs:314
+  -         sorted.sort_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap());
+- [production hot path] crates/quantum-swarm/src/evolution/selection.rs:204
+  -                 .unwrap()
+- [production hot path] crates/quantum-swarm/src/executor.rs:429
+  -         executor.initialize(&template).unwrap();
+- [production hot path] crates/quantum-swarm/src/executor.rs:442
+  -         executor.initialize(&template).unwrap();
+- [production hot path] crates/quantum-swarm/src/executor.rs:448
+  -         let result = executor.step(&market_data).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/backend.rs:412
+  -         let result = simulator.execute(&circuit, 1000).await.unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/backend.rs:431
+  -         let result = simulator.execute(&circuit, 1000).await.unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:363
+  -         self.circuit.add_gate(Gate::h(qubit)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:369
+  -         self.circuit.add_gate(Gate::x(qubit)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:375
+  -         self.circuit.add_gate(Gate::y(qubit)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:381
+  -         self.circuit.add_gate(Gate::z(qubit)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:387
+  -         self.circuit.add_gate(Gate::rx(qubit, theta)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:393
+  -         self.circuit.add_gate(Gate::ry(qubit, theta)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:399
+  -         self.circuit.add_gate(Gate::rz(qubit, theta)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:405
+  -         self.circuit.add_gate(Gate::cnot(control, target)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:411
+  -         self.circuit.add_gate(Gate::cz(control, target)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:419
+  -             .unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:431
+  -         self.circuit.measure(qubits).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:444
+  -             self.circuit.add_gate(Gate::h(q)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:453
+  -                 self.circuit.add_gate(Gate::ry(i, theta)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/circuit.rs:462
+  -             self.circuit.add_gate(Gate::cnot(i, i + 1)).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/qaoa.rs:429
+  -         let result = optimizer.optimize(&problem, &backend).await.unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/qubo.rs:508
+  -         let result = solver.solve(&qubo).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/qubo.rs:522
+  -         let result = solver.parallel_tempering(&qubo).unwrap();
+- [production hot path] crates/quantum-swarm/src/quantum/vqe.rs:441
+  -         let result = optimizer.optimize(&hamiltonian, &backend).await.unwrap();
+- [production hot path] crates/quantum-swarm/src/strategy/arbitrage.rs:158
+  -                     .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()),
+- [production hot path] crates/quantum-swarm/src/strategy/arbitrage.rs:161
+  -                     .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()),
+- [production hot path] crates/quantum-swarm/src/strategy/market_making.rs:355
+  -         let inv = strategy.inventory.get("ETH").unwrap();
+- [production hot path] crates/quantum-swarm/src/strategy/trend.rs:464
+  -         let sma = history.sma(20).unwrap();
+- [production hot path] crates/quantum-swarm/src/strategy/trend.rs:467
+  -         let rsi = history.rsi(14).unwrap();
+- [production hot path] crates/quantum-swarm/src/strategy/trend.rs:497
+  -         let signal = signal.unwrap();
+- [production hot path] crates/svm-integration/src/interp.rs:1039
+  -         let res = execute_bpf(&prog, &[], &default_config()).unwrap();
+- [production hot path] crates/svm-integration/src/interp.rs:1046
+  -         let res = execute_bpf(&prog, &[], &default_config()).unwrap();
+- [production hot path] crates/svm-integration/src/interp.rs:1060
+  -         let res = execute_bpf(&p, &[], &default_config()).unwrap();
+- [production hot path] crates/svm-integration/src/lib.rs:476
+  -         assert!(result.unwrap().success);
+- [production hot path] crates/svm-integration/src/lib.rs:521
+  -         assert_eq!(db.get_account(&from).unwrap().lamports, 500);
+- [production hot path] crates/svm-integration/src/lib.rs:522
+  -         assert_eq!(db.get_account(&to).unwrap().lamports, 500);
+- [test-only] crates/svm-integration/tests/counter_integration.rs:59
+  -         .unwrap()
+- [test-only] crates/svm-integration/tests/counter_integration.rs:60
+  -         .expect("account not found");
+- [production hot path] crates/swarm-media/src/reputation.rs:66
+  -         let mut g = self.events.lock().expect("events mutex poisoned");
+- [production hot path] crates/swarm-media/src/reputation.rs:71
+  -         let mut g = self.slashes.lock().expect("slashes mutex poisoned");
+- [production hot path] crates/swarm-media/src/reputation.rs:76
+  -         let g = self.events.lock().expect("events mutex poisoned");
+- [production hot path] crates/swarm-media/src/reputation.rs:80
+  -         let g = self.slashes.lock().expect("slashes mutex poisoned");
+- [production hot path] crates/swarm-media/src/reputation.rs:101
+  -     reps.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [production hot path] crates/swarm-media/src/reputation.rs:246
+  -     let database_url = std::env::var("DATABASE_URL").unwrap();
+- [production hot path] crates/swarm-media/src/reputation.rs:247
+  -     let pool = sqlx::PgPool::connect(&database_url).await.expect("could not connect to postgres for test");
+- [production hot path] crates/swarm-media/src/reputation.rs:276
+  -     sqlx::query(create_reputation).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:277
+  -     sqlx::query(create_slashing).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:293
+  -     repo.insert_reputation_event(ev.clone()).await.expect("insert failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:294
+  -     let found = repo.get_reputation_events("0xroundtrip").await.expect("query failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:305
+  -     let database_url = std::env::var("DATABASE_URL").unwrap();
+- [production hot path] crates/swarm-media/src/reputation.rs:306
+  -     let pool = sqlx::PgPool::connect(&database_url).await.expect("could not connect to postgres for test");
+- [production hot path] crates/swarm-media/src/reputation.rs:321
+  -     sqlx::query(create_slashing).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:327
+  -     repo.insert_slashing_event(s).await.expect("insert failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:335
+  -         .expect("update failed");
+- [production hot path] crates/swarm-media/src/reputation.rs:337
+  -     let events = repo.get_slashing_events("0xappeal").await.expect("query failed");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:154
+  -         let job_id = rpc.submit_job(request).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:155
+  -         let status = rpc.get_job_status(job_id).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:165
+  -         let node_rep = rpc.get_node_reputation(node_id.clone()).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:168
+  -         let wallet_rep = rpc.get_wallet_reputation("0xabc".to_string()).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:172
+  -         repo.insert_slashing_event(slash).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:174
+  -         let slashes = rpc.get_slashing_events("0xabc".to_string()).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:181
+  -         let database_url = std::env::var("DATABASE_URL").unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:182
+  -         let pool = sqlx::PgPool::connect(&database_url).await.expect("could not connect to postgres for test");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:229
+  -         sqlx::query(cleanup_seq_reputation).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:230
+  -         sqlx::query(cleanup_seq_slashing).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:231
+  -         sqlx::query(create_reputation).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:232
+  -         sqlx::query(create_slashing).execute(&pool).await.expect("migration failed");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:238
+  -         let empty = rpc.get_slashing_events("this-wallet-does-not-exist".to_string()).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:245
+  -         repo.insert_slashing_event(slash1).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:246
+  -         repo.insert_slashing_event(slash2).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:248
+  -         let slashes = rpc.get_slashing_events("0xedge".to_string()).await.unwrap();
+- [production hot path] crates/swarm-media/src/rpc_api.rs:252
+  -             let occurred = s.get("occurred_at").and_then(|v| v.as_str()).expect("occurred_at missing");
+- [production hot path] crates/swarm-media/src/rpc_api.rs:253
+  -             chrono::DateTime::parse_from_rfc3339(occurred).expect("invalid RFC3339 timestamp");
+- [production hot path] crates/voice-to-x3/src/generator.rs:880
+  -             .unwrap();
+- [production hot path] crates/voice-to-x3/src/generator.rs:884
+  -         let contract = result.unwrap();
+- [production hot path] crates/voice-to-x3/src/generator.rs:896
+  -             .unwrap();
+- [production hot path] crates/voice-to-x3/src/generator.rs:900
+  -         let contract = result.unwrap();
+- [production hot path] crates/voice-to-x3/src/intent.rs:103
+  -                 if best_match.is_none() || score > best_match.unwrap().1 {
+- [production hot path] crates/voice-to-x3/src/intent.rs:385
+  -         let intent = result.unwrap();
+- [production hot path] crates/voice-to-x3/src/intent.rs:396
+  -         let intent = result.unwrap();
+- [production hot path] crates/voice-to-x3/src/lib.rs:63
+  -         let contract = result.unwrap();
+- [production hot path] crates/voice-to-x3/src/lib.rs:73
+  -         let contract = result.unwrap();
+- [production hot path] crates/voice-to-x3/src/lib.rs:82
+  -         let contract = result.unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:328
+  -         reg.register(test_identity(), 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:343
+  -         reg.register(test_identity(), 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:347
+  -             .unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:349
+  -         let resolved = reg.resolve_identity(&ephemeral).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:359
+  -         reg.register(test_identity(), 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:362
+  -             .unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:364
+  -             reg.get(&test_identity().pubkey).unwrap().status,
+- [production hot path] crates/x3-agent/src/registry.rs:369
+  -             .unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:371
+  -             reg.get(&test_identity().pubkey).unwrap().status,
+- [production hot path] crates/x3-agent/src/registry.rs:379
+  -         reg.register(test_identity(), 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:383
+  -                 .unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:386
+  -         let agent = reg.get(&test_identity().pubkey).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:394
+  -         reg.register(test_identity(), 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-agent/src/registry.rs:396
+  -         let returned = reg.deregister(&test_identity().pubkey, 200).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:501
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:527
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:529
+  -         let result = factory.create_app_zone("test", "nonexistent", temp_dir.path().to_str().unwrap());
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:537
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:541
+  -         fs::create_dir(&app_dir).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:543
+  -         let result = factory.create_app_zone("existing", "basic", temp_dir.path().to_str().unwrap());
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:551
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:554
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:555
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:556
+  -         fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:557
+  -         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:566
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:568
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:569
+  -         fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:570
+  -         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:580
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:582
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "invalid toml").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:583
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:584
+  -         fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:585
+  -         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:595
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:597
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:598
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:599
+  -         fs::write(temp_dir.path().join("app-config.toml"), "invalid toml").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:600
+  -         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:610
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:613
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:615
+  -         let result = factory.deploy_app_zone(temp_dir.path().to_str().unwrap(), "local");
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:622
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:624
+  -         let config = factory.generate_deploy_config(temp_dir.path(), "testnet").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:634
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:637
+  -         fs::write(&cargo_path, "x3-framework = \"0.1.0\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:639
+  -         factory.update_dependencies(temp_dir.path()).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:641
+  -         let updated = fs::read_to_string(&cargo_path).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:648
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:651
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:652
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:653
+  -         fs::write(temp_dir.path().join("app-config.toml"), "[app]\nname = \"test\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:654
+  -         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:656
+  -         let result = factory.update_app_zone(temp_dir.path().to_str().unwrap());
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:663
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:665
+  -         let result = factory.update_app_zone(temp_dir.path().to_str().unwrap());
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:672
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:675
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:676
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:688
+  -         let temp_dir = TempDir::new().unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:691
+  -         fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:692
+  -         fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:710
+  -         let json = serde_json::to_string(&config).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:711
+  -         let deserialized: DeployConfig = serde_json::from_str(&json).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:730
+  -         let json = serde_json::to_string(&receipt).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:731
+  -         let deserialized: DeployReceipt = serde_json::from_str(&json).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:765
+  -         let cli = Cli::try_parse_from(args).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:772
+  -             _ => panic!("Wrong command parsed"),
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:779
+  -         let cli = Cli::try_parse_from(args).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:786
+  -             _ => panic!("Wrong command parsed"),
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:793
+  -         let cli = Cli::try_parse_from(args).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:799
+  -             _ => panic!("Wrong command parsed"),
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:806
+  -         let cli = Cli::try_parse_from(args).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:812
+  -             _ => panic!("Wrong command parsed"),
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:819
+  -         let cli = Cli::try_parse_from(args).unwrap();
+- [production hot path] crates/x3-appzone-factory/src/lib.rs:823
+  -             _ => panic!("Wrong command parsed"),
+- [production hot path] crates/x3-atomic-client/src/lib.rs:368
+  -             .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:338
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:355
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:357
+  -         RollbackEventListener::initiate_rollback(&mut failure, vec![(0, 100000)]).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:372
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:374
+  -         RollbackEventListener::initiate_rollback(&mut failure, vec![]).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:375
+  -         RollbackEventListener::complete_rollback(&mut failure, 1.05).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:391
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:408
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:410
+  -         RollbackEventListener::initiate_rollback(&mut failure, vec![]).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:411
+  -         RollbackEventListener::complete_rollback(&mut failure, 1.0).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:413
+  -         let payout = RollbackEventListener::issue_compensation(&mut failure, 5000).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:424
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:439
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:455
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:466
+  -                 .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:468
+  -         RollbackEventListener::mark_notification_read(&mut notif).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:482
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:484
+  -         let recovered = RollbackEventListener::auto_recover_failure(&mut failure).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:498
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:500
+  -         RollbackEventListener::update_partial_execution(&mut failure, 75000).unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:514
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:520
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:536
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:554
+  -         .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:572
+  -             .unwrap(),
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:581
+  -             .unwrap(),
+- [production hot path] crates/x3-atomic-trade/src/rollback_listener.rs:590
+  -             .unwrap(),
+- [production hot path] crates/x3-atomic-trade/src/swap_rpc.rs:427
+  -             .unwrap();
+- [production hot path] crates/x3-atomic-trade/src/swap_rpc.rs:480
+  -         assert!(slippage.unwrap() >= 0.0);
+- [production hot path] crates/x3-atomic-trade/src/swap_rpc.rs:509
+  -             .unwrap();
+- [production hot path] crates/x3-automation/src/lib.rs:232
+  -         assert_eq!(execution::calculate_fee(21000, 1).unwrap(), 21000);
+- [production hot path] crates/x3-automation/src/lib.rs:233
+  -         assert_eq!(execution::calculate_fee(1000, 2).unwrap(), 2000);
+- [production hot path] crates/x3-backend/src/bc_format_helpers.rs:350
+  -         let module = BytecodeModule::from_bytes(&bytes).expect("should parse");
+- [production hot path] crates/x3-backend/src/bc_format_helpers.rs:365
+  -         let module = BytecodeModule::from_bytes(&bytes).expect("should parse");
+- [production hot path] crates/x3-backend/src/bc_format_helpers.rs:375
+  -         let module = BytecodeModule::from_bytes(&bytes).expect("should parse");
+- [production hot path] crates/x3-backend/src/bc_format_helpers.rs:385
+  -         let module = BytecodeModule::from_bytes(&bytes).expect("should parse");
+- [production hot path] crates/x3-backend/src/bc_format.rs:1333
+  -         let idx1 = pool.add_integer(42).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1334
+  -         let idx2 = pool.add_integer(42).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1337
+  -         let idx3 = pool.add_integer(100).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1346
+  -         module.const_pool.add_integer(123).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1347
+  -         module.const_pool.add_string("hello".to_string()).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1359
+  -         let decoded = BytecodeModule::from_bytes(&bytes).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1439
+  -         module.const_pool.add_integer(42).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1464
+  -         let decoded = BytecodeModule::from_bytes(&bytes).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1467
+  -         let meta = decoded.metadata.unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1485
+  -         module.const_pool.add_integer(1).unwrap();
+- [production hot path] crates/x3-backend/src/bc_format.rs:1497
+  -         let decoded = BytecodeModule::from_bytes(&bytes).unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:870
+  -         emitter.finalize().unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:880
+  -         emitter.emit_int(Register(0), 42).unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:881
+  -         emitter.emit_int(Register(1), 0).unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:882
+  -         emitter.emit_int(Register(2), 1000000).unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:883
+  -         emitter.emit_float(Register(3), 3.14159).unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:884
+  -         emitter.emit_string(Register(4), "hello").unwrap();
+- [production hot path] crates/x3-backend/src/emit.rs:904
+  -         emitter.finalize().unwrap();
+- [production hot path] crates/x3-backend/src/layout.rs:333
+  -         assert_eq!(layout.current_loop().unwrap().break_label, Label(1));
+- [production hot path] crates/x3-backend/src/layout.rs:336
+  -         assert_eq!(layout.current_loop().unwrap().break_label, Label(3));
+- [production hot path] crates/x3-backend/src/layout.rs:339
+  -         assert_eq!(layout.current_loop().unwrap().break_label, Label(1));
+- [production hot path] crates/x3-backend/src/layout.rs:353
+  -             .unwrap();
+- [production hot path] crates/x3-backend/src/layout.rs:359
+  -             .unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:173
+  -                 let layout = self.layout.current_function_mut().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:233
+  -                 let layout = self.layout.current_function().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:245
+  -                 let layout = self.layout.current_function().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:369
+  -             let layout = self.layout.current_function_mut().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:393
+  -             let layout = self.layout.current_function_mut().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:409
+  -                 let layout = self.layout.current_function().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:472
+  -                 let layout = self.layout.current_function().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:840
+  -         let layout = self.layout.current_function_mut().unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:935
+  -         let bytecode = BytecodeCompiler::compile(&module).unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:946
+  -         let bytecode = BytecodeCompiler::compile(&module).unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:950
+  -         let decoded = BytecodeModule::from_bytes(&bytes).unwrap();
+- [production hot path] crates/x3-backend/src/lower.rs:1002
+  -         let bytecode = BytecodeCompiler::compile(&module).unwrap();
+- [production hot path] crates/x3-backend/src/mir_lower.rs:502
+  -         let module = result.unwrap();
+- [production hot path] crates/x3-backend/src/mir_lower.rs:512
+  -         let module = result.unwrap();
+- [production hot path] crates/x3-backend/src/mir_lower.rs:521
+  -         let unopt_bc = MirBytecodeCompiler::compile(&unopt_mir).unwrap();
+- [production hot path] crates/x3-backend/src/mir_lower.rs:522
+  -         let opt_bc = MirBytecodeCompiler::compile(&opt_mir).unwrap();
+- [production hot path] crates/x3-bench/src/pipeline.rs:411
+  -         let hir = bridge_parse_to_hir(SIMPLE_SOURCE).unwrap();
+- [production hot path] crates/x3-bench/src/pipeline.rs:421
+  -         let res = result.unwrap();
+- [production hot path] crates/x3-bot/src/api.rs:17
+  -         .unwrap()
+- [production hot path] crates/x3-bot/src/api.rs:30
+  -         .unwrap()
+- [production hot path] crates/x3-bot/src/api.rs:46
+  -     let listener = TcpListener::bind(addr).await.unwrap();
+- [production hot path] crates/x3-bot/src/api.rs:47
+  -     axum::serve(listener, app).await.unwrap();
+- [production hot path] crates/x3-bot/src/api.rs:67
+  -             .unwrap()
+- [production hot path] crates/x3-bot/src/telemetry.rs:10
+  -     .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:15
+  -     .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:20
+  -     .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:25
+  -     .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:30
+  -     .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:36
+  -         .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:39
+  -         .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:42
+  -         .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:45
+  -         .unwrap();
+- [production hot path] crates/x3-bot/src/telemetry.rs:48
+  -         .unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:36
+  - //!     .expect("offchain storage required");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:195
+  -             let guard = self.overlay.read().expect("overlay read");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:202
+  -         let mut guard = self.overlay.write().expect("overlay write");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:218
+  -         let mut guard = self.overlay.write().expect("overlay write");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:221
+  -             .expect("credit: address must be loaded")
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:232
+  -         let mut guard = self.overlay.write().expect("overlay write");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:235
+  -             .expect("debit: address must be loaded")
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:249
+  -         let guard = self.overlay.read().expect("overlay read");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:296
+  -         let mut guard = self.overlay.write().expect("overlay write");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:297
+  -         guard.get_mut(from).expect("from must be loaded").current -= amount;
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:298
+  -         guard.get_mut(to).expect("to must be loaded").current = to_bal.saturating_add(amount);
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:363
+  -         self.storage.lock().expect("offchain storage lock").set(
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:374
+  -         let guard = self.storage.lock().expect("offchain storage lock");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:444
+  -             let guard = self.tickets.read().expect("ticket read");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:480
+  -             .expect("ticket write")
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:510
+  -             let mut guard = self.tickets.write().expect("ticket write");
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:911
+  -                 .unwrap()
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:930
+  -             let mut guard = self.overlay.write().unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:935
+  -             guard.get_mut(address).unwrap().current = current.saturating_add(amount);
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:943
+  -                 .unwrap()
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:955
+  -             let mut guard = self.overlay.write().unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:965
+  -             guard.get_mut(from).unwrap().current -= amount;
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:966
+  -             guard.get_mut(to).unwrap().current = to_bal.saturating_add(amount);
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1001
+  -             self.tickets.write().unwrap().insert(
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1014
+  -                 let g = self.tickets.read().unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1024
+  -             self.tickets.write().unwrap().get_mut(ticket).unwrap().spent = true;
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1048
+  -         b.transfer(b"alice", b"bob", 200).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1076
+  -         b.transfer(b"alice", b"bob", 777).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1104
+  -         b.transfer(b"alice", b"bob", 400).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1110
+  -         let alice_change = changes.iter().find(|c| c.address == b"alice").unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1111
+  -         let new_bal = u128::from_le_bytes(alice_change.value.as_bytes()[..16].try_into().unwrap());
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1115
+  -         let bob_change = changes.iter().find(|c| c.address == b"bob").unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1116
+  -         let bob_bal = u128::from_le_bytes(bob_change.value.as_bytes()[..16].try_into().unwrap());
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1123
+  -         b.transfer(b"alice", b"bob", 50).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1127
+  -             let asset_id = u32::from_le_bytes(c.key.as_bytes()[..4].try_into().unwrap());
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1148
+  -         let ticket = escrow.lock(b"svm_alice", 400).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1160
+  -         let ticket = escrow.lock(b"svm_alice", 500).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1162
+  -         escrow.release(&ticket, evm_bob.as_slice(), 500).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1173
+  -         let ticket = escrow.lock(b"svm_alice", 100).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1175
+  -         escrow.release(&ticket, evm_bob.as_slice(), 100).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1200
+  -         let ticket = escrow.lock(evm_alice.as_slice(), 300).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1206
+  -         escrow.release(&ticket, b"svm_bob", 300).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1213
+  -         let t1 = escrow.lock(b"svm_alice", 100).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1214
+  -         let t2 = escrow.lock(b"svm_alice", 100).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1221
+  -         let ticket = escrow.lock(b"svm_alice", 100).unwrap();
+- [production hot path] crates/x3-bridge-adapters/src/lib.rs:1263
+  -         let decoded = EscrowPersistedEntry::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:310
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:378
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:385
+  -         let redeemed_hash = BitcoinHTLC::redeem(&mut contract, &preimage_obj, 1).unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:403
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:425
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:428
+  -         BitcoinHTLC::refund(&mut contract, b"1A1z7agoat".to_vec(), 6000).unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:443
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:456
+  -         assert!(BitcoinHTLC::validate_address(&address).unwrap());
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:466
+  -         assert!(BitcoinHTLC::validate_address(&address).unwrap());
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:472
+  -             BitcoinHTLC::compute_htlc_script(vec![1, 2, 3], vec![4, 5, 6], [7; 32], 86400).unwrap();
+- [production hot path] crates/x3-bridge/src/bitcoin_htlc.rs:489
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/btc_spv.rs:309
+  -         let parsed = BitcoinBlockHeader::from_bytes(&bytes).unwrap();
+- [production hot path] crates/x3-bridge/src/btc_spv.rs:372
+  -         let max_target = bits_to_target(0x207fffff).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:436
+  -         let account = CrossChainAccountManager::create_account(master_key, x3_address).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:453
+  -         let evm_addr = CrossChainAccountManager::derive_evm_address(&master_key).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:458
+  -         let evm_addr2 = CrossChainAccountManager::derive_evm_address(&master_key).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:465
+  -         let cosmos_addr = CrossChainAccountManager::derive_cosmos_address(&master_key).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:474
+  -         let solana_addr = CrossChainAccountManager::derive_solana_address(&master_key).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:481
+  -         let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:483
+  -         CrossChainAccountManager::add_evm_address(&mut account, [3; 20]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:489
+  -         let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:492
+  -         CrossChainAccountManager::add_cosmos_address(&mut account, cosmos_addr.clone()).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:498
+  -         let account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:503
+  -                 .unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:511
+  -         let account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:523
+  -         let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:528
+  -                 .unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:531
+  -             CrossChainAccountManager::vote_on_rotation(&mut proposal, [4; 32], true).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:534
+  -         CrossChainAccountManager::execute_rotation(&mut account, &mut proposal).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:541
+  -         let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:542
+  -         CrossChainAccountManager::add_evm_address(&mut account, [3; 20]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:555
+  -         let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:557
+  -         CrossChainAccountManager::deactivate_account(&mut account).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:560
+  -         CrossChainAccountManager::reactivate_account(&mut account).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:568
+  -             let pair = sp_core::sr25519::Pair::from_seed_slice(&[1u8; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:573
+  -             let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:585
+  -             assert!(CrossChainAccountManager::verify_signature(&account, &sig).unwrap());
+- [production hot path] crates/x3-bridge/src/cross_chain_account.rs:591
+  -         let mut account = CrossChainAccountManager::create_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/cross_chain_proofs.rs:322
+  -             let keypair = Pair::from_string(&seed, None).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:551
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:578
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:607
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:610
+  -         let msg = bridge.create_bridge_message(deposit.id).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:622
+  -         let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:641
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:644
+  -         let msg = bridge.create_bridge_message(deposit.id).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:657
+  -         let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:676
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:679
+  -         let msg = bridge.create_bridge_message(deposit.id).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:717
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:727
+  -         let mut bridge = EthereumBridge::new_with_test_bypass(validators).unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:746
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/ethereum_bridge.rs:749
+  -         let msg = bridge.create_bridge_message(deposit.id).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:389
+  -         let config = GasRelayer::register_relayer(relayer_id, tokens.clone(), 500).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:405
+  -             GasRelayer::create_fee_request([1; 32], [2; 32], 1000000, 950000, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:421
+  -             GasRelayer::create_fee_request([1; 32], [2; 32], 1000000, 1000000, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:429
+  -         let result = GasRelayer::settle_fee(&mut req, &rate, 100).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:435
+  -         let rate = GasRelayer::update_exchange_rate([1; 32], 500000000000000000, 1000).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:444
+  -             GasRelayer::create_fee_request([1; 32], [2; 32], 1000000, 1000000, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:447
+  -         let config = GasRelayer::register_relayer([3; 32], vec![[2; 32]], 500).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:450
+  -             GasRelayer::process_relayer_payout(&req, &config).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:464
+  -         .unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:474
+  -                 .unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:476
+  -         assert!(GasRelayer::is_sponsored_beneficiary(&pool, &[3; 32]).unwrap());
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:477
+  -         assert!(!GasRelayer::is_sponsored_beneficiary(&pool, &[4; 32]).unwrap());
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:484
+  -                 .unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:486
+  -         GasRelayer::deduct_sponsored_fee(&mut pool, [2; 32], 1000000).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:492
+  -         let mut config = GasRelayer::register_relayer([1; 32], vec![[2; 32]], 500).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:494
+  -         GasRelayer::add_accepted_token(&mut config, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:500
+  -         let mut config = GasRelayer::register_relayer([1; 32], vec![[2; 32]], 500).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:503
+  -         GasRelayer::pause_relayer(&mut config).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:506
+  -         GasRelayer::resume_relayer(&mut config).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:513
+  -             GasRelayer::create_fee_request([1; 32], [2; 32], 1000000, 950000, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:515
+  -         GasRelayer::dispute_fee(&mut req, "slippage").unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:522
+  -             GasRelayer::create_fee_request([1; 32], [2; 32], 1000000, 1000000, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:531
+  -         GasRelayer::settle_fee(&mut req, &rate, 100).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:533
+  -         let result = GasRelayer::batch_settle_fees(&[req], &[rate]).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:540
+  -             GasRelayer::register_relayer([1; 32], vec![[2; 32], [3; 32]], 500).unwrap();
+- [production hot path] crates/x3-bridge/src/gas_relayer.rs:542
+  -         GasRelayer::remove_accepted_token(&mut config, [2; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:335
+  -         let client_id = IBCLightClient::register_client(chain_id.clone(), 604800, 2592000).unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:444
+  -         let result = IBCLightClient::verify_packet_data(&packet, &proof, &consensus).unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:479
+  -         let result = IBCLightClient::verify_packet_data(&packet, &proof, &consensus).unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:507
+  -                 .unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:525
+  -         let (amount, denom) = IBCLightClient::process_ft_transfer(&packet, [0; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:544
+  -         assert!(!IBCLightClient::timeout_packet(&packet, 1000).unwrap());
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:545
+  -         assert!(IBCLightClient::timeout_packet(&packet, 2000).unwrap());
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:546
+  -         assert!(IBCLightClient::timeout_packet(&packet, 3000).unwrap());
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:574
+  -             IBCLightClient::freeze_client_on_misbehavior(&header1, &header2).unwrap();
+- [production hot path] crates/x3-bridge/src/ibc_light_client.rs:603
+  -             IBCLightClient::freeze_client_on_misbehavior(&header1, &header2).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:369
+  -         let deposit_id = L2Bridge::initiate_deposit([1; 20], [2; 20], 1000000, [3; 32]).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:391
+  -         L2Bridge::confirm_deposit(&mut deposit, 1000, 1200, 1200).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:423
+  -         L2Bridge::relay_deposit(&mut deposit).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:430
+  -             L2Bridge::initiate_withdrawal([1; 32], [2; 20], 500000, [3; 20]).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:446
+  -         L2Bridge::batch_withdrawal(&mut withdrawal).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:452
+  -         let output = L2Bridge::submit_output_root(0, [1; 32], 1000, 2000).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:489
+  -         L2Bridge::prove_withdrawal(&mut withdrawal, &proof, &output_root, withdrawal_root).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:505
+  -         L2Bridge::execute_withdrawal(&mut withdrawal, 1000, 700000).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:537
+  -         L2Bridge::refund_deposit(&mut deposit).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:543
+  -         let config = L2Bridge::register_token_pair([1; 20], [2; 20], 18).unwrap();
+- [production hot path] crates/x3-bridge/src/l2_bridge.rs:567
+  -         assert!(L2Bridge::validate_output_root(&output2, &output1).unwrap());
+- [production hot path] crates/x3-bridge/src/security_council.rs:397
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/security_council.rs:432
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/security_council.rs:488
+  -             .unwrap();
+- [production hot path] crates/x3-bridge/src/security_council.rs:510
+  -         assert!(!member_info.unwrap().active);
+- [production hot path] crates/x3-circuit-breaker/src/lib.rs:174
+  -             .unwrap();
+- [compiler/tooling-only] crates/x3-cli/src/commands/build.rs:83
+  -             .unwrap(),
+- [compiler/tooling-only] crates/x3-cli/src/commands/build.rs:202
+  -     let file_stem = file.file_stem().unwrap().to_string_lossy();
+- [production hot path] crates/x3-cli/src/commands/compile.rs:81
+  -     let file_stem = args.input.file_stem().unwrap().to_string_lossy();
+- [production hot path] crates/x3-cli/src/commands/docgen.rs:124
+  -         std::fs::create_dir_all(doc_path.parent().unwrap())?;
+- [production hot path] crates/x3-cli/src/commands/swap.rs:206
+  -         println!("{}", serde_json::to_string_pretty(&json).unwrap());
+- [production hot path] crates/x3-cli/src/commands/swap.rs:243
+  -         println!("{}", serde_json::to_string_pretty(&filtered).unwrap());
+- [production hot path] crates/x3-cli/src/commands/swap.rs:286
+  -         println!("{}", serde_json::to_string_pretty(&chain).unwrap());
+- [production hot path] crates/x3-cli/src/config.rs:329
+  -         let toml = toml::to_string_pretty(&config).unwrap();
+- [production hot path] crates/x3-cli/src/templates.rs:24
+  -             .expect("Failed to register solidity template");
+- [production hot path] crates/x3-cli/src/templates.rs:27
+  -             .expect("Failed to register anchor template");
+- [production hot path] crates/x3-cli/src/templates.rs:30
+  -             .expect("Failed to register test template");
+- [production hot path] crates/x3-compiler/src/compiler.rs:269
+  -         let output = result.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:291
+  -         let output = result.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:294
+  -         let artifacts = output.artifacts.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:314
+  -         let output = result.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:317
+  -         let artifacts = output.artifacts.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:320
+  -         let gas = artifacts.gas_report.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:351
+  -         let output = result.unwrap();
+- [production hot path] crates/x3-compiler/src/compiler.rs:354
+  -         let artifacts = output.artifacts.unwrap();
+- [test-only] crates/x3-compiler/tests/determinism.rs:28
+  -     let out0 = Compiler::compile(source, opts.clone()).expect("Initial compile failed");
+- [test-only] crates/x3-compiler/tests/determinism.rs:35
+  -         let out = Compiler::compile(source, opts.clone()).expect("Repeated compile failed");
+- [test-only] crates/x3-compiler/tests/e2e_test.rs:16
+  -     let result = Compiler::compile(source, options).expect("Compilation should succeed");
+- [test-only] crates/x3-compiler/tests/e2e_test.rs:31
+  -     let source = std::fs::read_to_string(&path).expect(&format!("Failed to read {}", path));
+- [test-only] crates/x3-compiler/tests/e2e_test.rs:119
+  -     let result1 = Compiler::compile(source, options.clone()).unwrap();
+- [test-only] crates/x3-compiler/tests/e2e_test.rs:120
+  -     let result2 = Compiler::compile(source, options.clone()).unwrap();
+- [test-only] crates/x3-compiler/tests/integration_test.rs:21
+  -                 panic!("Compilation failed: {:?}", e);
+- [test-only] crates/x3-compiler/tests/integration_test.rs:37
+  -                 panic!("Compilation failed: {:?}", e);
+- [test-only] crates/x3-compiler/tests/integration_test.rs:53
+  -                 panic!("Compilation failed: {:?}", e);
+- [production hot path] crates/x3-consensus/src/finality_proof_api.rs:299
+  -         assert_eq!(retrieved.unwrap().block_height, 5);
+- [production hot path] crates/x3-consensus/src/finality_proof_api.rs:322
+  -         let (a, b) = result.unwrap();
+- [production hot path] crates/x3-consensus/src/ghost_fork_choice.rs:150
+  -                 .expect("Should have at least one child");
+- [production hot path] crates/x3-consensus/src/hotstuff.rs:704
+  -         assert_eq!(state.last_block, block.header.hash().unwrap());
+- [production hot path] crates/x3-consensus/src/network_partition_recovery.rs:262
+  -             _ => panic!("Should detect partition"),
+- [production hot path] crates/x3-consensus/src/network_partition_recovery.rs:279
+  -             _ => panic!("Should be recovered"),
+- [production hot path] crates/x3-consensus/src/proof_of_history.rs:247
+  -         assert!(PoHGenerator::verify_tick_chain(proof.unwrap().as_slice()));
+- [production hot path] crates/x3-constitution/src/engine.rs:291
+  -         let new_hash = e.apply_amendment(&proof).unwrap();
+- [production hot path] crates/x3-constitution/src/types.rs:111
+  -         let back = ConstitutionHash::from_hex(&hex).unwrap();
+- [production hot path] crates/x3-court/src/court.rs:536
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:247
+  -             dispute_engine: ProofDisputeEngine::new(10).expect("non-zero dispute window"),
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:293
+  -             .expect("route just inserted");
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:752
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:791
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:794
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:801
+  -                 .unwrap()
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:809
+  -                 .unwrap()
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:823
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:852
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:913
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:929
+  -         gateway.enable_gateway_route(dispute_route).unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:932
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:942
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:945
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:953
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:956
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:967
+  -             .expect("burn should debit ledger");
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:968
+  -         gateway.finalize_external_release(withdrawal_id).unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:972
+  -         assert!(gateway.get_withdrawal(withdrawal_id).unwrap().released);
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:1007
+  -             .unwrap();
+- [production hot path] crates/x3-crosschain-gateway/src/lib.rs:1021
+  -             gateway.indexer.get_insurance_fund([3; 32]).unwrap().status,
+- [production hot path] crates/x3-dex/src/amm_pools.rs:384
+  -         let pool = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:434
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:436
+  -         let lp = AMMPool::add_liquidity(&mut pool, 1000000, 500000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:454
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:456
+  -         let lp1 = AMMPool::add_liquidity(&mut pool, 1000000, 500000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:457
+  -         let lp2 = AMMPool::add_liquidity(&mut pool, 1000000, 500000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:473
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:475
+  -         AMMPool::add_liquidity(&mut pool, 1000000, 1000000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:476
+  -         let amount_out = AMMPool::swap(&mut pool, 100000, 0).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:493
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:495
+  -         AMMPool::add_liquidity(&mut pool, 1000000, 1000000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:511
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:513
+  -         let lp = AMMPool::add_liquidity(&mut pool, 1000000, 1000000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:514
+  -         let (amount_a, amount_b) = AMMPool::remove_liquidity(&mut pool, lp).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:531
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:533
+  -         let lp = AMMPool::add_liquidity(&mut pool, 1000000, 1000000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:534
+  -         let (amount_a, amount_b) = AMMPool::remove_liquidity(&mut pool, lp / 2).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:551
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:553
+  -         AMMPool::add_liquidity(&mut pool, 1000000, 1000000).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:580
+  -         let pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:596
+  -         let mut pool = AMMPool::create_pool(token_a, token_b, 30).unwrap();
+- [production hot path] crates/x3-dex/src/amm_pools.rs:598
+  -         AMMPool::add_liquidity(&mut pool, 1000000, 1000000).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:346
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:363
+  -             ArbBotEventSystem::create_subscription([1; 32], 100, 50000, vec![[2; 32]]).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:374
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:382
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:384
+  -         assert!(ArbBotEventSystem::matches_subscription(&opp, &sub, 1000).unwrap());
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:393
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:401
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:403
+  -         assert!(!ArbBotEventSystem::matches_subscription(&opp, &sub, 1000).unwrap());
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:411
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:433
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:435
+  -         ArbBotEventSystem::update_performance(&mut perf, &exec).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:446
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:457
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:459
+  -         let min_input = ArbBotEventSystem::calculate_min_input(&opp, 5000).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:465
+  -         let mut sub = ArbBotEventSystem::create_subscription([1; 32], 100, 50000, vec![]).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:467
+  -         ArbBotEventSystem::set_subscription_active(&mut sub, false).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:474
+  -             ArbBotEventSystem::create_subscription([1; 32], 100, 50000, vec![[2; 32]]).unwrap();
+- [production hot path] crates/x3-dex/src/arb_bot_events.rs:476
+  -         ArbBotEventSystem::add_whitelisted_token(&mut sub, [3; 32]).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:362
+  -         let batch = BatchSwapRouter::create_batch_swap([1; 32], swaps, 100).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:379
+  -         let mut batch = BatchSwapRouter::create_batch_swap([1; 32], swaps, 100).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:381
+  -         let output = BatchSwapRouter::execute_batch_swap(&mut batch, vec![98]).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:391
+  -         let route = BatchSwapRouter::calculate_optimal_route(1, 2, 1000, pools, 100).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:398
+  -         let swaps = BatchSwapRouter::split_swap_across_pools(1, 2, 1000, 5).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:417
+  -         let valid = BatchSwapRouter::validate_mev_protection(975, &protection, 150).unwrap();
+- [production hot path] crates/x3-dex/src/batch_swap_router.rs:447
+  -         let mut batch = BatchSwapRouter::create_batch_swap([1; 32], swaps, 100).unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:316
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:347
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:351
+  -         ConcentratedLiquidityEngine::increase_liquidity(&mut pos, 500_000, 500_000).unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:361
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:366
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:378
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:380
+  -         ConcentratedLiquidityEngine::close_position(&mut pos).unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:405
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:421
+  -             ConcentratedLiquidityEngine::collect_fees(&mut accrue, 500_000, 500_000).unwrap();
+- [production hot path] crates/x3-dex/src/concentrated_liquidity.rs:443
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:331
+  -         let loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:353
+  -         let mut loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:355
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:357
+  -         let (amount, fee) = FlashLoanEngine::execute_flash_loan(&mut loan, &mut pool, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:366
+  -         let mut loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:368
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:369
+  -         FlashLoanEngine::execute_flash_loan(&mut loan, &mut pool, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:372
+  -         FlashLoanEngine::repay_flash_loan(&mut loan, &mut pool, repayment_required, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:380
+  -         let mut loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:382
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:383
+  -         FlashLoanEngine::execute_flash_loan(&mut loan, &mut pool, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:385
+  -         let penalty = FlashLoanEngine::mark_default(&mut loan, &mut pool).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:393
+  -         let mut loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:395
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:396
+  -         FlashLoanEngine::execute_flash_loan(&mut loan, &mut pool, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:403
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:410
+  -         let mut loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 1_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:411
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 2_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:412
+  -         FlashLoanEngine::pause_pool(&mut pool).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:418
+  -         let pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:426
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:428
+  -         let new_balance = FlashLoanEngine::deposit_to_pool(&mut pool, 50_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:435
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:437
+  -         let new_balance = FlashLoanEngine::withdraw_from_pool(&mut pool, 30_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:444
+  -         let mut pool = FlashLoanEngine::create_flash_loan_pool(1, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:446
+  -         FlashLoanEngine::pause_pool(&mut pool).unwrap();
+- [production hot path] crates/x3-dex/src/flash_loan.rs:459
+  -         let loan = FlashLoanEngine::initiate_flash_loan([1; 32], 1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:217
+  -             u64::from_le_bytes(bid_id[..8].try_into().unwrap()),
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:218
+  -             u64::from_le_bytes(ask_id[..8].try_into().unwrap()),
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:353
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:365
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:381
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:383
+  -         LimitOrderBookEngine::cancel_order(&mut order, 100).unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:391
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:397
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:408
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:422
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:424
+  -         LimitOrderBookEngine::execute_order(&mut order, 4_800, 1_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:434
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/limit_order_book.rs:509
+  -         let vwap = LimitOrderBookEngine::calculate_vwap(&executions).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:289
+  -             LiquidityMiningEngine::create_mining_reward([0; 32], 1, 100_000, 10_000, 0).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:306
+  -             LiquidityMiningEngine::create_mining_reward([0; 32], 1, 100_000, 10_000, 0).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:313
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:322
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:339
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:347
+  -         let info = LiquidityMiningEngine::stake_lp_tokens([1; 32], 1_000_000, 0).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:355
+  -         let mut info = LiquidityMiningEngine::stake_lp_tokens([1; 32], 1_000_000, 0).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:357
+  -         let remaining = LiquidityMiningEngine::unstake_lp_tokens(&mut info, 500_000).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:379
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:386
+  -         let epoch = LiquidityMiningEngine::calculate_epoch_rewards(1, 10_000_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:394
+  -             LiquidityMiningEngine::create_mining_reward([0; 32], 1, 100_000, 10_000, 0).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:396
+  -         LiquidityMiningEngine::end_mining_campaign(&mut campaign, 5_000).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:402
+  -         let boosted = LiquidityMiningEngine::apply_reward_boost(100_000, 50).unwrap();
+- [production hot path] crates/x3-dex/src/liquidity_mining.rs:416
+  -         let claimed = LiquidityMiningEngine::harvest_rewards(&mut accumulator, 50_000).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:432
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:443
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:446
+  -         LPPositionNFTEngine::burn_nft(&mut nft, owner).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:455
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:458
+  -         let transfer = LPPositionNFTEngine::transfer_nft(&mut nft, owner, [3; 32], 200).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:469
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:471
+  -         let listing = LPPositionNFTEngine::list_nft(&nft, 75_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:482
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:484
+  -         let mut listing = LPPositionNFTEngine::list_nft(&nft, 75_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:493
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:504
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:509
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:519
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:521
+  -         let fees = LPPositionNFTEngine::update_accumulated_fees(&mut nft, 1_000).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:531
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:533
+  -         LPPositionNFTEngine::update_accumulated_fees(&mut nft, 2_000).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:535
+  -         let claimed = LPPositionNFTEngine::claim_nft_fees(&mut nft, owner).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:549
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:562
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:569
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:579
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:589
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:592
+  -             LPPositionNFTEngine::collateralize_nft(&nft, [2; 32], 25_000, 5_000).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:604
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:618
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:620
+  -         let mut listing = LPPositionNFTEngine::list_nft(&nft, 75_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/lp_position_nft.rs:622
+  -         LPPositionNFTEngine::cancel_listing(&mut listing, nft.owner).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:411
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:418
+  -         let greeks = OptionsEngine::calculate_greeks(10_000, 10_000, 1_000, 1_500, 0).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:426
+  -             OptionsEngine::quote_option(1, 2, 10_000, 1_000, 0, 10_000, 1_500, 100).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:434
+  -             OptionsEngine::buy_option([1; 32], 1, 2, 10_000, 5_000, 0, 100, 500, 100).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:446
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:453
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:461
+  -             OptionsEngine::buy_option([1; 32], 1, 2, 10_000, 1_000, 0, 100, 500, 100).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:463
+  -         OptionsEngine::expire_option(&mut option, 2_000).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:470
+  -         let pool = OptionsEngine::create_option_pool(1, 2).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:477
+  -         let mut pool = OptionsEngine::create_option_pool(1, 2).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:479
+  -         OptionsEngine::update_pool_volatility(&mut pool, 2_000).unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:490
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:497
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/options.rs:508
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:383
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:393
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:395
+  -         let pnl = PerpetualFuturesEngine::update_position_pnl(&mut pos, 11_000).unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:404
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:430
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:433
+  -             PerpetualFuturesEngine::liquidate_position(&mut pos, [2; 32], 9_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:443
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:445
+  -         let new_collateral = PerpetualFuturesEngine::add_collateral(&mut pos, 2_000).unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:454
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:456
+  -         let new_collateral = PerpetualFuturesEngine::reduce_collateral(&mut pos, 1_000).unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:465
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:467
+  -         let pnl = PerpetualFuturesEngine::close_position(&mut pos, 11_000).unwrap();
+- [production hot path] crates/x3-dex/src/perpetuals.rs:488
+  -         let rate = PerpetualFuturesEngine::create_funding_rate(1, 2, 100).unwrap();
+- [production hot path] crates/x3-dex/src/pool_analytics.rs:433
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/pool_analytics.rs:444
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/real_slippage.rs:297
+  -             RealSlippageCalculator::calculate_output_amount(100, 1_000, 1_000, 30).unwrap();
+- [production hot path] crates/x3-dex/src/real_slippage.rs:305
+  -         let price = RealSlippageCalculator::calculate_spot_price(1_000, 1_000).unwrap();
+- [production hot path] crates/x3-dex/src/real_slippage.rs:312
+  -         let price = RealSlippageCalculator::calculate_execution_price(100, 95).unwrap();
+- [production hot path] crates/x3-dex/src/real_slippage.rs:337
+  -         let quote = RealSlippageCalculator::generate_quote(&pool, 100_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/real_slippage.rs:390
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/real_slippage.rs:419
+  -             RealSlippageCalculator::validate_execution(&quote, &protection, 97_500, 205).unwrap();
+- [production hot path] crates/x3-dex/src/route_finder.rs:97
+  -                     || path.output_amount > best_path.as_ref().unwrap().output_amount
+- [production hot path] crates/x3-dex/src/route_finder.rs:353
+  -         assert!(!path.unwrap().hops.is_empty());
+- [production hot path] crates/x3-dex/src/settlement_bridge.rs:467
+  -         let intent = result.unwrap();
+- [production hot path] crates/x3-dex/src/settlement_bridge.rs:576
+  -         let intent = result.unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:426
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:439
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:453
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:463
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:466
+  -             StopLossTakeProfitEngine::check_stop_loss_trigger(&mut trigger, 4_200, 200).unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:476
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:479
+  -             StopLossTakeProfitEngine::check_stop_loss_trigger(&mut trigger, 5_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:489
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:492
+  -             StopLossTakeProfitEngine::check_take_profit_trigger(&mut trigger, 5_300, 200).unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:496
+  -         let exec = result.unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:505
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:508
+  -             StopLossTakeProfitEngine::update_trailing_stop(&mut trigger, 5_500, 200).unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:519
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:522
+  -         StopLossTakeProfitEngine::update_trailing_stop(&mut trigger, 6_000, 200).unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:526
+  -             StopLossTakeProfitEngine::update_trailing_stop(&mut trigger, 5_799, 201).unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:537
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:568
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/stop_loss_trigger.rs:570
+  -         StopLossTakeProfitEngine::cancel_stop_loss(&mut trigger).unwrap();
+- [test-only] crates/x3-dex/src/tests/attack_liquidation_frontrun.rs:25
+  -         .expect("batch must be created");
+- [test-only] crates/x3-dex/src/tests/attack_liquidation_frontrun.rs:28
+  -         .expect("batch execution must succeed");
+- [test-only] crates/x3-dex/src/tests/attack_oracle_frontrun.rs:6
+  -         TWAPExecutor::create_twap_order([8u8; 32], 1, 2, 10_000, 100, 10, 1).expect("valid order");
+- [test-only] crates/x3-dex/src/tests/attack_oracle_frontrun.rs:9
+  -         .expect("next slice query must succeed")
+- [test-only] crates/x3-dex/src/tests/attack_oracle_frontrun.rs:10
+  -         .expect("a slice should be due");
+- [test-only] crates/x3-dex/src/tests/attack_oracle_frontrun.rs:16
+  -         .expect("slice execution must succeed");
+- [test-only] crates/x3-dex/src/tests/attack_sandwich.rs:26
+  -         .expect("baseline quote must be computable");
+- [test-only] crates/x3-dex/src/tests/attack_sandwich.rs:31
+  -             .expect("front-run quote must succeed");
+- [test-only] crates/x3-dex/src/tests/attack_sandwich.rs:39
+  -             .expect("victim quote must succeed");
+- [test-only] crates/x3-dex/src/tests/attack_sandwich.rs:51
+  -     .expect("back-run quote must succeed");
+- [test-only] crates/x3-dex/src/tests/attack_twap_manipulation.rs:6
+  -         .expect("twap order creation must succeed");
+- [test-only] crates/x3-dex/src/tests/attack_twap_manipulation.rs:30
+  -         .expect("statistics must be computable");
+- [production hot path] crates/x3-dex/src/trade_history.rs:349
+  -                     && (filter.token_in.is_none() || t.token_in == filter.token_in.unwrap())
+- [production hot path] crates/x3-dex/src/trade_history.rs:350
+  -                     && (filter.token_out.is_none() || t.token_out == filter.token_out.unwrap())
+- [production hot path] crates/x3-dex/src/trade_history.rs:352
+  -                     && (filter.status.is_none() || t.status == filter.status.unwrap())
+- [production hot path] crates/x3-dex/src/trade_history.rs:470
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:481
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:483
+  -         TradeHistoryEngine::update_trade_status(&mut trade, 2).unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:503
+  -         let entry = TradeHistoryEngine::record_cost_basis([1; 32], 1, 1_000, 10_000, 100).unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:513
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:524
+  -         .unwrap()];
+- [production hot path] crates/x3-dex/src/trade_history.rs:526
+  -         let report = TradeHistoryEngine::generate_tax_report([1; 32], 50, 150, trades).unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:536
+  -         .unwrap()];
+- [production hot path] crates/x3-dex/src/trade_history.rs:539
+  -             TradeHistoryEngine::calculate_performance_metrics([1; 32], trades, 30).unwrap();
+- [production hot path] crates/x3-dex/src/trade_history.rs:549
+  -         .unwrap()];
+- [production hot path] crates/x3-dex/src/trade_history.rs:571
+  -         .unwrap()];
+- [production hot path] crates/x3-dex/src/trade_history.rs:585
+  -         .unwrap()];
+- [production hot path] crates/x3-dex/src/twap_executor.rs:227
+  -             executions.last().unwrap().executed_block - executions.first().unwrap().executed_block
+- [production hot path] crates/x3-dex/src/twap_executor.rs:328
+  -         let order = TWAPExecutor::create_twap_order([1; 32], 1, 2, 10_000_000, 100, 10, 0).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:343
+  -         let order = TWAPExecutor::create_twap_order([1; 32], 1, 2, 10_000_000, 100, 10, 0).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:345
+  -         let slice = TWAPExecutor::get_next_slice(&order, 0).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:347
+  -         assert_eq!(slice.unwrap().index, 0);
+- [production hot path] crates/x3-dex/src/twap_executor.rs:353
+  -             TWAPExecutor::create_twap_order([1; 32], 1, 2, 10_000_000, 100, 10, 0).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:363
+  -         let exec = TWAPExecutor::execute_slice(&mut order, &mut slice, 5_000, 10).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:373
+  -             TWAPExecutor::create_twap_order([1; 32], 1, 2, 10_000_000, 100, 10, 0).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:375
+  -         let remaining = TWAPExecutor::cancel_twap_order(&mut order).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:383
+  -         let order = TWAPExecutor::create_twap_order([1; 32], 1, 2, 10_000_000, 100, 10, 0).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:427
+  -         let stats = TWAPExecutor::calculate_statistics(&order, &executions, 5_050).unwrap();
+- [production hot path] crates/x3-dex/src/twap_executor.rs:436
+  -             TWAPExecutor::estimate_price_impact(5_000, 10_000_000, 10, 100_000_000).unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:415
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:423
+  -         let mut lock = VeX3GovernanceEngine::lock_x3_tokens([1; 32], 100_000, 365, 100).unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:427
+  -         let unlocked = VeX3GovernanceEngine::unlock_x3_tokens(&mut lock, unlock_block).unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:451
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:467
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:476
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:492
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:503
+  -         .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:511
+  -             VeX3GovernanceEngine::set_lm_allocation([1; 32], 100_000, 500_000).unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:518
+  -         let lock = VeX3GovernanceEngine::lock_x3_tokens([1; 32], 100_000, 365, 100).unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:529
+  -                 .unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:536
+  -         let mut lock = VeX3GovernanceEngine::lock_x3_tokens([1; 32], 100_000, 365, 100).unwrap();
+- [production hot path] crates/x3-dex/src/ve_governance.rs:538
+  -         let received = VeX3GovernanceEngine::early_unlock(&mut lock, 5_000).unwrap(); // 50% penalty
+- [production hot path] crates/x3-dns-server/src/config.rs:30
+  -             bind_address: "0.0.0.0:8053".parse().unwrap(),
+- [production hot path] crates/x3-dns-server/src/config.rs:59
+  -             bind_address: "127.0.0.1:8080".parse().unwrap(),
+- [production hot path] crates/x3-dns-server/src/config.rs:356
+  -             .add_source(config::File::with_name(path.as_ref().to_str().unwrap()))
+- [production hot path] crates/x3-dns-server/src/config.rs:397
+  -                 self.server.bind_address = "0.0.0.0:53".parse().unwrap();
+- [production hot path] crates/x3-dns-server/src/config.rs:398
+  -                 self.api.bind_address = "127.0.0.1:8080".parse().unwrap();
+- [production hot path] crates/x3-dns-server/src/config.rs:404
+  -                 self.server.bind_address = "127.0.0.1:5353".parse().unwrap();
+- [production hot path] crates/x3-dns-server/src/config.rs:405
+  -                 self.api.bind_address = "127.0.0.1:8080".parse().unwrap();
+- [production hot path] crates/x3-dns-server/src/config.rs:411
+  -                 self.server.bind_address = "127.0.0.1:5353".parse().unwrap();
+- [production hot path] crates/x3-dns-server/src/config.rs:412
+  -                 self.api.bind_address = "127.0.0.1:8080".parse().unwrap();
+- [production hot path] crates/x3-dns-server/src/domain.rs:145
+  -             let first_char = chars.next().unwrap();
+- [production hot path] crates/x3-economics/src/stake_compounding.rs:222
+  -         let alice_stake = pool.delegations.get("alice").unwrap().staked;
+- [production hot path] crates/x3-economics/src/stake_compounding.rs:223
+  -         let bob_stake = pool.delegations.get("bob").unwrap().staked;
+- [production hot path] crates/x3-economics/src/stake_compounding.rs:266
+  -         assert!(pool.delegations.get("dave").unwrap().staked > 500);
+- [production hot path] crates/x3-evolution/src/chromosome.rs:347
+  -         let chromosome = Chromosome::from_bytecode(bytecode.clone()).unwrap();
+- [production hot path] crates/x3-evolution/src/chromosome.rs:358
+  -         let mut chromosome = Chromosome::from_bytecode(bytecode).unwrap();
+- [production hot path] crates/x3-evolution/src/crossover.rs:309
+  -             Chromosome::from_bytecode(bytecode1).unwrap(),
+- [production hot path] crates/x3-evolution/src/crossover.rs:310
+  -             Chromosome::from_bytecode(bytecode2).unwrap(),
+- [production hot path] crates/x3-evolution/src/crossover.rs:320
+  -         let child = crossover.crossover(&p1, &p2, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/crossover.rs:331
+  -         let child = crossover.crossover(&p1, &p2, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/crossover.rs:341
+  -         let child = crossover.crossover(&p1, &p2, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/crossover.rs:351
+  -         let child = crossover.crossover(&p1, &p2, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/crossover.rs:361
+  -         let child = crossover.crossover(&p1, &p2, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/fitness.rs:468
+  -         let chromosome = Chromosome::from_bytecode(bytecode).unwrap();
+- [production hot path] crates/x3-evolution/src/fitness.rs:471
+  -         let score = evaluator.evaluate(&chromosome).unwrap();
+- [production hot path] crates/x3-evolution/src/mutation.rs:371
+  -         Chromosome::from_bytecode(bytecode).unwrap()
+- [production hot path] crates/x3-evolution/src/mutation.rs:381
+  -         mutation.mutate(&mut chromosome, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/mutation.rs:395
+  -         let result = mutation.mutate(&mut chromosome, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/mutation.rs:408
+  -             if mutation.mutate(&mut chromosome, &mut rng).unwrap() {
+- [production hot path] crates/x3-evolution/src/population.rs:493
+  -         let chromosome = Chromosome::from_bytecode(bytecode).unwrap();
+- [production hot path] crates/x3-evolution/src/population.rs:535
+  -         let best = pop.best().unwrap();
+- [production hot path] crates/x3-evolution/src/population.rs:537
+  -         assert_eq!(best.fitness.as_ref().unwrap().pnl, 4.0);
+- [production hot path] crates/x3-evolution/src/population.rs:555
+  -             assert!(elite.fitness.as_ref().unwrap().pnl >= 3.0);
+- [production hot path] crates/x3-evolution/src/population.rs:565
+  -             let chromosome = Chromosome::from_bytecode(bytecode).unwrap();
+- [production hot path] crates/x3-evolution/src/population.rs:582
+  -             assert!(ind.fitness.as_ref().unwrap().pnl >= 2.0);
+- [production hot path] crates/x3-evolution/src/population.rs:609
+  -         let pop = PopulationSeeder::from_templates(&templates, 10, 0.1).unwrap();
+- [production hot path] crates/x3-evolution/src/population.rs:615
+  -         let pop = PopulationSeeder::random(10, 16).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:444
+  -             let chromosome = Chromosome::from_bytecode(bytecode).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:463
+  -         let selected = selection.select(&pop, 5, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:473
+  -         let selected = selection.select(&pop, 5, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:483
+  -         let selected = selection.select(&pop, 3, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:488
+  -             let fitness = individual.fitness.as_ref().unwrap().pnl;
+- [production hot path] crates/x3-evolution/src/selection.rs:499
+  -         let selected = selection.select(&pop, 5, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:509
+  -         let selected = selection.select(&pop, 5, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/selection.rs:519
+  -         let selected = selection.select(&pop, 5, &mut rng).unwrap();
+- [production hot path] crates/x3-evolution/src/simulator.rs:683
+  -         let chromosome = Chromosome::from_bytecode(bytecode).unwrap();
+- [production hot path] crates/x3-evolution/src/simulator.rs:687
+  -         let result = simulator.simulate(&chromosome, &data).unwrap();
+- [production hot path] crates/x3-evolution/src/simulator.rs:702
+  -             .unwrap()
+- [production hot path] crates/x3-evolution/src/simulator.rs:703
+  -             .unwrap();
+- [production hot path] crates/x3-external-route-registry/src/lib.rs:229
+  -             .unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:174
+  -         let fees = calc.calculate(&simple_params(), &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:182
+  -         let (x3, ext, savings) = calc.compare_x3_vs_external(&p, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:196
+  -         let new_fee = calc.calculate(&p, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:197
+  -         let vet_fee = calc.calculate(&p, &veteran_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:207
+  -         let normal = calc.calculate(&p, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:208
+  -         let flash = calc.calculate(&flash_p, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:218
+  -         let local = calc.calculate(&p, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:219
+  -         let remote = calc.calculate(&cross, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:242
+  -         let s_fee = calc.calculate(&simple, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:243
+  -         let c_fee = calc.calculate(&complex, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:259
+  -         let fees = calc.calculate(&p, &new_agent()).unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:264
+  -             .unwrap();
+- [production hot path] crates/x3-fees/src/calculator.rs:270
+  -             .unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:23
+  -     let receipt = pool.borrow(&borrow).expect("borrow should succeed");
+- [production hot path] crates/x3-flashloan/examples/demo.rs:33
+  -         .expect("repay should succeed");
+- [production hot path] crates/x3-flashloan/examples/demo.rs:50
+  -         .unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:51
+  -     let p1 = engine.emit_proof(1000, 10, None).unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:55
+  -         .unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:56
+  -     let p2 = engine.emit_proof(500, 5, None).unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:58
+  -     let (chain, receipt_info) = engine.finalize().unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:84
+  -         tampered.append(copy).unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:108
+  -         .unwrap();
+- [production hot path] crates/x3-flashloan/examples/demo.rs:151
+  -         .unwrap();
+- [production hot path] crates/x3-flashloan/src/executor.rs:216
+  -         let finalized = result.unwrap();
+- [production hot path] crates/x3-flashloan/src/executor.rs:269
+  -             other => panic!("expected AtomicRevert, got {:?}", other),
+- [production hot path] crates/x3-flashloan/src/lib.rs:92
+  -         let receipt = pool.borrow(&borrow).unwrap();
+- [production hot path] crates/x3-flashloan/src/lib.rs:104
+  -         let settled = pool.repay(&receipt.id, repay_amount).unwrap();
+- [production hot path] crates/x3-flashloan/src/lib.rs:192
+  -         let validated = plan.unwrap();
+- [production hot path] crates/x3-flashloan/src/lib.rs:230
+  -         let record = settlement.unwrap();
+- [production hot path] crates/x3-flashloan/src/planner.rs:249
+  -         let result = planner.plan(sample_plan()).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:60
+  -         let entry = self.liquidity.get_mut(&(chain, asset.clone())).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:100
+  -             .unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:243
+  -         let receipt = pool.borrow(&request).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:287
+  -         let receipt = pool.borrow(&request).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:290
+  -         pool.repay(&receipt.id, repay_amount).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:310
+  -         let receipt = pool.borrow(&request).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:311
+  -         pool.revert(&receipt.id).unwrap();
+- [production hot path] crates/x3-flashloan/src/pool.rs:334
+  -         let receipt = pool.borrow(&request).unwrap();
+- [production hot path] crates/x3-flashloan/src/settlement.rs:208
+  -         let record = engine.settle(&receipt, 1_000_500, &proof_engine).unwrap();
+- [production hot path] crates/x3-flashloan/src/settlement.rs:255
+  -         let r1 = engine.settle(&receipt, 1_000_500, &proof_engine).unwrap();
+- [production hot path] crates/x3-flashloan/src/settlement.rs:256
+  -         let r2 = engine.settle(&receipt, 1_000_500, &proof_engine).unwrap();
+- [test-only] crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs:23
+  -     let receipt = pool.borrow(&borrow).expect("borrow should be issued");
+- [test-only] crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs:39
+  -         .expect("failed atomic path must restore principal");
+- [test-only] crates/x3-flashloan/src/tests/attack_reentrancy.rs:29
+  -     let receipt_1 = pool.borrow(&request_1).expect("first borrow should succeed");
+- [test-only] crates/x3-flashloan/src/tests/attack_repayment_bypass.rs:21
+  -     let receipt = pool.borrow(&request).expect("borrow should succeed");
+- [production hot path] crates/x3-gateway-indexer/src/lib.rs:448
+  -         assert!(indexer.get_verification_result([1; 32]).unwrap().verified);
+- [production hot path] crates/x3-gateway-indexer/src/lib.rs:450
+  -             indexer.get_dispute_window([1; 32]).unwrap().status,
+- [production hot path] crates/x3-gateway-indexer/src/lib.rs:454
+  -             indexer.get_gateway_risk_report([2; 32]).unwrap().status,
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:183
+  -         let fund = engine.fund_insurance([1; 32], 1_000).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:191
+  -         let fee = engine.charge_route_premium([2; 32], 10_000).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:195
+  -         assert_eq!(engine.get_fund([1; 32]).unwrap().balance, 100);
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:201
+  -         engine.fund_insurance([1; 32], 1_000).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:202
+  -         let fund = engine.cover_gateway_loss([2; 32], [7; 32], 400).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:210
+  -         engine.fund_insurance([1; 32], 1_000).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:225
+  -         engine.fund_insurance([1; 32], 1_000).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:226
+  -         let before = engine.get_fund([1; 32]).unwrap().balance;
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:227
+  -         engine.cover_gateway_loss([2; 32], [7; 32], 250).unwrap();
+- [production hot path] crates/x3-gateway-insurance/src/lib.rs:228
+  -         let after = engine.get_fund([1; 32]).unwrap().balance;
+- [production hot path] crates/x3-gateway/src/rest.rs:1476
+  -             .expect("provider manifest")
+- [production hot path] crates/x3-gateway/src/rest.rs:1490
+  -             .expect("read response body");
+- [production hot path] crates/x3-gateway/src/rest.rs:1491
+  -         serde_json::from_slice(&body).expect("deserialize response body")
+- [production hot path] crates/x3-gateway/src/rest.rs:1698
+  -             .expect("bind mock control-plane listener");
+- [production hot path] crates/x3-gateway/src/rest.rs:1701
+  -             .expect("mock control-plane local addr");
+- [production hot path] crates/x3-gateway/src/rest.rs:1704
+  -             .expect("convert mock control-plane listener");
+- [production hot path] crates/x3-gateway/src/rest.rs:1707
+  -                 .expect("serve mock control-plane from tcp")
+- [production hot path] crates/x3-gateway/src/rest.rs:1710
+  -                 .expect("run mock control-plane server");
+- [production hot path] crates/x3-gateway/src/rest.rs:1725
+  -             .expect("create isolated test database");
+- [production hot path] crates/x3-gateway/src/rest.rs:1740
+  -                     .expect("build benchmark request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1743
+  -             .expect("publish benchmark report");
+- [production hot path] crates/x3-gateway/src/rest.rs:1765
+  -                     .expect("build intent request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1768
+  -             .expect("create orchestra intent");
+- [production hot path] crates/x3-gateway/src/rest.rs:1773
+  -             .expect("intent id")
+- [production hot path] crates/x3-gateway/src/rest.rs:1794
+  -                     .expect("build approval request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1797
+  -             .expect("create approval case");
+- [production hot path] crates/x3-gateway/src/rest.rs:1802
+  -             .expect("approval case id")
+- [production hot path] crates/x3-gateway/src/rest.rs:1823
+  -                     .expect("build evidence request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1826
+  -             .expect("create evidence bundle");
+- [production hot path] crates/x3-gateway/src/rest.rs:1831
+  -             .expect("evidence bundle id")
+- [production hot path] crates/x3-gateway/src/rest.rs:1841
+  -                         .expect("build benchmark list request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1844
+  -                 .expect("list benchmark reports"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1854
+  -                         .expect("build intent list request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1857
+  -                 .expect("list orchestra intents"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1867
+  -                         .expect("build approval list request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1870
+  -                 .expect("list approval cases"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1880
+  -                         .expect("build evidence list request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1883
+  -                 .expect("list evidence bundles"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1893
+  -                         .expect("build benchmark get request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1896
+  -                 .expect("get benchmark report"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1906
+  -                             intent_json["intent_id"].as_str().expect("intent id")
+- [production hot path] crates/x3-gateway/src/rest.rs:1909
+  -                         .expect("build intent get request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1912
+  -                 .expect("get orchestra intent"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1924
+  -                         .expect("build approval get request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1927
+  -                 .expect("get approval case"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1937
+  -                         .expect("build evidence get request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1940
+  -                 .expect("get evidence bundle"),
+- [production hot path] crates/x3-gateway/src/rest.rs:1944
+  -         assert_eq!(benchmark_list.as_array().expect("benchmark list").len(), 1);
+- [production hot path] crates/x3-gateway/src/rest.rs:1945
+  -         assert_eq!(intent_list.as_array().expect("intent list").len(), 1);
+- [production hot path] crates/x3-gateway/src/rest.rs:1946
+  -         assert_eq!(approval_list.as_array().expect("approval list").len(), 1);
+- [production hot path] crates/x3-gateway/src/rest.rs:1947
+  -         assert_eq!(evidence_list.as_array().expect("evidence list").len(), 1);
+- [production hot path] crates/x3-gateway/src/rest.rs:1969
+  -             .expect("drop isolated test schema");
+- [production hot path] crates/x3-gateway/src/rest.rs:1981
+  -             .expect("create isolated test database");
+- [production hot path] crates/x3-gateway/src/rest.rs:2007
+  -                         .expect("build relayed intent request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2010
+  -                 .expect("create relayed orchestra intent"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2036
+  -                         .expect("build relayed approval request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2039
+  -                 .expect("create relayed approval case"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2064
+  -                         .expect("build relayed vote window request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2067
+  -                 .expect("create relayed vote window"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2094
+  -                         .expect("build relayed vote receipt request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2097
+  -                 .expect("create relayed vote receipt"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2120
+  -                         .expect("build relayed dispatch request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2123
+  -                 .expect("dispatch relayed orchestra intent"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2139
+  -                         .expect("build relayed imported tally request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2142
+  -                 .expect("import relayed vote tally"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2154
+  -                         .expect("build relayed vote window close request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2157
+  -                 .expect("close relayed vote window"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2174
+  -                         .expect("build remote evidence fetch request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2177
+  -                 .expect("fetch remote evidence through gateway"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2192
+  -                         .expect("build persisted intent request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2195
+  -                 .expect("get persisted intent"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2205
+  -                         .expect("build persisted vote window request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2208
+  -                 .expect("get persisted vote window"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2219
+  -                         .expect("build persisted dispatch evidence request"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2222
+  -                 .expect("get persisted dispatch evidence"),
+- [production hot path] crates/x3-gateway/src/rest.rs:2244
+  -             .expect("drop isolated test schema");
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:31
+  -             let mut q = self.queue.lock().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:36
+  -             let mut q = self.queue.lock().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:45
+  -             self.queue.lock().unwrap().len()
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:78
+  -             h1.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:79
+  -             h2.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:145
+  -                 h.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:148
+  -             let dequeued = deq_handle.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:180
+  -                 .unwrap()
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:187
+  -             self.nonces.lock().unwrap().insert(sender, nonce);
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:191
+  -             let mut nonces = self.nonces.lock().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:216
+  -             h1.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:217
+  -             h2.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:242
+  -             let mut res = self.reservations.lock().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:252
+  -             self.reservations.lock().unwrap().remove(&account);
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:283
+  -             let r1 = h1.join().unwrap();
+- [test-only] crates/x3-gateway/tests/loom_mempool_concurrency.rs:284
+  -             let r2 = h2.join().unwrap();
+- [production hot path] crates/x3-genesis-builder/src/lib.rs:40
+  -         Ok(serde_json::to_string(&canonical).expect("serializing manifest should not fail"))
+- [production hot path] crates/x3-genesis-builder/src/lib.rs:62
+  -         let first = manifest.digest_hex().expect("digest should succeed");
+- [production hot path] crates/x3-genesis-builder/src/lib.rs:63
+  -         let second = manifest.digest_hex().expect("digest should succeed");
+- [production hot path] crates/x3-gpu-validator-swarm/benches/e2e_tps.rs:58
+  -                 latencies_clone.lock().unwrap().push(latency_ms);
+- [production hot path] crates/x3-gpu-validator-swarm/benches/e2e_tps.rs:74
+  -     let mut lats = latencies.lock().unwrap().clone();
+- [production hot path] crates/x3-gpu-validator-swarm/benches/e2e_tps.rs:75
+  -     lats.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [production hot path] crates/x3-gpu-validator-swarm/benches/e2e_tps.rs:97
+  -     let rt = tokio::runtime::Runtime::new().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/benches/e2e_tps.rs:129
+  -     let rt = tokio::runtime::Runtime::new().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/benches/e2e_tps.rs:161
+  -     let rt = tokio::runtime::Runtime::new().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs:113
+  -     validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs:223
+  -     let json = serde_json::to_string_pretty(&report).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs:224
+  -     let mut file = File::create(&output_path).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs:225
+  -     file.write_all(json.as_bytes()).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs:247
+  -     let content = std::fs::read_to_string(&path).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs:248
+  -     let report: BenchmarkReport = serde_json::from_str(&content).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs:63
+  -         validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs:93
+  -     let state_json = orchestrator.export_state_json().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs:97
+  -     tokio::signal::ctrl_c().await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs:132
+  -     validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs:152
+  -         validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_validator.rs:102
+  -     tokio::signal::ctrl_c().await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_validator.rs:118
+  -     validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/bin/x3_validator.rs:187
+  -     validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/crypto.rs:234
+  -             .expect("secret is always 32 bytes");
+- [production hot path] crates/x3-gpu-validator-swarm/src/crypto.rs:270
+  -         let key = SigningKey::from_seed(b"test seed with at least thirty two bytes").unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:314
+  -         assert_eq!(add_result.unwrap(), vec![30]);
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:317
+  -         assert_eq!(mul_result.unwrap(), vec![30]);
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:343
+  -         assert_eq!(result.unwrap(), vec![12]);
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:380
+  -         assert_eq!(result.unwrap(), vec![10]);
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:423
+  -             _ => panic!("Expected healthy status"),
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:443
+  -             _ => panic!("Expected degraded status"),
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs:462
+  -         assert!(!chain.primary.as_ref().unwrap().is_operational);
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs:353
+  -         let h1 = pool.allocate("job1").await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs:354
+  -         let h2 = pool.allocate("job2").await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs:371
+  -         let h1 = pool.allocate("job1").await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs:372
+  -         let h2 = pool.allocate("job2").await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs:384
+  -         let h3 = alloc_task.await.unwrap().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs:393
+  -         let handle = futures::executor::block_on(pool.allocate("job1")).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/network.rs:137
+  -             .unwrap()
+- [production hot path] crates/x3-gpu-validator-swarm/src/network.rs:289
+  -         network.start().await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/network.rs:292
+  -         network.stop().await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/network.rs:301
+  -         network.start().await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/network.rs:306
+  -             .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/network.rs:310
+  -         network.disconnect("peer1").await.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/payment.rs:650
+  -             .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/payment.rs:663
+  -         payment.record_work(record).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:284
+  -         UnifiedProof::new(header, atomic_proof, 10).unwrap()
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:319
+  -         aggregator.submit_proof(proof).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:327
+  -                 .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:333
+  -         let (state, count, _) = aggregator.get_aggregation_state(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:343
+  -         aggregator.submit_proof(proof).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:361
+  -         aggregator.submit_proof(proof).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:364
+  -         let (state, count, _) = aggregator.get_aggregation_state(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:375
+  -                 .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:378
+  -         let (state, count, _) = aggregator.get_aggregation_state(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:388
+  -             .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:390
+  -         let (state, count, _) = aggregator.get_aggregation_state(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:402
+  -                 .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:405
+  -         let (state, count, _) = aggregator.get_aggregation_state(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:417
+  -                 .unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:427
+  -         let divergent = aggregator.get_divergent_validators(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_aggregator.rs:431
+  -         let finalized_proof = aggregator.get_proof(proof_hash).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_integration.rs:287
+  -         let receipt = execution_result_to_receipt(&result, executor, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_integration.rs:308
+  -         let receipt = execution_result_to_receipt(&result, executor, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_integration.rs:312
+  -         let proof = create_unified_proof(&result, receipt, signature, bundle_id, 100, 10).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/proof_integration.rs:343
+  -         .expect("orchestra proof");
+- [production hot path] crates/x3-gpu-validator-swarm/src/quarantine.rs:416
+  -         let status = manager.get_status("validator1").unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:388
+  -         let proof = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:444
+  -             let proof = generate_merkle_proof(&leaves, i).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:454
+  -             let proof = generate_merkle_proof(&leaves, i).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:491
+  -         let proof_path = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:503
+  -         let proof_path = generate_merkle_proof(&leaves, 1).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:514
+  -         let proof_path = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:525
+  -         let proof_path = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:536
+  -         let proof_path = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs:548
+  -         let proof_path = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/unified_proof.rs:499
+  -         let proof = unified.unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/unified_proof.rs:518
+  -         let mut proof = UnifiedProof::new(header, atomic_vm_proof, 10).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/unified_proof.rs:529
+  -         let merkle_path = generate_merkle_proof(&leaves, 0).unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/validator.rs:336
+  -         validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/validator.rs:354
+  -         validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/validator.rs:388
+  -         validator.initialize().unwrap();
+- [production hot path] crates/x3-gpu-validator-swarm/src/x3_kernel_versioning.rs:556
+  -         assert_eq!(active.unwrap().version, "2.0.0");
+- [test-only] crates/x3-gpu-validator-swarm/tests/chaos_stress_test.rs:324
+  -         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [test-only] crates/x3-gpu-validator-swarm/tests/metrics_sliding_window_integration.rs:277
+  -             total += handle.await.unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/stress_harness.rs:204
+  -             latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [test-only] crates/x3-gpu-validator-swarm/tests/stress_with_real_time_metrics.rs:92
+  -             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:125
+  -     let status = manager.get_status("validator1").unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:136
+  -         .unwrap());
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:176
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:189
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:207
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:229
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:248
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:297
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:310
+  -     let state_json = orchestrator.export_state_json().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:328
+  -         validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs:355
+  -     validator.initialize().unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/tps_sliding_window_test.rs:120
+  -             handle.await.unwrap();
+- [test-only] crates/x3-gpu-validator-swarm/tests/tps_sliding_window_test.rs:151
+  -         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [test-only] crates/x3-gpu-validator-swarm/tests/tps_sliding_window_test.rs:295
+  -         spike_handle.await.unwrap();
+- [production hot path] crates/x3-gulfstream/src/transaction.rs:44
+  -                 .unwrap()
+- [production hot path] crates/x3-hir/src/error.rs:295
+  -             Err(self.errors.into_iter().next().unwrap())
+- [production hot path] crates/x3-hir/src/lower.rs:73
+  -                         .expect("global symbol was registered");
+- [production hot path] crates/x3-hir/src/lower.rs:80
+  -                         .expect("function symbol was registered");
+- [production hot path] crates/x3-hir/src/lower.rs:87
+  -                         .expect("const symbol was registered");
+- [production hot path] crates/x3-hir/src/lower.rs:95
+  -                         .expect("agent symbol was registered");
+- [production hot path] crates/x3-hir/src/lower.rs:969
+  -         let frame = self.frames.last_mut().unwrap();
+- [production hot path] crates/x3-hir/src/lower.rs:995
+  -         let module = parser.parse_module().expect("parse");
+- [production hot path] crates/x3-hir/src/lower.rs:1007
+  -         let hir = parse_and_lower(source).expect("lower");
+- [production hot path] crates/x3-hir/src/lower.rs:1050
+  -         let hir = parse_and_lower(source).expect("lower");
+- [production hot path] crates/x3-hir/src/lower.rs:1066
+  -         let hir = parse_and_lower(source).expect("lower");
+- [production hot path] crates/x3-hir/src/lower.rs:1083
+  -         let hir = parse_and_lower(source).expect("lower");
+- [production hot path] crates/x3-hir/src/lower.rs:1160
+  -         let hir = parse_and_lower(source).expect("lower");
+- [production hot path] crates/x3-hir/src/lower.rs:1175
+  -         let hir = parse_and_lower(source).expect("lower");
+- [production hot path] crates/x3-hir/src/lower.rs:1184
+  -             panic!("expected return statement");
+- [production hot path] crates/x3-integration/src/mini_x3.rs:1252
+  -         let result = execute_x3bc(&payload, 10_000).unwrap();
+- [production hot path] crates/x3-integration/src/mini_x3.rs:1284
+  -         let result = execute_x3bc(&payload, 10_000).unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:311
+  -         .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:316
+  -             .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:320
+  -         IntentLifecycle::begin_execute(&mut intent, 102).unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:334
+  -         .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:338
+  -         let settlement = IntentLifecycle::finalize(&mut intent, 103).unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:358
+  -         .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:361
+  -             .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:363
+  -         IntentLifecycle::begin_execute(&mut intent, 102).unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:376
+  -         .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:398
+  -         .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:422
+  -         .unwrap();
+- [production hot path] crates/x3-intent/src/lifecycle.rs:424
+  -         IntentLifecycle::cancel(&mut intent).unwrap();
+- [production hot path] crates/x3-ixl/src/interpreter.rs:336
+  -                 panic!("planner rejected valid test bundle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/interpreter.rs:343
+  -                 panic!("interpreter failed on lock+settle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/interpreter.rs:367
+  -                 panic!("planner rejected refund bundle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/interpreter.rs:421
+  -                 panic!("planner rejected slippage bundle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/interpreter.rs:459
+  -                 panic!("planner rejected abort bundle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/planner.rs:164
+  -                 panic!("planner failed for empty bundle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/planner.rs:191
+  -                 panic!("planner rejected valid lock+settle: {:?}", err);
+- [production hot path] crates/x3-ixl/src/planner.rs:210
+  -                 panic!("planner accepted unresolved custody");
+- [production hot path] crates/x3-ixl/src/planner.rs:230
+  -                 panic!("planner accepted mint without lock");
+- [production hot path] crates/x3-ixl/src/planner.rs:264
+  -                 panic!("planner accepted duplicate slot");
+- [production hot path] crates/x3-ixl/src/planner.rs:288
+  -                 panic!("planner accepted oversized bundle");
+- [test-only] crates/x3-ixl/tests/properties.rs:73
+  -         let p1 = Planner::plan(b.clone()).expect("valid bundle plans");
+- [test-only] crates/x3-ixl/tests/properties.rs:74
+  -         let p2 = Planner::plan(b).expect("valid bundle plans");
+- [test-only] crates/x3-ixl/tests/properties.rs:86
+  -         let plan = Planner::plan(b).unwrap();
+- [test-only] crates/x3-ixl/tests/properties.rs:89
+  -             .expect("Lock+Settle plan must execute");
+- [test-only] crates/x3-ixl/tests/properties.rs:130
+  -                 _ => panic!("expected CreditReceiver for Lock rollback"),
+- [production hot path] crates/x3-launch-validator/src/main.rs:34
+  -         let json = serde_json::to_string_pretty(&checklist.items).expect("serialization failed");
+- [production hot path] crates/x3-lexer/src/lib.rs:173
+  -             match self.peek_char().unwrap() {
+- [production hot path] crates/x3-lexer/src/lib.rs:340
+  -             .unwrap();
+- [production hot path] crates/x3-liquidity-core/src/anti_rug.rs:139
+  -         Ok(self.locks.remove(&key).unwrap())
+- [production hot path] crates/x3-liquidity-core/src/lib.rs:74
+  -         let req = Settlement::build(42, 100, 95).unwrap();
+- [production hot path] crates/x3-liquidity-core/src/lib.rs:102
+  -         reg.lock([0x01; 32], 42, 1000, 100).unwrap();
+- [production hot path] crates/x3-liquidity-core/src/lib.rs:103
+  -         let lock = reg.get(&[0x01; 32], 42).unwrap();
+- [production hot path] crates/x3-liquidity-core/src/lib.rs:120
+  -         reg.lock([0x02; 32], 1, 500, 200).unwrap();
+- [production hot path] crates/x3-lsp/src/backend.rs:293
+  -                 let doc = self.documents.get(uri).unwrap();
+- [production hot path] crates/x3-lsp/src/backend.rs:355
+  -                 let doc = self.documents.get(uri).unwrap();
+- [production hot path] crates/x3-lsp/src/diagnostics.rs:68
+  -         let comit_re = Regex::new(r#"comit\s+"[^"]+"\s*\{"#).unwrap();
+- [production hot path] crates/x3-lsp/src/diagnostics.rs:95
+  -             if let Some(caps) = Regex::new(r"gas_limit:\s*(\d+)").unwrap().captures(line) {
+- [production hot path] crates/x3-lsp/src/diagnostics.rs:121
+  -                 .unwrap()
+- [production hot path] crates/x3-lsp/src/diagnostics.rs:151
+  -             let addr_re = Regex::new(r#"contract:\s*"(0x[a-fA-F0-9]*)""#).unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:308
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:320
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:332
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:335
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:345
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:348
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:359
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:362
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:373
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:376
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:391
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/fee_distribution.rs:402
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:152
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:163
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:165
+  -         manager.increase_replication("QmTest123").unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:166
+  -         let pin = manager.get_pin("QmTest123").unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:190
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:193
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:204
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/ipfs_metadata.rs:207
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:359
+  -         let id = registry.register_plugin(plugin).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:369
+  -         registry.register_plugin(plugin.clone()).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:379
+  -         registry.register_plugin(plugin.clone()).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:381
+  -         let retrieved = registry.get_plugin("auth_plugin").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:392
+  -         registry.register_plugin(plugin1).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:393
+  -         registry.register_plugin(plugin2).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:403
+  -         registry.register_plugin(plugin).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:405
+  -         registry.record_download("auth_plugin").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:406
+  -         let plugin = registry.get_plugin("auth_plugin").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:415
+  -             registry.register_plugin(plugin).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:418
+  -         registry.record_download("plugin0").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:419
+  -         registry.record_download("plugin0").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:420
+  -         registry.record_download("plugin1").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:431
+  -         registry.register_plugin(plugin).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:441
+  -         registry.register_plugin(plugin).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:445
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:447
+  -         let plugin = registry.get_plugin("auth_plugin").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:455
+  -         registry.register_plugin(plugin).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:465
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:467
+  -         let plugin = registry.get_plugin("auth_plugin").unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:493
+  -         registry.register_plugin(plugin1).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:494
+  -         registry.register_plugin(plugin2).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:507
+  -         registry.register_plugin(plugin1).unwrap();
+- [production hot path] crates/x3-marketplace/src/plugin_registry.rs:508
+  -         registry.register_plugin(plugin2).unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:346
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:378
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:388
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:407
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:409
+  -         system.mark_helpful(&review_id).unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:410
+  -         let review = system.get_review(&review_id).unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:426
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:436
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:446
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:465
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:475
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:507
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:517
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:535
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:544
+  -             .unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:546
+  -         let review = system.get_review(&review_id).unwrap();
+- [production hot path] crates/x3-marketplace/src/rating_system.rs:576
+  -             .unwrap();
+- [production hot path] crates/x3-mir/src/lower.rs:361
+  -         let module = parser.parse_module().expect("parse");
+- [production hot path] crates/x3-mir/src/lower.rs:362
+  -         let hir = HirLowerer::lower(module).expect("hir");
+- [production hot path] crates/x3-mir/src/lower.rs:363
+  -         let mir = MirLowerer::lower(&hir).expect("mir");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:135
+  -         let mut templates = self.templates.lock().expect("templates mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:145
+  -         let failed = *self.failed_attempts.lock().expect("failed_attempts mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:150
+  -         let templates = self.templates.lock().expect("templates mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:180
+  -                 *self.failed_attempts.lock().expect("failed_attempts mutex poisoned") = 0;
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:188
+  -         let mut failed = self.failed_attempts.lock().expect("failed_attempts mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:235
+  -             let mut failed = self.failed_attempts.lock().expect("failed_attempts mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:301
+  -         let templates = self.templates.lock().expect("templates mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:307
+  -         let templates = self.templates.lock().expect("templates mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:313
+  -         *self.failed_attempts.lock().expect("failed_attempts mutex poisoned") = 0;
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:405
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:407
+  -         let result = auth.verify(biometric_data).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:418
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:421
+  -         let result = auth.verify(wrong_data).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:425
+  -             _ => panic!("Expected failure"),
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:436
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:438
+  -         let AuthResult::Success(token) = auth.verify(biometric_data).await.unwrap() else {
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:439
+  -             panic!("Expected success");
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:442
+  -         auth.logout(&token).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:461
+  -         auth.enroll(b"face", BiometricType::FaceID).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:462
+  -         auth.enroll(b"finger", BiometricType::Fingerprint).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:464
+  -         let methods = auth.get_enrolled_methods().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:472
+  -         auth.enroll(b"face", BiometricType::FaceID).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:474
+  -         assert!(auth.is_enrolled(BiometricType::FaceID).await.unwrap());
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:475
+  -         assert!(!auth.is_enrolled(BiometricType::Fingerprint).await.unwrap());
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:493
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:499
+  -         let result = auth.verify(b"biometric").await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:512
+  -         auth.reset_lockout().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:514
+  -         let result = auth.verify(b"wrong").await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/biometric_auth_mobile.rs:517
+  -             _ => panic!("Expected failure"),
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:102
+  -         let allowed = self.allowed_schemes.lock().expect("allowed_schemes mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:124
+  -         let mut allowed = self.allowed_schemes.lock().expect("allowed_schemes mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:134
+  -         let mut allowed = self.allowed_schemes.lock().expect("allowed_schemes mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:203
+  -         let request = DeeplinkRequest::from_url(url).unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:213
+  -         let request = DeeplinkRequest::from_url(url).unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:223
+  -         let request = DeeplinkRequest::from_url(url).unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:231
+  -         let history = handler.get_history(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:240
+  -         let request = handler.handle(url).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:249
+  -         handler.register_scheme("myapp://".to_string()).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:261
+  -         handler.revoke_scheme("ethereum://").await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:276
+  -         handler.handle(url1).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:277
+  -         handler.handle(url2).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:279
+  -         let history = handler.get_history(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:288
+  -         handler.handle(url).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:290
+  -         handler.clear_history().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/deeplink_handler.rs:292
+  -         let history = handler.get_history(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:345
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:346
+  -         let addresses = wallet.get_addresses().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:353
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:358
+  -         let addr = wallet.import_from_seed(seed, path).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:365
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:377
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:387
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:396
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:398
+  -         let status = wallet.get_network_status().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:406
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:411
+  -         let can_afford = wallet.can_afford_transaction("x3:test", 1000, 100).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:418
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:423
+  -         let addresses_before = wallet.get_addresses().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:426
+  -         wallet.reset().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:428
+  -         let addresses_after = wallet.get_addresses().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:435
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:438
+  -         let addr = wallet.import_from_seed(seed, "m/44'/60'/0'/0/0").await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:443
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:445
+  -         let addresses = wallet.get_addresses().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:452
+  -         let wallet = MobileWallet::new(config).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:457
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:462
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/mobile_wallet_core.rs:464
+  -         let txs = wallet.get_recent_transactions(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:264
+  -         let qr = QRData::from_raw(raw.to_string()).unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:271
+  -         let qr = QRData::from_raw(raw.to_string()).unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:294
+  -         let history = scanner.get_history(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:303
+  -         scanner.scan(raw.to_string()).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:305
+  -         let history = scanner.get_history(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:314
+  -         scanner.trust_address(address).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:316
+  -         let is_trusted = scanner.is_trusted(address).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:325
+  -         scanner.trust_address(address).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:326
+  -         scanner.untrust_address(address).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:328
+  -         let is_trusted = scanner.is_trusted(address).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:335
+  -         assert!(QRScanner::validate_address(valid).unwrap());
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:338
+  -         assert!(!QRScanner::validate_address(invalid).unwrap());
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:344
+  -         assert!(QRScanner::detect_phishing(suspicious).unwrap());
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:352
+  -         scanner.scan(raw.to_string()).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:354
+  -         scanner.clear_history().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/qr_scanner.rs:356
+  -         let history = scanner.get_history(10).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:100
+  -         let mut keys = self.private_keys.lock().expect("private_keys mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:112
+  -         let mut keys = self.private_keys.lock().expect("private_keys mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:191
+  -             let keys = self.private_keys.lock().expect("private_keys mutex poisoned");
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:370
+  -         let queue = signer.get_pending_requests().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:412
+  -         assert_eq!(result.unwrap(), request_id);
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:425
+  -         signer.queue_signing_request(request.clone()).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:427
+  -         let pending = signer.get_pending_requests().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:443
+  -         signer.queue_signing_request(request).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:448
+  -         let pending = signer.get_pending_requests().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:460
+  -             .unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:481
+  -         signer.queue_signing_request(request1).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:482
+  -         signer.queue_signing_request(request2).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:484
+  -         let size = signer.queue_size().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:498
+  -         signer.queue_signing_request(request).await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:499
+  -         signer.clear_queue().await.unwrap();
+- [production hot path] crates/x3-mobile-sdk/src/transaction_signer_mobile.rs:501
+  -         let pending = signer.get_pending_requests().await.unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:65
+  -                         let cur = in_map.get(var).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:66
+  -                         let cand = pred_edge.get(var).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:82
+  -                 let existing = current.get(var).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:83
+  -                 let incoming = out_map.get(var).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:330
+  -         let then_const = edge_consts.get(&(MirBlockId(0), MirBlockId(1))).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:335
+  -         let else_const = edge_consts.get(&(MirBlockId(0), MirBlockId(2))).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:369
+  -             _ => panic!("expected goto"),
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:408
+  -         let input = edge_consts.get(&(MirBlockId(0), MirBlockId(2))).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:413
+  -         let input2 = edge_consts.get(&(MirBlockId(1), MirBlockId(2))).unwrap();
+- [production hot path] crates/x3-opt/src/edge_const_prop.rs:424
+  -             _ => panic!("expected branch"),
+- [production hot path] crates/x3-opt/src/optimizer.rs:290
+  -         let stats = opt.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/optimizer.rs:298
+  -         let stats = opt.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/block_fusion.rs:241
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/block_fusion.rs:297
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/block_fusion.rs:341
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/block_fusion.rs:378
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/block_fusion.rs:410
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:262
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:265
+  -         let term = module.functions[0].blocks[0].terminator.as_ref().unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:304
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:307
+  -         let term = module.functions[0].blocks[0].terminator.as_ref().unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:333
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:336
+  -         let term = module.functions[0].blocks[0].terminator.as_ref().unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:370
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:374
+  -         let term = module.functions[0].blocks[0].terminator.as_ref().unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:402
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:443
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:446
+  -         let term = module.functions[0].blocks[0].terminator.as_ref().unwrap();
+- [production hot path] crates/x3-opt/src/passes/branch_opt.rs:465
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/cond_fold.rs:416
+  -         let stats = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/cond_fold.rs:420
+  -             _ => panic!("expected goto"),
+- [production hot path] crates/x3-opt/src/passes/cond_fold.rs:442
+  -         let stats = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/cond_fold.rs:446
+  -             _ => panic!("expected goto"),
+- [production hot path] crates/x3-opt/src/passes/cond_fold.rs:471
+  -         let stats = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/cond_fold.rs:475
+  -             _ => panic!("expected branch"),
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:316
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:343
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:367
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:391
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:420
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:449
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/constant_fold.rs:480
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/copy_propagation.rs:338
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dead_code_elimination.rs:160
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dead_code_elimination.rs:196
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dead_code_elimination.rs:230
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dead_code_elimination.rs:275
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dead_code_elimination.rs:322
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:432
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:442
+  -             .unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:510
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:520
+  -             .unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:529
+  -             .unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:573
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/dom_const_prop.rs:581
+  -             .unwrap();
+- [production hot path] crates/x3-opt/src/passes/global_const_prop.rs:392
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/global_const_prop.rs:432
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/global_const_prop.rs:463
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:350
+  -                         if let MirRhs::Literal(lit) = &new_statements.last().unwrap().rhs {
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:417
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:441
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:468
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:488
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:517
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:547
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/peephole.rs:569
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:767
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:818
+  -         let expr = ExprKey::from_rhs(&stmt.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:830
+  -         let expr1 = ExprKey::from_rhs(&add1.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:831
+  -         let expr2 = ExprKey::from_rhs(&add2.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:888
+  -         let expr_add = ExprKey::from_rhs(&add1.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:889
+  -         let expr_mul = ExprKey::from_rhs(&mul1.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:911
+  -         let expr1 = ExprKey::from_rhs(&sub1.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/pre.rs:912
+  -         let expr2 = ExprKey::from_rhs(&sub2.rhs, &mut vn_table).unwrap();
+- [production hot path] crates/x3-opt/src/passes/speculative_hoist.rs:334
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/speculative_hoist.rs:345
+  -             .unwrap();
+- [production hot path] crates/x3-opt/src/passes/speculative_hoist.rs:391
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/speculative_hoist.rs:442
+  -         let result = pass.run(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/passes/speculative_hoist.rs:457
+  -             .unwrap();
+- [production hot path] crates/x3-opt/src/peephole_autogen.rs:67
+  -         hot.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+- [production hot path] crates/x3-opt/src/peephole_autogen.rs:165
+  -         sorted.sort_by(|a, b| b.benefit.partial_cmp(&a.benefit).unwrap());
+- [production hot path] crates/x3-opt/src/regalloc.rs:109
+  -                         cost_a.partial_cmp(&cost_b).unwrap()
+- [production hot path] crates/x3-opt/src/regalloc.rs:112
+  -                     .unwrap();
+- [production hot path] crates/x3-opt/src/run_yolo.rs:137
+  -         let report = run_yolo_once(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/run_yolo.rs:149
+  -         let report1 = run_yolo_once(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/run_yolo.rs:150
+  -         let report2 = run_yolo_once(&mut module).unwrap();
+- [production hot path] crates/x3-opt/src/ssa_lite.rs:315
+  -             panic!("expected literal after propagation");
+- [production hot path] crates/x3-opt/src/superoptimizer.rs:298
+  -                 .min_by(|a, b| a.cost.total().partial_cmp(&b.cost.total()).unwrap())
+- [production hot path] crates/x3-opt/src/superoptimizer.rs:299
+  -                 .unwrap()
+- [production hot path] crates/x3-opt/src/telemetry.rs:98
+  -         let js = serde_json::to_string_pretty(self).unwrap();
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:239
+  -                 loop_sum_module().functions.into_iter().next().unwrap(),
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:240
+  -                 nested_loop_module().functions.into_iter().next().unwrap(),
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:241
+  -                 licm_target_module().functions.into_iter().next().unwrap(),
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:257
+  -         let report = run_yolo_once(&mut module).expect("optimization failed");
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:306
+  -         let report = run_yolo_once(&mut module).expect("optimization failed");
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:347
+  -         let report = run_yolo_once(&mut module).expect("optimization failed");
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:389
+  -         let report = run_yolo_once(&mut module).expect("optimization failed");
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:442
+  -         let report = run_yolo_once(&mut module).expect("optimization failed");
+- [test-only] crates/x3-opt/tests/loop_pack_integration_bench.rs:476
+  -             let _report = run_yolo_once(&mut module).expect("optimization failed");
+- [test-only] crates/x3-opt/tests/optimizer_yolo_smoke.rs:44
+  -         let report = run_yolo_once(&mut module).expect("yolo failed");
+- [test-only] crates/x3-opt/tests/optimizer_yolo_smoke.rs:62
+  -         let report = run_yolo_once(&mut module).expect("yolo failed");
+- [test-only] crates/x3-opt/tests/optimizer_yolo_smoke.rs:76
+  -         let report = run_yolo_once(&mut module).expect("yolo failed");
+- [production hot path] crates/x3-oracle/src/pyth_oracle.rs:262
+  -         assert_eq!(price.unwrap(), 225_000_000_000i64);
+- [production hot path] crates/x3-oracle/src/pyth_oracle.rs:285
+  -         assert!(price.unwrap() > 2200.0 && price.unwrap() < 2300.0);
+- [production hot path] crates/x3-oracle/src/pyth_oracle.rs:337
+  -         assert_eq!(history.unwrap().len(), 3);
+- [production hot path] crates/x3-oracle/src/pyth_oracle.rs:388
+  -         assert!(change.unwrap() > 8.0 && change.unwrap() < 10.0);
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:559
+  -             .expect("create intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:594
+  -             .expect("create intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:609
+  -             .expect("dispatch benchmarking intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:635
+  -             .expect("create intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:648
+  -             .expect("create approval case");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:662
+  -             .expect("open vote window");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:675
+  -             .expect("record alice vote");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:687
+  -             .expect("record bob vote");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:711
+  -             .expect("close vote window");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:735
+  -             .expect("create intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:748
+  -             .expect("create approval case");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:761
+  -             .expect("open vote window");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:776
+  -             .expect("import tally");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:783
+  -         let dir = tempdir().expect("tempdir");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:786
+  -         let service = OrchestraControlPlane::open_persistent(dir.path()).expect("open store");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:799
+  -             .expect("create intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:812
+  -             .expect("approval case");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:825
+  -             .expect("vote window");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:837
+  -             .expect("record vote");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:841
+  -             .expect("close window");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:844
+  -         let restored = OrchestraControlPlane::open_persistent(dir.path()).expect("restore store");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:848
+  -             .expect("restored intent");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:852
+  -             .expect("restored case");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:856
+  -             .expect("restored window");
+- [production hot path] crates/x3-orchestra-control-plane/src/service.rs:860
+  -             .expect("restored evidence");
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:46
+  -     let id = msg.id().unwrap();
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:49
+  -     let routed_id = router.route(&msg, &proof).expect("route should succeed");
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:57
+  -     let id = msg.id().unwrap();
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:60
+  -     router.route(&msg, &proof).expect("first route succeeds");
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:66
+  -         other => panic!("expected ReplayDetected, got {other:?}"),
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:78
+  -     let id = msg.id().unwrap();
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:85
+  -         other => panic!("expected AdapterNotFound, got {other:?}"),
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:100
+  -     snapshot.validate().expect("invariant should hold");
+- [test-only] crates/x3-orchestrator/tests/orchestrator_smoke.rs:124
+  -     let id = msg.id().unwrap();
+- [production hot path] crates/x3-packet-schema/src/evm.rs:86
+  -         let decoded: EvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/evm.rs:99
+  -         let decoded: EvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/evm.rs:118
+  -         let decoded: EvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:215
+  -         let decoded = Packet::from_bytes(&bytes).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:257
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:258
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:279
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:280
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:296
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:297
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:322
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:323
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:343
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:344
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:377
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:378
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:393
+  -         let packet = Packet::new(PacketType::Evm, payload, 0b0001).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:407
+  -         let packet = Packet::new(PacketType::Svm, payload, 0b0010).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:423
+  -         let packet = Packet::new(PacketType::X3Vm, payload, 0b0100).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:473
+  -         let mut wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:557
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:558
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:572
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:619
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:620
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:632
+  -         let packet = Packet::new(PacketType::X3Vm, payload, 0b0100).unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:634
+  -         let wire = packet.to_wire_format().unwrap();
+- [production hot path] crates/x3-packet-schema/src/lib.rs:635
+  -         let decoded = Packet::from_wire_format(&wire).unwrap();
+- [production hot path] crates/x3-packet-schema/src/svm.rs:57
+  -         let decoded: SvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/svm.rs:73
+  -         let decoded: SvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/svm.rs:85
+  -         let decoded: SvmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/svm.rs:101
+  -         let decoded: SvmAccount = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/svm.rs:114
+  -         let decoded: SvmDeployMetadata = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:104
+  -         let decoded: X3VmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:129
+  -         let decoded: X3VmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:148
+  -         let decoded: X3VmPacket = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:159
+  -         let decoded: X3Condition = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:171
+  -         let decoded: X3Condition = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:185
+  -         let decoded: X3Condition = Decode::decode(&mut &encoded[..]).unwrap();
+- [production hot path] crates/x3-packet-schema/src/x3vm.rs:196
+  -         let decoded: X3Condition = Decode::decode(&mut &encoded[..]).unwrap();
+- [test-only] crates/x3-packet-standard/tests/properties.rs:41
+  -         .expect("payload <= MAX_PAYLOAD")
+- [test-only] crates/x3-packet-standard/tests/properties.rs:52
+  -         let decoded = Packet::decode(&mut &bytes[..]).expect("decode");
+- [test-only] crates/x3-packet-standard/tests/properties.rs:107
+  -         g.mark_received(&p).unwrap();
+- [test-only] crates/x3-packet-standard/tests/properties.rs:140
+  -         ).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:379
+  -         let conflicts = detector.detect_conflicts(&[list1, list2]).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:475
+  -         result.merge(tx_result).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:478
+  -         result.commit_batch().unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:531
+  -         let conflicts = detector.detect_conflicts(&[list1, list2]).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:549
+  -         let conflicts = detector.detect_conflicts(&[list1, list2]).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:568
+  -         let conflicts = detector.detect_conflicts(&[list1, list2]).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:592
+  -         let conflicts = detector.detect_conflicts(&[list1, list2, list3]).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:599
+  -         let conflicts = detector.detect_conflicts(&[]).unwrap();
+- [production hot path] crates/x3-parallel-executor/src/lib.rs:620
+  -         let execution_result = result.unwrap();
+- [production hot path] crates/x3-parser/src/cursor.rs:12
+  -         if tokens.is_empty() || !matches!(tokens.last().unwrap().kind, TokenKind::Eof) {
+- [production hot path] crates/x3-parser/src/cursor.rs:24
+  -             .unwrap_or_else(|| self.tokens.last().unwrap())
+- [production hot path] crates/x3-parser/src/cursor.rs:35
+  -             .unwrap_or_else(|| self.tokens.last().unwrap())
+- [production hot path] crates/x3-parser/src/parser.rs:721
+  -         let module = parser.parse_module().expect("should parse module");
+- [production hot path] crates/x3-parser/src/parser.rs:727
+  -             _ => panic!("expected function"),
+- [production hot path] crates/x3-parser/src/parser.rs:740
+  -         let module = parser.parse_module().expect("should parse module");
+- [production hot path] crates/x3-parser/src/parser.rs:743
+  -             _ => panic!("expected function"),
+- [production hot path] crates/x3-parser/src/parser.rs:753
+  -                     _ => panic!("expected binary initializer"),
+- [production hot path] crates/x3-parser/src/parser.rs:756
+  -             _ => panic!("expected let statement"),
+- [production hot path] crates/x3-parser/src/parser.rs:761
+  -                 _ => panic!("expected identifier return"),
+- [production hot path] crates/x3-parser/src/parser.rs:763
+  -             _ => panic!("expected return statement"),
+- [production hot path] crates/x3-parser/src/parser.rs:775
+  -         let module = parser.parse_module().expect("should parse module");
+- [production hot path] crates/x3-parser/src/parser.rs:778
+  -             _ => panic!("expected function"),
+- [production hot path] crates/x3-parser/src/parser.rs:784
+  -                     _ => panic!("expected identifier callee"),
+- [production hot path] crates/x3-parser/src/parser.rs:790
+  -                         _ => panic!("expected binary second argument"),
+- [production hot path] crates/x3-parser/src/parser.rs:792
+  -                     _ => panic!("expected nested call"),
+- [production hot path] crates/x3-parser/src/parser.rs:795
+  -             _ => panic!("expected expression statement"),
+- [production hot path] crates/x3-parser/src/parser.rs:806
+  -         let module = parser.parse_module().expect("should parse module");
+- [production hot path] crates/x3-parser/src/tokens.rs:33
+  -         if tokens.is_empty() || !matches!(tokens.last().unwrap().kind, TokenKind::Eof) {
+- [production hot path] crates/x3-parser/src/tokens.rs:54
+  -             .unwrap_or_else(|| self.tokens.last().unwrap())
+- [production hot path] crates/x3-parser/src/tokens.rs:62
+  -             .unwrap_or_else(|| self.tokens.last().unwrap())
+- [test-only] crates/x3-parser/tests/golden.rs:15
+  -         for entry in fs::read_dir(&fixture_dir).expect("Failed to read fixture directory") {
+- [test-only] crates/x3-parser/tests/golden.rs:16
+  -             let entry = entry.expect("Failed to read directory entry");
+- [test-only] crates/x3-parser/tests/golden.rs:20
+  -                 let stem = path.file_stem().unwrap().to_str().unwrap();
+- [test-only] crates/x3-parser/tests/golden.rs:26
+  -                 let source = fs::read_to_string(&path).expect("Failed to read fixture file");
+- [test-only] crates/x3-parser/tests/golden.rs:29
+  -                 let module = x3_parser::parse_program(&source).expect("Failed to parse fixture");
+- [test-only] crates/x3-parser/tests/golden.rs:33
+  -                     serde_json::to_string_pretty(&module).expect("Failed to serialize AST to JSON");
+- [test-only] crates/x3-parser/tests/golden.rs:36
+  -                 fs::write(&json_path, json).expect("Failed to write golden file");
+- [test-only] crates/x3-parser/tests/golden.rs:48
+  -         for entry in fs::read_dir(&fixture_dir).expect("Failed to read fixture directory") {
+- [test-only] crates/x3-parser/tests/golden.rs:49
+  -             let entry = entry.expect("Failed to read directory entry");
+- [test-only] crates/x3-parser/tests/golden.rs:53
+  -                 let stem = path.file_stem().unwrap().to_str().unwrap();
+- [test-only] crates/x3-parser/tests/golden.rs:57
+  -                 let source = fs::read_to_string(&path).expect("Failed to read fixture file");
+- [test-only] crates/x3-parser/tests/golden.rs:61
+  -                     fs::read_to_string(&json_path).expect("Failed to read golden file");
+- [test-only] crates/x3-parser/tests/golden.rs:64
+  -                 let module = x3_parser::parse_program(&source).expect("Failed to parse fixture");
+- [test-only] crates/x3-parser/tests/golden.rs:68
+  -                     serde_json::to_string_pretty(&module).expect("Failed to serialize AST to JSON");
+- [production hot path] crates/x3-pq/src/lib.rs:398
+  -         let manager = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:404
+  -         let keypair = PQManager::generate_keypair(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:411
+  -         let manager = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:414
+  -         let signature = manager.sign(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:417
+  -         let verified = manager.verify(message, &signature, public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:423
+  -         let hybrid = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:436
+  -         let identity = PQValidatorIdentity::new(1, PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:449
+  -         manager.enable_pq(PQScheme::Sphincs256).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:463
+  -         let keypair = PQManager::generate_keypair(PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:470
+  -         let manager = PQManager::new(PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:473
+  -         let signature = manager.sign(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:476
+  -         let verified = manager.verify(message, &signature, public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:482
+  -         let keypair = PQManager::generate_keypair(PQScheme::Sphincs256).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:489
+  -         let manager = PQManager::new(PQScheme::Sphincs256).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:492
+  -         let signature = manager.sign(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:495
+  -         let verified = manager.verify(message, &signature, public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:501
+  -         let manager = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:505
+  -         let signature = manager.sign(message1).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:508
+  -         let verified = manager.verify(message2, &signature, public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:514
+  -         let manager1 = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:515
+  -         let manager2 = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:518
+  -         let signature = manager1.sign(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:521
+  -         let verified = manager1.verify(message, &signature, wrong_public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:527
+  -         let hybrid = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:530
+  -         let hybrid_sig = hybrid.sign_hybrid(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:539
+  -         let hybrid = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:542
+  -         let hybrid_sig = hybrid.sign_hybrid(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:547
+  -         let verified = hybrid.verify_hybrid(message, &hybrid_sig, classical_pk, pq_pk).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:553
+  -         let hybrid1 = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:554
+  -         let hybrid2 = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:557
+  -         let hybrid_sig = hybrid1.sign_hybrid(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:562
+  -         let verified = hybrid1.verify_hybrid(message, &hybrid_sig, &wrong_classical_pk, pq_pk).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:568
+  -         let hybrid1 = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:569
+  -         let hybrid2 = HybridSigner::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:572
+  -         let hybrid_sig = hybrid1.sign_hybrid(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:577
+  -         let verified = hybrid1.verify_hybrid(message, &hybrid_sig, classical_pk, wrong_pq_pk).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:589
+  -         assert!(!schedule.should_rotate().unwrap());
+- [production hot path] crates/x3-pq/src/lib.rs:607
+  -         schedule.record_rotation().unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:614
+  -         let mut manager = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:617
+  -         manager.rotate_keys().unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:626
+  -         let manager = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:629
+  -         assert!(!manager.needs_rotation().unwrap());
+- [production hot path] crates/x3-pq/src/lib.rs:634
+  -         let identity = PQValidatorIdentity::new(42, PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:643
+  -         let identity = PQValidatorIdentity::new(1, PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:646
+  -         let signature = identity.sign_validator_message(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:655
+  -         let mut identity = PQValidatorIdentity::new(1, PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:659
+  -         let rotated = identity.rotate_keys_if_needed().unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:686
+  -         manager.enable_pq(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:689
+  -         assert_eq!(manager.pq_manager.as_ref().unwrap().scheme, PQScheme::Dilithium3);
+- [production hot path] crates/x3-pq/src/lib.rs:692
+  -         manager.enable_pq(PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:693
+  -         assert_eq!(manager.pq_manager.as_ref().unwrap().scheme, PQScheme::Falcon512);
+- [production hot path] crates/x3-pq/src/lib.rs:709
+  -         manager.enable_pq(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:712
+  -         assert!(result.unwrap().0.len() > 0);
+- [production hot path] crates/x3-pq/src/lib.rs:723
+  -         manager.enable_pq(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:726
+  -         let signature = manager.sign_transaction(tx).unwrap().unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:727
+  -         let public_key = manager.pq_manager.as_ref().unwrap().public_key().clone();
+- [production hot path] crates/x3-pq/src/lib.rs:729
+  -         let verified = manager.verify_transaction_signature(tx, &signature, &public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:741
+  -         manager.enable_pq(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:745
+  -         let public_key = manager.pq_manager.as_ref().unwrap().public_key().clone();
+- [production hot path] crates/x3-pq/src/lib.rs:747
+  -         let verified = manager.verify_transaction_signature(tx, &wrong_sig, &public_key).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:848
+  -         let dilithium = PQManager::generate_keypair(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:849
+  -         let falcon = PQManager::generate_keypair(PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:850
+  -         let sphincs = PQManager::generate_keypair(PQScheme::Sphincs256).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:860
+  -         let dilithium = PQManager::new(PQScheme::Dilithium3).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:861
+  -         let falcon = PQManager::new(PQScheme::Falcon512).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:862
+  -         let sphincs = PQManager::new(PQScheme::Sphincs256).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:866
+  -         let dilithium_sig = dilithium.sign(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:867
+  -         let falcon_sig = falcon.sign(message).unwrap();
+- [production hot path] crates/x3-pq/src/lib.rs:868
+  -         let sphincs_sig = sphincs.sign(message).unwrap();
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:128
+  -         let mut tracker = DisputeTracker::new([2; 32], 10, 5).expect("must create tracker");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:129
+  -         tracker.vote("alice", true).expect("first vote succeeds");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:136
+  -         let mut tracker = DisputeTracker::new([3; 32], 10, 20).expect("must create tracker");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:137
+  -         tracker.vote("alice", true).expect("vote recorded");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:144
+  -         let mut tracker = DisputeTracker::new([4; 32], 10, 2).expect("must create tracker");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:145
+  -         tracker.vote("alice", true).expect("vote recorded");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:146
+  -         tracker.vote("bob", true).expect("vote recorded");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:147
+  -         let result = tracker.close(12, 2).expect("must close");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:155
+  -         let mut tracker = DisputeTracker::new([5; 32], 10, 2).expect("must create tracker");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:156
+  -         tracker.vote("alice", false).expect("vote recorded");
+- [production hot path] crates/x3-proof-dispute/src/lib.rs:157
+  -         let result = tracker.close(12, 1).expect("must close");
+- [production hot path] crates/x3-proof/src/chain.rs:203
+  -         chain.append(proof1).unwrap();
+- [production hot path] crates/x3-proof/src/chain.rs:204
+  -         chain.append(proof2).unwrap();
+- [production hot path] crates/x3-proof/src/chain.rs:208
+  -         chain.verify_integrity().unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:120
+  -         let pre_state_hash = self.atomic_pre_state.take().unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:291
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:293
+  -         let proof = engine.emit_proof(1000, 50, None).unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:306
+  -         engine.begin_atomic().unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:309
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:312
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:314
+  -         let proof = engine.commit_atomic(2000, 100, None).unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:323
+  -         engine.begin_atomic().unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:326
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:327
+  -         engine.rollback_atomic().unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:330
+  -         let proof = engine.emit_proof(0, 0, None).unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:341
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:342
+  -         engine.emit_proof(1000, 50, None).unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:346
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:347
+  -         engine.emit_proof(500, 25, None).unwrap();
+- [production hot path] crates/x3-proof/src/engine.rs:349
+  -         let (chain, receipt) = engine.finalize().unwrap();
+- [production hot path] crates/x3-proof/src/epoch.rs:289
+  -         let post_epoch_state_root = block_proofs.last().unwrap().post_state_root;
+- [production hot path] crates/x3-proof/src/epoch.rs:508
+  -         let ep = EpochProof::build_from_blocks(0, &blocks, genesis).unwrap();
+- [production hot path] crates/x3-proof/src/epoch.rs:543
+  -             assert!(result.unwrap().is_none());
+- [production hot path] crates/x3-proof/src/epoch.rs:549
+  -             .unwrap();
+- [production hot path] crates/x3-proof/src/epoch.rs:551
+  -         let ep = result.unwrap();
+- [production hot path] crates/x3-proof/src/epoch.rs:571
+  -             .unwrap()
+- [production hot path] crates/x3-proof/src/main.rs:141
+  -             fs::write(&out, body).expect("failed to write report");
+- [production hot path] crates/x3-proof/src/verifier.rs:193
+  -         ProofVerifier::verify_proof(&proof).unwrap();
+- [production hot path] crates/x3-proof/src/verifier.rs:210
+  -         c1.append(p.clone()).unwrap();
+- [production hot path] crates/x3-proof/src/verifier.rs:211
+  -         c2.append(p).unwrap();
+- [production hot path] crates/x3-proof/src/verifier.rs:215
+  -             _ => panic!("chains should match"),
+- [production hot path] crates/x3-readiness-report/src/tests.rs:115
+  -     let back: ReadinessReport = serde_json::from_str(&json).expect("valid json");
+- [production hot path] crates/x3-relayer/src/submitter.rs:397
+  -         let extrinsic = submitter.build_submit_cross_vm_extrinsic(&proof).unwrap();
+- [production hot path] crates/x3-relayer/src/submitter.rs:398
+  -         let value: serde_json::Value = serde_json::from_str(&extrinsic).unwrap();
+- [production hot path] crates/x3-relayer/src/watchers/evm.rs:177
+  -         let result = hex_to_array32(hex).unwrap();
+- [production hot path] crates/x3-relayer/src/watchers/svm.rs:165
+  -         let result = solana_blockhash_to_array(hash).unwrap();
+- [production hot path] crates/x3-rpc/src/benchmark.rs:788
+  -             "queued".parse::<BenchmarkJobStatus>().unwrap(),
+- [production hot path] crates/x3-rpc/src/benchmark.rs:792
+  -             "running".parse::<BenchmarkJobStatus>().unwrap(),
+- [production hot path] crates/x3-rpc/src/benchmark.rs:796
+  -             "completed".parse::<BenchmarkJobStatus>().unwrap(),
+- [production hot path] crates/x3-rpc/src/benchmark.rs:800
+  -             "failed".parse::<BenchmarkJobStatus>().unwrap(),
+- [production hot path] crates/x3-sdk/src/client.rs:567
+  -         assert_eq!(parse_u128_hex("0x10").unwrap(), 16);
+- [production hot path] crates/x3-sdk/src/client.rs:568
+  -         assert_eq!(parse_u128_hex("ff").unwrap(), 255);
+- [production hot path] crates/x3-sdk/src/client.rs:573
+  -         assert_eq!(parse_u64_hex("0x64").unwrap(), 100);
+- [production hot path] crates/x3-sdk/src/client.rs:574
+  -         assert_eq!(parse_u64_hex("1000").unwrap(), 4096);
+- [production hot path] crates/x3-sdk/src/comit.rs:34
+  - ///     .unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:263
+  -             .unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:278
+  -             .unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:291
+  -             .unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:304
+  -             .unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:336
+  -         let _evm = evm_comit(&[0x00]).with_fee(1000).build().unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:337
+  -         let _svm = svm_comit(&[0x00]).with_fee(1000).build().unwrap();
+- [production hot path] crates/x3-sdk/src/comit.rs:338
+  -         let _dual = dual_comit(&[0x00], &[0x01]).with_fee(1000).build().unwrap();
+- [production hot path] crates/x3-sdk/src/evm.rs:386
+  -         let decoded = abi_decode_uint256(&encoded).unwrap();
+- [production hot path] crates/x3-sdk/src/evm.rs:397
+  -         let decoded = abi_decode_address(&encoded).unwrap();
+- [production hot path] crates/x3-sdk/src/evm.rs:428
+  -         let parsed = parse_address(&formatted).unwrap();
+- [production hot path] crates/x3-sdk/src/rpc.rs:399
+  -         let json = serde_json::to_string(&request).unwrap();
+- [production hot path] crates/x3-sdk/src/rpc.rs:419
+  -         let client = WsRpcClient::connect("ws://localhost:9944").await.unwrap();
+- [production hot path] crates/x3-sdk/src/svm.rs:416
+  -         let decoded = bs58_decode(&encoded).unwrap();
+- [production hot path] crates/x3-sdk/src/svm.rs:424
+  -         let decoded = bs58_decode(&encoded).unwrap();
+- [production hot path] crates/x3-sdk/src/utils.rs:235
+  -         let decoded = from_hex(&hex).unwrap();
+- [production hot path] crates/x3-sdk/src/utils.rs:239
+  -         let decoded2 = from_hex("deadbeef").unwrap();
+- [production hot path] crates/x3-sdk/src/utils.rs:257
+  -         assert_eq!(parse_balance("1", 18).unwrap(), 1_000_000_000_000_000_000);
+- [production hot path] crates/x3-sdk/src/utils.rs:258
+  -         assert_eq!(parse_balance("1.5", 18).unwrap(), 1_500_000_000_000_000_000);
+- [production hot path] crates/x3-sdk/src/utils.rs:259
+  -         assert_eq!(parse_balance("0.1", 18).unwrap(), 100_000_000_000_000_000);
+- [production hot path] crates/x3-sdk/src/utils.rs:267
+  -         let (decoded, len) = decode_compact_u16(&encoded).unwrap();
+- [production hot path] crates/x3-sdk/src/utils.rs:274
+  -         let (decoded, len) = decode_compact_u16(&encoded).unwrap();
+- [production hot path] crates/x3-semantics/src/lib.rs:28
+  - //! let module = parser.parse_module().unwrap();
+- [production hot path] crates/x3-semantics/src/resolver.rs:698
+  -         let resolved = result.unwrap();
+- [production hot path] crates/x3-semantics/src/scope.rs:238
+  -         self.get(ScopeId::ROOT).expect("global scope must exist")
+- [production hot path] crates/x3-semantics/src/scope.rs:281
+  -         assert_eq!(tree.get(func_scope).unwrap().depth, 1);
+- [production hot path] crates/x3-semantics/src/scope.rs:282
+  -         assert_eq!(tree.get(loop_scope).unwrap().depth, 2);
+- [production hot path] crates/x3-semantics/src/symbol.rs:213
+  -         let symbol = table.get(id).unwrap();
+- [test-only] crates/x3-semantics/tests/golden.rs:25
+  -                     let name = path.file_stem().unwrap().to_string_lossy().to_string();
+- [test-only] crates/x3-semantics/tests/golden.rs:52
+  -             .unwrap_or_else(|e| panic!("Failed to parse {}: {:?}", name, e));
+- [test-only] crates/x3-semantics/tests/golden.rs:67
+  -                 panic!(
+- [test-only] crates/x3-semantics/tests/golden.rs:87
+  -         let module = parser.parse_module().expect("should parse");
+- [test-only] crates/x3-semantics/tests/golden.rs:121
+  -         let module = parser.parse_module().expect("should parse");
+- [test-only] crates/x3-semantics/tests/golden.rs:139
+  -         let module = parser.parse_module().expect("should parse");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:778
+  -         config.data_dir = tempdir().expect("tempdir").keep();
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:800
+  -         let store = BenchmarkStore::open(&config()).expect("store");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:805
+  -             .expect("submit");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:812
+  -         let store = BenchmarkStore::open(&config()).expect("store");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:818
+  -             .expect("submit");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:822
+  -             .expect("execute");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:825
+  -             .expect("get job")
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:826
+  -             .expect("job exists");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:829
+  -             .get_report(loaded.report_id.as_deref().expect("report id"))
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:830
+  -             .expect("get report")
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:831
+  -             .expect("report exists");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:884
+  -                 .expect("bind");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:885
+  -             let addr = listener.local_addr().expect("local addr");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:891
+  -                     .expect("serve");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:897
+  -         let (gateway_addr, _) = gateway_server.await.expect("gateway setup");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:915
+  -             BenchmarkStore::open_with_gateway_client(&config, Some(gateway_client)).expect("store");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:923
+  -             .expect("submit");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:929
+  -             .expect("execute");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:940
+  -             .get_report(response.report_id.as_deref().expect("report id"))
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:941
+  -             .expect("get report")
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:942
+  -             .expect("report exists");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:965
+  -         .expect("build onboarding request");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:979
+  -         let store = BenchmarkStore::open(&config()).expect("store");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:998
+  -             .expect("submit onboarding");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:1002
+  -             .expect("execute onboarding job");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:1004
+  -             .get_report(response.report_id.as_deref().expect("report id"))
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:1005
+  -             .expect("get report")
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:1006
+  -             .expect("report exists");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:1013
+  -             .expect("provider manifest artifact");
+- [production hot path] crates/x3-sidecar/src/benchmark.rs:1018
+  -             .expect("hardware attestation artifact");
+- [production hot path] crates/x3-sidecar/src/evm_provider.rs:446
+  -                     .expect("serialize"),
+- [production hot path] crates/x3-sidecar/src/evm_provider.rs:491
+  -                     .expect("serialize"),
+- [production hot path] crates/x3-sidecar/src/evm_provider.rs:526
+  -                     .expect("serialize"),
+- [production hot path] crates/x3-sidecar/src/evm_provider.rs:563
+  -                     .expect("serialize"),
+- [production hot path] crates/x3-sidecar/src/evm_provider.rs:579
+  -         let pool = EvmProviderPool::new(vec![server.url("/")]).expect("pool");
+- [production hot path] crates/x3-sidecar/src/evm_provider.rs:580
+  -         let window = pool.ingest_recent_window(2).await.expect("window");
+- [production hot path] crates/x3-sidecar/src/executor.rs:285
+  -         let result = executor.execute(&bytecode, &[], 1000).unwrap();
+- [production hot path] crates/x3-sidecar/src/executor.rs:320
+  -             .expect("first execution should succeed");
+- [production hot path] crates/x3-sidecar/src/executor.rs:323
+  -             .expect("second execution should succeed");
+- [production hot path] crates/x3-sidecar/src/lib.rs:481
+  -         assert_eq!(status_submitted.tx_hash.as_ref().unwrap(), "0x123abc");
+- [production hot path] crates/x3-sidecar/src/lib.rs:487
+  -         assert_eq!(status_failed.error.as_ref().unwrap(), "timeout");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:705
+  -                     config.data_dir = tempfile::tempdir().expect("tempdir").keep();
+- [production hot path] crates/x3-sidecar/src/rpc.rs:708
+  -                 .expect("benchmark store"),
+- [production hot path] crates/x3-sidecar/src/rpc.rs:746
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:748
+  -         let resp = app.clone().oneshot(req).await.expect("submit request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:752
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:754
+  -             .expect("submit response json")
+- [production hot path] crates/x3-sidecar/src/rpc.rs:757
+  -             .expect("job_id present")
+- [production hot path] crates/x3-sidecar/src/rpc.rs:770
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:771
+  -         let get_resp = app.clone().oneshot(get_req).await.expect("get request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:775
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:777
+  -             serde_json::from_slice(&get_body).expect("get response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:787
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:792
+  -             .expect("status request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:796
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:798
+  -             serde_json::from_slice(&status_body).expect("status response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:814
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:819
+  -             .expect("cancel request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:826
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:831
+  -             .expect("metrics request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:835
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:836
+  -         let metrics_text = String::from_utf8(metrics_body.to_vec()).expect("utf8 metrics");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:864
+  -                 serde_json::to_vec(&request).expect("serialize request"),
+- [production hot path] crates/x3-sidecar/src/rpc.rs:866
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:871
+  -             .expect("submit request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:875
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:877
+  -             serde_json::from_slice(&submit_body).expect("submit response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:881
+  -             .expect("report id");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:887
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:892
+  -             .expect("report request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:897
+  -             .expect("report body");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:899
+  -             serde_json::from_slice(&report_body).expect("report response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:932
+  -                 serde_json::to_vec(&request).expect("serialize request"),
+- [production hot path] crates/x3-sidecar/src/rpc.rs:934
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:939
+  -             .expect("submit request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:942
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:944
+  -             serde_json::from_slice(&submit_body).expect("submit response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:948
+  -             .expect("report id");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:954
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:959
+  -             .expect("publish request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:990
+  -                 serde_json::to_vec(&request).expect("serialize request"),
+- [production hot path] crates/x3-sidecar/src/rpc.rs:992
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:997
+  -             .expect("submit request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1001
+  -             .expect("body bytes");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1003
+  -             serde_json::from_slice(&submit_body).expect("submit response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1007
+  -             .expect("report id");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1011
+  -             .expect("job id");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1017
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1018
+  -         let job_resp = app.clone().oneshot(job_req).await.expect("job request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1025
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1030
+  -             .expect("report request");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1034
+  -             .expect("report body");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1036
+  -             serde_json::from_slice(&report_body).expect("report response json");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1045
+  -             .expect("artifact array")
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1103
+  -                 serde_json::to_vec(&request).expect("serialize request"),
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1105
+  -             .expect("request build");
+- [production hot path] crates/x3-sidecar/src/rpc.rs:1110
+  -             .expect("submit request");
+- [production hot path] crates/x3-sidecar/src/submitter.rs:318
+  -             .expect("bind listener");
+- [production hot path] crates/x3-sidecar/src/submitter.rs:319
+  -         let address = listener.local_addr().expect("listener address");
+- [production hot path] crates/x3-sidecar/src/submitter.rs:320
+  -         let listener = listener.into_std().expect("convert listener");
+- [production hot path] crates/x3-sidecar/src/submitter.rs:324
+  -                 .expect("server from tcp")
+- [production hot path] crates/x3-sidecar/src/submitter.rs:327
+  -                 .expect("serve mock rpc");
+- [production hot path] crates/x3-sidecar/src/submitter.rs:340
+  -             .expect("primary registration check succeeds");
+- [production hot path] crates/x3-sidecar/src/submitter.rs:351
+  -             .expect("fallback registration check succeeds");
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:347
+  -                 .expect("bind");
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:348
+  -             let addr = listener.local_addr().expect("local addr");
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:354
+  -                     .expect("serve");
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:360
+  -         let (gateway_addr, _) = gateway_server.await.expect("gateway setup");
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:545
+  -             .expect("time")
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:750
+  -         let response = result.unwrap();
+- [test-only] crates/x3-sidecar/tests/e2e_gateway_integration.rs:867
+  -         assert!(health.unwrap());
+- [production hot path] crates/x3-slash/src/bond.rs:188
+  -         let bond_id = mgr.post_bond(test_agent(), 2_000_000, 100, None).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:190
+  -         let released = mgr.release(bond_id).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:204
+  -         let bond_id = mgr.post_bond(test_agent(), 2_000_000, 100, None).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:206
+  -         let slashed = mgr.slash(bond_id, SlashSeverity::Moderate).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:209
+  -         let bond = mgr.get(bond_id).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:216
+  -         let bond_id = mgr.post_bond(test_agent(), 2_000_000, 100, None).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:218
+  -         mgr.slash(bond_id, SlashSeverity::Major).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:219
+  -         let bond = mgr.get(bond_id).unwrap();
+- [production hot path] crates/x3-slash/src/bond.rs:230
+  -         mgr.post_bond(test_agent(), 2_000_000, 100, None).unwrap();
+- [production hot path] crates/x3-slash/src/engine.rs:238
+  -             .unwrap();
+- [production hot path] crates/x3-slash/src/engine.rs:242
+  -             .unwrap();
+- [production hot path] crates/x3-slash/src/engine.rs:254
+  -             .unwrap();
+- [production hot path] crates/x3-slash/src/engine.rs:258
+  -             .unwrap();
+- [production hot path] crates/x3-slash/src/engine.rs:269
+  -             .unwrap();
+- [production hot path] crates/x3-slash/src/engine.rs:273
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/reward_calculator.rs:279
+  -         assert_eq!(era1.unwrap().total_reward, 1000);
+- [production hot path] crates/x3-staking-analytics/src/slash_tracker.rs:239
+  -         let oldest = history.first().unwrap();
+- [production hot path] crates/x3-staking-analytics/src/slash_tracker.rs:240
+  -         let newest = history.last().unwrap();
+- [production hot path] crates/x3-staking-analytics/src/slash_tracker.rs:371
+  -         tracker.mark_recovered(&event_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/slash_tracker.rs:372
+  -         let event = tracker.get_event(&event_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/slash_tracker.rs:405
+  -         tracker.mark_recovered(&id1).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:335
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:374
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:376
+  -         ledger.accrue_rewards(&pos_id, 100).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:377
+  -         let position = ledger.get_position(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:386
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:388
+  -         ledger.unbond(&pos_id, 300).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:389
+  -         let position = ledger.get_position(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:401
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:403
+  -         ledger.accrue_rewards(&pos_id, 100).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:404
+  -         let claimed = ledger.claim_rewards(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:407
+  -         let position = ledger.get_position(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:415
+  -         ledger.stake("alice", "validator1", 1000, 10.0, 0.5).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:416
+  -         ledger.stake("alice", "validator2", 500, 10.0, 0.5).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:417
+  -         ledger.stake("bob", "validator1", 2000, 10.0, 0.5).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:430
+  -         ledger.stake("alice", "validator1", 1000, 10.0, 0.5).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:431
+  -         ledger.stake("bob", "validator1", 2000, 10.0, 0.5).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:432
+  -         ledger.stake("charlie", "validator2", 1500, 10.0, 0.5).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:450
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:483
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:485
+  -         let pos = ledger.get_position(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:488
+  -         ledger.unbond(&pos_id, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:489
+  -         let pos = ledger.get_position(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:498
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:501
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:503
+  -         ledger.accrue_rewards(&pos1, 100).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:504
+  -         ledger.accrue_rewards(&pos2, 50).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:535
+  -             .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:537
+  -         ledger.unbond(&pos_id, 300).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:538
+  -         ledger.unbond(&pos_id, 200).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_ledger.rs:540
+  -         let position = ledger.get_position(&pos_id).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:299
+  -         assert!(scenario.final_balance().unwrap() > 1000);
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:322
+  -         assert!(scenario.final_balance().unwrap() > 2200); // 1000 + (100 * 12) + interest
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:341
+  -         assert!(analysis.base_apy_scenario.final_balance().unwrap() > 1000);
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:343
+  -             analysis.high_apy_scenario.final_balance().unwrap()
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:344
+  -                 > analysis.low_apy_scenario.final_balance().unwrap()
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:353
+  -         assert!(scenarios[0].final_balance().unwrap() > scenarios[2].final_balance().unwrap());
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:359
+  -         let final_roi = scenario.final_roi().unwrap();
+- [production hot path] crates/x3-staking-analytics/src/staking_simulator.rs:366
+  -         assert_eq!(scenario.final_balance().unwrap(), 0);
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:148
+  -         self.validators.get(address).unwrap()
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:372
+  -         assert_eq!(val.unwrap().commission, 5.0);
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:379
+  -         manager.update_performance("val1", 950, 50, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:381
+  -         let val = manager.get_validator("val1").unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:391
+  -         let val = manager.get_validator("val1").unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:401
+  -         let val = manager.get_validator("val1").unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:410
+  -         manager.update_performance("val1", 950, 50, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:412
+  -         let val = manager.get_validator("val1").unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:421
+  -         manager.update_performance("val1", 950, 50, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:423
+  -         let val = manager.get_validator("val1").unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:439
+  -                 .unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:452
+  -         manager.update_performance("val1", 950, 50, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:453
+  -         manager.update_performance("val2", 900, 100, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:463
+  -         manager.update_commission("val1", 7.0).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:465
+  -         let val = manager.get_validator("val1").unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:476
+  -         manager.update_performance("val1", 950, 50, 500).unwrap();
+- [production hot path] crates/x3-staking-analytics/src/validator_stats.rs:477
+  -         manager.update_performance("val2", 950, 50, 500).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:337
+  -         let idl = AnchorIDLParser::parse_idl(b"test_program".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:349
+  -         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:357
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:364
+  -         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:370
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:377
+  -         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:384
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:391
+  -         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:398
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:405
+  -         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:406
+  -         AnchorIDLParser::add_instruction(&mut idl, b"test_instr".to_vec(), [0; 8], vec![], vec![]).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:408
+  -         let code = AnchorIDLParser::generate_code(&idl).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:414
+  -         let idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:421
+  -         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:422
+  -         AnchorIDLParser::add_instruction(&mut idl, b"init".to_vec(), [0; 8], vec![], vec![]).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:424
+  -         assert!(AnchorIDLParser::validate_idl(&idl).unwrap());
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:429
+  -         let idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
+- [production hot path] crates/x3-svm/src/anchor_idl_parser.rs:430
+  -         let json = AnchorIDLParser::export_idl_json(&idl).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:376
+  -         let config = SolanaDevnetFork::create_fork(fork_id, 100, 1234567890).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:394
+  -         let snapshot = SolanaDevnetFork::snapshot_fork_state(100, 1234567890, accounts).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:420
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:440
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:444
+  -         assert_eq!(account.unwrap().lamports, 1_000_000);
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:462
+  -         SolanaDevnetFork::update_account(&mut state, [1; 32], 500_000, vec![1, 2]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:464
+  -         let account = SolanaDevnetFork::get_forked_account(&state, &[1; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:476
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:489
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:497
+  -         let new_slot = SolanaDevnetFork::advance_slot(100, 10).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:516
+  -         SolanaDevnetFork::mark_executable(&mut state, [1; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:517
+  -         let account = SolanaDevnetFork::get_forked_account(&state, &[1; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:524
+  -         let valid = SolanaDevnetFork::validate_rent_exemption(lamports, 1000).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:549
+  -         let exported = SolanaDevnetFork::export_fork_state(&state).unwrap();
+- [production hot path] crates/x3-svm/src/solana_devnet_fork.rs:560
+  -         let state = SolanaDevnetFork::import_fork_state(encoded).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:317
+  -         let sys = SolanaPrograms::init_system_program().unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:323
+  -         let token = SolanaPrograms::init_token_program(Some([1; 32]), 1000000, 6).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:336
+  -         let account = SolanaPrograms::create_token_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:361
+  -         SolanaPrograms::transfer(&mut source, &mut dest, [2; 32], 500).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:393
+  -         let ata = SolanaPrograms::create_associated_token_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:400
+  -         let memo = SolanaPrograms::log_memo(b"test memo".to_vec(), [1; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:412
+  -         let mut token = SolanaPrograms::init_token_program(Some([1; 32]), 1000000, 6).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:413
+  -         let mut account = SolanaPrograms::create_token_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:415
+  -         SolanaPrograms::mint_tokens(&mut token, &mut account, [1; 32], 500000).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:423
+  -         let mut token = SolanaPrograms::init_token_program(Some([1; 32]), 1000000, 6).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:433
+  -         SolanaPrograms::burn_tokens(&mut token, &mut account, 100000).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:441
+  -         let mut account = SolanaPrograms::create_token_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:443
+  -         SolanaPrograms::freeze_account(&mut account).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:446
+  -         SolanaPrograms::thaw_account(&mut account).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:452
+  -         let mut account = SolanaPrograms::create_token_account([1; 32], [2; 32]).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:454
+  -         SolanaPrograms::approve_delegation(&mut account, [3; 32], 500).unwrap();
+- [production hot path] crates/x3-svm/src/solana_programs.rs:467
+  -         let prog = SolanaPrograms::register_program([1; 32], ProgramType::Token).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:344
+  -         let token_id = SPLTokenBridge::register_spl_mint(mint, 6).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:363
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:383
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:396
+  -         ).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:404
+  -         let vault = SPLTokenBridge::create_bridge_vault(vault_owner, mint).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:419
+  -         let balance = SPLTokenBridge::deposit_to_vault(&mut vault, 50).unwrap();
+- [production hot path] crates/x3-svm/src/spl_token_bridge.rs:447
+  -         let balance = SPLTokenBridge::withdraw_from_vault(&mut vault, 75).unwrap();
+- [production hot path] crates/x3-swap-router/src/lib.rs:179
+  -         let route = router.find_route(0, 1, U256::from(1000), 2).unwrap();
+- [production hot path] crates/x3-swap-router/src/lib.rs:201
+  -         let optimized = AiRouteOptimizer::optimize_route(0, 1, U256::from(1000), routes).unwrap();
+- [production hot path] crates/x3-swap-router/src/mev_protection/mod.rs:222
+  -                         .unwrap()
+- [production hot path] crates/x3-swap-router/src/mev_protection/mod.rs:262
+  -             .any(|dex| dex.parse::<H160>().unwrap() == *dex_address)
+- [production hot path] crates/x3-swap-router/src/mev_protection/mod.rs:344
+  -         Self::new().expect("Failed to create MEVProtector")
+- [production hot path] crates/x3-swap-router/src/tests.rs:33
+  -     let opt = RouteOptimizer::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:69
+  -     let route = opt.optimize_route(&quotes, &p).await.unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:76
+  -     let opt = RouteOptimizer::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:97
+  -     let gas = GasOptimizer::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:104
+  -     let params = gas.calculate_gas(&route).await.unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:111
+  -     let ctrl = SlippageController::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:126
+  -     let calc = FeeCalculator::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:136
+  -     let fees = calc.calculate_swap_fees(&route, &params).await.unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:143
+  -     let calc = FeeCalculator::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:155
+  -     let fees = calc.calculate_swap_fees(&route, &params).await.unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:162
+  -     let calc = FeeCalculator::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:176
+  -     let fees = calc.calculate_swap_fees(&route, &params).await.unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:183
+  -     let exec = AtomicSwapExecutor::new().unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:201
+  -         .unwrap();
+- [production hot path] crates/x3-swap-router/src/tests.rs:208
+  -     let protector = MEVProtector::new().unwrap().with_overhead_limit(0); // force error
+- [production hot path] crates/x3-turbine/src/blockstore.rs:68
+  -                 .expect("max pending blocks must be non-zero"),
+- [production hot path] crates/x3-turbine/src/lib.rs:258
+  -         let shreds = turbine.shredder.create_shreds(1, block_data).unwrap();
+- [production hot path] crates/x3-turbine/src/packet.rs:37
+  -                 .unwrap()
+- [production hot path] crates/x3-turbine/src/packet.rs:155
+  -                     .unwrap()
+- [production hot path] crates/x3-turbine/src/peer.rs:77
+  -                 .expect("peer cache size must be non-zero"),
+- [production hot path] crates/x3-turbine/src/shred.rs:432
+  -         let shreds = shredder.create_shreds(1, data).unwrap();
+- [production hot path] crates/x3-turbine/src/shred.rs:443
+  -         let shreds = shredder.create_shreds(1, data).unwrap();
+- [production hot path] crates/x3-typeck/src/env.rs:289
+  -         assert!(ty.unwrap().is_numeric());
+- [production hot path] crates/x3-typeck/src/infer.rs:495
+  -         assert!(result.unwrap().is_bool());
+- [production hot path] crates/x3-typeck/src/lib.rs:35
+  - //! let module = parser.parse_module().unwrap();
+- [production hot path] crates/x3-typeck/src/lib.rs:38
+  - //! let resolved = resolver.resolve(&module).unwrap();
+- [production hot path] crates/x3-typeck/src/lib.rs:41
+  - //! let typed = checker.check(&module, &resolved).unwrap();
+- [test-only] crates/x3-typeck/tests/golden.rs:26
+  -                     let name = path.file_stem().unwrap().to_string_lossy().to_string();
+- [test-only] crates/x3-typeck/tests/golden.rs:39
+  -     let module = parser.parse_module().expect("should parse");
+- [test-only] crates/x3-typeck/tests/golden.rs:42
+  -     let resolved = resolver.resolve(&module).expect("should resolve");
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:165
+  -         let bundle = result.unwrap();
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:186
+  -         let bundle = result.unwrap();
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:217
+  -         assert_eq!(result.unwrap().len(), 2);
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:239
+  -         let bundle1 = Compiler::compile(&actions).unwrap();
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:240
+  -         let bundle2 = Compiler::compile(&actions).unwrap();
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:329
+  -         let compiled = contract.compile().unwrap();
+- [production hot path] crates/x3-universal-contracts/src/tests.rs:350
+  -         let compiled = contract.compile().unwrap();
+- [production hot path] crates/x3-validator-attestation/src/lib.rs:88
+  -         set.add_attestation(mk_attestation("alice", 30)).unwrap();
+- [production hot path] crates/x3-validator-attestation/src/lib.rs:96
+  -         set.add_attestation(mk_attestation("alice", 40)).unwrap();
+- [production hot path] crates/x3-validator-attestation/src/lib.rs:97
+  -         set.add_attestation(mk_attestation("bob", 35)).unwrap();
+- [production hot path] crates/x3-verification-router/src/lib.rs:119
+  -         let result = router.route(&proof).expect("verification should succeed");
+- [test-only] crates/x3-verifier/tests/integration.rs:36
+  -     let report = verifier.verify_mir(&module).unwrap();
+- [test-only] crates/x3-verifier/tests/integration.rs:58
+  -     let report = verifier.verify_mir(&module).unwrap();
+- [test-only] crates/x3-verifier/tests/integration.rs:92
+  -     let report = verifier.verify_mir(&module).unwrap();
+- [test-only] crates/x3-verifier/tests/integration.rs:95
+  -     let gas_report = report.gas_report.unwrap();
+- [test-only] crates/x3-verifier/tests/integration.rs:127
+  -     let rules = SafetyRules::from_yaml(yaml).unwrap();
+- [test-only] crates/x3-verifier/tests/integration.rs:141
+  -     let report = verifier.verify_mir(&module).unwrap();
+- [test-only] crates/x3-verifier/tests/integration.rs:180
+  -     let report = verifier.verify_mir(&module).unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:525
+  -                         u128::from_le_bytes(b.as_slice().try_into().expect("checked len"))
+- [production hot path] crates/x3-vm/src/bridge.rs:582
+  -                         u128::from_le_bytes(b.as_slice().try_into().expect("checked len"))
+- [production hot path] crates/x3-vm/src/bridge.rs:654
+  -         let exec_result = result.unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:666
+  -         let exec_result = result.unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:708
+  -             *self.ledger.lock().unwrap().get(address).unwrap_or(&0)
+- [production hot path] crates/x3-vm/src/bridge.rs:712
+  -             let mut ledger = self.ledger.lock().unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:783
+  -             self.svm_locks.lock().unwrap().insert(ticket, amount);
+- [production hot path] crates/x3-vm/src/bridge.rs:793
+  -             let mut locks = self.svm_locks.lock().unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:808
+  -             self.evm_locks.lock().unwrap().insert(ticket, amount);
+- [production hot path] crates/x3-vm/src/bridge.rs:818
+  -             let mut locks = self.evm_locks.lock().unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:833
+  -         let ticket = esc.lock_svm(b"alice_svm_pubkey", 1_000).unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:841
+  -         let ticket = esc.lock_svm(b"alice_svm_pubkey", 500).unwrap();
+- [production hot path] crates/x3-vm/src/bridge.rs:851
+  -         let ticket = esc.lock_evm(&from_evm, 250).unwrap();
+- [production hot path] crates/x3-vm/src/dap_debugging.rs:354
+  -         assert_eq!(bps.unwrap().len(), 3);
+- [production hot path] crates/x3-vm/src/dap_debugging.rs:391
+  -         let thread = server.session.threads.get(&tid).unwrap();
+- [production hot path] crates/x3-vm/src/dap_debugging.rs:417
+  -         assert!(!frames.unwrap().is_empty());
+- [production hot path] crates/x3-vm/src/dap_debugging.rs:426
+  -         assert_eq!(result.unwrap(), "0xabcd1234...");
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:224
+  -         assert_eq!(table.cost("ADD").unwrap(), 3);
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:225
+  -         assert_eq!(table.cost("MUL").unwrap(), 5);
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:226
+  -         assert_eq!(table.cost("GPU_MATMUL").unwrap(), 100);
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:232
+  -         let original = table.cost("GPU_MATMUL").unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:240
+  -         table.apply_audit(audit).unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:242
+  -         let updated = table.cost("GPU_MATMUL").unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:265
+  -         let total = table.estimate_gas(&instructions).unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:280
+  -             .unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:288
+  -             .unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:310
+  -             let original = table.cost(opcode).unwrap();
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:316
+  -         assert!(table.cost("GPU_MATMUL").unwrap() > 100);
+- [production hot path] crates/x3-vm/src/gas_metering_audit.rs:317
+  -         assert!(table.cost("GPU_FFT").unwrap() > 200);
+- [production hot path] crates/x3-vm/src/jit_compiler.rs:395
+  -         compiler.compile(1, b"code").unwrap();
+- [production hot path] crates/x3-vm/src/jit_compiler.rs:414
+  -         compiler.compile(1, b"code1").unwrap();
+- [production hot path] crates/x3-vm/src/jit_compiler.rs:415
+  -         compiler.compile(2, b"code2").unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1163
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1169
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1173
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1184
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1194
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1206
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1221
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1237
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1251
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1267
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1281
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1303
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1321
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1338
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1357
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1374
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1384
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1399
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1410
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1419
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1435
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1447
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1461
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1473
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1503
+  -         let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1531
+  -             let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/verifier.rs:1556
+  -             let instrs = Verifier::decode_all_instructions(&code).unwrap();
+- [production hot path] crates/x3-vm/src/vm.rs:1291
+  -         let mut vm = VM::from_bytes(&bytes).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1294
+  -         let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [production hot path] crates/x3-vm/src/vm.rs:1305
+  -         let mut vm = VM::from_bytes(&bytes).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1309
+  -             .expect("execution should succeed");
+- [production hot path] crates/x3-vm/src/vm.rs:1317
+  -         let mut vm = VM::from_bytes(&bytes).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1322
+  -             .expect("execution should succeed");
+- [production hot path] crates/x3-vm/src/vm.rs:1330
+  -         let mut vm = VM::from_bytes(&bytes).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1335
+  -             .expect("execution should succeed");
+- [production hot path] crates/x3-vm/src/vm.rs:1343
+  -         let mut vm = VM::from_bytes(&bytes).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1345
+  -         let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [production hot path] crates/x3-vm/src/vm.rs:1353
+  -         let mut vm = VM::from_bytes(&bytes).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1362
+  -             _ => panic!("expected gas limit error"),
+- [production hot path] crates/x3-vm/src/vm.rs:1452
+  -         let mut vm = VM::from_bytes(&out).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1453
+  -         let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [production hot path] crates/x3-vm/src/vm.rs:1536
+  -         let mut vm = VM::from_bytes(&out).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1537
+  -         let res = vm.call_function(0, &[]).expect("exec");
+- [production hot path] crates/x3-vm/src/vm.rs:1601
+  -         let mut vm2 = VM::from_bytes(&outb).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1649
+  -         let mut vmc = VM::from_bytes(&outc).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1650
+  -         let r = vmc.call_function(0, &[]).expect("read global");
+- [production hot path] crates/x3-vm/src/vm.rs:1799
+  -         let mut vm = VM::from_bytes(&out).expect("module should load");
+- [production hot path] crates/x3-vm/src/vm.rs:1802
+  -             .expect("nested call should succeed");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:77
+  -             panic!("execution should succeed: {err:?}");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:125
+  -             panic!("execution should succeed: {err:?}");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:164
+  -     let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:189
+  -     let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:216
+  -     let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:254
+  -     let result = vm.call_function(0, &[]).expect("execution should succeed");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:262
+  -         other => panic!("Expected I64, got {:?}", other),
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:284
+  -     let val = result.unwrap();
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:289
+  -         other => panic!("Expected Some(I64), got {:?}", other),
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:339
+  -             panic!("execution should succeed: {err:?}");
+- [test-only] crates/x3-vm/tests/gpu_integration.rs:360
+  -         other => panic!("Expected Bytes, got {:?}", other),
+- [production hot path] crates/x3-vrf/src/lib.rs:170
+  -         let proof = provider.prove(&seed).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:232
+  -         let book = result.unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:239
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:255
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:270
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:279
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:283
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:297
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:301
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:311
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:315
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:318
+  -         AddressBookManager::toggle_favorite(&mut contact, [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:324
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:328
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:338
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:342
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:351
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:355
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:360
+  -         assert_eq!(found.unwrap().address, [2u8; 32]);
+- [production hot path] crates/x3-wallet/src/address_book.rs:365
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:369
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:371
+  -         AddressBookManager::toggle_favorite(&mut contact, [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:379
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:383
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:399
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:402
+  -             .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:405
+  -             .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:412
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:422
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:431
+  -         let mut book = AddressBookManager::create_address_book([1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/address_book.rs:441
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:215
+  -         let policy = result.unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:227
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:231
+  -         assert!(!result.unwrap()); // doesn't need approval
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:236
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:240
+  -         assert!(result.unwrap()); // needs approval
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:245
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:253
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:257
+  -         let approval = result.unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:263
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:266
+  -             ApprovalManager::request_approval(&policy, [2u8; 32], 7000, [3u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:275
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:278
+  -             ApprovalManager::request_approval(&policy, [2u8; 32], 7000, [3u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:280
+  -         ApprovalManager::approve_transaction(&mut approval, [4u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:288
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:291
+  -             ApprovalManager::request_approval(&policy, [2u8; 32], 7000, [3u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:300
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:303
+  -             ApprovalManager::request_approval(&policy, [2u8; 32], 7000, [3u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:305
+  -         ApprovalManager::approve_transaction(&mut approval, [4u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:313
+  -         let mut policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:322
+  -         let mut policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:333
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:336
+  -             ApprovalManager::request_approval(&policy, [2u8; 32], 7000, [3u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:338
+  -         ApprovalManager::approve_transaction(&mut approval, [4u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:345
+  -         let policy = ApprovalManager::create_policy([1u8; 32], 10000, 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/approval_manager.rs:348
+  -             ApprovalManager::request_approval(&policy, [2u8; 32], 7000, [3u8; 32], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:247
+  -         let profile = result.unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:266
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:270
+  -         assert!(result.unwrap());
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:276
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:280
+  -         let session = result.unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:287
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:297
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:306
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:367
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:377
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:387
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:389
+  -         BiometricManager::disable_profile(&mut profile).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:400
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:414
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/biometric_unlock.rs:428
+  -             BiometricManager::create_profile([1u8; 32], 0, [2u8; 32], [3u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:350
+  -         let pos = result.unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:367
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:379
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:389
+  -         let stake = result.unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:403
+  -             DeFiTracker::create_staking_position([1u8; 32], [2u8; 32], 5000, 720, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:413
+  -             DeFiTracker::create_staking_position([1u8; 32], [2u8; 32], 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:423
+  -             DeFiTracker::create_staking_position([1u8; 32], [2u8; 32], 5000, 100, 0).unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:434
+  -         let borrow = result.unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:449
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:460
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:471
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:481
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:526
+  -         DeFiTracker::add_lp_to_portfolio(&mut portfolio, [99u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/defi_tracker.rs:527
+  -         DeFiTracker::add_staking_to_portfolio(&mut portfolio, [98u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:256
+  -         let wallet = result.unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:271
+  -         let wallet = result.unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:284
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:289
+  -         let request = result.unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:297
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:327
+  -         assert!(!result.unwrap());
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:333
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:335
+  -             HardwareWalletEngine::request_signature(&wallet, [42u8; 32], b"Confirm", 100).unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:340
+  -         let sig = result.unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:348
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:350
+  -             HardwareWalletEngine::request_signature(&wallet, [42u8; 32], b"Confirm", 100).unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:359
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:361
+  -             HardwareWalletEngine::request_signature(&wallet, [42u8; 32], b"Confirm", 100).unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:365
+  -         assert_eq!(result.unwrap().status, 2); // rejected
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:371
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:373
+  -             HardwareWalletEngine::request_signature(&wallet, [42u8; 32], b"Confirm", 100).unwrap();
+- [production hot path] crates/x3-wallet/src/hardware_wallet.rs:383
+  -             HardwareWalletEngine::connect_ledger(b"usb://device1", b"m/44'/60'/0'/0/0").unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:271
+  -         let wallet = result.unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:293
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:299
+  -         let proposal = result.unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:306
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:317
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:322
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:334
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:339
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:352
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:357
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:360
+  -             .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:364
+  -         assert!(!MultisigWalletEngine::can_execute(&proposal, 105).unwrap());
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:367
+  -         assert!(MultisigWalletEngine::can_execute(&proposal, 120).unwrap());
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:373
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:378
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:381
+  -             .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:391
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:396
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:406
+  -         let mut wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:416
+  -         let mut wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:425
+  -         let mut wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:435
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 3, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:440
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:448
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:453
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:461
+  -         let wallet = MultisigWalletEngine::create_multisig(signers, 2, [0u8; 32], 10).unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:466
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/multisig_wallet.rs:471
+  -             .unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:221
+  -         let pool = result.unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:234
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:244
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:252
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:253
+  -         let mut tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:262
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:263
+  -         let mut tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:271
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:272
+  -         let mut tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:274
+  -         PrivacyMixer::mark_mixed(&mut tx, 150).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:282
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:283
+  -         let mut tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:285
+  -         PrivacyMixer::mark_mixed(&mut tx, 150).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:292
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:297
+  -             PrivacyMixer::deposit_to_pool(&mut pool, 1000, [i as u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:305
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:308
+  -             PrivacyMixer::deposit_to_pool(&mut pool, 1000, [i as u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:316
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:317
+  -         PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:325
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:334
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:335
+  -         PrivacyMixer::deactivate_pool(&mut pool).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:344
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:345
+  -         let tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:353
+  -         let pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:361
+  -         let mut pool = PrivacyMixer::create_pool(1000, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:362
+  -         let mut tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
+- [production hot path] crates/x3-wallet/src/privacy_mixing.rs:367
+  -         PrivacyMixer::mark_mixed(&mut tx, 150).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:251
+  -         let account = result.unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:267
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:278
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 1, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:288
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:299
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:303
+  -         let recovery = result.unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:312
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 1, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:322
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:325
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:343
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:346
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:355
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:364
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:374
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:377
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:386
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:394
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:396
+  -         assert!(!SocialRecoveryManager::can_execute_recovery(&recovery, 1050).unwrap());
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:397
+  -         assert!(SocialRecoveryManager::can_execute_recovery(&recovery, 1100).unwrap());
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:404
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:407
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:416
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:424
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:436
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 1, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:439
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:450
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:453
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:466
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:477
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:480
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:489
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:498
+  -             SocialRecoveryManager::create_recovery_account([0u8; 32], guardians, 2, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:501
+  -             SocialRecoveryManager::initiate_recovery(&account, [99u8; 32], 1000).unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:514
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/social_recovery.rs:522
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:254
+  -         let token = result.unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:288
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:306
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:322
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:333
+  -         let whitelist = result.unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:339
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], true, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:348
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], true, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:350
+  -         TokenManager::add_to_whitelist(&mut whitelist, [2u8; 32], [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:357
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], true, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:359
+  -         TokenManager::add_to_whitelist(&mut whitelist, [2u8; 32], [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:367
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], true, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:368
+  -         TokenManager::add_to_whitelist(&mut whitelist, [2u8; 32], [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:377
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], false, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:378
+  -         TokenManager::add_to_whitelist(&mut whitelist, [2u8; 32], [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:395
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:396
+  -         TokenManager::blacklist_token(&mut token, [2u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:428
+  -         .unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:470
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], true, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:471
+  -         TokenManager::add_to_whitelist(&mut whitelist, [2u8; 32], [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:478
+  -         let mut whitelist = TokenManager::create_whitelist([1u8; 32], true, 100).unwrap();
+- [production hot path] crates/x3-wallet/src/token_manager.rs:479
+  -         TokenManager::add_to_whitelist(&mut whitelist, [2u8; 32], [1u8; 32]).unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:247
+  -         let tx = result.unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:278
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:283
+  -         let req = result.unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:291
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:302
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:312
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:332
+  -         assert!(result.unwrap());
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:354
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:358
+  -         TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:361
+  -         TransactionSigner::add_signature(&mut tx, [4u8; 32], vec![255], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:369
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:371
+  -         TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:382
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:392
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:394
+  -         TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:450
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:460
+  -                 .unwrap();
+- [production hot path] crates/x3-wallet/src/transaction_signer.rs:464
+  -         TransactionSigner::add_signature(&mut tx, [3u8; 32], vec![255], 0).unwrap();
+- [production hot path] node/benches/rpc_dex_latency.rs:101
+  -     latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [production hot path] node/benches/rpc_dex_latency.rs:126
+  -     latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+- [production hot path] node/benches/rpc_dex_latency.rs:156
+  -     let rt = Runtime::new().unwrap();
+- [production hot path] node/benches/rpc_dex_latency.rs:178
+  -     let rt = Runtime::new().unwrap();
+- [production hot path] node/benches/rpc_dex_latency.rs:200
+  -     let rt = Runtime::new().unwrap();
+- [production hot path] node/src/rpc_frontier.rs:333
+  -         let decoded = decode_address(&addr).expect("address should decode");
+- [production hot path] node/src/rpc_frontier.rs:349
+  -         let gas = parse_gas_limit(&tx).expect("hex gas should parse");
+- [production hot path] node/src/rpc_frontier.rs:356
+  -         let gas = parse_gas_limit(&tx).expect("numeric gas should parse");
+- [production hot path] node/src/rpc_frontier.rs:363
+  -         let gas = parse_gas_limit(&tx).expect("decimal string gas should parse");
+- [production hot path] node/src/rpc_frontier.rs:378
+  -         let gas = parse_gas_limit(&tx).expect("default gas should be used");
+- [production hot path] node/src/service.rs:1206
+  -                                     .expect("cross-vm bridge lock poisoned");
+- [production hot path] node/src/service.rs:1363
+  -                                     panic!(
+- [production hot path] node/src/service.rs:1399
+  -                         panic!("Cross-chain validator critical failure: {}", e);
+- [test-only] pallets/agent-accounts/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:17
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"TestAgent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:18
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:32
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:33
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:51
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:52
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:79
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:80
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:101
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:102
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:103
+  -         let reason: BoundedVec<u8, ConstU32<256>> = b"Violation".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:117
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:118
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:119
+  -         let reason: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:134
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:135
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:153
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:154
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:168
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:169
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:182
+  -         let name: BoundedVec<u8, ConstU32<64>> = b"Agent".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:183
+  -         let metadata: BoundedVec<u8, ConstU32<1024>> = vec![].try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/benchmarking.rs:184
+  -         let action_data: BoundedVec<u8, ConstU32<512>> = b"{}".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-accounts/src/mock.rs:103
+  -         .unwrap();
+- [test-only] pallets/agent-accounts/src/mock.rs:116
+  -     .unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:13
+  -         let name: BoundedVec<_, _> = b"TestAgent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:14
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:23
+  -         let agent = AgentAccounts::agents(0).unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:45
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:46
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:63
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:64
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:84
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:85
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:112
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:113
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:128
+  -         let agent = AgentAccounts::agents(0).unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:138
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:139
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:166
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:167
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:201
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:202
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:227
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:228
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:246
+  -         let quota = AgentAccounts::quotas(0).unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:259
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:260
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:286
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:287
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:316
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:317
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:318
+  -         let reason: BoundedVec<_, _> = b"Violation".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:333
+  -         let agent = AgentAccounts::agents(0).unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:342
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:343
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:344
+  -         let reason: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:360
+  -         let agent = AgentAccounts::agents(0).unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:369
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:370
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:389
+  -         let agent = AgentAccounts::agents(0).unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:403
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:404
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:405
+  -         let reason: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:434
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:435
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:450
+  -         assert_eq!(AgentAccounts::agents(0).unwrap().reputation, 150);
+- [production hot path] pallets/agent-accounts/src/tests.rs:458
+  -         assert_eq!(AgentAccounts::agents(0).unwrap().reputation, 120);
+- [production hot path] pallets/agent-accounts/src/tests.rs:465
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:466
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:481
+  -         assert_eq!(AgentAccounts::agents(0).unwrap().reputation, 200);
+- [production hot path] pallets/agent-accounts/src/tests.rs:489
+  -         assert_eq!(AgentAccounts::agents(0).unwrap().reputation, 0);
+- [production hot path] pallets/agent-accounts/src/tests.rs:500
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:501
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:502
+  -         let action_data: BoundedVec<_, _> = b"{\"trade\":\"BTC/ETH\"}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:528
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:529
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:530
+  -         let action_data: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:566
+  -         let name: BoundedVec<_, _> = b"Agent".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-accounts/src/tests.rs:567
+  -         let metadata: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [test-only] pallets/agent-memory/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/agent-memory/src/benchmarking.rs:36
+  -         let content: BoundedVec<u8, ConstU32<4096>> = vec![0u8; 1000].try_into().unwrap();
+- [test-only] pallets/agent-memory/src/benchmarking.rs:61
+  -                 let content: BoundedVec<u8, ConstU32<4096>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/agent-memory/src/benchmarking.rs:107
+  -             let content: BoundedVec<u8, ConstU32<4096>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/agent-memory/src/mock.rs:97
+  -         .unwrap();
+- [test-only] pallets/agent-memory/src/mock.rs:108
+  -     .unwrap();
+- [production hot path] pallets/agent-memory/src/offchain_storage.rs:277
+  -         let decoded = MemorySnapshot::decode(&encoded).unwrap();
+- [production hot path] pallets/agent-memory/src/offchain_storage.rs:333
+  -         assert_eq!(result.result.unwrap(), b"test_result");
+- [production hot path] pallets/agent-memory/src/offchain_storage.rs:341
+  -         assert_eq!(result.error.unwrap(), b"query_failed");
+- [production hot path] pallets/agent-memory/src/tests.rs:44
+  -         let content: BoundedVec<_, _> = b"{\"observation\":\"test\"}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:56
+  -         let chunk = AgentMemory::memory_chunks(0, 0).unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:71
+  -         let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:93
+  -         let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:118
+  -         let content: BoundedVec<_, _> = b"{\"action\":\"trade\"}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:120
+  -             b"{\"source\":\"market_data\"}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:130
+  -         let chunk = AgentMemory::memory_chunks(0, 0).unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:149
+  -             (EntryType::Observation, b"{}".to_vec().try_into().unwrap()),
+- [production hot path] pallets/agent-memory/src/tests.rs:152
+  -                 b"{\"thought\":1}".to_vec().try_into().unwrap(),
+- [production hot path] pallets/agent-memory/src/tests.rs:156
+  -                 b"{\"action\":1}".to_vec().try_into().unwrap(),
+- [production hot path] pallets/agent-memory/src/tests.rs:185
+  -             let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:196
+  -         let chunk0 = AgentMemory::memory_chunks(0, 0).unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:201
+  -         let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:211
+  -         let chunk0 = AgentMemory::memory_chunks(0, 0).unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:216
+  -         let chunk1 = AgentMemory::memory_chunks(0, 1).unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:267
+  -         let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:312
+  -         let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:363
+  -             let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:413
+  -             let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:443
+  -                 format!("{{\"id\":{}}}", i).into_bytes().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:473
+  -                 format!("{{\"id\":{}}}", i).into_bytes().try_into().unwrap();
+- [production hot path] pallets/agent-memory/src/tests.rs:506
+  -             let content: BoundedVec<_, _> = b"{}".to_vec().try_into().unwrap();
+- [test-only] pallets/atomic-trade-engine/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/amm.rs:572
+  -         let calldata = UniswapV2Adapter::build_swap_calldata(&params).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/amm.rs:589
+  -         let calldata = RaydiumAdapter::build_swap_calldata(&params).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/amm.rs:613
+  -         let decoded = decode_uint256(&encoded).unwrap();
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:38
+  -                 route_data: BoundedVec::try_from(vec![0u8; 20]).expect("bounded route data"),
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:75
+  -             route_data: BoundedVec::try_from(vec![0u8; 20]).expect("bounded route data"),
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:99
+  -         let batch = TradeBatches::<T>::get(batch_id).unwrap();
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:118
+  -             route_data: BoundedVec::try_from(vec![0u8; 20]).expect("bounded route data"),
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:150
+  -             address: BoundedVec::try_from(vec![0xab; 20]).expect("bounded address"),
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:170
+  -             address: BoundedVec::try_from(vec![0xcd; 32]).expect("bounded address"),
+- [test-only] pallets/atomic-trade-engine/src/benchmarking.rs:199
+  -             route_data: BoundedVec::try_from(vec![0u8; 20]).expect("bounded route data"),
+- [production hot path] pallets/atomic-trade-engine/src/graph.rs:517
+  -             address: BoundedVec::try_from(vec![0u8; 20]).unwrap(),
+- [production hot path] pallets/atomic-trade-engine/src/graph.rs:542
+  -         let paths = TradeGraphResolver::find_all_paths(&graph, start, end, 4).unwrap();
+- [test-only] pallets/atomic-trade-engine/src/mock.rs:335
+  -         .unwrap();
+- [test-only] pallets/atomic-trade-engine/src/mock.rs:345
+  -     .unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:39
+  -         route_data: BoundedVec::try_from(vec![0u8; 20]).unwrap(), // Mock recipient address
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:250
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:284
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:314
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:356
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:399
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:435
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:474
+  -         let batch = AtomicTradeEngine::trade_batches(batch_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:585
+  -             address: BoundedVec::try_from(vec![0xab; 20]).unwrap(),
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:597
+  -         let stored = AtomicTradeEngine::amm_adapters(AmmProtocol::UniswapV2).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:608
+  -             address: BoundedVec::try_from(vec![0xab; 20]).unwrap(),
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:635
+  -             address: BoundedVec::try_from(vec![0xcd; 32]).unwrap(),
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:707
+  -         let pool_id = LiquidityPools::<Test>::iter().next().unwrap().0;
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:716
+  -         let pool = AtomicTradeEngine::liquidity_pools(pool_id).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:740
+  -         let pool_id = LiquidityPools::<Test>::iter().next().unwrap().0;
+- [production hot path] pallets/atomic-trade-engine/src/tests.rs:796
+  -             AtomicTradeEngine::simulate_trade_path(&legs, 1_000_000_000_000_000_000u128).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/types.rs:442
+  -             address: BoundedVec::try_from(vec![0u8; 20]).unwrap(),
+- [production hot path] pallets/atomic-trade-engine/src/types.rs:451
+  -         let amount_out = pool.get_amount_out(amount_in, pool.token_a).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/types.rs:476
+  -         let amount_in = pool.get_amount_in(desired_out, pool.token_b).unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/types.rs:490
+  -             .unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/types.rs:497
+  -             .unwrap();
+- [production hot path] pallets/atomic-trade-engine/src/types.rs:581
+  -             .unwrap();
+- [test-only] pallets/cross-chain-validator/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/cross-chain-validator/src/tests.rs:27
+  -         let header = stored.unwrap();
+- [production hot path] pallets/cross-chain-validator/src/tests.rs:68
+  -         let header = stored.unwrap();
+- [production hot path] pallets/cross-chain-validator/src/tests.rs:236
+  -         .unwrap()
+- [test-only] pallets/depin-marketplace/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/depin-marketplace/src/benchmarking.rs:26
+  -             .unwrap(),
+- [test-only] pallets/depin-marketplace/src/benchmarking.rs:38
+  -         let provider = Providers::<T>::get(&caller).expect("provider should exist");
+- [test-only] pallets/depin-marketplace/src/mock.rs:107
+  -         .unwrap();
+- [test-only] pallets/depin-marketplace/src/mock.rs:118
+  -     .unwrap();
+- [production hot path] pallets/depin-marketplace/src/tests.rs:14
+  -         model: BoundedVec::try_from(b"NVIDIA A100 80GB".to_vec()).unwrap(),
+- [production hot path] pallets/depin-marketplace/src/tests.rs:54
+  -         let provider = DepinMarketplace::providers(1).unwrap();
+- [production hot path] pallets/depin-marketplace/src/tests.rs:176
+  -         let provider = DepinMarketplace::providers(1).unwrap();
+- [production hot path] pallets/depin-marketplace/src/tests.rs:277
+  -         let provider = DepinMarketplace::providers(1).unwrap();
+- [test-only] pallets/evolution-core/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/fraud-proofs/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/governance/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:30
+  -         let title: BoundedVec<u8, ConstU32<256>> = vec![0u8; 256].try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:31
+  -         let description: BoundedVec<u8, ConstU32<4096>> = vec![0u8; 4096].try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:58
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:59
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:74
+  -         .unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:120
+  -         .unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:134
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:135
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:149
+  -         .unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:161
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:162
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:176
+  -         .unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:191
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:192
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:207
+  -         .unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:217
+  -         .unwrap();
+- [test-only] pallets/governance/src/benchmarking.rs:220
+  -         let voting_end = Pallet::<T>::proposals(0).unwrap().voting_end;
+- [test-only] pallets/governance/src/mock.rs:147
+  -         .unwrap();
+- [test-only] pallets/governance/src/mock.rs:160
+  -     .unwrap();
+- [test-only] pallets/governance/src/mock.rs:164
+  -         .unwrap();
+- [production hot path] pallets/governance/src/tests.rs:15
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test Proposal".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:17
+  -             b"A test proposal".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:31
+  -         let proposal = Governance::proposals(0).unwrap();
+- [production hot path] pallets/governance/src/tests.rs:43
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:44
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:73
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:74
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:107
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:108
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:140
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:141
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:175
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:176
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:229
+  -         let delegation = Governance::delegations(account(2)).unwrap();
+- [production hot path] pallets/governance/src/tests.rs:273
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:274
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:316
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:317
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:347
+  -         let proposal = Governance::proposals(0).unwrap();
+- [production hot path] pallets/governance/src/tests.rs:357
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:358
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:388
+  -         let proposal = Governance::proposals(0).unwrap();
+- [production hot path] pallets/governance/src/tests.rs:398
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:399
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:423
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Finalize".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:425
+  -             b"Snapshot cleanup check on finalize".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:459
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Attack".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:461
+  -             b"Flash-loan governance takeover attempt".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:504
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:505
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:520
+  -         let proposal = Governance::proposals(0).unwrap();
+- [production hot path] pallets/governance/src/tests.rs:534
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:535
+  -         let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:558
+  -         let title: BoundedVec<u8, ConstU32<256>> = b"Snapshot Cancel".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:560
+  -             b"Snapshot cleanup check on cancel".to_vec().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:596
+  -                 format!("Proposal {}", i).into_bytes().try_into().unwrap();
+- [production hot path] pallets/governance/src/tests.rs:597
+  -             let description: BoundedVec<u8, ConstU32<4096>> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/meme-overlord/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/private-execution/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/private-execution/src/mock.rs:108
+  -         .unwrap();
+- [test-only] pallets/private-execution/src/mock.rs:119
+  -     .unwrap();
+- [production hot path] pallets/private-execution/src/tests.rs:50
+  -         let att = PrivateExecution::confidential_validators(1).unwrap();
+- [production hot path] pallets/private-execution/src/tests.rs:165
+  -         let record = PrivateExecution::private_transactions(H256::repeat_byte(0x01)).unwrap();
+- [production hot path] pallets/private-execution/src/tests.rs:202
+  -         let record = PrivateExecution::private_transactions(tx_hash).unwrap();
+- [test-only] pallets/svm-runtime/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/svm-runtime/src/lib.rs:708
+  -             .unwrap()
+- [production hot path] pallets/svm-runtime/src/lib.rs:731
+  -             let account = pallet::Accounts::<Test>::get(&pubkey).unwrap();
+- [production hot path] pallets/svm-runtime/src/lib.rs:782
+  -             let from_account = pallet::Accounts::<Test>::get(&from_pubkey).unwrap();
+- [production hot path] pallets/svm-runtime/src/lib.rs:785
+  -             let to_account = pallet::Accounts::<Test>::get(&to_pubkey).unwrap();
+- [production hot path] pallets/svm-runtime/src/lib.rs:827
+  -             let program = pallet::Programs::<Test>::get(&program_id).unwrap();
+- [production hot path] pallets/svm-runtime/src/lib.rs:832
+  -             let account = pallet::Accounts::<Test>::get(&program_id).unwrap();
+- [production hot path] pallets/svm-runtime/src/lib.rs:860
+  -             let recipient_account = pallet::Accounts::<Test>::get(&recipient).unwrap();
+- [test-only] pallets/swarm/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/swarm/src/mock.rs:110
+  -         .unwrap();
+- [test-only] pallets/swarm/src/mock.rs:123
+  -     .unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:29
+  -     BoundedVec::try_from(name.as_bytes().to_vec()).unwrap()
+- [production hot path] pallets/swarm/src/tests.rs:49
+  -         let contributor_id = AccountContributor::<Test>::get(ALICE).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:52
+  -         let contributor = Contributors::<Test>::get(contributor_id).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:161
+  -         let contributor_id = AccountContributor::<Test>::get(ALICE).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:162
+  -         let contributor = Contributors::<Test>::get(contributor_id).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:204
+  -         let contributor_id = AccountContributor::<Test>::get(ALICE).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:205
+  -         let contributor = Contributors::<Test>::get(contributor_id).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:333
+  -         let contributor = Swarm::contributors(0).unwrap();
+- [production hot path] pallets/swarm/src/tests.rs:337
+  -         let account_id = Swarm::account_contributor(ALICE).unwrap();
+- [test-only] pallets/treasury/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:24
+  -         let description: BoundedVec<u8, ConstU32<1024>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:41
+  -             vec![signer.clone()].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:48
+  -         let description: BoundedVec<u8, ConstU32<1024>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:68
+  -             vec![signer.clone()].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:77
+  -         let description: BoundedVec<u8, ConstU32<1024>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:99
+  -         let description: BoundedVec<u8, ConstU32<1024>> = vec![0u8; 100].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:116
+  -         let description: BoundedVec<u8, ConstU32<256>> = vec![0u8; 50].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:132
+  -         let description: BoundedVec<u8, ConstU32<256>> = vec![0u8; 50].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:152
+  -         let description: BoundedVec<u8, ConstU32<256>> = vec![0u8; 50].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:168
+  -         let description: BoundedVec<u8, ConstU32<256>> = vec![0u8; 50].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:191
+  -         let description: BoundedVec<u8, ConstU32<256>> = vec![0u8; 50].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:226
+  -         let description: BoundedVec<u8, ConstU32<256>> = vec![0u8; 50].try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:244
+  -         let reason: BoundedVec<u8, ConstU32<256>> = b"Emergency".to_vec().try_into().unwrap();
+- [test-only] pallets/treasury/src/benchmarking.rs:252
+  -         let reason: BoundedVec<u8, ConstU32<256>> = b"Emergency".to_vec().try_into().unwrap();
+- [test-only] pallets/treasury/src/mock.rs:111
+  -         .unwrap();
+- [test-only] pallets/treasury/src/mock.rs:124
+  -     .unwrap();
+- [test-only] pallets/treasury/src/mock.rs:130
+  -     .unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:14
+  -         let description: BoundedVec<_, _> = b"Test proposal".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:23
+  -         let proposal = Treasury::proposals(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:44
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:66
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:75
+  -         assert_eq!(Treasury::proposals(0).unwrap().track, SpendingTrack::Small);
+- [production hot path] pallets/treasury/src/tests.rs:84
+  -         assert_eq!(Treasury::proposals(1).unwrap().track, SpendingTrack::Medium);
+- [production hot path] pallets/treasury/src/tests.rs:93
+  -         assert_eq!(Treasury::proposals(2).unwrap().track, SpendingTrack::Large);
+- [production hot path] pallets/treasury/src/tests.rs:103
+  -             Treasury::proposals(3).unwrap().track,
+- [production hot path] pallets/treasury/src/tests.rs:112
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:128
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:148
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:168
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:189
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:203
+  -         let proposal = Treasury::proposals(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:216
+  -         let description: BoundedVec<_, _> = b"Salary".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:227
+  -         let payment = Treasury::recurring_payments(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:239
+  -         let description: BoundedVec<_, _> = b"Salary".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:257
+  -         let payment = Treasury::recurring_payments(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:265
+  -         let description: BoundedVec<_, _> = b"Grant".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:278
+  -         let payment = Treasury::recurring_payments(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:290
+  -         let description: BoundedVec<_, _> = b"DeFi Strategy".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:301
+  -         let strategy = Treasury::yield_strategies(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:312
+  -         let description: BoundedVec<_, _> = b"Strategy".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:342
+  -         let description: BoundedVec<_, _> = b"Strategy".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:368
+  -         let description: BoundedVec<_, _> = b"Strategy".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:384
+  -         let strategy = Treasury::yield_strategies(0).unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:402
+  -         let reason: BoundedVec<_, _> = b"Security incident".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:407
+  -         let pause_info = Treasury::pause_info().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:415
+  -         let reason: BoundedVec<_, _> = b"Emergency".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:416
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:431
+  -         let reason: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [production hot path] pallets/treasury/src/tests.rs:501
+  -         let description: BoundedVec<_, _> = b"Test".to_vec().try_into().unwrap();
+- [test-only] pallets/x3-account-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-account-registry/src/lib.rs:319
+  -             .unwrap()
+- [production hot path] pallets/x3-account-registry/src/lib.rs:379
+  -             assert_eq!(AccountRegistry::increment_nonce(&1).unwrap(), 1);
+- [production hot path] pallets/x3-account-registry/src/lib.rs:380
+  -             assert_eq!(AccountRegistry::increment_nonce(&1).unwrap(), 2);
+- [production hot path] pallets/x3-account-registry/src/lib.rs:393
+  -             AccountRegistry::increment_nonce(&1).unwrap();
+- [production hot path] pallets/x3-account-registry/src/lib.rs:394
+  -             AccountRegistry::increment_nonce(&1).unwrap();
+- [production hot path] pallets/x3-account-registry/src/lib.rs:409
+  -             let info = AccountRegistry::accounts(&2).unwrap();
+- [test-only] pallets/x3-asset-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-atomic-kernel/fuzz/fuzz_targets/fuzz_codec_parsing.rs:26
+  -                     Err(e) => panic!(
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:38
+  -             .expect("legs within MaxLegsPerBundle");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:43
+  -         let bundle_id = Bundles::<T>::iter_keys().next().expect("bundle should exist");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:44
+  -         let bundle = Bundles::<T>::get(bundle_id).expect("bundle should be retrievable");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:67
+  -         }]).expect("within MaxLegsPerBundle");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:68
+  -         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:69
+  -         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:73
+  -         let bundle = Bundles::<T>::get(bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:98
+  -         }]).expect("within MaxLegsPerBundle");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:99
+  -         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:100
+  -         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:102
+  -         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(executor.clone()).into(), bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:109
+  -         let bundle = Bundles::<T>::get(bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:111
+  -         let proof = PoaeProofs::<T>::get(bundle_id).expect("proof should be stored");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:133
+  -         }]).expect("within MaxLegsPerBundle");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:134
+  -         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:135
+  -         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:139
+  -         let bundle = Bundles::<T>::get(bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:160
+  -         }]).expect("within MaxLegsPerBundle");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:161
+  -         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:162
+  -         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:166
+  -         let bundle = Bundles::<T>::get(bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:187
+  -         }]).expect("within MaxLegsPerBundle");
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:188
+  -         X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:189
+  -         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:191
+  -         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(caller.clone()).into(), bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:199
+  -         let bundle = Bundles::<T>::get(bundle_id).unwrap();
+- [test-only] pallets/x3-atomic-kernel/src/benchmarking.rs:210
+  -         let anchored = FinalityCertAnchors::<T>::get(block_num).expect("anchor should be stored");
+- [test-only] pallets/x3-atomic-kernel/src/mock.rs:165
+  -             .expect("Failed to build system genesis storage");
+- [test-only] pallets/x3-atomic-kernel/src/mock.rs:171
+  -         .expect("Failed to assimilate balances storage");
+- [production hot path] pallets/x3-atomic-kernel/src/tests.rs:98
+  -     let decoded = BundleLeg::decode(&mut &encoded[..]).expect("decode failed");
+- [production hot path] pallets/x3-atomic-kernel/src/tests.rs:144
+  -             .expect("slice is exactly 8 bytes"),
+- [production hot path] pallets/x3-atomic-kernel/src/tests.rs:212
+  -     let decoded_block = u64::from_le_bytes(key[5..13].try_into().unwrap());
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:33
+  -                 let mut log = changes.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:47
+  -                 let log = changes_clone.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:57
+  -             let rollback_done = t1.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:58
+  -             let state_consistent = t2.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:81
+  -                 let mut res = reserved.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:95
+  -                 let mut res = reserved_clone.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:106
+  -             let r1 = t1.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:107
+  -             let r2 = t2.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:134
+  -                 let mut l = log.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:141
+  -                 let mut l = log_clone.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:151
+  -             t1.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:152
+  -             let rollback_monotonic = t2.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:179
+  -                 let mut s = state_for_change.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:182
+  -                 tx_change.send(()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:187
+  -                 rx_change.recv().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:189
+  -                 let s = state_for_observer.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:193
+  -                 tx_observed.send(()).unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:199
+  -                 rx_observed.recv().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:201
+  -                 let mut s = state_for_rollback.lock().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:205
+  -             t1.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:206
+  -             let seen_change = t2.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:207
+  -             t3.join().unwrap();
+- [test-only] pallets/x3-atomic-kernel/tests/loom_concurrency.rs:209
+  -             let final_state = *state.lock().unwrap();
+- [test-only] pallets/x3-automation/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-automation/src/mock.rs:115
+  -     let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+- [test-only] pallets/x3-automation/src/mock.rs:120
+  -     .unwrap();
+- [test-only] pallets/x3-coin/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-coin/src/mock.rs:186
+  -         .unwrap();
+- [test-only] pallets/x3-coin/src/mock.rs:194
+  -     .unwrap();
+- [test-only] pallets/x3-coin/src/mock.rs:198
+  -         .unwrap();
+- [test-only] pallets/x3-coin/src/mock.rs:206
+  -     .unwrap();
+- [production hot path] pallets/x3-coin/src/tests.rs:114
+  -         let team_schedule = X3Coin::team_vesting(&TEAM_MEMBER).unwrap();
+- [production hot path] pallets/x3-coin/src/tests.rs:152
+  -         let schedule = X3Coin::team_vesting(&TEAM_MEMBER).unwrap();
+- [production hot path] pallets/x3-coin/src/tests.rs:590
+  -         let decoded = CrossChainOperation::decode(&mut &encoded[..]).unwrap();
+- [production hot path] pallets/x3-coin/src/tests.rs:610
+  -         let decoded = X3Proof::decode(&mut &encoded[..]).unwrap();
+- [test-only] pallets/x3-consensus/src/mock.rs:117
+  -     system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:131
+  -         .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:176
+  -     .expect("register_asset");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:182
+  -     Registry::activate_asset(RuntimeOrigin::root(), asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:200
+  -         .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:212
+  -     .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:244
+  -     .expect("xvm_transfer");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:274
+  -     Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).expect("complete");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:299
+  -     .expect("xvm_transfer_from_vm");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:323
+  -     Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).expect("complete");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:397
+  -         Router::nonce_batch_allocation(src, sender.clone()).expect("nonce allocation exists");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:438
+  -         let l0 = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:444
+  -         l0.check_invariant().unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:460
+  -         let l3 = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:469
+  -         l3.check_invariant().unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:471
+  -         assert_eq!(l3.represented().unwrap(), l3.canonical_supply);
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:494
+  -             let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:495
+  -             l.check_invariant().unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:500
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:502
+  -         assert_eq!(l.represented().unwrap(), 10_000);
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:528
+  -         .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:545
+  -         Router::complete_xvm_transfer(RuntimeOrigin::signed(1), message_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:559
+  -         Registry::pause_asset(RuntimeOrigin::root(), asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:584
+  -         .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:653
+  -         .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:672
+  -         Router::cancel_expired_xvm_transfer(RuntimeOrigin::signed(1), message_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:674
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:679
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:707
+  -         .unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1044
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1046
+  -         assert!(l.represented().unwrap() <= l.canonical_supply);
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1047
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1122
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1133
+  -         let before = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1135
+  -         let after = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1145
+  -         let before = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1147
+  -         let after = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1189
+  -         let before = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1191
+  -         let after = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1320
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1400
+  -             let before = Ledger::ledgers(asset_id).expect("ledger exists");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1408
+  -             let after = Ledger::ledgers(asset_id).expect("ledger exists");
+- [production hot path] pallets/x3-cross-vm-router/src/tests.rs:1413
+  -             assert_eq!(after.represented().unwrap(), after.canonical_supply);
+- [test-only] pallets/x3-da/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-da/src/mock.rs:95
+  -         .unwrap();
+- [test-only] pallets/x3-da/src/mock.rs:101
+  -     .unwrap();
+- [production hot path] pallets/x3-da/src/tests.rs:24
+  -         let blob = X3Da::blobs(h256(0xAA)).expect("blob should exist");
+- [production hot path] pallets/x3-da/src/tests.rs:60
+  -         let blob = X3Da::blobs(h256(0xBB)).unwrap();
+- [production hot path] pallets/x3-da/src/tests.rs:77
+  -         let blob = X3Da::blobs(h256(0xCC)).unwrap();
+- [production hot path] pallets/x3-da/src/tests.rs:228
+  -         assert_eq!(X3Da::blobs(h256(0x01)).unwrap().blob_id, 0);
+- [production hot path] pallets/x3-da/src/tests.rs:229
+  -         assert_eq!(X3Da::blobs(h256(0x02)).unwrap().blob_id, 1);
+- [production hot path] pallets/x3-da/src/tests.rs:230
+  -         assert_eq!(X3Da::blobs(h256(0x03)).unwrap().blob_id, 2);
+- [production hot path] pallets/x3-da/src/tests.rs:267
+  -         assert_eq!(blob.unwrap().size_bytes, 100);
+- [test-only] pallets/x3-dex/fuzz/fuzz_targets/fuzz_codec_parsing.rs:30
+  -         let re_decoded = LiquidityPool::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-dex/fuzz/fuzz_targets/fuzz_codec_parsing.rs:48
+  -             let re_decoded = LPPosition::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-dex/src/mock.rs:70
+  -     frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+- [production hot path] pallets/x3-dex/src/tests_amm_math.rs:31
+  -     let (amount_a, amount_b, lp_tokens) = result.unwrap();
+- [production hot path] pallets/x3-dex/src/tests_amm_math.rs:85
+  -     let amount_out = result.unwrap();
+- [production hot path] pallets/x3-dex/src/tests_liquidity_provision.rs:29
+  -         let pool = pool.unwrap();
+- [production hot path] pallets/x3-dex/src/tests_liquidity_provision.rs:87
+  -         let pool = DEX::pools(0).unwrap();
+- [production hot path] pallets/x3-dex/src/tests_swapping.rs:34
+  -         let pool = DEX::pools(0).unwrap();
+- [production hot path] pallets/x3-dex/src/tests_swapping.rs:69
+  -         let pool = DEX::pools(0).unwrap();
+- [test-only] pallets/x3-domain-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-domain-registry/src/mock.rs:78
+  -         .unwrap();
+- [production hot path] pallets/x3-domain-registry/src/tests.rs:71
+  -         let txt: BoundedVec<u8, crate::mock::MaxTxtLen> = b"hello".to_vec().try_into().unwrap();
+- [test-only] pallets/x3-invariants/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-invariants/src/lib.rs:15
+  - //!    logged at error level. (Earlier versions called `panic!()` here, which
+- [production hot path] pallets/x3-invariants/src/lib.rs:154
+  -         /// Replaces previous `panic!()` behaviour. Monitoring and governance
+- [test-only] pallets/x3-invariants/src/mock.rs:72
+  -         .unwrap();
+- [test-only] pallets/x3-invariants/src/mock.rs:82
+  -     .unwrap();
+- [test-only] pallets/x3-inventory/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-inventory/src/mock.rs:61
+  -         .unwrap()
+- [production hot path] pallets/x3-inventory/src/tests.rs:32
+  -         BoundedVec::try_from(vec![LiquiditySourceType::ExternalMarket]).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:59
+  -         let vault = Vaults::<Test>::get(id).expect("vault must exist");
+- [production hot path] pallets/x3-inventory/src/tests.rs:136
+  -             let v = v.as_mut().unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:140
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:152
+  -             let v = v.as_mut().unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:156
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:171
+  -             let v = v.as_mut().unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:175
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:196
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:211
+  -             v.as_mut().unwrap().available_balance = 800;
+- [production hot path] pallets/x3-inventory/src/tests.rs:224
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:238
+  -         let lane = Lanes::<Test>::get(id).expect("lane must exist");
+- [production hot path] pallets/x3-inventory/src/tests.rs:265
+  -             BoundedVec::try_from(vec![LiquiditySourceType::ExternalMarket]).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:297
+  -         let lane = Lanes::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:349
+  -         let lane = Lanes::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:414
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:463
+  -         let vault = Vaults::<Test>::get(vault_id(23)).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:482
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:508
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:569
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:587
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:638
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:663
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:722
+  -         let vault = Vaults::<Test>::get(vault_id(36)).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:752
+  -         let vault = Vaults::<Test>::get(vault_id(38)).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:761
+  -         let vault = Vaults::<Test>::get(vault_id(38)).unwrap();
+- [production hot path] pallets/x3-inventory/src/tests.rs:795
+  -         let vault = Vaults::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-inventory/src/types.rs:329
+  -                 .expect("decode must succeed for a well-formed value");
+- [production hot path] pallets/x3-inventory/src/types.rs:454
+  -             Decode::decode(&mut &encoded[..]).expect("decode must succeed");
+- [test-only] pallets/x3-jury-anchor/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:244
+  -             .unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:254
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:262
+  -             let record = JuryAnchor::get_jury_decision(session_id).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:270
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:284
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:301
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:303
+  -                 .unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:316
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:318
+  -                 .unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:330
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:332
+  -                 .unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:343
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:363
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 1).unwrap();
+- [production hot path] pallets/x3-jury-anchor/src/lib.rs:364
+  -             JuryAnchor::set_jury_authority(RuntimeOrigin::root(), 2).unwrap();
+- [test-only] pallets/x3-kernel/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-kernel/src/adapters.rs:591
+  -         let result = MockEvmAdapter::execute(payload, 100_000).unwrap();
+- [production hot path] pallets/x3-kernel/src/adapters.rs:599
+  -         let result = MockSvmAdapter::execute(payload, 100_000).unwrap();
+- [production hot path] pallets/x3-kernel/src/adapters.rs:606
+  -         let result = <() as EvmExecutorAdapter>::execute(b"test", 100_000).unwrap();
+- [production hot path] pallets/x3-kernel/src/adapters.rs:610
+  -         let result = <() as SvmExecutorAdapter>::execute(b"test", 100_000).unwrap();
+- [production hot path] pallets/x3-kernel/src/adapters.rs:629
+  -         assert!(result.unwrap().success);
+- [production hot path] pallets/x3-kernel/src/authority.rs:70
+  -         let decoded = AuthorityChange::<u64>::decode(&mut &encoded[..]).unwrap();
+- [test-only] pallets/x3-kernel/src/benchmarking.rs:46
+  -         symbol.to_vec().try_into().expect("Symbol too long");
+- [test-only] pallets/x3-kernel/src/benchmarking.rs:211
+  -             initial_authorities.try_into().expect("Within bounds");
+- [test-only] pallets/x3-kernel/src/benchmarking.rs:243
+  -             initial_authorities.try_into().expect("Within bounds");
+- [test-only] pallets/x3-kernel/src/benchmarking.rs:298
+  -             new_authorities.clone().try_into().expect("Within bounds");
+- [test-only] pallets/x3-kernel/src/mock.rs:324
+  -             .expect("Failed to build system genesis storage");
+- [test-only] pallets/x3-kernel/src/mock.rs:332
+  -         .expect("Failed to assimilate balances storage");
+- [test-only] pallets/x3-kernel/src/mock.rs:424
+  -             Some(self.execute_evm_tx(evm_tx.unwrap())?)
+- [test-only] pallets/x3-kernel/src/mock.rs:430
+  -             Some(self.execute_svm_tx(svm_tx.unwrap())?)
+- [production hot path] pallets/x3-kernel/src/packet_adapters.rs:307
+  -         assert_eq!(route.unwrap(), DomainRoute::EvmOnly);
+- [production hot path] pallets/x3-kernel/src/packet_adapters.rs:319
+  -         assert_eq!(route.unwrap(), DomainRoute::SvmOnly);
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:41
+  -             let deserialized_packet = deserialized.unwrap();
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:55
+  -             assert_eq!(route.unwrap(), DomainRoute::EvmOnly, "Should route to EVM");
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:78
+  -             let deserialized_packet = deserialized.unwrap();
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:83
+  -             assert_eq!(route.unwrap(), DomainRoute::EvmOnly, "Should route to EVM");
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:124
+  -             let deserialized_packet = deserialized.unwrap();
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:134
+  -             assert_eq!(route.unwrap(), DomainRoute::SvmOnly, "Should route to SVM");
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:173
+  -             let deserialized_packet = deserialized.unwrap();
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:184
+  -                 route.unwrap(),
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:253
+  -             let deserialized = deserialize_packet(&bytes1).expect("First round should succeed");
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:280
+  -             assert_eq!(route_packet(&evm_packet).unwrap(), DomainRoute::EvmOnly);
+- [production hot path] pallets/x3-kernel/src/packet_integration_tests.rs:289
+  -             assert_eq!(route_packet(&svm_packet).unwrap(), DomainRoute::SvmOnly);
+- [production hot path] pallets/x3-kernel/src/replay_tests.rs:41
+  -     .expect("payload fits in MAX_CROSS_VM_PAYLOAD")
+- [production hot path] pallets/x3-kernel/src/replay_tests.rs:91
+  -         let key = AtlasKernel::admit_x3vm_call_for(&call).expect("first admit");
+- [production hot path] pallets/x3-kernel/src/tests.rs:98
+  -             e => panic!("Unexpected event: {:?}", e),
+- [production hot path] pallets/x3-kernel/src/tests.rs:147
+  -             events.last().unwrap(),
+- [production hot path] pallets/x3-kernel/src/tests.rs:479
+  -         let stored = AssetRegistry::<Test>::get(asset_id).expect("asset metadata should exist");
+- [production hot path] pallets/x3-kernel/src/tests.rs:495
+  -             e => panic!("Unexpected event: {:?}", e),
+- [production hot path] pallets/x3-kernel/src/tests.rs:573
+  -             e => panic!("Unexpected event: {:?}", e),
+- [production hot path] pallets/x3-kernel/src/tests.rs:933
+  -             let stored = AssetRegistry::<Test>::get(id).expect("asset should exist");
+- [production hot path] pallets/x3-kernel/src/tests.rs:1144
+  -             _ => panic!("Unexpected event"),
+- [production hot path] pallets/x3-kernel/src/tests.rs:1285
+  -             _ => panic!("Unexpected event"),
+- [production hot path] pallets/x3-kernel/src/tests.rs:1513
+  -                 e => panic!("Unexpected event: {:?}", e),
+- [production hot path] pallets/x3-kernel/src/tests.rs:1530
+  -                 e => panic!("Unexpected event: {:?}", e),
+- [production hot path] pallets/x3-kernel/src/tests.rs:1609
+  -         let fee = crate::Pallet::<Test>::calculate_execution_fee(999, 0, 0u128).unwrap();
+- [production hot path] pallets/x3-kernel/src/tests.rs:1613
+  -         let fee = crate::Pallet::<Test>::calculate_execution_fee(1000, 0, 0u128).unwrap();
+- [production hot path] pallets/x3-kernel/src/tests.rs:1617
+  -         let fee = crate::Pallet::<Test>::calculate_execution_fee(1001, 0, 0u128).unwrap();
+- [production hot path] pallets/x3-kernel/src/tests.rs:1626
+  -         let fee = crate::Pallet::<Test>::calculate_execution_fee(0, 0, 0u128).unwrap();
+- [production hot path] pallets/x3-kernel/src/tests.rs:1670
+  -             _ => panic!("Expected FeeDeducted event"),
+- [production hot path] pallets/x3-kernel/src/tests.rs:2950
+  -             fee_event.unwrap(),
+- [production hot path] pallets/x3-kernel/src/types.rs:603
+  - 		let decoded: EvmPayload = EvmPayload::decode(&mut &encoded[..]).unwrap();
+- [production hot path] pallets/x3-kernel/src/types.rs:619
+  - 		let decoded: SvmPayload = SvmPayload::decode(&mut &encoded[..]).unwrap();
+- [production hot path] pallets/x3-kernel/src/types.rs:694
+  - 		let decoded: AssetMetadata = AssetMetadata::decode(&mut &encoded[..]).unwrap();
+- [test-only] pallets/x3-oracle/fuzz/fuzz_targets/fuzz_codec_parsing.rs:29
+  -         let re_decoded = PriceSubmission::<MockBlockNumber>::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-oracle/fuzz/fuzz_targets/fuzz_codec_parsing.rs:56
+  -             let re_decoded = PriceData::<MockBlockNumber>::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-oracle/fuzz/fuzz_targets/fuzz_median_calculation.rs:32
+  -         let price = u64::from_le_bytes(price_bytes.try_into().unwrap());
+- [test-only] pallets/x3-oracle/fuzz/fuzz_targets/fuzz_median_calculation.rs:61
+  -     let min_price = *sorted_prices.first().unwrap();
+- [test-only] pallets/x3-oracle/fuzz/fuzz_targets/fuzz_median_calculation.rs:62
+  -     let max_price = *sorted_prices.last().unwrap();
+- [test-only] pallets/x3-oracle/src/mock.rs:76
+  -     let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+- [production hot path] pallets/x3-oracle/src/tests.rs:109
+  -         let price_data = Oracle::get_price(1).unwrap();
+- [test-only] pallets/x3-reservation/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-reservation/src/mock.rs:72
+  -         .unwrap()
+- [production hot path] pallets/x3-reservation/src/tests.rs:46
+  -         BoundedVec::try_from(vec![LiquiditySourceType::ProtocolFloat]).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:87
+  -         let state = Reservations::<Test>::get(rid).expect("reservation must exist");
+- [production hot path] pallets/x3-reservation/src/tests.rs:130
+  -         let vault = Vaults::<Test>::get(vid).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:274
+  -         let vault = Vaults::<Test>::get(vid).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:278
+  -         let state = Reservations::<Test>::get(res_id(10)).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:369
+  -         let vault = Vaults::<Test>::get(vid).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:374
+  -         let state = Reservations::<Test>::get(res_id(20)).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:439
+  -         let vault = Vaults::<Test>::get(vid).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:444
+  -         let state = Reservations::<Test>::get(res_id(30)).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:488
+  -         let state = Reservations::<Test>::get(res_id(31)).unwrap();
+- [production hot path] pallets/x3-reservation/src/tests.rs:491
+  -         let vault = Vaults::<Test>::get(vid).unwrap();
+- [test-only] pallets/x3-sequencer/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-sequencer/src/lib.rs:301
+  -                     let last = *current.last().unwrap();
+- [test-only] pallets/x3-sequencer/src/mock.rs:98
+  -         .unwrap();
+- [test-only] pallets/x3-sequencer/src/mock.rs:104
+  -     .unwrap();
+- [production hot path] pallets/x3-sequencer/src/tests.rs:73
+  -         let batch = X3Sequencer::batches(0).expect("batch 0 should exist");
+- [production hot path] pallets/x3-sequencer/src/tests.rs:128
+  -         let batch0 = X3Sequencer::batches(0).unwrap();
+- [production hot path] pallets/x3-sequencer/src/tests.rs:132
+  -         let batch1 = X3Sequencer::batches(1).unwrap();
+- [production hot path] pallets/x3-sequencer/src/tests.rs:194
+  -         let root1 = X3Sequencer::batches(0).unwrap().merkle_root;
+- [production hot path] pallets/x3-sequencer/src/tests.rs:211
+  -         let root2 = X3Sequencer::batches(1).unwrap().merkle_root;
+- [production hot path] pallets/x3-sequencer/src/tests.rs:235
+  -         let root_a = X3Sequencer::batches(0).unwrap().merkle_root;
+- [production hot path] pallets/x3-sequencer/src/tests.rs:252
+  -         let root_b = X3Sequencer::batches(1).unwrap().merkle_root;
+- [production hot path] pallets/x3-sequencer/src/tests.rs:271
+  -         let batch = X3Sequencer::batches(0).unwrap();
+- [production hot path] pallets/x3-sequencer/src/tests.rs:319
+  -         assert_eq!(batch.unwrap().tx_count, 1);
+- [production hot path] pallets/x3-settlement-engine/src/collateral.rs:168
+  -             .unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/collateral.rs:169
+  -         let b = c.get_bond(id).unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/collateral.rs:175
+  -         let b2 = c.get_bond(id).unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/collateral.rs:188
+  -             .unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/collateral.rs:190
+  -         let b = c.get_bond(id).unwrap();
+- [test-only] pallets/x3-settlement-engine/src/mock.rs:139
+  -         .unwrap();
+- [test-only] pallets/x3-settlement-engine/src/mock.rs:145
+  -     .unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:21
+  -                 .unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:23
+  -             let rec = Bonds::<Test>::get(id).expect("exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:28
+  -             let rec2 = Bonds::<Test>::get(id).expect("exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:39
+  -                 .unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:48
+  -                 Pallet::<Test>::create_bond_internal(&BOB, b"B".to_vec(), 200u128, 0).unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:50
+  -             let rec = Bonds::<Test>::get(id2).expect("exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:77
+  -             let rec = Bonds::<Test>::get(id).expect("exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:122
+  -                 .expect("Intent should exist after create_intent");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:136
+  -                 .expect("AtomicLock should exist after first lock_escrow");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:143
+  -                 _ => panic!("Lock should be in LockedForCommit phase"),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:178
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:192
+  -             let after_leg1 = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:195
+  -                 _ => panic!("Lock should still be in LockedForCommit phase after locking 1 leg"),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:209
+  -             let updated_lock = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:214
+  -                 _ => panic!("Lock should be in CommitInProgress phase after all legs locked"),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:250
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:273
+  -             let lock_before = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:276
+  -                 _ => panic!("Lock should be in CommitInProgress after all legs locked"),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:288
+  -             let lock_after_taker = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:291
+  -                 _ => panic!("Lock should still be in CommitInProgress after 1 leg claimed"),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:303
+  -             let lock_after = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:309
+  -                 _ => panic!(
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:346
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:359
+  -                 .expect("Lock should exist after lock_escrow");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:364
+  -                 _ => panic!("Lock should be in LockedForCommit phase"),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:377
+  -                 let lock_after = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:382
+  -                     _ => panic!(
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:388
+  -                 panic!("Lock should have a deadline");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:422
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:435
+  -                 .expect("Lock should exist after lock_escrow");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:462
+  -                 panic!("Lock should have a deadline");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:488
+  -             merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:489
+  -             receipt_data: receipt_data.try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:536
+  -             merkle_proof: (vec![H256::from([6u8; 32])]).try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:537
+  -             receipt_data: tx_data.try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:575
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:620
+  -                 .expect("Intent should still exist after finalization");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:658
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:714
+  -                 crate::SettlementIntents::<Test>::get(intent_id).expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:748
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:775
+  -                 merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:776
+  -                 receipt_data: vec![].try_into().unwrap(), // Empty = invalid
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:822
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:893
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:920
+  -                 merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:921
+  -                 receipt_data: vec![].try_into().unwrap(), // Empty = invalid
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:966
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1017
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1118
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1159
+  -             let intent = crate::SettlementIntents::<Test>::get(intent_id).unwrap();
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1198
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1268
+  -                 .expect("Second intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1366
+  -                     .expect("Secret should be found for intent");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1415
+  -                         merkle_proof: (vec![H256::from([3u8; 32])]).try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1416
+  -                         receipt_data: receipt_data.try_into().unwrap(),
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1486
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1567
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1644
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1737
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1749
+  -             let lock = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1762
+  -             let lock = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1788
+  -             let lock = crate::AtomicLocks::<Test>::get(intent_id).expect("lock exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1825
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1929
+  -                 .expect("Intent should exist");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:1985
+  -             let final_intent = crate::SettlementIntents::<Test>::get(intent_id).expect("exists");
+- [production hot path] pallets/x3-settlement-engine/src/tests.rs:2019
+  -                 .expect("Intent should exist");
+- [test-only] pallets/x3-slash/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-slash/src/benchmarking.rs:37
+  -         let bond = Bonds::<T>::get(bond_id).unwrap();
+- [test-only] pallets/x3-slash/src/benchmarking.rs:56
+  -         let bond = Bonds::<T>::get(bond_id).unwrap();
+- [production hot path] pallets/x3-slash/src/lib.rs:527
+  -                         .expect("bond_expiry fits in bounded reason"),
+- [test-only] pallets/x3-slash/src/mock.rs:97
+  -         .unwrap();
+- [test-only] pallets/x3-slash/src/mock.rs:107
+  -     .unwrap();
+- [production hot path] pallets/x3-slash/src/tests.rs:48
+  -             let bond = Bonds::<Test>::get(bond_id).unwrap();
+- [production hot path] pallets/x3-slash/src/tests.rs:78
+  -             let bond = Bonds::<Test>::get(bond_id).unwrap();
+- [production hot path] pallets/x3-slash/src/tests.rs:82
+  -             let slash = SlashRecords::<Test>::get(0).unwrap();
+- [test-only] pallets/x3-solvency/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-solvency/src/mock.rs:88
+  -         .unwrap()
+- [test-only] pallets/x3-supply-ledger/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_halt.rs:101
+  -         .unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_halt.rs:207
+  -         let out = pallet_x3_supply_ledger::Ledgers::<Test>::get(id).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:66
+  -         let sum = ledger.represented().unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:82
+  -         ledger.canonical_supply = ledger.canonical_supply.checked_add(500).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:83
+  -         ledger.evm_supply = ledger.evm_supply.checked_add(500).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:90
+  -         assert_eq!(ledger.represented().unwrap(), 1500);
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:100
+  -         ledger.canonical_supply = ledger.canonical_supply.checked_sub(200).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:101
+  -         ledger.native_supply = ledger.native_supply.checked_sub(200).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:108
+  -         assert_eq!(ledger.represented().unwrap(), 800);
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:118
+  -         ledger.native_supply = ledger.native_supply.checked_sub(100).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:119
+  -         ledger.pending_supply = ledger.pending_supply.checked_add(100).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:122
+  -         ledger.pending_supply = ledger.pending_supply.checked_sub(100).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:123
+  -         ledger.svm_supply = ledger.svm_supply.checked_add(100).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:128
+  -         assert_eq!(ledger.represented().unwrap(), 1000);
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:140
+  -         ledger.canonical_supply = ledger.canonical_supply.checked_add(500).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:141
+  -         ledger.external_locked_supply = ledger.external_locked_supply.checked_add(500).unwrap();
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:147
+  -         assert_eq!(ledger.represented().unwrap(), 1500);
+- [production hot path] pallets/x3-supply-ledger/src/tests_s0_1.rs:266
+  -             let proof = CurrentSupplyProof::<Test>::get().unwrap();
+- [test-only] pallets/x3-token-factory/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:128
+  -         .unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:139
+  -     bytes.to_vec().try_into().expect("symbol fits")
+- [production hot path] pallets/x3-token-factory/src/tests.rs:142
+  -     bytes.to_vec().try_into().expect("name fits")
+- [production hot path] pallets/x3-token-factory/src/tests.rs:145
+  -     v.try_into().expect("domains fit")
+- [production hot path] pallets/x3-token-factory/src/tests.rs:214
+  -     asset_id.expect("TokenCreated event emitted")
+- [production hot path] pallets/x3-token-factory/src/tests.rs:308
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:314
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:327
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:333
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:345
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:351
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:364
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:370
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:407
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:410
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:439
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:441
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:456
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:460
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:472
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:475
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:487
+  -         let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:489
+  -         l.check_invariant().unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:544
+  -     let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:565
+  -                 let l = Ledger::ledgers(asset_id).unwrap();
+- [production hot path] pallets/x3-token-factory/src/tests.rs:567
+  -                     .expect("invariant holds across factory launch + transfers");
+- [production hot path] pallets/x3-token-factory/src/tests.rs:578
+  -                     l.represented().expect("represented ok"),
+- [test-only] pallets/x3-verifier/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-vrf/fuzz/fuzz_targets/fuzz_codec_parsing.rs:27
+  -         let re_decoded = RandomnessRequest::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-vrf/fuzz/fuzz_targets/fuzz_codec_parsing.rs:46
+  -             let re_decoded = RandomnessResult::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-vrf/fuzz/fuzz_targets/fuzz_codec_parsing.rs:61
+  -             let re_decoded = VrfProof::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-vrf/fuzz/fuzz_targets/fuzz_vrf_prove.rs:36
+  -             let result2 = provider.prove(&seed).unwrap();
+- [test-only] pallets/x3-vrf/src/mock.rs:94
+  -     let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+- [test-only] pallets/x3-vrf/src/mock.rs:99
+  -     .unwrap();
+- [production hot path] pallets/x3-vrf/src/tests.rs:21
+  -         let request = Vrf::pending_requests(request_id).unwrap();
+- [production hot path] pallets/x3-vrf/src/tests.rs:90
+  -         let result = Vrf::fulfilled_requests(request_id).unwrap();
+- [test-only] pallets/x3-wallet-pallet/fuzz/fuzz_targets/fuzz_codec_parsing.rs:20
+  -     //     let re_decoded = SomeStructure::decode(&mut &re_encoded[..]).unwrap();
+- [test-only] pallets/x3-wallet-pallet/src/mock.rs:60
+  -         .unwrap()
+- [production hot path] pallets/x3-wallet-pallet/src/tests.rs:80
+  -         .unwrap();
+- [production hot path] pallets/x3-wallet-pallet/src/tests.rs:105
+  -         .unwrap();
+- [production hot path] pallets/x3-wallet-pallet/src/tests.rs:232
+  -         let profile = X3Wallet::get_biometric_profile(&ALICE).unwrap();
+- [compiler/tooling-only] runtime/build.rs:4
+  -     let out_dir = env::var("OUT_DIR").expect("OUT_DIR must be set by cargo");
+- [compiler/tooling-only] runtime/build.rs:10
+  -     fs::write(&wasm_binary_path, stub).expect("failed to write wasm_binary.rs stub");
+- [production hot path] runtime/src/fraud_proofs/freeze.rs:158
+  -         let decoded = FreezeState::decode(&mut &bytes[..]).expect("decode must succeed");
+- [production hot path] runtime/src/fraud_proofs/pallet.rs:356
+  -             scheduler_commitment_from_bytes(&witness_bytes, 1, 256).expect("valid witness");
+- [startup fail-fast] runtime/src/fraud_proofs/startup_gate.rs:211
+  -         for v in required_vectors().expect("reference vectors must decode") {
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:190
+  -         let real_commitment = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:200
+  -         let (_, proposer) = result.unwrap();
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:209
+  -         let commitment = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:224
+  -         let real = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:241
+  -         let real = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:262
+  -         let commitment = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:276
+  -         let real = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:293
+  -         let real = witness.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/fraud_proofs/verifier.rs:303
+  -         let real2 = witness2.compute_commitments().unwrap().scheduler_commitment;
+- [production hot path] runtime/src/lib.rs:2829
+  -             let receipt = result.unwrap();
+- [production hot path] runtime/src/lib.rs:2846
+  -             let receipt = result.unwrap();
+- [test-only] runtime/tests/fraud_proofs_proptest.rs:167
+  -         let c1 = scheduler_commitment_from_bytes(&witness, 1, 256).expect("valid witness");
+- [test-only] runtime/tests/fraud_proofs_proptest.rs:168
+  -         let c2 = scheduler_commitment_from_bytes(&witness, 1, 256).expect("valid witness");
+- [test-only] runtime/tests/fraud_proofs_proptest.rs:181
+  -     let commitment = scheduler_commitment_from_bytes(&witness, 1, 256).expect("valid witness");
+- [test-only] runtime/tests/fraud_proofs_proptest.rs:199
+  -     let commitment = scheduler_commitment_from_bytes(&witness, 1, 256).expect("valid witness");
+- [test-only] runtime/tests/fraud_proofs_proptest.rs:222
+  -     let real_commitment = scheduler_commitment_from_bytes(&witness, 1, 256).expect("valid witness");
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:160
+  -     let w1 = SchedulerWitnessV1::decode_and_validate(&enc, 1, 1000).unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:161
+  -     let w2 = SchedulerWitnessV1::decode_and_validate(&enc, 1, 1000).unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:163
+  -     let c1 = w1.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:164
+  -     let c2 = w2.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:177
+  -     let c1 = w1.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:178
+  -     let c2 = w2.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:256
+  -     let w1 = SchedulerWitnessV1::decode_and_validate(&enc1, 1, 1000).unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:257
+  -     let w2 = SchedulerWitnessV1::decode_and_validate(&enc2, 1, 1000).unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:260
+  -         w1.compute_commitments().unwrap().graph_commitment,
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:261
+  -         w2.compute_commitments().unwrap().graph_commitment,
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:268
+  -     let commitments = w.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:271
+  -     let comms_conflict = w_conflict.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:286
+  -     let c1 = w1.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:287
+  -     let c2 = w2.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:298
+  -         w1.compute_commitments().unwrap().order_commitment,
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:299
+  -         w2.compute_commitments().unwrap().order_commitment,
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:308
+  -     let c1 = w_no_conflict.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:309
+  -     let c2 = w_full_conflict.compute_commitments().unwrap();
+- [test-only] runtime/tests/fraud_proofs_witness_v1.rs:323
+  -     assert_eq!(decoded.unwrap().seed, Some(H256([0x55u8; 32])));
+
+## Summary
+
+- runtime-hook findings: 0
+- extrinsic-path findings: 0
+- production hot-path findings: 3245
+
+## Gate Evaluation
+
+- runtime hook panic path gate: PASS
+- user-triggerable unwrap/expect gate: FAIL

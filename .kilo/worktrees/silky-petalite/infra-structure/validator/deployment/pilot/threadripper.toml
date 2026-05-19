@@ -1,0 +1,69 @@
+# ── X3 Chain – Threadripper Core Node Configuration ──────────────────────
+# Primary pilot validator: Threadripper + 3 × GTX 1070 (8 GB each)
+
+[node]
+role       = "core"
+name       = "threadripper-core-01"
+datacenter = "local"
+
+[hardware]
+cpu        = "AMD Threadripper"
+gpu_count  = 3
+gpu_model  = "GTX 1070"
+gpu_vram_mb = 8192
+
+[gpu]
+# Device indices and chain family assignments
+# Scheduler will rebalance dynamically, but these are initial hints
+[[gpu.devices]]
+index       = 0
+family      = "evm"
+kernels     = ["secp256k1", "keccak256"]
+max_batch   = 8192
+streams     = 4
+
+[[gpu.devices]]
+index       = 1
+family      = "svm"
+kernels     = ["ed25519", "sha256", "poh"]
+max_batch   = 16384
+streams     = 4
+
+[[gpu.devices]]
+index       = 2
+family      = "cosmos"
+kernels     = ["secp256k1", "sha256"]
+max_batch   = 8192
+streams     = 4
+
+[scheduler]
+rebalance_interval_sec = 30
+vram_headroom_mb       = 512           # Keep 512 MB free per GPU
+idle_threshold_sec     = 5             # GPU idle → hand to swarm compute
+preempt_latency_ms     = 50            # Max preemption latency for swarm tasks
+
+[validator]
+chains = [
+    "ethereum", "polygon", "arbitrum", "optimism", "base",   # EVM
+    "solana", "eclipse",                                       # SVM
+    "cosmoshub", "osmosis", "injective",                       # Cosmos
+    "polkadot", "kusama",                                      # Substrate
+]
+rpc_url              = "ws://127.0.0.1:9944"
+state_root_interval  = 12              # Validate state root every N seconds
+atomic_swap_enabled  = true
+
+[swarm]
+enabled              = true
+callback_url         = "http://127.0.0.1:8089/swarm/gpu"
+max_idle_tasks       = 64
+priority_floor       = 10              # Min priority to accept from swarm
+
+[metrics]
+prometheus_port      = 9100
+json_log_path        = "/var/log/x3/pilot-metrics.jsonl"
+dashboard_port       = 8080
+
+[tls]
+cert_path = "/etc/x3/tls/cert.pem"
+key_path  = "/etc/x3/tls/key.pem"

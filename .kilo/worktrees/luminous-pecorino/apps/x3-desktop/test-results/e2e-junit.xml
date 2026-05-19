@@ -1,0 +1,1965 @@
+<testsuites id="" name="" tests="120" failures="109" skipped="11" errors="0" time="60.08697000000021">
+<testsuite name="full-integration.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="17" failures="6" skipped="11" time="0" errors="0">
+<testcase name="Full E2E Integration Suite › should verify all backend services are running" classname="full-integration.spec.ts" time="0">
+<failure message="full-integration.spec.ts:37:3 should verify all backend services are running" type="FAILURE">
+<![CDATA[  [chromium] › full-integration.spec.ts:37:3 › Full E2E Integration Suite › should verify all backend services are running 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      29 |
+      30 |   test.afterAll(async () => {
+    > 31 |     await desktopPage.close();
+         |                       ^
+      32 |     await dashboardPage.close();
+      33 |   });
+      34 |
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/full-integration.spec.ts:31:23
+]]>
+</failure>
+</testcase>
+<testcase name="Full E2E Integration Suite › should load Tauri desktop app without errors" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should display desktop navigation menu" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should fetch real-time floor stats from API" classname="full-integration.spec.ts" time="0">
+<failure message="full-integration.spec.ts:84:3 should fetch real-time floor stats from API" type="FAILURE">
+<![CDATA[  [chromium] › full-integration.spec.ts:84:3 › Full E2E Integration Suite › should fetch real-time floor stats from API 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      29 |
+      30 |   test.afterAll(async () => {
+    > 31 |     await desktopPage.close();
+         |                       ^
+      32 |     await dashboardPage.close();
+      33 |   });
+      34 |
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/full-integration.spec.ts:31:23
+]]>
+</failure>
+</testcase>
+<testcase name="Full E2E Integration Suite › should display live execution feed with intents from API" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should update stats every 3 seconds" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should sync settings between desktop and browser" classname="full-integration.spec.ts" time="0">
+<failure message="full-integration.spec.ts:134:3 should sync settings between desktop and browser" type="FAILURE">
+<![CDATA[  [chromium] › full-integration.spec.ts:134:3 › Full E2E Integration Suite › should sync settings between desktop and browser 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      29 |
+      30 |   test.afterAll(async () => {
+    > 31 |     await desktopPage.close();
+         |                       ^
+      32 |     await dashboardPage.close();
+      33 |   });
+      34 |
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/full-integration.spec.ts:31:23
+]]>
+</failure>
+</testcase>
+<testcase name="Full E2E Integration Suite › should handle API errors gracefully" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should load dashboard under 3 seconds" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should handle rapid stat refreshes" classname="full-integration.spec.ts" time="0">
+<failure message="full-integration.spec.ts:161:3 should handle rapid stat refreshes" type="FAILURE">
+<![CDATA[  [chromium] › full-integration.spec.ts:161:3 › Full E2E Integration Suite › should handle rapid stat refreshes 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      29 |
+      30 |   test.afterAll(async () => {
+    > 31 |     await desktopPage.close();
+         |                       ^
+      32 |     await dashboardPage.close();
+      33 |   });
+      34 |
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/full-integration.spec.ts:31:23
+]]>
+</failure>
+</testcase>
+<testcase name="Full E2E Integration Suite › should query all major API endpoints successfully" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should validate API response schemas" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should load all UI plugins without errors" classname="full-integration.spec.ts" time="0">
+<failure message="full-integration.spec.ts:221:3 should load all UI plugins without errors" type="FAILURE">
+<![CDATA[  [chromium] › full-integration.spec.ts:221:3 › Full E2E Integration Suite › should load all UI plugins without errors 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      29 |
+      30 |   test.afterAll(async () => {
+    > 31 |     await desktopPage.close();
+         |                       ^
+      32 |     await dashboardPage.close();
+      33 |   });
+      34 |
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/full-integration.spec.ts:31:23
+]]>
+</failure>
+</testcase>
+<testcase name="Full E2E Integration Suite › should maintain consistent state across API calls" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should render dashboard with proper semantic HTML" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Full E2E Integration Suite › should display error boundary if API fails" classname="full-integration.spec.ts" time="0">
+<failure message="full-integration.spec.ts:280:3 should display error boundary if API fails" type="FAILURE">
+<![CDATA[  [chromium] › full-integration.spec.ts:280:3 › Full E2E Integration Suite › should display error boundary if API fails 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      29 |
+      30 |   test.afterAll(async () => {
+    > 31 |     await desktopPage.close();
+         |                       ^
+      32 |     await dashboardPage.close();
+      33 |   });
+      34 |
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/full-integration.spec.ts:31:23
+]]>
+</failure>
+</testcase>
+<testcase name="Full E2E Integration Suite › should complete full user workflow: load → view data → navigate" classname="full-integration.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="network-edge-cases.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="16" failures="16" skipped="0" time="0.219" errors="0">
+<testcase name="Network Edge Cases: Slow Connections › should handle 1s network latency gracefully" classname="network-edge-cases.spec.ts" time="0.009">
+<failure message="network-edge-cases.spec.ts:29:3 should handle 1s network latency gracefully" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:29:3 › Network Edge Cases: Slow Connections › should handle 1s network latency gracefully 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Slow Connections › should handle 3s network latency and timeout gracefully" classname="network-edge-cases.spec.ts" time="0.007">
+<failure message="network-edge-cases.spec.ts:48:3 should handle 3s network latency and timeout gracefully" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:48:3 › Network Edge Cases: Slow Connections › should handle 3s network latency and timeout gracefully 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Slow Connections › should display helpful timeouts errors" classname="network-edge-cases.spec.ts" time="0.017">
+<failure message="network-edge-cases.spec.ts:62:3 should display helpful timeouts errors" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:62:3 › Network Edge Cases: Slow Connections › should display helpful timeouts errors 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Slow Connections › should complete slow requests after timeout period" classname="network-edge-cases.spec.ts" time="0.008">
+<failure message="network-edge-cases.spec.ts:80:3 should complete slow requests after timeout period" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:80:3 › Network Edge Cases: Slow Connections › should complete slow requests after timeout period 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Packet Loss › should handle 10% packet loss" classname="network-edge-cases.spec.ts" time="0.007">
+<failure message="network-edge-cases.spec.ts:104:3 should handle 10% packet loss" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:104:3 › Network Edge Cases: Packet Loss › should handle 10% packet loss 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Packet Loss › should handle 30% packet loss with recovery" classname="network-edge-cases.spec.ts" time="0.011">
+<failure message="network-edge-cases.spec.ts:118:3 should handle 30% packet loss with recovery" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:118:3 › Network Edge Cases: Packet Loss › should handle 30% packet loss with recovery 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Packet Loss › should show user-friendly message during packet loss" classname="network-edge-cases.spec.ts" time="0.006">
+<failure message="network-edge-cases.spec.ts:134:3 should show user-friendly message during packet loss" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:134:3 › Network Edge Cases: Packet Loss › should show user-friendly message during packet loss 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Complete Failure › should handle network disconnection" classname="network-edge-cases.spec.ts" time="0.022">
+<failure message="network-edge-cases.spec.ts:156:3 should handle network disconnection" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:156:3 › Network Edge Cases: Complete Failure › should handle network disconnection 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Complete Failure › should provide retry mechanism when offline" classname="network-edge-cases.spec.ts" time="0.024">
+<failure message="network-edge-cases.spec.ts:172:3 should provide retry mechanism when offline" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:172:3 › Network Edge Cases: Complete Failure › should provide retry mechanism when offline 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Complete Failure › should recover when network is restored" classname="network-edge-cases.spec.ts" time="0.007">
+<failure message="network-edge-cases.spec.ts:183:3 should recover when network is restored" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:183:3 › Network Edge Cases: Complete Failure › should recover when network is restored 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Complete Failure › should handle intermittent connection drops" classname="network-edge-cases.spec.ts" time="0.014">
+<failure message="network-edge-cases.spec.ts:202:3 should handle intermittent connection drops" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:202:3 › Network Edge Cases: Complete Failure › should handle intermittent connection drops 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: High Latency Scenarios › should handle latency spikes gracefully" classname="network-edge-cases.spec.ts" time="0.017">
+<failure message="network-edge-cases.spec.ts:224:3 should handle latency spikes gracefully" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:224:3 › Network Edge Cases: High Latency Scenarios › should handle latency spikes gracefully 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: High Latency Scenarios › should queue requests during high latency" classname="network-edge-cases.spec.ts" time="0.016">
+<failure message="network-edge-cases.spec.ts:240:3 should queue requests during high latency" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:240:3 › Network Edge Cases: High Latency Scenarios › should queue requests during high latency 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: High Latency Scenarios › should display latency-aware loading states" classname="network-edge-cases.spec.ts" time="0.021">
+<failure message="network-edge-cases.spec.ts:262:3 should display latency-aware loading states" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:262:3 › Network Edge Cases: High Latency Scenarios › should display latency-aware loading states 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Consistency › should maintain data consistency across retries" classname="network-edge-cases.spec.ts" time="0.014">
+<failure message="network-edge-cases.spec.ts:281:3 should maintain data consistency across retries" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:281:3 › Network Edge Cases: Consistency › should maintain data consistency across retries 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Network Edge Cases: Consistency › should handle mixed success and failure responses" classname="network-edge-cases.spec.ts" time="0.019">
+<failure message="network-edge-cases.spec.ts:301:3 should handle mixed success and failure responses" type="FAILURE">
+<![CDATA[  [chromium] › network-edge-cases.spec.ts:301:3 › Network Edge Cases: Consistency › should handle mixed success and failure responses 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+</testsuite>
+<testsuite name="practical-integration.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="19" failures="19" skipped="0" time="1.03" errors="0">
+<testcase name="X3 Intelligence E2E Integration › API server should be running and healthy" classname="practical-integration.spec.ts" time="0.062">
+<failure message="practical-integration.spec.ts:21:3 API server should be running and healthy" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:21:3 › X3 Intelligence E2E Integration › API server should be running and healthy 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/health
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      20 |
+      21 |   test('API server should be running and healthy', async () => {
+    > 22 |     const response = await apiRequest.get('http://localhost:8001/health');
+         |                                       ^
+      23 |     expect(response.status()).toBe(200);
+      24 |     const data = await response.json();
+      25 |     expect(data.status).toBe('ok');
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:22:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › all API endpoints should return 200" classname="practical-integration.spec.ts" time="0.042">
+<failure message="practical-integration.spec.ts:28:3 all API endpoints should return 200" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:28:3 › X3 Intelligence E2E Integration › all API endpoints should return 200 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/floor/stats
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      36 |
+      37 |     for (const endpoint of endpoints) {
+    > 38 |       const response = await apiRequest.get(`${API_BASE}${endpoint}`);
+         |                                         ^
+      39 |       expect(response.status()).toBe(200);
+      40 |     }
+      41 |   });
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:38:41
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › floor stats should have required fields" classname="practical-integration.spec.ts" time="0.058">
+<failure message="practical-integration.spec.ts:45:3 floor stats should have required fields" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:45:3 › X3 Intelligence E2E Integration › floor stats should have required fields 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/floor/stats
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      44 |
+      45 |   test('floor stats should have required fields', async () => {
+    > 46 |     const response = await apiRequest.get(`${API_BASE}/floor/stats`);
+         |                                       ^
+      47 |     const data = await response.json();
+      48 |
+      49 |     expect(data).toHaveProperty('activeAgents');
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:46:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › intents should be properly paginated" classname="practical-integration.spec.ts" time="0.083">
+<failure message="practical-integration.spec.ts:60:3 intents should be properly paginated" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:60:3 › X3 Intelligence E2E Integration › intents should be properly paginated 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/intents?page=1&pageSize=5
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      59 |
+      60 |   test('intents should be properly paginated', async () => {
+    > 61 |     const response = await apiRequest.get(`${API_BASE}/intents?page=1&pageSize=5`);
+         |                                       ^
+      62 |     const data = await response.json();
+      63 |
+      64 |     expect(data).toHaveProperty('items');
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:61:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › intent items should have required fields" classname="practical-integration.spec.ts" time="0.045">
+<failure message="practical-integration.spec.ts:74:3 intent items should have required fields" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:74:3 › X3 Intelligence E2E Integration › intent items should have required fields 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/intents?page=1&pageSize=1
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      73 |
+      74 |   test('intent items should have required fields', async () => {
+    > 75 |     const response = await apiRequest.get(`${API_BASE}/intents?page=1&pageSize=1`);
+         |                                       ^
+      76 |     const data = await response.json();
+      77 |
+      78 |     if (data.items.length > 0) {
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:75:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › agents should be properly paginated" classname="practical-integration.spec.ts" time="0.042">
+<failure message="practical-integration.spec.ts:92:3 agents should be properly paginated" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:92:3 › X3 Intelligence E2E Integration › agents should be properly paginated 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/agents?page=1&pageSize=5
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      91 |
+      92 |   test('agents should be properly paginated', async () => {
+    > 93 |     const response = await apiRequest.get(`${API_BASE}/agents?page=1&pageSize=5`);
+         |                                       ^
+      94 |     const data = await response.json();
+      95 |
+      96 |     expect(data).toHaveProperty('items');
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:93:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › slashing events should be properly formatted" classname="practical-integration.spec.ts" time="0.1">
+<failure message="practical-integration.spec.ts:105:3 slashing events should be properly formatted" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:105:3 › X3 Intelligence E2E Integration › slashing events should be properly formatted 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/slashes?page=1&pageSize=5
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      104 |
+      105 |   test('slashing events should be properly formatted', async () => {
+    > 106 |     const response = await apiRequest.get(`${API_BASE}/slashes?page=1&pageSize=5`);
+          |                                       ^
+      107 |     const data = await response.json();
+      108 |
+      109 |     expect(data).toHaveProperty('items');
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:106:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › dashboard should load successfully" classname="practical-integration.spec.ts" time="0.013">
+<failure message="practical-integration.spec.ts:123:3 dashboard should load successfully" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:123:3 › X3 Intelligence E2E Integration › dashboard should load successfully 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › dashboard should display floor statistics" classname="practical-integration.spec.ts" time="0.014">
+<failure message="practical-integration.spec.ts:139:3 dashboard should display floor statistics" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:139:3 › X3 Intelligence E2E Integration › dashboard should display floor statistics 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › dashboard should fetch from correct API endpoint" classname="practical-integration.spec.ts" time="0.013">
+<failure message="practical-integration.spec.ts:150:3 dashboard should fetch from correct API endpoint" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:150:3 › X3 Intelligence E2E Integration › dashboard should fetch from correct API endpoint 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › dashboard elements should be accessible" classname="practical-integration.spec.ts" time="0.008">
+<failure message="practical-integration.spec.ts:167:3 dashboard elements should be accessible" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:167:3 › X3 Intelligence E2E Integration › dashboard elements should be accessible 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › API should return fresh data on each call" classname="practical-integration.spec.ts" time="0.051">
+<failure message="practical-integration.spec.ts:183:3 API should return fresh data on each call" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:183:3 › X3 Intelligence E2E Integration › API should return fresh data on each call 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/floor/stats
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      182 |
+      183 |   test('API should return fresh data on each call', async () => {
+    > 184 |     const call1 = await apiRequest.get(`${API_BASE}/floor/stats`);
+          |                                    ^
+      185 |     const data1 = await call1.json();
+      186 |
+      187 |     // Add small delay
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:184:36
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › rapid API calls should not fail" classname="practical-integration.spec.ts" time="0.225">
+<failure message="practical-integration.spec.ts:202:3 rapid API calls should not fail" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:202:3 › X3 Intelligence E2E Integration › rapid API calls should not fail 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/floor/stats
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      203 |     const calls = [];
+      204 |     for (let i = 0; i < 10; i++) {
+    > 205 |       calls.push(apiRequest.get(`${API_BASE}/floor/stats`));
+          |                             ^
+      206 |     }
+      207 |
+      208 |     const responses = await Promise.all(calls);
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:205:29
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › API should handle invalid pagination gracefully" classname="practical-integration.spec.ts" time="0.046">
+<failure message="practical-integration.spec.ts:217:3 API should handle invalid pagination gracefully" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:217:3 › X3 Intelligence E2E Integration › API should handle invalid pagination gracefully 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/intents?page=99999&pageSize=10
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      216 |
+      217 |   test('API should handle invalid pagination gracefully', async () => {
+    > 218 |     const response = await apiRequest.get(`${API_BASE}/intents?page=99999&pageSize=10`);
+          |                                       ^
+      219 |     // Should return 200 with empty items
+      220 |     expect([200, 404]).toContain(response.status());
+      221 |   });
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:218:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › API should handle missing query params" classname="practical-integration.spec.ts" time="0.092">
+<failure message="practical-integration.spec.ts:223:3 API should handle missing query params" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:223:3 › X3 Intelligence E2E Integration › API should handle missing query params 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/intents
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      222 |
+      223 |   test('API should handle missing query params', async () => {
+    > 224 |     const response = await apiRequest.get(`${API_BASE}/intents`);
+          |                                       ^
+      225 |     // Should still return valid response
+      226 |     expect(response.status()).toBe(200);
+      227 |   });
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:224:39
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › dashboard should load within 5 seconds" classname="practical-integration.spec.ts" time="0.018">
+<failure message="practical-integration.spec.ts:231:3 dashboard should load within 5 seconds" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:231:3 › X3 Intelligence E2E Integration › dashboard should load within 5 seconds 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › API endpoints should respond within 1 second" classname="practical-integration.spec.ts" time="0.079">
+<failure message="practical-integration.spec.ts:240:3 API endpoints should respond within 1 second" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:240:3 › X3 Intelligence E2E Integration › API endpoints should respond within 1 second 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:8001
+    Call log:
+      - → GET http://localhost:8001/api/v1/floor/stats
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      247 |     for (const endpoint of endpoints) {
+      248 |       const startTime = Date.now();
+    > 249 |       const response = await apiRequest.get(`${API_BASE}${endpoint}`);
+          |                                         ^
+      250 |       const responseTime = Date.now() - startTime;
+      251 |
+      252 |       expect(response.status()).toBe(200);
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:249:41
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › complete workflow: load dashboard and fetch data" classname="practical-integration.spec.ts" time="0.005">
+<failure message="practical-integration.spec.ts:259:3 complete workflow: load dashboard and fetch data" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:259:3 › X3 Intelligence E2E Integration › complete workflow: load dashboard and fetch data 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="X3 Intelligence E2E Integration › multiple users can access dashboard simultaneously" classname="practical-integration.spec.ts" time="0.034">
+<failure message="practical-integration.spec.ts:283:3 multiple users can access dashboard simultaneously" type="FAILURE">
+<![CDATA[  [chromium] › practical-integration.spec.ts:283:3 › X3 Intelligence E2E Integration › multiple users can access dashboard simultaneously 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+      288 |     // Create 3 concurrent page instances
+      289 |     for (let i = 0; i < 3; i++) {
+    > 290 |       const page = await playwright.chromium.launch().then(browser =>
+          |                                              ^
+      291 |         browser.newPage()
+      292 |       );
+      293 |       pages.push(page);
+        at /home/lojak/Desktop/X3_ATOMIC_STAR/apps/x3-desktop/tests/e2e/practical-integration.spec.ts:290:46
+]]>
+</failure>
+</testcase>
+</testsuite>
+<testsuite name="smoke-tests.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="34" failures="34" skipped="0" time="0.525" errors="0">
+<testcase name="TIER 6 - CRM System › Create new contact" classname="smoke-tests.spec.ts" time="0.015">
+<failure message="smoke-tests.spec.ts:20:3 Create new contact" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:20:3 › TIER 6 - CRM System › Create new contact ─────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › View all contacts" classname="smoke-tests.spec.ts" time="0.007">
+<failure message="smoke-tests.spec.ts:37:3 View all contacts" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:37:3 › TIER 6 - CRM System › View all contacts ──────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Search contact by email" classname="smoke-tests.spec.ts" time="0.007">
+<failure message="smoke-tests.spec.ts:47:3 Search contact by email" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:47:3 › TIER 6 - CRM System › Search contact by email ────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Edit contact details" classname="smoke-tests.spec.ts" time="0.021">
+<failure message="smoke-tests.spec.ts:57:3 Edit contact details" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:57:3 › TIER 6 - CRM System › Edit contact details ───────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Delete contact" classname="smoke-tests.spec.ts" time="0.008">
+<failure message="smoke-tests.spec.ts:71:3 Delete contact" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:71:3 › TIER 6 - CRM System › Delete contact ─────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Import contacts from CSV" classname="smoke-tests.spec.ts" time="0.012">
+<failure message="smoke-tests.spec.ts:86:3 Import contacts from CSV" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:86:3 › TIER 6 - CRM System › Import contacts from CSV ───────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Export contacts to CSV" classname="smoke-tests.spec.ts" time="0.016">
+<failure message="smoke-tests.spec.ts:104:3 Export contacts to CSV" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:104:3 › TIER 6 - CRM System › Export contacts to CSV ────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Find duplicate contacts" classname="smoke-tests.spec.ts" time="0.03">
+<failure message="smoke-tests.spec.ts:119:3 Find duplicate contacts" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:119:3 › TIER 6 - CRM System › Find duplicate contacts ───────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Merge duplicate contacts" classname="smoke-tests.spec.ts" time="0.008">
+<failure message="smoke-tests.spec.ts:130:3 Merge duplicate contacts" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:130:3 › TIER 6 - CRM System › Merge duplicate contacts ──────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Send email to contact" classname="smoke-tests.spec.ts" time="0.024">
+<failure message="smoke-tests.spec.ts:148:3 Send email to contact" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:148:3 › TIER 6 - CRM System › Send email to contact ─────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Use email template" classname="smoke-tests.spec.ts" time="0.022">
+<failure message="smoke-tests.spec.ts:166:3 Use email template" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:166:3 › TIER 6 - CRM System › Use email template ────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Create campaign" classname="smoke-tests.spec.ts" time="0.014">
+<failure message="smoke-tests.spec.ts:184:3 Create campaign" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:184:3 › TIER 6 - CRM System › Create campaign ───────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › View campaign metrics" classname="smoke-tests.spec.ts" time="0.03">
+<failure message="smoke-tests.spec.ts:204:3 View campaign metrics" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:204:3 › TIER 6 - CRM System › View campaign metrics ─────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Calculate lead scores" classname="smoke-tests.spec.ts" time="0.008">
+<failure message="smoke-tests.spec.ts:218:3 Calculate lead scores" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:218:3 › TIER 6 - CRM System › Calculate lead scores ─────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Filter contacts by score grade" classname="smoke-tests.spec.ts" time="0.024">
+<failure message="smoke-tests.spec.ts:232:3 Filter contacts by score grade" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:232:3 › TIER 6 - CRM System › Filter contacts by score grade ────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › View pipeline analytics" classname="smoke-tests.spec.ts" time="0.016">
+<failure message="smoke-tests.spec.ts:248:3 View pipeline analytics" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:248:3 › TIER 6 - CRM System › View pipeline analytics ───────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 6 - CRM System › Export analytics report" classname="smoke-tests.spec.ts" time="0.007">
+<failure message="smoke-tests.spec.ts:260:3 Export analytics report" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:260:3 › TIER 6 - CRM System › Export analytics report ───────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Connect WebSocket" classname="smoke-tests.spec.ts" time="0.007">
+<failure message="smoke-tests.spec.ts:281:3 Connect WebSocket" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:281:3 › TIER 7 - Social Network › Connect WebSocket ─────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Send direct message" classname="smoke-tests.spec.ts" time="0.009">
+<failure message="smoke-tests.spec.ts:293:3 Send direct message" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:293:3 › TIER 7 - Social Network › Send direct message ───────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Post to social feed" classname="smoke-tests.spec.ts" time="0.01">
+<failure message="smoke-tests.spec.ts:307:3 Post to social feed" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:307:3 › TIER 7 - Social Network › Post to social feed ───────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Upload media to IPFS" classname="smoke-tests.spec.ts" time="0.008">
+<failure message="smoke-tests.spec.ts:322:3 Upload media to IPFS" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:322:3 › TIER 7 - Social Network › Upload media to IPFS ──────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Receive notifications" classname="smoke-tests.spec.ts" time="0.021">
+<failure message="smoke-tests.spec.ts:341:3 Receive notifications" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:341:3 › TIER 7 - Social Network › Receive notifications ─────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › ActivityPub federation - profile is discoverable" classname="smoke-tests.spec.ts" time="0.023">
+<failure message="smoke-tests.spec.ts:356:3 ActivityPub federation - profile is discoverable" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:356:3 › TIER 7 - Social Network › ActivityPub federation - profile is discoverable 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Like and unlike post" classname="smoke-tests.spec.ts" time="0.023">
+<failure message="smoke-tests.spec.ts:365:3 Like and unlike post" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:365:3 › TIER 7 - Social Network › Like and unlike post ──────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Follow user" classname="smoke-tests.spec.ts" time="0.017">
+<failure message="smoke-tests.spec.ts:380:3 Follow user" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:380:3 › TIER 7 - Social Network › Follow user ───────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › Comment on post" classname="smoke-tests.spec.ts" time="0.026">
+<failure message="smoke-tests.spec.ts:393:3 Comment on post" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:393:3 › TIER 7 - Social Network › Comment on post ───────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="TIER 7 - Social Network › View user profile" classname="smoke-tests.spec.ts" time="0.009">
+<failure message="smoke-tests.spec.ts:408:3 View user profile" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:408:3 › TIER 7 - Social Network › View user profile ─────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Integration - CRM + Social › Link contact profile to social account" classname="smoke-tests.spec.ts" time="0.016">
+<failure message="smoke-tests.spec.ts:426:3 Link contact profile to social account" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:426:3 › Integration - CRM + Social › Link contact profile to social account 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Integration - CRM + Social › Send email from campaign to social followers" classname="smoke-tests.spec.ts" time="0.009">
+<failure message="smoke-tests.spec.ts:446:3 Send email from campaign to social followers" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:446:3 › Integration - CRM + Social › Send email from campaign to social followers 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Performance › Dashboard loads in under 2 seconds" classname="smoke-tests.spec.ts" time="0.011">
+<failure message="smoke-tests.spec.ts:467:3 Dashboard loads in under 2 seconds" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:467:3 › Performance › Dashboard loads in under 2 seconds ────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Performance › Contacts list with 1000 items loads and is searchable" classname="smoke-tests.spec.ts" time="0.022">
+<failure message="smoke-tests.spec.ts:477:3 Contacts list with 1000 items loads and is searchable" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:477:3 › Performance › Contacts list with 1000 items loads and is searchable 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Error Handling › Invalid email format shows error" classname="smoke-tests.spec.ts" time="0.008">
+<failure message="smoke-tests.spec.ts:497:3 Invalid email format shows error" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:497:3 › Error Handling › Invalid email format shows error ───────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Error Handling › Duplicate email shows warning" classname="smoke-tests.spec.ts" time="0.015">
+<failure message="smoke-tests.spec.ts:506:3 Duplicate email shows warning" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:506:3 › Error Handling › Duplicate email shows warning ──────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Error Handling › Network error shows offline message" classname="smoke-tests.spec.ts" time="0.022">
+<failure message="smoke-tests.spec.ts:515:3 Network error shows offline message" type="FAILURE">
+<![CDATA[  [chromium] › smoke-tests.spec.ts:515:3 › Error Handling › Network error shows offline message ────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+</testsuite>
+<testsuite name="stress-tests.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="16" failures="16" skipped="0" time="0.29" errors="0">
+<testcase name="Stress Tests: Rapid Concurrent Requests › should handle 10 rapid panel interactions" classname="stress-tests.spec.ts" time="0.026">
+<failure message="stress-tests.spec.ts:27:3 should handle 10 rapid panel interactions" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:27:3 › Stress Tests: Rapid Concurrent Requests › should handle 10 rapid panel interactions 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Rapid Concurrent Requests › should handle 20 concurrent IPC commands" classname="stress-tests.spec.ts" time="0.014">
+<failure message="stress-tests.spec.ts:52:3 should handle 20 concurrent IPC commands" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:52:3 › Stress Tests: Rapid Concurrent Requests › should handle 20 concurrent IPC commands 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Rapid Concurrent Requests › should maintain performance under concurrent load" classname="stress-tests.spec.ts" time="0.038">
+<failure message="stress-tests.spec.ts:71:3 should maintain performance under concurrent load" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:71:3 › Stress Tests: Rapid Concurrent Requests › should maintain performance under concurrent load 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Rapid Concurrent Requests › should handle 100 rapid requests in succession" classname="stress-tests.spec.ts" time="0.02">
+<failure message="stress-tests.spec.ts:99:3 should handle 100 rapid requests in succession" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:99:3 › Stress Tests: Rapid Concurrent Requests › should handle 100 rapid requests in succession 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Concurrent Failures › should handle 50% packet loss on all requests" classname="stress-tests.spec.ts" time="0.022">
+<failure message="stress-tests.spec.ts:136:3 should handle 50% packet loss on all requests" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:136:3 › Stress Tests: Concurrent Failures › should handle 50% packet loss on all requests 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Concurrent Failures › should handle rapid retries under 50% packet loss" classname="stress-tests.spec.ts" time="0.026">
+<failure message="stress-tests.spec.ts:157:3 should handle rapid retries under 50% packet loss" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:157:3 › Stress Tests: Concurrent Failures › should handle rapid retries under 50% packet loss 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Concurrent Failures › should recover from cascading failures" classname="stress-tests.spec.ts" time="0.011">
+<failure message="stress-tests.spec.ts:178:3 should recover from cascading failures" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:178:3 › Stress Tests: Concurrent Failures › should recover from cascading failures 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Concurrent Failures › should handle simultaneous errors on all panels" classname="stress-tests.spec.ts" time="0.013">
+<failure message="stress-tests.spec.ts:195:3 should handle simultaneous errors on all panels" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:195:3 › Stress Tests: Concurrent Failures › should handle simultaneous errors on all panels 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Concurrent Failures › should not leak memory during repeated failures" classname="stress-tests.spec.ts" time="0.008">
+<failure message="stress-tests.spec.ts:216:3 should not leak memory during repeated failures" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:216:3 › Stress Tests: Concurrent Failures › should not leak memory during repeated failures 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: High-Frequency Retries › should handle exponential backoff correctly under high load" classname="stress-tests.spec.ts" time="0.009">
+<failure message="stress-tests.spec.ts:250:3 should handle exponential backoff correctly under high load" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:250:3 › Stress Tests: High-Frequency Retries › should handle exponential backoff correctly under high load 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: High-Frequency Retries › should not retry successfully completed requests" classname="stress-tests.spec.ts" time="0.013">
+<failure message="stress-tests.spec.ts:276:3 should not retry successfully completed requests" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:276:3 › Stress Tests: High-Frequency Retries › should not retry successfully completed requests 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: High-Frequency Retries › should limit retries to prevent infinite loops" classname="stress-tests.spec.ts" time="0.031">
+<failure message="stress-tests.spec.ts:293:3 should limit retries to prevent infinite loops" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:293:3 › Stress Tests: High-Frequency Retries › should limit retries to prevent infinite loops 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Latency Under Load › should maintain reasonable latency with 1s delay + concurrent requests" classname="stress-tests.spec.ts" time="0.018">
+<failure message="stress-tests.spec.ts:323:3 should maintain reasonable latency with 1s delay + concurrent requests" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:323:3 › Stress Tests: Latency Under Load › should maintain reasonable latency with 1s delay + concurrent requests 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Latency Under Load › should handle timeout correctly under 2s latency + concurrent load" classname="stress-tests.spec.ts" time="0.012">
+<failure message="stress-tests.spec.ts:348:3 should handle timeout correctly under 2s latency + concurrent load" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:348:3 › Stress Tests: Latency Under Load › should handle timeout correctly under 2s latency + concurrent load 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Stability &amp; Recovery › should remain stable through 5-minute continuous operation" classname="stress-tests.spec.ts" time="0.012">
+<failure message="stress-tests.spec.ts:373:3 should remain stable through 5-minute continuous operation" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:373:3 › Stress Tests: Stability & Recovery › should remain stable through 5-minute continuous operation 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Stress Tests: Stability &amp; Recovery › should handle memory efficiently under sustained load" classname="stress-tests.spec.ts" time="0.017">
+<failure message="stress-tests.spec.ts:403:3 should handle memory efficiently under sustained load" type="FAILURE">
+<![CDATA[  [chromium] › stress-tests.spec.ts:403:3 › Stress Tests: Stability & Recovery › should handle memory efficiently under sustained load 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+</testsuite>
+<testsuite name="tauri-backend.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="13" failures="13" skipped="0" time="0.211" errors="0">
+<testcase name="E2E: Tauri Desktop Application › should load the application and render all panels" classname="tauri-backend.spec.ts" time="0.01">
+<failure message="tauri-backend.spec.ts:23:3 should load the application and render all panels" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:23:3 › E2E: Tauri Desktop Application › should load the application and render all panels 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should execute launch_system_metrics command" classname="tauri-backend.spec.ts" time="0.011">
+<failure message="tauri-backend.spec.ts:32:3 should execute launch_system_metrics command" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:32:3 › E2E: Tauri Desktop Application › should execute launch_system_metrics command 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should execute launch_ipfs_storage command" classname="tauri-backend.spec.ts" time="0.032">
+<failure message="tauri-backend.spec.ts:52:3 should execute launch_ipfs_storage command" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:52:3 › E2E: Tauri Desktop Application › should execute launch_ipfs_storage command 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should execute launch_swarm_health command" classname="tauri-backend.spec.ts" time="0.017">
+<failure message="tauri-backend.spec.ts:71:3 should execute launch_swarm_health command" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:71:3 › E2E: Tauri Desktop Application › should execute launch_swarm_health command 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should execute launch_network_control command" classname="tauri-backend.spec.ts" time="0.01">
+<failure message="tauri-backend.spec.ts:89:3 should execute launch_network_control command" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:89:3 › E2E: Tauri Desktop Application › should execute launch_network_control command 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should execute launch_storage_monitor command" classname="tauri-backend.spec.ts" time="0.01">
+<failure message="tauri-backend.spec.ts:105:3 should execute launch_storage_monitor command" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:105:3 › E2E: Tauri Desktop Application › should execute launch_storage_monitor command 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should execute launch_ide_ipc command" classname="tauri-backend.spec.ts" time="0.017">
+<failure message="tauri-backend.spec.ts:121:3 should execute launch_ide_ipc command" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:121:3 › E2E: Tauri Desktop Application › should execute launch_ide_ipc command 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should display real system metrics data" classname="tauri-backend.spec.ts" time="0.016">
+<failure message="tauri-backend.spec.ts:137:3 should display real system metrics data" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:137:3 › E2E: Tauri Desktop Application › should display real system metrics data 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should display real IPFS storage data" classname="tauri-backend.spec.ts" time="0.016">
+<failure message="tauri-backend.spec.ts:155:3 should display real IPFS storage data" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:155:3 › E2E: Tauri Desktop Application › should display real IPFS storage data 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should handle rapid successive IPC calls" classname="tauri-backend.spec.ts" time="0.03">
+<failure message="tauri-backend.spec.ts:167:3 should handle rapid successive IPC calls" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:167:3 › E2E: Tauri Desktop Application › should handle rapid successive IPC calls 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Tauri Desktop Application › should recover from transient errors" classname="tauri-backend.spec.ts" time="0.019">
+<failure message="tauri-backend.spec.ts:191:3 should recover from transient errors" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:191:3 › E2E: Tauri Desktop Application › should recover from transient errors 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Application Stability › should remain stable with continuous polling" classname="tauri-backend.spec.ts" time="0.016">
+<failure message="tauri-backend.spec.ts:220:3 should remain stable with continuous polling" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:220:3 › E2E: Application Stability › should remain stable with continuous polling 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="E2E: Application Stability › should handle window resize without errors" classname="tauri-backend.spec.ts" time="0.007">
+<failure message="tauri-backend.spec.ts:240:3 should handle window resize without errors" type="FAILURE">
+<![CDATA[  [chromium] › tauri-backend.spec.ts:240:3 › E2E: Application Stability › should handle window resize without errors 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+</testsuite>
+<testsuite name="wallet.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="4" failures="4" skipped="0" time="0.049" errors="0">
+<testcase name="Wallet Flow › should show wallet setup view initially when not connected" classname="wallet.spec.ts" time="0.012">
+<failure message="wallet.spec.ts:14:3 should show wallet setup view initially when not connected" type="FAILURE">
+<![CDATA[  [chromium] › wallet.spec.ts:14:3 › Wallet Flow › should show wallet setup view initially when not connected 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Wallet Flow › should generate a new wallet and show dashboard" classname="wallet.spec.ts" time="0.018">
+<failure message="wallet.spec.ts:27:3 should generate a new wallet and show dashboard" type="FAILURE">
+<![CDATA[  [chromium] › wallet.spec.ts:27:3 › Wallet Flow › should generate a new wallet and show dashboard ─
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Wallet Flow › should navigate between wallet views" classname="wallet.spec.ts" time="0.008">
+<failure message="wallet.spec.ts:44:3 should navigate between wallet views" type="FAILURE">
+<![CDATA[  [chromium] › wallet.spec.ts:44:3 › Wallet Flow › should navigate between wallet views ────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+<testcase name="Wallet Flow › should disconnect correctly" classname="wallet.spec.ts" time="0.011">
+<failure message="wallet.spec.ts:69:3 should disconnect correctly" type="FAILURE">
+<![CDATA[  [chromium] › wallet.spec.ts:69:3 › Wallet Flow › should disconnect correctly ─────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+</testsuite>
+<testsuite name="world-monitor.spec.ts" timestamp="2026-05-01T16:26:27.859Z" hostname="chromium" tests="1" failures="1" skipped="0" time="0.013" errors="0">
+<testcase name="World Monitor integration (App Store) › opens World Monitor window and renders iframe" classname="world-monitor.spec.ts" time="0.013">
+<failure message="world-monitor.spec.ts:10:3 opens World Monitor window and renders iframe" type="FAILURE">
+<![CDATA[  [chromium] › world-monitor.spec.ts:10:3 › World Monitor integration (App Store) › opens World Monitor window and renders iframe 
+
+    Error: browserType.launch: Executable doesn't exist at /home/lojak/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+]]>
+</failure>
+</testcase>
+</testsuite>
+</testsuites>

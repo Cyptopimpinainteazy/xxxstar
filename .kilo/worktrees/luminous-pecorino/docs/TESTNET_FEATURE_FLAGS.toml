@@ -1,0 +1,63 @@
+[[feature]]
+name = "atomic_kernel"
+mode = "LIVE_TESTNET"
+
+[[feature]]
+name = "atomic_router"
+mode = "LIVE_TESTNET"
+
+[[feature]]
+name = "atomic_gateway"
+mode = "GUARDED_TESTNET"
+
+[[feature]]
+name = "btc_fortress_gateway"
+mode = "SIM_TESTNET"
+
+[[feature]]
+name = "axe"
+mode = "GUARDED_TESTNET"
+
+[[feature]]
+name = "x3_forge"
+mode = "GUARDED_TESTNET"
+
+[[feature]]
+name = "atomic_lock"
+mode = "LIVE_TESTNET"
+
+[[feature]]
+name = "x3_sentinel"
+mode = "GUARDED_TESTNET"
+
+[[feature]]
+name = "x3_swarm"
+mode = "GUARDED_TESTNET"
+
+[[feature]]
+name = "x3_reactor"
+mode = "LIVE_TESTNET"
+
+[[feature]]
+name = "x3_broadcast"
+mode = "LIVE_TESTNET"
+
+[[feature]]
+name = "x3_grantsmith"
+mode = "LIVE_TESTNET"
+
+[[feature]]
+name = "ai_consensus"
+mode = "DISABLED_BLOCKED"
+
+[[feature]]
+name = "auto_mainnet_deploy"
+mode = "DISABLED_BLOCKED"
+
+[[feature]]
+name = "btc_mainnet_gateway"
+mode = "DISABLED_BLOCKED"
+
+[[feature]]
+name = "external_bridges_mainnet"
+mode = "DISABLED_BLOCKED"

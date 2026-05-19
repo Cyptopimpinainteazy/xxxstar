@@ -1,0 +1,14 @@
+[package]
+name = "x3-lang-vm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "X3 Virtual Machine core runtime (executor, JIT, and glue)"
+
+[dependencies]
+x3-lang-common = { path = "../crates/x3-common" }
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+proptest = { workspace = true }

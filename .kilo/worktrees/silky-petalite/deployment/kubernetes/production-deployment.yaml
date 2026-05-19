@@ -1,0 +1,665 @@
+# ============================================================================
+# X3 Chain - Kubernetes Production Deployment
+# ============================================================================
+# Components: Validator nodes, RPC gateway, monitoring
+# ============================================================================
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: x3-chain
+  labels:
+    name: x3-chain
+    environment: production
+
+---
+# ConfigMap - Chain specification
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chain-spec
+  namespace: x3-chain
+data:
+  production-raw.json: |
+    # Chain spec will be generated and inserted here
+    # Generated via: x3-chain-node build-spec --chain=production --raw
+
+---
+# Secret - Validator keys (sealed secret in production)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: validator-keys
+  namespace: x3-chain
+type: Opaque
+data:
+  # Base64 encoded validator keys (MUST be replaced with actual keys)
+  # Generate with: ed25519-dalek or use existing keys from secure storage
+  # bootnode-key: <BASE64_BOOTNODE_KEY>
+  # validator-0-key: <BASE64_VALIDATOR_0_KEY>
+  # validator-1-key: <BASE64_VALIDATOR_1_KEY>
+  # validator-2-key: <BASE64_VALIDATOR_2_KEY>
+  
+---
+# Secret - Database credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: x3-chain
+type: Opaque
+stringData:
+  # Set these values via environment variables when applying:
+  # export POSTGRES_PASSWORD="your-secure-password"
+  POSTGRES_USER: x3
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+  DATABASE_URL: "postgresql://x3:${POSTGRES_PASSWORD}@postgres:5432/x3_analytics"
+
+---
+# PersistentVolumeClaim - Bootnode data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bootnode-data
+  namespace: x3-chain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+
+---
+# PersistentVolumeClaim - Validator 1
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: validator-01-data
+  namespace: x3-chain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: fast-ssd
+
+---
+# PersistentVolumeClaim - Validator 2
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: validator-02-data
+  namespace: x3-chain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: fast-ssd
+
+---
+# PersistentVolumeClaim - Validator 3
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: validator-03-data
+  namespace: x3-chain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: fast-ssd
+
+---
+# PersistentVolumeClaim - PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: x3-chain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+
+---
+# Deployment - Bootnode
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bootnode
+  namespace: x3-chain
+  labels:
+    app: bootnode
+    component: blockchain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bootnode
+  template:
+    metadata:
+      labels:
+        app: bootnode
+        component: blockchain
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+      - name: bootnode
+        image: x3-chain/node:v1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 30333
+          name: p2p
+          protocol: TCP
+        - containerPort: 9933
+          name: http-rpc
+          protocol: TCP
+        - containerPort: 9944
+          name: ws-rpc
+          protocol: TCP
+        - containerPort: 9615
+          name: metrics
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info"
+        args:
+        - --chain=/data/chain-spec.json
+        - --base-path=/data
+        - --node-key-file=/data/node-key
+        - --name=X3-Bootnode-K8s
+        - --rpc-cors=all
+        - --rpc-methods=safe
+        - --prometheus-external
+        - --prometheus-port=9615
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: chain-spec
+          mountPath: /data/chain-spec.json
+          subPath: production-raw.json
+        - name: node-key
+          mountPath: /data/node-key
+          subPath: bootnode-key
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: bootnode-data
+      - name: chain-spec
+        configMap:
+          name: chain-spec
+      - name: node-key
+        secret:
+          secretName: validator-keys
+
+---
+# Service - Bootnode
+apiVersion: v1
+kind: Service
+metadata:
+  name: bootnode
+  namespace: x3-chain
+  labels:
+    app: bootnode
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 30333
+    targetPort: 30333
+    protocol: TCP
+    name: p2p
+  - port: 9944
+    targetPort: 9944
+    protocol: TCP
+    name: ws-rpc
+  selector:
+    app: bootnode
+
+---
+# StatefulSet - Validators (3 replicas)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: validator
+  namespace: x3-chain
+  labels:
+    app: validator
+    component: blockchain
+spec:
+  serviceName: validator
+  replicas: 3
+  selector:
+    matchLabels:
+      app: validator
+  template:
+    metadata:
+      labels:
+        app: validator
+        component: blockchain
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+      - name: validator
+        image: x3-chain/node:v1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 30333
+          name: p2p
+        - containerPort: 9944
+          name: ws-rpc
+        - containerPort: 9615
+          name: metrics
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        args:
+        - --chain=/data/chain-spec.json
+        - --base-path=/data
+        - --validator
+        - --name=X3-Validator-$(POD_NAME)
+        # BOOTNODE_PEER_ID must be generated via:
+        # ./x3-chain-node key generate-node-key --file /tmp/bootnode-key
+        # ./x3-chain-node key inspect-node-key --file /tmp/bootnode-key
+        # Copy the peer ID from the output and replace below
+        - --bootnodes=/dns/bootnode.x3-chain.svc.cluster.local/tcp/30333/p2p/BOOTNODE_PEER_ID
+        - --rpc-cors=all
+        - --rpc-methods=safe
+        - --prometheus-external
+        - --telemetry-url=wss://telemetry.polkadot.io/submit/ 0
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: chain-spec
+          mountPath: /data/chain-spec.json
+          subPath: production-raw.json
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+          limits:
+            cpu: "4"
+            memory: 16Gi
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -X POST -H "Content-Type: application/json" \
+                --data '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
+                http://localhost:9933 | grep -q '"isSyncing":false'
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: chain-spec
+        configMap:
+          name: chain-spec
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 200Gi
+
+---
+# Service - Validators (headless)
+apiVersion: v1
+kind: Service
+metadata:
+  name: validator
+  namespace: x3-chain
+  labels:
+    app: validator
+spec:
+  clusterIP: None
+  ports:
+  - port: 30333
+    name: p2p
+  - port: 9944
+    name: ws-rpc
+  - port: 9615
+    name: metrics
+  selector:
+    app: validator
+
+---
+# Deployment - PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: x3-chain
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: x3_analytics
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - x3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: postgres-data
+
+---
+# Service - PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: x3-chain
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+
+---
+# Deployment - Analytics Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics
+  namespace: x3-chain
+  labels:
+    app: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics
+  template:
+    metadata:
+      labels:
+        app: analytics
+    spec:
+      containers:
+      - name: analytics
+        image: x3-chain/analytics:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: DATABASE_URL
+        - name: RUST_LOG
+          value: "info"
+        - name: BIND_ADDRESS
+          value: "0.0.0.0:8080"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 15
+
+---
+# Service - Analytics
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics
+  namespace: x3-chain
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: analytics
+
+---
+# Deployment - Explorer (Next.js)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: explorer
+  namespace: x3-chain
+  labels:
+    app: explorer
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: explorer
+  template:
+    metadata:
+      labels:
+        app: explorer
+        component: frontend
+    spec:
+      containers:
+      - name: explorer
+        image: x3-chain/explorer:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_PUBLIC_NETWORK
+          value: "production"
+        - name: NEXT_PUBLIC_SUBSTRATE_WS_ENDPOINT
+          value: "wss://rpc.x3-chain.io:9944"
+        resources:
+          requests:
+            cpu: "250m"
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+  
+---
+# Service - Explorer
+apiVersion: v1
+kind: Service
+metadata:
+  name: explorer
+  namespace: x3-chain
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: explorer
+
+---
+# Ingress - RPC Gateway (with SSL/TLS)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rpc-gateway
+  namespace: x3-chain
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "10"
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/frontend/websocket-services: bootnode
+spec:
+  tls:
+  - hosts:
+    - rpc.x3-chain.io
+    secretName: rpc-tls-cert
+  rules:
+  - host: rpc.x3-chain.io
+    http:
+      paths:
+      - path: /rpc
+        pathType: Prefix
+        backend:
+          service:
+            name: bootnode
+            port:
+              number: 9933
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: bootnode
+            port:
+              number: 9944
+
+---
+# HorizontalPodAutoscaler - Analytics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: analytics-hpa
+  namespace: x3-chain
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analytics
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

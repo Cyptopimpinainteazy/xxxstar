@@ -1,0 +1,16 @@
+# Helm Chart for GPU Swarm
+apiVersion: v2
+name: gpu-swarm
+description: Distributed GPU compute swarm for X3 Chain
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+- gpu
+- compute
+- distributed
+- swarm
+- x3
+maintainers:
+- name: X3 Chain Team
+  email: team@x3-chain.io

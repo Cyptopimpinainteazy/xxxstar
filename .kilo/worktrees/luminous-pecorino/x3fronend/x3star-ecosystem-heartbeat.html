@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Ecosystem Heartbeat</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000000;--green:#00FF6A;--green2:#00CC55;--green3:rgba(0,255,106,0.08);
+  --cyan:#00FFCC;--gold:#FFD700;--white:rgba(255,255,255,0.85);
+  --muted:rgba(255,255,255,0.2);--dim:rgba(0,255,106,0.04);
+  --font:'Oxanium',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--white);font-family:var(--font);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;}
+
+/* RADIAL PULSE RINGS */
+.pulse-rings{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;z-index:0;}
+.ring{position:absolute;border-radius:50%;border:1px solid var(--green);
+  animation:ringExpand 4s ease-out infinite;}
+.ring:nth-child(1){width:200px;height:200px;animation-delay:0s;}
+.ring:nth-child(2){width:200px;height:200px;animation-delay:1s;}
+.ring:nth-child(3){width:200px;height:200px;animation-delay:2s;}
+.ring:nth-child(4){width:200px;height:200px;animation-delay:3s;}
+@keyframes ringExpand{
+  0%{width:120px;height:120px;opacity:0.6;border-color:rgba(0,255,106,0.6);}
+  100%{width:800px;height:800px;opacity:0;border-color:rgba(0,255,106,0);}
+}
+
+/* ECG LINE */
+#ecg-canvas{position:fixed;bottom:0;left:0;right:0;z-index:1;opacity:0.6;}
+
+/* MAIN */
+.main{position:relative;z-index:2;text-align:center;padding:40px;}
+.eyebrow{font-size:10px;letter-spacing:6px;text-transform:uppercase;
+  color:rgba(0,255,106,0.4);margin-bottom:24px;}
+
+/* THE NUMBER */
+.heartbeat-num{font-size:clamp(60px,12vw,140px);font-weight:800;letter-spacing:-2px;
+  line-height:1;background:linear-gradient(180deg,var(--white) 0%,var(--green) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:heartPulse 2s ease-in-out infinite;margin-bottom:8px;}
+@keyframes heartPulse{
+  0%,100%{filter:drop-shadow(0 0 20px rgba(0,255,106,0.3));}
+  50%{filter:drop-shadow(0 0 60px rgba(0,255,106,0.8));}
+}
+.num-label{font-size:12px;letter-spacing:4px;text-transform:uppercase;
+  color:rgba(0,255,106,0.5);margin-bottom:48px;}
+
+/* BREAKDOWN GRID */
+.breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:rgba(0,255,106,0.08);border-radius:12px;overflow:hidden;
+  max-width:720px;width:100%;margin:0 auto 40px;}
+.bd-cell{background:rgba(0,0,0,0.97);padding:20px 16px;text-align:center;}
+.bdc-val{font-size:clamp(18px,2.5vw,28px);font-weight:700;line-height:1;
+  margin-bottom:4px;}
+.bdc-key{font-size:8px;letter-spacing:2.5px;text-transform:uppercase;
+  color:rgba(255,255,255,0.2);}
+.bdc-delta{font-size:10px;margin-top:4px;}
+
+/* BEAT INDICATOR */
+.beat{display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-bottom:32px;}
+.beat-dot{width:12px;height:12px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 20px var(--green);animation:beatDot 2s ease-in-out infinite;}
+@keyframes beatDot{0%,100%{transform:scale(1);box-shadow:0 0 8px var(--green);}
+  50%{transform:scale(1.4);box-shadow:0 0 24px var(--green),0 0 48px rgba(0,255,106,0.3);}}
+.beat-label{font-size:11px;letter-spacing:3px;color:rgba(0,255,106,0.5);text-transform:uppercase;}
+.beat-rate{font-size:13px;font-weight:700;color:var(--green);}
+
+/* BOTTOM BAR */
+.bottom{position:fixed;bottom:0;left:0;right:0;z-index:10;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 40px;background:rgba(0,0,0,0.9);border-top:1px solid rgba(0,255,106,0.1);}
+.bt-nav{display:flex;gap:16px;}
+.bt-link{font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(0,255,106,0.3);cursor:pointer;text-decoration:none;transition:color 0.2s;}
+.bt-link:hover{color:var(--green);}
+.bt-cta{padding:10px 28px;background:var(--green);color:#000;border:none;
+  border-radius:6px;font-size:10px;font-weight:800;letter-spacing:3px;
+  text-transform:uppercase;cursor:pointer;font-family:var(--font);transition:all 0.2s;}
+.bt-cta:hover{box-shadow:0 0 20px rgba(0,255,106,0.4);}
+
+/* EMBED NOTE */
+.embed-note{position:fixed;top:20px;right:20px;z-index:20;
+  font-size:9px;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,0.1);cursor:pointer;border:1px solid rgba(255,255,255,0.08);
+  padding:6px 12px;border-radius:4px;transition:all 0.2s;}
+.embed-note:hover{color:rgba(255,255,255,0.4);border-color:rgba(255,255,255,0.2);}
+</style>
+</head>
+<body>
+
+<div class="pulse-rings">
+  <div class="ring"></div><div class="ring"></div>
+  <div class="ring"></div><div class="ring"></div>
+</div>
+
+<canvas id="ecg-canvas" height="80"></canvas>
+
+<button class="embed-note" onclick="showEmbed()">⟨ embed widget ⟩</button>
+
+<div class="main">
+  <div class="eyebrow">X3STAR · Total Ecosystem Value Flow · Live</div>
+
+  <div class="beat">
+    <div class="beat-dot"></div>
+    <div class="beat-label">Network Pulse</div>
+    <div class="beat-rate" id="beat-bpm">142 BPM</div>
+  </div>
+
+  <div class="heartbeat-num" id="main-num">$48,291,840</div>
+  <div class="num-label">Total Value Flowing Through X3STAR</div>
+
+  <div class="breakdown">
+    <div class="bd-cell">
+      <div class="bdc-val" style="color:var(--green)" id="bd-tvl">$8.4M</div>
+      <div class="bdc-key">TVL</div>
+      <div class="bdc-delta" style="color:var(--green)">▲ +2.1%</div>
+    </div>
+    <div class="bd-cell">
+      <div class="bdc-val" style="color:var(--gold)" id="bd-raised">$14.7M</div>
+      <div class="bdc-key">Raised</div>
+      <div class="bdc-delta" style="color:var(--green)">▲ Active</div>
+    </div>
+    <div class="bd-cell">
+      <div class="bdc-val" style="color:var(--cyan)" id="bd-staked">$18.4M</div>
+      <div class="bdc-key">Staked</div>
+      <div class="bdc-delta" style="color:var(--green)">▲ +4.8%</div>
+    </div>
+    <div class="bd-cell">
+      <div class="bdc-val" id="bd-grants">$6.8M</div>
+      <div class="bdc-key">Grants</div>
+      <div class="bdc-delta" style="color:var(--green)">▲ +1 today</div>
+    </div>
+  </div>
+
+  <div style="font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.12);text-transform:uppercase;">
+    1,847 validators · 4,218 TPS · 84,291 holders · 48 grants · 3 audits
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="bt-nav">
+    <a class="bt-link" href="x3star-landing.html">Home</a>
+    <a class="bt-link" href="x3star-network-pulse.html">Network</a>
+    <a class="bt-link" href="x3star-tokenomics-warroom.html">Tokenomics</a>
+    <a class="bt-link" href="x3star-dashboard.html">Dashboard</a>
+  </div>
+  <button class="bt-cta" onclick="location.href='x3star-token-presale.html'">Join the Ecosystem →</button>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

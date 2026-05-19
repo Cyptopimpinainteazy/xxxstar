@@ -1,0 +1,585 @@
+
+[1;35m
+       ________          __                
+___  __\_____  \  ______/  |______ _______ 
+\  \/  / _(__  < /  ___|   __\__  \\_  __ \
+ >    < /       \\\___ \ |  |  / __ \|  | \/
+/__/\_Y______  /____  >|__| (____  /__|   
+     \/      \/     \/           \/       
+[0m[36m
+🚀  X3 Chain Node — syncing the mesh ⚡️[0m
+
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: X3 Chain Node
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: ✌️  version 0.1.0
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: ❤️  by X3 Chain Core Engineering <engineering@x3-chain.io>, 2024-2026
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: 📋 Chain specification: X3 Chain Local Testnet
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: 🏷  Node name: Bob
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: 👤 Role: AUTHORITY
+2026-05-13 18:01:18.160  INFO main sc_cli::runner: 💾 Database: ParityDb at /tmp/x3-rc3-bob/chains/x3_chain_local/paritydb/full
+2026-05-13 18:01:18.161  INFO main x3_chain_node::command: Starting X3 Chain node as Authority
+2026-05-13 18:01:18.161  INFO main x3_chain_node::service: 🌐 Network speed detected: Normal (set X3_NETWORK_SPEED=slow|normal|fast to override)
+2026-05-13 18:01:18.161  INFO main x3_chain_node::service: 🔗 TX Pool configured for Normal network: 100000 ready / 50000 future, 256 MiB
+2026-05-13 18:01:19.183  INFO main txpool: Creating transaction pool txpool_type=SingleState ready=Limit { count: 100000, total_bytes: 268435456 } future=Limit { count: 10000, total_bytes: 26843545 }
+2026-05-13 18:01:51.409  INFO main x3_chain_node::service: 🧩 Atomic kernel feature gate is disabled (default)
+2026-05-13 18:01:51.411  INFO main sub-libp2p: 🏷  Local node identity is: 12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+2026-05-13 18:01:51.411  INFO main sub-libp2p: Running libp2p network backend
+2026-05-13 18:01:51.413  INFO main libp2p_swarm: local_peer_id=12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+2026-05-13 18:01:51.415  INFO main x3_chain_node::service: 📊 X3 Prometheus metrics registered successfully
+2026-05-13 18:01:51.418  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp address=/ip4/192.168.0.8/tcp/30433/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+2026-05-13 18:01:51.419  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp address=/ip4/172.17.0.1/tcp/30433/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+2026-05-13 18:01:51.419  INFO tokio-rt-worker libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp address=/ip4/172.18.0.1/tcp/30433/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 Operating system: linux
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 CPU architecture: x86_64
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 Target environment: gnu
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 CPU: AMD Ryzen Threadripper 1900X 8-Core Processor
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 CPU cores: 8
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 Memory: 64137MB
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 Kernel: 6.8.0-111-generic
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 Linux distribution: Ubuntu 22.04.5 LTS
+2026-05-13 18:01:51.582  INFO            main sc_sysinfo: 💻 Virtual machine: no
+2026-05-13 18:01:51.582  INFO            main sc_service::builder: 📦 Highest known block at #287
+2026-05-13 18:01:51.584  INFO            main sc_rpc_server: Running JSON-RPC server: addr=127.0.0.1:9945,[::1]:9945
+2026-05-13 18:01:51.588  INFO            main x3_chain_node::service: 🌉 Cross-VM bridge adapters wired (balance + escrow)
+2026-05-13 18:01:51.588  WARN            main x3_chain_node::service: ⚠️ Cross-VM Sidecar Service disabled via X3_ENABLE_SIDECAR=false
+2026-05-13 18:01:51.588  INFO            main x3_chain_node::service: ✨ X3 Chain node started successfully
+2026-05-13 18:01:51.588  INFO            main x3_chain_node::service: 🔗 Network: X3 Chain Local Testnet
+2026-05-13 18:01:51.588  INFO            main x3_chain_node::service: 👤 Node name: Bob
+2026-05-13 18:01:51.588  INFO            main x3_chain_node::service: 📋 Role: Authority
+2026-05-13 18:01:51.753  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #288 — syncing state\x1b[0m
+2026-05-13 18:01:51.753  INFO tokio-rt-worker substrate: 🏆 Imported #288 (0x14c4…15f1 → 0xa662…9d96)
+2026-05-13 18:01:51.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xa6623cfeda5a5f349b14ba10630b4f24bae36278fe6abf6326139b1eb7799d96
+2026-05-13 18:01:51.830  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #289 on parent #288
+2026-05-13 18:01:51.906  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 289. Hash now 0x73981984339bd2223819ea2cbda697806765cada688f0f825798b0e78782e998, previously 0xa2d03719b0316a5672976a99d690daa6a2262a348c172d527d90e273a9218461.
+2026-05-13 18:01:51.908  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #289 — syncing state\x1b[0m
+2026-05-13 18:01:51.908  INFO tokio-rt-worker substrate: 🏆 Imported #289 (0xa662…9d96 → 0x7398…e998)
+2026-05-13 18:01:52.062  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #285 ✅\x1b[0m
+2026-05-13 18:01:52.145  INFO tokio-rt-worker substrate: 🏆 Imported #290 (0x7398…e998 → 0xfa0b…ea72)
+2026-05-13 18:01:52.145  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #290 — syncing state\x1b[0m
+2026-05-13 18:01:52.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xfa0b09d493658c50785f1ee5f2e9716d24ccae69bf80c4d5941b601c3af7ea72
+2026-05-13 18:01:52.227  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #291 on parent #290
+2026-05-13 18:01:52.301  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 291. Hash now 0x7449becc0ed7151d11cf9bc88b9149022cb747f2702a2ef4adabf5c473c10ba8, previously 0xfcdb61ca3329733bfea80b248748629383e23c68ca976569ed2d9fe3179e5a3a.
+2026-05-13 18:01:52.303  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #291 — syncing state\x1b[0m
+2026-05-13 18:01:52.303  INFO tokio-rt-worker substrate: 🏆 Imported #291 (0xfa0b…ea72 → 0x7449…0ba8)
+2026-05-13 18:01:52.540  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #288 ✅\x1b[0m
+2026-05-13 18:01:52.560  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #292 — syncing state\x1b[0m
+2026-05-13 18:01:52.560  INFO tokio-rt-worker substrate: 🏆 Imported #292 (0x7449…0ba8 → 0x536a…1ebf)
+2026-05-13 18:01:52.601  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x536adcdbde03fef81c62b33eeeb1d3f981c728248d634a1819d5d25c4cc71ebf
+2026-05-13 18:01:52.626  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #293 on parent #292
+2026-05-13 18:01:52.687  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 293. Hash now 0x5cb6bf89fd3ab2d90b5b283fe7e05b7814d50d99dcb8f2d89ab5ee037c564a1a, previously 0xb0c767ff8625ae93e56f7c054bd429c48836f1d532d979db033a8c99cc5e4a06.
+2026-05-13 18:01:52.688  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #293 — syncing state\x1b[0m
+2026-05-13 18:01:52.688  INFO tokio-rt-worker substrate: 🏆 Imported #293 (0x536a…1ebf → 0x5cb6…4a1a)
+2026-05-13 18:01:52.931  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #294 — syncing state\x1b[0m
+2026-05-13 18:01:52.931  INFO tokio-rt-worker substrate: 🏆 Imported #294 (0x5cb6…4a1a → 0xaa57…1c8b)
+2026-05-13 18:01:53.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xaa57020bd6a2d77762ef6741854c98d94547a0abb16b7c34cfcfc6d9d61a1c8b
+2026-05-13 18:01:53.009  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #291 ✅\x1b[0m
+2026-05-13 18:01:53.045  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #295 on parent #294
+2026-05-13 18:01:53.112  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 295. Hash now 0x9319facaeb8778ed65bb50ee56afc2064af07de11b35ac9aa2d2fb2bbd84f0bf, previously 0x6e1cbbbab636f0f7b26bea8fecbf7d9f86c383a59a266494201765f8dcf4cd40.
+2026-05-13 18:01:53.113  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #295 — syncing state\x1b[0m
+2026-05-13 18:01:53.113  INFO tokio-rt-worker substrate: 🏆 Imported #295 (0xaa57…1c8b → 0x9319…f0bf)
+2026-05-13 18:01:53.372  INFO tokio-rt-worker substrate: 🏆 Imported #296 (0x9319…f0bf → 0x3b00…c1d2)
+2026-05-13 18:01:53.372  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #296 — syncing state\x1b[0m
+2026-05-13 18:01:53.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x3b0081d4e977109147a2652398ed7d271ae315fe23273fcfd1f62a8792e0c1d2
+2026-05-13 18:01:53.440  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #297 on parent #296
+2026-05-13 18:01:53.481  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #293 ✅\x1b[0m
+2026-05-13 18:01:53.522  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 297. Hash now 0x9b6558573849f0ea19f0b85be9c5224c4574ba4704b2ec0188199ff9d35dc8ae, previously 0xd8a8de6deaa128bb60b8755872840749b8d3170b301dd43e85742a006dc3f35e.
+2026-05-13 18:01:53.523  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #297 — syncing state\x1b[0m
+2026-05-13 18:01:53.523  INFO tokio-rt-worker substrate: 🏆 Imported #297 (0x3b00…c1d2 → 0x9b65…c8ae)
+2026-05-13 18:01:53.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x9b6558573849f0ea19f0b85be9c5224c4574ba4704b2ec0188199ff9d35dc8ae
+2026-05-13 18:01:53.817  INFO tokio-rt-worker substrate: 🏆 Imported #298 (0x9b65…c8ae → 0x4bc2…ecc2)
+2026-05-13 18:01:53.817  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #298 — syncing state\x1b[0m
+2026-05-13 18:01:53.831  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #298 on parent #297
+2026-05-13 18:01:53.889  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 298. Hash now 0xfab121a9097cb11a7ddad6ffb644f89b6f33152554b89f8b01dc1df577c54eee, previously 0xa335d7d2ad2452c7896585540d76144acd1aa720e60eba790e3e674bb7876197.
+2026-05-13 18:01:53.890  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #298 — syncing state\x1b[0m
+2026-05-13 18:01:53.890  INFO tokio-rt-worker substrate: 🆕 Imported #298 (0x9b65…c8ae → 0xfab1…4eee)
+2026-05-13 18:01:53.955  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #295 ✅\x1b[0m
+2026-05-13 18:01:54.151  INFO tokio-rt-worker substrate: 🏆 Imported #299 (0x4bc2…ecc2 → 0x70ee…66dd)
+2026-05-13 18:01:54.151  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #299 — syncing state\x1b[0m
+2026-05-13 18:01:54.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x70eec6e27e0bd3e1fe174d07f2f49adb78e2ddfab33dee28418fd2539f5566dd
+2026-05-13 18:01:54.225  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #300 on parent #299
+2026-05-13 18:01:54.304  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 300. Hash now 0x190bf88287e94673ac5edbfaeb9093082d938133a22788e67106931eee63f70d, previously 0xfbbd87b035223cd64a73b9bc558e5809f643fa5ed1af6bb2ce3651d3b42a1e54.
+2026-05-13 18:01:54.306  INFO tokio-rt-worker substrate: 🏆 Imported #300 (0x70ee…66dd → 0x190b…f70d)
+2026-05-13 18:01:54.306  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #300 — syncing state\x1b[0m
+2026-05-13 18:01:54.444  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #297 ✅\x1b[0m
+2026-05-13 18:01:54.533  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #301 — syncing state\x1b[0m
+2026-05-13 18:01:54.533  INFO tokio-rt-worker substrate: 🏆 Imported #301 (0x190b…f70d → 0xd18f…63c6)
+2026-05-13 18:01:54.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xd18f66791bdaaf4137ee8437f975acc7fe215cfe5caa136ddbbc8117693163c6
+2026-05-13 18:01:54.637  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #302 on parent #301
+2026-05-13 18:01:54.713  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 302. Hash now 0x38c00a97b762a1201a5de7f4436e8e6f0dc9bee013bcfe1f54a2fe2b681d0133, previously 0x2e52b3dd24f3213bc856f8f32e2a9c542216fb585fd5b5f2171f7bcdc0b4ce59.
+2026-05-13 18:01:54.714  INFO tokio-rt-worker substrate: 🏆 Imported #302 (0xd18f…63c6 → 0x38c0…0133)
+2026-05-13 18:01:54.715  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #302 — syncing state\x1b[0m
+2026-05-13 18:01:54.944  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #299 ✅\x1b[0m
+2026-05-13 18:01:54.964  INFO tokio-rt-worker substrate: 🏆 Imported #303 (0x38c0…0133 → 0x05ea…62dd)
+2026-05-13 18:01:54.964  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #303 — syncing state\x1b[0m
+2026-05-13 18:01:55.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x05eae73de65c809af42c4e12c74ba490fd5417f562a0a47e70466fee6c8c62dd
+2026-05-13 18:01:55.034  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #304 on parent #303
+2026-05-13 18:01:55.114  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 304. Hash now 0x005a1f8c66a2a32234651483aab584f713e8cdecaccde03e625ebbd2e320ce91, previously 0xc32670b5d4344dea3c6e172f7d4970bff57e5d9036f743adf949d1526fe2981d.
+2026-05-13 18:01:55.115  INFO tokio-rt-worker substrate: 🏆 Imported #304 (0x05ea…62dd → 0x005a…ce91)
+2026-05-13 18:01:55.115  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #304 — syncing state\x1b[0m
+2026-05-13 18:01:55.326  INFO tokio-rt-worker substrate: 🏆 Imported #305 (0x005a…ce91 → 0x47c7…fea2)
+2026-05-13 18:01:55.326  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #305 — syncing state\x1b[0m
+2026-05-13 18:01:55.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x47c7adcdd04015a5f5e745d87fe4ecdd46d5e72f049308ebb35025735976fea2
+2026-05-13 18:01:55.412  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #301 ✅\x1b[0m
+2026-05-13 18:01:55.440  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #306 on parent #305
+2026-05-13 18:01:55.512  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 306. Hash now 0x00abd5dcdadb624ca7474e7483318bf6e62fe49faeaad41fa674adcae9e1461a, previously 0x4e2ff5416f911b1bb3fa15f509b315bbf9fa602f58821ceea718357397956281.
+2026-05-13 18:01:55.514  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #306 — syncing state\x1b[0m
+2026-05-13 18:01:55.514  INFO tokio-rt-worker substrate: 🏆 Imported #306 (0x47c7…fea2 → 0x00ab…461a)
+2026-05-13 18:01:55.760  INFO tokio-rt-worker substrate: 🏆 Imported #307 (0x00ab…461a → 0xc53f…e283)
+2026-05-13 18:01:55.760  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #307 — syncing state\x1b[0m
+2026-05-13 18:01:55.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xc53fe8ea28432d8308c3145f6ab1de5a8817785ce3b1d3d9d7c02b358bf4e283
+2026-05-13 18:01:55.836  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #308 on parent #307
+2026-05-13 18:01:55.890  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #304 ✅\x1b[0m
+2026-05-13 18:01:55.920  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 308. Hash now 0xf41368157aaeb46a0e940901cd167a8303509354f4a4c88ce946adf0130d1bd2, previously 0x241263134ad1d0aae428f12535443f06ab2118334a5a1a99ecb30741a4fbe9ca.
+2026-05-13 18:01:55.922  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #308 — syncing state\x1b[0m
+2026-05-13 18:01:55.922  INFO tokio-rt-worker substrate: 🏆 Imported #308 (0xc53f…e283 → 0xf413…1bd2)
+2026-05-13 18:01:56.177  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #309 — syncing state\x1b[0m
+2026-05-13 18:01:56.177  INFO tokio-rt-worker substrate: 🏆 Imported #309 (0xf413…1bd2 → 0x30c8…6685)
+2026-05-13 18:01:56.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x30c88ca2ec5abc14e69758f2aa3b5a7dca40617c0facc5a44ef719f400e76685
+2026-05-13 18:01:56.240  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #310 on parent #309
+2026-05-13 18:01:56.295  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 310. Hash now 0x7c4f61c46de0b68e239afd4c0049e5bcab69e342d85e97a43bc84c5da74fcaa8, previously 0x7936828312b05ebce518c034fb9bc6fe6edde5785fb76368c41d2f15812235c6.
+2026-05-13 18:01:56.297  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #310 — syncing state\x1b[0m
+2026-05-13 18:01:56.297  INFO tokio-rt-worker substrate: 🏆 Imported #310 (0x30c8…6685 → 0x7c4f…caa8)
+2026-05-13 18:01:56.361  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #306 ✅\x1b[0m
+2026-05-13 18:01:56.549  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #311 — syncing state\x1b[0m
+2026-05-13 18:01:56.549  INFO tokio-rt-worker substrate: 🏆 Imported #311 (0x7c4f…caa8 → 0x4216…e888)
+2026-05-13 18:01:56.585  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #311 (0x4216…e888), finalized #306 (0x00ab…461a), ⬇ 6.8kiB/s ⬆ 8.4kiB/s
+2026-05-13 18:01:56.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x4216db18dc2e858e303e29a27d63f599d8541b8ea09121df473736b53808e888
+2026-05-13 18:01:56.641  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #312 on parent #311
+2026-05-13 18:01:56.715  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 312. Hash now 0x2eba22260857d4cbcca48dafea8911a21b7e0d433086c516d8a7c0dffbc4f659, previously 0xdf6ec800533409b49a24df10fb716c392dd7f78b1974ebbca65b233bfc63abc8.
+2026-05-13 18:01:56.716  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #312 — syncing state\x1b[0m
+2026-05-13 18:01:56.716  INFO tokio-rt-worker substrate: 🏆 Imported #312 (0x4216…e888 → 0x2eba…f659)
+2026-05-13 18:01:56.829  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #309 ✅\x1b[0m
+2026-05-13 18:01:56.947  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #313 — syncing state\x1b[0m
+2026-05-13 18:01:56.947  INFO tokio-rt-worker substrate: 🏆 Imported #313 (0x2eba…f659 → 0xf253…8655)
+2026-05-13 18:01:57.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xf253fd1f45339b292518d76144dc07c7860ca80b347e987d2d0eb6b6deed8655
+2026-05-13 18:01:57.044  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #314 on parent #313
+2026-05-13 18:01:57.120  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 314. Hash now 0xca952fa91f1b2cd55fc95f10b22a246f917ad571ff7f7f4c68cf329b562526fc, previously 0xf8b17cf71fcec7711a62091ae40403537bda75c034194dbb4ec8c9016084d62d.
+2026-05-13 18:01:57.122  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #314 — syncing state\x1b[0m
+2026-05-13 18:01:57.122  INFO tokio-rt-worker substrate: 🏆 Imported #314 (0xf253…8655 → 0xca95…26fc)
+2026-05-13 18:01:57.312  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #311 ✅\x1b[0m
+2026-05-13 18:01:57.335  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #315 — syncing state\x1b[0m
+2026-05-13 18:01:57.335  INFO tokio-rt-worker substrate: 🏆 Imported #315 (0xca95…26fc → 0xa1cf…9d44)
+2026-05-13 18:01:57.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xa1cfb0c047306dbeafeb9d1844990c0f2c8e87e773ffe76019ebc4aa76049d44
+2026-05-13 18:01:57.439  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #316 on parent #315
+2026-05-13 18:01:57.499  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 316. Hash now 0x6133f03e41391e3268d706d8b9e7d6173407005dbdff37590238f0bf8f69ee81, previously 0x6367f534dea9ccfac9ad5db0b52d1ccaf0d0fc72c60ce28d7490be0ca25310fe.
+2026-05-13 18:01:57.501  INFO tokio-rt-worker substrate: 🏆 Imported #316 (0xa1cf…9d44 → 0x6133…ee81)
+2026-05-13 18:01:57.501  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #316 — syncing state\x1b[0m
+2026-05-13 18:01:57.752  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #317 — syncing state\x1b[0m
+2026-05-13 18:01:57.752  INFO tokio-rt-worker substrate: 🏆 Imported #317 (0x6133…ee81 → 0x6add…2ad8)
+2026-05-13 18:01:57.783  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #313 ✅\x1b[0m
+2026-05-13 18:01:57.801  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x6add6fcd46134cdd3a21f4e0615e1fc7596181fd391be913e57aa4fb71d32ad8
+2026-05-13 18:01:57.839  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #318 on parent #317
+2026-05-13 18:01:57.891  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 318. Hash now 0x01fd6b7378707dc5e38fab67aaee5f2cb1418df3d33002b7cf1f6b89876ceef5, previously 0xe52417d9965f2eb57d46492d477b3c1d78e0664679f1a2d091e2b9da74027b46.
+2026-05-13 18:01:57.893  INFO tokio-rt-worker substrate: 🏆 Imported #318 (0x6add…2ad8 → 0x01fd…eef5)
+2026-05-13 18:01:57.893  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #318 — syncing state\x1b[0m
+2026-05-13 18:01:58.131  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #319 — syncing state\x1b[0m
+2026-05-13 18:01:58.131  INFO tokio-rt-worker substrate: 🏆 Imported #319 (0x01fd…eef5 → 0xf0ea…c1a8)
+2026-05-13 18:01:58.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xf0ea6142638a03104749c8a46b6111f0e4ffe2e64ef36fc70efe4b364324c1a8
+2026-05-13 18:01:58.238  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #320 on parent #319
+2026-05-13 18:01:58.250  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #316 ✅\x1b[0m
+2026-05-13 18:01:58.294  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 320. Hash now 0xbe7f38d177cd86cc428aec7ec829f076b837855c2b7d493f9c087ddc3ef37ea5, previously 0x88965d60828037fab423d7305c55f16e97de750c3921b7312e3d08b831191704.
+2026-05-13 18:01:58.295  INFO tokio-rt-worker substrate: 🏆 Imported #320 (0xf0ea…c1a8 → 0xbe7f…7ea5)
+2026-05-13 18:01:58.295  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #320 — syncing state\x1b[0m
+2026-05-13 18:01:58.544  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #321 — syncing state\x1b[0m
+2026-05-13 18:01:58.544  INFO tokio-rt-worker substrate: 🏆 Imported #321 (0xbe7f…7ea5 → 0xbfd6…ba96)
+2026-05-13 18:01:58.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xbfd6f8f00bed597c2c094baa965a3906d16e51ec81200aaae0c01a9cddaeba96
+2026-05-13 18:01:58.637  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #322 on parent #321
+2026-05-13 18:01:58.713  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #318 ✅\x1b[0m
+2026-05-13 18:01:58.715  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 322. Hash now 0x8e49f47bfba1854878bf9077c343c5054766770dfb8d82ddc0bd7135cbd15427, previously 0x7021c3cf5f71dc94f2bd20681b325ec8726347b6f543077a41c4d8eb70a242bf.
+2026-05-13 18:01:58.717  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #322 — syncing state\x1b[0m
+2026-05-13 18:01:58.717  INFO tokio-rt-worker substrate: 🏆 Imported #322 (0xbfd6…ba96 → 0x8e49…5427)
+2026-05-13 18:01:58.936  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #323 — syncing state\x1b[0m
+2026-05-13 18:01:58.936  INFO tokio-rt-worker substrate: 🏆 Imported #323 (0x8e49…5427 → 0x6ef9…f1b9)
+2026-05-13 18:01:59.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x6ef97cb4bea579da22f303e665d5a11903894d3d1f5d6744ceac3f8024a3f1b9
+2026-05-13 18:01:59.038  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #324 on parent #323
+2026-05-13 18:01:59.116  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 324. Hash now 0x4e3c04b0774af922265d364771d42500fcc65313d20a01586bc0a1f40248b936, previously 0x6b9fd278487eef1961f150e5337a6d314bb065b37062e7cbe773e245025e9daa.
+2026-05-13 18:01:59.117  INFO tokio-rt-worker substrate: 🏆 Imported #324 (0x6ef9…f1b9 → 0x4e3c…b936)
+2026-05-13 18:01:59.117  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #324 — syncing state\x1b[0m
+2026-05-13 18:01:59.184  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #320 ✅\x1b[0m
+2026-05-13 18:01:59.345  INFO tokio-rt-worker substrate: 🏆 Imported #325 (0x4e3c…b936 → 0x8ffe…ddaf)
+2026-05-13 18:01:59.345  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #325 — syncing state\x1b[0m
+2026-05-13 18:01:59.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x8ffe4d647e20b81723b0fdef6fd8296f35c112b2a90f0b69ea42d5e4b100ddaf
+2026-05-13 18:01:59.433  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #326 on parent #325
+2026-05-13 18:01:59.506  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 326. Hash now 0x9eb39f8f7857b1d71d7680c1d7e6d5e460c3f322db25784253abe942e606d2d6, previously 0xfa4ec9f6efc43d2cb52b462c7c48304c28b1e66e512e37c14cfa17d3953b7cd5.
+2026-05-13 18:01:59.508  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #326 — syncing state\x1b[0m
+2026-05-13 18:01:59.508  INFO tokio-rt-worker substrate: 🏆 Imported #326 (0x8ffe…ddaf → 0x9eb3…d2d6)
+2026-05-13 18:01:59.675  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #323 ✅\x1b[0m
+2026-05-13 18:01:59.728  INFO tokio-rt-worker substrate: 🏆 Imported #327 (0x9eb3…d2d6 → 0xbbf3…36bd)
+2026-05-13 18:01:59.728  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #327 — syncing state\x1b[0m
+2026-05-13 18:01:59.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xbbf354133f3162046eb3e3463fd58984dc2e3ee42e881c2cbc7e2c18304836bd
+2026-05-13 18:01:59.819  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #328 on parent #327
+2026-05-13 18:01:59.895  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 328. Hash now 0x0c6addbc2e92b8a5224a98262921eb542f85cd8cbb08706f126fbacb2275e118, previously 0x681270ad6c25aa37c2b710f3ed126bfe601386e121f13f59c4ad8e0021fc2327.
+2026-05-13 18:01:59.897  INFO tokio-rt-worker substrate: 🏆 Imported #328 (0xbbf3…36bd → 0x0c6a…e118)
+2026-05-13 18:01:59.897  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #328 — syncing state\x1b[0m
+2026-05-13 18:02:00.136  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #329 — syncing state\x1b[0m
+2026-05-13 18:02:00.136  INFO tokio-rt-worker substrate: 🏆 Imported #329 (0x0c6a…e118 → 0xf766…cbf9)
+2026-05-13 18:02:00.145  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #325 ✅\x1b[0m
+2026-05-13 18:02:00.201  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xf7660034c3d5cb25e63ac8188d2e2f2cc3c18ff0f5b3b8c2f3af2c8a6489cbf9
+2026-05-13 18:02:00.235  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #330 on parent #329
+2026-05-13 18:02:00.306  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 330. Hash now 0x3760b6011d34f18804f1efebf9655bef86daf4ac2b2b4a1e06f114c330a6e3c0, previously 0x0e201226878526d5d32652531b8657532032ed5b54e6d9e61693c7ef75a533b9.
+2026-05-13 18:02:00.308  INFO tokio-rt-worker substrate: 🏆 Imported #330 (0xf766…cbf9 → 0x3760…e3c0)
+2026-05-13 18:02:00.308  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #330 — syncing state\x1b[0m
+2026-05-13 18:02:00.580  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #331 — syncing state\x1b[0m
+2026-05-13 18:02:00.580  INFO tokio-rt-worker substrate: 🏆 Imported #331 (0x3760…e3c0 → 0xa178…fb6f)
+2026-05-13 18:02:00.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xa178b8760152e1733af177fe763e9cb9a4197274801eb5d9945ba69ff197fb6f
+2026-05-13 18:02:00.620  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #327 ✅\x1b[0m
+2026-05-13 18:02:00.621  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #332 on parent #331
+2026-05-13 18:02:00.680  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 332. Hash now 0xb994800f54727f71cfb8b76c58d621058dce176be7c3f1452446d90dc879c2f4, previously 0x63d766d440247941425133179867e3dbf02dbfc7762a70c8d7e67e5263c6558e.
+2026-05-13 18:02:00.682  INFO tokio-rt-worker substrate: 🏆 Imported #332 (0xa178…fb6f → 0xb994…c2f4)
+2026-05-13 18:02:00.682  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #332 — syncing state\x1b[0m
+2026-05-13 18:02:00.951  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #333 — syncing state\x1b[0m
+2026-05-13 18:02:00.951  INFO tokio-rt-worker substrate: 🏆 Imported #333 (0xb994…c2f4 → 0x56f3…d71c)
+2026-05-13 18:02:01.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x56f3b3b97c17bbe20c3fae212522ab0ab72fed97a8b68c78d2705059fbe6d71c
+2026-05-13 18:02:01.035  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #334 on parent #333
+2026-05-13 18:02:01.100  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #330 ✅\x1b[0m
+2026-05-13 18:02:01.115  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 334. Hash now 0xb174f6f13aa3a3408ec694bd2c1cddaf530a727a18cb77fca0725d6ca83b5741, previously 0x18c68e5c2f26fb608cc41c5f8b7754f415084b94e5a17e6368145248a390f2d2.
+2026-05-13 18:02:01.117  INFO tokio-rt-worker substrate: 🏆 Imported #334 (0x56f3…d71c → 0xb174…5741)
+2026-05-13 18:02:01.117  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #334 — syncing state\x1b[0m
+2026-05-13 18:02:01.370  INFO tokio-rt-worker substrate: 🏆 Imported #335 (0xb174…5741 → 0x4015…2424)
+2026-05-13 18:02:01.370  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #335 — syncing state\x1b[0m
+2026-05-13 18:02:01.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x40151094b7026893120c86cd3b6a42495f054b6a8fd96b9a7c1d51c688c52424
+2026-05-13 18:02:01.433  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #336 on parent #335
+2026-05-13 18:02:01.512  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 336. Hash now 0x54dbdacc50fb9f93dfac606da95262a8ca6b782631d11203d0bc0902441e601f, previously 0x48c0949b93b5e1835a5fdabf9750384da5eea1d37f2cd5a2bda865d7ac2ce75b.
+2026-05-13 18:02:01.514  INFO tokio-rt-worker substrate: 🏆 Imported #336 (0x4015…2424 → 0x54db…601f)
+2026-05-13 18:02:01.514  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #336 — syncing state\x1b[0m
+2026-05-13 18:02:01.586  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #336 (0x54db…601f), finalized #330 (0x3760…e3c0), ⬇ 6.0kiB/s ⬆ 7.0kiB/s
+2026-05-13 18:02:01.598  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #332 ✅\x1b[0m
+2026-05-13 18:02:01.739  INFO tokio-rt-worker substrate: 🏆 Imported #337 (0x54db…601f → 0xfca4…a127)
+2026-05-13 18:02:01.739  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #337 — syncing state\x1b[0m
+2026-05-13 18:02:01.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xfca42fa3c5cf9fda00e842fc1897f291e526ae738468a4d01e5ba6123630a127
+2026-05-13 18:02:01.827  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #338 on parent #337
+2026-05-13 18:02:01.905  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 338. Hash now 0x3481cd0ed682be313d5b822bc40e4c7ace48774a0d608662162cb9e5dcf1105b, previously 0x23daf45fc320d14ae5985f53deb4fec445601e6176ff4de77310e2ec4559221f.
+2026-05-13 18:02:01.906  INFO tokio-rt-worker substrate: 🏆 Imported #338 (0xfca4…a127 → 0x3481…105b)
+2026-05-13 18:02:01.906  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #338 — syncing state\x1b[0m
+2026-05-13 18:02:02.068  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #335 ✅\x1b[0m
+2026-05-13 18:02:02.127  INFO tokio-rt-worker substrate: 🏆 Imported #339 (0x3481…105b → 0x7d2a…3d45)
+2026-05-13 18:02:02.127  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #339 — syncing state\x1b[0m
+2026-05-13 18:02:02.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x7d2a88d3e647ad035d20f0bbbe8e3d21e76e51a4575bc3f7f0506e9057613d45
+2026-05-13 18:02:02.225  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #340 on parent #339
+2026-05-13 18:02:02.301  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 340. Hash now 0x80f6ce3f32e497c9b0d1c7c3dad98521e7ae8d0319e5f0cc99510f0e00d7f3ce, previously 0x6f41e616f260684fb0efaf0c7e6689e96e5556f0acfba5c62dd0b9a8c2624aa8.
+2026-05-13 18:02:02.303  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #340 — syncing state\x1b[0m
+2026-05-13 18:02:02.303  INFO tokio-rt-worker substrate: 🏆 Imported #340 (0x7d2a…3d45 → 0x80f6…f3ce)
+2026-05-13 18:02:02.530  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #337 ✅\x1b[0m
+2026-05-13 18:02:02.547  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #341 — syncing state\x1b[0m
+2026-05-13 18:02:02.547  INFO tokio-rt-worker substrate: 🏆 Imported #341 (0x80f6…f3ce → 0xb91d…2aae)
+2026-05-13 18:02:02.601  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xb91d258445ef827c1601e44709584a44a6c7153d61610026c5ee1c8970152aae
+2026-05-13 18:02:02.635  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #342 on parent #341
+2026-05-13 18:02:02.708  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 342. Hash now 0xbbdd393df5356f00894cfd8dd9eb23e7b67a8eca919350009502a7af2dfd1278, previously 0x9a17f57f9c6a7b56edc1f3be153140a17f20d1b4fd4c319a81438205cdcf4628.
+2026-05-13 18:02:02.710  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #342 — syncing state\x1b[0m
+2026-05-13 18:02:02.710  INFO tokio-rt-worker substrate: 🏆 Imported #342 (0xb91d…2aae → 0xbbdd…1278)
+2026-05-13 18:02:02.953  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #343 — syncing state\x1b[0m
+2026-05-13 18:02:02.953  INFO tokio-rt-worker substrate: 🏆 Imported #343 (0xbbdd…1278 → 0x6e45…43a0)
+2026-05-13 18:02:03.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x6e45204b5af744e7ac4c5ddc45e72d937884c5589eeb7db04a08b913bb1643a0
+2026-05-13 18:02:03.007  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #339 ✅\x1b[0m
+2026-05-13 18:02:03.023  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #344 on parent #343
+2026-05-13 18:02:03.091  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 344. Hash now 0xfb3a23a31f9c17310c161121610fe357ce747d6b82ae082186672b10967f78d0, previously 0x070d5df07ee759a19b88bab978e5cf40f240061575aec41b08bb9fa55e0c0a20.
+2026-05-13 18:02:03.093  INFO tokio-rt-worker substrate: 🏆 Imported #344 (0x6e45…43a0 → 0xfb3a…78d0)
+2026-05-13 18:02:03.093  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #344 — syncing state\x1b[0m
+2026-05-13 18:02:03.353  INFO tokio-rt-worker substrate: 🏆 Imported #345 (0xfb3a…78d0 → 0x806b…747f)
+2026-05-13 18:02:03.353  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #345 — syncing state\x1b[0m
+2026-05-13 18:02:03.403  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x806bf4559fdf655f35d5d2742baee1697da1753b97c162f14173082cdf08747f
+2026-05-13 18:02:03.426  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #346 on parent #345
+2026-05-13 18:02:03.480  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #342 ✅\x1b[0m
+2026-05-13 18:02:03.503  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 346. Hash now 0x11a1ca5dd2a3ce6d7d8ab95b0748a37e4670f85908197829bf4eafd5b3f35cac, previously 0x6685bc327220911d95b2b47e498c6f5bec9fafc403b963de5dc7171d48978a7b.
+2026-05-13 18:02:03.505  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #346 — syncing state\x1b[0m
+2026-05-13 18:02:03.505  INFO tokio-rt-worker substrate: 🏆 Imported #346 (0x806b…747f → 0x11a1…5cac)
+2026-05-13 18:02:03.766  INFO tokio-rt-worker substrate: 🏆 Imported #347 (0x11a1…5cac → 0x945f…74c4)
+2026-05-13 18:02:03.766  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #347 — syncing state\x1b[0m
+2026-05-13 18:02:03.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x945f96bf3ed826b848a7399b4dedc280255b33749edd7537a3cb801adff274c4
+2026-05-13 18:02:03.833  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #348 on parent #347
+2026-05-13 18:02:03.916  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 348. Hash now 0x5dc640492bb14fe8ac2e64d7c88e836a286a7e504de9c2337d0758090d803cab, previously 0xf5498eb9fe4381ca01bb1b788bd865b06b0d4a316367b7a22b07831f20c65a5c.
+2026-05-13 18:02:03.917  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #348 — syncing state\x1b[0m
+2026-05-13 18:02:03.917  INFO tokio-rt-worker substrate: 🏆 Imported #348 (0x945f…74c4 → 0x5dc6…3cab)
+2026-05-13 18:02:03.951  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #344 ✅\x1b[0m
+2026-05-13 18:02:04.169  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #349 — syncing state\x1b[0m
+2026-05-13 18:02:04.169  INFO tokio-rt-worker substrate: 🏆 Imported #349 (0x5dc6…3cab → 0x0d29…311f)
+2026-05-13 18:02:04.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x0d29407dea3ff41e7f86b186db0bca4498ef6415481981be100e02872200311f
+2026-05-13 18:02:04.236  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #350 on parent #349
+2026-05-13 18:02:04.313  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 350. Hash now 0xc49b0011da4b1f3dc6cb6f2cc54f2aa291fc487682f8e07c29694f52656757fe, previously 0x1de2ffa7de1b8a17fabc2b5f7c034550a4bd7327f71bef9658f05e971460ba61.
+2026-05-13 18:02:04.315  INFO tokio-rt-worker substrate: 🏆 Imported #350 (0x0d29…311f → 0xc49b…57fe)
+2026-05-13 18:02:04.315  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #350 — syncing state\x1b[0m
+2026-05-13 18:02:04.438  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #346 ✅\x1b[0m
+2026-05-13 18:02:04.531  INFO tokio-rt-worker substrate: 🏆 Imported #351 (0xc49b…57fe → 0xb302…e917)
+2026-05-13 18:02:04.531  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #351 — syncing state\x1b[0m
+2026-05-13 18:02:04.601  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xb30269d7f748c21c8b0ff4fcddfce9fe5d05871548c95a5c1856ea72255fe917
+2026-05-13 18:02:04.632  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #352 on parent #351
+2026-05-13 18:02:04.703  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 352. Hash now 0x1cceb6e81550e7fddb0bed52352b380ac4c961f7932964e5e1309fe6c8156268, previously 0xb98fae0be7596b42945cf142982b76862864227363a65a147d2d7feda5865198.
+2026-05-13 18:02:04.705  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #352 — syncing state\x1b[0m
+2026-05-13 18:02:04.705  INFO tokio-rt-worker substrate: 🏆 Imported #352 (0xb302…e917 → 0x1cce…6268)
+2026-05-13 18:02:04.900  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #349 ✅\x1b[0m
+2026-05-13 18:02:04.957  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #353 — syncing state\x1b[0m
+2026-05-13 18:02:04.957  INFO tokio-rt-worker substrate: 🏆 Imported #353 (0x1cce…6268 → 0x82a1…8f42)
+2026-05-13 18:02:05.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x82a19562e1073d4c2f85b58f99591aab930f23e7ac20df8e272560fad4748f42
+2026-05-13 18:02:05.035  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #354 on parent #353
+2026-05-13 18:02:05.111  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 354. Hash now 0xce5a5a0bc2c34efee1d2e764b85e35896f5e6e6300b683d0cad7f4be5c04160f, previously 0x4bb3453e4b0dd45fda12be7ded9739c4d1c8cf07fcef9f90fded73eb2c8d31c2.
+2026-05-13 18:02:05.112  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #354 — syncing state\x1b[0m
+2026-05-13 18:02:05.112  INFO tokio-rt-worker substrate: 🏆 Imported #354 (0x82a1…8f42 → 0xce5a…160f)
+2026-05-13 18:02:05.333  INFO tokio-rt-worker substrate: 🏆 Imported #355 (0xce5a…160f → 0x7ea7…d730)
+2026-05-13 18:02:05.333  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #355 — syncing state\x1b[0m
+2026-05-13 18:02:05.362  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #351 ✅\x1b[0m
+2026-05-13 18:02:05.403  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x7ea73abb03198ef8d6335ba7eebc2f473347099297941071e5bad0e20730d730
+2026-05-13 18:02:05.434  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #356 on parent #355
+2026-05-13 18:02:05.510  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 356. Hash now 0xe6950164e2a143cc065b64562f9b3c526676eae9d47811a8c7d4580317931b12, previously 0x1800dc9add90a0ddea7791b052b4fa41fa0812793758c728eb7b8c052c817475.
+2026-05-13 18:02:05.511  INFO tokio-rt-worker substrate: 🏆 Imported #356 (0x7ea7…d730 → 0xe695…1b12)
+2026-05-13 18:02:05.511  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #356 — syncing state\x1b[0m
+2026-05-13 18:02:05.748  INFO tokio-rt-worker substrate: 🏆 Imported #357 (0xe695…1b12 → 0xc807…ac1b)
+2026-05-13 18:02:05.748  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #357 — syncing state\x1b[0m
+2026-05-13 18:02:05.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xc80777d5fc8b62e6bb3af28ea323b5fc3a185bf12d6ded76a246127063a8ac1b
+2026-05-13 18:02:05.821  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #358 on parent #357
+2026-05-13 18:02:05.853  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #353 ✅\x1b[0m
+2026-05-13 18:02:05.877  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 358. Hash now 0xed0a610130ed5b17eace22869c1287f2fe55179244b35aa22bae76a8c8346162, previously 0x88c0ea84ff335433ffe71f05b4c82114be9cff8303d26f5a76e4bf12cda96df6.
+2026-05-13 18:02:05.878  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #358 — syncing state\x1b[0m
+2026-05-13 18:02:05.878  INFO tokio-rt-worker substrate: 🏆 Imported #358 (0xc807…ac1b → 0xed0a…6162)
+2026-05-13 18:02:06.143  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #359 — syncing state\x1b[0m
+2026-05-13 18:02:06.143  INFO tokio-rt-worker substrate: 🏆 Imported #359 (0xed0a…6162 → 0xf358…4bed)
+2026-05-13 18:02:06.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xf3589615a7b4d3fb424c12c8e6b6a2cb096c7f4dae9ac77ed1dfef6f815a4bed
+2026-05-13 18:02:06.233  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #360 on parent #359
+2026-05-13 18:02:06.305  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 360. Hash now 0x26f3ef657f171b100d18d6f034389e691fc155cecb2b25e60b9e1e02864be907, previously 0x43c5fd69c4c119b1f3818d859aaeec4f1c69c5a5b452068afc9bc7e34121b2e2.
+2026-05-13 18:02:06.307  INFO tokio-rt-worker substrate: 🏆 Imported #360 (0xf358…4bed → 0x26f3…e907)
+2026-05-13 18:02:06.307  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #360 — syncing state\x1b[0m
+2026-05-13 18:02:06.314  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #356 ✅\x1b[0m
+2026-05-13 18:02:06.540  INFO tokio-rt-worker substrate: 🏆 Imported #361 (0x26f3…e907 → 0xd336…a2c0)
+2026-05-13 18:02:06.541  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #361 — syncing state\x1b[0m
+2026-05-13 18:02:06.586  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #361 (0xd336…a2c0), finalized #356 (0xe695…1b12), ⬇ 5.7kiB/s ⬆ 6.9kiB/s
+2026-05-13 18:02:06.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xd3369ddc0bd79d056dec47a29acb659ec4b15a393beda2d56849c3590770a2c0
+2026-05-13 18:02:06.619  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #362 on parent #361
+2026-05-13 18:02:06.691  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 362. Hash now 0xfad955c635c61c6b632749de124af3b60945fb22564ab2c0fe03c9de8234fbb6, previously 0x6ec461a499cf59e9c06c693a0895f2aa6d3716f922ded5e5933e74f6a6a0dbe6.
+2026-05-13 18:02:06.693  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #362 — syncing state\x1b[0m
+2026-05-13 18:02:06.693  INFO tokio-rt-worker substrate: 🏆 Imported #362 (0xd336…a2c0 → 0xfad9…fbb6)
+2026-05-13 18:02:06.806  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #358 ✅\x1b[0m
+2026-05-13 18:02:06.939  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #363 — syncing state\x1b[0m
+2026-05-13 18:02:06.939  INFO tokio-rt-worker substrate: 🏆 Imported #363 (0xfad9…fbb6 → 0x9298…cde7)
+2026-05-13 18:02:07.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x9298ab2185ef9a87622f54ee7145ffae77335fe29b29291ce0193ae1ad39cde7
+2026-05-13 18:02:07.032  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #364 on parent #363
+2026-05-13 18:02:07.112  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 364. Hash now 0xa688a10fcee38854c2ecd905ac871fccdf02b5931609d521f581836eb0750d90, previously 0xdfc15f855acf8ef84808c60f092bb0af9e5774a45e25b3599b8beae84bbbfb74.
+2026-05-13 18:02:07.114  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #364 — syncing state\x1b[0m
+2026-05-13 18:02:07.114  INFO tokio-rt-worker substrate: 🏆 Imported #364 (0x9298…cde7 → 0xa688…0d90)
+2026-05-13 18:02:07.291  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #361 ✅\x1b[0m
+2026-05-13 18:02:07.341  INFO tokio-rt-worker substrate: 🏆 Imported #365 (0xa688…0d90 → 0xde8e…c8e1)
+2026-05-13 18:02:07.341  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #365 — syncing state\x1b[0m
+2026-05-13 18:02:07.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xde8ee603edeea23029a2f75f232fdabee30b98f64657dd0bee44274f9f77c8e1
+2026-05-13 18:02:07.434  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #366 on parent #365
+2026-05-13 18:02:07.507  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 366. Hash now 0x1c4d0e69a34e099101df7210b8d6b6b5fe1758c4dca243bd2bccd1da5f4c2a12, previously 0x1907fdefb7ebc8747ff83df97621a51d124325474e4225cb756bdd2f1ac8406b.
+2026-05-13 18:02:07.508  INFO tokio-rt-worker substrate: 🏆 Imported #366 (0xde8e…c8e1 → 0x1c4d…2a12)
+2026-05-13 18:02:07.508  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #366 — syncing state\x1b[0m
+2026-05-13 18:02:07.752  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #363 ✅\x1b[0m
+2026-05-13 18:02:07.767  INFO tokio-rt-worker substrate: 🏆 Imported #367 (0x1c4d…2a12 → 0x91c0…c0a2)
+2026-05-13 18:02:07.767  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #367 — syncing state\x1b[0m
+2026-05-13 18:02:07.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x91c0384fe6e2d23d573b7023da292ebbd3ad76ac3a2fd15a3df9f99efce3c0a2
+2026-05-13 18:02:07.833  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #368 on parent #367
+2026-05-13 18:02:07.905  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 368. Hash now 0x6cd24463b8e85ad99229e173287d18fb23bf241385f71fde20d2b02c0a3ec8d0, previously 0x6ed21ed813ee9e913d70446f1085036c12aac2d960c29bf438916ee8928022cc.
+2026-05-13 18:02:07.906  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #368 — syncing state\x1b[0m
+2026-05-13 18:02:07.906  INFO tokio-rt-worker substrate: 🏆 Imported #368 (0x91c0…c0a2 → 0x6cd2…c8d0)
+2026-05-13 18:02:08.186  INFO tokio-rt-worker substrate: 🏆 Imported #369 (0x6cd2…c8d0 → 0x25fa…1793)
+2026-05-13 18:02:08.186  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #369 — syncing state\x1b[0m
+2026-05-13 18:02:08.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x25fa5150fc1902148628cf7e08cd6da8e0f72561533b0e9312ac972556f21793
+2026-05-13 18:02:08.220  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #370 on parent #369
+2026-05-13 18:02:08.242  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #366 ✅\x1b[0m
+2026-05-13 18:02:08.279  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 370. Hash now 0x989e5fbb7a1694456cabe2c62bfc1a35e86c617bf240341cb5a4dbd17443f3bc, previously 0x7e6f57c5b1ffe1377f7563509833652cc687b0e2c6cbde1ea29e48b7a27e36ca.
+2026-05-13 18:02:08.281  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #370 — syncing state\x1b[0m
+2026-05-13 18:02:08.281  INFO tokio-rt-worker substrate: 🏆 Imported #370 (0x25fa…1793 → 0x989e…f3bc)
+2026-05-13 18:02:08.545  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #371 — syncing state\x1b[0m
+2026-05-13 18:02:08.546  INFO tokio-rt-worker substrate: 🏆 Imported #371 (0x989e…f3bc → 0x25a9…5f1f)
+2026-05-13 18:02:08.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x25a9080c77362d8dd90c3da71b72174e9ac9ee3d27cde1e7dd70d1a909435f1f
+2026-05-13 18:02:08.630  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #372 on parent #371
+2026-05-13 18:02:08.707  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 372. Hash now 0x87060ad7c7f7cd4300c64a123f9087fcbc2e13faa4fdc1f92f12a272550483fc, previously 0x922504f7e96b98f19465e628f40de38cdd9c3149c756dcf115ae052423c50bad.
+2026-05-13 18:02:08.708  INFO tokio-rt-worker substrate: 🏆 Imported #372 (0x25a9…5f1f → 0x8706…83fc)
+2026-05-13 18:02:08.708  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #372 — syncing state\x1b[0m
+2026-05-13 18:02:08.713  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #368 ✅\x1b[0m
+2026-05-13 18:02:08.960  INFO tokio-rt-worker substrate: 🏆 Imported #373 (0x8706…83fc → 0x8d4c…7386)
+2026-05-13 18:02:08.960  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #373 — syncing state\x1b[0m
+2026-05-13 18:02:09.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x8d4c3de3323106b92f248c1370529d92558a11ea2828e2fdb04a13b3d7787386
+2026-05-13 18:02:09.034  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #374 on parent #373
+2026-05-13 18:02:09.086  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 374. Hash now 0x6ea8408eaf69571138eecfc0e34551bd39e13e1af0191a4eb4d984bca441272f, previously 0xd558df01d0d35f9340c1e5b19199f50f2a8a2d16ba26f1348d618bf1d1882f49.
+2026-05-13 18:02:09.087  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #374 — syncing state\x1b[0m
+2026-05-13 18:02:09.087  INFO tokio-rt-worker substrate: 🏆 Imported #374 (0x8d4c…7386 → 0x6ea8…272f)
+2026-05-13 18:02:09.187  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #370 ✅\x1b[0m
+2026-05-13 18:02:09.347  INFO tokio-rt-worker substrate: 🏆 Imported #375 (0x6ea8…272f → 0x1d59…7d3b)
+2026-05-13 18:02:09.347  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #375 — syncing state\x1b[0m
+2026-05-13 18:02:09.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x1d5906cf27cf041610ed1bb9e3da3b110a5e619b64e6ce89364753ab33007d3b
+2026-05-13 18:02:09.439  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #376 on parent #375
+2026-05-13 18:02:09.518  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 376. Hash now 0x4cd6f7d717d60512499e657d81771a91981f13730de5c618445f17870923b723, previously 0x090bca7de24b0be8e3a88b277d09953b5c738f91c23dd7b5f27bd80c12c277cf.
+2026-05-13 18:02:09.519  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #376 — syncing state\x1b[0m
+2026-05-13 18:02:09.519  INFO tokio-rt-worker substrate: 🏆 Imported #376 (0x1d59…7d3b → 0x4cd6…b723)
+2026-05-13 18:02:09.662  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #373 ✅\x1b[0m
+2026-05-13 18:02:09.755  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #377 — syncing state\x1b[0m
+2026-05-13 18:02:09.755  INFO tokio-rt-worker substrate: 🏆 Imported #377 (0x4cd6…b723 → 0xa9d1…7a40)
+2026-05-13 18:02:09.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xa9d1f7610e96fcef551fe41b62711db7131c3375eec57fe8f8b68191a3557a40
+2026-05-13 18:02:09.831  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #378 on parent #377
+2026-05-13 18:02:09.891  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 378. Hash now 0x3ce9805f090fa160ca8d32ea38e43c153f0d82a7fe9b13d46b1651531748a1dc, previously 0x163ec0d8f8874092366d5ef547739a63a646015718033fdba466d1351200be7c.
+2026-05-13 18:02:09.893  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #378 — syncing state\x1b[0m
+2026-05-13 18:02:09.893  INFO tokio-rt-worker substrate: 🏆 Imported #378 (0xa9d1…7a40 → 0x3ce9…a1dc)
+2026-05-13 18:02:10.125  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #375 ✅\x1b[0m
+2026-05-13 18:02:10.166  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #379 — syncing state\x1b[0m
+2026-05-13 18:02:10.166  INFO tokio-rt-worker substrate: 🏆 Imported #379 (0x3ce9…a1dc → 0x8b2e…133b)
+2026-05-13 18:02:10.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x8b2efc982310118f2ed28ef6610c7ab863d2a39d9ae0da4ee170d98e5c45133b
+2026-05-13 18:02:10.220  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #380 on parent #379
+2026-05-13 18:02:10.294  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 380. Hash now 0x81c2b83b7967abb3efddd8d6a166d346f1b5bb86f591910b9e3382ecb6a46444, previously 0x9473a217cb7a9f33dcd2c9a007459ce2c988d3d800150d4499f0152266948a63.
+2026-05-13 18:02:10.296  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #380 — syncing state\x1b[0m
+2026-05-13 18:02:10.296  INFO tokio-rt-worker substrate: 🏆 Imported #380 (0x8b2e…133b → 0x81c2…6444)
+2026-05-13 18:02:10.508  INFO tokio-rt-worker substrate: 🏆 Imported #381 (0x81c2…6444 → 0x66ae…6cd4)
+2026-05-13 18:02:10.508  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #381 — syncing state\x1b[0m
+2026-05-13 18:02:10.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x66ae6ff3d1f5699305174dd86eb20f682fed410e280e8aa1b867fcbb368f6cd4
+2026-05-13 18:02:10.609  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #377 ✅\x1b[0m
+2026-05-13 18:02:10.637  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #382 on parent #381
+2026-05-13 18:02:10.711  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 382. Hash now 0x480b5a4805f69a8e95c0047fad0dd518afdf46ad5e765c5cfd7007997ae3e844, previously 0xc73d7d2ece46803ab39bb8c3ee733a157ec1e43aa7f9287ba11c868a62b38a0f.
+2026-05-13 18:02:10.712  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #382 — syncing state\x1b[0m
+2026-05-13 18:02:10.712  INFO tokio-rt-worker substrate: 🏆 Imported #382 (0x66ae…6cd4 → 0x480b…e844)
+2026-05-13 18:02:10.929  INFO tokio-rt-worker substrate: 🏆 Imported #383 (0x480b…e844 → 0x98d4…2662)
+2026-05-13 18:02:10.929  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #383 — syncing state\x1b[0m
+2026-05-13 18:02:11.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x98d483b08cd515e0e8ebb4a17847fe78e420eb53878dcedf5a3f622175cb2662
+2026-05-13 18:02:11.034  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #384 on parent #383
+2026-05-13 18:02:11.075  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #380 ✅\x1b[0m
+2026-05-13 18:02:11.118  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 384. Hash now 0xcec2571d0dc00def852ea134be5bca0afe104ebf53a05bc7b46ac6e98d68033b, previously 0xc47f96a449af994f3292d0897104684e8b357de115edb0038af456edc3b9d0b1.
+2026-05-13 18:02:11.120  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #384 — syncing state\x1b[0m
+2026-05-13 18:02:11.120  INFO tokio-rt-worker substrate: 🏆 Imported #384 (0x98d4…2662 → 0xcec2…033b)
+2026-05-13 18:02:11.360  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #385 — syncing state\x1b[0m
+2026-05-13 18:02:11.360  INFO tokio-rt-worker substrate: 🏆 Imported #385 (0xcec2…033b → 0xe000…71a6)
+2026-05-13 18:02:11.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xe000553b5198d44ac54a8d3c9f6ce93fd22bd529ddf121475e9c5e37b44571a6
+2026-05-13 18:02:11.424  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #386 on parent #385
+2026-05-13 18:02:11.495  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 386. Hash now 0x791583778a18fd2b6b340b7073db7ee5725632aee5224cd0861898ee6b5d1cc2, previously 0x7bf63b2199a4943628fd9f8cfcbbc871cad13a13bbed272173a76903342becb1.
+2026-05-13 18:02:11.496  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #386 — syncing state\x1b[0m
+2026-05-13 18:02:11.496  INFO tokio-rt-worker substrate: 🏆 Imported #386 (0xe000…71a6 → 0x7915…1cc2)
+2026-05-13 18:02:11.535  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #382 ✅\x1b[0m
+2026-05-13 18:02:11.587  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #386 (0x7915…1cc2), finalized #382 (0x480b…e844), ⬇ 5.6kiB/s ⬆ 7.1kiB/s
+2026-05-13 18:02:11.745  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #387 — syncing state\x1b[0m
+2026-05-13 18:02:11.745  INFO tokio-rt-worker substrate: 🏆 Imported #387 (0x7915…1cc2 → 0xfcd9…b3b0)
+2026-05-13 18:02:11.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xfcd9a5799ec821f2151cce868140618ce5f1e68dfb14b6d091496eada7bdb3b0
+2026-05-13 18:02:11.836  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #388 on parent #387
+2026-05-13 18:02:11.896  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 388. Hash now 0xbab827b37e2a8fd9b29e880b529d873b9e1c6194823269896bd2c3303d575521, previously 0x8e5424c8400bf53466cfa71e16e543723f6c1e685d1ced658fc281b377ebd267.
+2026-05-13 18:02:11.898  INFO tokio-rt-worker substrate: 🏆 Imported #388 (0xfcd9…b3b0 → 0xbab8…5521)
+2026-05-13 18:02:11.898  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #388 — syncing state\x1b[0m
+2026-05-13 18:02:11.999  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #384 ✅\x1b[0m
+2026-05-13 18:02:12.154  INFO tokio-rt-worker substrate: 🏆 Imported #389 (0xbab8…5521 → 0x32d1…a50b)
+2026-05-13 18:02:12.154  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #389 — syncing state\x1b[0m
+2026-05-13 18:02:12.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x32d17f3e61c64ce537d25fc4c82c930961a64ca8fab2127ace3fff479373a50b
+2026-05-13 18:02:12.224  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #390 on parent #389
+2026-05-13 18:02:12.299  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 390. Hash now 0x855ee766ee289aea4b3172048473b6c8e2782a2a8b9abb40dfe0f920b4902936, previously 0x64e42c2773205c9a404a6e1bfba33f770480e3ed2b13bd7e8840a9b4f5f06eb1.
+2026-05-13 18:02:12.300  INFO tokio-rt-worker substrate: 🏆 Imported #390 (0x32d1…a50b → 0x855e…2936)
+2026-05-13 18:02:12.300  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #390 — syncing state\x1b[0m
+2026-05-13 18:02:12.497  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #387 ✅\x1b[0m
+2026-05-13 18:02:12.529  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #391 — syncing state\x1b[0m
+2026-05-13 18:02:12.529  INFO tokio-rt-worker substrate: 🏆 Imported #391 (0x855e…2936 → 0x13d2…9ff8)
+2026-05-13 18:02:12.603  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x13d23e79f431b6b11c5c235c54fc9d462fedaa8facf4772f4301500cc2309ff8
+2026-05-13 18:02:12.632  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #392 on parent #391
+2026-05-13 18:02:12.705  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 392. Hash now 0x3752221bf27c993447f44a785da9bfded7084dea49b5873e583739ab2fe9d7ca, previously 0x88d6e64027cbb65388209fe19c5752617e3f3d483631c4e5b83745b6ac7daf7e.
+2026-05-13 18:02:12.706  INFO tokio-rt-worker substrate: 🏆 Imported #392 (0x13d2…9ff8 → 0x3752…d7ca)
+2026-05-13 18:02:12.706  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #392 — syncing state\x1b[0m
+2026-05-13 18:02:12.952  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #393 — syncing state\x1b[0m
+2026-05-13 18:02:12.952  INFO tokio-rt-worker substrate: 🏆 Imported #393 (0x3752…d7ca → 0x1917…f389)
+2026-05-13 18:02:12.959  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #389 ✅\x1b[0m
+2026-05-13 18:02:13.002  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x19172ce5fc99c4027bcea35f1eb7b5cdd01efe28d84738eccd56db5c430ff389
+2026-05-13 18:02:13.034  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #394 on parent #393
+2026-05-13 18:02:13.108  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 394. Hash now 0xb30996d004fe7b5fb06b3fdc3bc550f78bd313c69e5a85f03da6d59bde57b1b4, previously 0x51a8521c825b42a535679062e2a04f7e11e1c80347affe261f8ff9da381ec66d.
+2026-05-13 18:02:13.109  INFO tokio-rt-worker substrate: 🏆 Imported #394 (0x1917…f389 → 0xb309…b1b4)
+2026-05-13 18:02:13.109  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #394 — syncing state\x1b[0m
+2026-05-13 18:02:13.348  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #395 — syncing state\x1b[0m
+2026-05-13 18:02:13.348  INFO tokio-rt-worker substrate: 🏆 Imported #395 (0xb309…b1b4 → 0x6814…b743)
+2026-05-13 18:02:13.402  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x681490ae062f60adecfed10937857f79567f9a99c02cbc3c3d0656742bcfb743
+2026-05-13 18:02:13.422  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #392 ✅\x1b[0m
+2026-05-13 18:02:13.425  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #396 on parent #395
+2026-05-13 18:02:13.500  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 396. Hash now 0x0bccb17b026eefa02117f0b68f15ab5d67c5c7a89fa8b109e7f3c0125ae00fe8, previously 0xf5dab579cf694c84b9b440a6b3bbcd605fd01046265a27536bda65395e61ec68.
+2026-05-13 18:02:13.501  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #396 — syncing state\x1b[0m
+2026-05-13 18:02:13.501  INFO tokio-rt-worker substrate: 🏆 Imported #396 (0x6814…b743 → 0x0bcc…0fe8)
+2026-05-13 18:02:13.714  INFO tokio-rt-worker substrate: 🏆 Imported #397 (0x0bcc…0fe8 → 0x651b…94be)
+2026-05-13 18:02:13.714  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #397 — syncing state\x1b[0m
+2026-05-13 18:02:13.802  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x651b1896ed170c03a68fc6a8e43ad7c58eca0c735cd5da25847375e3588794be
+2026-05-13 18:02:13.831  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #398 on parent #397
+2026-05-13 18:02:13.897  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #394 ✅\x1b[0m
+2026-05-13 18:02:13.906  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 398. Hash now 0xc60746a54b727e1e88cd866e818f35544798b33825e19674008761e1e29cd42b, previously 0xe8e902289ccd05b860a4a91823ae5d1175859533a1e70bc20dc5241c581fdb9f.
+2026-05-13 18:02:13.908  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #398 — syncing state\x1b[0m
+2026-05-13 18:02:13.908  INFO tokio-rt-worker substrate: 🏆 Imported #398 (0x651b…94be → 0xc607…d42b)
+2026-05-13 18:02:14.129  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #399 — syncing state\x1b[0m
+2026-05-13 18:02:14.129  INFO tokio-rt-worker substrate: 🏆 Imported #399 (0xc607…d42b → 0xc2ea…cb03)
+2026-05-13 18:02:14.201  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xc2ea8020b32f5c56aa1bf8a2fab08eb33346e9b514ca3ee8da6237b1cb4ccb03
+2026-05-13 18:02:14.240  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #400 on parent #399
+2026-05-13 18:02:14.310  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 400. Hash now 0x9bc9b21fd839460453d7cc31aa64534886e59e52320ea9011495e9f005a1160e, previously 0xd30b5ba4824271d524eeae15044868c4ef1ec7f066cebac2e1a3d7b7d537be32.
+2026-05-13 18:02:14.312  INFO tokio-rt-worker substrate: 🏆 Imported #400 (0xc2ea…cb03 → 0x9bc9…160e)
+2026-05-13 18:02:14.312  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #400 — syncing state\x1b[0m
+2026-05-13 18:02:14.374  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #396 ✅\x1b[0m
+2026-05-13 18:02:14.534  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #401 — syncing state\x1b[0m
+2026-05-13 18:02:14.534  INFO tokio-rt-worker substrate: 🏆 Imported #401 (0x9bc9…160e → 0x3584…8761)
+2026-05-13 18:02:14.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x3584d7cc8c2f84419e509b035cc3334c7fc93ff8d209a5b0ca4a4883edcd8761
+2026-05-13 18:02:14.626  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #402 on parent #401
+2026-05-13 18:02:14.702  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 402. Hash now 0x9efb0fcebd21c34e543510d8079c6b2eaa237967620dc67baf09b2e8c458578d, previously 0xd1016474d7e9886fd62004dbef66e0781ce55b100263e462ca191d88dfc41e9a.
+2026-05-13 18:02:14.704  INFO tokio-rt-worker substrate: 🏆 Imported #402 (0x3584…8761 → 0x9efb…578d)
+2026-05-13 18:02:14.704  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #402 — syncing state\x1b[0m
+2026-05-13 18:02:14.851  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #399 ✅\x1b[0m
+2026-05-13 18:02:14.968  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #403 — syncing state\x1b[0m
+2026-05-13 18:02:14.968  INFO tokio-rt-worker substrate: 🏆 Imported #403 (0x9efb…578d → 0x41ed…dc9d)
+2026-05-13 18:02:15.012  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x41ed378be1cbaa8badf131b0e07f222d6dd01c292f858db4ebb1dc599b5edc9d
+2026-05-13 18:02:15.041  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #404 on parent #403
+2026-05-13 18:02:15.117  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 404. Hash now 0x8d72650dda8b18d13ea690c216aa71c6b42d43a189a652fbe37ec1984220f873, previously 0x785d4f05f993166de57b134068f46a621569e43ea6bde9a1429ef2e05a10e828.
+2026-05-13 18:02:15.119  INFO tokio-rt-worker substrate: 🏆 Imported #404 (0x41ed…dc9d → 0x8d72…f873)
+2026-05-13 18:02:15.119  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #404 — syncing state\x1b[0m
+2026-05-13 18:02:15.312  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #401 ✅\x1b[0m
+2026-05-13 18:02:15.331  INFO tokio-rt-worker substrate: 🏆 Imported #405 (0x8d72…f873 → 0xea8c…64dc)
+2026-05-13 18:02:15.331  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #405 — syncing state\x1b[0m
+2026-05-13 18:02:15.401  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xea8c7b6c16fae1eeae56f073eb3460010fa11c6fa68914d60a18d24c5b3c64dc
+2026-05-13 18:02:15.431  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #406 on parent #405
+2026-05-13 18:02:15.523  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 406. Hash now 0x6e8d9d771bf23c231370434abfdd47f3523f916939444a6c5371f656a006fe4d, previously 0x312786c617b8e71993cfcc3be966a96c4fe957d9f93c01b4ced086fd7ff30148.
+2026-05-13 18:02:15.526  INFO tokio-rt-worker substrate: 🏆 Imported #406 (0xea8c…64dc → 0x6e8d…fe4d)
+2026-05-13 18:02:15.526  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #406 — syncing state\x1b[0m
+2026-05-13 18:02:15.739  INFO tokio-rt-worker substrate: 🏆 Imported #407 (0x6e8d…fe4d → 0x2bdb…0d38)
+2026-05-13 18:02:15.739  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #407 — syncing state\x1b[0m
+2026-05-13 18:02:15.794  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #403 ✅\x1b[0m
+2026-05-13 18:02:15.801  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x2bdb6e34f0f70d2caeef23f916c8a0a58ef8d2cd999d767fef36773f851f0d38
+2026-05-13 18:02:15.835  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #408 on parent #407
+2026-05-13 18:02:15.891  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 408. Hash now 0x9b57be71aba997c2370de7afe33c207be4d4508b5e3e559386158f5cd0cc1008, previously 0x21850d2059d872066d6720fe480abab2d9bab896444653cff53d4fa5f9a797d1.
+2026-05-13 18:02:15.893  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #408 — syncing state\x1b[0m
+2026-05-13 18:02:15.893  INFO tokio-rt-worker substrate: 🏆 Imported #408 (0x2bdb…0d38 → 0x9b57…1008)
+2026-05-13 18:02:16.122  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #409 — syncing state\x1b[0m
+2026-05-13 18:02:16.122  INFO tokio-rt-worker substrate: 🏆 Imported #409 (0x9b57…1008 → 0x6447…064f)
+2026-05-13 18:02:16.202  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x6447667c029a764561c86c800b6bbd3945023aea4f33acf53e8aafe42947064f
+2026-05-13 18:02:16.232  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #410 on parent #409
+2026-05-13 18:02:16.258  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #406 ✅\x1b[0m
+2026-05-13 18:02:16.313  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 410. Hash now 0x7b9a9ad9f20bb2a51f4a0713aaabab563bd07946ce553e1b6275a6c5db1a3906, previously 0xbdc6a3ea827ab11d6765580545eaff093efcf56f13445f71a7ab61dd31e2ef2f.
+2026-05-13 18:02:16.314  INFO tokio-rt-worker substrate: 🏆 Imported #410 (0x6447…064f → 0x7b9a…3906)
+2026-05-13 18:02:16.314  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #410 — syncing state\x1b[0m
+2026-05-13 18:02:16.549  INFO tokio-rt-worker substrate: 🏆 Imported #411 (0x7b9a…3906 → 0x07a7…6b94)
+2026-05-13 18:02:16.549  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #411 — syncing state\x1b[0m
+2026-05-13 18:02:16.587  INFO tokio-rt-worker substrate: 💤 Idle (2 peers), best: #411 (0x07a7…6b94), finalized #406 (0x6e8d…fe4d), ⬇ 5.7kiB/s ⬆ 6.9kiB/s
+2026-05-13 18:02:16.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x07a78bb0643d1f6d63bb7b46c9ba965751f8fccf4e74c8f2dd50f51e28046b94
+2026-05-13 18:02:16.636  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #412 on parent #411
+2026-05-13 18:02:16.704  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 412. Hash now 0x96873b3cbdcb3d26b71202a6d0da28e6da6150f4d52fb009cbaf4fe201ac6397, previously 0x795cb3480f931128911fefbf8dc8fe60a87cdb5215082dd877526172fe2b2b69.
+2026-05-13 18:02:16.705  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #412 — syncing state\x1b[0m
+2026-05-13 18:02:16.705  INFO tokio-rt-worker substrate: 🏆 Imported #412 (0x07a7…6b94 → 0x9687…6397)
+2026-05-13 18:02:16.743  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #408 ✅\x1b[0m
+2026-05-13 18:02:16.943  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #413 — syncing state\x1b[0m
+2026-05-13 18:02:16.943  INFO tokio-rt-worker substrate: 🏆 Imported #413 (0x9687…6397 → 0x2dac…ba47)
+2026-05-13 18:02:17.001  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x2dac2619ca1bb9b73993cfa3f09b198368ec8a9e5ec9f58f47aeab21b2d5ba47
+2026-05-13 18:02:17.032  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #414 on parent #413
+2026-05-13 18:02:17.108  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 414. Hash now 0x38d40d7044d20bdf906b8ceda5ac2ccefc639be3b4607ff50d930103f2e190fd, previously 0xb8893f51d66ce8b9264d62bf97590e08b4c8b4677e463e6b5133de8fac974276.
+2026-05-13 18:02:17.110  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #414 — syncing state\x1b[0m
+2026-05-13 18:02:17.110  INFO tokio-rt-worker substrate: 🏆 Imported #414 (0x2dac…ba47 → 0x38d4…90fd)
+2026-05-13 18:02:17.229  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #410 ✅\x1b[0m
+2026-05-13 18:02:17.353  INFO tokio-rt-worker substrate: 🏆 Imported #415 (0x38d4…90fd → 0x1cf7…108d)
+2026-05-13 18:02:17.353  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #415 — syncing state\x1b[0m
+2026-05-13 18:02:17.403  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x1cf743e56295d743172198323a070ac422a75c76e2b4e66fadbba8f41543108d
+2026-05-13 18:02:17.440  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #416 on parent #415
+2026-05-13 18:02:17.517  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 416. Hash now 0x3fb948184ff30bbda1cb1e537ebda8d35f7850285b1e0f51923ae8feb1df1989, previously 0x9239ddd083a2bf7a6bb87673bbdd4c77d2caed12f0e964027f929b3c3a8685c2.
+2026-05-13 18:02:17.518  INFO tokio-rt-worker substrate: 🏆 Imported #416 (0x1cf7…108d → 0x3fb9…1989)
+2026-05-13 18:02:17.518  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #416 — syncing state\x1b[0m
+2026-05-13 18:02:17.726  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #413 ✅\x1b[0m
+2026-05-13 18:02:17.767  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #417 — syncing state\x1b[0m
+2026-05-13 18:02:17.767  INFO tokio-rt-worker substrate: 🏆 Imported #417 (0x3fb9…1989 → 0x88b2…9692)
+2026-05-13 18:02:17.801  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x88b2d56c4eb63f42565e5afa101ed6ac8984458832826ae43ea7683412439692
+2026-05-13 18:02:17.836  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #418 on parent #417
+2026-05-13 18:02:17.906  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 418. Hash now 0x5df3a3f3caa74639fc31e2ff442613441017c59974df4fee62a5330dd9fbb389, previously 0x15a86423f363d01132b32cbdfd0b4faf972e56ef0dd4cab44008f16d487efbca.
+2026-05-13 18:02:17.907  INFO tokio-rt-worker substrate: 🏆 Imported #418 (0x88b2…9692 → 0x5df3…b389)
+2026-05-13 18:02:17.907  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #418 — syncing state\x1b[0m
+2026-05-13 18:02:18.151  INFO tokio-rt-worker substrate: 🏆 Imported #419 (0x5df3…b389 → 0xdcb4…2913)
+2026-05-13 18:02:18.151  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #419 — syncing state\x1b[0m
+2026-05-13 18:02:18.201  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0xdcb400cfa15cbde4f1aae26ff81eca440659b64a829ee133b00e53af5e322913
+2026-05-13 18:02:18.208  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #415 ✅\x1b[0m
+2026-05-13 18:02:18.239  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #420 on parent #419
+2026-05-13 18:02:18.293  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 420. Hash now 0x201e8cc56cf394895913e67bb45240c906a0ddd9a188f7857ad38837209c0d29, previously 0x900bac14666bbe2b93098beab17d4174424da741f479ad34e77df6e7efcf9fb5.
+2026-05-13 18:02:18.294  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #420 — syncing state\x1b[0m
+2026-05-13 18:02:18.294  INFO tokio-rt-worker substrate: 🏆 Imported #420 (0xdcb4…2913 → 0x201e…0d29)
+2026-05-13 18:02:18.532  INFO tokio-rt-worker substrate: 🏆 Imported #421 (0x201e…0d29 → 0x93dc…e61a)
+2026-05-13 18:02:18.532  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #421 — syncing state\x1b[0m
+2026-05-13 18:02:18.602  INFO tokio-rt-worker parallel-proposer: Starting parallel proposer on top of parent 0x93dc1b23c605bb8de0c99e1c72063db4472ab79944f99c2daee59e5c47cfe61a
+2026-05-13 18:02:18.636  INFO tokio-rt-worker parallel-proposer: Prepared parallel proposal for block #422 on parent #421
+2026-05-13 18:02:18.672  INFO tokio-rt-worker x3_chain_node::service: \x1b[33m🏆 Block finalized: #418 ✅\x1b[0m
+2026-05-13 18:02:18.696  INFO tokio-rt-worker aura: 🔖 Pre-sealed block for proposal at 422. Hash now 0xd8cb3709fc039335d384e92b0f221c23bb7995fe5123060c35854d38613a6fcc, previously 0xe686a1c8e8ea76329ec7fbacb998d017756b6e47987a04ab24adcd5b0d503cb6.
+2026-05-13 18:02:18.697  INFO tokio-rt-worker substrate: 🏆 Imported #422 (0x93dc…e61a → 0xd8cb…6fcc)
+2026-05-13 18:02:18.697  INFO tokio-rt-worker x3_chain_node::service: \x1b[35m📦 Block imported: #422 — syncing state\x1b[0m

@@ -1,0 +1,7 @@
+{
+  "lanes": {
+    "simple": { "provider": "ollama", "model": "gemma:12b" },
+    "medium": { "provider": "ollama", "model": "gemma:12b" },
+    "complex": { "provider": "ollama", "model": "gemma:12b" }
+  }
+}

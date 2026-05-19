@@ -1,0 +1,157 @@
+version: '3.9'
+
+services:
+  # PostgreSQL for jury audit logging persistence
+  jury-db:
+    image: postgres:15-alpine
+    container_name: x3-jury-db
+    environment:
+      POSTGRES_USER: jury_admin
+      POSTGRES_PASSWORD: ${JURY_DB_PASSWORD:-jury_secure_password_change_me}
+      POSTGRES_DB: jury_audit
+      POSTGRES_INITDB_ARGS: "-c max_connections=100"
+    volumes:
+      - jury-db-data:/var/lib/postgresql/data
+      - ./sql-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jury_admin -d jury_audit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jury-net
+    restart: unless-stopped
+
+  # Redis for caching and session management (optional, for scaling)
+  jury-cache:
+    image: redis:7-alpine
+    container_name: x3-jury-cache
+    command: redis-server --requirepass ${JURY_REDIS_PASSWORD:-redis_secure_password_change_me}
+    volumes:
+      - jury-cache-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jury-net
+    restart: unless-stopped
+
+  # Main Jury API Service
+  jury-service:
+    build:
+      context: ../../..
+      dockerfile: openspec/changes/add-offchain-jury/Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+        WITH_GPU: ${WITH_GPU:-false}
+    container_name: x3-jury-service
+    environment:
+      # Python environment
+      PYTHONUNBUFFERED: "1"
+      PYTHONVERBOSE: "0"
+      
+      # Database configuration
+      DATABASE_URL: postgresql://jury_admin:${JURY_DB_PASSWORD:-jury_secure_password_change_me}@jury-db:5432/jury_audit
+      SQLALCHEMY_DATABASE_URL: postgresql://jury_admin:${JURY_DB_PASSWORD:-jury_secure_password_change_me}@jury-db:5432/jury_audit
+      
+      # Redis configuration (optional)
+      REDIS_URL: redis://:${JURY_REDIS_PASSWORD:-redis_secure_password_change_me}@jury-cache:6379/0
+      
+      # Jury service configuration
+      JURY_API_HOST: "0.0.0.0"
+      JURY_API_PORT: "8000"
+      JURY_LOG_LEVEL: "${JURY_LOG_LEVEL:-INFO}"
+      JURY_COMMIT_DEADLINE_SECONDS: "300"
+      JURY_REVEAL_DEADLINE_SECONDS: "600"
+      JURY_MIN_MEMBERS: "3"
+      JURY_MAX_MEMBERS: "21"
+      JURY_QUORUM_THRESHOLD: "0.66"
+      JURY_SECTION_DIVERSITY_CAP: "0.75"
+      
+      # On-chain integration (stubs for future)
+      ONCHAIN_RPC_URL: "${ONCHAIN_RPC_URL:-http://localhost:9944}"
+      ONCHAIN_ANCHOR_ENABLED: "${ONCHAIN_ANCHOR_ENABLED:-false}"
+      
+      # GPU configuration (if WITH_GPU=true)
+      GPU_ENABLED: "${WITH_GPU:-false}"
+      CUDA_VISIBLE_DEVICES: "${CUDA_VISIBLE_DEVICES:-0}"
+      
+      # Telemetry
+      TELEMETRY_ENABLED: "${TELEMETRY_ENABLED:-true}"
+      TELEMETRY_ENDPOINT: "${TELEMETRY_ENDPOINT:-http://localhost:8888}"
+    
+    ports:
+      - "8000:8000"       # Main API
+      - "8001:8001"       # Metrics/health
+    
+    volumes:
+      - jury-logs:/var/log/jury
+      - jury-sessions:/var/cache/jury/sessions
+      # Mount source for development (comment out in production)
+      - ../../../swarm:/app/swarm:ro
+    
+    depends_on:
+      jury-db:
+        condition: service_healthy
+      jury-cache:
+        condition: service_healthy
+    
+    networks:
+      - jury-net
+    
+    # GPU support (uncomment for GPU-enabled builds)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Optional: Prometheus for metrics collection
+  jury-metrics:
+    image: prom/prometheus:latest
+    container_name: x3-jury-metrics
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - jury-prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - jury-net
+    restart: unless-stopped
+    profiles:
+      - observability
+
+volumes:
+  jury-db-data:
+    driver: local
+  jury-cache-data:
+    driver: local
+  jury-logs:
+    driver: local
+  jury-sessions:
+    driver: local
+  jury-prometheus-data:
+    driver: local
+
+networks:
+  jury-net:
+    driver: bridge

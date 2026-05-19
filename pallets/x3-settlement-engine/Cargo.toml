@@ -1,0 +1,67 @@
+[package]
+name = "pallet-x3-settlement-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain Team"]
+description = "X3 Settlement Engine - Protocol-level atomic settlement for BTC, EVM, and SVM"
+repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
+license = "MIT"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { package = "scale-info", version = "2.10", default-features = false, features = ["derive"] }
+log = { version = "0.4", default-features = false }
+
+# Substrate dependencies
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+sp-core = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+sp-api = { workspace = true, default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+ripemd = { version = "0.1", default-features = false }
+frame-benchmarking = { workspace = true, default-features = false, optional = true }
+
+# Internal dependencies
+pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
+pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
+
+[dev-dependencies]
+pallet-timestamp = { workspace = true }
+pallet-balances = { workspace = true }
+proptest = "1.4"
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "log/std",
+    "frame-benchmarking?/std",
+    "frame-support/std",
+    "frame-system/std",
+    "sp-core/std",
+    "sp-std/std",
+    "sp-runtime/std",
+    "sp-io/std",
+    "sp-api/std",
+    "serde/std",
+    "ripemd/std",
+    "pallet-x3-kernel/std",
+    "pallet-atomic-trade-engine/std",
+]
+runtime-benchmarks = [
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+    "frame-benchmarking",
+    "frame-benchmarking/runtime-benchmarks",
+]
+try-runtime = [
+    "frame-support/try-runtime",
+]
+dev-bypass = []

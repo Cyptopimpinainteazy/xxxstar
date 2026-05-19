@@ -1,0 +1,339 @@
+# Kubernetes StatefulSet for GPU Swarm Coordinator
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: swarm-coordinator
+  namespace: x3-chain
+spec:
+  serviceName: swarm-coordinator
+  replicas: 3
+  selector:
+    matchLabels:
+      app: swarm-coordinator
+  template:
+    metadata:
+      labels:
+        app: swarm-coordinator
+    spec:
+      serviceAccountName: swarm-coordinator
+      containers:
+      - name: coordinator
+        image: x3-chain/swarm-coordinator:latest
+        imagePullPolicy: Always
+        ports:
+        - name: p2p
+          containerPort: 9000
+          protocol: TCP
+        - name: rpc
+          containerPort: 9100
+          protocol: TCP
+        - name: admin
+          containerPort: 3000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info,gpu_swarm=debug"
+        - name: COORDINATOR_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: BLOCKCHAIN_RPC
+          value: "ws://x3-kernel:9944"
+        resources:
+          requests:
+            cpu: "2"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "4Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: coordinator-data
+          mountPath: /var/lib/swarm
+        - name: coordinator-config
+          mountPath: /etc/swarm
+          readOnly: true
+      volumes:
+      - name: coordinator-config
+        configMap:
+          name: swarm-coordinator-config
+  volumeClaimTemplates:
+  - metadata:
+      name: coordinator-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 10Gi
+---
+# Kubernetes DaemonSet for GPU Nodes
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: swarm-node
+  namespace: x3-chain
+spec:
+  selector:
+    matchLabels:
+      app: swarm-node
+  template:
+    metadata:
+      labels:
+        app: swarm-node
+    spec:
+      nodeSelector:
+        gpu: "true"
+      tolerations:
+      - key: gpu
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      containers:
+      - name: node
+        image: x3-chain/swarm-node:latest
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+        ports:
+        - name: p2p
+          containerPort: 9000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          value: "info,gpu_swarm=debug"
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: COORDINATOR_ENDPOINT
+          value: "http://swarm-coordinator:9100"
+        - name: GPU_BACKEND
+          value: "cuda"
+        - name: ACCEPTED_TASK_TYPES
+          value: "x3_bytecode,mempool_sim,route_optimize,model_training,zk_proving"
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - curl -f http://localhost:9090/metrics || exit 1
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - curl -f http://localhost:9090/metrics || exit 1
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: gpu-devices
+          mountPath: /dev
+        - name: nvidia-install-dir
+          mountPath: /usr/local/nvidia
+          readOnly: true
+        - name: node-config
+          mountPath: /etc/swarm
+          readOnly: true
+        - name: node-data
+          mountPath: /var/lib/swarm
+      volumes:
+      - name: gpu-devices
+        hostPath:
+          path: /dev
+          type: Directory
+      - name: nvidia-install-dir
+        hostPath:
+          path: /usr/local/nvidia
+          type: Directory
+      - name: node-config
+        configMap:
+          name: swarm-node-config
+      - name: node-data
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
+---
+# Service for Coordinator
+apiVersion: v1
+kind: Service
+metadata:
+  name: swarm-coordinator
+  namespace: x3-chain
+spec:
+  selector:
+    app: swarm-coordinator
+  ports:
+  - name: p2p
+    port: 9000
+    targetPort: 9000
+  - name: rpc
+    port: 9100
+    targetPort: 9100
+  - name: admin
+    port: 3000
+    targetPort: 3000
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+---
+# HorizontalPodAutoscaler for Coordinator
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: swarm-coordinator-hpa
+  namespace: x3-chain
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: swarm-coordinator
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: swarm_task_queue_size
+      target:
+        type: AverageValue
+        averageValue: "1000"
+---
+# ConfigMap for Coordinator
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: swarm-coordinator-config
+  namespace: x3-chain
+data:
+  coordinator-config.toml: |
+    [coordinator]
+    listen_addresses = ["/ip4/0.0.0.0/tcp/9000"]
+    max_peers = 500
+    enable_mdns = true
+    
+    [scheduler]
+    strategy = "reputationweighted"
+    max_queue_size = 10000
+    
+    [verification]
+    min_verifiers = 2
+    verification_timeout_secs = 60
+    
+    [reputation]
+    initial_score = 100
+    success_reward = 1
+    failure_penalty = 5
+---
+# ConfigMap for Node
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: swarm-node-config
+  namespace: x3-chain
+data:
+  node-config.toml: |
+    [identity]
+    keypair_path = "/var/lib/swarm/node.key"
+    
+    [network]
+    listen_addresses = ["/ip4/0.0.0.0/tcp/9000"]
+    max_peers = 100
+    enable_mdns = true
+    
+    [gpu]
+    enable_cuda = true
+    max_concurrent_tasks = 6
+    task_timeout = 300
+    sandbox_enabled = true
+    
+    [rewards]
+    min_stake = 1000
+    claim_threshold = 100
+---
+# ServiceAccount for Coordinator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: swarm-coordinator
+  namespace: x3-chain
+---
+# Role for Coordinator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: swarm-coordinator
+  namespace: x3-chain
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+---
+# RoleBinding for Coordinator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: swarm-coordinator
+  namespace: x3-chain
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: swarm-coordinator
+subjects:
+- kind: ServiceAccount
+  name: swarm-coordinator
+  namespace: x3-chain
+---
+# Namespace creation
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: x3-chain

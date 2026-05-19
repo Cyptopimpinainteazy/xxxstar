@@ -1,0 +1,45 @@
+{
+  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "command_run": "x3-proof verify x3.proofforge.receipt_integrity",
+  "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "proof/receipts/claims"
+  ],
+  "timestamp": "2026-05-06T12:38:57.654643194Z",
+  "result": {
+    "claim_id": "x3.proofforge.receipt_integrity",
+    "claim": "ProofForge receipt integrity and freshness",
+    "status": "partial",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "proof/receipts/claims"
+    ],
+    "commands_run": [
+      "x3-proof verify <claim> --strict"
+    ],
+    "passed_checks": [
+      "11 fresh receipts"
+    ],
+    "failed_checks": [
+      "16 stale/not-fresh receipts",
+      "stale receipts: x3.consensus.equivocation_detection, x3.consensus.finality_safety, x3.consensus.validator_rotation, x3.contracts.some_unimplemented, x3.dex.amm_math_safety, x3.dex.liquidity_provision, x3.dex.swapping_mechanism, x3.evolution.no_regression, x3.flashloans.attack_resistance, x3.funding.milestone_receipts, x3.gpu.cpu_gpu_parity, x3.observability.telemetry_pipeline, x3.onboarding.developer_first_value, x3.runtime.full_proof, x3.treasury.full_proof, x3.x3vm.full_proof"
+    ],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 0.5,
+    "evidence": {
+      "fresh_receipts": "11",
+      "invalid_receipts": "0",
+      "stale_receipts": "16"
+    },
+    "timestamp": "2026-05-06T12:38:57.650811863Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "75d64a5d6268e48ec9efb78cdca1f5ad7a1852dad877ce3596004f258cd886d3"
+}

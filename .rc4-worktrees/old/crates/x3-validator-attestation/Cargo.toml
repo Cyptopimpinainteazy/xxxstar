@@ -1,0 +1,12 @@
+[package]
+name = "x3-validator-attestation"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Validator attestation set tracking and quorum checks for X3 flows."
+
+[lib]
+name = "x3_validator_attestation"
+path = "src/lib.rs"
+
+[dependencies]

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Grant Mission Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050810;--panel:rgba(5,8,16,0.98);
+  --border:rgba(0,180,255,0.12);
+  --teal:#00C8B4;--blue:#0088FF;--cyan:#00D4FF;
+  --gold:#FFD060;--green:#2EFF9A;--red:#FF3860;
+  --orange:#FF8C20;--purple:#9944FF;
+  --text:#D8F0FF;--muted:#1A3050;--dim:#0A1828;
+  --mono:'Syne Mono',monospace;--body:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);overflow-x:hidden;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 70% 40% at 50% 0%,rgba(0,136,255,0.06),transparent),
+  radial-gradient(ellipse 50% 60% at 100% 50%,rgba(0,200,180,0.03),transparent);}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:center;
+  padding:0 24px;gap:0;background:rgba(5,8,16,0.97);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(16px);}
+.logo{font-family:var(--mono);font-size:16px;letter-spacing:3px;
+  color:var(--cyan);margin-right:32px;text-shadow:0 0 20px rgba(0,212,255,0.4);}
+.ntab{padding:0 18px;height:58px;display:flex;align-items:center;font-size:11px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all 0.2s;text-decoration:none;}
+.ntab:hover,.ntab.active{color:var(--teal);border-bottom-color:var(--teal);}
+.nav-stats{display:flex;gap:20px;margin-left:auto;align-items:center;}
+.ns-item{text-align:right;}
+.ns-val{font-family:var(--mono);font-size:14px;font-weight:700;}
+.ns-key{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.btn-join{padding:8px 20px;border-radius:8px;background:linear-gradient(135deg,var(--teal),var(--blue));
+  color:#fff;border:none;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  cursor:pointer;font-family:var(--body);transition:all 0.2s;}
+.btn-join:hover{box-shadow:0 0 24px rgba(0,200,180,0.4);transform:translateY(-1px);}
+
+/* PAGE HEADER */
+.page-head{padding:24px 24px 0;position:relative;z-index:1;
+  display:flex;align-items:flex-end;justify-content:space-between;}
+.ph-title{font-size:32px;font-weight:800;letter-spacing:-0.5px;line-height:1;}
+.ph-title span{color:var(--teal);}
+.ph-sub{font-size:13px;color:var(--muted);margin-top:4px;}
+.ph-kpis{display:flex;gap:2px;background:var(--border);border-radius:12px;overflow:hidden;}
+.phk{background:var(--dim);padding:12px 20px;text-align:center;}
+.phk-val{font-family:var(--mono);font-size:18px;font-weight:700;}
+.phk-key{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+
+/* KANBAN BOARD */
+.board{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;
+  padding:20px 24px 80px;position:relative;z-index:1;min-height:calc(100vh - 160px);}
+.column{display:flex;flex-direction:column;gap:8px;}
+.col-header{display:flex;align-items:center;gap:8px;padding:10px 14px;
+  border-radius:10px;margin-bottom:4px;}
+.ch-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ch-title{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex:1;}
+.ch-count{font-family:var(--mono);font-size:12px;font-weight:700;
+  background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:100px;}
+
+/* GRANT CARD */
+.grant-card{background:rgba(8,14,28,0.9);border-radius:12px;padding:14px;
+  border:1px solid rgba(255,255,255,0.06);cursor:pointer;
+  transition:all 0.25s;position:relative;overflow:hidden;}
+.grant-card::before{content:'';position:absolute;top:0;left:0;width:2px;bottom:0;border-radius:2px 0 0 2px;}
+.grant-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4);}
+.gc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.gc-icon{font-size:24px;flex-shrink:0;}
+.gc-cat{font-size:8px;letter-spacing:1.5px;padding:2px 8px;border-radius:100px;font-weight:700;text-transform:uppercase;}
+.gc-title{font-size:13px;font-weight:700;line-height:1.3;margin-bottom:5px;}
+.gc-team{font-size:10px;color:var(--muted);margin-bottom:10px;}
+.gc-progress{margin-bottom:8px;}
+.gcp-bar-wrap{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;margin:5px 0;}
+.gcp-fill{height:100%;border-radius:2px;transition:width 1s ease;}
+.gcp-labels{display:flex;justify-content:space-between;font-size:9px;}
+.gc-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.gc-tag{font-size:8px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,0.05);
+  color:rgba(255,255,255,0.35);border:1px solid rgba(255,255,255,0.07);}
+.gc-amount{font-family:var(--mono);font-size:12px;font-weight:700;margin-top:8px;}
+.gc-milestone{font-size:10px;color:var(--muted);margin-top:4px;
+  display:flex;align-items:center;gap:4px;}
+.gm-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+
+/* ─── COLUMN COLORS ─── */
+/* Review */
+.col-review .col-header{background:rgba(255,140,32,0.06);border:1px solid rgba(255,140,32,0.15);}
+.col-review .ch-dot{background:var(--orange);}
+.col-review .ch-title{color:var(--orange);}
+.col-review .grant-card::before{background:var(--orange);}
+.col-review .grant-card:hover{border-color:rgba(255,140,32,0.25);box-shadow:0 12px 40px rgba(255,140,32,0.06);}
+
+/* Building */
+.col-building .col-header{background:rgba(0,136,255,0.06);border:1px solid rgba(0,136,255,0.15);}
+.col-building .ch-dot{background:var(--blue);}
+.col-building .ch-title{color:var(--blue);}
+.col-building .grant-card::before{background:var(--blue);}
+.col-building .grant-card:hover{border-color:rgba(0,136,255,0.25);box-shadow:0 12px 40px rgba(0,136,255,0.06);}
+
+/* Milestone */
+.col-milestone .col-header{background:rgba(153,68,255,0.06);border:1px solid rgba(153,68,255,0.15);}
+.col-milestone .ch-dot{background:var(--purple);}
+.col-milestone .ch-title{color:var(--purple);}
+.col-milestone .grant-card::before{background:var(--purple);}
+.col-milestone .grant-card:hover{border-color:rgba(153,68,255,0.25);box-shadow:0 12px 40px rgba(153,68,255,0.06);}
+
+/* Review_pay */
+.col-review_pay .col-header{background:rgba(255,208,96,0.06);border:1px solid rgba(255,208,96,0.15);}
+.col-review_pay .ch-dot{background:var(--gold);}
+.col-review_pay .ch-title{color:var(--gold);}
+.col-review_pay .grant-card::before{background:var(--gold);}
+
+/* Complete */
+.col-complete .col-header{background:rgba(46,255,154,0.06);border:1px solid rgba(46,255,154,0.15);}
+.col-complete .ch-dot{background:var(--green);}
+.col-complete .ch-title{color:var(--green);}
+.col-complete .grant-card::before{background:var(--green);}
+.col-complete .grant-card:hover{border-color:rgba(46,255,154,0.2);box-shadow:0 12px 40px rgba(46,255,154,0.05);}
+
+/* APPLY BANNER */
+.apply-banner{position:fixed;bottom:0;left:0;right:0;z-index:50;
+  background:linear-gradient(90deg,rgba(0,200,180,0.12),rgba(0,136,255,0.12));
+  border-top:1px solid rgba(0,200,180,0.2);padding:14px 24px;
+  display:flex;align-items:center;gap:16px;}
+.ab-text{font-size:14px;font-weight:600;}
+.ab-text span{color:var(--teal);}
+.ab-cta{margin-left:auto;display:flex;gap:10px;}
+
+/* EXPANDED MODAL */
+.modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-overlay.show{display:flex;}
+.modal{background:rgba(5,10,24,0.99);border:1px solid var(--border);border-radius:20px;
+  padding:32px;max-width:560px;width:90%;max-height:90vh;overflow-y:auto;position:relative;}
+.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--teal),transparent);}
+.m-close{position:absolute;top:16px;right:16px;width:32px;height:32px;
+  background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:var(--muted);
+  cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.m-close:hover{color:var(--text);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <a class="ntab active">Grant Mission Control</a>
+  <a class="ntab" href="x3star-tokenomics-warroom.html">Tokenomics</a>
+  <a class="ntab" href="x3star-whale-tracker.html">Whale Tracker</a>
+  <a class="ntab" href="x3star-dashboard.html">Dashboard</a>
+  <div class="nav-stats">
+    <div class="ns-item"><div class="ns-val" style="color:var(--gold)" id="gm-pool">--</div><div class="ns-key">Grant Pool</div></div>
+    <div class="ns-item"><div class="ns-val" style="color:var(--teal)" id="gm-active">--</div><div class="ns-key">Active</div></div>
+    <div class="ns-item"><div class="ns-val" style="color:var(--green)" id="gm-distributed">--</div><div class="ns-key">Distributed</div></div>
+    <button class="btn-join" onclick="showApplyModal()">Apply for Grant →</button>
+  </div>
+</nav>
+
+<div class="page-head">
+  <div>
+    <h1 class="ph-title">Grant <span>Mission Control</span></h1>
+    <div class="ph-sub">Real-time visibility into every funded project building on X3STAR</div>
+  </div>
+  <div class="ph-kpis">
+    <div class="phk"><div class="phk-val" style="color:var(--orange)" id="gm-review">--</div><div class="phk-key">In Review</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--blue)" id="gm-building">--</div><div class="phk-key">Building</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--purple)" id="gm-milestone">--</div><div class="phk-key">Milestone</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--gold)" id="gm-payout">--</div><div class="phk-key">Payout</div></div>
+    <div class="phk"><div class="phk-val" style="color:var(--green)" id="gm-complete">--</div><div class="phk-key">Complete</div></div>
+  </div>
+</div>
+
+<!-- KANBAN BOARD -->
+<div class="board">
+
+  <!-- REVIEW -->
+  <div class="column col-review">
+    <div class="col-header">
+      <div class="ch-dot"></div>
+      <div class="ch-title">Under Review</div>
+      <div class="ch-count" style="color:var(--orange)" id="gm-review-count">--</div>
+    </div>
+    <div id="gm-col-review"></div>
+  </div>
+
+  <!-- BUILDING -->
+  <div class="column col-building">
+    <div class="col-header">
+      <div class="ch-dot"></div>
+      <div class="ch-title">Building</div>
+      <div class="ch-count" style="color:var(--blue)" id="gm-building-count">--</div>
+    </div>
+    <div id="gm-col-building"></div>
+  </div>
+
+  <!-- MILESTONE REVIEW -->
+  <div class="column col-milestone">
+    <div class="col-header">
+      <div class="ch-dot"></div>
+      <div class="ch-title">Milestone Review</div>
+      <div class="ch-count" style="color:var(--purple)" id="gm-milestone-count">--</div>
+    </div>
+    <div id="gm-col-milestone"></div>
+  </div>
+
+  <!-- PAYOUT PENDING -->
+  <div class="column col-review_pay">
+    <div class="col-header">
+      <div class="ch-dot"></div>
+      <div class="ch-title">Payout Pending</div>
+      <div class="ch-count" style="color:var(--gold)" id="gm-payout-count">--</div>
+    </div>
+    <div id="gm-col-payout"></div>
+  </div>
+
+  <!-- COMPLETE -->
+  <div class="column col-complete">
+    <div class="col-header">
+      <div class="ch-dot"></div>
+      <div class="ch-title">Shipped ✓</div>
+      <div class="ch-count" style="color:var(--green)" id="gm-complete-count">--</div>
+    </div>
+    <div id="gm-col-complete"></div>
+  </div>
+
+</div><!-- /board -->
+
+<!-- APPLY BANNER -->
+<div class="apply-banner">
+  <div class="ab-text">💡 Have an idea that can grow the <span>X3STAR ecosystem</span>? Grants from $5K to $500K available.</div>
+  <div class="ab-cta">
+    <button style="padding:10px 24px;border-radius:8px;background:transparent;border:1px solid rgba(0,200,180,0.3);color:var(--teal);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:var(--body);">View Guidelines</button>
+    <button class="btn-join" onclick="showApplyModal()">Apply for Grant →</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="m-close" onclick="closeModal()">×</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+function showApplyModal(){
+  document.getElementById('modal-content').innerHTML=`
+    <h2 style="font-size:22px;font-weight:800;margin-bottom:4px">Apply for a Grant</h2>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px">Submit a grant request to the X3STAR team.</div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Project Name</div><input id="gm-apply-name" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="e.g. X3STAR DeFi Protocol"></div>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Organization</div><input id="gm-apply-org" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="Your team or company"></div>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Category</div>
+        <select id="gm-apply-category" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;cursor:pointer;">
+          <option>DeFi</option><option>Infrastructure</option><option>Gaming</option><option>NFT</option><option>Security</option><option>AI/ML</option><option>Other</option>
+        </select></div>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Grant Amount Requested (USD)</div><input id="gm-apply-amount" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;" placeholder="25000"></div>
+      <div><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Short Description</div><textarea id="gm-apply-desc" rows="3" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:11px 14px;color:var(--text);font-family:var(--body);font-size:13px;outline:none;resize:none;" placeholder="What are you building and why does X3STAR need it?"></textarea></div>
+      <button id="gm-apply-submit" style="width:100%;padding:14px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;border:none;font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;">SUBMIT APPLICATION →</button>
+    </div>
+  `;
+  document.getElementById('modal').classList.add('show');
+  var submit = document.getElementById('gm-apply-submit');
+  if (submit) {
+    submit.onclick = async function () {
+      if (!window.X3API) return;
+      submit.textContent = 'Submitting...';
+      await window.X3API.submitForm('grant', {
+        projectName: document.getElementById('gm-apply-name').value,
+        organization: document.getElementById('gm-apply-org').value,
+        category: document.getElementById('gm-apply-category').value,
+        requestedUsd: Number(document.getElementById('gm-apply-amount').value || 0),
+        summary: document.getElementById('gm-apply-desc').value,
+      });
+      submit.textContent = 'Submitted ✓';
+      setTimeout(closeModal, 800);
+    };
+  }
+}
+if (window.X3PageAdapters) {
+  window.X3PageAdapters.start();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+# Helm values for GPU Swarm production deployment
+# Usage: helm install gpu-swarm ./charts/gpu-swarm -f values.yaml
+
+global:Ran terminal command:  /home/lojak/.cargo/bin/rustup --version; echo RUSTUP_EXIT:$?; /home/lojak/.cargo/bin/rustup show active-toolchain; echo TOOLCHAIN_EXIT:$?; env | grep -E 'RUST|CARGO'
+
+Summarized conversation historyContinuing from the last blocker: I’m first re-establishing terminal stability and verifying the Rust toolchain directly, since build commands were returning success without artifacts. I’ll run a minimal shell probe and then rebuild with verbose output to pinpoint where execution is being swallowed.
+
+Ran terminal command:  pwd && ls -la | head -n 20
+
+Ran terminal command:  set -x; command -v cargo; ls -l /home/lojak/.cargo/bin/cargo; /home/lojak/.cargo/bin/rustup --version; echo RUSTUP_EXIT:$?; /home/lojak/.cargo/bin/rustup show active-toolchain; echo TOOLCHAIN_EXIT:$?; cargo --version; echo CARGO_EXIT:$?
+
+I confirmed the terminal works, and found the key symptom: `rustup` is healthy, but `cargo --version` returns exit `0` with no output, which is abnormal and likely why builds look “successful” without artifacts. Next I’m checking whether the `cargo` shim invocation is broken in this shell and forcing a direct rustc/cargo path Ran terminal command:  /home/lojak/.cargo/bin/rustup --version; echo RUSTUP_EXIT:$?; /home/lojak/.cargo/bin/rustup show active-toolchain; echo TOOLCHAIN_EXIT:$?; env | grep -E 'RUST|CARGO'
+
+Summarized conversation historyContinuing from the last blocker: I’m first re-establishing terminal stability and verifying the Rust toolchain directly, since build commands were returning success without artifacts. I’ll run a minimal shell probe and then rebuild with verbose output to pinpoint where execution is being swallowed.
+
+Ran terminal command:  pwd && ls -la | head -n 20
+
+Ran terminal command:  set -x; command -v cargo; ls -l /home/lojak/.cargo/bin/cargo; /home/lojak/.cargo/bin/rustup --version; echo RUSTUP_EXIT:$?; /home/lojak/.cargo/bin/rustup show active-toolchain; echo TOOLCHAIN_EXIT:$?; cargo --version; echo CARGO_EXIT:$?
+
+I confirmed the terminal works, and found the key symptom: `rustup` is healthy, but `cargo --version` returns exit `0` with no output, which is abnormal and likely why builds look “successful” without artifacts. Next I’m checking whether the `cargo` shim invocation is broken in this shell and forcing a direct rustc/cargo path 
+  environment: production
+  domain: gpu-swarm.example.com
+  imagePullPolicy: Always
+
+coordinator:
+  enabled: true
+  replicas: 3
+  image:
+    repository: x3-chain/gpu-swarm-coordinator
+    tag: latest
+  
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  
+  persistence:
+    enabled: true
+    storageClass: fast-ssd
+    size: 100Gi
+  
+  config:
+    quorum_size: 3
+    consensus_timeout: 30s
+    task_timeout: 300s
+    verification_threshold: 0.95
+    log_level: info
+
+gpuNode:
+  enabled: true
+  image:
+    repository: x3-chain/gpu-swarm-node
+    tag: latest
+  
+  resources:
+    requests:
+      cpu: 4
+      memory: 8Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8
+      memory: 16Gi
+      nvidia.com/gpu: 1
+  
+  config:
+    gpu_backends:
+      - cuda
+      - rocm
+    memory_pooling_enabled: true
+    memory_pool_size: 40GB
+    task_batch_size: 32
+    batch_timeout: 1s
+
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    image: prom/prometheus:v2.47.0
+    retention: 30d
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+  
+  grafana:
+    enabled: true
+    image: grafana/grafana:10.0.0
+    adminPassword: changeme
+    persistence:
+      enabled: false  # Set to true for production
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+  
+  jaeger:
+    enabled: true
+    image: jaegertracing/all-in-one:1.47
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+
+logging:
+  enabled: true
+  
+  elasticsearch:
+    enabled: true
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    replicas: 3
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+  
+  kibana:
+    enabled: true
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+  
+  logstash:
+    enabled: true
+    image: docker.elastic.co/logstash/logstash:8.8.0
+    resources:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 2Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: grafana.gpu-swarm.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: monitoring-stack
+          port: 3000
+    - host: jaeger.gpu-swarm.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: monitoring-stack
+          port: 16686
+    - host: kibana.gpu-swarm.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: logging-stack
+          port: 5601
+  
+  tls:
+    enabled: true
+    issuer: letsencrypt-prod
+
+alerting:
+  enabled: true
+  alertmanager:
+    enabled: true
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: 'default'
+      receivers:
+        - name: 'default'
+          slack_configs:
+            - api_url: ${SLACK_WEBHOOK_URL}
+              channel: '#alerts-gpu-swarm'
+          pagerduty_configs:
+            - service_key: ${PAGERDUTY_SERVICE_KEY}
+
+rbac:
+  enabled: true
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+nodeSelector: {}
+  # gpu: "true"
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - swarm-coordinator
+          topologyKey: kubernetes.io/hostname

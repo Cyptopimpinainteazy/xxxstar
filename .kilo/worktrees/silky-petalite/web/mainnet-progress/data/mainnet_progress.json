@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-04-24T17:50:03Z",
+  "generatedDate": "April 24, 2026",
+  "source": "X3_MAINNET_READINESS_SCORECARD_2026_04_22.md",
+  "overallPercent": 20.8,
+  "remainingPercent": 79.2,
+  "gateCounts": {
+    "total": 24,
+    "trackedArtifacts": 12,
+    "green": 0,
+    "yellow": 4,
+    "red": 8
+  },
+  "gates": [
+    {"id": 1, "name": "Consensus and runtime readiness", "status": "YELLOW", "score": 0.5, "piecePercent": 50.0},
+    {"id": 2, "name": "Cross-VM and settlement readiness", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 3, "name": "Bridge and relayer readiness", "status": "YELLOW", "score": 0.5, "piecePercent": 50.0},
+    {"id": 4, "name": "GPU validator readiness", "status": "YELLOW", "score": 0.5, "piecePercent": 50.0},
+    {"id": 5, "name": "Wallet and custody readiness", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 6, "name": "RPC, sidecar, gateway, indexer readiness", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 7, "name": "Testing and CI readiness", "status": "YELLOW", "score": 0.5, "piecePercent": 50.0},
+    {"id": 8, "name": "Validator set and operations readiness", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 9, "name": "Governance and control transition", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 10, "name": "Audit and security sign-off", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 11, "name": "Genesis and deployment readiness", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 12, "name": "Final go decision readiness", "status": "RED", "score": 0.0, "piecePercent": 0.0},
+    {"id": 13, "name": "`launchops/stale_docs.json`", "status": "TRACKED", "contentHash": "8291BB2069", "score": 0.0, "piecePercent": 0.0},
+    {"id": 14, "name": "`launchops/red_flags.json`", "status": "TRACKED", "contentHash": "063B69A2E3", "score": 0.0, "piecePercent": 0.0},
+    {"id": 15, "name": "`launchops/requirement_conflicts.json`", "status": "TRACKED", "contentHash": "8813C3B6D6", "score": 0.0, "piecePercent": 0.0},
+    {"id": 16, "name": "`launchops/rpc_consumer_contracts.json`", "status": "TRACKED", "contentHash": "07E860F25E", "score": 0.0, "piecePercent": 0.0},
+    {"id": 17, "name": "`launchops/runtime_rpc_inventory.json`", "status": "TRACKED", "contentHash": "E72726D94E", "score": 0.0, "piecePercent": 0.0},
+    {"id": 18, "name": "`launchops/feature_matrix.json`", "status": "TRACKED", "contentHash": "1783DE725E", "score": 0.0, "piecePercent": 0.0},
+    {"id": 19, "name": "Raw chain-spec (dev + prod)", "status": "TRACKED", "contentHash": "1C20DC1743", "score": 0.0, "piecePercent": 0.0},
+    {"id": 20, "name": "Genesis allocations", "status": "TRACKED", "contentHash": "6008F45033", "score": 0.0, "piecePercent": 0.0},
+    {"id": 21, "name": "CycloneDX SBOMs (node + runtime)", "status": "TRACKED", "contentHash": "AD62F2259B", "score": 0.0, "piecePercent": 0.0},
+    {"id": 22, "name": "Runtime identity (RuntimeVersion + `construct_runtime!` + SignedExtra)", "status": "TRACKED", "contentHash": "A73750043A", "score": 0.0, "piecePercent": 0.0},
+    {"id": 23, "name": "pallet-svm CycloneDX SBOM", "status": "TRACKED", "contentHash": "E9AA63B2A9", "score": 0.0, "piecePercent": 0.0},
+    {"id": 24, "name": "`Cargo.lock` drift-only hash pin", "status": "TRACKED", "contentHash": "5D6A4CFA7A", "score": 0.0, "piecePercent": 0.0}
+  ]
+}

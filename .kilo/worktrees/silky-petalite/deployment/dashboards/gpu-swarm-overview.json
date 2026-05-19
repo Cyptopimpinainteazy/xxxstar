@@ -1,0 +1,133 @@
+{
+  "dashboard": {
+    "title": "GPU Swarm - Overview",
+    "tags": ["gpu-swarm", "overview"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Active GPU Nodes",
+        "targets": [
+          {
+            "expr": "count(up{job=\"gpu-nodes\"})",
+            "refId": "A"
+          }
+        ],
+        "type": "stat",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 3}, {"color": "green", "value": 5}]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "title": "Average GPU Utilization",
+        "targets": [
+          {
+            "expr": "avg(gpu_utilization_percent)",
+            "refId": "A"
+          }
+        ],
+        "type": "gauge",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "title": "Memory Utilization",
+        "targets": [
+          {
+            "expr": "avg(gpu_memory_used_bytes / gpu_memory_total_bytes * 100)",
+            "refId": "A"
+          }
+        ],
+        "type": "gauge",
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "title": "Task Queue Depth",
+        "targets": [
+          {
+            "expr": "gpu_task_queue_depth",
+            "refId": "A"
+          }
+        ],
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "title": "Task Success Rate (5m)",
+        "targets": [
+          {
+            "expr": "rate(gpu_tasks_completed_total[5m]) / (rate(gpu_tasks_completed_total[5m]) + rate(gpu_tasks_failed_total[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "title": "Peer Connectivity",
+        "targets": [
+          {
+            "expr": "gpu_peer_count",
+            "refId": "A"
+          }
+        ],
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "title": "Network Latency (ms)",
+        "targets": [
+          {
+            "expr": "gpu_network_latency_ms",
+            "refId": "A"
+          }
+        ],
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "title": "Coordinator Resource Usage",
+        "targets": [
+          {
+            "expr": "coordinator_memory_usage_bytes / 1073741824",
+            "legendFormat": "Memory (GB)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(coordinator_cpu_seconds_total[1m]) * 100",
+            "legendFormat": "CPU %",
+            "refId": "B"
+          }
+        ],
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

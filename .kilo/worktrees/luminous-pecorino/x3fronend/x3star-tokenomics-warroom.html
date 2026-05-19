@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Tokenomics War Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#000;--s:rgba(0,0,0,0.95);
+  --gold:#F5C542;--gold2:#E8A020;--gold3:#FFF4C2;
+  --red:#FF3B30;--green:#30D158;--blue:#0A84FF;
+  --orange:#FF9F0A;--purple:#BF5AF2;--cyan:#5AC8FA;
+  --text:#F5F5F7;--muted:#3D3D3F;--dim:#1C1C1E;
+  --mono:'Space Mono',monospace;--body:'DM Sans',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);}
+/* subtle grid bg */
+body::before{content:'';position:fixed;inset:0;z-index:0;opacity:0.04;
+  background-image:linear-gradient(rgba(255,255,255,0.3) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,0.3) 1px,transparent 1px);
+  background-size:40px 40px;}
+
+/* ─── NAV ─── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:52px;display:flex;
+  align-items:center;padding:0 20px;gap:16px;
+  background:rgba(0,0,0,0.9);border-bottom:1px solid rgba(255,255,255,0.08);
+  backdrop-filter:blur(12px);}
+.logo{font-family:var(--mono);font-size:15px;letter-spacing:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.nav-sep{width:1px;height:24px;background:rgba(255,255,255,0.1);}
+.nav-title{font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);}
+.nav-right{display:flex;gap:10px;margin-left:auto;align-items:center;}
+.ntab{padding:6px 14px;border-radius:6px;font-size:11px;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;color:rgba(255,255,255,0.4);
+  transition:all 0.2s;font-family:var(--mono);text-decoration:none;}
+.ntab:hover{color:var(--text);background:rgba(255,255,255,0.06);}
+.ntab.active{color:var(--gold);background:rgba(245,197,66,0.08);}
+.btn-nav{padding:7px 18px;border-radius:8px;font-size:11px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;
+  font-family:var(--body);transition:all 0.2s;
+  background:var(--gold);color:#000;}
+.btn-nav:hover{background:var(--gold3);box-shadow:0 0 20px rgba(245,197,66,0.3);}
+
+/* ─── LAYOUT ─── */
+.layout{display:grid;grid-template-columns:220px 1fr 220px;grid-template-rows:1fr 180px;
+  height:calc(100vh - 52px);margin-top:52px;gap:1px;background:rgba(255,255,255,0.07);
+  position:relative;z-index:1;}
+.panel{background:var(--bg);overflow:hidden;}
+.center-panel{grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;position:relative;}
+.bottom-strip{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:repeat(6,1fr);
+  gap:1px;background:rgba(255,255,255,0.07);}
+.bs-cell{background:var(--bg);padding:16px 18px;display:flex;flex-direction:column;gap:4px;}
+
+/* ─── PANEL TITLES ─── */
+.pt{font-size:9px;letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,255,255,0.25);padding:14px 16px 0;font-family:var(--mono);}
+.pval{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1;padding:0 16px;}
+.pkey{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+  color:rgba(255,255,255,0.3);padding:0 16px 10px;}
+
+/* ─── SUPPLY BARS ─── */
+.supply-bars{padding:0 16px 14px;display:flex;flex-direction:column;gap:8px;}
+.sb-row{display:flex;flex-direction:column;gap:3px;}
+.sb-labels{display:flex;justify-content:space-between;align-items:baseline;}
+.sb-name{font-size:10px;color:rgba(255,255,255,0.5);}
+.sb-pct{font-family:var(--mono);font-size:11px;font-weight:700;}
+.sb-track{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;}
+.sb-fill{height:100%;border-radius:2px;transition:width 1.5s cubic-bezier(0.4,0,0.2,1);}
+
+/* ─── VESTING TIMELINE ─── */
+.vest-list{padding:0 16px;display:flex;flex-direction:column;gap:6px;}
+.vest-row{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:8px 10px;}
+.vr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.vr-name{font-size:10px;color:rgba(255,255,255,0.6);}
+.vr-date{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.3);}
+.vr-bar-track{height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;}
+.vr-bar{height:100%;border-radius:2px;transition:width 2s ease;}
+.vr-bottom{display:flex;justify-content:space-between;margin-top:4px;}
+.vr-amt{font-family:var(--mono);font-size:10px;font-weight:700;}
+.vr-status{font-size:8px;letter-spacing:1px;padding:1px 6px;border-radius:100px;font-weight:700;}
+.vs-locked{background:rgba(255,59,48,0.12);color:var(--red);border:1px solid rgba(255,59,48,0.2);}
+.vs-cliff{background:rgba(255,159,10,0.12);color:var(--orange);border:1px solid rgba(255,159,10,0.2);}
+.vs-active{background:rgba(48,209,88,0.12);color:var(--green);border:1px solid rgba(48,209,88,0.2);}
+
+/* ─── CENTER CANVAS AREA ─── */
+.center-canvas{position:relative;width:min(500px,70%);aspect-ratio:1;}
+.center-title{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;z-index:2;}
+.ct-main{font-family:var(--mono);font-size:28px;font-weight:700;
+  color:var(--gold);line-height:1;}
+.ct-sub{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,0.3);
+  text-transform:uppercase;margin-top:4px;}
+/* orbiting particles */
+.orbit-ring{position:absolute;inset:0;animation:spinOrbit 20s linear infinite;}
+.orbit-ring:nth-child(2){animation-duration:14s;animation-direction:reverse;}
+.orbit-ring:nth-child(3){animation-duration:30s;}
+@keyframes spinOrbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* FLOW ARROWS from center */
+.flow-arrows{position:absolute;inset:-60px;pointer-events:none;}
+.fa-item{position:absolute;display:flex;flex-direction:column;align-items:center;
+  gap:4px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;}
+.fa-arrow{font-size:20px;animation:flowPulse 2s ease-in-out infinite;}
+@keyframes flowPulse{0%,100%{opacity:0.3;transform:scale(0.9)}50%{opacity:1;transform:scale(1.1)}}
+
+/* ─── BURN COUNTER ─── */
+.burn-counter{text-align:center;padding:14px 16px;}
+.bc-flames{font-size:32px;animation:flicker 0.5s ease-in-out infinite alternate;}
+@keyframes flicker{from{filter:brightness(1)}to{filter:brightness(1.3) saturate(1.5)}}
+.bc-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red);margin-top:4px;}
+.bc-rate{font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;font-family:var(--mono);}
+
+/* ─── EMISSION RATE ─── */
+.emission-viz{padding:0 16px 14px;}
+.ev-bar{height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;margin:8px 0 4px;}
+.ev-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),var(--cyan));
+  transition:width 0.5s ease;position:relative;overflow:hidden;}
+.ev-fill::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);
+  animation:shimmer 2s linear infinite;background-size:200% 100%;}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+/* ─── CIRCULATING SUPPLY METER ─── */
+.circ-meter{padding:8px 16px 14px;}
+.cm-ring{width:100%;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.cm-fill{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan));
+  border-radius:3px;transition:width 2s ease;}
+
+/* ─── BOTTOM STRIP ─── */
+.bsc-val{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1;}
+.bsc-key{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-top:3px;}
+.bsc-change{font-size:10px;margin-top:4px;font-family:var(--mono);}
+
+/* ─── PARTICLE CANVAS ─── */
+#flow-canvas{position:absolute;inset:0;pointer-events:none;z-index:1;}
+
+/* ─── LIVE EVENTS ─── */
+.event-feed{overflow:hidden;height:calc(100% - 42px);}
+.ef-inner{overflow-y:auto;height:100%;padding:0 16px 14px;}
+.ef-inner::-webkit-scrollbar{width:2px;}
+.ef-inner::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);}
+.ev-item{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;
+  animation:evSlide 0.3s ease;}
+@keyframes evSlide{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.ev-type{font-size:8px;letter-spacing:1.5px;font-family:var(--mono);font-weight:700;}
+.ev-desc{color:rgba(255,255,255,0.5);font-size:10px;margin-top:1px;}
+.ev-amount{font-family:var(--mono);font-size:10px;font-weight:700;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <div class="nav-sep"></div>
+  <div class="nav-title">Tokenomics War Room</div>
+  <div class="nav-right">
+    <a class="ntab" href="x3star-whale-tracker.html">Whale Tracker</a>
+    <a class="ntab" href="x3star-network-pulse.html">Network Pulse</a>
+    <a class="ntab" href="x3star-dashboard.html">Dashboard</a>
+    <button class="btn-nav" onclick="location.href='x3star-token-presale.html'">Buy X3S →</button>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- LEFT: SUPPLY BREAKDOWN -->
+  <div class="panel" style="grid-row:1;">
+    <div class="pt">Supply Breakdown</div>
+    <div class="pval" style="color:var(--gold)" id="total-supply">--</div>
+    <div class="pkey">Total X3S Supply</div>
+    <div class="supply-bars">
+      <div class="sb-row">
+        <div class="sb-labels"><span class="sb-name">Circulating</span><span class="sb-pct" style="color:var(--green)">--</span></div>
+        <div class="sb-track"><div class="sb-fill" style="width:0%;background:var(--green)"></div></div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-labels"><span class="sb-name">Presale Locked</span><span class="sb-pct" style="color:var(--gold)">--</span></div>
+        <div class="sb-track"><div class="sb-fill" style="width:0%;background:var(--gold)"></div></div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-labels"><span class="sb-name">Staking Locked</span><span class="sb-pct" style="color:var(--cyan)">--</span></div>
+        <div class="sb-track"><div class="sb-fill" style="width:0%;background:var(--cyan)"></div></div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-labels"><span class="sb-name">Team (Vesting)</span><span class="sb-pct" style="color:var(--purple)">--</span></div>
+        <div class="sb-track"><div class="sb-fill" style="width:0%;background:var(--purple)"></div></div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-labels"><span class="sb-name">Ecosystem</span><span class="sb-pct" style="color:var(--blue)">--</span></div>
+        <div class="sb-track"><div class="sb-fill" style="width:0%;background:var(--blue)"></div></div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-labels"><span class="sb-name">Burned</span><span class="sb-pct" style="color:var(--red)">--</span></div>
+        <div class="sb-track"><div class="sb-fill" style="width:0%;background:var(--red)"></div></div>
+      </div>
+    </div>
+    <div class="pt" style="padding-top:8px;">Emission Rate</div>
+    <div class="emission-viz">
+      <div style="display:flex;justify-content:space-between;font-size:10px;">
+        <span style="color:rgba(255,255,255,0.4)">Daily Emissions</span>
+        <span style="font-family:var(--mono);color:var(--cyan)" id="em-rate">--</span>
+      </div>
+      <div class="ev-bar"><div class="ev-fill" id="em-bar" style="width:14%"></div></div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.25)">Halving in <span id="halving-days">--</span> days</div>
+    </div>
+    <div class="pt" style="padding-top:4px;">Burn Counter</div>
+    <div class="burn-counter">
+      <div class="bc-flames">🔥</div>
+      <div class="bc-val" id="burn-val">--</div>
+      <div class="bc-rate" id="burn-rate">burning --</div>
+    </div>
+  </div>
+
+  <!-- CENTER: DONUT + FLOWS -->
+  <div class="center-panel">
+    <canvas id="flow-canvas"></canvas>
+
+    <div class="center-canvas">
+      <canvas id="main-donut"></canvas>
+      <div class="center-title">
+        <div class="ct-main" id="ctr-supply">--</div>
+        <div class="ct-sub">Locked Supply</div>
+      </div>
+    </div>
+
+    <!-- Flow labels around donut -->
+    <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);
+      text-align:center;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.25);text-transform:uppercase;">
+      Supply Flow Map
+    </div>
+
+    <div style="position:absolute;bottom:20px;display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+      <span style="font-size:9px;color:var(--green);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--green);border-radius:2px;display:inline-block"></span>Circulating</span>
+      <span style="font-size:9px;color:var(--gold);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--gold);border-radius:2px;display:inline-block"></span>Presale</span>
+      <span style="font-size:9px;color:var(--cyan);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--cyan);border-radius:2px;display:inline-block"></span>Staking</span>
+      <span style="font-size:9px;color:var(--purple);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--purple);border-radius:2px;display:inline-block"></span>Team</span>
+      <span style="font-size:9px;color:var(--blue);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--blue);border-radius:2px;display:inline-block"></span>Ecosystem</span>
+      <span style="font-size:9px;color:var(--red);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;background:var(--red);border-radius:2px;display:inline-block"></span>Burned</span>
+    </div>
+  </div>
+
+  <!-- RIGHT: VESTING SCHEDULE -->
+  <div class="panel" style="grid-row:1;overflow-y:auto;">
+    <div class="pt">Vesting Schedule</div>
+    <div class="vest-list" id="vest-list"></div>
+
+    <div class="pt" style="padding-top:14px;">Unlock Pressure</div>
+    <div class="circ-meter">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.3);">
+        <span>Next 30 days</span><span style="font-family:var(--mono);color:var(--orange)">+8.2M X3S</span>
+      </div>
+      <div class="cm-ring"><div class="cm-fill" id="unlock-bar" style="background:linear-gradient(90deg,var(--orange),var(--red))"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">
+        <span>Next 90 days</span><span style="font-family:var(--mono);color:var(--gold)">+24.6M X3S</span>
+      </div>
+      <div class="cm-ring" style="margin-bottom:0;"><div class="cm-fill" id="unlock-bar2" style="background:linear-gradient(90deg,var(--gold),var(--orange))"></div></div>
+    </div>
+
+    <div class="pt" style="padding-top:6px;">Live Token Events</div>
+    <div class="event-feed">
+      <div class="ef-inner" id="event-feed"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM STRIP: 6 KEY METRICS -->
+  <div class="bottom-strip">
+    <div class="bs-cell">
+      <div class="bsc-key">Market Cap</div>
+      <div class="bsc-val" style="color:var(--gold)" id="mktcap">$7.1M</div>
+      <div class="bsc-change" style="color:var(--green)">▲ +12.4% 24h</div>
+    </div>
+    <div class="bs-cell">
+      <div class="bsc-key">Fully Diluted Val.</div>
+      <div class="bsc-val" style="color:var(--cyan)">$84.2M</div>
+      <div class="bsc-change" style="color:rgba(255,255,255,0.3)">at $0.0842/X3S</div>
+    </div>
+    <div class="bs-cell">
+      <div class="bsc-key">Staking Lock Rate</div>
+      <div class="bsc-val" style="color:var(--green)" id="lock-rate">42.1%</div>
+      <div class="bsc-change" style="color:var(--green)">▲ Healthy</div>
+    </div>
+    <div class="bs-cell">
+      <div class="bsc-key">24h Burn</div>
+      <div class="bsc-val" style="color:var(--red)" id="daily-burn">28,800</div>
+      <div class="bsc-change" style="color:rgba(255,255,255,0.3)">X3S destroyed</div>
+    </div>
+    <div class="bs-cell">
+      <div class="bsc-key">Circulating Supply</div>
+      <div class="bsc-val" id="circ-supply">84.2M</div>
+      <div class="bsc-change" style="color:rgba(255,255,255,0.3)">of 1B total</div>
+    </div>
+    <div class="bs-cell">
+      <div class="bsc-key">Supply Pressure</div>
+      <div class="bsc-val" style="color:var(--green)">LOW</div>
+      <div class="bsc-change" style="color:var(--green)">Bullish setup</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

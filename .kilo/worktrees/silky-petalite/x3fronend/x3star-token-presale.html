@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Token Presale</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#010208;--surface:rgba(6,10,28,0.9);--border:rgba(0,200,255,0.12);
+  --glow:rgba(0,200,255,0.4);--gold:#ffd700;--gold2:#ffaa00;
+  --cyan:#00c8ff;--green:#00ff88;--red:#ff3366;--purple:#cc44ff;
+  --text:#ddeeff;--muted:#4466aa;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;cursor:none;}
+
+/* Custom cursor */
+#cursor{position:fixed;width:20px;height:20px;border:1px solid var(--cyan);border-radius:50%;pointer-events:none;z-index:9999;transition:transform 0.1s;mix-blend-mode:screen;}
+#cursor-dot{position:fixed;width:4px;height:4px;background:var(--cyan);border-radius:50%;pointer-events:none;z-index:9999;}
+
+/* BG grid */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,200,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,0.03) 1px,transparent 1px);
+  background-size:60px 60px;pointer-events:none;z-index:0;
+}
+
+/* Nebula blobs */
+.nebula{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;}
+.n1{width:600px;height:600px;background:radial-gradient(circle,rgba(0,150,255,0.08),transparent);top:-200px;left:-200px;}
+.n2{width:500px;height:500px;background:radial-gradient(circle,rgba(200,50,255,0.06),transparent);bottom:-150px;right:-150px;}
+.n3{width:400px;height:400px;background:radial-gradient(circle,rgba(255,200,0,0.05),transparent);top:50%;left:50%;transform:translate(-50%,-50%);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;padding:0 60px;height:72px;
+  background:linear-gradient(180deg,rgba(1,2,8,0.95),rgba(1,2,8,0));backdrop-filter:blur(12px);}
+.nav-logo{font-family:'Orbitron',monospace;font-weight:900;font-size:22px;
+  background:linear-gradient(90deg,var(--gold),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:3px;cursor:pointer;}
+.nav-links{display:flex;gap:32px;margin:0 auto;}
+.nav-link{font-size:13px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:color 0.2s;padding:4px 0;border-bottom:1px solid transparent;}
+.nav-link:hover,.nav-link.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+.nav-actions{display:flex;gap:12px;}
+.btn{padding:10px 24px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;border:none;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--cyan);}
+.btn-outline:hover{border-color:var(--cyan);box-shadow:0 0 20px rgba(0,200,255,0.2);}
+.btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;font-weight:700;}
+.btn-primary:hover{box-shadow:0 0 30px rgba(255,215,0,0.4);transform:translateY(-1px);}
+.btn-glow{background:linear-gradient(135deg,var(--cyan),#0066ff);color:#000;font-weight:700;}
+.btn-glow:hover{box-shadow:0 0 30px rgba(0,200,255,0.5);transform:translateY(-1px);}
+
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:120px 60px 60px;text-align:center;z-index:1;}
+
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;
+  background:rgba(0,200,255,0.06);border:1px solid rgba(0,200,255,0.2);
+  border-radius:100px;padding:8px 20px;font-size:12px;letter-spacing:3px;
+  color:var(--cyan);text-transform:uppercase;margin-bottom:32px;
+  animation:fadeUp 0.6s ease both;}
+.hero-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:blink 1.5s infinite;}
+
+.hero-title{font-family:'Orbitron',monospace;font-size:clamp(48px,8vw,96px);font-weight:900;
+  line-height:0.95;letter-spacing:-2px;margin-bottom:24px;
+  animation:fadeUp 0.6s 0.1s ease both;opacity:0;}
+.ht-1{display:block;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.ht-2{display:block;color:var(--text);}
+.ht-3{display:block;background:linear-gradient(135deg,var(--cyan),#0088ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+
+.hero-sub{font-size:18px;color:var(--muted);max-width:560px;margin:0 auto 48px;
+  line-height:1.6;animation:fadeUp 0.6s 0.2s ease both;opacity:0;}
+
+/* PRESALE WIDGET */
+.presale-card{
+  background:rgba(6,10,28,0.95);border:1px solid rgba(0,200,255,0.2);
+  border-radius:20px;padding:32px;max-width:560px;margin:0 auto;
+  box-shadow:0 0 60px rgba(0,200,255,0.08),0 0 120px rgba(255,200,0,0.04);
+  animation:fadeUp 0.6s 0.3s ease both;opacity:0;position:relative;overflow:hidden;
+}
+.presale-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+}
+
+.presale-stage{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.stage-badge{background:linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,170,0,0.1));
+  border:1px solid rgba(255,215,0,0.3);border-radius:100px;padding:6px 16px;
+  font-size:11px;letter-spacing:2px;color:var(--gold);font-weight:600;}
+.stage-live{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--green);}
+.stage-live::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
+
+/* COUNTDOWN */
+.countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px;}
+.cd-unit{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;
+  padding:12px 8px;text-align:center;}
+.cd-num{font-family:'Orbitron',monospace;font-size:28px;font-weight:700;color:var(--cyan);
+  line-height:1;display:block;transition:all 0.3s;}
+.cd-label{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:4px;display:block;}
+
+/* PROGRESS */
+.raise-info{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;}
+.raise-raised{color:var(--gold);font-weight:700;font-family:'Orbitron',monospace;}
+.raise-cap{color:var(--muted);}
+.raise-bar{height:8px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;margin-bottom:6px;position:relative;}
+.raise-fill{height:100%;border-radius:100px;
+  background:linear-gradient(90deg,var(--gold),var(--cyan));position:relative;
+  transition:width 1.5s cubic-bezier(0.4,0,0.2,1);}
+.raise-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:20px;
+  background:rgba(255,255,255,0.4);filter:blur(4px);}
+.raise-pct{text-align:right;font-size:11px;color:var(--cyan);margin-bottom:20px;}
+
+/* BUY WIDGET */
+.buy-tabs{display:flex;gap:4px;background:rgba(255,255,255,0.04);padding:4px;border-radius:10px;margin-bottom:20px;}
+.buy-tab{flex:1;text-align:center;padding:8px;border-radius:7px;font-size:12px;font-weight:600;
+  letter-spacing:1px;cursor:pointer;transition:all 0.2s;color:var(--muted);border:none;background:transparent;
+  font-family:'Rajdhani',sans-serif;}
+.buy-tab.active{background:rgba(0,200,255,0.12);color:var(--cyan);border:1px solid rgba(0,200,255,0.3);}
+
+.input-group{margin-bottom:16px;}
+.input-label{font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;display:block;}
+.input-wrap{position:relative;}
+.presale-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:10px;padding:14px 90px 14px 16px;font-family:'Orbitron',monospace;
+  font-size:18px;color:var(--text);outline:none;transition:all 0.2s;}
+.presale-input:focus{border-color:var(--cyan);box-shadow:0 0 20px rgba(0,200,255,0.1);}
+.input-suffix{position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  font-size:12px;font-weight:700;color:var(--gold);letter-spacing:1px;}
+.input-max{position:absolute;right:60px;top:50%;transform:translateY(-50%);
+  font-size:10px;color:var(--cyan);cursor:pointer;letter-spacing:1px;
+  background:rgba(0,200,255,0.1);padding:3px 8px;border-radius:4px;}
+
+.convert-row{display:flex;align-items:center;justify-content:center;gap:12px;
+  font-size:12px;color:var(--muted);margin-bottom:20px;}
+.convert-arrow{font-size:20px;color:var(--cyan);}
+.convert-val{font-family:'Orbitron',monospace;font-size:16px;color:var(--gold);font-weight:700;}
+
+.bonus-tag{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.25);
+  border-radius:8px;padding:10px 16px;display:flex;align-items:center;gap:10px;
+  margin-bottom:20px;font-size:12px;}
+.bonus-icon{font-size:18px;}
+.bonus-text{color:var(--text);}
+.bonus-pct{color:var(--green);font-weight:700;font-family:'Orbitron',monospace;}
+
+.buy-btn{width:100%;padding:18px;border-radius:12px;font-family:'Orbitron',monospace;
+  font-size:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;
+  border:none;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
+.buy-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
+  transition:left 0.5s;}
+.buy-btn:hover::before{left:100%;}
+.buy-btn:hover{box-shadow:0 0 40px rgba(255,215,0,0.5);transform:translateY(-2px);}
+
+.presale-footer{margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.pf-item{text-align:center;background:rgba(255,255,255,0.02);border:1px solid var(--border);
+  border-radius:8px;padding:10px;}
+.pf-val{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--cyan);}
+.pf-key{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;}
+
+/* STATS BAR */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+  margin:80px 60px 0;position:relative;z-index:1;}
+.stat-item{background:var(--bg);padding:32px 24px;text-align:center;transition:background 0.2s;}
+.stat-item:hover{background:rgba(0,200,255,0.04);}
+.stat-num{font-family:'Orbitron',monospace;font-size:32px;font-weight:800;margin-bottom:6px;}
+.stat-label{font-size:12px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+
+/* TOKENOMICS */
+.section{padding:100px 60px;position:relative;z-index:1;}
+.section-eyebrow{font-size:11px;letter-spacing:4px;color:var(--cyan);text-transform:uppercase;
+  margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.section-eyebrow::after{content:'';flex:1;max-width:60px;height:1px;background:var(--cyan);}
+.section-title{font-family:'Orbitron',monospace;font-size:clamp(28px,4vw,48px);font-weight:700;
+  margin-bottom:16px;letter-spacing:-1px;}
+.section-sub{font-size:16px;color:var(--muted);max-width:540px;line-height:1.7;}
+
+.tokenomics-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-top:60px;}
+.tko-chart-wrap{position:relative;}
+.tko-rings{width:320px;height:320px;position:relative;margin:0 auto;}
+.ring{position:absolute;border-radius:50%;animation:spinRing 20s linear infinite;}
+.ring-1{inset:0;border:2px solid rgba(255,215,0,0.2);animation-direction:normal;}
+.ring-2{inset:20px;border:1px solid rgba(0,200,255,0.15);animation-direction:reverse;animation-duration:15s;}
+.ring-3{inset:40px;border:1px dashed rgba(200,50,255,0.15);}
+@keyframes spinRing{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+.tko-center{position:absolute;inset:60px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,215,0,0.15),rgba(0,200,255,0.05),transparent);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  border:1px solid rgba(255,215,0,0.2);}
+.tko-center-val{font-family:'Orbitron',monospace;font-size:26px;font-weight:800;color:var(--gold);}
+.tko-center-lbl{font-size:10px;letter-spacing:2px;color:var(--muted);margin-top:4px;}
+
+.tko-list{display:flex;flex-direction:column;gap:16px;}
+.tko-item{display:flex;align-items:center;gap:16px;padding:16px;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;
+  cursor:pointer;transition:all 0.2s;}
+.tko-item:hover{background:rgba(0,200,255,0.04);border-color:rgba(0,200,255,0.2);transform:translateX(4px);}
+.tko-color{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.tko-name{flex:1;font-size:14px;font-weight:500;}
+.tko-pct{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;}
+.tko-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.tko-bar-wrap{width:80px;height:4px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+.tko-bar{height:100%;border-radius:100px;}
+
+/* ROADMAP */
+.roadmap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:60px;position:relative;}
+.roadmap-grid::before{content:'';position:absolute;top:24px;left:12.5%;right:12.5%;
+  height:1px;background:linear-gradient(90deg,transparent,var(--border),var(--gold),var(--border),transparent);}
+.rm-item{padding:0 16px;text-align:center;}
+.rm-dot-wrap{display:flex;justify-content:center;margin-bottom:20px;position:relative;}
+.rm-dot{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:16px;border:2px solid;position:relative;z-index:1;}
+.rm-q{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;color:var(--gold);
+  margin-bottom:8px;letter-spacing:1px;}
+.rm-title{font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text);}
+.rm-items{font-size:12px;color:var(--muted);line-height:2;}
+.rm-done .rm-dot{background:rgba(0,255,136,0.15);border-color:var(--green);color:var(--green);}
+.rm-active .rm-dot{background:rgba(255,215,0,0.15);border-color:var(--gold);color:var(--gold);
+  box-shadow:0 0 20px rgba(255,215,0,0.3);animation:pulse-logo 2s infinite;}
+.rm-soon .rm-dot{background:rgba(0,200,255,0.08);border-color:rgba(0,200,255,0.3);color:var(--muted);}
+@keyframes pulse-logo{0%,100%{box-shadow:0 0 20px rgba(255,215,0,0.3)}50%{box-shadow:0 0 40px rgba(255,215,0,0.6)}}
+
+/* FEATURES */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:60px;}
+.feat-card{background:rgba(6,10,28,0.8);border:1px solid var(--border);border-radius:16px;
+  padding:28px;transition:all 0.3s;cursor:pointer;position:relative;overflow:hidden;}
+.feat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:0;transition:opacity 0.3s;}
+.feat-card:hover{transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.feat-card:hover::before{opacity:1;}
+.feat-card.c-gold{color:var(--gold);}
+.feat-card.c-cyan{color:var(--cyan);}
+.feat-card.c-purple{color:var(--purple);}
+.feat-card.c-green{color:var(--green);}
+.feat-icon{font-size:32px;margin-bottom:16px;}
+.feat-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:600;margin-bottom:10px;}
+.feat-text{font-size:13px;color:var(--muted);line-height:1.7;}
+
+/* INVESTORS STRIP */
+.inv-strip{padding:60px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,0.01);position:relative;z-index:1;}
+.inv-label{font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;
+  text-align:center;margin-bottom:32px;}
+.inv-logos{display:flex;gap:40px;align-items:center;justify-content:center;flex-wrap:wrap;}
+.inv-logo{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;letter-spacing:2px;
+  color:rgba(255,255,255,0.2);transition:color 0.2s;cursor:pointer;padding:8px 20px;
+  border:1px solid rgba(255,255,255,0.05);border-radius:8px;}
+.inv-logo:hover{color:var(--gold);border-color:rgba(255,215,0,0.3);}
+
+/* FAQ */
+.faq-list{max-width:720px;margin:60px auto 0;}
+.faq-item{border-bottom:1px solid var(--border);}
+.faq-q{padding:20px 0;display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;font-size:15px;font-weight:600;transition:color 0.2s;}
+.faq-q:hover{color:var(--cyan);}
+.faq-icon{font-size:20px;color:var(--muted);transition:transform 0.3s;}
+.faq-a{max-height:0;overflow:hidden;transition:max-height 0.4s ease;font-size:13px;color:var(--muted);line-height:1.8;}
+.faq-item.open .faq-a{max-height:200px;padding-bottom:20px;}
+.faq-item.open .faq-icon{transform:rotate(45deg);color:var(--cyan);}
+
+/* FOOTER */
+footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:center;
+  justify-content:space-between;position:relative;z-index:1;}
+.footer-logo{font-family:'Orbitron',monospace;font-size:24px;font-weight:900;
+  background:linear-gradient(90deg,var(--gold),var(--cyan));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;}
+.footer-links{display:flex;gap:24px;font-size:12px;letter-spacing:1px;color:var(--muted);}
+.footer-links a{cursor:pointer;transition:color 0.2s;text-decoration:none;color:var(--muted);}
+.footer-links a:hover{color:var(--cyan);}
+.footer-legal{font-size:11px;color:var(--muted);opacity:0.5;}
+
+/* UTILS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.text-gold{color:var(--gold)}.text-cyan{color:var(--cyan)}.text-green{color:var(--green)}
+
+/* Scroll reveal */
+.reveal{opacity:0;transform:translateY(30px);transition:all 0.7s cubic-bezier(0.4,0,0.2,1);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+
+@media(max-width:900px){
+  .tokenomics-grid,.roadmap-grid,.features-grid{grid-template-columns:1fr;}
+  .stats-bar{grid-template-columns:1fr 1fr;}
+  nav{padding:0 20px;}
+  .section,.hero{padding:80px 20px 60px;}
+}
+</style>
+</head>
+<body>
+<div class="nebula n1"></div>
+<div class="nebula n2"></div>
+<div class="nebula n3"></div>
+<div id="cursor"></div>
+<div id="cursor-dot"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">X3STAR</div>
+  <div class="nav-links">
+    <span class="nav-link active">Presale</span>
+    <span class="nav-link" onclick="location.href='x3star-validator-presale.html'">Validator</span>
+    <span class="nav-link" onclick="location.href='x3star-dashboard.html'">Dashboard</span>
+    <span class="nav-link" onclick="location.href='x3star-staking.html'">Staking</span>
+    <span class="nav-link" onclick="location.href='x3star-governance.html'">Governance</span>
+  </div>
+  <div class="nav-actions">
+    <button class="btn btn-outline">Whitepaper</button>
+    <button class="btn btn-primary">Connect Wallet</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div>
+    <div class="hero-eyebrow" id="presale-round">Presale</div>
+    <h1 class="hero-title">
+      <span class="ht-1">BUY</span>
+      <span class="ht-2">X3STAR</span>
+      <span class="ht-3">TOKENS</span>
+    </h1>
+    <p class="hero-sub">Join the next-generation blockchain prefunding. Early participants receive bonus tokens, validator access, and lifetime protocol rewards.</p>
+
+    <!-- PRESALE CARD -->
+    <div class="presale-card">
+      <div class="presale-stage">
+        <span class="stage-badge" id="presale-stage">⬡ PRESALE</span>
+        <span class="stage-live" id="presale-status">STATUS</span>
+      </div>
+
+      <!-- COUNTDOWN -->
+      <div class="countdown">
+        <div class="cd-unit"><span class="cd-num" id="cd-d">--</span><span class="cd-label">Days</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-h">--</span><span class="cd-label">Hours</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-m">--</span><span class="cd-label">Mins</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cd-s">--</span><span class="cd-label">Secs</span></div>
+      </div>
+
+      <!-- PROGRESS -->
+      <div class="raise-info">
+        <span class="raise-raised" id="raised-amt">--</span>
+        <span class="raise-cap" id="raise-cap">Hard Cap: --</span>
+      </div>
+      <div class="raise-bar">
+        <div class="raise-fill" id="raise-fill" style="width:0%"></div>
+      </div>
+      <div class="raise-pct" id="raise-pct">--</div>
+
+      <!-- BUY TABS -->
+      <div class="buy-tabs">
+        <button class="buy-tab active" onclick="setTab(this,'ETH')">ETH</button>
+        <button class="buy-tab" onclick="setTab(this,'BTC')">BTC</button>
+        <button class="buy-tab" onclick="setTab(this,'USDT')">USDT</button>
+        <button class="buy-tab" onclick="setTab(this,'CARD')">CARD</button>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Amount to spend</label>
+        <div class="input-wrap">
+          <input class="presale-input" type="number" id="spend-input" placeholder="0.00" oninput="calcTokens()">
+          <span class="input-max" onclick="calcTokens()">MAX</span>
+          <span class="input-suffix" id="spend-sym">ETH</span>
+        </div>
+      </div>
+
+      <div class="convert-row">
+        <span id="spend-display">--</span>
+        <span class="convert-arrow">→</span>
+        <span class="convert-val" id="tokens-out">--</span>
+      </div>
+
+      <div class="bonus-tag">
+        <span class="bonus-icon">🎁</span>
+        <span class="bonus-text" id="bonus-text">Round III Bonus: <span class="bonus-pct" id="bonus-pct">--</span> tokens included</span>
+      </div>
+
+      <button class="buy-btn" onclick="handleBuy()">⬡ BUY X3STAR NOW</button>
+
+      <div class="presale-footer">
+        <div class="pf-item">
+          <div class="pf-val" id="pf-price">--</div>
+          <div class="pf-key">Token Price</div>
+        </div>
+        <div class="pf-item">
+          <div class="pf-val" id="pf-bonus">--</div>
+          <div class="pf-key">R3 Bonus</div>
+        </div>
+        <div class="pf-item">
+          <div class="pf-val" id="pf-vesting">--</div>
+          <div class="pf-key">Vesting</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar reveal">
+  <div class="stat-item">
+    <div class="stat-num text-gold" id="stat-raised">--</div>
+    <div class="stat-label">Total Raised</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num text-cyan" id="stat-investors">--</div>
+    <div class="stat-label">Investors</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num text-green" id="stat-holders">--</div>
+    <div class="stat-label">Token Holders</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" style="color:var(--purple)" id="stat-supply">--</div>
+    <div class="stat-label">Total Supply</div>
+  </div>
+</div>
+
+<!-- TOKENOMICS -->
+<section class="section reveal">
+  <div class="section-eyebrow">Tokenomics</div>
+  <h2 class="section-title">Token <span class="text-gold">Distribution</span></h2>
+  <p class="section-sub">Token supply and distribution are reported live from the X3 backend.</p>
+
+  <div class="tokenomics-grid">
+    <div class="tko-chart-wrap">
+      <div class="tko-rings">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+        <div class="tko-center">
+          <div class="tko-center-val" id="tko-total">--</div>
+          <div class="tko-center-lbl">Total Supply</div>
+        </div>
+      </div>
+    </div>
+    <div class="tko-list">
+      <div class="tko-item">
+        <div class="tko-color" style="background:var(--gold)"></div>
+        <div><div class="tko-name">Presale & Public</div><div class="tko-sub">Community distribution</div></div>
+        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-presale" style="width:0%;background:var(--gold)"></div></div>
+        <div class="tko-pct text-gold" id="tko-presale">--</div>
+      </div>
+      <div class="tko-item">
+        <div class="tko-color" style="background:var(--cyan)"></div>
+        <div><div class="tko-name">Ecosystem & Grants</div><div class="tko-sub">Builder incentives</div></div>
+        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-ecosystem" style="width:0%;background:var(--cyan)"></div></div>
+        <div class="tko-pct text-cyan" id="tko-ecosystem">--</div>
+      </div>
+      <div class="tko-item">
+        <div class="tko-color" style="background:var(--purple)"></div>
+        <div><div class="tko-name">Team & Advisors</div><div class="tko-sub">36mo vesting</div></div>
+        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-team" style="width:0%;background:var(--purple)"></div></div>
+        <div class="tko-pct text-purple" id="tko-team">--</div>
+      </div>
+      <div class="tko-item">
+        <div class="tko-color" style="background:var(--green)"></div>
+        <div><div class="tko-name">Staking Rewards</div><div class="tko-sub">10yr emission</div></div>
+        <div class="tko-bar-wrap"><div class="tko-bar" id="tko-bar-staking" style="width:0%;background:var(--green)"></div></div>
+        <div class="tko-pct text-green" id="tko-staking">--</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section class="section reveal" style="background:rgba(255,255,255,0.01);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div class="section-eyebrow">Roadmap</div>
+  <h2 class="section-title">Building the <span class="text-cyan">Future</span></h2>
+  <div class="roadmap-grid">
+    <div class="rm-item rm-done">
+      <div class="rm-dot-wrap"><div class="rm-dot">✓</div></div>
+      <div class="rm-q">Phase 1</div>
+      <div class="rm-title">Foundation</div>
+      <div class="rm-items">
+        <div>✓ Protocol architecture</div>
+        <div>✓ Validator onboarding</div>
+        <div>✓ Public telemetry</div>
+        <div>✓ Governance scaffolding</div>
+      </div>
+    </div>
+    <div class="rm-item rm-active">
+      <div class="rm-dot-wrap"><div class="rm-dot">⬡</div></div>
+      <div class="rm-q">Phase 2</div>
+      <div class="rm-title">Prefunding</div>
+      <div class="rm-items">
+        <div class="text-gold">◈ Presale live</div>
+        <div class="text-gold">◈ Validator reservations</div>
+        <div style="color:var(--muted)">· Partner integrations</div>
+        <div style="color:var(--muted)">· Grant intake</div>
+      </div>
+    </div>
+    <div class="rm-item rm-soon">
+      <div class="rm-dot-wrap"><div class="rm-dot">○</div></div>
+      <div class="rm-q">Phase 3</div>
+      <div class="rm-title">Activation</div>
+      <div class="rm-items">
+        <div>· Mainnet readiness</div>
+        <div>· Validator reward routing</div>
+        <div>· Staking activation</div>
+        <div>· Ecosystem rollouts</div>
+      </div>
+    </div>
+    <div class="rm-item rm-soon">
+      <div class="rm-dot-wrap"><div class="rm-dot">○</div></div>
+      <div class="rm-q">Phase 4</div>
+      <div class="rm-title">Expansion</div>
+      <div class="rm-items">
+        <div>· Interop rollouts</div>
+        <div>· Governance upgrades</div>
+        <div>· Proof verification</div>
+        <div>· Treasury programs</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section reveal">
+  <div class="section-eyebrow">Why X3STAR</div>
+  <h2 class="section-title">Built <span class="text-gold">Different</span></h2>
+  <div class="features-grid">
+    <div class="feat-card c-gold">
+      <div class="feat-icon">⚡</div>
+      <div class="feat-title">Ultra-Fast Finality</div>
+      <div class="feat-text">Performance claims on the public surface now defer to live benchmark artifacts and network telemetry instead of static marketing numbers.</div>
+    </div>
+    <div class="feat-card c-cyan">
+      <div class="feat-icon">🔗</div>
+      <div class="feat-title">Cross-Chain Native</div>
+      <div class="feat-text">Interoperability remains part of the roadmap, but this page only claims the integrations that are currently wired and exposed through the backend.</div>
+    </div>
+    <div class="feat-card c-purple">
+      <div class="feat-icon">🛡</div>
+      <div class="feat-title">Quantum-Ready Security</div>
+      <div class="feat-text">Security posture is communicated through implemented code paths, published disclosures, and investor-relations updates rather than unsupported slogans.</div>
+    </div>
+    <div class="feat-card c-green">
+      <div class="feat-icon">🌱</div>
+      <div class="feat-title">Carbon Negative</div>
+      <div class="feat-text">Environmental and treasury narratives must be backed by live accounting and published disclosures before they appear as hard claims on the site.</div>
+    </div>
+    <div class="feat-card c-gold">
+      <div class="feat-icon">◈</div>
+      <div class="feat-title">Grant Ecosystem</div>
+      <div class="feat-text">Grant availability, budgets, and milestones are published in the grants hub and backed by live funding records.</div>
+    </div>
+    <div class="feat-card c-cyan">
+      <div class="feat-icon">⟁</div>
+      <div class="feat-title">Validator Rewards</div>
+      <div class="feat-text">Validator rewards, governance weight, and protocol fee sharing follow the live network terms published through the backend.</div>
+    </div>
+  </div>
+</section>
+
+<!-- INVESTOR STRIP -->
+<div class="inv-strip reveal">
+  <div class="inv-label">Backed By</div>
+  <div class="inv-logos">
+    <div class="inv-logo">APEX VENTURES</div>
+    <div class="inv-logo">NEBULA CAPITAL</div>
+    <div class="inv-logo">QUANTUM DAO</div>
+    <div class="inv-logo">POLARIS FUND</div>
+    <div class="inv-logo">STARFALL LABS</div>
+    <div class="inv-logo">DELTA STAKE</div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<section class="section reveal">
+  <div class="section-eyebrow">FAQ</div>
+  <h2 class="section-title" style="text-align:center">Common <span class="text-gold">Questions</span></h2>
+  <div class="faq-list">
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How do I participate in the presale? <span class="faq-icon">+</span></div>
+      <div class="faq-a">Connect a supported wallet, enter the amount you want to spend, and follow the checkout flow. Allocation and vesting terms are shown during checkout and in the presale memo.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">What is the token vesting schedule? <span class="faq-icon">+</span></div>
+      <div class="faq-a">Presale tokens follow the published vesting schedule. Round III bonus allocations, if active, follow the same schedule outlined in the presale memo.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">When is the TGE (Token Generation Event)? <span class="faq-icon">+</span></div>
+      <div class="faq-a">TGE timing is announced only after mainnet readiness is confirmed. Participants are notified through official email and community channels.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Is there a minimum purchase? <span class="faq-icon">+</span></div>
+      <div class="faq-a">Minimums and maximums are shown at checkout and may vary by payment rail and jurisdiction.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Which networks/currencies are accepted? <span class="faq-icon">+</span></div>
+      <div class="faq-a">Supported networks and payment rails are listed in the live checkout experience and can change by jurisdiction.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">X3STAR</div>
+  <div class="footer-links">
+    <a>Whitepaper</a>
+    <a>Terms</a>
+    <a>Privacy</a>
+    <a>Audit</a>
+    <a>Twitter</a>
+    <a>Telegram</a>
+    <a>Discord</a>
+  </div>
+  <div class="footer-legal">© 2025 X3STAR Protocol. All rights reserved.</div>
+</footer>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+// Cursor
+const cursor = document.getElementById('cursor');
+const dot = document.getElementById('cursor-dot');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX - 10 + 'px';
+  cursor.style.top = e.clientY - 10 + 'px';
+  dot.style.left = e.clientX - 2 + 'px';
+  dot.style.top = e.clientY - 2 + 'px';
+});
+document.querySelectorAll('button,a,.nav-link,.faq-q,.tko-item,.feat-card,.inv-logo').forEach(el => {
+  el.addEventListener('mouseenter', () => cursor.style.transform = 'scale(1.8)');
+  el.addEventListener('mouseleave', () => cursor.style.transform = 'scale(1)');
+});
+
+// Token calc
+let curSym = 'ETH';
+function calcTokens() {
+  const v = parseFloat(document.getElementById('spend-input').value) || 0;
+  document.getElementById('spend-display').textContent = v ? v + ' ' + curSym : '--';
+  const quote = (window.__x3PresaleQuote || {})[curSym];
+  if (quote && quote.tokensPerUnit) {
+    const tokens = Math.floor(v * quote.tokensPerUnit);
+    document.getElementById('tokens-out').textContent = tokens.toLocaleString() + ' X3S';
+  } else {
+    document.getElementById('tokens-out').textContent = '--';
+  }
+}
+function setTab(el, sym) {
+  document.querySelectorAll('.buy-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  curSym = sym;
+  document.getElementById('spend-sym').textContent = sym;
+  calcTokens();
+}
+function handleBuy() {
+  const btn = document.querySelector('.buy-btn');
+  btn.textContent = '⟁ CONNECTING WALLET...';
+  setTimeout(() => { btn.textContent = '⬡ BUY X3STAR NOW'; alert('Connect your wallet to proceed with the purchase!'); }, 1500);
+}
+
+X3PageAdapters.start();
+
+// FAQ
+function toggleFaq(el) {
+  const item = el.parentElement;
+  item.classList.toggle('open');
+}
+
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, {threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Funding Lanes — X3 Atomic Star</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#111827;--text:#eef2ff;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;--card:#0f1720;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;line-height:1.7;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:24px 32px;background:rgba(5,10,18,0.96);border-bottom:1px solid rgba(148,163,184,0.14);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:22px;letter-spacing:0.18em;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;flex-wrap:wrap;}
+nav a{color:var(--muted);text-decoration:none;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;}
+nav a:hover{color:#fff;}
+.container{max-width:1100px;margin:0 auto;padding:40px 32px;}
+.hero{margin-bottom:32px;}
+.hero-kicker{font-size:11px;text-transform:uppercase;letter-spacing:0.28em;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(44px,6vw,72px);line-height:0.95;margin-bottom:22px;color:#fff;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:720px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:32px;}
+.card{background:var(--card);border:1px solid rgba(56,189,248,0.12);border-radius:22px;padding:26px;display:flex;flex-direction:column;gap:14px;transition:transform 0.2s ease,background 0.2s ease;}
+.card:hover{transform:translateY(-2px);background:rgba(255,255,255,0.03);}
+.card h3{font-size:18px;color:#fff;margin-bottom:8px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card a{margin-top:auto;color:var(--accent);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;text-decoration:none;}
+.section{margin-top:40px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:28px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:800px;}
+.footer{margin-top:40px;padding:24px 32px;color:var(--muted);font-size:13px;text-align:center;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/funding/index.html">Funding Home</a><a href="/funding/grants.html">Grant Lanes</a><a href="/funding/ai.html">AI</a><a href="/funding/post-quantum-security.html">PQC</a><a href="/funding/portal.html">Portal</a><a href="/funding/scoreboard.html">Scoreboard</a><a href="/funding/email-reputation.html">Email Ops</a></div>
+</nav>
+<div class="container">
+  <section class="hero">
+    <div class="hero-kicker">Funding Lanes</div>
+    <h1 class="hero-title">Targeted funding lanes for infrastructure, security, and hardware readiness.</h1>
+    <p class="hero-copy">Each lane is built to communicate technical value to grant managers, defense sponsors, and infrastructure partners. These are not token economics pages — they are funding pathways for proof, audit, and deployment.</p>
+  </section>
+  <section class="grid">
+    <article class="card"><h3>Grant Funding</h3><p>Grant lanes for technical funders focused on AI routing, post-quantum readiness, public goods security, and validator deployment.</p><a href="/funding/grants.html">Explore grant lanes</a></article>
+    <article class="card"><h3>AI Infrastructure</h3><p>StarSignal AI routing, multi-VM execution orchestration, and risk-aware validator operations for compute-backed funding.</p><a href="/funding/ai.html">View AI funding</a></article>
+    <article class="card"><h3>Post-Quantum Security</h3><p>Funding asks for PQC identity, attestation proof, bridge security, and long-lived signature support.</p><a href="/funding/post-quantum-security.html">View PQC funding</a></article>
+    <article class="card"><h3>Cloud Credits</h3><p>Support cloud credits for validator/testnet infrastructure, RPC, monitoring, storage, and benchmark compute.</p><a href="/funding/cloud-credits.html">View cloud funding</a></article>
+    <article class="card"><h3>SBIR / Defense</h3><p>Government-grade infrastructure funding for secure distributed systems, integrity reporting, and testbed readiness.</p><a href="/funding/sbir.html">View SBIR funding</a></article>
+    <article class="card"><h3>Hardware Lab</h3><p>Funding for GPU rigs, recycled servers, validator lab hardware, and benchmark harness equipment.</p><a href="/funding/hardware-lab.html">View hardware lab funding</a></article>
+    <article class="card"><h3>Colorado Local Impact</h3><p>Funding pathways for Colorado-based workforce training, compute campus, and state-backed infrastructure programs.</p><a href="/funding/colorado.html">View Colorado funding</a></article>
+  </section>
+  <section class="section">
+    <h2>How to use this portal</h2>
+    <p>The portal is designed for reviewers who want a quick path to the funding lane they care about. Each page contains the ask, the technical scope, deliverables, and how the work fits into the X3 Atomic Star infrastructure roadmap.</p>
+  </section>
+  <section class="section">
+    <h2>Next step</h2>
+    <p>Contact the funding team with the lane name and ask for a packet. Example subject: <strong>"X3 Atomic Star Funding packet — Post-Quantum Security lane"</strong>.</p>
+  </section>
+</div>
+<footer class="footer">This portal is purpose-built to keep funding discussions technical, transparent, and ready for a future subdomain launch.</footer>
+</body>
+</html>

@@ -1,0 +1,16 @@
+[package]
+name = "x3-tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+x3-lang-common = { path = "../x3-common" }
+x3-lang-ast = { path = "../x3-ast" }
+x3-lang-compiler = { path = "../../compiler" }
+x3-lang-vm = { path = "../../vm" }
+
+[[bin]]
+name = "run_simple"
+path = "src/main.rs"

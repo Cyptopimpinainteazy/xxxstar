@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Mission Launch Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020A02;--panel:rgba(2,10,2,0.97);
+  --green:#00FF41;--green2:#00CC33;--green3:rgba(0,255,65,0.08);
+  --gold:#FFD700;--red:#FF3B30;--cyan:#00FFFF;--blue:#0088FF;
+  --amber:#FF9500;--white:rgba(255,255,255,0.85);
+  --dim:#0A1A0A;--muted:rgba(0,255,65,0.25);
+  --vt:'VT323',monospace;--mono:'Share Tech Mono',monospace;--body:'Exo 2',sans-serif;
+  --glow:0 0 10px rgba(0,255,65,0.4);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--green);font-family:var(--mono);}
+
+/* CRT SCANLINE OVERLAY */
+body::before{content:'';position:fixed;inset:0;z-index:999;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 1px,rgba(0,0,0,0.15) 1px,rgba(0,0,0,0.15) 2px);}
+/* CRT flicker */
+body::after{content:'';position:fixed;inset:0;z-index:998;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,0.4) 100%);}
+
+/* TOP HEADER — NASA STYLE */
+.header{height:56px;border-bottom:1px solid var(--muted);display:flex;align-items:center;
+  padding:0 20px;gap:20px;background:rgba(0,8,0,0.98);}
+.h-logo{font-family:var(--vt);font-size:28px;color:var(--green);
+  text-shadow:var(--glow);letter-spacing:6px;}
+.h-title{font-size:14px;letter-spacing:4px;color:rgba(0,255,65,0.5);}
+.h-sep{width:1px;height:32px;background:var(--muted);}
+.h-clock{font-size:18px;color:var(--cyan);letter-spacing:3px;}
+.h-status{margin-left:auto;display:flex;align-items:center;gap:16px;}
+.hs-item{text-align:right;}
+.hs-val{font-size:13px;color:var(--green);letter-spacing:2px;}
+.hs-key{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);
+  animation:blink 1s ease-in-out infinite;box-shadow:0 0 8px var(--green);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* MAIN LAYOUT */
+.main{display:grid;grid-template-columns:280px 1fr 260px;
+  height:calc(100vh - 56px);gap:1px;background:var(--muted);}
+.col{background:var(--bg);overflow:hidden;display:flex;flex-direction:column;}
+
+/* SECTION TITLE — TERMINAL STYLE */
+.st{font-size:10px;letter-spacing:4px;text-transform:uppercase;
+  padding:10px 16px;border-bottom:1px solid var(--muted);color:rgba(0,255,65,0.5);
+  background:rgba(0,255,65,0.02);}
+.st::before{content:'> ';color:var(--green);}
+
+/* MISSION LOG (left col) */
+.log-scroll{flex:1;overflow-y:auto;padding:8px 12px;}
+.log-scroll::-webkit-scrollbar{width:4px;}
+.log-scroll::-webkit-scrollbar-thumb{background:var(--muted);}
+.log-line{font-size:11px;padding:3px 0;border-bottom:1px solid rgba(0,255,65,0.04);
+  line-height:1.5;animation:logIn 0.2s ease;}
+@keyframes logIn{from{opacity:0}to{opacity:1}}
+.ll-time{color:rgba(0,255,65,0.3);margin-right:8px;}
+.ll-ok{color:var(--green);}
+.ll-warn{color:var(--amber);}
+.ll-info{color:var(--cyan);}
+.ll-alert{color:var(--red);}
+.blink-cursor{animation:cursorBlink 1s step-end infinite;}
+@keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* CENTER: MISSION TIMELINE */
+.center-col{grid-column:2;flex-direction:column;overflow-y:auto;padding:0 0 20px;}
+.center-col::-webkit-scrollbar{width:4px;}
+.center-col::-webkit-scrollbar-thumb{background:var(--muted);}
+
+/* NEXT LAUNCH HERO */
+.launch-hero{padding:24px 28px;border-bottom:1px solid var(--muted);
+  background:rgba(0,255,65,0.015);text-align:center;}
+.lh-pre{font-size:10px;letter-spacing:5px;color:rgba(0,255,65,0.4);text-transform:uppercase;margin-bottom:8px;}
+.lh-name{font-family:var(--vt);font-size:44px;color:var(--green);
+  text-shadow:0 0 20px rgba(0,255,65,0.5);margin-bottom:16px;line-height:1;}
+.lh-countdown{display:flex;gap:0;justify-content:center;margin-bottom:16px;}
+.lh-cd-unit{text-align:center;padding:12px 20px;border:1px solid var(--muted);background:rgba(0,255,65,0.03);}
+.lh-cd-unit:not(:last-child){border-right:none;}
+.lh-cd-num{font-family:var(--vt);font-size:52px;color:var(--green);
+  text-shadow:0 0 30px rgba(0,255,65,0.6);line-height:1;display:block;}
+.lh-cd-lbl{font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-top:4px;}
+.lh-desc{font-size:12px;color:rgba(0,255,65,0.5);letter-spacing:1px;max-width:500px;margin:0 auto;}
+.lh-prog{height:3px;background:rgba(0,255,65,0.1);margin:14px 0 0;overflow:hidden;}
+.lh-prog-fill{height:100%;background:var(--green);box-shadow:0 0 8px var(--green);
+  transition:width 0.5s ease;}
+
+/* MILESTONE ITEMS */
+.milestone-list{padding:0 28px;}
+.ms-item{display:grid;grid-template-columns:100px 24px 1fr;gap:0 16px;
+  padding:16px 0;border-bottom:1px solid rgba(0,255,65,0.06);align-items:start;}
+.ms-date{font-size:10px;color:rgba(0,255,65,0.3);letter-spacing:2px;padding-top:2px;}
+.ms-dot-col{display:flex;flex-direction:column;align-items:center;}
+.ms-dot{width:24px;height:24px;border-radius:50%;border:1px solid var(--muted);
+  display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+.ms-line{width:1px;flex:1;min-height:20px;background:var(--muted);margin:4px 0;}
+.ms-done .ms-dot{background:rgba(0,255,65,0.15);border-color:var(--green);color:var(--green);
+  box-shadow:0 0 8px rgba(0,255,65,0.3);}
+.ms-active .ms-dot{background:rgba(0,255,255,0.15);border-color:var(--cyan);color:var(--cyan);
+  box-shadow:0 0 12px rgba(0,255,255,0.4);animation:pulseNode 2s infinite;}
+@keyframes pulseNode{0%,100%{box-shadow:0 0 8px rgba(0,255,255,0.3)}50%{box-shadow:0 0 20px rgba(0,255,255,0.7)}}
+.ms-future .ms-dot{background:rgba(0,255,65,0.03);border-color:rgba(0,255,65,0.12);color:rgba(0,255,65,0.2);}
+.ms-body{}
+.ms-title{font-family:var(--body);font-size:14px;font-weight:700;margin-bottom:4px;}
+.ms-done .ms-title{color:var(--green);}
+.ms-active .ms-title{color:var(--cyan);}
+.ms-future .ms-title{color:rgba(0,255,65,0.4);}
+.ms-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.ms-tag{font-size:9px;letter-spacing:1.5px;padding:2px 8px;border-radius:3px;font-weight:700;}
+.mt-done{background:rgba(0,255,65,0.08);color:var(--green);border:1px solid rgba(0,255,65,0.2);}
+.mt-active{background:rgba(0,255,255,0.08);color:var(--cyan);border:1px solid rgba(0,255,255,0.2);}
+.mt-future{background:rgba(0,255,65,0.03);color:rgba(0,255,65,0.25);border:1px solid rgba(0,255,65,0.08);}
+.ms-desc{font-size:10px;color:rgba(0,255,65,0.35);line-height:1.6;font-family:var(--body);}
+.ms-progress{margin-top:8px;}
+.msp-bar{height:3px;background:rgba(0,255,65,0.08);border-radius:1px;overflow:hidden;}
+.msp-fill{height:100%;border-radius:1px;}
+.msp-label{font-size:9px;color:rgba(0,255,65,0.25);margin-top:3px;display:flex;justify-content:space-between;}
+
+/* RIGHT: SYSTEM STATUS */
+.sys-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto;}
+.sys-list::-webkit-scrollbar{width:3px;}
+.sys-list::-webkit-scrollbar-thumb{background:var(--muted);}
+.sys-item{display:flex;align-items:center;justify-content:space-between;
+  padding:6px 8px;border:1px solid rgba(0,255,65,0.06);border-radius:4px;
+  background:rgba(0,255,65,0.02);font-size:10px;}
+.si-name{color:rgba(0,255,65,0.5);}
+.si-val{font-size:10px;letter-spacing:1px;}
+.si-ok{color:var(--green);}
+.si-warn{color:var(--amber);}
+.si-off{color:rgba(0,255,65,0.2);}
+.si-bar{width:60px;height:3px;background:rgba(0,255,65,0.1);border-radius:1px;overflow:hidden;}
+.si-fill{height:100%;background:var(--green);border-radius:1px;}
+
+/* TERMINAL INPUT at bottom */
+.terminal-input{border-top:1px solid var(--muted);padding:10px 16px;
+  display:flex;align-items:center;gap:8px;background:rgba(0,5,0,0.95);}
+.ti-prompt{color:var(--green);font-size:13px;}
+.ti-input{flex:1;background:transparent;border:none;outline:none;
+  font-family:var(--mono);font-size:13px;color:var(--green);caret-color:var(--green);}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="h-logo">X3STAR</div>
+  <div class="h-sep"></div>
+  <div class="h-title">MISSION LAUNCH TERMINAL</div>
+  <div class="h-sep"></div>
+  <div class="h-clock" id="utc-clock">00:00:00 UTC</div>
+  <div class="h-status">
+    <div class="hs-item"><div class="hs-val" style="color:var(--cyan)" id="hdr-block">#1,847,412</div><div class="hs-key">Block</div></div>
+    <div class="hs-item"><div class="hs-val" style="color:var(--gold)">$0.0842</div><div class="hs-key">X3S</div></div>
+    <div class="hs-item"><div class="hs-val" style="color:var(--green)">TESTNET</div><div class="hs-key">Network</div></div>
+    <div class="status-dot"></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: MISSION LOG -->
+  <div class="col" style="border-right:1px solid var(--muted);">
+    <div class="st">Mission Log</div>
+    <div class="log-scroll" id="mission-log">
+      <!-- populated by JS -->
+    </div>
+    <div class="terminal-input">
+      <div class="ti-prompt">X3S://&gt;</div>
+      <input class="ti-input" id="terminal" placeholder="Type command..." onkeydown="handleCmd(event)">
+    </div>
+  </div>
+
+  <!-- CENTER: MISSION TIMELINE -->
+  <div class="col center-col">
+
+    <!-- NEXT LAUNCH HERO -->
+    <div class="launch-hero">
+      <div class="lh-pre">T-MINUS · NEXT MILESTONE</div>
+      <div class="lh-name">MAINNET GENESIS</div>
+      <div class="lh-countdown">
+        <div class="lh-cd-unit"><span class="lh-cd-num" id="cd-d">--</span><div class="lh-cd-lbl">DAYS</div></div>
+        <div class="lh-cd-unit"><span class="lh-cd-num" id="cd-h">--</span><div class="lh-cd-lbl">HRS</div></div>
+        <div class="lh-cd-unit"><span class="lh-cd-num" id="cd-m">--</span><div class="lh-cd-lbl">MIN</div></div>
+        <div class="lh-cd-unit"><span class="lh-cd-num" id="cd-s">--</span><div class="lh-cd-lbl">SEC</div></div>
+      </div>
+      <div class="lh-desc">Presale close checkpoint · live metrics flowing from the site backend</div>
+      <div class="lh-prog"><div class="lh-prog-fill" id="launch-prog" style="width:0%"></div></div>
+    </div>
+
+    <!-- MILESTONE TIMELINE -->
+    <div class="milestone-list">
+
+      <div class="ms-item ms-done">
+        <div class="ms-date">Q4 2023</div>
+        <div class="ms-dot-col"><div class="ms-dot">✓</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Genesis — Project Founded</div>
+          <div class="ms-tags"><span class="ms-tag mt-done">COMPLETE</span><span class="ms-tag mt-done">FUNDED</span></div>
+          <div class="ms-desc">Core team assembled. $1.2M seed round closed. Whitepaper published. GitHub repo public.</div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-done">
+        <div class="ms-date">Q1 2024</div>
+        <div class="ms-dot-col"><div class="ms-dot">✓</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Testnet Alpha — Internal</div>
+          <div class="ms-tags"><span class="ms-tag mt-done">COMPLETE</span><span class="ms-tag mt-done">BENCHMARKED</span></div>
+          <div class="ms-desc">Internal alpha milestone completed. Performance artifacts and implementation progress are tracked in the repo and surfaced through the live benchmark views.</div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-done">
+        <div class="ms-date">Q2 2024</div>
+        <div class="ms-dot-col"><div class="ms-dot">✓</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Series A — Archived</div>
+          <div class="ms-tags"><span class="ms-tag mt-done">COMPLETE</span><span class="ms-tag mt-done">ARCHIVED</span></div>
+          <div class="ms-desc">Capital formation milestone completed. Public pages now defer to the live funding and network data feeds instead of fixed historical counters.</div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-done">
+        <div class="ms-date">Q3 2024</div>
+        <div class="ms-dot-col"><div class="ms-dot">✓</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Testnet Beta — Public Launch</div>
+          <div class="ms-tags"><span class="ms-tag mt-done">COMPLETE</span><span class="ms-tag mt-done">LIVE VALIDATORS</span></div>
+          <div class="ms-desc">Public testnet milestone tracked here. Current validator participation, treasury state, and open governance activity are rendered from the active site backend.</div>
+          <div class="ms-progress">
+            <div class="msp-bar"><div class="msp-fill" style="width:100%;background:var(--green)"></div></div>
+            <div class="msp-label"><span>Progress</span><span style="color:var(--green)">100% ✓</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-done">
+        <div class="ms-date">Q4 2024</div>
+        <div class="ms-dot-col"><div class="ms-dot">✓</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Prefunding Round III — LIVE NOW</div>
+          <div class="ms-tags"><span class="ms-tag mt-done">IN PROGRESS</span><span class="ms-tag mt-done">LIVE RAISE</span></div>
+          <div class="ms-desc">Round III remains active. Funding progress, investor count, and close window are driven by the authoritative presale store and refreshed on page load.</div>
+          <div class="ms-progress">
+            <div class="msp-bar"><div class="msp-fill" id="r3-bar" style="width:0%;background:var(--gold)"></div></div>
+            <div class="msp-label"><span>Raise Progress</span><span style="color:var(--gold)" id="r3-pct">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-active">
+        <div class="ms-date">Q1 2025</div>
+        <div class="ms-dot-col"><div class="ms-dot">◉</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Mainnet Genesis Launch Track</div>
+          <div class="ms-tags"><span class="ms-tag mt-active">IN PROGRESS</span><span class="ms-tag mt-active">LIVE COUNTDOWN</span></div>
+          <div class="ms-desc">Current launch track for the network. This milestone stays qualitative until the chain, RPC surface, and production feature set are actually shipped.</div>
+          <div class="ms-progress">
+            <div class="msp-bar"><div class="msp-fill" id="mainnet-prog" style="width:0%;background:var(--cyan);box-shadow:0 0 6px rgba(0,255,255,0.4)"></div></div>
+            <div class="msp-label"><span>Launch readiness</span><span style="color:var(--cyan)" id="mainnet-pct">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-future">
+        <div class="ms-date">Q2 2025</div>
+        <div class="ms-dot-col"><div class="ms-dot">○</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">DeFi Ecosystem Launch</div>
+          <div class="ms-tags"><span class="ms-tag mt-future">PENDING</span><span class="ms-tag mt-future">PLANNED</span></div>
+          <div class="ms-desc">Native DEX, lending protocol, yield aggregator. Targets published when ready.</div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-future">
+        <div class="ms-date">Q3 2025</div>
+        <div class="ms-dot-col"><div class="ms-dot">○</div><div class="ms-line"></div></div>
+        <div class="ms-body">
+          <div class="ms-title">Sharding — 50,000 TPS</div>
+          <div class="ms-tags"><span class="ms-tag mt-future">PENDING</span><span class="ms-tag mt-future">SCALING</span></div>
+          <div class="ms-desc">Horizontal sharding implementation. Performance targets published later.</div>
+        </div>
+      </div>
+
+      <div class="ms-item ms-future">
+        <div class="ms-date">Q4 2025</div>
+        <div class="ms-dot-col"><div class="ms-dot">○</div></div>
+        <div class="ms-body">
+          <div class="ms-title">Quantum Security Upgrade</div>
+          <div class="ms-tags"><span class="ms-tag mt-future">FUTURE</span><span class="ms-tag mt-future">POST-QUANTUM</span></div>
+          <div class="ms-desc">CRYSTALS-Dilithium post-quantum signatures fully deployed. Quantum-resistant by default.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT: SYSTEMS STATUS -->
+  <div class="col" style="border-left:1px solid var(--muted);">
+    <div class="st">Systems Status</div>
+    <div class="sys-list">
+      <div class="sys-item"><span class="si-name">CONSENSUS</span><span class="si-val si-ok">● NOMINAL</span></div>
+      <div class="sys-item"><span class="si-name">VALIDATOR NET</span><span class="si-val si-ok">● --</span></div>
+      <div class="sys-item"><span class="si-name">BLOCK PROD.</span><span class="si-val si-ok">● --</span></div>
+      <div class="sys-item"><span class="si-name">FINALITY</span><span class="si-val si-ok">● --</span></div>
+      <div class="sys-item"><span class="si-name">ZK BRIDGE ETH</span><span class="si-val si-ok">● LIVE</span></div>
+      <div class="sys-item"><span class="si-name">ZK BRIDGE SOL</span><span class="si-val si-warn">● BETA</span></div>
+      <div class="sys-item"><span class="si-name">DEX</span><span class="si-val si-off">○ PENDING</span></div>
+      <div class="sys-item"><span class="si-name">LENDING</span><span class="si-val si-off">○ PENDING</span></div>
+      <div class="sys-item"><span class="si-name">MOBILE WALLET</span><span class="si-val si-warn">● TESTNET</span></div>
+      <div class="sys-item"><span class="si-name">GOVERNANCE</span><span class="si-val si-ok">● LIVE</span></div>
+      <div class="sys-item"><span class="si-name">STAKING</span><span class="si-val si-ok">● --</span></div>
+      <div class="sys-item"><span class="si-name">GRANT PORTAL</span><span class="si-val si-ok">● LIVE</span></div>
+      <div class="sys-item"><span class="si-name">CEX LISTING</span><span class="si-val si-off">○ Q2 2025</span></div>
+      <div class="sys-item"><span class="si-name">SHARDING</span><span class="si-val si-off">○ Q3 2025</span></div>
+      <div class="sys-item"><span class="si-name">QUANTUM SEC.</span><span class="si-val si-off">○ Q4 2025</span></div>
+    </div>
+
+    <div style="border-top:1px solid var(--muted);padding:12px 14px;">
+      <div class="st" style="border:none;padding:0 0 8px;">Network Load</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="font-size:9px;color:var(--muted);display:flex;justify-content:space-between;"><span>TPS UTILIZATION</span><span id="tps-pct" style="color:var(--green)">--</span></div>
+        <div style="height:4px;background:rgba(0,255,65,0.08);border-radius:2px;overflow:hidden;">
+          <div id="tps-bar" style="height:100%;width:84%;background:var(--green);border-radius:2px;box-shadow:0 0 6px var(--green);transition:width 0.5s"></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);display:flex;justify-content:space-between;margin-top:4px;"><span>MEMORY</span><span style="color:var(--amber)">--</span></div>
+        <div style="height:4px;background:rgba(0,255,65,0.08);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:0%;background:var(--amber);border-radius:2px;transition:width 0.5s"></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);display:flex;justify-content:space-between;margin-top:4px;"><span>STORAGE</span><span style="color:var(--green)">--</span></div>
+        <div style="height:4px;background:rgba(0,255,65,0.08);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:0%;background:var(--green);border-radius:2px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--muted);padding:12px 14px;">
+      <div class="st" style="border:none;padding:0 0 8px;">Quick Nav</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="x3star-network-pulse.html" style="font-size:10px;color:rgba(0,255,65,0.4);text-decoration:none;padding:5px 8px;border:1px solid rgba(0,255,65,0.08);border-radius:3px;transition:all 0.2s;display:block;" onmouseover="this.style.color='var(--green)';this.style.borderColor='rgba(0,255,65,0.25)'" onmouseout="this.style.color='rgba(0,255,65,0.4)';this.style.borderColor='rgba(0,255,65,0.08)'">→ NETWORK PULSE</a>
+        <a href="x3star-whale-tracker.html" style="font-size:10px;color:rgba(0,255,65,0.4);text-decoration:none;padding:5px 8px;border:1px solid rgba(0,255,65,0.08);border-radius:3px;transition:all 0.2s;display:block;" onmouseover="this.style.color='var(--green)';this.style.borderColor='rgba(0,255,65,0.25)'" onmouseout="this.style.color='rgba(0,255,65,0.4)';this.style.borderColor='rgba(0,255,65,0.08)'">→ WHALE TRACKER</a>
+        <a href="x3star-token-presale.html" style="font-size:10px;color:rgba(0,255,215,0.5);text-decoration:none;padding:5px 8px;border:1px solid rgba(0,255,215,0.15);border-radius:3px;transition:all 0.2s;display:block;background:rgba(0,255,215,0.03);" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='rgba(0,255,215,0.5)'">→ BUY X3S PRESALE ◈</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

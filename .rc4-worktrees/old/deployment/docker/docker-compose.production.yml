@@ -1,0 +1,359 @@
+version: '3.9'
+
+# ============================================================================
+# X3 Chain Production Testnet - Docker Compose
+# ============================================================================
+# Components:
+# - 3x Validator nodes with persistent storage
+# - 1x Bootnode for peer discovery
+# - RPC Gateway (Nginx) with SSL/TLS
+# - Analytics Service
+# - PostgreSQL database
+# - Prometheus monitoring
+# - Grafana apps/dash-legacy-2-legacy-2boards
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # Bootnode - P2P network bootstrapping
+  # ==========================================================================
+  bootnode:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.node
+    image: x3-chain/node:latest
+    container_name: x3-bootnode
+    hostname: bootnode
+    restart: unless-stopped
+    ports:
+      - "30333:30333"  # P2P
+      - "9944:9944"    # WebSocket RPC (internal)
+    volumes:
+      - bootnode-data:/data
+      - ./chain-specs/testnet-raw.json:/data/chain-spec.json:ro
+      - ./keys/bootnode-key.txt:/data/node-key:ro
+    command:
+      - --chain=/data/chain-spec.json
+      - --base-path=/data
+      - --node-key-file=/data/node-key
+      - --name=X3-Bootnode
+      - --rpc-external
+      - --rpc-cors=all
+      - --prometheus-external
+      - --prometheus-port=9615
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9933/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Validator Node 1
+  # ==========================================================================
+  validator-01:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.node
+    image: x3-chain/node:latest
+    container_name: x3-validator-01
+    hostname: validator-01
+    restart: unless-stopped
+    ports:
+      - "30334:30333"
+      - "9945:9944"
+    volumes:
+      - validator-01-data:/data
+      - ./chain-specs/testnet-raw.json:/data/chain-spec.json:ro
+      - ./keys/validator-01-keys:/data/keys:ro
+    command:
+      - --chain=/data/chain-spec.json
+      - --base-path=/data
+      - --validator
+      - --name=X3-Validator-01
+      - --bootnodes=/dns/bootnode/tcp/30333/p2p/${BOOTNODE_PEER_ID}
+      - --rpc-external
+      - --rpc-cors=all
+      - --prometheus-external
+      - --telemetry-url=wss://telemetry.polkadot.io/submit/ 0
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      - bootnode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9933/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Validator Node 2
+  # ==========================================================================
+  validator-02:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.node
+    image: x3-chain/node:latest
+    container_name: x3-validator-02
+    hostname: validator-02
+    restart: unless-stopped
+    ports:
+      - "30335:30333"
+      - "9946:9944"
+    volumes:
+      - validator-02-data:/data
+      - ./chain-specs/testnet-raw.json:/data/chain-spec.json:ro
+      - ./keys/validator-02-keys:/data/keys:ro
+    command:
+      - --chain=/data/chain-spec.json
+      - --base-path=/data
+      - --validator
+      - --name=X3-Validator-02
+      - --bootnodes=/dns/bootnode/tcp/30333/p2p/${BOOTNODE_PEER_ID}
+      - --rpc-external
+      - --rpc-cors=all
+      - --prometheus-external
+      - --telemetry-url=wss://telemetry.polkadot.io/submit/ 0
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      - bootnode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9933/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Validator Node 3
+  # ==========================================================================
+  validator-03:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.node
+    image: x3-chain/node:latest
+    container_name: x3-validator-03
+    hostname: validator-03
+    restart: unless-stopped
+    ports:
+      - "30336:30333"
+      - "9947:9944"
+    volumes:
+      - validator-03-data:/data
+      - ./chain-specs/testnet-raw.json:/data/chain-spec.json:ro
+      - ./keys/validator-03-keys:/data/keys:ro
+    command:
+      - --chain=/data/chain-spec.json
+      - --base-path=/data
+      - --validator
+      - --name=X3-Validator-03
+      - --bootnodes=/dns/bootnode/tcp/30333/p2p/${BOOTNODE_PEER_ID}
+      - --rpc-external
+      - --rpc-cors=all
+      - --prometheus-external
+      - --telemetry-url=wss://telemetry.polkadot.io/submit/ 0
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      - bootnode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9933/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # ==========================================================================
+  # RPC Gateway - Public-facing load balanced RPC
+  # ==========================================================================
+  rpc-gateway:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.rpc-gateway
+    image: x3-chain/rpc-gateway:latest
+    container_name: x3-rpc-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+      - gateway-cache:/var/cache/nginx
+      - gateway-logs:/var/log/nginx
+    environment:
+      - BOOTNODE_PEER_ID=${BOOTNODE_PEER_ID}
+    depends_on:
+      - bootnode
+      - validator-01
+      - validator-02
+      - validator-03
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ==========================================================================
+  # PostgreSQL Database - Analytics storage
+  # ==========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: x3-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: x3_analytics
+      POSTGRES_USER: ${POSTGRES_USER:-x3}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-x3}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Analytics Service - Event tracking and metrics
+  # ==========================================================================
+  analytics:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.analytics
+    image: x3-chain/analytics:latest
+    container_name: x3-analytics
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-x3}:${POSTGRES_PASSWORD}@postgres:5432/x3_analytics
+      RUST_LOG: info
+      BIND_ADDRESS: 0.0.0.0:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Prometheus - Metrics collection
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: x3-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Grafana - Visualization apps/dash-legacy-2-legacy-2boards
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: x3-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "https://metrics.x3-chain.io"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana-apps/dash-legacy-2-legacy-2boards:/etc/grafana/provisioning/apps/dash-legacy-2-legacy-2boards:ro
+      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    depends_on:
+      - prometheus
+    networks:
+      - x3-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  x3-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================================================
+# Volumes - Persistent storage
+# ============================================================================
+volumes:
+  bootnode-data:
+  validator-01-data:
+  validator-02-data:
+  validator-03-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  gateway-cache:
+  gateway-logs:

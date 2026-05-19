@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Prefunding Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #03040a;
+    --bg2: #080c18;
+    --bg3: #0d1225;
+    --card: rgba(12,18,40,0.85);
+    --border: rgba(80,140,255,0.12);
+    --border-glow: rgba(80,200,255,0.35);
+    --gold: #f0c040;
+    --gold2: #ffdb6e;
+    --cyan: #30e8ff;
+    --blue: #4a90ff;
+    --green: #26e8a0;
+    --red: #ff4e6a;
+    --purple: #b06aff;
+    --text: #e8eeff;
+    --muted: #6070a0;
+    --accent: #1a2550;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Animated star field ── */
+  #stars-canvas {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    pointer-events:none; z-index:0; opacity:0.5;
+  }
+
+  /* ── Noise overlay ── */
+  body::before {
+    content:'';
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity:0.25;
+  }
+
+  .app { position:relative; z-index:2; display:flex; min-height:100vh; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 72px;
+    background: linear-gradient(180deg, rgba(8,12,30,0.98) 0%, rgba(5,8,20,0.98) 100%);
+    border-right: 1px solid var(--border);
+    display:flex; flex-direction:column; align-items:center;
+    padding: 24px 0; gap:8px;
+    position: fixed; top:0; left:0; height:100vh; z-index:100;
+    backdrop-filter: blur(20px);
+  }
+
+  .logo-mark {
+    width:44px; height:44px; margin-bottom:24px;
+    background: linear-gradient(135deg, var(--gold), var(--cyan));
+    clip-path: polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Syne',sans-serif; font-weight:800; font-size:14px;
+    color:#000; cursor:pointer;
+    animation: pulse-logo 3s ease-in-out infinite;
+    position:relative;
+  }
+  .logo-mark::after {
+    content:'';
+    position:absolute; inset:-4px;
+    clip-path: polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);
+    background: linear-gradient(135deg, var(--gold), var(--cyan));
+    filter: blur(8px); opacity:0.4; z-index:-1;
+  }
+  @keyframes pulse-logo {
+    0%,100%{filter:drop-shadow(0 0 6px rgba(240,192,64,0.6))}
+    50%{filter:drop-shadow(0 0 16px rgba(48,232,255,0.8))}
+  }
+
+  .nav-item {
+    width:48px; height:48px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--muted); transition: all 0.2s;
+    position:relative; font-size:18px;
+  }
+  .nav-item:hover, .nav-item.active {
+    background: rgba(74,144,255,0.12);
+    color: var(--cyan);
+    box-shadow: 0 0 16px rgba(48,232,255,0.15);
+  }
+  .nav-item.active::before {
+    content:'';
+    position:absolute; left:-1px; top:50%; transform:translateY(-50%);
+    width:3px; height:24px; background: var(--cyan);
+    border-radius:0 3px 3px 0;
+  }
+
+  .nav-tooltip {
+    position:absolute; left:60px; background: rgba(8,12,30,0.95);
+    border:1px solid var(--border-glow); padding:6px 12px;
+    border-radius:8px; font-size:11px; color:var(--cyan);
+    white-space:nowrap; pointer-events:none;
+    opacity:0; transform:translateX(-4px); transition:all 0.15s;
+    z-index:200;
+  }
+  .nav-item:hover .nav-tooltip { opacity:1; transform:translateX(0); }
+
+  /* ── MAIN CONTENT ── */
+  .main { margin-left:72px; flex:1; display:flex; flex-direction:column; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    height:64px; background: rgba(8,12,30,0.92);
+    border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; padding:0 32px;
+    gap:16px; position:sticky; top:0; z-index:50;
+    backdrop-filter: blur(20px);
+  }
+
+  .topbar-title {
+    font-family:'Syne',sans-serif; font-weight:800; font-size:20px;
+    background: linear-gradient(90deg, var(--gold), var(--cyan));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    letter-spacing:-0.5px; margin-right:auto;
+  }
+  .topbar-sub {
+    font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase;
+    font-family:'Syne',sans-serif;
+  }
+
+  .status-pill {
+    display:flex; align-items:center; gap:6px;
+    background: rgba(38,232,160,0.08); border:1px solid rgba(38,232,160,0.25);
+    border-radius:100px; padding:5px 14px; font-size:11px;
+    color: var(--green); letter-spacing:1px;
+  }
+  .status-pill::before {
+    content:''; width:7px; height:7px; border-radius:50%;
+    background:var(--green); animation: blink 1.5s ease-in-out infinite;
+  }
+  @keyframes blink {0%,100%{opacity:1}50%{opacity:0.3}}
+
+  .topbar-btn {
+    height:36px; padding:0 18px; border-radius:10px; border:none; cursor:pointer;
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500;
+    letter-spacing:1px; transition: all 0.2s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold), #e8a800);
+    color:#000; font-weight:700;
+  }
+  .btn-primary:hover { box-shadow:0 0 20px rgba(240,192,64,0.5); transform:translateY(-1px); }
+  .btn-ghost {
+    background: rgba(74,144,255,0.1); border:1px solid var(--border-glow);
+    color: var(--cyan);
+  }
+  .btn-ghost:hover { background:rgba(74,144,255,0.2); }
+
+  .avatar {
+    width:36px; height:36px; border-radius:50%;
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:700; cursor:pointer;
+    border: 2px solid rgba(176,106,255,0.4);
+  }
+
+  /* ── CONTENT ── */
+  .content { padding:32px; display:flex; flex-direction:column; gap:28px; }
+
+  /* ── TICKER STRIP ── */
+  .ticker-strip {
+    background: var(--bg3); border:1px solid var(--border);
+    border-radius:12px; padding:12px 24px;
+    overflow:hidden; position:relative;
+  }
+  .ticker-wrap {
+    display:flex; gap:0; white-space:nowrap;
+    animation: scroll-ticker 30s linear infinite;
+  }
+  .ticker-item {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:0 32px; font-size:12px;
+  }
+  .ticker-sym { color:var(--gold); font-weight:700; }
+  .ticker-price { color:var(--text); }
+  .ticker-up { color:var(--green); }
+  .ticker-dn { color:var(--red); }
+  .ticker-sep { color:var(--muted); }
+  @keyframes scroll-ticker {
+    0%{transform:translateX(0)}
+    100%{transform:translateX(-50%)}
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 4px;
+  }
+  .section-title {
+    font-family:'Syne',sans-serif; font-size:13px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; color:var(--muted);
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-title::before {
+    content:''; width:3px; height:16px; background: var(--cyan);
+    border-radius:2px;
+  }
+
+  /* ── STAT CARDS ── */
+  .kpi-grid {
+    display:grid; grid-template-columns: repeat(4,1fr); gap:16px;
+  }
+
+  .kpi-card {
+    background: var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:20px 24px;
+    position:relative; overflow:hidden; cursor:pointer;
+    transition: all 0.3s; backdrop-filter:blur(12px);
+  }
+  .kpi-card:hover {
+    border-color: var(--border-glow);
+    box-shadow: 0 8px 40px rgba(48,232,255,0.08);
+    transform:translateY(-2px);
+  }
+  .kpi-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  }
+  .kpi-card.gold::before   { background:linear-gradient(90deg,transparent,var(--gold),transparent); }
+  .kpi-card.cyan::before   { background:linear-gradient(90deg,transparent,var(--cyan),transparent); }
+  .kpi-card.green::before  { background:linear-gradient(90deg,transparent,var(--green),transparent); }
+  .kpi-card.purple::before { background:linear-gradient(90deg,transparent,var(--purple),transparent); }
+
+  .kpi-card-bg {
+    position:absolute; right:-20px; bottom:-20px;
+    width:100px; height:100px; border-radius:50%;
+    opacity:0.06; filter:blur(20px);
+  }
+  .gold .kpi-card-bg   { background:var(--gold); }
+  .cyan .kpi-card-bg   { background:var(--cyan); }
+  .green .kpi-card-bg  { background:var(--green); }
+  .purple .kpi-card-bg { background:var(--purple); }
+
+  .kpi-label {
+    font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--muted); margin-bottom:10px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .kpi-icon { font-size:16px; opacity:0.7; }
+  .kpi-value {
+    font-family:'Syne',sans-serif; font-size:28px; font-weight:800;
+    line-height:1; margin-bottom:8px; letter-spacing:-1px;
+  }
+  .kpi-sub {
+    font-size:11px; display:flex; align-items:center; gap:6px;
+  }
+  .badge-up   { color:var(--green); background:rgba(38,232,160,0.12); padding:2px 8px; border-radius:100px; }
+  .badge-dn   { color:var(--red);   background:rgba(255,78,106,0.12);  padding:2px 8px; border-radius:100px; }
+  .kpi-sub-label { color:var(--muted); font-size:10px; }
+
+  /* ── CHARTS ROW ── */
+  .charts-row {
+    display:grid; grid-template-columns: 2fr 1fr; gap:16px;
+  }
+
+  .chart-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:24px; backdrop-filter:blur(12px);
+    position:relative; overflow:hidden;
+  }
+  .chart-card:hover { border-color:var(--border-glow); }
+
+  .chart-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:20px;
+  }
+  .chart-title {
+    font-family:'Syne',sans-serif; font-size:14px; font-weight:700; color:var(--text);
+  }
+  .chart-tabs {
+    display:flex; gap:4px;
+    background:rgba(255,255,255,0.04); padding:3px; border-radius:8px;
+  }
+  .chart-tab {
+    padding:4px 12px; border-radius:6px; font-size:10px; cursor:pointer;
+    color:var(--muted); transition:all 0.2s; letter-spacing:0.5px;
+    border:none; background:transparent; font-family:'JetBrains Mono',monospace;
+  }
+  .chart-tab.active { background:var(--accent); color:var(--cyan); }
+
+  canvas.chart { width:100%!important; }
+
+  /* ── DONUT ── */
+  .donut-center {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    text-align:center; pointer-events:none;
+  }
+  .donut-val { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; }
+  .donut-lbl { font-size:9px; color:var(--muted); letter-spacing:2px; }
+
+  /* ── 3-COL ROW ── */
+  .three-col { display:grid; grid-template-columns:1.2fr 1fr 0.8fr; gap:16px; }
+
+  /* ── TABLE CARD ── */
+  .table-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:24px; backdrop-filter:blur(12px);
+  }
+  .table-card:hover { border-color:var(--border-glow); }
+
+  .data-table { width:100%; border-collapse:collapse; }
+  .data-table th {
+    font-size:9px; text-transform:uppercase; letter-spacing:2px;
+    color:var(--muted); padding:0 0 12px; text-align:left;
+    border-bottom:1px solid var(--border);
+  }
+  .data-table td {
+    padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.03);
+    font-size:12px; vertical-align:middle;
+  }
+  .data-table tr:last-child td { border:none; }
+  .data-table tr:hover td { background:rgba(74,144,255,0.04); }
+
+  .token-badge {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.05); padding:3px 10px;
+    border-radius:100px; font-size:11px; font-weight:700;
+  }
+  .token-dot {
+    width:8px; height:8px; border-radius:50%;
+  }
+
+  .prog-bar-wrap { width:80px; height:5px; background:rgba(255,255,255,0.08); border-radius:100px; overflow:hidden; }
+  .prog-bar { height:100%; border-radius:100px; transition:width 1s ease; }
+
+  /* ── GRANT LIST ── */
+  .grant-item {
+    padding:14px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .grant-item:last-child { border:none; }
+  .grant-row { display:flex; align-items:center; justify-content:space-between; }
+  .grant-name { font-size:13px; font-weight:600; color:var(--text); font-family:'Syne',sans-serif; }
+  .grant-org  { font-size:10px; color:var(--muted); }
+  .grant-amt  { font-size:14px; font-weight:700; color:var(--gold); font-family:'Syne',sans-serif; }
+  .grant-status {
+    font-size:9px; letter-spacing:1.5px; padding:3px 10px; border-radius:100px;
+    text-transform:uppercase; font-weight:700;
+  }
+  .st-active    { background:rgba(38,232,160,0.12); color:var(--green); border:1px solid rgba(38,232,160,0.3); }
+  .st-review    { background:rgba(240,192,64,0.12);  color:var(--gold);  border:1px solid rgba(240,192,64,0.3); }
+  .st-pending   { background:rgba(74,144,255,0.12);  color:var(--blue);  border:1px solid rgba(74,144,255,0.3); }
+  .st-closed    { background:rgba(255,78,106,0.12);  color:var(--red);   border:1px solid rgba(255,78,106,0.3); }
+
+  .full-prog { width:100%; height:3px; background:rgba(255,255,255,0.06); border-radius:100px; overflow:hidden; }
+  .full-prog .prog-bar { background:linear-gradient(90deg,var(--cyan),var(--blue)); }
+
+  /* ── INVESTORS PANEL ── */
+  .investor-item {
+    display:flex; align-items:center; gap:12px;
+    padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+    cursor:pointer; transition:all 0.2s;
+  }
+  .investor-item:hover { padding-left:4px; }
+  .investor-item:last-child { border:none; }
+  .inv-avatar {
+    width:36px; height:36px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; font-family:'Syne',sans-serif;
+  }
+  .inv-name  { font-size:12px; font-weight:600; color:var(--text); }
+  .inv-type  { font-size:10px; color:var(--muted); }
+  .inv-commit{ font-size:12px; font-weight:700; color:var(--gold); margin-left:auto; }
+  .inv-tier  { font-size:9px; padding:2px 8px; border-radius:100px; margin-left:8px; }
+  .tier-lead  { background:rgba(240,192,64,0.15); color:var(--gold); border:1px solid rgba(240,192,64,0.3); }
+  .tier-major { background:rgba(176,106,255,0.15); color:var(--purple); border:1px solid rgba(176,106,255,0.3); }
+  .tier-seed  { background:rgba(48,232,255,0.1); color:var(--cyan); border:1px solid rgba(48,232,255,0.3); }
+
+  /* ── TIMELINE ── */
+  .timeline-item {
+    display:flex; gap:16px; padding:12px 0;
+    border-bottom:1px solid rgba(255,255,255,0.04);
+  }
+  .tl-dot-wrap { display:flex; flex-direction:column; align-items:center; gap:0; padding-top:3px; }
+  .tl-dot {
+    width:10px; height:10px; border-radius:50%; flex-shrink:0;
+    border:2px solid;
+  }
+  .tl-line { flex:1; width:1px; background:rgba(255,255,255,0.08); margin:2px 0; }
+  .tl-content { flex:1; }
+  .tl-title { font-size:12px; font-weight:600; color:var(--text); margin-bottom:3px; }
+  .tl-meta  { font-size:10px; color:var(--muted); }
+  .tl-date  { font-size:10px; color:var(--muted); white-space:nowrap; padding-top:2px; }
+
+  /* ── BOTTOM ROW ── */
+  .bottom-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+  /* ── MINI SPARKLINE ── */
+  .sparkline-row {
+    display:flex; align-items:center; gap:8px;
+  }
+
+  /* ── UTILITY ── */
+  .flex-between { display:flex; align-items:center; justify-content:space-between; }
+  .gap-4 { gap:4px; }
+  .mb-16 { margin-bottom:16px; }
+  .mb-20 { margin-bottom:20px; }
+  .text-gold   { color:var(--gold); }
+  .text-cyan   { color:var(--cyan); }
+  .text-green  { color:var(--green); }
+  .text-muted  { color:var(--muted); }
+  .text-purple { color:var(--purple); }
+
+  /* ── MINI METRIC LIST ── */
+  .metric-list { display:flex; flex-direction:column; gap:14px; }
+  .metric-row {
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12px;
+  }
+  .metric-key { color:var(--muted); font-size:11px; }
+  .metric-val { font-weight:700; color:var(--text); font-family:'Syne',sans-serif; }
+  .metric-bar-wrap { flex:1; height:4px; background:rgba(255,255,255,0.06); border-radius:100px; margin:0 12px; overflow:hidden; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:rgba(74,144,255,0.3); border-radius:2px; }
+
+  /* ── FADE IN ── */
+  @keyframes fadeUp {
+    from{opacity:0;transform:translateY(16px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  .kpi-card { animation:fadeUp 0.5s ease both; }
+  .kpi-card:nth-child(1){animation-delay:0.05s}
+  .kpi-card:nth-child(2){animation-delay:0.1s}
+  .kpi-card:nth-child(3){animation-delay:0.15s}
+  .kpi-card:nth-child(4){animation-delay:0.2s}
+
+  /* ── NOTIFICATION DOT ── */
+  .notif { position:relative; }
+  .notif-dot {
+    position:absolute; top:8px; right:8px;
+    width:6px; height:6px; border-radius:50%; background:var(--red);
+    border:1.5px solid var(--bg);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  /* ── GAUGE ── */
+  .gauge-wrap { display:flex; flex-direction:column; align-items:center; gap:8px; padding:8px 0; }
+  .gauge-label { font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+  .gauge-val { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:var(--gold); }
+
+  /* ── ALERT STRIP ── */
+  .alert-strip {
+    background: linear-gradient(90deg, rgba(240,192,64,0.08), rgba(48,232,255,0.06));
+    border:1px solid rgba(240,192,64,0.2);
+    border-radius:12px; padding:12px 20px;
+    display:flex; align-items:center; gap:12px; font-size:12px;
+  }
+  .alert-icon { font-size:16px; }
+  .alert-text { flex:1; color:var(--text); }
+  .alert-text strong { color:var(--gold); }
+  .alert-cta {
+    font-size:11px; color:var(--cyan); letter-spacing:1px; cursor:pointer;
+    border-bottom:1px solid rgba(48,232,255,0.3);
+  }
+
+  /* ── TAB PANEL ── */
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  @media (max-width:1200px) {
+    .kpi-grid { grid-template-columns: repeat(2,1fr); }
+    .three-col { grid-template-columns:1fr 1fr; }
+    .charts-row { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="logo-mark">X3</div>
+
+    <div class="nav-item active">
+      ◈
+      <span class="nav-tooltip">Dashboard</span>
+    </div>
+    <div class="nav-item">
+      ⬡
+      <span class="nav-tooltip">Grants</span>
+    </div>
+    <div class="nav-item">
+      ◎
+      <span class="nav-tooltip">Investors</span>
+    </div>
+    <div class="nav-item">
+      ⟁
+      <span class="nav-tooltip">Portfolio</span>
+    </div>
+    <div class="nav-item">
+      ⌗
+      <span class="nav-tooltip">Analytics</span>
+    </div>
+    <div class="nav-item notif">
+      ◻
+      <span class="notif-dot"></span>
+      <span class="nav-tooltip">Proposals</span>
+    </div>
+    <div class="nav-item" style="margin-top:auto">
+      ◈
+      <span class="nav-tooltip">Settings</span>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div>
+        <div class="topbar-title">X3STAR PREFUNDING</div>
+        <div class="topbar-sub">Blockchain Grant Infrastructure</div>
+      </div>
+      <div style="display:flex;gap:20px;margin:0 20px;">
+        <a href="x3star-token-presale.html" style="font-size:11px;letter-spacing:1.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--muted)'">Presale</a>
+        <a href="x3star-validator-presale.html" style="font-size:11px;letter-spacing:1.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--muted)'">Validator</a>
+        <a href="x3star-staking.html" style="font-size:11px;letter-spacing:1.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--muted)'">Staking</a>
+        <a href="x3star-governance.html" style="font-size:11px;letter-spacing:1.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--muted)'">Governance</a>
+        <a href="x3star-portfolio.html" style="font-size:11px;letter-spacing:1.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--muted)'">Portfolio</a>
+      </div>
+      <div class="status-pill">LIVE NETWORK</div>
+      <div style="font-size:11px;color:var(--muted)">Block <span class="text-cyan" id="block-num">--</span></div>
+      <div style="font-size:11px;color:var(--muted)">Gas <span class="text-green" id="gas">--</span></div>
+      <button class="topbar-btn btn-ghost">+ New Grant</button>
+      <button class="topbar-btn btn-primary">Connect Wallet</button>
+      <div class="avatar">DK</div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+      <div class="page-head" style="display:flex;justify-content:flex-end;margin-bottom:12px;"></div>
+
+      <!-- ALERT -->
+      <div class="alert-strip">
+        <span class="alert-icon">⚡</span>
+        <div class="alert-text" id="alert-text"><strong>Round Prefunding</strong> update loading…</div>
+        <span class="alert-cta" id="alert-cta">VIEW ROUND →</span>
+      </div>
+
+      <!-- TICKER -->
+      <div class="ticker-strip">
+        <div class="ticker-wrap" id="ticker">
+          <span class="ticker-item"><span class="ticker-sym">X3S</span><span class="ticker-price">--</span><span class="ticker-up" id="ticker-change">--</span></span>
+        </div>
+      </div>
+
+      <!-- KPI CARDS -->
+      <div>
+        <div class="section-header mb-16">
+          <div class="section-title">Core Metrics</div>
+          <div style="font-size:10px;color:var(--muted)">Last updated <span id="kpi-updated">--</span></div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card gold">
+            <div class="kpi-card-bg"></div>
+            <div class="kpi-label">Total Raised <span class="kpi-icon">◈</span></div>
+            <div class="kpi-value text-gold" id="kpi-raised">--</div>
+            <div class="kpi-sub"><span class="badge-up" id="kpi-raised-delta">--</span><span class="kpi-sub-label">vs last round</span></div>
+          </div>
+          <div class="kpi-card cyan">
+            <div class="kpi-card-bg"></div>
+            <div class="kpi-label">Active Grants <span class="kpi-icon">⬡</span></div>
+            <div class="kpi-value text-cyan" id="kpi-grants">--</div>
+            <div class="kpi-sub"><span class="badge-up" id="kpi-grants-delta">--</span><span class="kpi-sub-label">new this cycle</span></div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-card-bg"></div>
+            <div class="kpi-label">Investors <span class="kpi-icon">◎</span></div>
+            <div class="kpi-value text-green" id="kpi-investors">--</div>
+            <div class="kpi-sub"><span class="badge-up" id="kpi-investors-delta">--</span><span class="kpi-sub-label">30-day change</span></div>
+          </div>
+          <div class="kpi-card purple">
+            <div class="kpi-card-bg"></div>
+            <div class="kpi-label">X3S Token Price <span class="kpi-icon">⟁</span></div>
+            <div class="kpi-value text-purple" id="kpi-price">--</div>
+            <div class="kpi-sub"><span class="badge-up" id="kpi-price-delta">--</span><span class="kpi-sub-label">24h change</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHARTS ROW -->
+      <div class="charts-row">
+        <!-- Funding Chart -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Prefunding Flow</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:3px">Cumulative raise vs target</div>
+            </div>
+            <div class="chart-tabs">
+              <button class="chart-tab active" onclick="switchTab(this,'7d')">7D</button>
+              <button class="chart-tab" onclick="switchTab(this,'1M')">1M</button>
+              <button class="chart-tab" onclick="switchTab(this,'3M')">3M</button>
+              <button class="chart-tab" onclick="switchTab(this,'All')">All</button>
+            </div>
+          </div>
+          <canvas id="fundingChart" height="180" class="chart"></canvas>
+        </div>
+
+        <!-- Donut -->
+        <div class="chart-card" style="position:relative">
+          <div class="chart-header">
+            <div class="chart-title">Allocation Split</div>
+          </div>
+          <div style="position:relative;width:180px;margin:0 auto">
+            <canvas id="allocChart" width="180" height="180"></canvas>
+            <div class="donut-center">
+              <div class="donut-val text-gold" id="donut-total">--</div>
+              <div class="donut-lbl">TOTAL</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+              <span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0"></span>
+              <span style="color:var(--muted);flex:1">Lead Investors</span>
+              <span class="text-gold" style="font-weight:700" id="alloc-lead">--</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+              <span style="width:10px;height:10px;border-radius:2px;background:var(--cyan);flex-shrink:0"></span>
+              <span style="color:var(--muted);flex:1">Grant Programs</span>
+              <span class="text-cyan" style="font-weight:700" id="alloc-grants">--</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+              <span style="width:10px;height:10px;border-radius:2px;background:var(--purple);flex-shrink:0"></span>
+              <span style="color:var(--muted);flex:1">Community</span>
+              <span class="text-purple" style="font-weight:700" id="alloc-community">--</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+              <span style="width:10px;height:10px;border-radius:2px;background:var(--green);flex-shrink:0"></span>
+              <span style="color:var(--muted);flex:1">Treasury Reserve</span>
+              <span class="text-green" style="font-weight:700" id="alloc-treasury">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-COL ROW: Grants | Investors | Activity -->
+      <div class="three-col">
+
+        <!-- GRANTS TABLE -->
+        <div class="table-card">
+          <div class="section-header mb-20">
+            <div class="chart-title">Active Grants</div>
+            <div style="font-size:10px;color:var(--cyan);cursor:pointer;letter-spacing:1px">VIEW ALL →</div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Grant</th>
+                <th>Amount</th>
+                <th>Progress</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="grants-body">
+              <tr>
+                <td colspan="4" style="color:var(--muted);font-size:11px;padding:16px 0;">Awaiting live grant feed.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- INVESTORS PANEL -->
+        <div class="table-card">
+          <div class="section-header mb-20">
+            <div class="chart-title">Top Investors</div>
+            <div style="font-size:10px;color:var(--cyan);cursor:pointer;letter-spacing:1px">ALL →</div>
+          </div>
+
+          <div id="investor-list" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="font-size:11px;color:var(--muted)">Awaiting live investor feed.</div>
+          </div>
+        </div>
+
+        <!-- ACTIVITY + ROUND STATS -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <!-- Round Progress -->
+          <div class="chart-card">
+            <div class="chart-title" style="margin-bottom:16px">Round III Status</div>
+            <div class="metric-list">
+              <div>
+                <div class="flex-between" style="margin-bottom:6px">
+                  <span style="font-size:11px;color:var(--muted)">Hard Cap</span>
+                  <span class="text-gold" style="font-size:12px;font-weight:700" id="round-hardcap">--</span>
+                </div>
+                <div style="width:100%;height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden">
+                  <div id="round-progress" style="height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--cyan));border-radius:100px;"></div>
+                </div>
+                <div id="round-progress-text" style="font-size:10px;color:var(--muted);margin-top:4px">--</div>
+              </div>
+              <div style="height:1px;background:rgba(255,255,255,0.05)"></div>
+              <div class="metric-row">
+                <span class="metric-key">Soft Cap</span>
+                <div class="metric-bar-wrap"><div id="round-softcap-bar" class="prog-bar" style="height:4px;width:0%;background:var(--green)"></div></div>
+                <span class="metric-val text-green" id="round-softcap">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Min Ticket</span>
+                <span class="metric-val" id="round-min-ticket">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Vesting</span>
+                <span class="metric-val" id="round-vesting">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Token Price</span>
+                <span class="metric-val text-gold" id="round-price">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Bonus</span>
+                <span class="metric-val text-cyan" id="round-bonus">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini Activity -->
+          <div class="chart-card">
+            <div class="chart-title" style="margin-bottom:12px">Live Activity</div>
+            <div id="activity-feed" style="display:flex;flex-direction:column;gap:10px;font-size:11px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW -->
+      <div class="bottom-row">
+
+        <!-- Milestone Timeline -->
+        <div class="chart-card">
+          <div class="chart-title mb-20">Project Roadmap</div>
+          <div style="font-size:11px;color:var(--muted);">Awaiting roadmap feed.</div>
+        </div>
+
+        <!-- Token + Chain Stats -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <div class="chart-card">
+            <div class="chart-title" style="margin-bottom:16px">X3S Token Analytics</div>
+            <canvas id="tokenChart" height="100" class="chart"></canvas>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+              <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
+                <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">MARKET CAP</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--gold)" id="token-mcap">--</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
+                <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">CIRCULATING</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--cyan)" id="token-circ">--</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
+                <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">24H VOLUME</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--green)" id="token-vol">--</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px">
+                <div style="font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px">HOLDERS</div>
+                <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--purple)" id="token-holders">--</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-title" style="margin-bottom:16px">Network Health</div>
+            <div class="metric-list">
+              <div class="metric-row">
+                <span class="metric-key">TPS</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" id="net-tps-bar" style="height:4px;width:0%;background:var(--cyan)"></div></div>
+                <span class="metric-val text-cyan" id="net-tps">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Validators</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" id="net-vals-bar" style="height:4px;width:0%;background:var(--green)"></div></div>
+                <span class="metric-val text-green" id="net-vals">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Uptime</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" id="net-uptime-bar" style="height:4px;width:0%;background:var(--gold)"></div></div>
+                <span class="metric-val text-gold" id="net-uptime">--</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-key">Finality</span>
+                <div class="metric-bar-wrap"><div class="prog-bar" id="net-finality-bar" style="height:4px;width:0%;background:var(--purple)"></div></div>
+                <span class="metric-val text-purple" id="net-finality">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+// ── STARS ──
+const canvas = document.getElementById('stars-canvas');
+const ctx = canvas.getContext('2d');
+let stars = [];
+function resizeStars() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  stars = Array.from({length:200}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+    r: Math.random()*1.5, a: Math.random(), speed: 0.0002+Math.random()*0.0003
+  }));
+}
+function drawStars() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  stars.forEach(s => {
+    s.a += s.speed;
+    const alpha = 0.3 + 0.5*Math.abs(Math.sin(s.a));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(180,210,255,${alpha})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+resizeStars(); drawStars();
+window.addEventListener('resize', resizeStars);
+
+function updateChartsPlaceholder() {}
+
+X3PageAdapters.start();
+
+// ── FUNDING CHART ──
+const fundingCtx = document.getElementById('fundingChart').getContext('2d');
+const gradFund = fundingCtx.createLinearGradient(0,0,0,180);
+gradFund.addColorStop(0,'rgba(48,232,255,0.3)');
+gradFund.addColorStop(1,'rgba(48,232,255,0)');
+
+const fundingChart = new Chart(fundingCtx, {
+  type:'line',
+  data:{
+    labels:['Now'],
+    datasets:[
+      {
+        label:'Raised ($M)',
+        data:[0],
+        borderColor:'var(--cyan)', backgroundColor:gradFund, borderWidth:2,
+        fill:true, tension:0.4, pointRadius:0, pointHoverRadius:5,
+        pointHoverBackgroundColor:'var(--cyan)'
+      },
+      {
+        label:'Target ($M)',
+        data:[0],
+        borderColor:'rgba(240,192,64,0.4)', borderWidth:1.5,
+        borderDash:[5,5], fill:false, tension:0.4, pointRadius:0
+      }
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, interaction:{intersect:false,mode:'index'},
+    plugins:{legend:{display:false}, tooltip:{
+      backgroundColor:'rgba(8,12,30,0.95)',
+      borderColor:'rgba(48,232,255,0.3)', borderWidth:1,
+      titleColor:'#e8eeff', bodyColor:'var(--muted)',
+      padding:12,
+      callbacks:{
+        label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y}M`
+      }
+    }},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'var(--muted)',font:{size:10,family:'JetBrains Mono'}}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'var(--muted)',font:{size:10,family:'JetBrains Mono'}, callback:v=>'$'+v+'M'}}
+    }
+  }
+});
+window.__x3FundingChart = fundingChart;
+
+// ── ALLOC DONUT ──
+const allocCtx = document.getElementById('allocChart').getContext('2d');
+const allocChart = new Chart(allocCtx, {
+  type:'doughnut',
+  data:{
+    datasets:[{
+      data:[0,0,0,0],
+      backgroundColor:['rgba(240,192,64,0.85)','rgba(48,232,255,0.85)','rgba(176,106,255,0.85)','rgba(38,232,160,0.85)'],
+      borderColor:'rgba(8,12,30,0.6)', borderWidth:3, hoverOffset:8
+    }]
+  },
+  options:{
+    responsive:false, cutout:'72%',
+    plugins:{legend:{display:false}, tooltip:{
+      backgroundColor:'rgba(8,12,30,0.95)',
+      borderColor:'rgba(80,140,255,0.3)', borderWidth:1,
+      callbacks:{label:c=>` ${c.parsed}%`}
+    }}
+  }
+});
+window.__x3AllocChart = allocChart;
+
+// ── TOKEN SPARKLINE ──
+const tokenCtx = document.getElementById('tokenChart').getContext('2d');
+const gradTok = tokenCtx.createLinearGradient(0,0,0,100);
+gradTok.addColorStop(0,'rgba(240,192,64,0.25)');
+gradTok.addColorStop(1,'rgba(240,192,64,0)');
+const prices = [0];
+const tokenChart = new Chart(tokenCtx, {
+  type:'line',
+  data:{
+    labels:prices.map((_,i)=>`W${i+1}`),
+    datasets:[{
+      data:prices, borderColor:'var(--gold)', backgroundColor:gradTok,
+      borderWidth:2, fill:true, tension:0.4, pointRadius:0
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{
+      backgroundColor:'rgba(8,12,30,0.95)',
+      borderColor:'rgba(240,192,64,0.3)',borderWidth:1,
+      callbacks:{label:c=>` $${c.parsed.y.toFixed(4)}`}
+    }},
+    scales:{
+      x:{display:false},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'var(--muted)',font:{size:9,family:'JetBrains Mono'},callback:v=>'$'+v.toFixed(3)}}
+    }
+  }
+});
+window.__x3TokenChart = tokenChart;
+
+// ── CHART TAB SWITCH ──
+function switchTab(el, period) {
+  document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+document.getElementById('activity-feed').innerHTML = '<div style="font-size:11px;color:var(--muted)">Loading reservations activity…</div>';
+</script>
+</body>
+</html>

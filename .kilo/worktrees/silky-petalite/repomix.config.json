@@ -1,0 +1,35 @@
+{
+  "output": {
+    "style": "markdown",
+    "copyToClipboard": false
+  },
+  "include": [
+    "launch-gates/**/*.yaml",
+    "launch-gates/**/*.sh",
+    "launch-gates/**/*.md",
+    "launch-gates/prompts/**/*",
+    "**/*.rs",
+    "**/*.toml",
+    "**/*.json",
+    "Cargo.lock",
+    "README.md",
+    "*.md"
+  ],
+  "exclude": [
+    "target",
+    "node_modules",
+    ".git",
+    ".gitignore",
+    ".env",
+    "*.log",
+    "repomix/",
+    "contracts/**/out",
+    "contracts/**/build",
+    "contracts/**/node_modules",
+    "apps/**/node_modules",
+    "apps/**/build",
+    "apps/**/dist",
+    "**/artifacts",
+    "**/.next"
+  ]
+}

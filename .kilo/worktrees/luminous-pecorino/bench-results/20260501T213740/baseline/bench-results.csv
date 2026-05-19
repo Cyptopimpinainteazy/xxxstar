@@ -1,0 +1,10 @@
+name,old_instrs,new_instrs,instr_delta,old_gas,new_gas,gas_delta,old_bytes,new_bytes,bytes_delta,notes,compile_baseline_us,compile_optimized_us
+name,old_instrs,new_instrs,instr_delta,old_gas,new_gas,gas_delta,old_bytes,new_bytes,bytes_delta,notes,compile_baseline_us,compile_optimized_us
+constant_fold_heavy,25,18,-7,108,87,-21,145,118,-27,instrΔ=-7 ✓ gasΔ=-21 ✓ bytesΔ=-27 ✓,98,70
+arithmetic_chain,32,24,-8,135,114,-21,183,152,-31,instrΔ=-8 ✓ gasΔ=-21 ✓ bytesΔ=-31 ✓,32,43
+conditional_logic,33,33,0,144,165,21,193,221,28,instrΔ=0 = gasΔ=21 ⬆ bytesΔ=28 ⬆,24,80
+dead_code_sample,21,15,-6,93,69,-24,127,94,-33,instrΔ=-6 ✓ gasΔ=-24 ✓ bytesΔ=-33 ✓,17,22
+copy_chain,12,7,-5,63,48,-15,85,66,-19,instrΔ=-5 ✓ gasΔ=-15 ✓ bytesΔ=-19 ✓,11,16
+peephole_targets,24,15,-9,108,72,-36,147,98,-49,instrΔ=-9 ✓ gasΔ=-36 ✓ bytesΔ=-49 ✓,19,25
+simple_function,18,15,-3,87,81,-6,117,110,-7,instrΔ=-3 ✓ gasΔ=-6 ✓ bytesΔ=-7 ✓,14,20
+multi_function,37,28,-9,156,135,-21,210,181,-29,instrΔ=-9 ✓ gasΔ=-21 ✓ bytesΔ=-29 ✓,34,50

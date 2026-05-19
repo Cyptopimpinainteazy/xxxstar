@@ -1,0 +1,144 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: jury_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: jury_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jury_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - x3
+
+  blockchain-node:
+    image: x3-substrate:latest
+    environment:
+      JURY_AUTHORITY: ${JURY_AUTHORITY}
+      RUST_LOG: info
+    ports:
+      - "9944:9944"  # RPC
+      - "9933:9933"  # WS
+      - "30333:30333"  # P2P
+    volumes:
+      - blockchain_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9944"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - x3
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  jury-service:
+    image: x3-jury:latest
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: jury_db
+      LOG_LEVEL: ${LOG_LEVEL}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      blockchain-node:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - x3
+    volumes:
+      - ./config/jury-service.json:/config/jury-service.json:ro
+
+  jury-anchorer:
+    image: x3-jury-anchorer:latest
+    environment:
+      RPC_URL: http://blockchain-node:9944
+      JURY_SERVICE_URL: http://jury-service:8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: jury_db
+      JURY_AUTHORITY: ${JURY_AUTHORITY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      POLLING_INTERVAL_SECONDS: ${POLLING_INTERVAL_SECONDS}
+      MAX_FINALIZATION_ATTEMPTS: ${MAX_FINALIZATION_ATTEMPTS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      blockchain-node:
+        condition: service_started
+      jury-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - x3
+    volumes:
+      - ./logs:/app/logs
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    restart: unless-stopped
+    networks:
+      - x3
+    depends_on:
+      - blockchain-node
+      - jury-service
+      - jury-anchorer
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards.json:/etc/grafana/provisioning/dashboards/dashboards.json:ro
+      - ./monitoring/grafana-datasources.json:/etc/grafana/provisioning/datasources/datasources.json:ro
+    restart: unless-stopped
+    networks:
+      - x3
+    depends_on:
+      - prometheus
+
+networks:
+  x3:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  blockchain_data:
+  prometheus_data:
+  grafana_data:

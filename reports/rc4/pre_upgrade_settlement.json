@@ -1,0 +1,5 @@
+{
+  "test": "test_x3_native_evm_svm_roundtrip_preserves_supply",
+  "result": "PASS",
+  "log": "/home/lojak/Desktop/X3_ATOMIC_STAR/reports/rc4/pre_upgrade_settlement.log"
+}

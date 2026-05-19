@@ -1,0 +1,383 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: substreams-llm
+
+---
+# Ollama ConfigMap for initialization
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-init-script
+  namespace: substreams-llm
+data:
+  init.sh: |
+    #!/bin/bash
+    set -e
+    /bin/ollama serve &
+    OLLAMA_PID=$!
+    
+    echo "Waiting for Ollama to be ready..."
+    for i in {1..30}; do
+      if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+        echo "Ollama is ready!"
+        break
+      fi
+      sleep 1
+    done
+    
+    # Pull models
+    /bin/ollama pull mistral || echo "Warning: Failed to pull mistral"
+    /bin/ollama pull neural-chat || echo "Warning: Failed to pull neural-chat"
+    
+    wait $OLLAMA_PID
+
+---
+# Ollama PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-storage
+  namespace: substreams-llm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: default
+
+---
+# Ollama Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: substreams-llm
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 11434
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2"
+          limits:
+            memory: "16Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: ollama-storage
+          mountPath: /root/.ollama
+        - name: init-script
+          mountPath: /docker-entrypoint.sh
+          subPath: init.sh
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: ollama-storage
+        persistentVolumeClaim:
+          claimName: ollama-storage
+      - name: init-script
+        configMap:
+          name: ollama-init-script
+          defaultMode: 0755
+
+---
+# Ollama Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: substreams-llm
+  labels:
+    app: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+  - port: 11434
+    targetPort: 11434
+    name: http
+    protocol: TCP
+  type: ClusterIP
+
+---
+# LLM Config ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-config
+  namespace: substreams-llm
+data:
+  llm-config.json: |
+    {
+      "default_provider": "ollama",
+      "providers": {
+        "ollama": {
+          "type": "ollama",
+          "endpoint": "http://ollama:11434",
+          "model": "mistral",
+          "temperature": 0.7,
+          "timeout_ms": 30000
+        },
+        "openrouter": {
+          "type": "openrouter",
+          "endpoint": "https://openrouter.dev/api/v1",
+          "api_key": "${OPENROUTER_API_KEY}",
+          "model": "openai/gpt-3.5-turbo",
+          "temperature": 0.7,
+          "timeout_ms": 60000
+        }
+      },
+      "failover_chain": [
+        {"provider": "ollama", "model": "mistral", "priority": 1},
+        {"provider": "openrouter", "model": "mistralai/mistral-7b-instruct", "priority": 2}
+      ],
+      "retry_config": {
+        "max_retries": 3,
+        "backoff_multiplier": 1.5,
+        "timeout_ms": 30000
+      },
+      "caching": {
+        "enabled": true,
+        "ttl_seconds": 3600,
+        "max_size_mb": 100
+      }
+    }
+
+---
+# LLM Router Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-router
+  namespace: substreams-llm
+  labels:
+    app: llm-router
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: llm-router
+  template:
+    metadata:
+      labels:
+        app: llm-router
+    spec:
+      serviceAccountName: llm-router
+      containers:
+      - name: llm-router
+        image: node:20-alpine
+        imagePullPolicy: IfNotPresent
+        workingDir: /app
+        command: ["node", "llm-service/router.js"]
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "3000"
+        - name: DEFAULT_PROVIDER
+          value: "ollama"
+        - name: OLLAMA_ENDPOINT
+          value: "http://ollama:11434"
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openrouter-secret
+              key: api-key
+              optional: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: config
+          mountPath: /app/llm-config.json
+          subPath: llm-config.json
+          readOnly: true
+        - name: code
+          mountPath: /app/llm-service
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+      volumes:
+      - name: config
+        configMap:
+          name: llm-config
+      - name: code
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - llm-router
+              topologyKey: kubernetes.io/hostname
+
+---
+# LLM Router Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-router
+  namespace: substreams-llm
+  labels:
+    app: llm-router
+spec:
+  selector:
+    app: llm-router
+  ports:
+  - port: 3000
+    targetPort: 3000
+    name: http
+    protocol: TCP
+  type: LoadBalancer
+
+---
+# ServiceAccount for LLM Router
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: llm-router
+  namespace: substreams-llm
+
+---
+# Ingress (Optional - uncomment if on-cluster DNS works)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llm-router
+  namespace: substreams-llm
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - llm-router.example.com
+    secretName: llm-router-tls
+  rules:
+  - host: llm-router.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: llm-router
+            port:
+              number: 3000
+
+---
+# HorizontalPodAutoscaler for LLM Router
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: llm-router-hpa
+  namespace: substreams-llm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: llm-router
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+
+---
+# Optional: OpenRouter Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openrouter-secret
+  namespace: substreams-llm
+type: Opaque
+stringData:
+  # Set this to your actual API key
+  # kubectl create secret generic openrouter-secret --from-literal=api-key=sk-or-... -n substreams-llm
+  api-key: "sk-or-changeme"

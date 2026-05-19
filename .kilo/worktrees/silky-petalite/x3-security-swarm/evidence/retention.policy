@@ -1,0 +1,7 @@
+X3 Security Swarm Evidence Retention Policy
+
+Every incident bundle must preserve watcher findings, judge assessments, warden votes, scribe output, runtime events, orchestrator events, related configuration versions, and any governance approvals that changed the incident outcome.
+
+Evidence must be stored in immutable off-chain storage with an on-chain anchor for integrity verification. Raw logs may be tiered by sensitivity, but the final bundle hash, timeline, and sanction references must remain reproducible from retained artifacts.
+
+The minimum retention period for finalized incident bundles is seven years. Drill reports and false-positive bundles may use a shorter local retention period, but their anchored hashes and summary metadata must remain queryable for audit continuity.

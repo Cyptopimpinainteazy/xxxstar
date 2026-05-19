@@ -1,0 +1,30 @@
+[Unit]
+Description=X3 Chain Cross-Chain GPU Validator
+Documentation=man:ccgv(1)
+After=network-online.target redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=x3
+WorkingDirectory=/home/lojak/Desktop/x3-chain-master
+ExecStart=/usr/bin/python3 -m cross_chain_gpu_validator.cli serve --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="PATH=/home/x3/x3-chain/cross-chain-gpu-validator/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="CCGV_REDIS_HOST=localhost"
+Environment="CCGV_REDIS_PORT=6379"
+Environment="CCGV_LOG_LEVEL=INFO"
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/x3 /var/lib/x3
+
+[Install]
+WantedBy=multi-user.target

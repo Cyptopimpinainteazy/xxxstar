@@ -1,0 +1,46 @@
+{
+  "rounds": [
+    {
+      "stage": "baseline",
+      "metrics": {
+        "baseline_compile_us": 249,
+        "baseline_tps": 32128.51,
+        "bytes": 1040,
+        "gas": 771,
+        "instr": 155,
+        "mode": "Baseline",
+        "optimized_compile_us": 326,
+        "optimized_tps": 24539.88,
+        "samples": 8
+      }
+    },
+    {
+      "stage": "round-1",
+      "metrics": {
+        "baseline_compile_us": 301,
+        "baseline_tps": 26578.07,
+        "bytes": 888,
+        "gas": 610,
+        "instr": 112,
+        "mode": "YOLO Pass",
+        "optimized_compile_us": 8550,
+        "optimized_tps": 935.67,
+        "samples": 8
+      }
+    },
+    {
+      "stage": "round-2",
+      "metrics": {
+        "baseline_compile_us": 286,
+        "baseline_tps": 27972.03,
+        "bytes": 888,
+        "gas": 610,
+        "instr": 112,
+        "mode": "YOLO Pass",
+        "optimized_compile_us": 8599,
+        "optimized_tps": 930.34,
+        "samples": 8
+      }
+    }
+  ]
+}

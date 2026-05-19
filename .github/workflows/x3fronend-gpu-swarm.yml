@@ -1,0 +1,67 @@
+name: X3 Fronend + GPU Swarm CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'sprint-*'
+  pull_request:
+    branches:
+      - main
+      - develop
+      - 'sprint-*'
+  workflow_dispatch:
+
+jobs:
+  frontend-build:
+    name: Build X3 Fronend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: |
+          cd x3fronend
+          npm ci
+
+      - name: Build frontend assets
+        run: |
+          cd x3fronend
+          npm run build
+
+  gpu-swarm-gate:
+    name: GPU Swarm Gate
+    needs: frontend-build
+    runs-on: [self-hosted, linux, gpu]
+    timeout-minutes: 180
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: target
+          cache-all-crates: true
+
+      - name: Run GPU validator swarm determinism gate
+        run: |
+          chmod +x scripts/test-gpu-cpu-determinism-benchmark-gate.sh
+          ./scripts/test-gpu-cpu-determinism-benchmark-gate.sh

@@ -1,0 +1,17 @@
+{
+  "name": "x3-chain-db",
+  "version": "1.0.0",
+  "private": true,
+  "description": "X3 Chain Chain Database API — 60k+ blockchain registry with search, metrics, and GPU validation stats",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "seed": "python3 ../db/seed/seed_chains.py"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  }
+}

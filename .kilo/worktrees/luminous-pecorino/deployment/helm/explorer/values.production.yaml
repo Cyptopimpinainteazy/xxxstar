@@ -1,0 +1,22 @@
+# Production-specific values for Explorer
+replicaCount: 3
+
+image:
+  tag: "stable"
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2"
+    memory: "2Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  host: explorer.x3-chain.io

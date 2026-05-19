@@ -1,0 +1,18 @@
+safety_locks:
+  default_environment: testnet
+  mainnet:
+    enabled: false
+    activation_requires:
+      - governance_supermajority
+      - operator_dual_control
+      - rollback_plan_hash
+  constraints:
+    - automatic_rollback_required
+    - no_permanent_penalties_during_drills
+    - isolate_test_wallets_from_real_funds
+    - publish_drill_report_after_completion
+  abort_conditions:
+    - uncontrolled_blast_radius
+    - telemetry_loss
+    - evidence_pipeline_failure
+    - operator_unavailable

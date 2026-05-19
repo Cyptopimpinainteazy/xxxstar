@@ -1,0 +1,34 @@
+[package]
+name = "x3-compiler"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "X3 full compiler pipeline with optimization"
+publish = false
+
+[dependencies]
+# Compilation pipeline
+x3-lexer = { path = "../x3-lexer" }
+x3-parser = { path = "../x3-parser" }
+x3-hir = { path = "../x3-hir" }
+x3-mir = { path = "../x3-mir" }
+x3-backend = { path = "../x3-backend" }
+x3-typeck = { path = "../x3-typeck" }
+x3-common = { path = "../x3-common" }
+
+# Optimization
+x3-opt = { path = "../x3-opt" }
+
+# Verification & Gas Analysis
+x3-verifier = { path = "../x3-verifier" }
+
+# Error handling
+thiserror = "1.0"
+
+# Serialization (for ABI generation)
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+blake2 = "0.10"
+invariant-macros = { path = "../../crates/invariant-macros" }

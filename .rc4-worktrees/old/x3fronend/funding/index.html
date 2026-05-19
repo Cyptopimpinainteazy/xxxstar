@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Atomic Star Funding Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#111827;--text:#eef2ff;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;--card:#0f1720;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:24px 32px;background:rgba(5,10,18,0.96);border-bottom:1px solid rgba(148,163,184,0.14);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:22px;letter-spacing:0.18em;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;}
+nav a{color:var(--muted);text-decoration:none;font-size:12px;text-transform:uppercase;letter-spacing:0.16em;}
+nav a:hover{color:#fff;}
+.hero{padding:80px 32px 32px;max-width:1120px;margin:0 auto;}
+.hero-kicker{font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(52px,6vw,98px);line-height:0.92;max-width:840px;margin-bottom:24px;color:#fff;}
+.hero-title span{color:#a5f3fc;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px;}
+.hero-actions{display:flex;flex-wrap:wrap;gap:14px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;text-decoration:none;transition:transform 0.2s ease,background 0.2s ease;}
+.btn-primary{background:linear-gradient(135deg,#38bdf8,#22d3ee);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(148,163,184,0.14);}
+.btn:hover{transform:translateY(-1px);}
+.container{max-width:1120px;margin:0 auto;padding:0 32px;}
+.section{margin-top:42px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:32px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:900px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:30px;}
+.card{background:var(--card);border:1px solid rgba(148,163,184,0.08);border-radius:22px;padding:26px;display:flex;flex-direction:column;gap:16px;transition:transform 0.2s ease,background 0.2s ease;}
+.card:hover{transform:translateY(-2px);background:rgba(255,255,255,0.03);}
+.card h3{font-size:18px;color:#fff;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card a{margin-top:auto;text-decoration:none;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:30px;}
+.status-card{background:#0f1720;border:1px solid rgba(56,189,248,0.14);border-radius:20px;padding:24px;}
+.status-card h4{font-size:12px;text-transform:uppercase;color:var(--accent);letter-spacing:0.2em;margin-bottom:12px;}
+.status-card p{color:var(--muted);font-size:14px;line-height:1.7;}
+.list{display:grid;gap:10px;margin-top:18px;}
+.list li{padding-left:18px;position:relative;color:var(--muted);font-size:14px;line-height:1.7;}
+.list li:before{content:'▹';position:absolute;left:0;top:0;color:var(--accent);}
+footer{padding:32px;text-align:center;color:var(--muted);font-size:13px;}
+@media(max-width:840px){nav{flex-direction:column;align-items:flex-start;} }
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/x3star-landing.html">Home</a><a href="/x3star-grant-hub.html">Grant Hub</a><a href="/funding/index.html">Funding</a><a href="/funding/portal.html">Portal System</a><a href="/funding/provider.html">Provider</a><a href="/funding/admin.html">Admin</a><a href="/funding/scoreboard.html">Scoreboard</a><a href="/funding/email-reputation.html">Email Ops</a></div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">X3 Money Swarm</div>
+  <h1 class="hero-title">Funding infrastructure, not hype.</h1>
+  <p class="hero-copy">For now, this lives on the `.org` site at <strong>/funding</strong>. Later it can move to its own brand-safe domain like <strong>funding.x3atomicstar.org</strong> or <strong>funding.x3atomicstar.com</strong>.</p>
+  <div class="hero-actions"><a class="btn btn-primary" href="/funding/grants.html">View funding lanes</a><a class="btn btn-secondary" href="mailto:funding@x3atomicstar.com">Contact funding team</a></div>
+</section>
+<div class="container">
+  <div class="section">
+    <h2>Why this is on .org for now</h2>
+    <p>Keeping the funding portal under the main .org site gives us a safe, trusted landing zone while we build proof, collect sponsors, and validate our claim language. The structure supports a future move to a dedicated subdomain when the funding machine is ready.</p>
+  </div>
+  <div class="section">
+    <h2>Funding lanes</h2>
+    <div class="grid">
+      <div class="card"><h3>Grant Funding</h3><p>Focused grant lanes for AI, PQC, GPU benchmarks, interoperability, public goods, BTC settlement, SBIR, and cloud credits.</p><a href="/funding/grants.html">Open grant lanes →</a></div>
+      <div class="card"><h3>AI Infrastructure</h3><p>StarSignal routing and risk infrastructure for multi-VM execution and proof-driven routing decisions.</p><a href="/funding/ai.html">View AI page →</a></div>
+      <div class="card"><h3>Post-Quantum Security</h3><p>Quantum-readiness planning for validator identity, bridge attestations, wallet signing, and settlement proofs.</p><a href="/funding/post-quantum-security.html">View quantum page →</a></div>
+      <div class="card"><h3>Cloud Credits</h3><p>Infrastructure support for testnets, RPC, monitoring, AI compute, and GPU benchmarks.</p><a href="/funding/cloud-credits.html">View cloud page →</a></div>
+      <div class="card"><h3>SBIR / Defense</h3><p>Government-grade infrastructure funding for resilient distributed systems and cyber-readiness.</p><a href="/funding/sbir.html">View SBIR page →</a></div>
+      <div class="card"><h3>Hardware Lab</h3><p>Testnet validator lab, recycled servers, GPU rigs, storage, networking, and hardware wallet support.</p><a href="/funding/hardware-lab.html">View hardware lab →</a></div>
+      <div class="card"><h3>Colorado</h3><p>Local funding, workforce training, and state economic development pathways for Colorado-based infrastructure.</p><a href="/funding/colorado.html">View Colorado page →</a></div>
+      <div class="card"><h3>Funding System</h3><p>Public portal, admin workflow, partner intake, and reputation-grade operations for the funding machine.</p><a href="/funding/portal.html">View portal system →</a></div>
+      <div class="card"><h3>Scoreboard & Ops</h3><p>Funding status tracking, evidence readiness, and lane transparency for reviewers and sponsors.</p><a href="/funding/scoreboard.html">View scoreboard →</a></div>
+      <div class="card"><h3>Email Reputation</h3><p>Reputation-safe outreach design for sponsor contact, audited onboardings, and grant correspondence.</p><a href="/funding/email-reputation.html">View email ops →</a></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Current funding focus</h2>
+    <div class="status-grid">
+      <div class="status-card"><h4>Built</h4><p>Grant hub, Atomic Kernel model, ProofForge concept, benchmark methodology, and initial payloads.</p></div>
+      <div class="status-card"><h4>In progress</h4><p>Cloud infrastructure backlog, AI routing prototype, xBTC settlement design, and SBIR readiness stories.</p></div>
+      <div class="status-card"><h4>Funding needed</h4><p>Public testnet, audit reviews, AI compute, validator lab hardware, and grant execution deliverables.</p></div>
+      <div class="status-card"><h4>Audit required</h4><p>ProofForge reports, PQC prototype review, validator benchmark validation, and BTC settlement proofs.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proof & resources</h2>
+    <ul class="list">
+      <li>Readiness report / ProofForge evidence</li>
+      <li>Architecture docs and demo packet</li>
+      <li>Funding scoreboard and provider updates</li>
+      <li>Media story kit and technical memo</li>
+      <li>Contact for grant packet and partner review</li>
+    </ul>
+  </div>
+  <div class="section">
+    <h2>Next step</h2>
+    <p>This is the funding ops hub for X3 Money Swarm. It can live on <strong>x3atomicstar.org</strong> now, and the same pages can later be moved to a dedicated subdomain like <strong>funding.x3atomicstar.org</strong> when we are ready to scale into a separate funding brand.</p>
+  </div>
+</div>
+<footer>Funding portal hosted on X3 Atomic Star .org today. Future subdomain migration is ready when the funding machine is production-ready.</footer>
+</body>
+</html>

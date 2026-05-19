@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Quantum Readiness Program</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#111827;--text:#eef2ff;--muted:#94a3b8;--accent:#818cf8;--border:#334155;--card:#0f1720;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 32px;background:rgba(4,8,16,0.96);border-bottom:1px solid rgba(148,163,184,0.12);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:20px;color:var(--accent);}
+nav .nav-links{display:flex;gap:18px;}
+nav a{font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);text-decoration:none;}
+.hero{padding:72px 32px 24px;max-width:1120px;margin:0 auto;}
+.hero-kicker{font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(48px,6vw,86px);line-height:0.92;max-width:860px;margin-bottom:22px;color:#fff;}
+.hero-title span{color:#c4b5fd;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;text-decoration:none;transition:transform 0.2s ease,background 0.2s ease;}
+.btn-primary{background:linear-gradient(135deg,#818cf8,#a78bfa);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(148,163,184,0.14);}
+.btn:hover{transform:translateY(-1px);}
+.container{max-width:1120px;margin:0 auto;padding:0 32px;}
+.section{margin-top:36px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:30px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:900px;}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px;}
+.card{background:var(--card);border:1px solid rgba(148,163,184,0.08);border-radius:20px;padding:24px;}
+.card h3{font-size:18px;color:#fff;margin-bottom:10px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card ul{margin-top:12px;list-style:none;padding-left:0;display:grid;gap:10px;}
+.card li{padding-left:18px;position:relative;color:var(--muted);font-size:14px;}
+.card li:before{content:'▹';position:absolute;left:0;top:0;color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:18x;margin-top:28px;}
+.status{background:#0f1720;border:1px solid rgba(129,140,248,0.14);border-radius:18px;padding:22px;}
+.status h4{font-size:13px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:12px;}
+.status p{color:var(--muted);font-size:14px;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/grants/index.html">Grants Portal</a><a href="/x3star-grant-hub.html">Grant Hub</a><a href="/x3star-landing.html">Home</a></div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">Quantum Readiness Program</div>
+  <h1 class="hero-title">Post-quantum migration planning for multi-VM settlement.</h1>
+  <p class="hero-copy">X3 Atomic Star is building a practical PQC roadmap for validator identity, bridge attestations, wallet key rotation, governance signing, and long-lived settlement proofs.</p>
+  <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Fund PQC research</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request cryptography roadmap</a></div>
+</section>
+<div class="container">
+  <div class="section">
+    <h2>Problem</h2>
+    <p>Classical public-key cryptography creates long-term risk for wallets, validator identities, bridges, governance signatures, and archived settlement proofs. Serious reviewers know that infrastructure needs a migration path before quantum risk becomes urgent.</p>
+  </div>
+  <div class="section">
+    <h2>X3 solution</h2>
+    <p>X3 is designing a phased hybrid cryptography model for critical signing paths. This is a migration program, not a claim of quantum-proof production.</p>
+    <div class="row">
+      <div class="card"><h3>Hybrid signatures</h3><p>Classical + PQC validator attestations that can be verified alongside existing identity chains.</p></div>
+      <div class="card"><h3>Bridge hardening</h3><p>Bridge attestation tooling built to support PQC-ready verification paths.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Target architecture</h2>
+    <div class="card"><ul><li>ML-DSA / SLH-DSA research track</li><li>Hybrid classical + PQ validator signatures</li><li>Bridge attestation hardening</li><li>Wallet key migration tooling</li><li>PQC readiness dashboard</li><li>Verifier CLI and test vectors</li></ul></div>
+  </div>
+  <div class="section">
+    <h2>What is already built</h2>
+    <div class="card"><ul><li>PQC prototype crates exist.</li><li>Quantum-readiness concept and policy docs are drafted.</li><li>ProofForge readiness tooling supports the roadmap.</li></ul></div>
+  </div>
+  <div class="section">
+    <h2>What funding unlocks</h2>
+    <div class="row">
+      <div class="card"><h3>Standards-aligned implementation</h3><p>Fund a NIST-aligned PQC implementation track.</p></div>
+      <div class="card"><h3>Testing</h3><p>Deliver known-answer tests, differential testing, and fuzzing.</p></div>
+      <div class="card"><h3>Review</h3><p>Pay for external crypto review and validation.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Milestone roadmap</h2>
+    <div class="row">
+      <div class="card"><h3>Phase 1</h3><p>Build hybrid validator attestation prototype and test vector suite.</p></div>
+      <div class="card"><h3>Phase 2</h3><p>Integrate wallet and governance signing tooling with PQC migration paths.</p></div>
+      <div class="card"><h3>Phase 3</h3><p>Publish readiness reports and partner with security reviewers.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Funding use breakdown</h2>
+    <div class="status-grid">
+      <div class="status"><h4>Implementation</h4><p>40% for PQC code, libraries, and integration.</p></div>
+      <div class="status"><h4>Test tooling</h4><p>30% for test vectors, fuzzing, and verification CLI.</p></div>
+      <div class="status"><h4>Review</h4><p>20% for external cryptography validation.</p></div>
+      <div class="status"><h4>Documentation</h4><p>10% for migration guides and public evidence.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proof / demo</h2>
+    <p>Demonstrate a hybrid validator attestation verified by an independent CLI and publish a signed quantum-readiness report.</p>
+  </div>
+  <div class="section">
+    <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Partner on quantum readiness</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request roadmap</a></div>
+  </div>
+</div>
+</body>
+</html>

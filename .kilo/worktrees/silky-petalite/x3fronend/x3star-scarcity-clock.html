@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Round III Closing Fast</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0500;--orange:#FF6B00;--red:#FF1A1A;--gold:#FFD700;
+  --white:#FFF8F0;--muted:rgba(255,248,240,0.35);--dim:rgba(255,107,0,0.06);
+  --font:'Barlow',sans-serif;--display:'Bebas Neue',cursive;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--white);font-family:var(--font);position:relative;}
+
+/* FIRE BACKGROUND */
+#fire-canvas{position:fixed;inset:0;z-index:0;opacity:0.3;}
+
+/* GRAIN */
+body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0.04;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+/* LAYOUT */
+.page{position:relative;z-index:2;height:100vh;display:grid;
+  grid-template-rows:auto 1fr auto;padding:0;}
+
+/* TOP STRIP */
+.top-strip{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 40px;border-bottom:1px solid rgba(255,107,0,0.2);
+  background:rgba(10,5,0,0.8);backdrop-filter:blur(10px);}
+.logo{font-family:var(--display);font-size:24px;letter-spacing:4px;color:var(--gold);}
+.live-pill{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;color:var(--orange);
+  background:rgba(255,107,0,0.1);border:1px solid rgba(255,107,0,0.3);
+  border-radius:100px;padding:6px 16px;}
+.lp-dot{width:7px;height:7px;border-radius:50%;background:var(--orange);
+  animation:pulse 1s ease-in-out infinite;box-shadow:0 0 8px var(--orange);}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:0.6}}
+.top-price{font-size:13px;font-weight:700;color:var(--muted);}
+.top-price span{color:var(--gold);}
+
+/* CENTER */
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;padding:20px 40px;text-align:center;}
+
+/* CLOSING IN */
+.closing-label{font-family:var(--display);font-size:clamp(16px,2.5vw,26px);
+  letter-spacing:10px;color:var(--orange);margin-bottom:12px;
+  text-shadow:0 0 30px rgba(255,107,0,0.6);}
+
+/* BIG CLOCK */
+.big-clock{display:flex;align-items:flex-start;gap:0;margin-bottom:24px;}
+.bc-unit{display:flex;flex-direction:column;align-items:center;padding:0 clamp(10px,2vw,28px);}
+.bc-unit:not(:last-child){border-right:1px solid rgba(255,107,0,0.15);}
+.bc-num{font-family:var(--display);font-size:clamp(80px,14vw,180px);line-height:0.88;
+  background:linear-gradient(180deg,var(--white) 0%,var(--orange) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 40px rgba(255,107,0,0.4));}
+.bc-label{font-size:clamp(8px,1vw,11px);letter-spacing:4px;color:var(--muted);
+  text-transform:uppercase;margin-top:8px;}
+
+/* VELOCITY LINE */
+.velocity-line{font-size:clamp(14px,2vw,20px);font-weight:600;
+  color:var(--muted);margin-bottom:28px;letter-spacing:0.5px;}
+.vl-hot{color:var(--orange);font-weight:800;}
+.vl-est{color:var(--red);font-weight:800;animation:textPulse 2s ease-in-out infinite;}
+@keyframes textPulse{0%,100%{opacity:1}50%{opacity:0.6}}
+
+/* PROGRESS SECTION */
+.progress-section{width:100%;max-width:860px;}
+.ps-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.ps-raised{font-family:var(--display);font-size:clamp(28px,4vw,48px);
+  background:linear-gradient(90deg,var(--gold),var(--orange));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.ps-cap{font-size:14px;font-weight:600;color:var(--muted);}
+.ps-pct{font-family:var(--display);font-size:clamp(28px,4vw,48px);color:var(--orange);}
+
+.progress-track{height:16px;background:rgba(255,255,255,0.06);border-radius:100px;
+  overflow:hidden;margin-bottom:10px;position:relative;}
+.progress-fill{height:100%;width:73.5%;
+  background:linear-gradient(90deg,var(--red),var(--orange),var(--gold));
+  border-radius:100px;position:relative;transition:width 0.5s ease;}
+.progress-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5));
+  animation:sweep 2s linear infinite;}
+@keyframes sweep{0%{opacity:0;transform:translateX(-40px)}100%{opacity:0;transform:translateX(40px)}}
+
+.ps-markers{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:1px;}
+
+/* STATS ROW */
+.stats-row{display:flex;gap:0;background:rgba(255,107,0,0.04);
+  border:1px solid rgba(255,107,0,0.15);border-radius:14px;overflow:hidden;
+  margin-top:20px;width:100%;max-width:860px;}
+.sr-item{flex:1;padding:16px 0;text-align:center;border-right:1px solid rgba(255,107,0,0.1);}
+.sr-item:last-child{border:none;}
+.sri-val{font-family:var(--display);font-size:clamp(20px,2.5vw,30px);
+  color:var(--white);display:block;line-height:1;}
+.sri-key{font-size:9px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:4px;}
+
+/* BOTTOM CTA */
+.bottom-cta{padding:20px 40px;display:flex;align-items:center;
+  justify-content:center;gap:16px;flex-wrap:wrap;
+  border-top:1px solid rgba(255,107,0,0.15);background:rgba(10,5,0,0.9);}
+.cta-main{padding:18px 52px;background:linear-gradient(135deg,var(--orange),var(--red));
+  color:var(--white);border:none;border-radius:12px;font-family:var(--font);
+  font-size:15px;font-weight:800;letter-spacing:3px;text-transform:uppercase;
+  cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
+.cta-main::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);
+  opacity:0;transition:opacity 0.2s;}
+.cta-main:hover::before{opacity:1;}
+.cta-main:hover{box-shadow:0 0 60px rgba(255,107,0,0.6);transform:translateY(-2px);}
+.cta-ghost{padding:18px 32px;background:transparent;border:1px solid rgba(255,255,255,0.15);
+  color:var(--muted);border-radius:12px;font-family:var(--font);
+  font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.2s;}
+.cta-ghost:hover{border-color:rgba(255,255,255,0.4);color:var(--white);}
+.cta-trust{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.ct-check{color:var(--orange);}
+
+/* PURCHASE TICKER — bottom crawl */
+.ticker-wrap{position:fixed;bottom:0;left:0;right:0;z-index:10;
+  background:rgba(10,5,0,0.97);border-top:1px solid rgba(255,107,0,0.2);
+  padding:8px 0;overflow:hidden;pointer-events:none;}
+.ticker-inner{display:flex;gap:0;white-space:nowrap;animation:tick 28s linear infinite;}
+.tick-item{display:inline-flex;align-items:center;gap:8px;padding:0 28px;font-size:11px;font-weight:600;}
+.ti-flag{font-size:14px;}
+.ti-name{color:var(--muted);}
+.ti-amt{color:var(--gold);font-family:var(--display);font-size:13px;}
+.ti-sep{color:rgba(255,107,0,0.2);font-size:18px;margin:0 8px;}
+@keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* SHARE BTN */
+.share-btn{position:fixed;top:18px;right:40px;z-index:20;
+  padding:8px 18px;background:rgba(255,107,0,0.15);border:1px solid rgba(255,107,0,0.35);
+  color:var(--orange);border-radius:8px;font-size:11px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  font-family:var(--font);transition:all 0.2s;}
+.share-btn:hover{background:rgba(255,107,0,0.25);}
+</style>
+</head>
+<body>
+<canvas id="fire-canvas"></canvas>
+
+<button class="share-btn" onclick="shareThis()">📤 SHARE</button>
+
+<div class="page">
+  <!-- TOP -->
+  <div class="top-strip">
+    <div class="logo">X3STAR</div>
+    <div class="live-pill"><div class="lp-dot"></div>ROUND III — CLOSING</div>
+    <div class="top-price">X3S: <span id="price">--</span> &nbsp;·&nbsp; Next Round: <span id="next-price" style="color:var(--red)">--</span> (<span id="next-premium">--</span>)</div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <div class="closing-label">AT CURRENT PURCHASE VELOCITY, ROUND III CLOSES IN</div>
+
+    <div class="big-clock">
+      <div class="bc-unit"><div class="bc-num" id="cd-d">06</div><div class="bc-label">Days</div></div>
+      <div class="bc-unit"><div class="bc-num" id="cd-h">14</div><div class="bc-label">Hours</div></div>
+      <div class="bc-unit"><div class="bc-num" id="cd-m">32</div><div class="bc-label">Minutes</div></div>
+      <div class="bc-unit"><div class="bc-num" id="cd-s">08</div><div class="bc-label">Seconds</div></div>
+    </div>
+
+    <div class="velocity-line">
+      Selling at <span class="vl-hot" id="vel-rate">--</span> per minute &nbsp;·&nbsp;
+      At this pace, <span class="vl-est" id="vel-est">--</span>
+    </div>
+
+    <div class="progress-section">
+      <div class="ps-row">
+        <div>
+          <div class="ps-raised" id="raised-num">--</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">raised of <span id="hard-cap">--</span> hard cap</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="ps-pct" id="pct-num">--</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">filled</div>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="prog-fill"></div>
+      </div>
+      <div class="ps-markers">
+        <span id="mk-0">--</span><span id="mk-25">--</span><span id="mk-50">--</span>
+        <span style="color:var(--orange);font-weight:700;">◀ YOU ARE HERE</span>
+        <span id="mk-100">--</span>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="sr-item"><span class="sri-val" id="s-investors">--</span><div class="sri-key">Investors In</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-remaining">--</span><div class="sri-key">Remaining</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-ph">--</span><div class="sri-key">$/Minute</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-today">--</span><div class="sri-key">Today So Far</div></div>
+      <div class="sr-item"><span class="sri-val" id="s-wallets">--</span><div class="sri-key">Wallets</div></div>
+      <div class="sr-item"><span class="sri-val" style="color:var(--red)" id="s-genesis-left">--</span><div class="sri-key">Genesis Slots Left</div></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CTA -->
+  <div class="bottom-cta">
+    <button class="cta-main" onclick="location.href='x3star-token-presale.html'">
+      ⬡ SECURE MY ALLOCATION BEFORE IT'S GONE
+    </button>
+    <button class="cta-ghost" onclick="location.href='x3star-validator-presale.html'">
+      Own a Validator Node
+    </button>
+    <div class="cta-trust">
+      <span class="ct-check">✓</span>Audited
+      <span class="ct-check">✓</span>KYC
+      <span class="ct-check">✓</span>Multi-sig
+      <span class="ct-check">✓</span>Instant tokens at TGE
+    </div>
+  </div>
+</div>
+
+<!-- PURCHASE TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker-inner" id="ticker">
+    <span class="tick-item"><span class="ti-flag">🇺🇸</span><span class="ti-name">J. Chen</span><span class="ti-amt">+$25,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇸🇬</span><span class="ti-name">apex.eth</span><span class="ti-amt">+$50,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇩🇪</span><span class="ti-name">M. Braun</span><span class="ti-amt">+$10,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇬🇧</span><span class="ti-name">starfall.eth</span><span class="ti-amt">+$75,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇯🇵</span><span class="ti-name">K. Tanaka</span><span class="ti-amt">+$5,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇦🇪</span><span class="ti-name">gulf_fund</span><span class="ti-amt">+$250,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇨🇦</span><span class="ti-name">A. Patel</span><span class="ti-amt">+$15,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇳🇱</span><span class="ti-name">defi_max</span><span class="ti-amt">+$8,400</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇦🇺</span><span class="ti-name">P. Wilson</span><span class="ti-amt">+$30,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇧🇷</span><span class="ti-name">crypto_rio</span><span class="ti-amt">+$12,000</span></span><span class="ti-sep">|</span>
+    <!-- duplicate for seamless loop -->
+    <span class="tick-item"><span class="ti-flag">🇺🇸</span><span class="ti-name">J. Chen</span><span class="ti-amt">+$25,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇸🇬</span><span class="ti-name">apex.eth</span><span class="ti-amt">+$50,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇩🇪</span><span class="ti-name">M. Braun</span><span class="ti-amt">+$10,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇬🇧</span><span class="ti-name">starfall.eth</span><span class="ti-amt">+$75,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇯🇵</span><span class="ti-name">K. Tanaka</span><span class="ti-amt">+$5,000</span></span><span class="ti-sep">|</span>
+    <span class="tick-item"><span class="ti-flag">🇦🇪</span><span class="ti-name">gulf_fund</span><span class="ti-amt">+$250,000</span></span>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "command_run": "x3-proof verify x3.x3vm.full_proof",
+  "artifact_hash": "9169f1457fef9bc20f6a845c6a5f9215d19a917e163cd6008f0c2a45d5fe36ae",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "crates/x3-vm/Cargo.toml",
+    "crates/x3-vm/src/vm.rs",
+    "crates/x3-vm/src/bridge.rs",
+    "proof/receipts/claims/x3.x3vm.determinism.receipt.json"
+  ],
+  "timestamp": "2026-05-02T02:00:32.480617577Z",
+  "result": {
+    "claim_id": "x3.x3vm.full_proof",
+    "claim": "X3VM determinism and execution artifacts are present",
+    "status": "verified",
+    "proof_level": "P6",
+    "edge_case_level": "E7",
+    "hack_level": "H8",
+    "operator_level": "I7",
+    "degraded_level": "D6",
+    "files_inspected": [
+      "crates/x3-vm/Cargo.toml",
+      "crates/x3-vm/src/vm.rs",
+      "crates/x3-vm/src/bridge.rs",
+      "proof/receipts/claims/x3.x3vm.determinism.receipt.json"
+    ],
+    "commands_run": [
+      "cargo check -p x3-vm --quiet"
+    ],
+    "passed_checks": [
+      "x3-vm crate manifest exists",
+      "x3-vm execution core exists",
+      "x3-vm bridge integration module exists",
+      "x3vm determinism receipt exists",
+      "x3-vm executable check passed"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "crates/x3-vm/Cargo.toml": "true",
+      "crates/x3-vm/src/bridge.rs": "true",
+      "proof/receipts/claims/x3.x3vm.determinism.receipt.json": "true",
+      "x3vm_check": "true",
+      "crates/x3-vm/src/vm.rs": "true"
+    },
+    "timestamp": "2026-05-02T02:00:32.473703147Z",
+    "duration_ms": 1836
+  },
+  "limitations": [],
+  "binding_hash": "b960287dda0490cc796b698d373fd67651072ede9ef1eb4efbd9b6328f353c88"
+}

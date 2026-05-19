@@ -1,0 +1,52 @@
+# StarShield Quantum Red Team Policy
+
+# This policy defines the safe scope and purpose of X3 Atomic Star's quantum readiness red-team program.
+
+name: "StarShield Quantum Red Team Policy"
+version: "1.0.0"
+last_updated: "2026-05-10"
+
+purpose:
+  - "Define the safe adversarial scope for quantum readiness testing."
+  - "Ensure StarShield is defensive, evidence-driven, and compliant."
+  - "Prevent offensive or unauthorized quantum attack activities."
+
+scope:
+  allowed:
+    - "Scanning X3 code, config, docs, and testnet systems for quantum-vulnerable cryptography."
+    - "Modeling post-quantum migration paths for validator keys, bridge attestations, wallet signatures, and governance signing."
+    - "Publishing readiness reports, exposure scores, and migration plans."
+    - "Comparing publicly verifiable claim strength without attacking external systems."
+    - "Building safe threat models, red-team exercises, and internal adversarial simulations for X3's own infrastructure."
+  prohibited:
+    - "Building offensive attack tools against third-party chains, wallets, validators, or infrastructure."
+    - "Attempting private key extraction or cryptographic key cracking."
+    - "Targeting live external networks, bridges, or accounts."
+    - "Claiming X3 is quantum-safe or quantum-proof without formal evidence and independent audit."
+    - "Publishing unsupported claims about competitor security or quantum readiness."
+
+requirements:
+  - "Any public quantum readiness claim must have a matching claim registry entry."
+  - "Any claim with status VERIFIED must reference receipts in `proof/receipts/claims/`."
+  - "All StarShield reports must include evidence sources, proof receipt references, and claim-check metadata."
+  - "StarShield must use NIST-aligned terminology where possible."
+
+naming:
+  - "StarShield Quantum Red Team"
+  - "Quantum Readiness Console"
+  - "Quantum Exposure Score"
+  - "ProofForge Readiness Report"
+  - "X3 Quantum War Room" (internal)
+
+reporting:
+  - "crypto_inventory.md"
+  - "quantum_exposure_score.md"
+  - "pqc_migration_plan.md"
+  - "validator_key_rotation_report.md"
+  - "bridge_attestation_report.md"
+  - "quantum_readiness_report.md"
+
+public_guidance:
+  - "Use language like 'post-quantum migration roadmap' and 'NIST-aligned readiness'."
+  - "Avoid language like 'quantum-safe', 'quantum-proof', or 'fully quantum-resistant' without audit evidence."
+  - "Frame StarShield as a defensive readiness program, not an offensive hacking tool."

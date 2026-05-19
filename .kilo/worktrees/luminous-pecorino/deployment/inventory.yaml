@@ -1,0 +1,193 @@
+# X3 Chain hardware-backed deployment inventory
+#
+# This file reflects the currently known operator-owned hardware and the
+# minimum public-testnet extension discussed in docs/deployment/HARDWARE_ROLE_PLAN.md.
+#
+# Fill in the null management/public addresses before using these hosts for
+# real deployment work. Do not replace them with invented values.
+
+metadata:
+  generated_for: x3-chain testnet planning
+  updated_at: 2026-04-04
+  source_of_truth: docs/deployment/HARDWARE_ROLE_PLAN.md
+  status: partial
+  notes:
+    - Rack hardware is real and assigned to roles.
+    - Exact IPs, NIC mappings, and final DNS records still need operator confirmation.
+    - A credible public testnet still requires at least two remote validators in separate regions.
+
+local_lab:
+  authorities:
+    - logical_name: validator-01
+      host_id: x3-lab-val-01
+      machine: Lenovo System x3550 M5 #1
+      role: bootnode + validator
+      confidence: medium
+      ssh_user: null
+      management_ip: null
+      p2p_ip: null
+      public_ip: null
+      p2p_port: 30333
+      rpc_port: null
+      metrics_port: 9615
+      storage_class: unknown
+      notes:
+        - First local authority during lab proving.
+        - Initial bootnode during bring-up.
+    - logical_name: validator-02
+      host_id: x3-lab-val-02
+      machine: Lenovo System x3550 M5 #2
+      role: validator
+      confidence: medium
+      ssh_user: null
+      management_ip: null
+      p2p_ip: null
+      public_ip: null
+      p2p_port: 30333
+      rpc_port: null
+      metrics_port: 9615
+      storage_class: unknown
+      notes:
+        - Second local authority.
+        - Candidate hot spare during public operations.
+    - logical_name: validator-03
+      host_id: x3-lab-val-03
+      machine: Threadripper 1900X workstation
+      role: validator during lab proving only
+      confidence: high
+      ssh_user: null
+      management_ip: null
+      p2p_ip: null
+      public_ip: null
+      p2p_port: 30333
+      rpc_port: null
+      metrics_port: 9615
+      storage_class: nvme
+      notes:
+        - 64 GB RAM, 4x GTX 1070, about 2 TB NVMe.
+        - Move this host out of the authority set once public testnet starts.
+
+  support_nodes:
+    - logical_name: rpc-01
+      host_id: x3-lab-rpc-01
+      machine: HP DL380p Gen8
+      role: rpc + prometheus + grafana
+      confidence: low
+      ssh_user: null
+      management_ip: null
+      public_ip: null
+      rpc_port: 9944
+      metrics_port: 9615
+      grafana_port: 3000
+      notes:
+        - Public RPC should terminate here, not on validators.
+    - logical_name: dr-01
+      host_id: x3-lab-dr-01
+      machine: Dell R710
+      role: restore target + cold or warm spare
+      confidence: low
+      ssh_user: null
+      management_ip: null
+      public_ip: null
+      notes:
+        - Keep off the authority path until sustained sync and restart tests pass.
+    - logical_name: ops-01
+      host_id: x3-lab-ops-01
+      machine: Apple Xserve
+      role: artifact mirror + backup + long-retention logs
+      confidence: low
+      ssh_user: null
+      management_ip: null
+      public_ip: null
+      notes:
+        - Remove from the operational path if software support is weak.
+
+public_testnet_minimum:
+  authorities:
+    - logical_name: validator-01
+      host_id: x3-lab-val-01
+      site: local-site
+      role: validator
+      ssh_user: null
+      public_ip: null
+      notes:
+        - Keep only if local power and connectivity are stable.
+    - logical_name: validator-02
+      host_id: remote-vps-a
+      site: remote-site-a
+      role: validator
+      ssh_user: null
+      public_ip: null
+      notes:
+        - Far-away VPS can fit here if it meets CPU, RAM, storage, and network requirements.
+    - logical_name: validator-03
+      host_id: remote-vps-b
+      site: remote-site-b
+      role: validator
+      ssh_user: null
+      public_ip: null
+      notes:
+        - Must be a second remote site, not the same region as remote-vps-a.
+
+  non_authority_nodes:
+    - logical_name: seed-01
+      host_id: x3-lab-val-02
+      site: local-site
+      role: non-authority bootnode or spare validator
+      ssh_user: null
+      public_ip: null
+    - logical_name: rpc-01
+      host_id: x3-lab-rpc-01
+      site: local-site
+      role: public rpc + monitoring
+      ssh_user: null
+      public_ip: null
+    - logical_name: gpu-canary-01
+      host_id: x3-lab-val-03
+      site: local-site
+      role: gpu canary + build host
+      ssh_user: null
+      public_ip: null
+
+dns_records:
+  - name: bootnode.testnet.x3-chain.io
+    type: A
+    value: null
+    source_host: seed-01
+  - name: rpc.testnet.x3-chain.io
+    type: A
+    value: null
+    source_host: rpc-01
+  - name: metrics.testnet.x3-chain.io
+    type: A
+    value: null
+    source_host: rpc-01
+
+firewall_policy:
+  ssh:
+    port: 22
+    protocol: tcp
+    source: operator-source-ips-only
+  p2p:
+    port: 30333
+    protocol: tcp
+    source: validator-peers-and-approved-seeds
+  rpc:
+    port: 9944
+    protocol: tcp
+    source: public-only-on-rpc-hosts
+  metrics:
+    port: 9615
+    protocol: tcp
+    source: vpn-or-management-network-only
+  grafana:
+    port: 3000
+    protocol: tcp
+    source: vpn-or-management-network-only
+
+required_truth_pass:
+  - Confirm CPU model, RAM size, storage type, and NIC speed for both Lenovo servers.
+  - Confirm CPU model, RAM size, storage type, and NIC speed for the DL380p and R710.
+  - Confirm the Xserve can still run a supported OS and stable storage stack.
+  - Fill in ssh_user and real management or public addresses for every host in use.
+  - Confirm which remote VPS hosts will carry validator-02 and validator-03 for public testnet.

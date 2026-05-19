@@ -1,0 +1,33 @@
+{
+  "name": "@x3-chain/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./config": "./config/chain.ts",
+    "./providers": "./providers/index.ts",
+    "./components": "./components/index.ts",
+    "./hooks": "./hooks/index.ts"
+  },
+  "peerDependencies": {
+    "@polkadot/api": "^14.0.1",
+    "framer-motion": "^12.23.26",
+    "react": "^18.0.0"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.26",
+    "lucide-react": "^0.460.0"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^14.1.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@types/jest": "^29.5.3",
+    "jest": "^29.7.0"
+  }
+}

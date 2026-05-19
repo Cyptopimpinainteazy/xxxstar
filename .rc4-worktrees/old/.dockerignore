@@ -1,0 +1,80 @@
+# .dockerignore - Exclude files from Docker build context
+# Reduces build time and image size by not copying unnecessary files
+
+# Version Control
+.git
+.github
+.gitignore
+.gitattributes
+
+# Build Artifacts & Cache
+# target/        # COMMENTED OUT - Need release binaries for Docker
+target/debug
+target/doc
+*.rlib
+*.rmeta
+.cargo
+
+# IDE & Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+.editorconfig
+
+# Documentation & Assets
+docs/
+*.md
+README.md
+LICENSE
+CHANGELOG.md
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+.circleci
+
+# Testing
+tests/
+test_output/
+*.test
+coverage/
+
+# Temporary & Log Files
+/tmp
+*.log
+*.tmp
+*.lock
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Kubernetes
+*.yaml
+*.yml
+k8s/
+helm/
+
+# Security
+.env
+.env.local
+*.key
+*.pem
+secrets/
+.ssh
+
+# Package Managers
+Cargo.lock
+package-lock.json
+yarn.lock
+
+# OS Specific
+.DS_Store
+Thumbs.db
+.directory

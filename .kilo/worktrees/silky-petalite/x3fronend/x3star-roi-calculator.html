@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Validator ROI Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0C0C10;--card:rgba(16,16,22,0.98);
+  --border:rgba(255,215,0,0.12);
+  --gold:#FFD700;--gold2:#FF9500;--gold3:#FFF4B0;
+  --text:#F8F8FF;--muted:#3A3A50;
+  --body:'Outfit',sans-serif;--mono:'Fira Code',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;}
+nav{position:sticky;top:0;z-index:100;height:60px;display:flex;align-items:center;
+  padding:0 32px;background:rgba(12,12,16,0.98);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);}
+.logo{font-size:20px;font-weight:900;letter-spacing:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:auto;}
+.nav-cta{padding:9px 24px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#000;font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  cursor:pointer;border:none;}
+.page{max-width:900px;margin:0 auto;padding:50px 32px 80px;}
+.page-title{font-size:clamp(28px,4vw,48px);font-weight:900;letter-spacing:-1px;margin-bottom:8px;}
+.page-title span{color:var(--gold);}
+.page-sub{font-size:16px;color:var(--muted);margin-bottom:30px;}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px;}
+.panel h2{font-size:18px;margin-bottom:10px;}
+.panel p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px;}
+.panel .cta{padding:14px 22px;border-radius:12px;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#000;border:none;font-weight:800;letter-spacing:2px;text-transform:uppercase;cursor:pointer;}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">X3STAR</div>
+  <a style="font-size:12px;letter-spacing:2px;color:var(--muted);text-decoration:none;text-transform:uppercase;margin-right:20px;cursor:pointer;" href="x3star-landing.html">← Back</a>
+  <button class="nav-cta" onclick="location.href='x3star-validator-presale.html'">Reserve Your Node →</button>
+</nav>
+
+<div class="page">
+  <h1 class="page-title">Validator <span>ROI Calculator</span></h1>
+  <p class="page-sub">This calculator is being wired to real staking and presale data feeds. We will re-enable it once all inputs are sourced from the live backend.</p>
+
+  <div class="panel">
+    <h2>Status</h2>
+    <p>Inputs such as tier pricing, APY, token price, and emissions must be authoritative before ROI results are displayed. Until those feeds are live, this page shows no synthetic projections.</p>
+    <button class="cta" onclick="location.href='x3star-staking.html'">View live staking data</button>
+  </div>
+</div>
+
+<script>
+if (window.X3PageAdapters) {
+  window.X3PageAdapters.start();
+}
+</script>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

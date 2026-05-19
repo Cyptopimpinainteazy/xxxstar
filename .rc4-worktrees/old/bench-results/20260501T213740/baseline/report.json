@@ -1,0 +1,13 @@
+{
+  "global": {
+    "baseline_compile_us": 249,
+    "baseline_tps": 32128.51,
+    "bytes": 1040,
+    "gas": 771,
+    "instr": 155,
+    "mode": "Baseline",
+    "optimized_compile_us": 326,
+    "optimized_tps": 24539.88,
+    "samples": 8
+  }
+}

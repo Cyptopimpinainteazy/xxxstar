@@ -1,0 +1,14 @@
+[build]
+# Using default gcc linker
+# rustflags = ["-C", "linker=clang"]
+
+[env]
+# Environment variables for compilation
+CC = { value = "gcc", relative = false }
+CXX = { value = "g++", relative = false }
+# Reduced optimization for faster builds and fewer compiler crashes
+CFLAGS = { value = "-O2 -fPIC", relative = false }
+CXXFLAGS = { value = "-O2 -fPIC", relative = false }
+
+[target.x86_64-unknown-linux-gnu]
+linker = "gcc"

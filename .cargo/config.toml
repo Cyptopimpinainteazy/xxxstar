@@ -1,0 +1,17 @@
+[profile.dev]
+codegen-units = 256
+incremental = true
+
+[profile.release]
+codegen-units = 16
+incremental = false
+lto = false
+
+
+# Vendor replacement disabled for RC1: the vendor/ tree is pinned to libp2p 0.51,
+# but stable2512 sc-network requires libp2p 0.54.1. Re-vendor after RC1 ships.
+# [source.crates-io]
+# replace-with = "vendored-sources"
+#
+# [source.vendored-sources]
+# directory = "vendor"

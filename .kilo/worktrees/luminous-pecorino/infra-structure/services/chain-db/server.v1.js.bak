@@ -1,0 +1,291 @@
+#!/usr/bin/env node
+/**
+ * X3 Chain — Chain Database API Server
+ *
+ * High-performance REST API serving 60,000+ blockchain chain data from SQLite.
+ * Powers the inferstructor dashboard chain explorer.
+ *
+ * Endpoints:
+ *   GET  /api/chains                  — Paginated chain listing with filters
+ *   GET  /api/chains/search?q=        — Full-text search across chains
+ *   GET  /api/chains/:chainId         — Single chain detail with RPC + GPU stats
+ *   GET  /api/chains/stats/overview   — Aggregate ecosystem statistics
+ *   GET  /api/chains/stats/ecosystems — Ecosystem breakdown
+ *   GET  /api/rpc/:chainId            — RPC endpoints for a chain
+ *   GET  /api/gpu-stats/:chainId      — GPU validation stats for a chain
+ *   GET  /health                      — Health check
+ */
+
+const express = require('express');
+const cors = require('cors');
+const Database = require('better-sqlite3');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.CHAIN_DB_PORT || 7070;
+const DB_PATH = process.env.CHAIN_DB_PATH || path.join(__dirname, '..', '..', 'db', 'chains.db');
+
+app.use(cors());
+app.use(express.json());
+
+// ── Database connection ──────────────────────────────────────────────────────
+
+let db;
+try {
+  db = new Database(DB_PATH);
+  db.pragma('journal_mode = WAL');
+  db.pragma('cache_size = -64000'); // 64MB cache
+  db.pragma('query_only = ON');     // prevent accidental writes via API
+  const count = db.prepare('SELECT COUNT(*) as cnt FROM chains').get();
+  console.log(`✓ Chain DB connected: ${count.cnt.toLocaleString()} chains loaded from ${DB_PATH}`);
+} catch (err) {
+  console.error(`✗ Failed to open chain database at ${DB_PATH}:`, err.message);
+  process.exit(1);
+}
+
+// ── Prepared statements (perf optimization) ──────────────────────────────────
+
+const stmts = {
+  listChains: db.prepare(`
+    SELECT chain_id, chain_name, chain_numeric_id, ecosystem, chain_type,
+           consensus, native_token, is_evm, is_svm, is_testnet,
+           supports_gpu, status
+    FROM chains
+    WHERE (:ecosystem IS NULL OR ecosystem = :ecosystem)
+      AND (:chain_type IS NULL OR chain_type = :chain_type)
+      AND (:status IS NULL OR status = :status)
+      AND (:is_evm IS NULL OR is_evm = :is_evm)
+      AND (:is_svm IS NULL OR is_svm = :is_svm)
+      AND (:is_testnet IS NULL OR is_testnet = :is_testnet)
+    ORDER BY chain_name
+    LIMIT :limit OFFSET :offset
+  `),
+
+  countChains: db.prepare(`
+    SELECT COUNT(*) as total
+    FROM chains
+    WHERE (:ecosystem IS NULL OR ecosystem = :ecosystem)
+      AND (:chain_type IS NULL OR chain_type = :chain_type)
+      AND (:status IS NULL OR status = :status)
+      AND (:is_evm IS NULL OR is_evm = :is_evm)
+      AND (:is_svm IS NULL OR is_svm = :is_svm)
+      AND (:is_testnet IS NULL OR is_testnet = :is_testnet)
+  `),
+
+  searchChains: db.prepare(`
+    SELECT c.chain_id, c.chain_name, c.chain_numeric_id, c.ecosystem, c.chain_type,
+           c.consensus, c.native_token, c.is_evm, c.is_svm, c.is_testnet,
+           c.supports_gpu, c.status
+    FROM chains_fts fts
+    JOIN chains c ON c.chain_id = fts.chain_id
+    WHERE chains_fts MATCH :query
+    ORDER BY rank
+    LIMIT :limit
+  `),
+
+  getChain: db.prepare(`
+    SELECT * FROM chains WHERE chain_id = ?
+  `),
+
+  getRpcEndpoints: db.prepare(`
+    SELECT * FROM rpc_endpoints WHERE chain_id = ? ORDER BY is_primary DESC
+  `),
+
+  getGpuStats: db.prepare(`
+    SELECT * FROM gpu_validation_stats WHERE chain_id = ?
+  `),
+
+  getMetrics: db.prepare(`
+    SELECT * FROM chain_metrics WHERE chain_id = ? ORDER BY measured_at DESC LIMIT 1
+  `),
+
+  ecosystemStats: db.prepare(`
+    SELECT ecosystem,
+           COUNT(*) as chain_count,
+           SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+           SUM(CASE WHEN is_testnet = 1 THEN 1 ELSE 0 END) as testnets,
+           SUM(CASE WHEN supports_gpu = 1 THEN 1 ELSE 0 END) as gpu_enabled
+    FROM chains
+    GROUP BY ecosystem
+    ORDER BY chain_count DESC
+  `),
+
+  overviewStats: db.prepare(`
+    SELECT
+      COUNT(*) as total_chains,
+      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_chains,
+      SUM(CASE WHEN is_evm = 1 THEN 1 ELSE 0 END) as evm_chains,
+      SUM(CASE WHEN is_svm = 1 THEN 1 ELSE 0 END) as svm_chains,
+      SUM(CASE WHEN is_testnet = 1 THEN 1 ELSE 0 END) as testnets,
+      SUM(CASE WHEN supports_gpu = 1 THEN 1 ELSE 0 END) as gpu_enabled,
+      COUNT(DISTINCT ecosystem) as ecosystems,
+      COUNT(DISTINCT chain_type) as chain_types
+    FROM chains
+  `),
+
+  chainTypeBreakdown: db.prepare(`
+    SELECT chain_type, COUNT(*) as count
+    FROM chains
+    GROUP BY chain_type
+    ORDER BY count DESC
+  `),
+
+  consensusBreakdown: db.prepare(`
+    SELECT consensus, COUNT(*) as count
+    FROM chains
+    GROUP BY consensus
+    ORDER BY count DESC
+  `),
+
+  recentChains: db.prepare(`
+    SELECT chain_id, chain_name, ecosystem, chain_type, status
+    FROM chains
+    ORDER BY created_at DESC
+    LIMIT ?
+  `),
+};
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
+// Health check
+app.get('/health', (_req, res) => {
+  const count = db.prepare('SELECT COUNT(*) as cnt FROM chains').get();
+  res.json({
+    status: 'healthy',
+    service: 'x3-chain-db',
+    chains_loaded: count.cnt,
+    db_path: DB_PATH,
+  });
+});
+
+// GET /api/chains — Paginated listing with filters
+app.get('/api/chains', (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
+
+  const filters = {
+    ecosystem: req.query.ecosystem || null,
+    chain_type: req.query.chain_type || null,
+    status: req.query.status || null,
+    is_evm: req.query.is_evm != null ? parseInt(req.query.is_evm) : null,
+    is_svm: req.query.is_svm != null ? parseInt(req.query.is_svm) : null,
+    is_testnet: req.query.is_testnet != null ? parseInt(req.query.is_testnet) : null,
+    limit,
+    offset,
+  };
+
+  const chains = stmts.listChains.all(filters);
+  const { total } = stmts.countChains.get(filters);
+
+  res.json({
+    chains,
+    pagination: {
+      page,
+      limit,
+      total,
+      total_pages: Math.ceil(total / limit),
+      has_next: page * limit < total,
+      has_prev: page > 1,
+    },
+  });
+});
+
+// GET /api/chains/search?q=ethereum
+app.get('/api/chains/search', (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) {
+    return res.status(400).json({ error: 'Query parameter "q" is required' });
+  }
+
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+
+  // FTS5 query — support both prefix match and quoted exact match
+  const ftsQuery = q.includes('"') ? q : `${q}*`;
+
+  try {
+    const chains = stmts.searchChains.all({ query: ftsQuery, limit });
+    res.json({ query: q, results: chains, count: chains.length });
+  } catch (err) {
+    // Fallback to LIKE if FTS fails
+    const fallback = db.prepare(`
+      SELECT chain_id, chain_name, chain_numeric_id, ecosystem, chain_type,
+             consensus, native_token, is_evm, is_svm, is_testnet,
+             supports_gpu, status
+      FROM chains
+      WHERE chain_name LIKE ? OR chain_id LIKE ?
+      ORDER BY chain_name
+      LIMIT ?
+    `).all(`%${q}%`, `%${q}%`, limit);
+    res.json({ query: q, results: fallback, count: fallback.length, fallback: true });
+  }
+});
+
+// GET /api/chains/stats/overview
+app.get('/api/chains/stats/overview', (_req, res) => {
+  const overview = stmts.overviewStats.get();
+  const ecosystems = stmts.ecosystemStats.all();
+  const chainTypes = stmts.chainTypeBreakdown.all();
+  const consensus = stmts.consensusBreakdown.all();
+
+  res.json({ overview, ecosystems, chain_types: chainTypes, consensus });
+});
+
+// GET /api/chains/stats/ecosystems
+app.get('/api/chains/stats/ecosystems', (_req, res) => {
+  const ecosystems = stmts.ecosystemStats.all();
+  res.json({ ecosystems });
+});
+
+// GET /api/chains/recent?limit=20
+app.get('/api/chains/recent', (req, res) => {
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+  const chains = stmts.recentChains.all(limit);
+  res.json({ chains });
+});
+
+// GET /api/chains/:chainId — Full chain detail
+app.get('/api/chains/:chainId', (req, res) => {
+  const chain = stmts.getChain.get(req.params.chainId);
+  if (!chain) {
+    return res.status(404).json({ error: 'Chain not found', chain_id: req.params.chainId });
+  }
+
+  const rpc_endpoints = stmts.getRpcEndpoints.all(req.params.chainId);
+  const gpu_stats = stmts.getGpuStats.get(req.params.chainId);
+  const latest_metrics = stmts.getMetrics.get(req.params.chainId);
+
+  res.json({ ...chain, rpc_endpoints, gpu_stats, latest_metrics });
+});
+
+// GET /api/rpc/:chainId
+app.get('/api/rpc/:chainId', (req, res) => {
+  const endpoints = stmts.getRpcEndpoints.all(req.params.chainId);
+  res.json({ chain_id: req.params.chainId, endpoints, count: endpoints.length });
+});
+
+// GET /api/gpu-stats/:chainId
+app.get('/api/gpu-stats/:chainId', (req, res) => {
+  const stats = stmts.getGpuStats.get(req.params.chainId);
+  if (!stats) {
+    return res.status(404).json({ error: 'No GPU stats for chain', chain_id: req.params.chainId });
+  }
+  res.json(stats);
+});
+
+// ── Error handler ────────────────────────────────────────────────────────────
+
+app.use((err, _req, res, _next) => {
+  console.error('API Error:', err);
+  res.status(500).json({ error: 'Internal server error', message: err.message });
+});
+
+// ── Start ────────────────────────────────────────────────────────────────────
+
+app.listen(PORT, () => {
+  console.log(`\n🔗 X3 Chain DB API running on http://localhost:${PORT}`);
+  console.log(`   Health: http://localhost:${PORT}/health`);
+  console.log(`   Chains: http://localhost:${PORT}/api/chains`);
+  console.log(`   Search: http://localhost:${PORT}/api/chains/search?q=ethereum`);
+  console.log(`   Stats:  http://localhost:${PORT}/api/chains/stats/overview\n`);
+});

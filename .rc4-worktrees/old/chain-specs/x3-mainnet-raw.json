@@ -1,0 +1,10 @@
+{
+  "name": "X3 Mainnet RC Raw",
+  "id": "x3_mainnet_rc_raw",
+  "chainType": "Live",
+  "notes": {
+    "target": "v0.4 Internal-Only Mainnet RC",
+    "ExternalBridgesEnabled": false,
+    "status": "Generated placeholder. Regenerate with scripts/mainnet/generate_mainnet_chain_spec.sh before launch."
+  }
+}

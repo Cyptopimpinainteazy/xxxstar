@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Transparency Ledger</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAFAFA;--white:#FFFFFF;--ink:#111118;
+  --muted:#6B6B7A;--dim:#F0F0F4;--border:#E2E2EA;
+  --green:#047857;--green-bg:#F0FDF4;--green-border:#BBF7D0;
+  --red:#B91C1C;--red-bg:#FEF2F2;--red-border:#FECACA;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;
+  --gold:#92400E;--gold-bg:#FFFBEB;--gold-border:#FDE68A;
+  --body:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);min-height:100vh;}
+
+/* NAV */
+nav{height:56px;background:var(--white);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 40px;gap:32px;position:sticky;top:0;z-index:50;}
+.logo{font-weight:700;font-size:16px;letter-spacing:2px;color:var(--ink);}
+.logo span{color:var(--gold);}
+.nav-sep{width:1px;height:20px;background:var(--border);}
+.nav-sub{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0.5px;}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:16px;}
+.verified-badge{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  color:var(--green);background:var(--green-bg);border:1px solid var(--green-border);
+  padding:5px 12px;border-radius:4px;}
+.vb-check{font-size:14px;}
+.nav-btn{padding:8px 20px;background:var(--ink);color:var(--white);border:none;
+  border-radius:4px;font-size:12px;font-weight:600;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;font-family:var(--body);transition:all 0.2s;}
+.nav-btn:hover{background:#2A2A35;}
+
+/* PAGE */
+.page{max-width:1100px;margin:0 auto;padding:40px 40px 80px;}
+.page-header{margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);}
+.ph-eyebrow{font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;}
+.ph-title{font-size:32px;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px;}
+.ph-desc{font-size:15px;color:var(--muted);line-height:1.6;max-width:640px;}
+.ph-note{margin-top:16px;padding:12px 16px;background:var(--blue-bg);border-left:3px solid var(--blue);
+  font-size:12px;color:var(--blue);line-height:1.6;}
+
+/* SUMMARY CARDS */
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:8px;
+  overflow:hidden;margin-bottom:40px;}
+.sc{background:var(--white);padding:20px 24px;}
+.sc-label{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;}
+.sc-val{font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* SECTION */
+.section{margin-bottom:40px;}
+.section-header{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.sec-title{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.sec-total{font-family:var(--mono);font-size:14px;font-weight:600;}
+
+/* LEDGER TABLE */
+.ledger{width:100%;border-collapse:collapse;font-size:13px;}
+.ledger thead th{text-align:left;font-size:10px;font-weight:600;letter-spacing:2px;
+  text-transform:uppercase;color:var(--muted);padding:8px 12px;
+  background:var(--dim);border-bottom:1px solid var(--border);}
+.ledger thead th:last-child{text-align:right;}
+.ledger tbody tr{border-bottom:1px solid var(--border);transition:background 0.15s;}
+.ledger tbody tr:hover{background:#F7F7FA;}
+.ledger td{padding:14px 12px;vertical-align:middle;}
+.ledger td:last-child{text-align:right;}
+.l-date{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;}
+.l-desc{font-weight:500;}
+.l-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.l-cat{font-size:9px;font-weight:600;letter-spacing:1.5px;padding:3px 8px;
+  border-radius:3px;text-transform:uppercase;display:inline-block;}
+.lc-in{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
+.lc-out{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
+.lc-escrow{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-border);}
+.l-amount{font-family:var(--mono);font-weight:600;font-size:14px;white-space:nowrap;}
+.l-in{color:var(--green);}
+.l-out{color:var(--red);}
+.l-chain{display:flex;align-items:center;gap:6px;margin-top:3px;}
+.lc-hash{font-family:var(--mono);font-size:10px;color:var(--blue);cursor:pointer;
+  text-decoration:underline;text-decoration-style:dotted;}
+.lc-verified{font-size:10px;color:var(--green);}
+
+/* MULTI-SIG TABLE */
+.msig-row{display:flex;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+.ms-sig{width:28px;height:28px;border-radius:50%;background:var(--dim);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+  color:var(--muted);border:2px solid var(--border);flex-shrink:0;}
+.ms-sig.signed{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.ms-name{font-size:12px;font-weight:500;flex:1;}
+.ms-addr{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.ms-date{font-size:10px;color:var(--muted);}
+
+/* ALLOCATION BAR CHART */
+.alloc-row{display:flex;flex-direction:column;gap:10px;}
+.ar-item{display:flex;align-items:center;gap:12px;}
+.ar-label{font-size:12px;font-weight:500;width:140px;flex-shrink:0;}
+.ar-bar-wrap{flex:1;height:8px;background:var(--dim);border-radius:4px;overflow:hidden;}
+.ar-bar{height:100%;border-radius:4px;transition:width 1.5s ease;}
+.ar-val{font-family:var(--mono);font-size:11px;font-weight:600;width:80px;text-align:right;flex-shrink:0;}
+.ar-pct{font-size:11px;color:var(--muted);width:32px;text-align:right;flex-shrink:0;}
+
+/* LIVE INDICATOR */
+.live-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green);margin-bottom:8px;}
+.lr-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* FOOTER */
+.footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);
+  font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3<span>STAR</span></div>
+  <div class="nav-sep"></div>
+  <div class="nav-sub">Transparency Ledger</div>
+  <div class="nav-right">
+    <div class="verified-badge"><span class="vb-check">✓</span> All entries verified on-chain</div>
+    <button class="nav-btn" onclick="location.href='x3star-token-presale.html'">Invest Now</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="ph-eyebrow">Financial Transparency · Updated in Real Time</div>
+    <h1 class="ph-title">Every Dollar. On the Record.</h1>
+    <p class="ph-desc">X3STAR publishes a full, line-by-line accounting of every dollar raised, every dollar spent, and every multi-sig transaction — verified on-chain. No exceptions. No surprises.</p>
+    <div class="ph-note">
+      <strong>How to verify:</strong> Every transaction below links directly to the X3STAR blockchain explorer. You can independently verify any entry. Treasury wallet: <span style="font-family:var(--mono);font-weight:600;">0x4F2a...9D1E</span> &nbsp;·&nbsp; Multi-sig: 4-of-7 signers required · Custodian: Fireblocks
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-grid">
+    <div class="sc">
+      <div class="sc-label">Total Raised</div>
+      <div class="sc-val" style="color:var(--green)" id="sum-raised">--</div>
+      <div class="sc-sub">Across all rounds</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Total Spent</div>
+      <div class="sc-val" style="color:var(--red)">--</div>
+      <div class="sc-sub">Verified expenditures</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Treasury Balance</div>
+      <div class="sc-val" id="sum-treasury">--</div>
+      <div class="sc-sub">In multi-sig escrow</div>
+    </div>
+    <div class="sc">
+      <div class="sc-label">Burn Rate</div>
+      <div class="sc-val">--</div>
+      <div class="sc-sub">~10 months runway</div>
+    </div>
+  </div>
+
+  <!-- INFLOWS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="sec-title">Inflows — Capital Raised</span>
+      <span class="sec-total" style="color:var(--green)" id="inflows-total">--</span>
+    </div>
+    <table class="ledger">
+      <thead><tr>
+        <th>Date</th><th>Description</th><th>Category</th><th>On-Chain</th><th>Amount</th>
+      </tr></thead>
+      <tbody id="ledger-inflows">
+        <tr>
+          <td class="l-date">--</td>
+          <td><div class="l-desc">Loading inflow ledger…</div><div class="l-sub">Data is sourced from the X3 business store.</div></td>
+          <td><span class="l-cat lc-in">RAISE</span></td>
+          <td><div class="l-chain"><span class="lc-hash">n/a</span></div></td>
+          <td class="l-amount l-in">--</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- OUTFLOWS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="sec-title">Outflows — Expenditures</span>
+      <span class="sec-total" style="color:var(--red)" id="outflows-total">--</span>
+    </div>
+    <div class="live-row"><div class="lr-dot"></div>Updated monthly · Last updated March 1, 2026</div>
+    <table class="ledger">
+      <thead><tr>
+        <th>Date</th><th>Description</th><th>Category</th><th>On-Chain</th><th>Amount</th>
+      </tr></thead>
+      <tbody id="ledger-outflows">
+        <tr>
+          <td class="l-date">--</td>
+          <td><div class="l-desc">No outflow ledger is published in the live store yet.</div><div class="l-sub">This table will populate once finance events are available.</div></td>
+          <td><span class="l-cat lc-out">OUTFLOW</span></td>
+          <td><div class="l-chain"><span class="lc-hash">n/a</span></div></td>
+          <td class="l-amount l-out">--</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ALLOCATION -->
+  <div class="section">
+    <div class="section-header">
+      <span class="sec-title">Treasury Allocation Plan</span>
+      <span class="sec-total">Pending</span>
+    </div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;">
+      Allocation targets are published only after governance approval. This panel remains empty until the live
+      treasury plan is available through the X3 business store.
+    </div>
+  </div>
+
+  <!-- MULTI-SIG SIGNERS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="sec-title">Multi-Sig Signers</span>
+      <span class="sec-total" style="font-size:12px;color:var(--muted)">Loaded from live store</span>
+    </div>
+    <div id="multisig-list">
+      <div class="msig-row">
+        <div class="ms-sig">--</div>
+        <div>
+          <div class="ms-name">Loading signers…</div>
+          <div class="ms-addr">n/a</div>
+        </div>
+        <div class="ms-date" style="margin-left:auto">unverified</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>X3STAR Transparency Ledger · Updated automatically · All on-chain references independently verifiable</div>
+    <div>Last verified: <span style="font-family:var(--mono)" id="last-verified">—</span></div>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+// Animate allocation bars on load
+setTimeout(()=>document.querySelectorAll('.ar-bar').forEach(b=>{const w=b.style.width;b.style.width='0';setTimeout(()=>b.style.width=w,100);}),200);
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "name": "@x3-chain/blockchain-connector",
+  "version": "0.1.0",
+  "description": "Enterprise-grade blockchain connector SDK — multi-chain RPC proxy, WebSocket streaming, test harness, and benchmarks",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./adapters": {
+      "import": "./dist/adapters/index.js",
+      "types": "./dist/adapters/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server/index.js",
+      "types": "./dist/server/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "start:server": "tsx src/server/index.ts",
+    "start:dev-server": "tsx -r ts-node/register src/server/dev-server.ts"
+  },
+  "dependencies": {
+    "@polkadot/api": "^9.0.0",
+    "@solana/web3.js": "^1.87.0",
+    "ethers": "^6.11.0",
+    "node-fetch": "^3.3.2",
+    "prom-client": "^15.1.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.0"
+  },
+  "files": [
+    "dist/",
+    "docs/root/README.md"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/x3-chain/x3-chain",
+    "directory": "packages/blockchain-connector"
+  }
+}

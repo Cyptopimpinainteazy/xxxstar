@@ -1,0 +1,19 @@
+[validator]
+name = "x3-mainnet-validator"
+chain = "x3-atomic-star"
+mode = "production"
+security_level = "hardened"
+telemetry_enabled = false
+rpc_port = 9933
+ws_port = 9944
+
+[consensus]
+algorithm = "proof-of-stake"
+finality_target = "session_end"
+max_validators = 256
+
+[security]
+enable_tls = true
+enable_rate_limiting = true
+enable_dos_protection = true
+max_connections = 1000

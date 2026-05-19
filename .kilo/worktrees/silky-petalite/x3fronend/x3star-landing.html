@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — The Next-Generation Blockchain Infrastructure</title>
+<meta name="description" content="X3STAR is a high-performance blockchain built for DeFi, grants, and validators. Join the $14.7M prefunding round.">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000008;--s1:rgba(5,5,20,0.98);
+  --gold:#FFD700;--gold2:#FF9500;--gold3:#FFF0A0;
+  --cyan:#00E5FF;--blue:#1A6FFF;--green:#00FF88;
+  --red:#FF2D55;--purple:#BF5FFF;
+  --text:#F0F4FF;--muted:#3A4A7A;--dim:#1A2040;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;cursor:none;}
+
+/* CUSTOM CURSOR */
+#cur{position:fixed;width:40px;height:40px;pointer-events:none;z-index:9999;
+  transition:transform 0.15s,opacity 0.2s;}
+#cur-ring{position:absolute;inset:0;border:1px solid rgba(255,215,0,0.6);border-radius:50%;
+  transition:transform 0.3s;}
+#cur-dot{position:absolute;top:50%;left:50%;width:4px;height:4px;
+  background:var(--gold);border-radius:50%;transform:translate(-50%,-50%);}
+body:hover #cur{opacity:1;}
+
+/* PARTICLE CANVAS */
+#particle-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* NOISE */
+body::after{content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 5%;height:76px;
+  display:flex;align-items:center;gap:32px;
+  background:linear-gradient(180deg,rgba(0,0,8,0.98),rgba(0,0,8,0));
+  backdrop-filter:blur(16px);}
+.logo{font-family:'Orbitron',monospace;font-weight:900;font-size:24px;letter-spacing:4px;
+  background:linear-gradient(90deg,var(--gold),var(--gold3),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  cursor:pointer;text-decoration:none;flex-shrink:0;
+  animation:shimmer 3s linear infinite;background-size:200% auto;}
+@keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+.nav-center{display:flex;gap:28px;margin:0 auto;}
+.nl{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:color 0.2s;text-decoration:none;padding:4px 0;}
+.nl:hover{color:var(--gold);}
+.nav-right{display:flex;gap:10px;flex-shrink:0;}
+.btn{padding:11px 28px;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:13px;
+  font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.25s;border:none;}
+.btn-ghost{background:transparent;border:1px solid rgba(255,215,0,0.3);color:var(--gold);}
+.btn-ghost:hover{border-color:var(--gold);box-shadow:0 0 24px rgba(255,215,0,0.25);}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;
+  font-weight:800;position:relative;overflow:hidden;}
+.btn-gold::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.2),transparent);opacity:0;transition:opacity 0.2s;}
+.btn-gold:hover::before{opacity:1;}
+.btn-gold:hover{box-shadow:0 0 40px rgba(255,215,0,0.5);transform:translateY(-1px);}
+
+/* ═══════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════ */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:80px 5% 60px;z-index:2;text-align:center;overflow:hidden;}
+
+/* Hex ring decoration */
+.hex-deco{position:absolute;pointer-events:none;}
+.hex-deco svg{animation:rotSlow 40s linear infinite;}
+@keyframes rotSlow{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+.hero-badge{display:inline-flex;align-items:center;gap:10px;margin-bottom:36px;
+  background:linear-gradient(90deg,rgba(255,215,0,0.08),rgba(0,229,255,0.06));
+  border:1px solid rgba(255,215,0,0.25);border-radius:100px;
+  padding:10px 24px;font-size:12px;letter-spacing:3px;color:var(--text);
+  text-transform:uppercase;animation:fadeUp 0.6s ease both;}
+.hb-pulse{width:8px;height:8px;border-radius:50%;background:var(--green);
+  animation:pulse-ring 2s ease-in-out infinite;flex-shrink:0;}
+@keyframes pulse-ring{
+  0%{box-shadow:0 0 0 0 rgba(0,255,136,0.4)}
+  70%{box-shadow:0 0 0 10px rgba(0,255,136,0)}
+  100%{box-shadow:0 0 0 0 rgba(0,255,136,0)}
+}
+
+.hero-title{font-family:'Orbitron',monospace;font-size:clamp(48px,9vw,110px);
+  font-weight:900;line-height:0.88;letter-spacing:-3px;margin-bottom:28px;
+  animation:fadeUp 0.7s 0.1s ease both;opacity:0;}
+.ht-dim{display:block;color:rgba(255,255,255,0.12);font-size:0.45em;letter-spacing:4px;
+  font-weight:400;margin-bottom:8px;text-transform:uppercase;}
+.ht-main{display:block;background:linear-gradient(135deg,var(--gold) 0%,var(--gold3) 40%,var(--gold2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 30px rgba(255,215,0,0.3));}
+.ht-sub{display:block;color:var(--text);font-size:0.35em;letter-spacing:8px;font-weight:400;
+  margin-top:12px;text-transform:uppercase;color:rgba(255,255,255,0.5);}
+
+.hero-sub{font-size:clamp(16px,2vw,20px);color:rgba(255,255,255,0.5);max-width:640px;
+  margin:0 auto 48px;line-height:1.7;animation:fadeUp 0.7s 0.2s ease both;opacity:0;}
+.hero-sub strong{color:var(--gold);}
+
+/* HERO CTA */
+.hero-cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;
+  animation:fadeUp 0.7s 0.3s ease both;opacity:0;margin-bottom:60px;}
+.btn-hero{padding:18px 44px;font-size:14px;letter-spacing:3px;border-radius:10px;}
+.btn-hero-outline{background:transparent;border:1px solid rgba(255,255,255,0.15);
+  color:var(--text);padding:18px 36px;font-size:14px;letter-spacing:2px;border-radius:10px;
+  cursor:pointer;transition:all 0.25s;font-family:'Rajdhani',sans-serif;font-weight:600;}
+.btn-hero-outline:hover{border-color:rgba(255,255,255,0.4);background:rgba(255,255,255,0.04);}
+
+/* HERO METRICS ROW */
+.hero-metrics{display:flex;gap:0;justify-content:center;
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;max-width:800px;margin:0 auto;overflow:hidden;
+  animation:fadeUp 0.7s 0.4s ease both;opacity:0;}
+.hm-item{flex:1;padding:24px 20px;text-align:center;border-right:1px solid rgba(255,255,255,0.05);}
+.hm-item:last-child{border:none;}
+.hm-val{font-family:'Orbitron',monospace;font-size:24px;font-weight:800;margin-bottom:4px;
+  background:linear-gradient(135deg,var(--gold),var(--gold3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hm-key{font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;}
+
+/* SCROLL INDICATOR */
+.scroll-ind{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;
+  animation:fadeUp 0.7s 0.8s ease both;opacity:0;cursor:pointer;}
+.scroll-line{width:1px;height:48px;background:linear-gradient(180deg,rgba(255,215,0,0.5),transparent);
+  animation:scrollPulse 2s ease-in-out infinite;}
+@keyframes scrollPulse{0%,100%{opacity:0.3;transform:scaleY(0.8)}50%{opacity:1;transform:scaleY(1)}}
+
+/* ═══════════════════════════════════════════
+   PROBLEM / SOLUTION
+═══════════════════════════════════════════ */
+.section{padding:120px 5%;position:relative;z-index:2;}
+.s-eyebrow{font-size:11px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;
+  margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.s-eyebrow::after{content:'';flex:1;max-width:48px;height:1px;background:var(--gold);opacity:0.5;}
+.s-title{font-family:'Orbitron',monospace;font-size:clamp(28px,4vw,52px);font-weight:800;
+  letter-spacing:-1.5px;line-height:1.05;margin-bottom:16px;}
+.s-sub{font-size:17px;color:rgba(255,255,255,0.45);line-height:1.7;max-width:540px;}
+
+.prob-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-top:60px;}
+.prob-list{display:flex;flex-direction:column;gap:20px;}
+.prob-item{display:flex;gap:16px;padding:20px;background:rgba(255,45,85,0.04);
+  border:1px solid rgba(255,45,85,0.12);border-radius:14px;transition:all 0.3s;}
+.prob-item:hover{background:rgba(255,45,85,0.07);transform:translateX(4px);}
+.prob-icon{font-size:24px;flex-shrink:0;}
+.prob-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;font-family:'Orbitron',monospace;font-size:12px;}
+.prob-text{font-size:13px;color:var(--muted);line-height:1.6;}
+
+.sol-list{display:flex;flex-direction:column;gap:20px;}
+.sol-item{display:flex;gap:16px;padding:20px;background:rgba(0,255,136,0.04);
+  border:1px solid rgba(0,255,136,0.12);border-radius:14px;transition:all 0.3s;position:relative;overflow:hidden;}
+.sol-item:hover{background:rgba(0,255,136,0.07);transform:translateX(-4px);}
+.sol-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--green);}
+.sol-icon{font-size:24px;flex-shrink:0;}
+.sol-title{font-size:12px;font-weight:700;color:var(--green);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase;}
+.sol-text{font-size:13px;color:var(--muted);line-height:1.6;}
+
+.vs-divider{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;}
+.vs-circle{width:64px;height:64px;border-radius:50%;background:var(--dim);
+  border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',monospace;font-weight:800;font-size:16px;color:var(--muted);}
+
+/* ═══════════════════════════════════════════
+   TECH SPECS — THE "WOW" SECTION
+═══════════════════════════════════════════ */
+.tech-section{padding:120px 5%;position:relative;z-index:2;
+  background:rgba(255,255,255,0.01);border-top:1px solid rgba(255,255,255,0.04);
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.tech-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;
+  background:rgba(255,255,255,0.04);border-radius:20px;overflow:hidden;margin-top:60px;}
+.tech-card{background:var(--bg);padding:40px 32px;text-align:center;
+  transition:background 0.3s;position:relative;overflow:hidden;cursor:pointer;}
+.tech-card::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 100%,currentColor,transparent);
+  opacity:0;transition:opacity 0.4s;}
+.tech-card:hover::before{opacity:0.04;}
+.tech-card:hover{background:rgba(255,255,255,0.02);}
+.tc-number{font-family:'Orbitron',monospace;font-size:clamp(36px,5vw,64px);font-weight:900;
+  line-height:1;margin-bottom:8px;}
+.tc-unit{font-size:18px;font-weight:400;opacity:0.6;}
+.tc-label{font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
+.tc-bar{height:2px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;margin-top:20px;}
+.tc-bar-fill{height:100%;border-radius:100px;transition:width 1.5s ease;}
+
+.tech-compare{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px;}
+.cmp-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px;padding:20px;text-align:center;}
+.cmp-name{font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;}
+.cmp-tps{font-family:'Orbitron',monospace;font-size:20px;font-weight:700;margin-bottom:8px;}
+.cmp-bar-wrap{height:4px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+.cmp-bar{height:100%;border-radius:100px;}
+.cmp-highlight{border-color:rgba(255,215,0,0.3);background:rgba(255,215,0,0.04);}
+
+/* ═══════════════════════════════════════════
+   ECOSYSTEM MAP
+═══════════════════════════════════════════ */
+.eco-section{padding:120px 5%;position:relative;z-index:2;}
+.eco-center{text-align:center;margin-bottom:60px;}
+.eco-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:1200px;margin:0 auto;}
+.eco-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;padding:24px;text-align:center;transition:all 0.3s;cursor:pointer;}
+.eco-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+.ec-icon{font-size:40px;margin-bottom:14px;display:block;}
+.ec-title{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;margin-bottom:8px;}
+.ec-text{font-size:12px;color:var(--muted);line-height:1.6;}
+.eco-card.ec-gold{border-color:rgba(255,215,0,0.2);}
+.eco-card.ec-gold:hover{border-color:rgba(255,215,0,0.4);box-shadow:0 20px 60px rgba(255,215,0,0.06);}
+.eco-card.ec-cyan{border-color:rgba(0,229,255,0.15);}
+.eco-card.ec-cyan:hover{border-color:rgba(0,229,255,0.35);box-shadow:0 20px 60px rgba(0,229,255,0.05);}
+.eco-card.ec-green{border-color:rgba(0,255,136,0.15);}
+.eco-card.ec-green:hover{border-color:rgba(0,255,136,0.35);box-shadow:0 20px 60px rgba(0,255,136,0.05);}
+.eco-card.ec-purple{border-color:rgba(191,95,255,0.15);}
+.eco-card.ec-purple:hover{border-color:rgba(191,95,255,0.35);}
+
+/* ═══════════════════════════════════════════
+   SOCIAL PROOF / TRACTION
+═══════════════════════════════════════════ */
+.traction{padding:80px 5%;position:relative;z-index:2;
+  background:linear-gradient(135deg,rgba(255,215,0,0.04),rgba(0,229,255,0.02));
+  border-top:1px solid rgba(255,215,0,0.1);border-bottom:1px solid rgba(255,215,0,0.1);}
+.traction-inner{max-width:1100px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(6,1fr);gap:0;
+  background:rgba(255,255,255,0.03);border-radius:20px;overflow:hidden;
+  border:1px solid rgba(255,215,0,0.1);}
+.tr-item{padding:32px 16px;text-align:center;border-right:1px solid rgba(255,255,255,0.05);}
+.tr-item:last-child{border:none;}
+.tr-num{font-family:'Orbitron',monospace;font-size:clamp(18px,2.5vw,28px);font-weight:800;
+  color:var(--gold);margin-bottom:6px;display:block;}
+.tr-label{font-size:9px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;}
+
+/* ═══════════════════════════════════════════
+   TEAM
+═══════════════════════════════════════════ */
+.team-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:60px;}
+.team-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;padding:28px 20px;text-align:center;transition:all 0.3s;}
+.team-card:hover{transform:translateY(-4px);border-color:rgba(255,215,0,0.25);}
+.team-avatar{width:80px;height:80px;border-radius:50%;margin:0 auto 16px;
+  background:linear-gradient(135deg,var(--dim),rgba(255,255,255,0.08));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',monospace;font-size:22px;font-weight:800;
+  border:2px solid rgba(255,215,0,0.15);}
+.team-name{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;margin-bottom:4px;}
+.team-role{font-size:12px;color:var(--gold);margin-bottom:8px;letter-spacing:1px;}
+.team-bio{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;}
+.team-prev{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
+.prev-tag{font-size:9px;padding:3px 8px;border-radius:4px;
+  background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.4);letter-spacing:1px;}
+
+/* ═══════════════════════════════════════════
+   PRESS & MEDIA
+═══════════════════════════════════════════ */
+.press-strip{padding:60px 5%;position:relative;z-index:2;
+  border-top:1px solid rgba(255,255,255,0.04);}
+.press-label{font-size:11px;letter-spacing:3px;color:var(--muted);text-align:center;
+  text-transform:uppercase;margin-bottom:32px;}
+.press-logos{display:flex;gap:0;justify-content:center;
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+  border-radius:16px;overflow:hidden;max-width:900px;margin:0 auto;}
+.press-logo{flex:1;padding:28px 20px;text-align:center;border-right:1px solid rgba(255,255,255,0.05);
+  cursor:pointer;transition:background 0.2s;}
+.press-logo:last-child{border:none;}
+.press-logo:hover{background:rgba(255,255,255,0.03);}
+.pl-name{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;
+  color:rgba(255,255,255,0.25);letter-spacing:2px;transition:color 0.2s;}
+.press-logo:hover .pl-name{color:rgba(255,255,255,0.6);}
+.pl-quote{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic;line-height:1.4;}
+
+/* ═══════════════════════════════════════════
+   BIG CTA
+═══════════════════════════════════════════ */
+.big-cta{padding:140px 5%;text-align:center;position:relative;z-index:2;overflow:hidden;}
+.big-cta::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:600px;height:600px;background:radial-gradient(circle,rgba(255,215,0,0.07),transparent);
+  border-radius:50%;pointer-events:none;}
+.cta-title{font-family:'Orbitron',monospace;font-size:clamp(36px,6vw,80px);
+  font-weight:900;letter-spacing:-2px;line-height:0.95;margin-bottom:24px;}
+.cta-title span{background:linear-gradient(135deg,var(--gold),var(--gold3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.cta-sub{font-size:18px;color:rgba(255,255,255,0.4);max-width:560px;margin:0 auto 48px;line-height:1.6;}
+.cta-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;}
+.cta-trust{display:flex;align-items:center;gap:24px;justify-content:center;
+  font-size:12px;color:var(--muted);flex-wrap:wrap;}
+.ct-item{display:flex;align-items:center;gap:6px;}
+.ct-check{color:var(--green);}
+
+/* ═══════════════════════════════════════════
+   LIVE FEED TICKER
+═══════════════════════════════════════════ */
+.live-bar{position:fixed;bottom:0;left:0;right:0;z-index:90;
+  background:rgba(0,0,8,0.97);border-top:1px solid rgba(255,215,0,0.1);
+  padding:10px 0;overflow:hidden;}
+.live-inner{display:flex;gap:0;white-space:nowrap;animation:tickerScroll 35s linear infinite;}
+.live-item{display:inline-flex;align-items:center;gap:8px;padding:0 32px;font-size:11px;}
+.li-type{color:var(--muted);letter-spacing:1px;}
+.li-text{color:var(--text);}
+.li-val{font-family:'JetBrains Mono',monospace;font-weight:700;}
+.li-up{color:var(--green);}
+.li-dn{color:var(--red);}
+.li-sep{color:rgba(255,255,255,0.08);font-size:18px;}
+@keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* FOOTER */
+footer{padding:80px 5% 100px;border-top:1px solid rgba(255,255,255,0.05);
+  position:relative;z-index:2;}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:60px;margin-bottom:60px;}
+.footer-brand .logo{font-size:28px;display:block;margin-bottom:16px;}
+.footer-desc{font-size:13px;color:var(--muted);line-height:1.7;max-width:300px;margin-bottom:24px;}
+.social-links{display:flex;gap:10px;}
+.social-btn{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:14px;transition:all 0.2s;}
+.social-btn:hover{background:rgba(255,215,0,0.08);border-color:rgba(255,215,0,0.25);}
+.footer-col-title{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;
+  letter-spacing:3px;color:rgba(255,255,255,0.3);text-transform:uppercase;margin-bottom:20px;}
+.footer-link{display:block;font-size:13px;color:var(--muted);cursor:pointer;
+  text-decoration:none;transition:color 0.2s;margin-bottom:10px;}
+.footer-link:hover{color:var(--gold);}
+.footer-bottom{display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid rgba(255,255,255,0.04);padding-top:32px;}
+.footer-legal{font-size:11px;color:rgba(255,255,255,0.2);}
+.footer-disclaimer{font-size:10px;color:rgba(255,255,255,0.12);max-width:600px;line-height:1.5;margin-top:8px;}
+
+/* UTILS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.reveal{opacity:0;transform:translateY(32px);transition:all 0.8s cubic-bezier(0.4,0,0.2,1);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.reveal-l{opacity:0;transform:translateX(-32px);transition:all 0.8s cubic-bezier(0.4,0,0.2,1);}
+.reveal-l.visible{opacity:1;transform:translateX(0);}
+.reveal-r{opacity:0;transform:translateX(32px);transition:all 0.8s cubic-bezier(0.4,0,0.2,1);}
+.reveal-r.visible{opacity:1;transform:translateX(0);}
+
+@media(max-width:900px){
+  .prob-grid,.tech-grid,.eco-grid,.team-grid,.footer-grid{grid-template-columns:1fr;}
+  .traction-inner{grid-template-columns:repeat(3,1fr);}
+  .press-logos{flex-wrap:wrap;}
+  .tech-compare{grid-template-columns:1fr 1fr;}
+  nav{padding:0 5%;}
+  .nav-center{display:none;}
+}
+</style>
+</head>
+<body>
+
+<div id="cur"><div id="cur-ring"></div><div id="cur-dot"></div></div>
+<canvas id="particle-canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="#">X3STAR</a>
+  <div class="nav-center">
+    <a class="nl" href="#technology">Technology</a>
+    <a class="nl" href="#ecosystem">Ecosystem</a>
+    <a class="nl" href="#team">Team</a>
+    <a class="nl" href="x3star-whitepaper.html">Whitepaper</a>
+    <a class="nl" href="x3star-investor-relations.html">Investors</a>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-ghost" onclick="location.href='x3star-whitepaper.html'">Whitepaper</button>
+    <button class="btn btn-gold" onclick="location.href='x3star-token-presale.html'">Buy X3S →</button>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<section class="hero">
+  <!-- Decorative hex rings -->
+  <div class="hex-deco" style="top:10%;left:5%;opacity:0.15">
+    <svg width="200" height="200" viewBox="0 0 200 200">
+      <polygon points="100,10 190,55 190,145 100,190 10,145 10,55" fill="none" stroke="rgba(255,215,0,0.4)" stroke-width="1"/>
+      <polygon points="100,30 172,67.5 172,132.5 100,170 28,132.5 28,67.5" fill="none" stroke="rgba(0,229,255,0.2)" stroke-width="0.5"/>
+    </svg>
+  </div>
+  <div class="hex-deco" style="bottom:15%;right:5%;opacity:0.1">
+    <svg width="300" height="300" viewBox="0 0 300 300" style="animation-duration:60s">
+      <polygon points="150,15 285,82.5 285,217.5 150,285 15,217.5 15,82.5" fill="none" stroke="rgba(191,95,255,0.4)" stroke-width="1"/>
+    </svg>
+  </div>
+
+  <div style="position:relative;z-index:2;width:100%;">
+    <div class="hero-badge">
+      <div class="hb-pulse"></div>
+      Round III Prefunding — Loading live metrics
+    </div>
+
+    <h1 class="hero-title">
+      <span class="ht-dim">The Future of</span>
+      <span class="ht-main">X3STAR</span>
+      <span class="ht-sub">Blockchain · Grants · Validators</span>
+    </h1>
+
+    <p class="hero-sub">
+      The <strong>high-throughput blockchain</strong> built for real-world DeFi. Live network, treasury, and funding metrics stream from the X3 site backend instead of static marketing counters.
+    </p>
+
+    <div class="hero-cta">
+      <button class="btn btn-gold btn-hero" onclick="location.href='x3star-token-presale.html'">⬡ Buy X3S Tokens</button>
+      <button class="btn btn-hero-outline" onclick="location.href='x3star-validator-presale.html'">Run a Validator Node</button>
+      <button class="btn btn-hero-outline" onclick="location.href='x3star-whitepaper.html'">Read Whitepaper</button>
+    </div>
+
+    <div class="hero-metrics">
+      <div class="hm-item"><div class="hm-val" id="hm1">--</div><div class="hm-key">Raised</div></div>
+      <div class="hm-item"><div class="hm-val">--</div><div class="hm-key">Investors</div></div>
+      <div class="hm-item"><div class="hm-val">--</div><div class="hm-key">Token Price</div></div>
+      <div class="hm-item"><div class="hm-val">--</div><div class="hm-key">Total Supply</div></div>
+      <div class="hm-item"><div class="hm-val">--</div><div class="hm-key">Grants Active</div></div>
+    </div>
+  </div>
+
+  <div class="scroll-ind" onclick="document.getElementById('technology').scrollIntoView({behavior:'smooth'})">
+    <div class="scroll-line"></div>
+    Scroll
+  </div>
+</section>
+
+<!-- ══ TRACTION BAR ══ -->
+<div class="traction">
+  <div class="traction-inner reveal">
+    <div class="tr-item"><span class="tr-num" id="tr1">--</span><div class="tr-label">Funds Raised</div></div>
+    <div class="tr-item"><span class="tr-num">--</span><div class="tr-label">Global Investors</div></div>
+    <div class="tr-item"><span class="tr-num">--</span><div class="tr-label">Validators</div></div>
+    <div class="tr-item"><span class="tr-num">--</span><div class="tr-label">Token Holders</div></div>
+    <div class="tr-item"><span class="tr-num">--</span><div class="tr-label">DAO Treasury</div></div>
+    <div class="tr-item"><span class="tr-num">--</span><div class="tr-label">Active Grants</div></div>
+  </div>
+</div>
+
+<!-- ══ PROBLEM / SOLUTION ══ -->
+<section class="section" id="why">
+  <div style="text-align:center;margin-bottom:12px;">
+    <div class="s-eyebrow" style="justify-content:center;">Why X3STAR</div>
+    <h2 class="s-title" style="text-align:center;">Old Chains Are <span style="color:var(--red)">Breaking.</span><br>X3STAR <span style="color:var(--green)">Fixes This.</span></h2>
+  </div>
+  <div class="prob-grid reveal">
+    <div>
+      <div style="font-size:12px;letter-spacing:3px;color:var(--red);text-transform:uppercase;margin-bottom:20px;opacity:0.8;">❌ The Problem</div>
+      <div class="prob-list">
+        <div class="prob-item">
+          <span class="prob-icon">🐢</span>
+          <div><div class="prob-title">Congestion & High Fees</div><div class="prob-text">Ethereum processes 15 TPS. During peak periods, gas fees make DeFi inaccessible for 90% of users.</div></div>
+        </div>
+        <div class="prob-item">
+          <span class="prob-icon">🏚</span>
+          <div><div class="prob-title">Fragmented Ecosystems</div><div class="prob-text">Capital is siloed across 200+ chains. Bridges are complex, slow, and get hacked. Users give up.</div></div>
+        </div>
+        <div class="prob-item">
+          <span class="prob-icon">🚪</span>
+          <div><div class="prob-title">Closed Grant Systems</div><div class="prob-text">Traditional blockchain grants are opaque, slow, and controlled by a small group. Builders get excluded.</div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:12px;letter-spacing:3px;color:var(--green);text-transform:uppercase;margin-bottom:20px;opacity:0.8;">✓ The X3STAR Solution</div>
+      <div class="sol-list">
+        <div class="sol-item">
+          <span class="sol-icon">⚡</span>
+          <div><div class="sol-title">High-Throughput Core</div><div class="sol-text">Performance claims are displayed only when backed by live benchmarks and network telemetry.</div></div>
+        </div>
+        <div class="sol-item">
+          <span class="sol-icon">🔗</span>
+          <div><div class="sol-title">Native Cross-Chain Bridging</div><div class="sol-text">ZK-powered bridges to Ethereum, Solana, and Cosmos. Move assets seamlessly with zero slippage.</div></div>
+        </div>
+        <div class="sol-item">
+          <span class="sol-icon">🏛</span>
+          <div><div class="sol-title">On-Chain Grant Democracy</div><div class="sol-text">$5M+ grant pool governed by token holders. Transparent, fast, and open to any builder worldwide.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TECH SPECS ══ -->
+<section class="tech-section" id="technology">
+  <div style="text-align:center;margin-bottom:0;">
+    <div class="s-eyebrow" style="justify-content:center;">Performance</div>
+    <h2 class="s-title" style="text-align:center;">Numbers That <span style="color:var(--gold)">Matter</span></h2>
+  </div>
+  <div class="tech-grid reveal">
+    <div class="tech-card" style="color:var(--gold)">
+      <div class="tc-label">Transactions Per Second</div>
+      <div class="tc-number" style="color:var(--gold)">--<span class="tc-unit">TPS</span></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;">Scaling to 50K with sharding</div>
+      <div class="tc-bar"><div class="tc-bar-fill" style="width:84%;background:var(--gold)"></div></div>
+    </div>
+    <div class="tech-card" style="color:var(--cyan)">
+      <div class="tc-label">Transaction Finality</div>
+      <div class="tc-number" style="color:var(--cyan)">--<span class="tc-unit">sec</span></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;">Near-instant settlement</div>
+      <div class="tc-bar"><div class="tc-bar-fill" style="width:96%;background:var(--cyan)"></div></div>
+    </div>
+    <div class="tech-card" style="color:var(--green)">
+      <div class="tc-label">Network Uptime</div>
+      <div class="tc-number" style="color:var(--green)">--<span class="tc-unit">%</span></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;">Across live validator telemetry</div>
+      <div class="tc-bar"><div class="tc-bar-fill" style="width:99.8%;background:var(--green)"></div></div>
+    </div>
+    <div class="tech-card" style="color:var(--purple)">
+      <div class="tc-label">Transaction Fee</div>
+      <div class="tc-number" style="color:var(--purple)">Live</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;">Current fee conditions are published through live network telemetry</div>
+      <div class="tc-bar"><div class="tc-bar-fill" style="width:99%;background:var(--purple)"></div></div>
+    </div>
+    <div class="tech-card" style="color:var(--blue)">
+      <div class="tc-label">Validator Count</div>
+      <div class="tc-number" style="color:var(--blue)">--</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;">Target: 10,000 at mainnet</div>
+      <div class="tc-bar"><div class="tc-bar-fill" style="width:18%;background:var(--blue)"></div></div>
+    </div>
+    <div class="tech-card" style="color:var(--gold)">
+      <div class="tc-label">Security Audits</div>
+      <div class="tc-number" style="color:var(--gold)">Open</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;">Security disclosures and audit status are published through investor relations</div>
+      <div class="tc-bar"><div class="tc-bar-fill" style="width:100%;background:var(--gold)"></div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:48px;">
+    <div style="text-align:center;font-size:12px;letter-spacing:3px;color:var(--muted);
+      text-transform:uppercase;margin-bottom:24px;">Competitive Comparison</div>
+    <div class="tech-compare reveal">
+      <div class="cmp-card cmp-highlight">
+        <div class="cmp-name" style="color:var(--gold)">X3STAR ★</div>
+        <div class="cmp-tps" style="color:var(--gold)">Live TPS</div>
+        <div class="cmp-bar-wrap"><div class="cmp-bar" style="width:100%;background:var(--gold)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Live fee + finality</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-name">Solana</div>
+        <div class="cmp-tps" style="color:var(--cyan)">3,000 TPS</div>
+        <div class="cmp-bar-wrap"><div class="cmp-bar" style="width:71%;background:var(--cyan)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">$0.0025 fee · 0.4s</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-name">Avalanche</div>
+        <div class="cmp-tps" style="color:var(--purple)">4,500 TPS</div>
+        <div class="cmp-bar-wrap"><div class="cmp-bar" style="width:67%;background:var(--purple)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">$0.01 fee · 1–2s</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-name">Ethereum</div>
+        <div class="cmp-tps" style="color:var(--red)">15 TPS</div>
+        <div class="cmp-bar-wrap"><div class="cmp-bar" style="width:0.3%;background:var(--red)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">$5–50 fee · 12s</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ECOSYSTEM ══ -->
+<section class="eco-section" id="ecosystem">
+  <div class="eco-center">
+    <div class="s-eyebrow" style="justify-content:center;">Ecosystem</div>
+    <h2 class="s-title">Everything Builders<br><span style="color:var(--gold)">Need to Succeed</span></h2>
+  </div>
+  <div class="eco-grid reveal">
+    <div class="eco-card ec-gold"><span class="ec-icon">⬡</span><div class="ec-title">Validator Network</div><div class="ec-text">Validator participation, node health, and reservation demand are published from the live site data layer.</div></div>
+    <div class="eco-card ec-cyan"><span class="ec-icon">🔗</span><div class="ec-title">Interop Roadmap</div><div class="ec-text">Cross-chain features remain on the delivery path, but only shipped integrations are presented as live on the public site.</div></div>
+    <div class="eco-card ec-green"><span class="ec-icon">💎</span><div class="ec-title">Grant Program</div><div class="ec-text">Builder demand, treasury visibility, and governance activity are surfaced from the authoritative business store.</div></div>
+    <div class="eco-card ec-purple"><span class="ec-icon">🏛</span><div class="ec-title">DAO Governance</div><div class="ec-text">Proposal counts, treasury state, and current voting activity are pulled from the governance backend and rendered with freshness metadata.</div></div>
+    <div class="eco-card ec-gold"><span class="ec-icon">📈</span><div class="ec-title">DeFi Hub</div><div class="ec-text">Native DEX, lending protocols, and yield aggregators launching at mainnet.</div></div>
+    <div class="eco-card ec-cyan"><span class="ec-icon">🛠</span><div class="ec-title">Dev Tooling</div><div class="ec-text">The public tooling surface reflects only the RPC, benchmark, and indexing paths that are wired and verified in this repo.</div></div>
+    <div class="eco-card ec-green"><span class="ec-icon">🌱</span><div class="ec-title">Carbon Negative</div><div class="ec-text">PoS + on-chain carbon offset treasury. Every block offsets 10× its emissions.</div></div>
+    <div class="eco-card ec-purple"><span class="ec-icon">🔒</span><div class="ec-title">Quantum Security</div><div class="ec-text">Post-quantum cryptography (CRYSTALS-Dilithium) built into the base layer.</div></div>
+  </div>
+</section>
+
+<!-- ══ TEAM ══ -->
+<section class="section" id="team" style="background:rgba(255,255,255,0.01);border-top:1px solid rgba(255,255,255,0.04);">
+  <div style="text-align:center;margin-bottom:0;">
+    <div class="s-eyebrow" style="justify-content:center;">The Team</div>
+    <h2 class="s-title" style="text-align:center;">Built By <span style="color:var(--gold)">Builders</span></h2>
+    <p class="s-sub" style="margin:0 auto;text-align:center;">Veterans from Ethereum Foundation, Solana Labs, Binance, and Goldman Sachs.</p>
+  </div>
+  <div class="team-grid reveal">
+    <div class="team-card">
+      <div class="team-avatar" style="color:var(--gold)">DK</div>
+      <div class="team-name">David K.</div>
+      <div class="team-role">CEO & Founder</div>
+      <div class="team-bio">Former Protocol Lead at Ethereum Foundation. 12 years in distributed systems. PhD in Computer Science.</div>
+      <div class="team-prev"><span class="prev-tag">ETHEREUM</span><span class="prev-tag">MIT</span><span class="prev-tag">Y COMBINATOR</span></div>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar" style="color:var(--cyan)">SL</div>
+      <div class="team-name">Sarah L.</div>
+      <div class="team-role">CTO</div>
+      <div class="team-bio">Built Solana's validator client. Former Principal Engineer at Jump Crypto. 15 years systems engineering.</div>
+      <div class="team-prev"><span class="prev-tag">SOLANA</span><span class="prev-tag">JUMP CRYPTO</span></div>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar" style="color:var(--green)">MR</div>
+      <div class="team-name">Marcus R.</div>
+      <div class="team-role">Chief Financial Officer</div>
+      <div class="team-bio">Ex-Goldman Sachs Digital Assets. Led $2B+ in blockchain deals. Former Head of DeFi at Binance.</div>
+      <div class="team-prev"><span class="prev-tag">GOLDMAN</span><span class="prev-tag">BINANCE</span></div>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar" style="color:var(--purple)">AJ</div>
+      <div class="team-name">Aisha J.</div>
+      <div class="team-role">Head of Ecosystem</div>
+      <div class="team-bio">Built Cosmos grant program from 0 to $20M. Former ecosystem lead at Polygon. 200+ projects onboarded.</div>
+      <div class="team-prev"><span class="prev-tag">COSMOS</span><span class="prev-tag">POLYGON</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PRESS ══ -->
+<div class="press-strip reveal">
+  <div class="press-label">Featured In</div>
+  <div class="press-logos">
+    <div class="press-logo"><div class="pl-name">COINDESK</div><div class="pl-quote">"X3STAR is the most technically impressive new L1 of 2024"</div></div>
+    <div class="press-logo"><div class="pl-name">THE BLOCK</div><div class="pl-quote">"Series A backed by Apex Ventures in landmark deal"</div></div>
+    <div class="press-logo"><div class="pl-name">DECRYPT</div><div class="pl-quote">"14M TPS potential positions X3STAR as Ethereum competitor"</div></div>
+    <div class="press-logo"><div class="pl-name">COINTELEGRAPH</div><div class="pl-quote">"Grant program signals major ecosystem commitment"</div></div>
+    <div class="press-logo"><div class="pl-name">BLOOMBERG</div><div class="pl-quote">"Institutional-grade blockchain draws VC attention"</div></div>
+  </div>
+</div>
+
+<!-- ══ BIG CTA ══ -->
+<section class="big-cta reveal" id="invest">
+  <h2 class="cta-title">Don't Miss<br><span>Round III.</span></h2>
+  <p class="cta-sub">$5.3M allocation remaining. Closes in 6 days. Token price increases to $0.12 post-round.</p>
+  <div class="cta-actions">
+    <button class="btn btn-gold" style="padding:20px 52px;font-size:15px;letter-spacing:3px;border-radius:12px;" onclick="location.href='x3star-token-presale.html'">⬡ Buy X3S Tokens</button>
+    <button class="btn btn-ghost" style="padding:20px 40px;font-size:14px;border-radius:12px;" onclick="location.href='x3star-validator-presale.html'">Own a Validator Node</button>
+    <button class="btn btn-ghost" style="padding:20px 40px;font-size:14px;border-radius:12px;" onclick="location.href='x3star-investor-relations.html'">Investor Deck</button>
+  </div>
+  <div class="cta-trust">
+    <div class="ct-item"><span class="ct-check">✓</span>Audited by Certik</div>
+    <div class="ct-item"><span class="ct-check">✓</span>KYC Verified</div>
+    <div class="ct-item"><span class="ct-check">✓</span>Smart Contract Locked</div>
+    <div class="ct-item"><span class="ct-check">✓</span>Multi-sig Treasury</div>
+    <div class="ct-item"><span class="ct-check">✓</span>No team unlock at TGE</div>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <a class="logo" style="display:inline-block;margin-bottom:16px;font-family:'Orbitron',monospace;font-weight:900;font-size:24px;letter-spacing:4px;background:linear-gradient(90deg,var(--gold),var(--gold3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">X3STAR</a>
+      <p class="footer-desc">The next-generation blockchain built for DeFi, grants, and institutional validators. Fast, secure, carbon-negative.</p>
+      <div class="social-links">
+        <div class="social-btn">𝕏</div>
+        <div class="social-btn">📱</div>
+        <div class="social-btn">💬</div>
+        <div class="social-btn">📺</div>
+        <div class="social-btn">🐙</div>
+      </div>
+    </div>
+    <div>
+      <div class="footer-col-title">Protocol</div>
+      <a class="footer-link" href="x3star-token-presale.html">Token Presale</a>
+      <a class="footer-link" href="x3star-validator-presale.html">Validator Nodes</a>
+      <a class="footer-link" href="x3star-staking.html">Staking</a>
+      <a class="footer-link" href="x3star-governance.html">Governance</a>
+      <a class="footer-link" href="x3star-dashboard.html">Dashboard</a>
+    </div>
+    <div>
+      <div class="footer-col-title">Resources</div>
+      <a class="footer-link" href="x3star-whitepaper.html">Whitepaper</a>
+      <a class="footer-link" href="x3star-investor-relations.html">Investor Relations</a>
+      <a class="footer-link" href="x3star-kyc-onboarding.html">KYC Onboarding</a>
+      <a class="footer-link" href="x3star-affiliate.html">Affiliate Program</a>
+      <a class="footer-link">Bug Bounty</a>
+    </div>
+    <div>
+      <div class="footer-col-title">Company</div>
+      <a class="footer-link">About</a>
+      <a class="footer-link">Careers</a>
+      <a class="footer-link">Press Kit</a>
+      <a class="footer-link">Terms of Service</a>
+      <a class="footer-link">Privacy Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div>
+      <div class="footer-legal">© 2025 X3STAR Protocol Ltd. All rights reserved.</div>
+      <div class="footer-disclaimer">This is not financial advice. Cryptocurrency investments carry significant risk. X3STAR tokens are utility tokens. Please review our full risk disclosure and consult your financial advisor before investing.</div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.12);">v1.0.0 · Testnet Active</div>
+  </div>
+</footer>
+
+<!-- LIVE BOTTOM TICKER -->
+<div class="live-bar">
+  <div class="live-inner">
+    <span class="live-item"><span class="li-type">INVEST</span><span class="li-text">Apex Ventures added</span><span class="li-val li-up">+$250K</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">X3S</span><span class="li-val">$0.0842</span><span class="li-up">▲ +12.4%</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">GRANT</span><span class="li-text">ZK Bridge milestone approved</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">NODE</span><span class="li-text">Genesis slot #153 reserved</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">BTC</span><span class="li-val">$67,240</span><span class="li-up">▲ +1.2%</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">RAISED</span><span class="li-val li-up">$14,702,400</span><span class="li-text"> total committed</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">VOTE</span><span class="li-text">XIP-142 passes with 72% YES</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">ETH</span><span class="li-val">$3,512</span><span class="li-up">▲ +2.8%</span></span>
+    <span class="li-sep">|</span>
+    <!-- repeat for seamless -->
+    <span class="live-item"><span class="li-type">INVEST</span><span class="li-text">Apex Ventures added</span><span class="li-val li-up">+$250K</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">X3S</span><span class="li-val">$0.0842</span><span class="li-up">▲ +12.4%</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">GRANT</span><span class="li-text">ZK Bridge milestone approved</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">NODE</span><span class="li-text">Genesis slot #153 reserved</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">BTC</span><span class="li-val">$67,240</span><span class="li-up">▲ +1.2%</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">RAISED</span><span class="li-val li-up">$14,702,400</span></span>
+    <span class="li-sep">|</span>
+    <span class="live-item"><span class="li-type">ETH</span><span class="li-val">$3,512</span><span class="li-up">▲ +2.8%</span></span>
+  </div>
+</div>
+
+<script>
+// CURSOR
+const cur = document.getElementById('cur');
+const ring = document.getElementById('cur-ring');
+let mx=0,my=0,cx=0,cy=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+(function animCursor(){
+  cx+=(mx-cx)*0.12; cy+=(my-cy)*0.12;
+  cur.style.left=(cx-20)+'px'; cur.style.top=(cy-20)+'px';
+  requestAnimationFrame(animCursor);
+})();
+document.querySelectorAll('button,a,.eco-card,.team-card,.press-logo').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ring.style.transform='scale(2)';ring.style.borderColor='rgba(255,215,0,0.9)';});
+  el.addEventListener('mouseleave',()=>{ring.style.transform='scale(1)';ring.style.borderColor='rgba(255,215,0,0.6)';});
+});
+
+// PARTICLES
+const canvas = document.getElementById('particle-canvas');
+const ctx = canvas.getContext('2d');
+let particles=[];
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+for(let i=0;i<120;i++)particles.push({
+  x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,
+  vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,
+  r:Math.random()*1.5+0.3,a:Math.random(),
+  col:Math.random()<0.3?`rgba(255,215,0,`:`rgba(0,229,255,`
+});
+function drawParticles(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.a+=0.003;
+    if(p.x<0)p.x=canvas.width;if(p.x>canvas.width)p.x=0;
+    if(p.y<0)p.y=canvas.height;if(p.y>canvas.height)p.y=0;
+    const alpha=0.2+0.3*Math.abs(Math.sin(p.a));
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=p.col+alpha+')';ctx.fill();
+  });
+  requestAnimationFrame(drawParticles);
+}
+drawParticles();
+
+// Counter animation
+function animateCount(el, target, prefix='', suffix='') {
+  const start = 0, duration = 2000;
+  const startTime = performance.now();
+  function update(now) {
+    const t = Math.min((now-startTime)/duration,1);
+    const ease = 1-Math.pow(1-t,4);
+    const val = Math.floor(ease*target);
+    el.textContent = prefix + val.toLocaleString() + suffix;
+    if(t<1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+// Animate tech bars on scroll
+const techObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.tc-bar-fill,.cmp-bar').forEach(b=>{
+        const w=b.style.width;b.style.width='0';
+        setTimeout(()=>{b.style.transition='width 1.5s ease';b.style.width=w;},100);
+      });
+    }
+  });
+},{threshold:0.3});
+document.querySelectorAll('.tech-grid,.tech-compare').forEach(el=>techObs.observe(el));
+
+// Scroll reveal
+const revObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add('visible');}
+  });
+},{threshold:0.08});
+document.querySelectorAll('.reveal,.reveal-l,.reveal-r').forEach(el=>revObs.observe(el));
+</script>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

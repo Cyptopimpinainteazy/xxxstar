@@ -1,0 +1,9 @@
+[package]
+name = "sp-io"
+version = "23.0.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Patched sp-io for Rust 1.88+ compatibility"
+
+[dependencies]
+# This is a stub - the real sp-io is complex, so we'll use a different approach

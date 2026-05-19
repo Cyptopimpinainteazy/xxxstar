@@ -1,0 +1,179 @@
+groups:
+  - name: gpu-swarm-alerts
+    interval: 30s
+    rules:
+      # ===== GPU HEALTH =====
+      - alert: HighGPUTemperature
+        expr: gpu_temperature_celsius > 85
+        for: 2m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "High GPU temperature on {{ $labels.device }}"
+          description: "GPU {{ $labels.device }} temperature is {{ $value }}°C (threshold: 85°C)"
+
+      - alert: CriticalGPUTemperature
+        expr: gpu_temperature_celsius > 95
+        for: 1m
+        labels:
+          severity: critical
+          service: gpu-swarm
+        annotations:
+          summary: "CRITICAL: GPU overheating on {{ $labels.device }}"
+          description: "GPU {{ $labels.device }} temperature is {{ $value }}°C. Immediate action required!"
+
+      - alert: LowGPUMemory
+        expr: gpu_memory_available_bytes / gpu_memory_total_bytes < 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "Low GPU memory on {{ $labels.device }}"
+          description: "GPU {{ $labels.device }} has only {{ $value | humanizePercentage }} memory available"
+
+      - alert: GPUUtilizationTooHigh
+        expr: gpu_utilization_percent > 95
+        for: 5m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "High GPU utilization on {{ $labels.device }}"
+          description: "GPU {{ $labels.device }} utilization is {{ $value }}% for 5+ minutes"
+
+      # ===== TASK EXECUTION =====
+      - alert: HighTaskFailureRate
+        expr: rate(gpu_tasks_failed_total[5m]) / (rate(gpu_tasks_completed_total[5m]) + rate(gpu_tasks_failed_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "High task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: TaskQueueBacklog
+        expr: gpu_task_queue_depth > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "Large task queue backlog"
+          description: "Task queue depth is {{ $value }} tasks. Processing may be slow."
+
+      - alert: TaskExecutionTimeout
+        expr: gpu_task_execution_time_seconds > 3600
+        for: 5m
+        labels:
+          severity: critical
+          service: gpu-swarm
+        annotations:
+          summary: "Task execution timeout"
+          description: "Task is taking {{ $value }}s to complete (max: 3600s)"
+
+      # ===== NETWORK HEALTH =====
+      - alert: PeerConnectionLoss
+        expr: gpu_peer_count < 3
+        for: 2m
+        labels:
+          severity: critical
+          service: gpu-swarm
+        annotations:
+          summary: "Low peer connectivity"
+          description: "Only {{ $value }} peers connected (minimum: 3)"
+
+      - alert: HighNetworkLatency
+        expr: gpu_network_latency_ms > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "High network latency"
+          description: "Network latency is {{ $value }}ms (threshold: 500ms)"
+
+      - alert: PacketLossDetected
+        expr: gpu_network_packet_loss_percent > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "Packet loss detected"
+          description: "Packet loss rate is {{ $value }}% (threshold: 1%)"
+
+      # ===== COORDINATOR HEALTH =====
+      - alert: CoordinatorDown
+        expr: up{job="gpu-swarm-coordinator"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: gpu-swarm
+        annotations:
+          summary: "GPU Swarm coordinator is down"
+          description: "Coordinator has been unreachable for 1+ minute"
+
+      - alert: CoordinatorHighMemory
+        expr: coordinator_memory_usage_bytes / coordinator_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "Coordinator memory usage high"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 85%)"
+
+      # ===== ECONOMIC METRICS =====
+      - alert: LowRewardFund
+        expr: reward_fund_balance_tokens < 10000
+        for: 10m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "Reward fund running low"
+          description: "Reward fund balance is {{ $value }} tokens. Consider rebalancing."
+
+      - alert: HighSlashingRate
+        expr: rate(slashing_events_total[1h]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: gpu-swarm
+        annotations:
+          summary: "Elevated slashing events"
+          description: "Slashing events rate is {{ $value | humanize }}/sec"
+
+      # ===== INFRASTRUCTURE =====
+      - alert: DiskSpaceRunningOut
+        expr: disk_available_bytes / disk_total_bytes < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Disk space low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+      - alert: HighCPUUsage
+        expr: node_cpu_seconds_total > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+      - alert: HighMemoryUsage
+        expr: node_memory_usage_bytes / node_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}"

@@ -1,0 +1,2511 @@
+{
+  "verdict": "BLOCKED",
+  "total_features": 59,
+  "built_count": 0,
+  "partial_count": 1,
+  "missing_count": 37,
+  "unwired_count": 12,
+  "untested_count": 7,
+  "weak_count": 2,
+  "stale_count": 0,
+  "blocked_count": 0,
+  "revoked_count": 0,
+  "results": [
+    {
+      "feature_id": "x3.runtime",
+      "name": "X3 Runtime Core",
+      "area": "runtime",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "runtime/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 2,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: runtime_compiles",
+        "unit: runtime_metadata_valid",
+        "integration: runtime_upgrade_works"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "runtime_upgrade_without_proof_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "3 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo build -p x3-runtime",
+        "cargo test -p x3-runtime",
+        "x3-proof claim prove x3.runtime"
+      ]
+    },
+    {
+      "feature_id": "x3.consensus",
+      "name": "Consensus Mechanism",
+      "area": "consensus",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/consensus.md"
+      ],
+      "code_found": 2,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "node service includes consensus",
+        "block production enabled"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: consensus_round_works",
+        "integration: multi_validator_consensus"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "malformed_block_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test consensus",
+        "x3-proof claim prove x3.consensus"
+      ]
+    },
+    {
+      "feature_id": "x3.finality",
+      "name": "Finality Gadget",
+      "area": "consensus",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/finality.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "finality gadget initialized"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: finality_works",
+        "integration: finality_across_validators"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "fake_finality_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test finality",
+        "x3-proof claim prove x3.finality"
+      ]
+    },
+    {
+      "feature_id": "x3.validator_set",
+      "name": "Validator Set Management",
+      "area": "staking",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/validators.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/staking/src/lib.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: validator_selection",
+        "integration: validator_rotation"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_validator_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-staking",
+        "x3-proof claim prove x3.validator_set"
+      ]
+    },
+    {
+      "feature_id": "x3.block_production",
+      "name": "Block Production",
+      "area": "consensus",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/block-production.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "block production service enabled"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: block_production_works",
+        "integration: blocks_produced_continuously"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_block_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test block_production",
+        "x3-proof claim prove x3.block_production"
+      ]
+    },
+    {
+      "feature_id": "x3.fee_market",
+      "name": "Fee Market",
+      "area": "transaction-payment",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/fees.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/transaction-payment/src/lib.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: fee_calculation",
+        "integration: fee_market_adjusts"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "zero_fee_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-transaction-payment",
+        "x3-proof claim prove x3.fee_market"
+      ]
+    },
+    {
+      "feature_id": "x3.accounts",
+      "name": "Account System",
+      "area": "system",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/accounts.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/system/src/lib.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: account_creation",
+        "integration: account_lifecycle"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_account_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p frame-system",
+        "x3-proof claim prove x3.accounts"
+      ]
+    },
+    {
+      "feature_id": "x3.balances",
+      "name": "Balance System",
+      "area": "balances",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/balances.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/balances/src/lib.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: balance_transfer",
+        "integration: balance_conservation"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "negative_balance_rejected",
+        "double_spend_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 tests missing",
+        "2 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-balances",
+        "x3-proof claim prove x3.balances"
+      ]
+    },
+    {
+      "feature_id": "x3.events",
+      "name": "Event System",
+      "area": "system",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/events.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "event emission enabled"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: event_emission",
+        "integration: events_across_pallets"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "malformed_event_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test events",
+        "x3-proof claim prove x3.events"
+      ]
+    },
+    {
+      "feature_id": "x3.errors",
+      "name": "Error Handling System",
+      "area": "system",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/errors.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "error types defined"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: error_propagation",
+        "integration: errors_across_pallets"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "error_recovery"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test errors",
+        "x3-proof claim prove x3.errors"
+      ]
+    },
+    {
+      "feature_id": "x3.genesis_config",
+      "name": "Genesis Configuration",
+      "area": "node",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/genesis.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "genesis config builds"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: genesis_builds",
+        "integration: genesis_produces_valid_state"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_genesis_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test chain_spec",
+        "x3-proof claim prove x3.genesis_config"
+      ]
+    },
+    {
+      "feature_id": "x3.asset_kernel",
+      "name": "Universal Asset Kernel",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/asset-kernel.md",
+        "pallets/x3-kernel/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [
+        "crates/x3-asset-kernel/src/lib.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [
+        "canonical supply callable",
+        "asset registry reachable"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: supply_conservation",
+        "unit: asset_mapping_unique",
+        "integration: evm_svm_asset_roundtrip"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "double_mint_rejected",
+        "duplicate_asset_mapping_rejected",
+        "failed_bridge_no_supply_leak"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 wiring checks failed",
+        "3 tests missing",
+        "3 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-x3-kernel",
+        "cargo test supply_conservation",
+        "x3-proof claim prove x3.asset_kernel.supply_conservation",
+        "x3-proof claim prove x3.asset_kernel"
+      ]
+    },
+    {
+      "feature_id": "x3.canonical_supply",
+      "name": "Canonical Supply Tracker",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/canonical-supply.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/supply.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "supply tracker in asset kernel"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: canonical_supply_tracking",
+        "integration: supply_across_vms"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "supply_inflation_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test canonical_supply",
+        "x3-proof claim prove x3.canonical_supply"
+      ]
+    },
+    {
+      "feature_id": "x3.asset_registry",
+      "name": "Asset Registry",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/asset-registry.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/registry.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: asset_registration",
+        "integration: cross_vm_asset_lookup"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "duplicate_registration_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test asset_registry",
+        "x3-proof claim prove x3.asset_registry"
+      ]
+    },
+    {
+      "feature_id": "x3.asset_mapping",
+      "name": "Cross-VM Asset Mapping",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/asset-mapping.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/mapping.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "asset mapping in kernel"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: asset_mapping_unique",
+        "integration: evm_svm_mapping"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "conflicting_mapping_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test asset_mapping",
+        "x3-proof claim prove x3.asset_mapping"
+      ]
+    },
+    {
+      "feature_id": "x3.mint_burn_controller",
+      "name": "Mint/Burn Controller",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/mint-burn.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/mint_burn.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "mint/burn controller in kernel"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: mint_burn_operations",
+        "integration: cross_vm_mint_burn"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "unauthorized_mint_rejected",
+        "double_mint_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "2 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test mint_burn",
+        "x3-proof claim prove x3.mint_burn_controller"
+      ]
+    },
+    {
+      "feature_id": "x3.external_locked_accounting",
+      "name": "External Locked Asset Accounting",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/external-locked.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/external_locked.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "external locked tracking in kernel"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: external_locked_tracking",
+        "integration: locked_supply_conservation"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "locked_asset_leak_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test external_locked",
+        "x3-proof claim prove x3.external_locked_accounting"
+      ]
+    },
+    {
+      "feature_id": "x3.pending_transfer_accounting",
+      "name": "Pending Transfer Accounting",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/pending-transfer.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/pending_transfer.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "pending transfer tracking in kernel"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: pending_transfer_tracking",
+        "integration: pending_supply_conservation"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "stuck_pending_transfer_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test pending_transfer",
+        "x3-proof claim prove x3.pending_transfer_accounting"
+      ]
+    },
+    {
+      "feature_id": "x3.supply_invariant_guard",
+      "name": "Supply Invariant Guard",
+      "area": "asset-kernel",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/supply-invariant.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-kernel/src/invariant.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "invariant guard in kernel"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: invariant_checking",
+        "integration: invariant_across_operations"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invariant_violation_caught"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test supply_invariant",
+        "x3-proof claim prove x3.supply_invariant_guard"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm",
+      "name": "X3VM Core",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-vm/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: x3vm_execution",
+        "integration: x3vm_determinism"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_bytecode_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p x3-vm",
+        "x3-proof claim prove x3.x3vm"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm_bytecode",
+      "name": "X3VM Bytecode Format",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/x3vm-bytecode.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/bytecode.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "bytecode parser in x3vm"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: bytecode_parsing",
+        "integration: bytecode_execution"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "malformed_bytecode_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test bytecode",
+        "x3-proof claim prove x3.x3vm_bytecode"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm_gas_metering",
+      "name": "X3VM Gas Metering",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/x3vm-gas.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/gas.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "gas metering in x3vm"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: gas_calculation",
+        "integration: gas_limits_enforced"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "out_of_gas_reverts"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test gas",
+        "x3-proof claim prove x3.x3vm_gas_metering"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm_storage",
+      "name": "X3VM Storage Interface",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/x3vm-storage.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/storage.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "storage interface in x3vm"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: storage_operations",
+        "integration: storage_persistence"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "storage_collision_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test storage",
+        "x3-proof claim prove x3.x3vm_storage"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm_events",
+      "name": "X3VM Event Emission",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/x3vm-events.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/events.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "event emission in x3vm"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: event_emission",
+        "integration: events_captured"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "malformed_event_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p x3-vm events",
+        "x3-proof claim prove x3.x3vm_events"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm_revert",
+      "name": "X3VM Revert Mechanism",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/x3vm-revert.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/revert.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "revert mechanism in x3vm"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: revert_works",
+        "integration: state_rollback_on_revert"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "failed_contract_reverts"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test revert",
+        "x3-proof claim prove x3.x3vm_revert"
+      ]
+    },
+    {
+      "feature_id": "x3.x3vm_cpu_gpu_parity",
+      "name": "X3VM CPU/GPU Parity",
+      "area": "gpu",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/cpu-gpu-parity.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/gpu.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "GPU execution path exists"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: cpu_gpu_same_result",
+        "integration: deterministic_state_root"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "divergent_results_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test cpu_gpu_parity",
+        "x3-proof claim prove x3.x3vm_cpu_gpu_parity"
+      ]
+    },
+    {
+      "feature_id": "x3.evm_adapter",
+      "name": "EVM Adapter",
+      "area": "evm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/evm-integration/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: evm_execution",
+        "integration: evm_contract_deployment"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_evm_bytecode_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p evm-integration",
+        "x3-proof claim prove x3.evm_adapter"
+      ]
+    },
+    {
+      "feature_id": "x3.svm_adapter",
+      "name": "SVM Adapter",
+      "area": "svm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/svm-integration/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: svm_execution",
+        "integration: svm_program_deployment"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_svm_program_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p svm-integration",
+        "x3-proof claim prove x3.svm_adapter"
+      ]
+    },
+    {
+      "feature_id": "x3.cross_vm_router",
+      "name": "Cross-VM Router",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "pallets/x3-cross-vm-router/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: vm_routing",
+        "integration: evm_to_svm_call",
+        "integration: svm_to_evm_call"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_vm_call_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "3 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-x3-cross-vm-router",
+        "x3-proof claim prove x3.cross_vm_router"
+      ]
+    },
+    {
+      "feature_id": "x3.evm_precompiles",
+      "name": "EVM Precompiles",
+      "area": "evm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/evm-precompiles.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/evm-integration/src/precompiles.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "precompiles in EVM adapter"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: precompile_execution",
+        "integration: precompile_gas_cost"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_precompile_input_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test precompiles",
+        "x3-proof claim prove x3.evm_precompiles"
+      ]
+    },
+    {
+      "feature_id": "x3.svm_syscalls",
+      "name": "SVM Syscalls",
+      "area": "svm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/svm-syscalls.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/svm-integration/src/syscalls.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "syscalls in SVM adapter"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: syscall_execution",
+        "integration: syscall_integration"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_syscall_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test syscalls",
+        "x3-proof claim prove x3.svm_syscalls"
+      ]
+    },
+    {
+      "feature_id": "x3.vm_isolation",
+      "name": "VM Isolation Layer",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/vm-isolation.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/isolation.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "isolation layer in VM stack"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: vm_isolation",
+        "integration: cross_vm_isolation"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "vm_escape_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test isolation",
+        "x3-proof claim prove x3.vm_isolation"
+      ]
+    },
+    {
+      "feature_id": "x3.vm_state_transition",
+      "name": "VM State Transition",
+      "area": "x3vm",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/vm-state-transition.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-vm/src/state.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "state transition in x3vm"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: state_transition",
+        "integration: deterministic_state"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_transition_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test state_transition",
+        "x3-proof claim prove x3.vm_state_transition"
+      ]
+    },
+    {
+      "feature_id": "x3.vm_fallback",
+      "name": "VM Fallback Mechanism",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/vm-fallback.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-cross-vm-router/src/fallback.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "fallback in cross-vm router"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: fallback_triggered",
+        "integration: fallback_recovery"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "fallback_loop_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test fallback",
+        "x3-proof claim prove x3.vm_fallback"
+      ]
+    },
+    {
+      "feature_id": "x3.vm_metering",
+      "name": "Cross-VM Metering",
+      "area": "cross-vm",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "docs/vm-metering.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-cross-vm-router/src/metering.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "metering in cross-vm router"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: cross_vm_gas_tracking",
+        "integration: metering_accuracy"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "out_of_gas_cross_vm_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test metering",
+        "x3-proof claim prove x3.vm_metering"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_parser",
+      "name": "x3-lang Parser",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/parser.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/parser.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "parser in compiler"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: parser_works",
+        "integration: parse_complex_contract"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_syntax_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p x3-compiler parser",
+        "x3-proof claim prove x3.x3lang_parser"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_typechecker",
+      "name": "x3-lang Type Checker",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/typechecker.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/typechecker.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "type checker in compiler"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: typechecker_works",
+        "integration: type_inference"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "type_mismatch_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test typechecker",
+        "x3-proof claim prove x3.x3lang_typechecker"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_compiler",
+      "name": "x3-lang Compiler",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "compiler builds"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: compiler_works",
+        "integration: compile_to_bytecode"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "compilation_error_reported"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p x3-compiler",
+        "x3-proof claim prove x3.x3lang_compiler"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_ir",
+      "name": "x3-lang IR",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/ir.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/ir.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "IR in compiler"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: ir_generation",
+        "integration: ir_optimization"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_ir_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test ir",
+        "x3-proof claim prove x3.x3lang_ir"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_optimizer",
+      "name": "x3-lang Optimizer",
+      "area": "x3lang",
+      "required_for": "testnet",
+      "criticality": "high",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/optimizer.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/optimizer.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "optimizer in compiler"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: optimization_works",
+        "integration: optimized_bytecode_smaller"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "optimization_preserves_semantics"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test optimizer",
+        "x3-proof claim prove x3.x3lang_optimizer"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_bytecode_generator",
+      "name": "x3-lang Bytecode Generator",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/codegen.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/codegen.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "codegen in compiler"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: bytecode_generation",
+        "integration: bytecode_executes"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_bytecode_not_generated"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test codegen",
+        "x3-proof claim prove x3.x3lang_bytecode_generator"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_abi_generator",
+      "name": "x3-lang ABI Generator",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-compiler/docs/abi.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "crates/x3-compiler/src/abi.rs"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "ABI generator in compiler"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: abi_generation",
+        "integration: abi_matches_contract"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_abi_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test abi",
+        "x3-proof claim prove x3.x3lang_abi_generator"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_stdlib",
+      "name": "x3-lang Standard Library",
+      "area": "x3lang",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-stdlib/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "stdlib available to contracts"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: stdlib_functions",
+        "integration: stdlib_in_contract"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "stdlib_error_handling"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p x3-stdlib",
+        "x3-proof claim prove x3.x3lang_stdlib"
+      ]
+    },
+    {
+      "feature_id": "x3.x3lang_contract_templates",
+      "name": "x3-lang Contract Templates",
+      "area": "x3lang",
+      "required_for": "testnet",
+      "criticality": "medium",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "templates/README.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "templates/src/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "templates available via CLI"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: template_compiles",
+        "integration: template_deploys"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "template_validation"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test templates",
+        "x3-proof claim prove x3.x3lang_contract_templates"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.evm_core",
+      "name": "EVM Contract Core",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/evm/README.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/contracts/core/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "EVM contracts deployable"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: evm_contract_tests",
+        "integration: evm_contract_deployment"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "evm_contract_revert"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cd X3-contracts/evm && forge test",
+        "x3-proof claim prove x3.contracts.evm_core"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.svm_core",
+      "name": "SVM Program Core",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/svm/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "SVM programs deployable"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: svm_program_tests",
+        "integration: svm_program_deployment"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "svm_program_error"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cd X3-contracts/svm && anchor test",
+        "x3-proof claim prove x3.contracts.svm_core"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.shared_specs",
+      "name": "Shared Contract Specs",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "UNWIRED",
+      "docs_found": 1,
+      "docs_missing": [],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "specs referenced by both EVM and SVM"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: spec_validation",
+        "integration: cross_vm_spec_compliance"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "spec_violation_caught"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test specs",
+        "x3-proof claim prove x3.contracts.shared_specs"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.evm_svm_parity",
+      "name": "EVM/SVM Parity Tests",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/shared/specs/parity.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "parity tests run in CI"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: evm_svm_parity",
+        "integration: cross_vm_parity"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "parity_violation_caught"
+      ],
+      "receipt_exists": true,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt stale"
+      ],
+      "next_commands": [
+        "cargo test parity"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.deployment",
+      "name": "Contract Deployment System",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/evm/script/README.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/script/deploy/",
+        "X3-contracts/svm/migrations/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "deployment scripts work"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: deployment_dry_run",
+        "integration: deployment_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "deployment_failure_handling"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "forge script deploy",
+        "x3-proof claim prove x3.contracts.deployment"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.upgrade",
+      "name": "Contract Upgrade System",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/evm/script/upgrade.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/script/upgrade/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "upgrade scripts work"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: upgrade_simulation",
+        "integration: upgrade_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "upgrade_failure_rollback"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "forge script upgrade",
+        "x3-proof claim prove x3.contracts.upgrade"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.event_schema",
+      "name": "Contract Event Schema",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/shared/schemas/events.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/shared/schemas/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "event schema validated"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: event_schema_validation",
+        "integration: cross_vm_event_decoding"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_event_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test event_schema",
+        "x3-proof claim prove x3.contracts.event_schema"
+      ]
+    },
+    {
+      "feature_id": "x3.contracts.security",
+      "name": "Contract Security Framework",
+      "area": "contracts",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "X3-contracts/evm/contracts/security/"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "X3-contracts/evm/contracts/security/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "security contracts deployed"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: security_controls",
+        "integration: security_enforcement"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "security_breach_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "forge test --match-path test/security",
+        "x3-proof claim prove x3.contracts.security"
+      ]
+    },
+    {
+      "feature_id": "x3.bridge",
+      "name": "Bridge Core",
+      "area": "bridge",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNTESTED",
+      "docs_found": 0,
+      "docs_missing": [
+        "crates/x3-bridge/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: bridge_message_processing",
+        "integration: bridge_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "replay_attack_rejected",
+        "fake_finality_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "2 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p x3-bridge",
+        "x3-proof claim prove x3.bridge"
+      ]
+    },
+    {
+      "feature_id": "x3.atomic_execution",
+      "name": "Atomic Execution Engine",
+      "area": "atomic",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "WEAK",
+      "docs_found": 0,
+      "docs_missing": [
+        "pallets/x3-atomic-kernel/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 1,
+      "tests_missing": [
+        "unit: atomic_commit",
+        "integration: cross_vm_atomic"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "partial_commit_rejected",
+        "rollback_failure_caught"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "2 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-x3-atomic-kernel",
+        "x3-proof claim prove x3.atomic_execution"
+      ]
+    },
+    {
+      "feature_id": "x3.flashloan",
+      "name": "Flashloan System",
+      "area": "flashloan",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "pallets/x3-flashloan/README.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "pallets/x3-flashloan/src/lib.rs"
+      ],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: flashloan_borrow_repay",
+        "integration: flashloan_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "theft_attempt_rejected",
+        "no_repay_reverts"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "2 tests missing",
+        "2 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-x3-flashloan",
+        "x3-proof claim prove x3.flashloan"
+      ]
+    },
+    {
+      "feature_id": "x3.dex",
+      "name": "DEX Core",
+      "area": "dex",
+      "required_for": "mainnet",
+      "criticality": "critical",
+      "status": "PARTIAL",
+      "docs_found": 0,
+      "docs_missing": [
+        "pallets/x3-dex/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 1,
+      "tests_missing": [
+        "unit: pool_creation",
+        "integration: dex_e2e"
+      ],
+      "negative_tests_found": 1,
+      "negative_tests_missing": [
+        "price_manipulation_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-x3-dex",
+        "x3-proof claim prove x3.dex"
+      ]
+    },
+    {
+      "feature_id": "x3.governance",
+      "name": "Governance System",
+      "area": "governance",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "WEAK",
+      "docs_found": 0,
+      "docs_missing": [
+        "pallets/governance/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 1,
+      "wiring_missing": [],
+      "tests_found": 1,
+      "tests_missing": [
+        "unit: proposal_creation",
+        "integration: governance_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "unauthorized_proposal_rejected",
+        "proof_gate_enforced"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "2 tests missing",
+        "2 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p pallet-governance",
+        "x3-proof claim prove x3.governance"
+      ]
+    },
+    {
+      "feature_id": "x3.proofforge_cli",
+      "name": "ProofForge CLI",
+      "area": "proofforge",
+      "required_for": "mainnet",
+      "criticality": "catastrophic",
+      "status": "UNWIRED",
+      "docs_found": 0,
+      "docs_missing": [
+        "proof-forge/README.md"
+      ],
+      "code_found": 1,
+      "code_missing": [],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "x3-proof binary builds"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: cli_parsing",
+        "integration: cli_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "invalid_command_rejected"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "cargo test -p proof-forge",
+        "x3-proof claim prove x3.proofforge_cli"
+      ]
+    },
+    {
+      "feature_id": "x3.dashboard",
+      "name": "Dashboard UI",
+      "area": "frontend",
+      "required_for": "testnet",
+      "criticality": "high",
+      "status": "MISSING",
+      "docs_found": 0,
+      "docs_missing": [
+        "dashboard/README.md"
+      ],
+      "code_found": 0,
+      "code_missing": [
+        "dashboard/src/"
+      ],
+      "wiring_found": 0,
+      "wiring_missing": [
+        "dashboard accessible"
+      ],
+      "tests_found": 0,
+      "tests_missing": [
+        "unit: component_tests",
+        "integration: dashboard_e2e"
+      ],
+      "negative_tests_found": 0,
+      "negative_tests_missing": [
+        "error_handling"
+      ],
+      "receipt_exists": false,
+      "receipt_fresh": false,
+      "critical_todos": 0,
+      "blockers": [
+        "1 code files missing",
+        "1 wiring checks failed",
+        "2 tests missing",
+        "1 negative tests missing",
+        "proof receipt missing"
+      ],
+      "next_commands": [
+        "npm test",
+        "x3-proof claim prove x3.dashboard"
+      ]
+    }
+  ],
+  "top_blockers": [
+    "x3.accounts: 1 code files missing",
+    "x3.accounts: 1 negative tests missing",
+    "x3.accounts: 2 tests missing",
+    "x3.accounts: proof receipt missing",
+    "x3.asset_kernel: 1 code files missing",
+    "x3.asset_kernel: 2 wiring checks failed",
+    "x3.asset_kernel: 3 negative tests missing",
+    "x3.asset_kernel: 3 tests missing",
+    "x3.asset_kernel: proof receipt missing",
+    "x3.asset_mapping: 1 code files missing",
+    "x3.asset_mapping: 1 negative tests missing",
+    "x3.asset_mapping: 1 wiring checks failed",
+    "x3.asset_mapping: 2 tests missing",
+    "x3.asset_mapping: proof receipt missing",
+    "x3.asset_registry: 1 code files missing",
+    "x3.asset_registry: 1 negative tests missing",
+    "x3.asset_registry: 2 tests missing",
+    "x3.asset_registry: proof receipt missing",
+    "x3.atomic_execution: 2 negative tests missing",
+    "x3.atomic_execution: 2 tests missing",
+    "x3.atomic_execution: proof receipt missing",
+    "x3.balances: 1 code files missing",
+    "x3.balances: 2 negative tests missing",
+    "x3.balances: 2 tests missing",
+    "x3.balances: proof receipt missing",
+    "x3.block_production: 1 negative tests missing",
+    "x3.block_production: 1 wiring checks failed",
+    "x3.block_production: 2 tests missing",
+    "x3.block_production: proof receipt missing",
+    "x3.bridge: 2 negative tests missing",
+    "x3.bridge: 2 tests missing",
+    "x3.bridge: proof receipt missing",
+    "x3.canonical_supply: 1 code files missing",
+    "x3.canonical_supply: 1 negative tests missing",
+    "x3.canonical_supply: 1 wiring checks failed",
+    "x3.canonical_supply: 2 tests missing",
+    "x3.canonical_supply: proof receipt missing",
+    "x3.consensus: 1 negative tests missing",
+    "x3.consensus: 2 tests missing",
+    "x3.consensus: 2 wiring checks failed",
+    "x3.consensus: proof receipt missing",
+    "x3.contracts.deployment: 1 negative tests missing",
+    "x3.contracts.deployment: 1 wiring checks failed",
+    "x3.contracts.deployment: 2 code files missing",
+    "x3.contracts.deployment: 2 tests missing",
+    "x3.contracts.deployment: proof receipt missing",
+    "x3.contracts.event_schema: 1 code files missing",
+    "x3.contracts.event_schema: 1 negative tests missing",
+    "x3.contracts.event_schema: 1 wiring checks failed",
+    "x3.contracts.event_schema: 2 tests missing"
+  ]
+}

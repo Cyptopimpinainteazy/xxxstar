@@ -1,0 +1,85 @@
+{
+  "name": "X3 Testnet",
+  "id": "x3_testnet_1",
+  "chainType": "Local",
+  "bootNodes": [],
+  "telemetryEndpoints": null,
+  "protocolId": "x3t",
+  "properties": {
+    "ss58Format": 42,
+    "tokenDecimals": 12,
+    "tokenSymbol": "X3T"
+  },
+  "relay_chain": "x3",
+  "para_id": 2000,
+  "genesis": {
+    "runtime": {
+      "system": {
+        "code": "0x..."
+      },
+      "balances": {
+        "balances": [
+          ["1AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1000000000000000],
+          ["1BBBBBBBBBBBBBBBBBBBBBBBBBBBB", 500000000000000],
+          ["1CCCCCCCCCCCCCCCCCCCCCCCCCCCC", 500000000000000],
+          ["1DDDDDDDDDDDDDDDDDDDDDDDDDDDD", 250000000000000],
+          ["1EEEEEEEEEEEEEEEEEEEEEEEEEEEE", 250000000000000]
+        ]
+      },
+      "sudo": {
+        "key": "1AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "aura": {
+        "authorities": [
+          "1AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "1BBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+          "1CCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+        ]
+      },
+      "grandpa": {
+        "authorities": [
+          ["1AAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1],
+          ["1BBBBBBBBBBBBBBBBBBBBBBBBBBBB", 1],
+          ["1CCCCCCCCCCCCCCCCCCCCCCCCCCCC", 1]
+        ]
+      },
+      "tokens": {
+        "endowedAccounts": [
+          "1AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "1BBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+          "1CCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+          "1DDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+          "1EEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+          "1FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        ]
+      },
+      "session": {
+        "keys": [
+          [
+            "1AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "1AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            {
+              "aura": "0x...",
+              "grandpa": "0x..."
+            }
+          ]
+        ]
+      },
+      "walletPallet": {
+        "maxWalletsPerAccount": 10,
+        "maxMultisigSigners": 50,
+        "maxContacts": 1000
+      },
+      "dexPallet": {
+        "minLiquidity": 1000,
+        "swapFeePercent": 500,
+        "protocolFeePercent": 100
+      },
+      "consensusGpu": {
+        "gpuRequirementJobs": 100,
+        "targetValidatorGpuCount": 50,
+        "jobDifficulty": 10000
+      }
+    }
+  }
+}

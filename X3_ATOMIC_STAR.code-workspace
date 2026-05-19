@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"name": "X3_ATOMIC_STAR",
+			"path": "."
+		}
+	],
+	"settings": {
+		"todo-tree.tree.scanMode": "workspace only"
+	}
+}

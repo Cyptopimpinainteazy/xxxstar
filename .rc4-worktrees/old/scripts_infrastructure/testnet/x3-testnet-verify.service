@@ -1,0 +1,35 @@
+[Unit]
+Description=X3 Testnet Continuous Verification
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lojak
+Group=lojak
+WorkingDirectory=/home/lojak/Desktop/x3-chain-master
+ExecStart=/bin/bash /home/lojak/Desktop/x3-chain-master/scripts/testnet/continuous-verify.sh --interval-sec 60
+Restart=always
+RestartSec=5
+Environment=PATH=/home/lojak/.local/bin:/home/lojak/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=INTERVAL_SEC=60
+Environment=RUN_LOAD=0
+Environment=RUN_MULTIPROCESS=0
+Environment=LOAD_DURATION_SEC=300
+Environment=MIN_FINALIZED_TPS=0
+Environment=MAX_ERROR_RATE=0.01
+Environment=CHECK_TELEMETRY=0
+Environment=TESTNET_CONFIG=/home/lojak/Desktop/x3-chain-master/docs/testnet-config/testnet-config.json
+Environment=LOG_FILE=/home/lojak/Desktop/x3-chain-master/logs/testnet-verify.log
+Environment=STATUS_FILE=/home/lojak/Desktop/x3-chain-master/logs/testnet-verify-status.json
+Environment=LOG_MAX_BYTES=10485760
+Environment=LOG_BACKUPS=5
+Environment=START_LOCAL_VALIDATORS=1
+Environment=LOCAL_BASE_DIR=/tmp/x3-testnet-ci
+Environment=LOCAL_LOG_DIR=/tmp/x3-testnet-ci-logs
+Environment=LOCAL_COUNT=7
+Environment=LOCAL_READY_TIMEOUT_SEC=120
+Environment=SUBKEY_BIN=/home/lojak/.cargo/bin/subkey
+
+[Install]
+WantedBy=multi-user.target

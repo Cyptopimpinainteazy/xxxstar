@@ -1,0 +1,5 @@
+category|finding|reason
+MEMORY|crates/x3-packet-standard/src/replay.rs:7://! The guard is intentionally a small in-memory map so the same logic can be|Design note for in-memory replay guard implementation
+LOCALHOST|crates/x3-readiness-report/src/collector.rs:23:const DEFAULT_RPC: &str = "http://127.0.0.1:9944";|Intentional local default endpoint for readiness tooling
+LOCALHOST|crates/x3-readiness-report/src/collector.rs:194:        let r = Collector::collect_live(Some("http://127.0.0.1:1"));|Intentional unreachable endpoint in tests for Unknown behavior
+LOCALHOST|crates/x3-readiness-report/src/collector.rs:206:        let live_unreachable = Collector::collect_live(Some("http://127.0.0.1:1"));|Intentional unreachable endpoint in tests for Unknown behavior

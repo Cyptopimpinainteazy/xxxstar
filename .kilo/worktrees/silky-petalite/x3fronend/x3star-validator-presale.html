@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Validator Node Presale</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#010208;--surface:rgba(6,10,28,0.9);
+  --border:rgba(255,160,0,0.15);--glow:rgba(255,160,0,0.4);
+  --gold:#ffd700;--gold2:#ff9900;--amber:#ff6600;
+  --cyan:#00d4ff;--green:#00ff88;--red:#ff3366;--purple:#bb44ff;
+  --text:#fff5e0;--muted:#886633;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;cursor:none;}
+#cursor{position:fixed;width:24px;height:24px;border:1px solid var(--gold);border-radius:50%;
+  pointer-events:none;z-index:9999;transition:transform 0.1s;mix-blend-mode:screen;}
+#cursor-dot{position:fixed;width:4px;height:4px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;}
+
+/* Hex grid BG */
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34z' fill='none' stroke='rgba(255,160,0,0.04)' stroke-width='1'/%3E%3C/svg%3E");
+  background-size:56px 100px;}
+
+.nebula{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0;}
+.n1{width:700px;height:700px;background:radial-gradient(circle,rgba(255,140,0,0.07),transparent);top:-300px;right:-200px;}
+.n2{width:500px;height:500px;background:radial-gradient(circle,rgba(0,200,255,0.05),transparent);bottom:-200px;left:-100px;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;padding:0 60px;height:72px;
+  background:linear-gradient(180deg,rgba(1,2,8,0.95),transparent);backdrop-filter:blur(12px);}
+.nav-logo{font-family:'Orbitron',monospace;font-weight:900;font-size:22px;
+  background:linear-gradient(90deg,var(--gold),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:3px;cursor:pointer;}
+.nav-links{display:flex;gap:32px;margin:0 auto;}
+.nav-link{font-size:13px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:color 0.2s;padding:4px 0;border-bottom:1px solid transparent;text-decoration:none;}
+.nav-link:hover,.nav-link.active{color:var(--gold);border-bottom-color:var(--gold);}
+.btn{padding:10px 24px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;border:none;}
+.btn-outline{background:transparent;border:1px solid rgba(255,215,0,0.3);color:var(--gold);}
+.btn-outline:hover{border-color:var(--gold);box-shadow:0 0 20px rgba(255,215,0,0.2);}
+.btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;font-weight:700;}
+.btn-primary:hover{box-shadow:0 0 30px rgba(255,215,0,0.4);transform:translateY(-1px);}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;align-items:center;padding:120px 60px 60px;
+  position:relative;z-index:1;gap:80px;}
+.hero-left{flex:1;}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;margin-bottom:24px;
+  background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);
+  border-radius:100px;padding:8px 20px;font-size:12px;letter-spacing:3px;
+  color:var(--gold);text-transform:uppercase;}
+.hero-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold);animation:blink 1.5s infinite;}
+.hero-title{font-family:'Orbitron',monospace;font-size:clamp(36px,5vw,68px);font-weight:900;
+  line-height:0.95;letter-spacing:-2px;margin-bottom:24px;}
+.ht-1{display:block;color:var(--text);}
+.ht-2{display:block;background:linear-gradient(135deg,var(--gold),var(--amber));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.ht-3{display:block;color:rgba(255,255,255,0.3);font-size:0.7em;}
+.hero-sub{font-size:17px;color:var(--muted);line-height:1.7;margin-bottom:36px;max-width:520px;}
+
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:36px;}
+.hs-item{background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.15);
+  border-radius:12px;padding:16px;}
+.hs-val{font-family:'Orbitron',monospace;font-size:22px;font-weight:800;color:var(--gold);}
+.hs-key{font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:4px;}
+
+.hero-actions{display:flex;gap:12px;}
+.btn-xl{padding:16px 36px;font-size:14px;letter-spacing:3px;border-radius:10px;}
+
+/* RIGHT: NODE WIDGET */
+.hero-right{width:440px;flex-shrink:0;}
+
+.node-selector{background:rgba(6,10,28,0.95);border:1px solid rgba(255,215,0,0.2);
+  border-radius:20px;padding:28px;position:relative;overflow:hidden;}
+.node-selector::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+
+.ns-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;margin-bottom:6px;}
+.ns-sub{font-size:12px;color:var(--muted);margin-bottom:24px;}
+
+/* SLOT TRACKER */
+.slot-track{margin-bottom:24px;}
+.slot-header{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;}
+.slot-remain{color:var(--gold);font-family:'Orbitron',monospace;font-weight:700;}
+.slot-total{color:var(--muted);}
+.slot-grid{display:grid;grid-template-columns:repeat(20,1fr);gap:3px;margin-bottom:6px;}
+.slot-cell{height:10px;border-radius:2px;transition:all 0.3s;}
+.slot-taken{background:var(--gold);}
+.slot-avail{background:rgba(255,215,0,0.12);border:1px solid rgba(255,215,0,0.15);}
+.slot-reserved{background:rgba(0,200,255,0.2);border:1px solid rgba(0,200,255,0.3);}
+.slot-legend{display:flex;gap:16px;font-size:10px;color:var(--muted);}
+.sl-item{display:flex;align-items:center;gap:5px;}
+.sl-dot{width:8px;height:8px;border-radius:2px;}
+
+/* TIER CARDS */
+.tier-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+.tier-card{border-radius:12px;padding:16px;cursor:pointer;transition:all 0.2s;
+  border:2px solid transparent;position:relative;}
+.tier-card.selected{border-color:var(--gold);}
+.tier-card::after{content:'';position:absolute;inset:0;border-radius:10px;
+  pointer-events:none;transition:all 0.2s;}
+
+.tc-genesis{background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,150,0,0.06));}
+.tc-genesis.selected{box-shadow:0 0 30px rgba(255,215,0,0.2);}
+.tc-star{background:linear-gradient(135deg,rgba(150,100,255,0.12),rgba(100,50,200,0.06));}
+.tc-star.selected{border-color:var(--purple)!important;box-shadow:0 0 30px rgba(150,100,255,0.2);}
+.tc-lite{background:linear-gradient(135deg,rgba(0,200,255,0.08),rgba(0,100,200,0.04));}
+.tc-lite.selected{border-color:var(--cyan)!important;box-shadow:0 0 30px rgba(0,200,255,0.2);}
+
+.tc-row{display:flex;align-items:center;justify-content:space-between;}
+.tc-name{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;}
+.tc-price{font-family:'Orbitron',monospace;font-size:16px;font-weight:800;}
+.tc-badge{font-size:9px;letter-spacing:1.5px;padding:3px 10px;border-radius:100px;margin-top:4px;display:inline-block;}
+.tc-features{font-size:11px;color:var(--muted);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;}
+.tc-feat{display:flex;align-items:center;gap:4px;}
+
+.qty-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.qty-label{font-size:12px;color:var(--muted);letter-spacing:1px;}
+.qty-controls{display:flex;align-items:center;gap:10px;}
+.qty-btn{width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);
+  background:rgba(255,215,0,0.05);color:var(--gold);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.qty-btn:hover{background:rgba(255,215,0,0.15);}
+.qty-num{font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--gold);
+  width:36px;text-align:center;}
+
+.order-summary{background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;}
+.os-row{display:flex;justify-content:space-between;padding:4px 0;}
+.os-row.total{border-top:1px solid var(--border);margin-top:8px;padding-top:10px;
+  font-size:14px;font-family:'Orbitron',monospace;font-weight:700;color:var(--gold);}
+
+.buy-btn{width:100%;padding:18px;border-radius:12px;font-family:'Orbitron',monospace;
+  font-size:13px;font-weight:700;letter-spacing:3px;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;
+  border:none;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
+.buy-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);
+  transition:left 0.5s;}
+.buy-btn:hover::before{left:100%;}
+.buy-btn:hover{box-shadow:0 0 40px rgba(255,215,0,0.5);transform:translateY(-2px);}
+
+/* BENEFITS */
+.benefits{padding:100px 60px;position:relative;z-index:1;}
+.section-eyebrow{font-size:11px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;
+  margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.section-eyebrow::after{content:'';flex:1;max-width:60px;height:1px;background:var(--gold);}
+.section-title{font-family:'Orbitron',monospace;font-size:clamp(28px,4vw,48px);font-weight:700;
+  margin-bottom:16px;letter-spacing:-1px;}
+
+.benefits-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:60px;}
+.benefit-card{background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.1);
+  border-radius:16px;padding:28px;transition:all 0.3s;position:relative;overflow:hidden;}
+.benefit-card:hover{background:rgba(255,215,0,0.06);border-color:rgba(255,215,0,0.25);
+  transform:translateY(-4px);}
+.benefit-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0;transition:opacity 0.3s;}
+.benefit-card:hover::before{opacity:1;}
+.bc-icon{font-size:36px;margin-bottom:16px;}
+.bc-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:600;color:var(--gold);margin-bottom:10px;}
+.bc-text{font-size:13px;color:var(--muted);line-height:1.7;}
+.bc-val{font-family:'Orbitron',monospace;font-size:22px;font-weight:800;color:var(--gold);
+  margin-top:12px;}
+
+/* COMPARISON TABLE */
+.comparison{padding:100px 60px;position:relative;z-index:1;
+  background:rgba(255,255,255,0.01);border-top:1px solid var(--border);}
+.comp-table{width:100%;border-collapse:collapse;margin-top:48px;}
+.comp-table th{padding:16px 24px;font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);text-align:left;}
+.comp-table th:not(:first-child){text-align:center;}
+.comp-table td{padding:14px 24px;border-top:1px solid rgba(255,255,255,0.04);font-size:13px;}
+.comp-table td:not(:first-child){text-align:center;font-family:'Orbitron',monospace;font-size:12px;}
+.comp-table tr:hover td{background:rgba(255,215,0,0.02);}
+.col-genesis{color:var(--gold);font-weight:700;}
+.col-star{color:var(--purple);font-weight:700;}
+.col-lite{color:var(--cyan);font-weight:700;}
+.check{color:var(--green);font-size:16px;}
+.cross{color:rgba(255,255,255,0.2);font-size:16px;}
+.th-genesis{background:rgba(255,215,0,0.08);border-radius:10px 10px 0 0;}
+.th-best{position:relative;}
+.best-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  background:var(--gold);color:#000;font-size:9px;font-weight:700;letter-spacing:1.5px;
+  padding:3px 10px;border-radius:100px;white-space:nowrap;}
+
+/* STEPS */
+.steps{padding:100px 60px;position:relative;z-index:1;}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:60px;position:relative;}
+.steps-grid::before{content:'';position:absolute;top:28px;left:12%;right:12%;height:1px;
+  background:linear-gradient(90deg,var(--gold),var(--amber),var(--gold));}
+.step{text-align:center;padding:0 20px;}
+.step-num{width:56px;height:56px;border-radius:50%;border:2px solid var(--gold);
+  background:rgba(255,215,0,0.08);display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',monospace;font-size:18px;font-weight:800;color:var(--gold);
+  margin:0 auto 20px;position:relative;z-index:1;}
+.step.done .step-num{background:rgba(0,255,136,0.15);border-color:var(--green);color:var(--green);}
+.step-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:600;margin-bottom:8px;}
+.step-text{font-size:12px;color:var(--muted);line-height:1.6;}
+
+/* TESTIMONIALS */
+.testimonials{padding:100px 60px;position:relative;z-index:1;background:rgba(255,255,255,0.01);border-top:1px solid var(--border);}
+.testimonials-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px;}
+.testi-card{background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.1);
+  border-radius:16px;padding:24px;}
+.testi-stars{color:var(--gold);font-size:14px;margin-bottom:12px;}
+.testi-text{font-size:13px;color:var(--text);line-height:1.7;margin-bottom:16px;font-style:italic;}
+.testi-author{display:flex;align-items:center;gap:10px;}
+.testi-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:13px;}
+.testi-name{font-size:13px;font-weight:600;}
+.testi-role{font-size:11px;color:var(--muted);}
+
+footer{padding:60px;border-top:1px solid var(--border);display:flex;align-items:center;
+  justify-content:space-between;position:relative;z-index:1;}
+.footer-logo{font-family:'Orbitron',monospace;font-size:24px;font-weight:900;
+  background:linear-gradient(90deg,var(--gold),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.footer-links{display:flex;gap:24px;font-size:12px;color:var(--muted);}
+.footer-links a{cursor:pointer;transition:color 0.2s;text-decoration:none;color:var(--muted);}
+.footer-links a:hover{color:var(--gold);}
+.footer-legal{font-size:11px;color:var(--muted);opacity:0.5;}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.reveal{opacity:0;transform:translateY(30px);transition:all 0.7s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+<div class="nebula n1"></div>
+<div class="nebula n2"></div>
+<div id="cursor"></div>
+<div id="cursor-dot"></div>
+
+<nav>
+  <div class="nav-logo">X3STAR</div>
+  <div class="nav-links">
+    <a class="nav-link" href="x3star-token-presale.html">Presale</a>
+    <a class="nav-link active">Validator</a>
+    <a class="nav-link" href="x3star-dashboard.html">Dashboard</a>
+    <a class="nav-link" href="x3star-staking.html">Staking</a>
+    <a class="nav-link" href="x3star-governance.html">Governance</a>
+  </div>
+  <div style="display:flex;gap:12px;">
+    <button class="btn btn-outline">Whitepaper</button>
+    <button class="btn btn-primary">Connect Wallet</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow">Genesis Validator Program</div>
+    <h1 class="hero-title">
+      <span class="ht-1">OWN A</span>
+      <span class="ht-2">VALIDATOR</span>
+      <span class="ht-3">NODE SPOT</span>
+    </h1>
+    <p class="hero-sub">Genesis Validators are the backbone of the X3STAR network. Secure your spot today, earn live protocol APY from day one of mainnet, and gain permanent governance superpowers on the protocol.</p>
+
+    <div class="hero-stats">
+      <div class="hs-item">
+        <div class="hs-val" id="hs-apy">--</div>
+        <div class="hs-key">Base APY</div>
+      </div>
+      <div class="hs-item">
+        <div class="hs-val" id="slots-left">--</div>
+        <div class="hs-key">Spots Left</div>
+      </div>
+      <div class="hs-item">
+        <div class="hs-val" id="hs-min-stake">--</div>
+        <div class="hs-key">Min Stake</div>
+      </div>
+    </div>
+
+    <div class="hero-actions">
+      <button class="btn btn-primary btn-xl" onclick="document.querySelector('.node-selector').scrollIntoView({behavior:'smooth'})">⬡ Secure My Node</button>
+      <button class="btn btn-outline btn-xl">Download Spec</button>
+    </div>
+  </div>
+
+  <!-- NODE WIDGET -->
+  <div class="hero-right">
+    <div class="node-selector">
+      <div class="ns-title">Reserve Node Slot</div>
+      <div class="ns-sub">Genesis program • Limited availability</div>
+
+      <!-- SLOT TRACKER -->
+      <div class="slot-track">
+        <div class="slot-header">
+          <span class="slot-remain" id="slots-remain">47 SLOTS LEFT</span>
+          <span class="slot-total">of <span id="slots-total">--</span> total</span>
+        </div>
+        <div class="slot-grid" id="slot-grid"></div>
+        <div class="slot-legend">
+          <div class="sl-item"><div class="sl-dot" style="background:var(--gold)"></div>Taken</div>
+          <div class="sl-item"><div class="sl-dot" style="background:rgba(255,215,0,0.12)"></div>Available</div>
+          <div class="sl-item"><div class="sl-dot" style="background:rgba(0,200,255,0.2)"></div>Reserved</div>
+        </div>
+      </div>
+
+      <!-- TIER CARDS -->
+      <div class="tier-cards">
+      <div class="tier-card tc-genesis selected" onclick="selectTier(this,'genesis',0,'APY + Full governance + Priority rewards')">
+          <div class="tc-row">
+            <div>
+              <div class="tc-name" style="color:var(--gold)">⬡ GENESIS NODE</div>
+              <div class="tc-badge" style="background:rgba(255,215,0,0.15);color:var(--gold);border:1px solid rgba(255,215,0,0.3)">MOST REWARDS</div>
+            </div>
+            <div class="tc-price" style="color:var(--gold)" id="tier-genesis-price">--</div>
+          </div>
+          <div class="tc-features">
+            <span class="tc-feat" id="tier-genesis-apy">✓ -- APY</span>
+            <span class="tc-feat">✓ Full governance</span>
+            <span class="tc-feat">✓ Fee sharing</span>
+            <span class="tc-feat">✓ Priority blocks</span>
+          </div>
+        </div>
+
+      <div class="tier-card tc-star" onclick="selectTier(this,'star',0,'APY + Governance rights + Standard rewards')">
+          <div class="tc-row">
+            <div>
+              <div class="tc-name" style="color:var(--purple)">✦ STAR NODE</div>
+              <div class="tc-badge" style="background:rgba(150,100,255,0.12);color:var(--purple);border:1px solid rgba(150,100,255,0.3)">POPULAR</div>
+            </div>
+            <div class="tc-price" style="color:var(--purple)" id="tier-star-price">--</div>
+          </div>
+          <div class="tc-features">
+            <span class="tc-feat" id="tier-star-apy">✓ -- APY</span>
+            <span class="tc-feat">✓ Governance</span>
+            <span class="tc-feat">✓ Standard rewards</span>
+          </div>
+        </div>
+
+      <div class="tier-card tc-lite" onclick="selectTier(this,'lite',0,'APY + Observer rights')">
+          <div class="tc-row">
+            <div>
+              <div class="tc-name" style="color:var(--cyan)">◎ LITE NODE</div>
+              <div class="tc-badge" style="background:rgba(0,200,255,0.08);color:var(--cyan);border:1px solid rgba(0,200,255,0.25)">ENTRY LEVEL</div>
+            </div>
+            <div class="tc-price" style="color:var(--cyan)" id="tier-lite-price">--</div>
+          </div>
+          <div class="tc-features">
+            <span class="tc-feat" id="tier-lite-apy">✓ -- APY</span>
+            <span class="tc-feat">✓ Observer rights</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- QTY -->
+      <div class="qty-row">
+        <div class="qty-label">QUANTITY</div>
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="adjustQty(-1)">−</button>
+          <span class="qty-num" id="qty-num">1</span>
+          <button class="qty-btn" onclick="adjustQty(1)">+</button>
+        </div>
+      </div>
+
+      <!-- ORDER SUMMARY -->
+      <div class="order-summary">
+        <div class="os-row">
+          <span style="color:var(--muted)">Node Type</span>
+          <span id="os-type" style="color:var(--gold)">GENESIS NODE</span>
+        </div>
+        <div class="os-row">
+          <span style="color:var(--muted)">APY</span>
+          <span id="os-apy" style="color:var(--green)">--</span>
+        </div>
+        <div class="os-row">
+          <span style="color:var(--muted)">Quantity</span>
+          <span id="os-qty" style="color:var(--text)">× 1</span>
+        </div>
+        <div class="os-row">
+          <span style="color:var(--muted)">Bonus X3S</span>
+          <span style="color:var(--cyan)" id="os-bonus">--</span>
+        </div>
+        <div class="os-row total">
+          <span>Total</span>
+          <span id="os-total">--</span>
+        </div>
+      </div>
+
+      <button class="buy-btn" onclick="handleBuy()">⬡ SECURE NODE SPOT</button>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section class="benefits reveal">
+  <div class="section-eyebrow">Node Benefits</div>
+  <h2 class="section-title">Genesis Validators <span style="color:var(--gold)">Earn More</span></h2>
+  <div class="benefits-grid">
+    <div class="benefit-card">
+      <div class="bc-icon">⚡</div>
+      <div class="bc-title">Block Rewards</div>
+      <div class="bc-text">Genesis validators receive priority block assignment, earning more rewards per epoch than post-genesis validators who join later.</div>
+      <div class="bc-val" id="benefit-apy">--</div>
+    </div>
+    <div class="benefit-card">
+      <div class="bc-icon">🗳</div>
+      <div class="bc-title">Governance Power</div>
+      <div class="bc-text">Full voting rights on protocol upgrades, grant allocation, fee structure, and network parameters. Your voice shapes X3STAR.</div>
+      <div class="bc-val">Priority voting</div>
+    </div>
+    <div class="benefit-card">
+      <div class="bc-icon">💰</div>
+      <div class="bc-title">Protocol Fee Share</div>
+      <div class="bc-text">Genesis validators receive a protocol fee share distributed proportionally as the network scales.</div>
+      <div class="bc-val" id="benefit-fee-share">--</div>
+    </div>
+    <div class="benefit-card">
+      <div class="bc-icon">🎁</div>
+      <div class="bc-title">Token Bonus</div>
+      <div class="bc-text">Node buyers may receive a token bonus on top of their purchase; details are published per round.</div>
+      <div class="bc-val" id="benefit-bonus">--</div>
+    </div>
+    <div class="benefit-card">
+      <div class="bc-icon">🛡</div>
+      <div class="bc-title">Slashing Protection</div>
+      <div class="bc-text">Genesis nodes benefit from an insurance pool to protect against accidental slashing events during the early mainnet period.</div>
+      <div class="bc-val">Coverage pending</div>
+    </div>
+    <div class="benefit-card">
+      <div class="bc-icon">🔑</div>
+      <div class="bc-title">Early Access</div>
+      <div class="bc-text">Priority access to all future ecosystem features, DeFi integrations, and grant programs before public launch.</div>
+      <div class="bc-val">Lifetime</div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON TABLE -->
+<section class="comparison reveal">
+  <div class="section-eyebrow">Compare Tiers</div>
+  <h2 class="section-title">Node <span style="color:var(--gold)">Comparison</span></h2>
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th class="th-best th-genesis"><span class="best-badge">BEST VALUE</span><span class="col-genesis">GENESIS</span></th>
+        <th><span class="col-star">STAR</span></th>
+        <th><span class="col-lite">LITE</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Minimum Stake</td><td class="col-genesis" id="ct-min-genesis">--</td><td class="col-star" id="ct-min-star">--</td><td class="col-lite" id="ct-min-lite">--</td></tr>
+      <tr><td>Base APY</td><td class="col-genesis" id="ct-apy-genesis">--</td><td class="col-star" id="ct-apy-star">--</td><td class="col-lite" id="ct-apy-lite">--</td></tr>
+      <tr><td>Governance Voting</td><td class="check">✓ Enhanced</td><td class="check">✓ Standard</td><td style="color:var(--muted)">Observer</td></tr>
+      <tr><td>Protocol Fee Share</td><td class="check" id="ct-fee-genesis">--</td><td style="color:var(--muted)">—</td><td class="cross">✗</td></tr>
+      <tr><td>Priority Block Rewards</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td>Slashing Insurance</td><td class="check">✓ Included</td><td class="check">✓ Included</td><td class="cross">✗</td></tr>
+      <tr><td>Token Bonus</td><td class="col-genesis" id="ct-bonus-genesis">--</td><td class="col-star" id="ct-bonus-star">--</td><td class="col-lite" id="ct-bonus-lite">--</td></tr>
+      <tr><td>Dedicated Support</td><td class="check">✓ Priority</td><td class="check">✓ Standard</td><td class="cross">✗</td></tr>
+      <tr><td>Spots Available</td><td class="col-genesis" id="ct-genesis">--</td><td class="col-star" id="ct-star">--</td><td class="col-lite" id="ct-lite">--</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="steps reveal">
+  <div class="section-eyebrow">How It Works</div>
+  <h2 class="section-title">Get <span style="color:var(--gold)">Running</span></h2>
+  <div class="steps-grid">
+    <div class="step done">
+      <div class="step-num">1</div>
+      <div class="step-title">Choose Tier</div>
+      <div class="step-text">Select Genesis, Star, or Lite based on your investment capacity and desired rewards.</div>
+    </div>
+    <div class="step done">
+      <div class="step-num">2</div>
+      <div class="step-title">Reserve & Pay</div>
+      <div class="step-text">Connect wallet, confirm your purchase. Smart contract locks your slot immediately.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-title">Node Setup</div>
+      <div class="step-text">We handle all infrastructure. One-click deployment or point to your own server — your choice.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-title">Earn Rewards</div>
+      <div class="step-text">From mainnet day one, receive block rewards, fee shares, and governance rights automatically.</div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials reveal">
+  <div class="section-eyebrow">Early Validators</div>
+  <h2 class="section-title" style="text-align:center">What They're <span style="color:var(--gold)">Saying</span></h2>
+  <div class="testimonials-grid">
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <div class="testi-text">"Running a Genesis node has been one of the best decisions of my DeFi career. The ROI is real, and the team is incredibly transparent."</div>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:linear-gradient(135deg,#ffd700,#ff9900)">A</div>
+        <div><div class="testi-name">Alex Mercer</div><div class="testi-role">DeFi Investor • Genesis Node #04</div></div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <div class="testi-text">"The governance weight alone is worth the entry. I've influenced two protocol decisions already. This is how blockchain should work."</div>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:linear-gradient(135deg,#bb44ff,#7722cc)">S</div>
+        <div><div class="testi-name">Sophia K.</div><div class="testi-role">Crypto Fund Manager • Genesis Node #11</div></div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <div class="testi-text">"Setup took literally 10 minutes. The managed infrastructure option is a game changer for investors who don't want to manage servers."</div>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:linear-gradient(135deg,#00d4ff,#0066ff)">R</div>
+        <div><div class="testi-name">Ryan Liu</div><div class="testi-role">Tech Entrepreneur • Star Node #07</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">X3STAR</div>
+  <div class="footer-links">
+    <a href="x3star-token-presale.html">Token Presale</a>
+    <a href="x3star-staking.html">Staking</a>
+    <a href="x3star-governance.html">Governance</a>
+    <a href="x3star-dashboard.html">Dashboard</a>
+    <a>Whitepaper</a>
+    <a>Terms</a>
+  </div>
+  <div class="footer-legal">© 2025 X3STAR Protocol</div>
+</footer>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+// Cursor
+const cursor = document.getElementById('cursor');
+const dot = document.getElementById('cursor-dot');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX - 12 + 'px'; cursor.style.top = e.clientY - 12 + 'px';
+  dot.style.left = e.clientX - 2 + 'px'; dot.style.top = e.clientY - 2 + 'px';
+});
+document.querySelectorAll('button,.tier-card,.benefit-card,.nav-link,.testi-card').forEach(el => {
+  el.addEventListener('mouseenter', () => cursor.style.transform = 'scale(1.8)');
+  el.addEventListener('mouseleave', () => cursor.style.transform = 'scale(1)');
+});
+
+// Build slot grid from live data
+const grid = document.getElementById('slot-grid');
+function renderSlotGrid(totalSlots, reservedSlots) {
+  if (!grid) return;
+  grid.innerHTML = '';
+  const total = Math.max(0, Number(totalSlots || 0));
+  const reserved = Math.max(0, Math.min(total, Number(reservedSlots || 0)));
+  for (let i = 0; i < total; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'slot-cell ';
+    cell.className += i < reserved ? 'slot-taken' : 'slot-avail';
+    grid.appendChild(cell);
+  }
+}
+window.updateValidatorSlots = function (totalSlots, reservedSlots) {
+  renderSlotGrid(totalSlots, reservedSlots);
+};
+
+// Tier selection
+let curTier = {name:'genesis', price:0, apy:'--', label:'GENESIS NODE'};
+let qty = 1;
+function selectTier(el, name, price, desc) {
+  document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const tier = (window.__x3PresaleTiers && window.__x3PresaleTiers[name]) || {};
+  const tierPrice = tier.priceUsd || price || 0;
+  const tierApy = tier.apy || '--';
+  curTier = {name, price: tierPrice, apy: tierApy, label: el.querySelector('.tc-name').textContent.trim()};
+  updateSummary();
+}
+function adjustQty(delta) {
+  qty = Math.max(1, Math.min(10, qty + delta));
+  document.getElementById('qty-num').textContent = qty;
+  updateSummary();
+}
+function updateSummary() {
+  document.getElementById('os-type').textContent = curTier.label;
+  document.getElementById('os-apy').textContent = curTier.apy;
+  document.getElementById('os-qty').textContent = '× ' + qty;
+  document.getElementById('os-total').textContent = curTier.price ? '$' + (curTier.price * qty).toLocaleString() : '--';
+  const bonusEl = document.getElementById('os-bonus');
+  if (bonusEl) bonusEl.textContent = window.__x3PresaleBonusLabel || '--';
+}
+
+function handleBuy() {
+  return;
+}
+
+// Reveal
+const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); }), {threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+X3PageAdapters.start();
+</script>
+</body>
+</html>

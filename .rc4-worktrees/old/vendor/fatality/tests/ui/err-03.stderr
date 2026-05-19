@@ -1,0 +1,40 @@
+error[E0277]: the trait bound `Fatal: Fatality` is not satisfied
+  --> tests/ui/err-03.rs:34:1
+   |
+34 | #[fatality(splitable)]
+   | ^^^^^^^^^^^^^^^^^^^^^^ the trait `Fatality` is not implemented for `Fatal`
+   |
+   = help: the trait `Fatality` is implemented for `Kaboom`
+   = note: this error originates in the attribute macro `fatality` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `?` couldn't convert the error to `Kaboom`
+  --> tests/ui/err-03.rs:45:12
+   |
+44 | fn iffy() -> Result<(), Kaboom> {
+   |              ------------------ expected `Kaboom` because of this
+45 |     Err(Fatal)?
+   |     ----------^ the trait `From<Fatal>` is not implemented for `Kaboom`, which is required by `Result<(), Kaboom>: FromResidual<Result<Infallible, Fatal>>`
+   |     |
+   |     this can't be annotated with `?` because it has type `Result<_, Fatal>`
+   |
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = help: the following other types implement trait `From<T>`:
+             <Kaboom as From<FatalKaboom>>
+             <Kaboom as From<JfyiKaboom>>
+   = note: required for `Result<(), Kaboom>` to implement `FromResidual<Result<Infallible, Fatal>>`
+
+error[E0277]: `?` couldn't convert the error to `Kaboom`
+  --> tests/ui/err-03.rs:49:11
+   |
+48 | fn bobo() -> Result<(), Kaboom> {
+   |              ------------------ expected `Kaboom` because of this
+49 |     Err(Bobo)?
+   |     ---------^ the trait `From<Bobo>` is not implemented for `Kaboom`, which is required by `Result<(), Kaboom>: FromResidual<Result<Infallible, Bobo>>`
+   |     |
+   |     this can't be annotated with `?` because it has type `Result<_, Bobo>`
+   |
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = help: the following other types implement trait `From<T>`:
+             <Kaboom as From<FatalKaboom>>
+             <Kaboom as From<JfyiKaboom>>
+   = note: required for `Result<(), Kaboom>` to implement `FromResidual<Result<Infallible, Bobo>>`

@@ -1,0 +1,83 @@
+[package]
+name = "pallet-x3-kernel"
+version = "0.1.0"
+authors = ["X3 Chain Core Team <core@x3-chain.io>"]
+description = "X3 Chain runtime pallet providing Comit orchestration and canonical ledger management."
+edition = "2021"
+license = "Apache-2.0"
+homepage = "https://x3-chain.io"
+repository = "https://github.com/x3-chain/x3-chain"
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+frame-benchmarking = { workspace = true, default-features = false, optional = true }
+pallet-balances = { workspace = true, default-features = false }
+pallet-timestamp = { workspace = true, default-features = false }
+pallet-x3-invariants = { path = "../x3-invariants", default-features = false }
+sp-api = { workspace = true, default-features = false }
+hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
+minicbor = { version = "0.24.0", default-features = false, features = ["derive", "alloc"] }
+parity-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+serde = { version = "1.0.197", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.117", default-features = false, features = ["alloc"] }
+sp-core = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+
+# Real VM integration crates (no-std paths always available; std paths activated via std feature)
+x3-evm-integration = { path = "../../crates/evm-integration", default-features = false }
+x3-svm-integration = { path = "../../crates/svm-integration", default-features = false }
+x3-x3-integration = { path = "../../crates/x3-integration", default-features = false }
+x3-cross-vm-bridge = { path = "../../crates/cross-vm-bridge", default-features = false }
+x3-packet-schema = { path = "../../crates/x3-packet-schema", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "frame-support/std",
+    "frame-system/std",
+    "pallet-balances/std",
+    "pallet-timestamp/std",
+    "pallet-x3-invariants/std",
+    "parity-scale-codec/std",
+    "scale-info/std",
+    "sp-api/std",
+    "sp-std/std",
+    "sp-core/std",
+    "sp-io/std",
+    "sp-runtime/std",
+    "serde/std",
+    "serde_json/std",
+    "minicbor/std",
+    "hex/std",
+    "frame-benchmarking?/std",
+    "x3-evm-integration/std",
+    "x3-svm-integration/std",
+    "x3-x3-integration/std",
+    "x3-cross-vm-bridge/std",
+    "x3-packet-schema/std",
+]
+runtime-benchmarks = [
+    "frame-benchmarking",
+]
+
+# Development mode: bypass authorization checks for easier testing
+dev-bypass = []
+
+try-runtime = [
+    "frame-support/try-runtime",
+    "frame-system/try-runtime",
+]
+
+[dev-dependencies]
+proptest = "1.4"

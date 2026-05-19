@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://x3.dev/schemas/receipt-v2.schema.json",
+  "title": "X3 ProofForge Receipt v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "repo_commit_hash",
+    "command_run",
+    "artifact_hash",
+    "policy_hash",
+    "relevant_files",
+    "timestamp",
+    "result",
+    "limitations",
+    "binding_hash"
+  ],
+  "properties": {
+    "receipt_version": {
+      "type": "string",
+      "pattern": "^2\\.[0-9]+\\.[0-9]+$"
+    },
+    "claim_id": {
+      "type": "string",
+      "pattern": "^x3\\.[A-Za-z0-9_.-]+$"
+    },
+    "repo_commit_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "command_run": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^x3-proof verify .+"
+    },
+    "artifact_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relevant_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "result": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "claim",
+        "status",
+        "files_inspected",
+        "commands_run",
+        "passed_checks",
+        "failed_checks",
+        "missing_proofs",
+        "blockers",
+        "score",
+        "evidence",
+        "timestamp",
+        "duration_ms"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "pattern": "^x3\\.[A-Za-z0-9_.-]+$"
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "pass",
+            "passed",
+            "partial",
+            "failed",
+            "unverified",
+            "blocked",
+            "proof_complete",
+            "green",
+            "red",
+            "unknown"
+          ]
+        },
+        "proof_level": {
+          "type": ["string", "null"]
+        },
+        "edge_case_level": {
+          "type": ["string", "null"]
+        },
+        "hack_level": {
+          "type": ["string", "null"]
+        },
+        "operator_level": {
+          "type": ["string", "null"]
+        },
+        "degraded_level": {
+          "type": ["string", "null"]
+        },
+        "files_inspected": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "commands_run": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "passed_checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failed_checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_proofs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "object"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "binding_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

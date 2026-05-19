@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Grant Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@300;400;500;600;700;800;900&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400;1,600&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F4F0;--white:#FFFFFF;--dark:#0A0F0A;
+  --ink:#0A0F0A;--ink3:#5A6A5A;
+  --rule:#D8E0D0;
+  --forest:#1A4A2A;--forest2:#2D7A46;--forestfaint:rgba(26,74,42,0.06);
+  --amber:#E07B00;--red:#C0392B;--blue:#1A3A7A;
+  --body:'Source Serif 4',serif;--display:'Big Shoulders Display',sans-serif;--mono:'Roboto Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);min-height:100vh;}
+
+/* NAV */
+nav{height:60px;display:flex;align-items:center;padding:0 40px;
+  background:var(--dark);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--display);font-size:22px;font-weight:900;letter-spacing:4px;
+  color:var(--forest2);margin-right:auto;text-transform:uppercase;}
+.nl{padding:0 16px;height:60px;display:flex;align-items:center;font-size:10px;
+  letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.3);
+  text-decoration:none;transition:color 0.2s;font-family:var(--display);}
+.nl:hover{color:var(--forest2);}
+.ncta{padding:10px 24px;background:var(--forest2);color:#fff;border:none;
+  font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  cursor:pointer;font-family:var(--display);margin-left:16px;transition:all 0.2s;}
+.ncta:hover{background:var(--forest);}
+
+/* HERO */
+.hero{background:var(--dark);color:#fff;padding:80px 40px 60px;border-bottom:4px solid var(--forest2);}
+.h-kicker{font-family:var(--mono);font-size:11px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--forest2);margin-bottom:20px;}
+.h-title{font-family:var(--display);font-size:clamp(56px,8vw,120px);font-weight:900;
+  text-transform:uppercase;line-height:0.9;letter-spacing:-1px;margin-bottom:24px;}
+.h-title span{color:var(--forest2);}
+.h-sub{font-size:17px;color:rgba(255,255,255,0.5);max-width:680px;line-height:1.8;
+  margin-bottom:40px;font-weight:300;}
+.h-sub strong{color:#fff;}
+.h-total{display:inline-flex;align-items:center;gap:20px;padding:16px 28px;
+  border:1px solid rgba(45,122,70,0.3);background:rgba(45,122,70,0.08);border-radius:4px;}
+.ht-num{font-family:var(--display);font-size:40px;font-weight:900;color:var(--forest2);line-height:1;}
+.ht-label{font-size:12px;color:rgba(255,255,255,0.4);}
+.ht-label strong{color:#fff;display:block;font-size:14px;}
+
+/* SUMMARY BAR */
+.summary{display:grid;grid-template-columns:repeat(5,1fr);background:var(--white);
+  border-bottom:2px solid var(--ink);}
+.sum-cell{padding:20px 24px;border-right:1px solid var(--rule);text-align:center;}
+.sum-cell:last-child{border:none;}
+.sc-val{font-family:var(--display);font-size:28px;font-weight:900;text-transform:uppercase;}
+.sc-key{font-size:11px;color:var(--ink3);margin-top:3px;font-family:var(--mono);}
+
+/* GRANT CATEGORIES */
+.categories{padding:40px;}
+.cat-tabs{display:flex;gap:0;border-bottom:2px solid var(--ink);margin-bottom:40px;overflow-x:auto;}
+.ctab{padding:12px 24px;font-family:var(--display);font-size:13px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--ink3);
+  border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all 0.2s;}
+.ctab.active{color:var(--forest);border-bottom-color:var(--forest);}
+.ctab:hover{color:var(--forest);}
+
+/* GRANT GRID */
+.grant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:2px;
+  background:var(--ink);}
+
+/* GRANT CARD */
+.grant-card{background:var(--white);padding:28px;transition:all 0.15s;cursor:pointer;}
+.grant-card:hover{background:var(--forestfaint);}
+.gc-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}
+.gc-org-icon{width:44px;height:44px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;font-size:22px;flex-shrink:0;background:var(--bg);}
+.gc-org{flex:1;}
+.gc-org-name{font-family:var(--display);font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+.gc-grant-name{font-size:12px;color:var(--ink3);margin-top:2px;}
+.gc-status{flex-shrink:0;}
+.status-badge{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;
+  padding:4px 10px;border-radius:2px;font-weight:700;}
+.sb-open{background:#E8F5E9;color:var(--forest);border:1px solid #A5D6A7;}
+.sb-apply{background:#FFF3E0;color:var(--amber);border:1px solid #FFCC80;}
+.sb-prep{background:#E3F2FD;color:var(--blue);border:1px solid #90CAF9;}
+.sb-done{background:#F3E5F5;color:#7B1FA2;border:1px solid #CE93D8;}
+.gc-amount{font-family:var(--display);font-size:24px;font-weight:900;text-transform:uppercase;
+  color:var(--forest);margin-bottom:6px;}
+.gc-type{font-size:11px;color:var(--ink3);font-family:var(--mono);margin-bottom:10px;}
+.gc-desc{font-size:13px;color:var(--ink3);line-height:1.7;margin-bottom:14px;}
+.gc-fit{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;}
+.fit-tag{font-size:10px;padding:3px 9px;background:var(--bg);border:1px solid var(--rule);
+  color:var(--ink3);font-family:var(--mono);}
+.gc-cta{width:100%;padding:10px;background:var(--dark);color:#fff;border:none;
+  font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
+.gc-cta:hover{background:var(--forest);}
+
+/* STRATEGY SECTION */
+.strategy{padding:60px 40px;background:var(--white);border-top:2px solid var(--ink);}
+.strat-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:40px;}
+.strat-col{}
+.sc-title{font-family:var(--display);font-size:28px;font-weight:900;text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:20px;border-bottom:2px solid var(--ink);padding-bottom:10px;}
+.strat-item{padding:16px 0;border-bottom:1px solid var(--rule);display:flex;gap:16px;}
+.si-num{font-family:var(--display);font-size:32px;font-weight:900;color:var(--rule);
+  flex-shrink:0;width:40px;line-height:1;}
+.si-body{}
+.si-title{font-size:14px;font-weight:600;margin-bottom:4px;}
+.si-text{font-size:13px;color:var(--ink3);line-height:1.6;}
+
+/* COMMUNITY SUPPORT */
+.community{padding:60px 40px;background:var(--forest);color:#fff;}
+.cm-title{font-family:var(--display);font-size:clamp(32px,5vw,64px);font-weight:900;
+  text-transform:uppercase;letter-spacing:-1px;margin-bottom:16px;}
+.cm-sub{font-size:16px;color:rgba(255,255,255,0.6);max-width:600px;margin-bottom:40px;line-height:1.7;}
+.support-actions{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px;background:rgba(255,255,255,0.1);}
+.sa-item{background:rgba(0,0,0,0.2);padding:24px;transition:background 0.2s;cursor:pointer;}
+.sa-item:hover{background:rgba(0,0,0,0.4);}
+.sai-icon{font-size:28px;margin-bottom:10px;}
+.sai-action{font-family:var(--display);font-size:16px;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
+.sai-desc{font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;}
+.sai-btn{margin-top:12px;padding:8px 16px;background:rgba(255,255,255,0.1);
+  border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:10px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:var(--display);
+  transition:all 0.2s;}
+.sai-btn:hover{background:var(--forest2);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <a class="nl" href="x3star-spine.html">The Spine</a>
+  <a class="nl" href="x3star-barter-exchange.html">Deal Room</a>
+  <a class="nl" href="x3star-compute-marketplace.html">Marketplace</a>
+  <a class="nl" href="x3star-competitor-annihilation.html">vs Competition</a>
+  <button class="ncta" onclick="location.href='x3star-barter-exchange.html'">Partner With Us</button>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="h-kicker">X3STAR Grant Strategy · Active Applications</div>
+  <h1 class="h-title"><span id="grant-total-pool">--</span> in<br><span>active</span><br>grant programs.</h1>
+  <p class="h-sub">We qualify for government, Web3, and AI research grants. Here's the live list, where we stand, and how you can help us win.</p>
+  <div class="h-total">
+    <div><div class="ht-num" id="grant-total-pool">--</div><div class="ht-label"><strong>Total grant pool</strong>available across <span id="grant-total-programs">--</span> programs</div></div>
+    <div style="width:1px;height:48px;background:rgba(255,255,255,0.1)"></div>
+    <div><div class="ht-num">0%</div><div class="ht-label"><strong>Equity required</strong>for all grants listed</div></div>
+  </div>
+</div>
+
+<!-- SUMMARY BAR -->
+<div class="summary">
+  <div class="sum-cell"><div class="sc-val" style="color:var(--forest)" id="grant-ready">--</div><div class="sc-key">Ready to Apply</div></div>
+  <div class="sum-cell"><div class="sc-val" style="color:var(--amber)" id="grant-preparing">--</div><div class="sc-key">Preparing</div></div>
+  <div class="sum-cell"><div class="sc-val" style="color:var(--blue)" id="grant-review">--</div><div class="sc-key">In Review</div></div>
+  <div class="sum-cell"><div class="sc-val" id="grant-largest">--</div><div class="sc-key">Largest Single Grant</div></div>
+  <div class="sum-cell"><div class="sc-val" style="color:var(--forest)" id="grant-total-programs">--</div><div class="sc-key">Total Programs</div></div>
+</div>
+
+<!-- GRANTS -->
+<div class="categories">
+  <div class="cat-tabs">
+    <div class="ctab active" onclick="filterGrants(this,'all')">All Grants (<span id="grant-programs-count">--</span>)</div>
+    <div class="ctab" onclick="filterGrants(this,'gov')">🏛 Government</div>
+    <div class="ctab" onclick="filterGrants(this,'web3')">⛓ Web3</div>
+    <div class="ctab" onclick="filterGrants(this,'ai')">🧠 AI/Compute</div>
+    <div class="ctab" onclick="filterGrants(this,'research')">🔬 Research</div>
+  </div>
+
+  <div class="grant-grid" id="grant-grid"></div>
+</div>
+
+<!-- STRATEGY -->
+<div class="strategy">
+  <div style="font-family:var(--display);font-size:36px;font-weight:900;text-transform:uppercase;letter-spacing:-1px;margin-bottom:8px;">The winning strategy</div>
+  <div style="font-size:15px;color:var(--ink3);margin-bottom:0;">How a one-man DARPA lab wins $2.8M without giving up a single point of equity.</div>
+  <div class="strat-grid">
+    <div class="strat-col">
+      <div class="sc-title">Why we qualify</div>
+      <div class="strat-item">
+        <div class="si-num">01</div>
+        <div class="si-body">
+          <div class="si-title">Novel architecture = research eligibility</div>
+          <div class="si-text">A custom kernel, custom VM, and custom language constitute original research. NSF SBIR and EF grants are specifically designed for exactly this.</div>
+        </div>
+      </div>
+      <div class="strat-item">
+        <div class="si-num">02</div>
+        <div class="si-body">
+          <div class="si-title">GPU routing = AI compute research</div>
+          <div class="si-text">The GPU swarm architecture overlaps with DOE, DARPA, and together.ai compute research programs. The AI spine is the hook into every AI grant.</div>
+        </div>
+      </div>
+      <div class="strat-item">
+        <div class="si-num">03</div>
+        <div class="si-body">
+          <div class="si-title">Post-quantum = government priority</div>
+          <div class="si-text">NIST just finalized post-quantum standards. Every government agency is now required to assess quantum-safe infrastructure. We're building it.</div>
+        </div>
+      </div>
+      <div class="strat-item" style="border:none;">
+        <div class="si-num">04</div>
+        <div class="si-body">
+          <div class="si-title">Multi-VM = Web3 ecosystem value</div>
+          <div class="si-text">EVM + SVM + BTC + X3VM atomic execution is a direct application for Ethereum Foundation, Solana Foundation, and Filecoin grants simultaneously.</div>
+        </div>
+      </div>
+    </div>
+    <div class="strat-col">
+      <div class="sc-title">Application playbook</div>
+      <div class="strat-item">
+        <div class="si-num">A</div>
+        <div class="si-body">
+          <div class="si-title">Lead with the benchmark</div>
+          <div class="si-text">2.4B intra-node TPS on a home Threadripper. That number opens doors. Lead every application with the hardware spec and the methodology.</div>
+        </div>
+      </div>
+      <div class="strat-item">
+        <div class="si-num">B</div>
+        <div class="si-body">
+          <div class="si-title">Frame the AI spine for each audience</div>
+          <div class="si-text">For NSF: "novel AI-integrated consensus mechanism." For DARPA: "autonomous adaptive compute architecture." For EF: "AI-guided execution VM." Same tech, right words.</div>
+        </div>
+      </div>
+      <div class="strat-item">
+        <div class="si-num">C</div>
+        <div class="si-body">
+          <div class="si-title">Publish the methodology first</div>
+          <div class="si-text">Open-source the benchmark methodology before applying. Grant committees trust reproducible research. It also creates community validators.</div>
+        </div>
+      </div>
+      <div class="strat-item" style="border:none;">
+        <div class="si-num">D</div>
+        <div class="si-body">
+          <div class="si-title">Apply in parallel, not sequence</div>
+          <div class="si-text">All 18 programs simultaneously. They don't conflict. The same IP can receive multiple grants from different agencies for different aspects of the same work.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNITY SUPPORT -->
+<div class="community">
+  <div class="cm-title">Help us win these grants.</div>
+  <div class="cm-sub">Grant committees look for community validation. Every LinkedIn share, GitHub star, and letter of support increases our application score. Here's how to help.</div>
+  <div class="support-actions">
+    <div class="sa-item">
+      <div class="sai-icon">⭐</div>
+      <div class="sai-action">Star on GitHub</div>
+      <div class="sai-desc">NSF SBIR applications score higher with active GitHub repositories. Every star counts.</div>
+      <button class="sai-btn" onclick="window.open('https://github.com')">Star The Repo →</button>
+    </div>
+    <div class="sa-item">
+      <div class="sai-icon">📝</div>
+      <div class="sai-action">Letter of Support</div>
+      <div class="sai-desc">If you work in AI, compute, or Web3 — a one-paragraph letter of support dramatically improves grant odds.</div>
+      <button class="sai-btn" onclick="location.href='x3star-barter-exchange.html'">Write A Letter →</button>
+    </div>
+    <div class="sa-item">
+      <div class="sai-icon">📢</div>
+      <div class="sai-action">Share The Research</div>
+      <div class="sai-desc">Tweet the benchmark page. Share the architecture. Every signal of public interest validates the grant application.</div>
+      <button class="sai-btn" onclick="window.open('https://twitter.com/intent/tweet?text=X3STAR: 2.4B intra-node TPS. AI as the spine. Built by one engineer. %23crypto %23AI %23blockchain x3star.io')">Share Now →</button>
+    </div>
+    <div class="sa-item">
+      <div class="sai-icon">🤝</div>
+      <div class="sai-action">Make An Introduction</div>
+      <div class="sai-desc">Know someone at NSF, DARPA, EF, or Solana Foundation? An intro is worth more than any application.</div>
+      <button class="sai-btn" onclick="location.href='x3star-barter-exchange.html'">Intro Us →</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+if (window.X3PageAdapters) {
+  window.X3PageAdapters.start();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+{
+  "name": "@x3-chain/atomic-swap-sdk",
+  "version": "0.1.0",
+  "description": "Multi-chain atomic swap SDK with HTLC support for EVM, Solana, Bitcoin, and Substrate — Polkadex-inspired DEX engine",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist/"
+  },
+  "dependencies": {
+    "@polkadot/api": "^12.4.2",
+    "@polkadot/keyring": "^13.3.1",
+    "@polkadot/util": "^13.3.1",
+    "@polkadot/util-crypto": "^13.3.1",
+    "@solana/web3.js": "^1.98.2",
+    "@noble/hashes": "^1.3.3",
+    "@noble/secp256k1": "^2.1.0",
+    "bitcoinjs-lib": "^6.1.7",
+    "ecpair": "^2.1.0",
+    "bech32": "^2.0.0",
+    "bs58": "^6.0.0",
+    "eventemitter3": "^5.0.1",
+    "tiny-secp256k1": "^2.2.3"
+  },
+  "peerDependencies": {
+    "@x3-chain/blockchain-connector": "*",
+    "ethers": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "contracts/"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/x3-chain/x3-chain",
+    "directory": "packages/atomic-swap-sdk"
+  }
+}

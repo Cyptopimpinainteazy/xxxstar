@@ -1,0 +1,4922 @@
+# X3 Graph Index
+
+- `.ai/context_map.md` -> **Launchpad** | LOC: 35 | Risks: none
+- `.ai/execution_prompts.md` -> **Bridge / Router** | LOC: 204 | Risks: bridge risk
+- `.ai/system_prompt.md` -> **Universal Asset Kernel** | LOC: 24 | Risks: bridge risk
+- `.ai/tasks.md` -> **X3 DEX** | LOC: 47 | Risks: none
+- `.legion/ARCHITECT.md` -> **Universal Asset Kernel** | LOC: 35 | Risks: bridge risk
+- `.legion/AUDITOR.md` -> **Bridge / Router** | LOC: 33 | Risks: bridge risk, known issue, replay risk, replay/nonce risk, unfinished logic, unsafe code
+- `.legion/FIXER.md` -> **Genesis / Chain Spec** | LOC: 21 | Risks: none
+- `.legion/INTEGRATOR.md` -> **Universal Asset Kernel** | LOC: 29 | Risks: none
+- `.legion/SCANNER.md` -> **Universal Asset Kernel** | LOC: 26 | Risks: bridge risk
+- `.roo/agents/X3_AGENT.md` -> **Universal Asset Kernel** | LOC: 37 | Risks: bridge risk
+- `.roo/rules.md` -> **Universal Asset Kernel** | LOC: 59 | Risks: atomic rollback risk, bridge risk
+- `.scripts/full_scan.sh` -> **Unclassified** | LOC: 27 | Risks: none
+- `.scripts/smell_scan.sh` -> **Unclassified** | LOC: 29 | Risks: fake timestamp risk, known issue, local-only config risk, mock hash risk, panic risk, stub risk, unfinished logic, unsafe code
+- `.scripts/x3_ai_loop.sh` -> **Unclassified** | LOC: 25 | Risks: none
+- `.scripts/x3_full_scan.sh` -> **Unclassified** | LOC: 30 | Risks: none
+- `.scripts/x3_graph_builder.py` -> **Universal Asset Kernel** | LOC: 298 | Risks: atomic rollback risk, bridge risk, fake timestamp risk, known issue, local-only config risk, mock hash risk, panic risk, replay risk, replay/nonce risk, stub risk, supply invariant risk, unfinished logic, unsafe code
+- `.scripts/x3_invariant_dashboard.py` -> **Universal Asset Kernel** | LOC: 107 | Risks: none
+- `.scripts/x3_repomix_pack.sh` -> **Bridge / Router** | LOC: 44 | Risks: bridge risk
+- `.scripts/x3_smell_scan.sh` -> **Universal Asset Kernel** | LOC: 33 | Risks: atomic rollback risk, bridge risk, fake timestamp risk, known issue, local-only config risk, mock hash risk, panic risk, replay risk, replay/nonce risk, stub risk, supply invariant risk, unfinished logic, unsafe code
+- `.traycer/X3_DEEP_DIVE_SPEC.md` -> **Bridge / Router** | LOC: 50 | Risks: bridge risk
+- `.traycer/X3_TASK_CHAIN.md` -> **Bridge / Router** | LOC: 79 | Risks: atomic rollback risk, bridge risk
+- `.x3/ACCEPTANCE_CRITERIA.md` -> **Unclassified** | LOC: 12 | Risks: atomic rollback risk, unfinished logic
+- `.x3/COST_CONTROL.md` -> **Unclassified** | LOC: 17 | Risks: none
+- `.x3/DO_NOT_TOUCH.md` -> **Bridge / Router** | LOC: 13 | Risks: bridge risk
+- `.x3/TEST_COMMANDS.md` -> **Unclassified** | LOC: 30 | Risks: known issue, panic risk, stub risk, unfinished logic
+- `.x3/X3_FEATURE_REGISTRY.md` -> **Universal Asset Kernel** | LOC: 77 | Risks: none
+- `.x3/X3_MAINNET_GATES.md` -> **Universal Asset Kernel** | LOC: 56 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, replay/nonce risk, unfinished logic, unsafe code
+- `.x3/X3_RISK_REGISTER.md` -> **Universal Asset Kernel** | LOC: 25 | Risks: bridge risk
+- `.x3/X3_SYSTEM_MAP.md` -> **Universal Asset Kernel** | LOC: 35 | Risks: bridge risk
+- `.x3/attacks/BREAK_THE_CHAIN_SCENARIOS.md` -> **Universal Asset Kernel** | LOC: 77 | Risks: atomic rollback risk, bridge risk, replay/nonce risk, supply invariant risk, unsafe code
+- `.x3/invariants/X3_INVARIANTS.md` -> **Universal Asset Kernel** | LOC: 58 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `.x3/mutations/DANGER_ZONES.md` -> **Universal Asset Kernel** | LOC: 26 | Risks: atomic rollback risk, bridge risk
+- `.x3/mutations/SAFE_ZONES.md` -> **Launchpad** | LOC: 18 | Risks: none
+- `CURRENT_PROJECT_FEATURE_INVENTORY.md` -> **Unclassified** | LOC: 15 | Risks: none
+- `DEEP_AUDIT_REPORT.md` -> **Unclassified** | LOC: 18 | Risks: none
+- `FAILED_CHECKS.md` -> **Unclassified** | LOC: 11 | Risks: none
+- `FASTEST_MAINNET_PLAN.md` -> **Launchpad** | LOC: 9 | Risks: none
+- `FEATURE_GAP_REPORT.md` -> **Bridge / Router** | LOC: 26 | Risks: bridge risk, local-only config risk, panic risk, stub risk, unsafe code
+- `FILE_INDEX.md` -> **X3 DEX** | LOC: 20 | Risks: none
+- `FINAL_AUDIT_REPORT.md` -> **Universal Asset Kernel** | LOC: 12 | Risks: bridge risk
+- `FINAL_BOSS_AUDIT.md` -> **Unclassified** | LOC: 13 | Risks: none
+- `FINAL_DEEP_DIVE_SUMMARY.md` -> **Proof System** | LOC: 16 | Risks: none
+- `GRAPHOPS_REPORT.md` -> **Unclassified** | LOC: 12 | Risks: none
+- `INTEGRATION_PLAN.md` -> **Launchpad** | LOC: 25 | Risks: unsafe code
+- `MAINNET_READINESS_DELTA.md` -> **Launchpad** | LOC: 30 | Risks: none
+- `MIGRATION_INVENTORY.md` -> **Launchpad** | LOC: 25 | Risks: none
+- `NEW_IDEAS_REPORT.md` -> **Proof System** | LOC: 19 | Risks: none
+- `NEXT_10_PATCHES.md` -> **Unclassified** | LOC: 11 | Risks: none
+- `NEXT_DANGER_ZONE_PATCHES.md` -> **Unclassified** | LOC: 11 | Risks: atomic rollback risk
+- `NEXT_SAFE_PATCHES.md` -> **Unclassified** | LOC: 12 | Risks: none
+- `OLD_PROJECT_FEATURE_INVENTORY.md` -> **Unclassified** | LOC: 20 | Risks: none
+- `P0_BLOCKERS.md` -> **Launchpad** | LOC: 14 | Risks: none
+- `PATCH_LOG.md` -> **Bridge / Router** | LOC: 36 | Risks: none
+- `SECURITY_BLOCKERS.md` -> **Unclassified** | LOC: 16 | Risks: none
+- `TEST_RESULTS.md` -> **Unclassified** | LOC: 12 | Risks: none
+- `X3_COMPETITIVE_ADVANTAGE.md` -> **Unclassified** | LOC: 13 | Risks: none
+- `X3_MAINNET_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 148 | Risks: bridge risk
+- `crates/cross-vm-bridge/bridge/finality.rs` -> **Bridge / Router** | LOC: 715 | Risks: panic risk
+- `crates/cross-vm-bridge/tests/finality_verification_tests.rs` -> **Bridge / Router** | LOC: 1196 | Risks: bridge risk, panic risk, replay/nonce risk
+- `docs/release-notes/2026-05-01-sdk-lane-convergence-plan.md` -> **EVM Integration** | LOC: 103 | Risks: none
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-201255.md` -> **Universal Asset Kernel** | LOC: 86 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260501-203300.md` -> **Universal Asset Kernel** | LOC: 86 | Risks: atomic rollback risk, bridge risk, replay risk
+- `.cargo/config.toml` -> **Unclassified** | LOC: 8 | Risks: none
+- `.github/BRANCH_PROTECTION.md` -> **Unclassified** | LOC: 161 | Risks: none
+- `.github/ISSUE_TEMPLATE/bug_report.md` -> **Unclassified** | LOC: 39 | Risks: none
+- `.github/ISSUE_TEMPLATE/feature_request.md` -> **Unclassified** | LOC: 21 | Risks: none
+- `.github/prompts/Ask yourself this before you ask me any questions.prompt.md` -> **Unclassified** | LOC: 9 | Risks: none
+- `.github/prompts/featureproof.prompt.md` -> **Universal Asset Kernel** | LOC: 105 | Risks: bridge risk, unfinished logic
+- `.github/workflows/README.md` -> **Unclassified** | LOC: 103 | Risks: none
+- `.github/workflows/build.yml` -> **Universal Asset Kernel** | LOC: 563 | Risks: bridge risk, local-only config risk
+- `.github/workflows/codeql-analysis.yml` -> **Unclassified** | LOC: 41 | Risks: none
+- `.github/workflows/codeql.yml` -> **TPS Benchmark Suite** | LOC: 108 | Risks: none
+- `.github/workflows/deploy-dashboard.yml` -> **Universal Asset Kernel** | LOC: 91 | Risks: none
+- `.github/workflows/economic-attack-tests.yml` -> **Proof System** | LOC: 40 | Risks: none
+- `.github/workflows/formal-verification.yml` -> **Universal Asset Kernel** | LOC: 239 | Risks: none
+- `.github/workflows/full-ci.yml` -> **Bridge / Router** | LOC: 144 | Risks: none
+- `.github/workflows/osv-scan.yml` -> **TPS Benchmark Suite** | LOC: 35 | Risks: none
+- `.github/workflows/proof-gates.yml` -> **Universal Asset Kernel** | LOC: 553 | Risks: bridge risk, replay risk
+- `.github/workflows/release-candidate-rehearsal.yml` -> **EVM Integration** | LOC: 168 | Risks: replay risk
+- `.github/workflows/rust-clippy.yml` -> **Unclassified** | LOC: 27 | Risks: none
+- `.github/workflows/security-dashboard.yml` -> **Unclassified** | LOC: 71 | Risks: none
+- `.github/workflows/semgrep.yml` -> **Unclassified** | LOC: 29 | Risks: none
+- `.github/workflows/snyk.yml` -> **Unclassified** | LOC: 40 | Risks: none
+- `.github/workflows/trivy.yml` -> **Unclassified** | LOC: 36 | Risks: none
+- `.github/workflows/v04-ship-gate.yml` -> **Bridge / Router** | LOC: 174 | Risks: atomic rollback risk, bridge risk, replay risk
+- `.kilo/agent-manager.json` -> **Unclassified** | LOC: 9 | Risks: none
+- `.planning/CODEBASE_ANALYSIS_V0.4_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 522 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unfinished logic
+- `.planning/GITHUB_PROJECTS_SETUP.md` -> **Universal Asset Kernel** | LOC: 303 | Risks: none
+- `.planning/GIT_WORKFLOW_AND_COLLABORATION.md` -> **Launchpad** | LOC: 586 | Risks: panic risk, replay risk, unfinished logic, unsafe code
+- `.planning/QUICK_EXECUTION_GUIDE.md` -> **Universal Asset Kernel** | LOC: 590 | Risks: none
+- `.planning/README.md` -> **Universal Asset Kernel** | LOC: 411 | Risks: atomic rollback risk, replay risk
+- `.planning/REFERENCE_CARD.md` -> **Universal Asset Kernel** | LOC: 388 | Risks: bridge risk, replay risk
+- `.planning/SPRINT_0_IMMEDIATE_EXECUTION.md` -> **Universal Asset Kernel** | LOC: 454 | Risks: bridge risk, panic risk, supply invariant risk
+- `.planning/SPRINT_0_LAUNCH_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 395 | Risks: bridge risk
+- `.planning/SPRINT_DETAILED_PLANS.md` -> **Universal Asset Kernel** | LOC: 1092 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `.vscode/settings.json` -> **Unclassified** | LOC: 3 | Risks: none
+- `00-START-HERE-MAINNET-READINESS.md` -> **Universal Asset Kernel** | LOC: 82 | Risks: bridge risk
+- `Cargo.toml` -> **Universal Asset Kernel** | LOC: 422 | Risks: bridge risk
+- `DOCUMENTATION_INDEX.md` -> **X3 DEX** | LOC: 175 | Risks: local-only config risk
+- `GAPS_REPORT_2026_04_27.md` -> **Bridge / Router** | LOC: 307 | Risks: bridge risk, known issue, panic risk, replay risk, unfinished logic, unsafe code
+- `MAINNET_QUICK_START.md` -> **Universal Asset Kernel** | LOC: 89 | Risks: bridge risk, local-only config risk
+- `MAINNET_RC1_READINESS_REPORT.md` -> **Launchpad** | LOC: 14 | Risks: none
+- `MAINNET_RC1_SCOPE.md` -> **Universal Asset Kernel** | LOC: 123 | Risks: bridge risk, replay risk
+- `MASTER_STATUS.md` -> **Universal Asset Kernel** | LOC: 169 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, supply invariant risk, unfinished logic
+- `PHASE_5_COMPLETE_LAUNCHER.sh` -> **X3 DEX** | LOC: 399 | Risks: bridge risk
+- `PHASE_5_STATUS.sh` -> **Bridge / Router** | LOC: 63 | Risks: bridge risk
+- `QUICK_COMMAND_REFERENCE.md` -> **Bridge / Router** | LOC: 304 | Risks: local-only config risk
+- `QUICK_PHASE_5_START.sh` -> **X3 DEX** | LOC: 92 | Risks: unsafe code
+- `QUICK_REFERENCE_MAINNET_GO.md` -> **Universal Asset Kernel** | LOC: 77 | Risks: bridge risk, local-only config risk
+- `README.md` -> **Bridge / Router** | LOC: 240 | Risks: bridge risk, local-only config risk
+- `ROADMAP.md` -> **Bridge / Router** | LOC: 88 | Risks: bridge risk, local-only config risk
+- `STATUS_AUDIT_2026_04_27.md` -> **Universal Asset Kernel** | LOC: 91 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, supply invariant risk
+- `TESTNET_DEPLOYMENT_GUIDE.md` -> **Bridge / Router** | LOC: 662 | Risks: local-only config risk, replay risk
+- `TESTNET_PRE_DEPLOYMENT_CHECKLIST.md` -> **Bridge / Router** | LOC: 274 | Risks: bridge risk, local-only config risk
+- `V0_4_INTERNAL_MAINNET_STATUS.md` -> **Bridge / Router** | LOC: 111 | Risks: bridge risk
+- `X3-contracts/README.md` -> **EVM Integration** | LOC: 45 | Risks: none
+- `X3-contracts/evm/contracts/flashloan/X3Flashloan.sol` -> **Universal Asset Kernel** | LOC: 94 | Risks: none
+- `X3-contracts/evm/contracts/interfaces/IX3FlashloanReceiver.sol` -> **Universal Asset Kernel** | LOC: 20 | Risks: none
+- `X3-contracts/evm/foundry.toml` -> **EVM Integration** | LOC: 28 | Risks: none
+- `X3-contracts/evm/test/parity/FlashloanParity.t.sol` -> **Universal Asset Kernel** | LOC: 146 | Risks: none
+- `X3-contracts/evm/test/unit/X3Flashloan.t.sol` -> **Universal Asset Kernel** | LOC: 125 | Risks: none
+- `X3-contracts/shared/gpu-parity-core/Cargo.toml` -> **GPU Validator Swarm** | LOC: 27 | Risks: none
+- `X3-contracts/shared/gpu-parity-core/src/lib.rs` -> **Universal Asset Kernel** | LOC: 206 | Risks: panic risk
+- `X3-contracts/shared/gpu-parity-core/tests/parity_vectors.rs` -> **Proof System** | LOC: 78 | Risks: panic risk
+- `X3-contracts/shared/parity-core/Cargo.toml` -> **EVM Integration** | LOC: 23 | Risks: none
+- `X3-contracts/shared/parity-core/src/lib.rs` -> **Universal Asset Kernel** | LOC: 189 | Risks: panic risk
+- `X3-contracts/shared/parity-core/tests/parity_vectors.rs` -> **EVM Integration** | LOC: 78 | Risks: panic risk
+- `X3-contracts/shared/specs/flashloan_repay_or_revert.md` -> **Universal Asset Kernel** | LOC: 39 | Risks: none
+- `X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json` -> **Universal Asset Kernel** | LOC: 53 | Risks: none
+- `X3-contracts/shared/test-vectors/gpu_hash_parity.json` -> **GPU Validator Swarm** | LOC: 51 | Risks: none
+- `X3-contracts/svm/Anchor.toml` -> **SVM Integration** | LOC: 24 | Risks: none
+- `X3-contracts/svm/programs/x3_core/Cargo.toml` -> **SVM Integration** | LOC: 22 | Risks: none
+- `X3-contracts/svm/programs/x3_core/src/lib.rs` -> **Universal Asset Kernel** | LOC: 182 | Risks: none
+- `X3-contracts/svm/rust-toolchain.toml` -> **SVM Integration** | LOC: 3 | Risks: none
+- `X3_ATOMIC_STAR_CURRENT_BUILD_STATE.md` -> **Bridge / Router** | LOC: 79 | Risks: none
+- `apps/analytics/analytics-service/Cargo.toml` -> **DEX Liquidity** | LOC: 25 | Risks: none
+- `apps/analytics/analytics-service/docker-compose.yml` -> **DEX Liquidity** | LOC: 47 | Risks: local-only config risk
+- `apps/analytics/analytics-service/setup.sh` -> **DEX Liquidity** | LOC: 94 | Risks: local-only config risk
+- `apps/analytics/analytics-service/src/db.rs` -> **X3 DEX** | LOC: 530 | Risks: none
+- `apps/analytics/analytics-service/src/error.rs` -> **DEX Liquidity** | LOC: 67 | Risks: none
+- `apps/analytics/analytics-service/src/handlers.rs` -> **DEX Liquidity** | LOC: 214 | Risks: none
+- `apps/analytics/analytics-service/src/main.rs` -> **DEX Liquidity** | LOC: 192 | Risks: local-only config risk, panic risk
+- `apps/analytics/analytics-service/src/models.rs` -> **EVM Integration** | LOC: 219 | Risks: none
+- `apps/blockchain-adapter/scripts/deploy_provenance.ts` -> **EVM Integration** | LOC: 36 | Risks: none
+- `apps/blockchain-adapter/src/index.ts` -> **EVM Integration** | LOC: 46 | Risks: none
+- `apps/blockchain-adapter/src/worker.ts` -> **EVM Integration** | LOC: 95 | Risks: none
+- `apps/dashboard/src/panelRegistry.tsx` -> **Universal Asset Kernel** | LOC: 560 | Risks: bridge risk
+- `apps/dashboard/src/panels/adapters/SolanaAdapterPanel.tsx` -> **Universal Asset Kernel** | LOC: 500 | Risks: bridge risk
+- `apps/dashboard/src/panels/agents/AgentMarketplacePanel.tsx` -> **X3 DEX** | LOC: 496 | Risks: none
+- `apps/dashboard/src/panels/backend/CRMDatabasePanel.tsx` -> **Launchpad** | LOC: 498 | Risks: none
+- `apps/dashboard/src/panels/backend/SocialBackendPanel.tsx` -> **Bridge / Router** | LOC: 444 | Risks: bridge risk
+- `apps/dashboard/src/panels/docs/AdvancedPortfolioAnalyticsPanel.tsx` -> **Universal Asset Kernel** | LOC: 404 | Risks: none
+- `apps/dashboard/src/panels/docs/AnalyticsReportingPanel.tsx` -> **TPS Benchmark Suite** | LOC: 272 | Risks: none
+- `apps/dashboard/src/panels/docs/AudioVisualizerPanel.tsx` -> **Unclassified** | LOC: 194 | Risks: none
+- `apps/dashboard/src/panels/docs/CommunicationCenterPanel.tsx` -> **Validator / LaunchOps** | LOC: 228 | Risks: none
+- `apps/dashboard/src/panels/docs/CryptoKeyManagementPanel.tsx` -> **X3 DEX** | LOC: 186 | Risks: none
+- `apps/dashboard/src/panels/docs/DatastoreManagementPanel.tsx` -> **Validator / LaunchOps** | LOC: 276 | Risks: none
+- `apps/dashboard/src/panels/docs/DeveloperPlaygroundPanel.tsx` -> **Unclassified** | LOC: 192 | Risks: none
+- `apps/dashboard/src/panels/docs/DocumentationLibraryPanel.tsx` -> **Validator / LaunchOps** | LOC: 212 | Risks: none
+- `apps/dashboard/src/panels/docs/FAQSupportPanel.tsx` -> **Validator / LaunchOps** | LOC: 254 | Risks: none
+- `apps/dashboard/src/panels/docs/GamificationAndAchievementsPanel.tsx` -> **DEX Liquidity** | LOC: 290 | Risks: none
+- `apps/dashboard/src/panels/docs/GeoLocationPanel.tsx` -> **Validator / LaunchOps** | LOC: 175 | Risks: none
+- `apps/dashboard/src/panels/docs/GovernanceProposalsPanel.tsx` -> **Bridge / Router** | LOC: 285 | Risks: bridge risk
+- `apps/dashboard/src/panels/docs/IntegrationMarketplacePanel.tsx` -> **Universal Asset Kernel** | LOC: 243 | Risks: none
+- `apps/dashboard/src/panels/docs/MediaStreamingPanel.tsx` -> **Unclassified** | LOC: 255 | Risks: none
+- `apps/dashboard/src/panels/docs/NftMarketplacePanel.tsx` -> **Unclassified** | LOC: 415 | Risks: none
+- `apps/dashboard/src/panels/docs/OnChainAnalyticsPanel.tsx` -> **X3 DEX** | LOC: 336 | Risks: none
+- `apps/dashboard/src/panels/docs/PerformanceMonitorPanel.tsx` -> **Unclassified** | LOC: 253 | Risks: none
+- `apps/dashboard/src/panels/docs/PortfolioAnalysisPanel.tsx` -> **Universal Asset Kernel** | LOC: 193 | Risks: none
+- `apps/dashboard/src/panels/docs/PrivacyVaultPanel.tsx` -> **Validator / LaunchOps** | LOC: 350 | Risks: none
+- `apps/dashboard/src/panels/docs/QuantumSecurityPanel.tsx` -> **X3VM / Cross-VM** | LOC: 311 | Risks: none
+- `apps/dashboard/src/panels/docs/SessionSecurityPanel.tsx` -> **Unclassified** | LOC: 224 | Risks: none
+- `apps/dashboard/src/panels/docs/SettingsPanel.tsx` -> **Unclassified** | LOC: 319 | Risks: none
+- `apps/dashboard/src/panels/docs/TokenMarketplacePanel.tsx` -> **Launchpad** | LOC: 294 | Risks: none
+- `apps/dashboard/src/panels/docs/TreasuryManagementPanel.tsx` -> **DEX Liquidity** | LOC: 263 | Risks: none
+- `apps/dashboard/src/panels/docs/ValidatorHealthPanel.tsx` -> **Validator / LaunchOps** | LOC: 169 | Risks: none
+- `apps/dashboard/src/panels/infrastructure/ChainCoreOptimizationPanel.tsx` -> **Universal Asset Kernel** | LOC: 355 | Risks: none
+- `apps/dashboard/src/panels/infrastructure/CrossChainBridgePanel.tsx` -> **Bridge / Router** | LOC: 445 | Risks: bridge risk
+- `apps/dashboard/src/panels/infrastructure/DynamicFeeMarketPanel.tsx` -> **DEX Liquidity** | LOC: 400 | Risks: none
+- `apps/dashboard/src/panels/integration/NFTCRMIntegrationPanel.tsx` -> **Validator / LaunchOps** | LOC: 490 | Risks: none
+- `apps/dashboard/src/panels/integration/PriceOraclePanel.tsx` -> **Universal Asset Kernel** | LOC: 450 | Risks: none
+- `apps/dashboard/src/panels/performance/WebWorkerOptimizationPanel.tsx` -> **GPU Validator Swarm** | LOC: 489 | Risks: none
+- `apps/dashboard/src/panels/security/AuditDashboardPanel.tsx` -> **Universal Asset Kernel** | LOC: 377 | Risks: bridge risk
+- `apps/dashboard/src/panels/security/BugBountyProgramPanel.tsx` -> **Bridge / Router** | LOC: 348 | Risks: bridge risk
+- `apps/dashboard/src/panels/tools/TerminalShellPanel.tsx` -> **Unclassified** | LOC: 347 | Risks: local-only config risk
+- `apps/dashboard/src/panels/tools/ValidatorAutomationPanel.tsx` -> **Validator / LaunchOps** | LOC: 461 | Risks: none
+- `apps/dex/.claude/commands/execute-prp.md` -> **X3 DEX** | LOC: 40 | Risks: none
+- `apps/dex/.claude/commands/generate-prp.md` -> **X3 DEX** | LOC: 74 | Risks: none
+- `apps/dex/.eslintrc.json` -> **X3 DEX** | LOC: 4 | Risks: none
+- `apps/dex/CLAUDE.md` -> **Bridge / Router** | LOC: 75 | Risks: unfinished logic
+- `apps/dex/PRPs/templates/prp_base.md` -> **Bridge / Router** | LOC: 218 | Risks: local-only config risk, panic risk
+- `apps/dex/README.md` -> **Bridge / Router** | LOC: 406 | Risks: bridge risk, local-only config risk, unfinished logic
+- `apps/dex/app/components/LimitOrderInterface.tsx` -> **X3 DEX** | LOC: 279 | Risks: none
+- `apps/dex/app/components/SwapInterface.tsx` -> **X3 DEX** | LOC: 238 | Risks: none
+- `apps/dex/app/components/WalletConnector.tsx` -> **X3 DEX** | LOC: 58 | Risks: none
+- `apps/dex/app/layout.tsx` -> **X3 DEX** | LOC: 10 | Risks: none
+- `apps/dex/app/lib/rpc-client.ts` -> **X3 DEX** | LOC: 214 | Risks: local-only config risk
+- `apps/dex/app/page.tsx` -> **X3 DEX** | LOC: 115 | Risks: local-only config risk
+- `apps/dex/examples/README.md` -> **X3 DEX** | LOC: 51 | Risks: none
+- `apps/dex/next-env.d.ts` -> **X3 DEX** | LOC: 7 | Risks: none
+- `apps/dex/next.config.js` -> **Universal Asset Kernel** | LOC: 25 | Risks: none
+- `apps/dex/package.json` -> **X3 DEX** | LOC: 36 | Risks: none
+- `apps/dex/postcss.config.js` -> **X3 DEX** | LOC: 7 | Risks: none
+- `apps/dex/tsconfig.json` -> **X3 DEX** | LOC: 37 | Risks: none
+- `apps/inferstructor-dashboard/.claude/hooks/auto-git-add.sh` -> **Unclassified** | LOC: 7 | Risks: none
+- `apps/inferstructor-dashboard/.claude/hooks/build-on-change.sh` -> **Unclassified** | LOC: 7 | Risks: none
+- `apps/inferstructor-dashboard/.claude/settings.json` -> **Unclassified** | LOC: 25 | Risks: none
+- `apps/inferstructor-dashboard/ADMIN_WORKFLOWS.md` -> **X3 DEX** | LOC: 388 | Risks: none
+- `apps/inferstructor-dashboard/TESTING.md` -> **X3 DEX** | LOC: 175 | Risks: panic risk
+- `apps/inferstructor-dashboard/eslint.config.js` -> **Unclassified** | LOC: 35 | Risks: none
+- `apps/inferstructor-dashboard/package.json` -> **Unclassified** | LOC: 55 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/Cargo.toml` -> **GPU Validator Swarm** | LOC: 18 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/build.rs` -> **Unclassified** | LOC: 4 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/gen/schemas/acl-manifests.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/gen/schemas/capabilities.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/gen/schemas/desktop-schema.json` -> **TPS Benchmark Suite** | LOC: 2244 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/gen/schemas/linux-schema.json` -> **TPS Benchmark Suite** | LOC: 2244 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/rust-toolchain.toml` -> **Unclassified** | LOC: 5 | Risks: none
+- `apps/inferstructor-dashboard/src-tauri/src/main.rs` -> **Bridge / Router** | LOC: 63 | Risks: panic risk
+- `apps/inferstructor-dashboard/src-tauri/tauri.conf.json` -> **TPS Benchmark Suite** | LOC: 43 | Risks: local-only config risk, unsafe code
+- `apps/inferstructor-dashboard/src/App.tsx` -> **X3 DEX** | LOC: 237 | Risks: none
+- `apps/inferstructor-dashboard/src/api-client.ts` -> **Unclassified** | LOC: 126 | Risks: none
+- `apps/inferstructor-dashboard/src/api.test.ts` -> **Bridge / Router** | LOC: 300 | Risks: bridge risk, local-only config risk, panic risk
+- `apps/inferstructor-dashboard/src/api.ts` -> **Bridge / Router** | LOC: 972 | Risks: bridge risk, local-only config risk
+- `apps/inferstructor-dashboard/src/components/AdminControls.tsx` -> **TPS Benchmark Suite** | LOC: 232 | Risks: none
+- `apps/inferstructor-dashboard/src/components/AdminDashboard.tsx` -> **TPS Benchmark Suite** | LOC: 1062 | Risks: bridge risk
+- `apps/inferstructor-dashboard/src/components/AdminDashboardTelemetryPanels.test.tsx` -> **Bridge / Router** | LOC: 90 | Risks: bridge risk, panic risk
+- `apps/inferstructor-dashboard/src/components/AdminDashboardTelemetryPanels.tsx` -> **TPS Benchmark Suite** | LOC: 521 | Risks: bridge risk
+- `apps/inferstructor-dashboard/src/components/AdminLogin.tsx` -> **Unclassified** | LOC: 126 | Risks: none
+- `apps/inferstructor-dashboard/src/components/Dashboard.tsx` -> **Bridge / Router** | LOC: 158 | Risks: bridge risk, local-only config risk
+- `apps/inferstructor-dashboard/src/components/DashboardCharts.test.tsx` -> **TPS Benchmark Suite** | LOC: 39 | Risks: panic risk
+- `apps/inferstructor-dashboard/src/components/LeaderboardAndMetrics.tsx` -> **TPS Benchmark Suite** | LOC: 284 | Risks: none
+- `apps/inferstructor-dashboard/src/components/LeaderboardAndMetricsPanels.tsx` -> **TPS Benchmark Suite** | LOC: 215 | Risks: none
+- `apps/inferstructor-dashboard/src/components/LoginPage.tsx` -> **Unclassified** | LOC: 147 | Risks: none
+- `apps/inferstructor-dashboard/src/components/MainNav.tsx` -> **X3 DEX** | LOC: 154 | Risks: none
+- `apps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.test.ts` -> **Bridge / Router** | LOC: 135 | Risks: bridge risk, panic risk
+- `apps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.tsx` -> **TPS Benchmark Suite** | LOC: 519 | Risks: bridge risk
+- `apps/inferstructor-dashboard/src/components/OrchestraOperationsPanel.ui.test.tsx` -> **Bridge / Router** | LOC: 182 | Risks: bridge risk, panic risk
+- `apps/inferstructor-dashboard/src/components/RegisterPage.tsx` -> **TPS Benchmark Suite** | LOC: 306 | Risks: none
+- `apps/inferstructor-dashboard/src/components/Toast.tsx` -> **Unclassified** | LOC: 75 | Risks: none
+- `apps/inferstructor-dashboard/src/components/TpsLeaderboard.test.tsx` -> **TPS Benchmark Suite** | LOC: 110 | Risks: panic risk
+- `apps/inferstructor-dashboard/src/components/TpsLeaderboard.tsx` -> **EVM Integration** | LOC: 495 | Risks: none
+- `apps/inferstructor-dashboard/src/components/TpsLeaderboardChart.tsx` -> **X3 DEX** | LOC: 127 | Risks: none
+- `apps/inferstructor-dashboard/src/components/ValidatorControls.tsx` -> **Validator / LaunchOps** | LOC: 232 | Risks: none
+- `apps/inferstructor-dashboard/src/components/admin-tabs/AuditPanel.tsx` -> **Unclassified** | LOC: 53 | Risks: none
+- `apps/inferstructor-dashboard/src/components/admin-tabs/EmergencyPanel.tsx` -> **X3 DEX** | LOC: 72 | Risks: none
+- `apps/inferstructor-dashboard/src/components/admin-tabs/FaucetPanel.tsx` -> **Unclassified** | LOC: 93 | Risks: none
+- `apps/inferstructor-dashboard/src/components/admin-tabs/RBACPanel.tsx` -> **Unclassified** | LOC: 35 | Risks: none
+- `apps/inferstructor-dashboard/src/components/admin-tabs/RpcPanel.tsx` -> **Unclassified** | LOC: 48 | Risks: none
+- `apps/inferstructor-dashboard/src/components/admin-tabs/index.ts` -> **X3 DEX** | LOC: 6 | Risks: none
+- `apps/inferstructor-dashboard/src/components/charts/SvgCharts.tsx` -> **X3 DEX** | LOC: 294 | Risks: none
+- `apps/inferstructor-dashboard/src/components/dashboard/DashboardHeader.tsx` -> **TPS Benchmark Suite** | LOC: 47 | Risks: none
+- `apps/inferstructor-dashboard/src/components/dashboard/DetailsGrid.tsx` -> **Bridge / Router** | LOC: 75 | Risks: bridge risk
+- `apps/inferstructor-dashboard/src/components/dashboard/ErrorBanner.tsx` -> **Unclassified** | LOC: 28 | Risks: none
+- `apps/inferstructor-dashboard/src/components/dashboard/GPULanesSection.tsx` -> **TPS Benchmark Suite** | LOC: 82 | Risks: none
+- `apps/inferstructor-dashboard/src/components/dashboard/SolanaChainSection.tsx` -> **X3 DEX** | LOC: 135 | Risks: none
+- `apps/inferstructor-dashboard/src/components/dashboard/StatsGrid.tsx` -> **Bridge / Router** | LOC: 64 | Risks: bridge risk
+- `apps/inferstructor-dashboard/src/components/dashboard/TpsChart.tsx` -> **TPS Benchmark Suite** | LOC: 84 | Risks: none
+- `apps/inferstructor-dashboard/src/components/orchestra-incidents.ts` -> **Bridge / Router** | LOC: 222 | Risks: bridge risk
+- `apps/inferstructor-dashboard/src/components/toast-context.ts` -> **Unclassified** | LOC: 26 | Risks: none
+- `apps/inferstructor-dashboard/src/constants.ts` -> **TPS Benchmark Suite** | LOC: 107 | Risks: none
+- `apps/inferstructor-dashboard/src/hooks/index.ts` -> **X3 DEX** | LOC: 5 | Risks: none
+- `apps/inferstructor-dashboard/src/hooks/useApi.ts` -> **Unclassified** | LOC: 49 | Risks: none
+- `apps/inferstructor-dashboard/src/hooks/useApiError.ts` -> **Unclassified** | LOC: 30 | Risks: none
+- `apps/inferstructor-dashboard/src/hooks/useLoading.ts` -> **Unclassified** | LOC: 28 | Risks: none
+- `apps/inferstructor-dashboard/src/hooks/useTokenRefresh.test.ts` -> **Validator / LaunchOps** | LOC: 67 | Risks: panic risk
+- `apps/inferstructor-dashboard/src/hooks/useTokenRefresh.ts` -> **Unclassified** | LOC: 207 | Risks: none
+- `apps/inferstructor-dashboard/src/main.tsx` -> **X3 DEX** | LOC: 11 | Risks: none
+- `apps/inferstructor-dashboard/src/test/setup.ts` -> **Bridge / Router** | LOC: 67 | Risks: local-only config risk
+- `apps/inferstructor-dashboard/src/test/test-utils.tsx` -> **Unclassified** | LOC: 17 | Risks: none
+- `apps/inferstructor-dashboard/src/utils/validation.test.ts` -> **TPS Benchmark Suite** | LOC: 258 | Risks: local-only config risk, panic risk
+- `apps/inferstructor-dashboard/src/utils/validation.ts` -> **TPS Benchmark Suite** | LOC: 366 | Risks: none
+- `apps/inferstructor-dashboard/tsconfig.app.json` -> **Unclassified** | LOC: 29 | Risks: none
+- `apps/inferstructor-dashboard/tsconfig.json` -> **Unclassified** | LOC: 8 | Risks: none
+- `apps/inferstructor-dashboard/tsconfig.node.json` -> **Unclassified** | LOC: 27 | Risks: none
+- `apps/inferstructor-dashboard/vite.config.ts` -> **TPS Benchmark Suite** | LOC: 25 | Risks: none
+- `apps/inferstructor-dashboard/vitest.config.ts` -> **Unclassified** | LOC: 29 | Risks: none
+- `apps/shared/components/ChainStatusBanner.tsx` -> **Unclassified** | LOC: 39 | Risks: none
+- `apps/shared/components/ConnectionStatus.tsx` -> **Unclassified** | LOC: 143 | Risks: none
+- `apps/shared/components/WalletButton.tsx` -> **Unclassified** | LOC: 321 | Risks: none
+- `apps/shared/components/__tests__/ChainStatusBanner.test.tsx` -> **Unclassified** | LOC: 13 | Risks: panic risk
+- `apps/shared/components/index.ts` -> **X3 DEX** | LOC: 7 | Risks: none
+- `apps/shared/components/quantum-ui/AnimatedSphere.tsx` -> **Unclassified** | LOC: 191 | Risks: none
+- `apps/shared/components/quantum-ui/AuroraBorealis.tsx` -> **X3 DEX** | LOC: 342 | Risks: none
+- `apps/shared/components/quantum-ui/Cube3D.tsx` -> **Unclassified** | LOC: 300 | Risks: none
+- `apps/shared/components/quantum-ui/CyberGrid.tsx` -> **Unclassified** | LOC: 355 | Risks: none
+- `apps/shared/components/quantum-ui/DataVisualizers.tsx` -> **Unclassified** | LOC: 413 | Risks: none
+- `apps/shared/components/quantum-ui/FloatingParticles.tsx` -> **Unclassified** | LOC: 314 | Risks: none
+- `apps/shared/components/quantum-ui/GhostText.tsx` -> **X3VM / Cross-VM** | LOC: 236 | Risks: none
+- `apps/shared/components/quantum-ui/GlitchText.tsx` -> **X3 DEX** | LOC: 260 | Risks: none
+- `apps/shared/components/quantum-ui/GooeyMarquee.tsx` -> **X3 DEX** | LOC: 256 | Risks: none
+- `apps/shared/components/quantum-ui/HolographicCard.tsx` -> **Unclassified** | LOC: 312 | Risks: none
+- `apps/shared/components/quantum-ui/LiquidMetal.tsx` -> **X3 DEX** | LOC: 269 | Risks: none
+- `apps/shared/components/quantum-ui/MatrixRain.tsx` -> **X3 DEX** | LOC: 356 | Risks: none
+- `apps/shared/components/quantum-ui/NoiseOverlay.tsx` -> **Unclassified** | LOC: 201 | Risks: none
+- `apps/shared/components/quantum-ui/ParticleVortex.tsx` -> **Unclassified** | LOC: 176 | Risks: none
+- `apps/shared/components/quantum-ui/PosterArtCard.tsx` -> **Unclassified** | LOC: 155 | Risks: none
+- `apps/shared/components/quantum-ui/RainbowBorder.tsx` -> **Unclassified** | LOC: 221 | Risks: none
+- `apps/shared/components/quantum-ui/SceneNavigation.tsx` -> **X3 DEX** | LOC: 266 | Risks: none
+- `apps/shared/components/quantum-ui/TiltCard3D.tsx` -> **Unclassified** | LOC: 159 | Risks: none
+- `apps/shared/components/quantum-ui/VHSRetroCard.tsx` -> **Unclassified** | LOC: 294 | Risks: none
+- `apps/shared/components/quantum-ui/XRayScanner.tsx` -> **X3 DEX** | LOC: 516 | Risks: none
+- `apps/shared/components/quantum-ui/index.ts` -> **X3 DEX** | LOC: 39 | Risks: none
+- `apps/shared/config/__tests__/chain.test.ts` -> **TPS Benchmark Suite** | LOC: 27 | Risks: local-only config risk, panic risk
+- `apps/shared/config/chain.ts` -> **Universal Asset Kernel** | LOC: 307 | Risks: local-only config risk
+- `apps/shared/hooks/index.ts` -> **X3 DEX** | LOC: 14 | Risks: none
+- `apps/shared/hooks/useChainSubscription.ts` -> **Validator / LaunchOps** | LOC: 316 | Risks: replay/nonce risk
+- `apps/shared/hooks/useWalletConnection.ts` -> **Unclassified** | LOC: 248 | Risks: none
+- `apps/shared/index.ts` -> **X3 DEX** | LOC: 11 | Risks: none
+- `apps/shared/package.json` -> **X3 DEX** | LOC: 34 | Risks: none
+- `apps/shared/providers/ChainProvider.tsx` -> **Universal Asset Kernel** | LOC: 445 | Risks: replay/nonce risk
+- `apps/shared/providers/index.ts` -> **X3 DEX** | LOC: 6 | Risks: none
+- `apps/shared/src/types/testing-library.d.ts` -> **Unclassified** | LOC: 14 | Risks: none
+- `apps/super-ide/backend/routes/testing.py` -> **Bridge / Router** | LOC: 33 | Risks: none
+- `apps/super-ide/src/components/panels/ExplorerPanel.tsx` -> **Unclassified** | LOC: 12 | Risks: none
+- `apps/validators/.eslintrc.json` -> **Validator / LaunchOps** | LOC: 19 | Risks: none
+- `apps/validators/package.json` -> **Validator / LaunchOps** | LOC: 46 | Risks: none
+- `apps/validators/postcss.config.js` -> **Validator / LaunchOps** | LOC: 7 | Risks: none
+- `apps/validators/src/App.tsx` -> **TPS Benchmark Suite** | LOC: 87 | Risks: none
+- `apps/validators/src/components/ValidatorGlobe.tsx` -> **X3 DEX** | LOC: 598 | Risks: none
+- `apps/validators/src/main.tsx` -> **X3 DEX** | LOC: 19 | Risks: none
+- `apps/validators/src/vite-env.d.ts` -> **Validator / LaunchOps** | LOC: 2 | Risks: none
+- `apps/validators/tailwind.config.js` -> **X3 DEX** | LOC: 26 | Risks: none
+- `apps/validators/tsconfig.json` -> **Validator / LaunchOps** | LOC: 30 | Risks: none
+- `apps/validators/tsconfig.node.json` -> **Validator / LaunchOps** | LOC: 11 | Risks: none
+- `apps/validators/vite.config.ts` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `apps/wallet/.eslintrc.json` -> **Unclassified** | LOC: 4 | Risks: none
+- `apps/wallet/next-env.d.ts` -> **TPS Benchmark Suite** | LOC: 7 | Risks: none
+- `apps/wallet/next.config.js` -> **Universal Asset Kernel** | LOC: 23 | Risks: none
+- `apps/wallet/package.json` -> **Unclassified** | LOC: 59 | Risks: none
+- `apps/wallet/postcss.config.js` -> **Unclassified** | LOC: 7 | Risks: none
+- `apps/wallet/src/app/layout.tsx` -> **X3 DEX** | LOC: 22 | Risks: none
+- `apps/wallet/src/app/page.tsx` -> **X3 DEX** | LOC: 94 | Risks: none
+- `apps/wallet/src/app/polkadex/advanced/page.tsx` -> **X3 DEX** | LOC: 386 | Risks: none
+- `apps/wallet/src/app/polkadex/analytics/page.tsx` -> **X3 DEX** | LOC: 292 | Risks: none
+- `apps/wallet/src/app/polkadex/bots/page.tsx` -> **X3 DEX** | LOC: 298 | Risks: none
+- `apps/wallet/src/app/polkadex/launchpad/page.tsx` -> **X3 DEX** | LOC: 516 | Risks: none
+- `apps/wallet/src/app/polkadex/layout.tsx` -> **X3 DEX** | LOC: 60 | Risks: none
+- `apps/wallet/src/app/polkadex/markets/page.tsx` -> **Universal Asset Kernel** | LOC: 181 | Risks: none
+- `apps/wallet/src/app/polkadex/orders/page.tsx` -> **X3 DEX** | LOC: 182 | Risks: none
+- `apps/wallet/src/app/polkadex/page.tsx` -> **X3 DEX** | LOC: 197 | Risks: none
+- `apps/wallet/src/app/polkadex/portfolio/page.tsx` -> **Universal Asset Kernel** | LOC: 135 | Risks: none
+- `apps/wallet/src/app/polkadex/scanner/page.tsx` -> **X3 DEX** | LOC: 393 | Risks: none
+- `apps/wallet/src/app/polkadex/settings/page.tsx` -> **X3 DEX** | LOC: 157 | Risks: none
+- `apps/wallet/src/app/polkadex/trading/page.tsx` -> **Universal Asset Kernel** | LOC: 294 | Risks: none
+- `apps/wallet/src/app/trading/agents/page.tsx` -> **Unclassified** | LOC: 150 | Risks: none
+- `apps/wallet/src/app/trading/arbitrage/page.tsx` -> **X3 DEX** | LOC: 131 | Risks: none
+- `apps/wallet/src/app/trading/bonds/page.tsx` -> **Unclassified** | LOC: 13 | Risks: none
+- `apps/wallet/src/app/trading/floor/page.tsx` -> **Proof System** | LOC: 338 | Risks: none
+- `apps/wallet/src/app/trading/guide/page.tsx` -> **Proof System** | LOC: 45 | Risks: none
+- `apps/wallet/src/app/trading/intents/page.tsx` -> **Unclassified** | LOC: 13 | Risks: none
+- `apps/wallet/src/app/trading/layout.tsx` -> **Proof System** | LOC: 48 | Risks: none
+- `apps/wallet/src/app/trading/proofs/page.tsx` -> **Proof System** | LOC: 13 | Risks: none
+- `apps/wallet/src/app/trading/rules/page.tsx` -> **X3VM / Cross-VM** | LOC: 35 | Risks: none
+- `apps/wallet/src/app/trading/slashing/page.tsx` -> **Unclassified** | LOC: 13 | Risks: none
+- `apps/wallet/src/app/trading/why/page.tsx` -> **Proof System** | LOC: 39 | Risks: none
+- `apps/wallet/src/components/crm/DorksSearchPanel.tsx` -> **Unclassified** | LOC: 205 | Risks: none
+- `apps/wallet/src/components/crm/FundingDashboard.tsx` -> **Unclassified** | LOC: 149 | Risks: none
+- `apps/wallet/src/components/x3/AdvancedChart.tsx` -> **X3 DEX** | LOC: 191 | Risks: none
+- `apps/wallet/src/components/x3/AdvancedOrderForm.tsx` -> **Unclassified** | LOC: 245 | Risks: none
+- `apps/wallet/src/components/x3/ArbitrageComponents.tsx` -> **Unclassified** | LOC: 113 | Risks: none
+- `apps/wallet/src/components/x3/Charts.tsx` -> **X3 DEX** | LOC: 165 | Risks: none
+- `apps/wallet/src/components/x3/UIComponents.tsx` -> **Unclassified** | LOC: 119 | Risks: none
+- `apps/wallet/src/lib/polkadex/services/api.ts` -> **Universal Asset Kernel** | LOC: 115 | Risks: none
+- `apps/wallet/src/lib/polkadex/types.ts` -> **Universal Asset Kernel** | LOC: 114 | Risks: none
+- `apps/wallet/src/lib/store/tradingStore.ts` -> **X3 DEX** | LOC: 102 | Risks: none
+- `apps/wallet/src/lib/x3/demoDorks.ts` -> **X3 DEX** | LOC: 258 | Risks: none
+- `apps/wallet/src/lib/x3/hooks/index.ts` -> **X3 DEX** | LOC: 2 | Risks: none
+- `apps/wallet/src/lib/x3/hooks/useDorksSearch.ts` -> **Unclassified** | LOC: 253 | Risks: none
+- `apps/wallet/src/lib/x3/hooks/useFundingPipeline.ts` -> **Unclassified** | LOC: 135 | Risks: none
+- `apps/wallet/src/lib/x3/services/api.ts` -> **Proof System** | LOC: 118 | Risks: none
+- `apps/wallet/src/lib/x3/services/flashloans.ts` -> **X3 DEX** | LOC: 39 | Risks: none
+- `apps/wallet/src/lib/x3/types.ts` -> **Universal Asset Kernel** | LOC: 151 | Risks: none
+- `apps/wallet/tailwind.config.ts` -> **Unclassified** | LOC: 41 | Risks: none
+- `apps/wallet/tsconfig.json` -> **Unclassified** | LOC: 58 | Risks: none
+- `apps/x3-desktop/.storybook/main.ts` -> **Unclassified** | LOC: 28 | Risks: none
+- `apps/x3-desktop/.storybook/preview.ts` -> **Unclassified** | LOC: 14 | Risks: none
+- `apps/x3-desktop/app-store/setup-treasury-integration.sh` -> **Launchpad** | LOC: 142 | Risks: none
+- `apps/x3-desktop/app-store/verify-apps.sh` -> **Unclassified** | LOC: 75 | Risks: none
+- `apps/x3-desktop/package.json` -> **Bridge / Router** | LOC: 92 | Risks: none
+- `apps/x3-desktop/playwright.config.ts` -> **Unclassified** | LOC: 60 | Risks: local-only config risk
+- `apps/x3-desktop/postcss.config.js` -> **Unclassified** | LOC: 7 | Risks: none
+- `apps/x3-desktop/rag-bot/config.js` -> **Unclassified** | LOC: 9 | Risks: local-only config risk
+- `apps/x3-desktop/rag-bot/index.js` -> **X3 DEX** | LOC: 33 | Risks: local-only config risk
+- `apps/x3-desktop/rag-bot/package.json` -> **X3 DEX** | LOC: 17 | Risks: none
+- `apps/x3-desktop/rag-bot/rag.js` -> **Universal Asset Kernel** | LOC: 78 | Risks: none
+- `apps/x3-desktop/scripts/demo-operator-dashboard.sh` -> **X3VM / Cross-VM** | LOC: 292 | Risks: none
+- `apps/x3-desktop/scripts/seed_atomic_pool.js` -> **X3VM / Cross-VM** | LOC: 140 | Risks: none
+- `apps/x3-desktop/src-tauri/.cargo/config.toml` -> **Unclassified** | LOC: 15 | Risks: none
+- `apps/x3-desktop/src-tauri/Cargo.toml` -> **Unclassified** | LOC: 63 | Risks: none
+- `apps/x3-desktop/src-tauri/build.rs` -> **Unclassified** | LOC: 4 | Risks: none
+- `apps/x3-desktop/src-tauri/capabilities/default.json` -> **Unclassified** | LOC: 32 | Risks: none
+- `apps/x3-desktop/src-tauri/gen/schemas/acl-manifests.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `apps/x3-desktop/src-tauri/gen/schemas/capabilities.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `apps/x3-desktop/src-tauri/gen/schemas/desktop-schema.json` -> **TPS Benchmark Suite** | LOC: 7141 | Risks: none
+- `apps/x3-desktop/src-tauri/gen/schemas/linux-schema.json` -> **TPS Benchmark Suite** | LOC: 7141 | Risks: none
+- `apps/x3-desktop/src-tauri/rust-toolchain.toml` -> **Unclassified** | LOC: 5 | Risks: none
+- `apps/x3-desktop/src-tauri/src/admin_commands.rs` -> **Universal Asset Kernel** | LOC: 147 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/agents.rs` -> **X3 DEX** | LOC: 2155 | Risks: bridge risk, local-only config risk, panic risk, replay risk
+- `apps/x3-desktop/src-tauri/src/crm/agents.rs.replace.py` -> **X3 DEX** | LOC: 425 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/audit_tournament.rs` -> **DEX Liquidity** | LOC: 433 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/commands.rs` -> **TPS Benchmark Suite** | LOC: 1072 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/db.rs` -> **Unclassified** | LOC: 326 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/crm/dorks.rs` -> **Unclassified** | LOC: 471 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/dorks_commands.rs` -> **Unclassified** | LOC: 506 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/funding.rs` -> **Unclassified** | LOC: 389 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/funding_war_plan.rs` -> **Unclassified** | LOC: 615 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/funding_war_plan_commands.rs` -> **Unclassified** | LOC: 388 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/hardware_acquisition_commands.rs` -> **GPU Validator Swarm** | LOC: 453 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/hardware_sources_db.rs` -> **TPS Benchmark Suite** | LOC: 1365 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/mod.rs` -> **Unclassified** | LOC: 6 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/models.rs` -> **Unclassified** | LOC: 443 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/outreach_system.rs` -> **GPU Validator Swarm** | LOC: 460 | Risks: none
+- `apps/x3-desktop/src-tauri/src/crm/smtp.rs` -> **TPS Benchmark Suite** | LOC: 61 | Risks: none
+- `apps/x3-desktop/src-tauri/src/main.rs` -> **Unclassified** | LOC: 1365 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/social/activitypub.rs` -> **TPS Benchmark Suite** | LOC: 273 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/social/commands.rs` -> **Unclassified** | LOC: 1042 | Risks: none
+- `apps/x3-desktop/src-tauri/src/social/db.rs` -> **Unclassified** | LOC: 236 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/social/ipfs.rs` -> **TPS Benchmark Suite** | LOC: 245 | Risks: none
+- `apps/x3-desktop/src-tauri/src/social/mod.rs` -> **Unclassified** | LOC: 9 | Risks: none
+- `apps/x3-desktop/src-tauri/src/social/models.rs` -> **Unclassified** | LOC: 334 | Risks: none
+- `apps/x3-desktop/src-tauri/src/social/notifications.rs` -> **Proof System** | LOC: 302 | Risks: none
+- `apps/x3-desktop/src-tauri/src/social/server.rs` -> **Unclassified** | LOC: 198 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/tests.rs` -> **Unclassified** | LOC: 378 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet.rs` -> **EVM Integration** | LOC: 196 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/coordinator.rs` -> **EVM Integration** | LOC: 41 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/ipc.rs` -> **Universal Asset Kernel** | LOC: 55 | Risks: none
+- `apps/x3-desktop/src-tauri/src/wallet_core/mod.rs` -> **Unclassified** | LOC: 9 | Risks: none
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/btc.rs` -> **Unclassified** | LOC: 39 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/common/hw_bridge.rs` -> **Bridge / Router** | LOC: 5 | Risks: none
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/common/mod.rs` -> **Bridge / Router** | LOC: 3 | Risks: bridge risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/common/secure_memory.rs` -> **X3 DEX** | LOC: 32 | Risks: unsafe code
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/evm.rs` -> **EVM Integration** | LOC: 73 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/mod.rs` -> **EVM Integration** | LOC: 48 | Risks: unsafe code
+- `apps/x3-desktop/src-tauri/src/wallet_core/signers/svm.rs` -> **SVM Integration** | LOC: 59 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/verifier/mod.rs` -> **Universal Asset Kernel** | LOC: 20 | Risks: panic risk
+- `apps/x3-desktop/src-tauri/src/wallet_core/verifier/quorum.rs` -> **Universal Asset Kernel** | LOC: 98 | Risks: none
+- `apps/x3-desktop/src-tauri/tauri.conf.json` -> **Universal Asset Kernel** | LOC: 40 | Risks: local-only config risk, unsafe code
+- `apps/x3-desktop/src-tauri/tests/unit_integration_tests.rs` -> **Unclassified** | LOC: 474 | Risks: panic risk
+- `apps/x3-desktop/src/.tauri/state.json` -> **Unclassified** | LOC: 2 | Risks: none
+- `apps/x3-desktop/src/App.tsx` -> **Bridge / Router** | LOC: 180 | Risks: none
+- `apps/x3-desktop/src/Test.tsx` -> **Unclassified** | LOC: 17 | Risks: none
+- `apps/x3-desktop/src/components/ErrorBoundary.test.tsx` -> **Unclassified** | LOC: 83 | Risks: panic risk
+- `apps/x3-desktop/src/components/ErrorBoundary.tsx` -> **Unclassified** | LOC: 176 | Risks: none
+- `apps/x3-desktop/src/components/HardwareAcquisitionDashboard.tsx` -> **GPU Validator Swarm** | LOC: 336 | Risks: none
+- `apps/x3-desktop/src/components/WarPlanDashboard.tsx` -> **Unclassified** | LOC: 567 | Risks: none
+- `apps/x3-desktop/src/components/common/ContextMenu.tsx` -> **Unclassified** | LOC: 95 | Risks: none
+- `apps/x3-desktop/src/components/common/Modal.tsx` -> **X3 DEX** | LOC: 96 | Risks: none
+- `apps/x3-desktop/src/components/common/Tooltip.tsx` -> **Unclassified** | LOC: 41 | Risks: none
+- `apps/x3-desktop/src/components/debug/PerformanceMonitor.tsx` -> **GPU Validator Swarm** | LOC: 365 | Risks: none
+- `apps/x3-desktop/src/components/desktop/AutoUpdateDialog.tsx` -> **Launchpad** | LOC: 616 | Risks: none
+- `apps/x3-desktop/src/components/desktop/BottomNavBar.tsx` -> **X3 DEX** | LOC: 166 | Risks: none
+- `apps/x3-desktop/src/components/desktop/CrashReporter.tsx` -> **TPS Benchmark Suite** | LOC: 739 | Risks: none
+- `apps/x3-desktop/src/components/desktop/Desktop.tsx` -> **X3 DEX** | LOC: 203 | Risks: none
+- `apps/x3-desktop/src/components/desktop/KeyboardShortcutMap.tsx` -> **X3 DEX** | LOC: 967 | Risks: none
+- `apps/x3-desktop/src/components/desktop/MultiMonitorManager.tsx` -> **Unclassified** | LOC: 541 | Risks: none
+- `apps/x3-desktop/src/components/desktop/SystemNotifications.tsx` -> **Validator / LaunchOps** | LOC: 797 | Risks: none
+- `apps/x3-desktop/src/components/desktop/Taskbar.tsx` -> **Unclassified** | LOC: 116 | Risks: none
+- `apps/x3-desktop/src/components/desktop/ThemeMarketplace.tsx` -> **Unclassified** | LOC: 678 | Risks: none
+- `apps/x3-desktop/src/components/desktop/TopNavBar.tsx` -> **Bridge / Router** | LOC: 628 | Risks: none
+- `apps/x3-desktop/src/components/desktop/WidgetLayer.tsx` -> **Validator / LaunchOps** | LOC: 640 | Risks: none
+- `apps/x3-desktop/src/components/desktop/WindowManager.tsx` -> **Unclassified** | LOC: 326 | Risks: none
+- `apps/x3-desktop/src/components/desktop/WindowSnapLayout.tsx` -> **Unclassified** | LOC: 266 | Risks: none
+- `apps/x3-desktop/src/components/documentation/Documentation.tsx` -> **X3 DEX** | LOC: 281 | Risks: none
+- `apps/x3-desktop/src/components/documentation/MarkdownViewer.tsx` -> **Unclassified** | LOC: 149 | Risks: none
+- `apps/x3-desktop/src/components/effects/ForegroundParallax.tsx` -> **Unclassified** | LOC: 63 | Risks: none
+- `apps/x3-desktop/src/components/eyeball/Eyeball.tsx` -> **Unclassified** | LOC: 380 | Risks: none
+- `apps/x3-desktop/src/components/eyeball/eyeballShaders.ts` -> **Unclassified** | LOC: 100 | Risks: none
+- `apps/x3-desktop/src/components/eyeball/useEyeballTracking.ts` -> **Unclassified** | LOC: 189 | Risks: none
+- `apps/x3-desktop/src/components/icons/ApplicationIcon.tsx` -> **X3 DEX** | LOC: 245 | Risks: none
+- `apps/x3-desktop/src/components/icons/FeaturedAppCard.tsx` -> **X3 DEX** | LOC: 115 | Risks: none
+- `apps/x3-desktop/src/components/icons/IconGrid.tsx` -> **Launchpad** | LOC: 191 | Risks: none
+- `apps/x3-desktop/src/components/ipfsStorage/IpfsStoragePanel.test.tsx` -> **Launchpad** | LOC: 452 | Risks: panic risk
+- `apps/x3-desktop/src/components/ipfsStorage/IpfsStoragePanel.tsx` -> **X3 DEX** | LOC: 319 | Risks: none
+- `apps/x3-desktop/src/components/monitoring/GoalGenomeViewer.tsx` -> **Unclassified** | LOC: 152 | Risks: none
+- `apps/x3-desktop/src/components/monitoring/MonitoringDashboard.test.tsx` -> **Unclassified** | LOC: 453 | Risks: panic risk
+- `apps/x3-desktop/src/components/monitoring/MonitoringDashboard.tsx` -> **Unclassified** | LOC: 35 | Risks: none
+- `apps/x3-desktop/src/components/monitoring/SelfImprovementViewer.tsx` -> **Unclassified** | LOC: 168 | Risks: none
+- `apps/x3-desktop/src/components/monitoring/SelfModelViewer.tsx` -> **Unclassified** | LOC: 224 | Risks: none
+- `apps/x3-desktop/src/components/monitoring/TripwireMonitor.tsx` -> **Unclassified** | LOC: 168 | Risks: none
+- `apps/x3-desktop/src/components/monitoring/WorldSimViewer.tsx` -> **Unclassified** | LOC: 164 | Risks: none
+- `apps/x3-desktop/src/components/panels/BlockchainConnectorPanel.tsx` -> **EVM Integration** | LOC: 1131 | Risks: replay/nonce risk
+- `apps/x3-desktop/src/components/panels/DevToolsPanel.tsx` -> **Unclassified** | LOC: 186 | Risks: none
+- `apps/x3-desktop/src/components/panels/IframePanel.tsx` -> **X3 DEX** | LOC: 294 | Risks: local-only config risk
+- `apps/x3-desktop/src/components/panels/LiveTelemetryPanel.tsx` -> **GPU Validator Swarm** | LOC: 171 | Risks: none
+- `apps/x3-desktop/src/components/panels/NetworkPanel.tsx` -> **Unclassified** | LOC: 139 | Risks: none
+- `apps/x3-desktop/src/components/panels/PanelStatus.tsx` -> **Unclassified** | LOC: 20 | Risks: none
+- `apps/x3-desktop/src/components/panels/SecurityPanel.tsx` -> **Governance** | LOC: 246 | Risks: none
+- `apps/x3-desktop/src/components/panels/StoragePanel.tsx` -> **Proof System** | LOC: 149 | Risks: none
+- `apps/x3-desktop/src/components/panels/SwarmHealthPanel.tsx` -> **GPU Validator Swarm** | LOC: 107 | Risks: none
+- `apps/x3-desktop/src/components/panels/WorldMonitorPanel.tsx` -> **X3 DEX** | LOC: 250 | Risks: local-only config risk
+- `apps/x3-desktop/src/components/panels/admin/AdminPanel.tsx` -> **Universal Asset Kernel** | LOC: 509 | Risks: local-only config risk
+- `apps/x3-desktop/src/components/panels/admin/ComplianceReportPanel.tsx` -> **Unclassified** | LOC: 338 | Risks: none
+- `apps/x3-desktop/src/components/panels/admin/EnterpriseSecurityPanel.tsx` -> **Bridge / Router** | LOC: 296 | Risks: none
+- `apps/x3-desktop/src/components/panels/analytics/AdvancedAnalyticsPanel.tsx` -> **Unclassified** | LOC: 253 | Risks: none
+- `apps/x3-desktop/src/components/panels/analytics/AdvancedPortfolioAnalyticsPanel.tsx` -> **Universal Asset Kernel** | LOC: 243 | Risks: none
+- `apps/x3-desktop/src/components/panels/analytics/CryptoHeatmapPanel.tsx` -> **Universal Asset Kernel** | LOC: 168 | Risks: none
+- `apps/x3-desktop/src/components/panels/analytics/MarketHeatmapPanel.tsx` -> **Universal Asset Kernel** | LOC: 225 | Risks: none
+- `apps/x3-desktop/src/components/panels/analytics/OnChainAnalyticsPanel.tsx` -> **X3 DEX** | LOC: 264 | Risks: none
+- `apps/x3-desktop/src/components/panels/analytics/PortfolioRiskPanel.tsx` -> **Unclassified** | LOC: 182 | Risks: none
+- `apps/x3-desktop/src/components/panels/auctions/NftAuctionPanel.tsx` -> **Genesis / Chain Spec** | LOC: 340 | Risks: none
+- `apps/x3-desktop/src/components/panels/crm/DealPipelinePanel.tsx` -> **Bridge / Router** | LOC: 294 | Risks: none
+- `apps/x3-desktop/src/components/panels/crm/HardwareAcquisitionPanel.tsx` -> **Unclassified** | LOC: 415 | Risks: none
+- `apps/x3-desktop/src/components/panels/crm/HardwareSourcesPanel.tsx` -> **Universal Asset Kernel** | LOC: 295 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/AntisniperPanel.tsx` -> **Launchpad** | LOC: 238 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/KycGatingPanel.tsx` -> **Proof System** | LOC: 215 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/LiquidityLockPanel.tsx` -> **X3 DEX** | LOC: 268 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/LiquidityMiningPanel.tsx` -> **DEX Liquidity** | LOC: 170 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/TokenAuditPanel.tsx` -> **Unclassified** | LOC: 233 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/TokenLaunchpadPanel.tsx` -> **Universal Asset Kernel** | LOC: 289 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/VeX3Panel.tsx` -> **DEX Liquidity** | LOC: 307 | Risks: none
+- `apps/x3-desktop/src/components/panels/defi/WhitelistPresalePanel.tsx` -> **Unclassified** | LOC: 228 | Risks: none
+- `apps/x3-desktop/src/components/panels/desktop/AppStorePanel.tsx` -> **DEX Liquidity** | LOC: 255 | Risks: none
+- `apps/x3-desktop/src/components/panels/desktop/DesktopUpdatesPanel.tsx` -> **X3 DEX** | LOC: 282 | Risks: none
+- `apps/x3-desktop/src/components/panels/desktop/MultiMonitorPanel.tsx` -> **Unclassified** | LOC: 221 | Risks: none
+- `apps/x3-desktop/src/components/panels/desktop/WidgetLayerPanel.tsx` -> **Validator / LaunchOps** | LOC: 188 | Risks: none
+- `apps/x3-desktop/src/components/panels/desktop/WindowLayoutsPanel.tsx` -> **Unclassified** | LOC: 255 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/AdvancedDexPanel.tsx` -> **X3 DEX** | LOC: 244 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/ConcentratedLiquidityPanel.tsx` -> **X3 DEX** | LOC: 360 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/DexAdvancedOrdersPanel.tsx` -> **X3 DEX** | LOC: 321 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/DexOrderbookPanel.tsx` -> **X3 DEX** | LOC: 613 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/DexPanel.tsx` -> **EVM Integration** | LOC: 869 | Risks: atomic rollback risk
+- `apps/x3-desktop/src/components/panels/dex/DexPoolsPanel.tsx` -> **Universal Asset Kernel** | LOC: 312 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/LpNftMarketplacePanel.tsx` -> **X3 DEX** | LOC: 287 | Risks: none
+- `apps/x3-desktop/src/components/panels/dex/TransactionSimulatorPanel.tsx` -> **X3 DEX** | LOC: 221 | Risks: none
+- `apps/x3-desktop/src/components/panels/documentation/ApiReferencePanel.tsx` -> **TPS Benchmark Suite** | LOC: 232 | Risks: none
+- `apps/x3-desktop/src/components/panels/documentation/InteractiveCodePlaygroundPanel.tsx` -> **Universal Asset Kernel** | LOC: 371 | Risks: none
+- `apps/x3-desktop/src/components/panels/documentation/SdkCodeGeneratorPanel.tsx` -> **X3 DEX** | LOC: 393 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/AISwarmPanel.tsx` -> **X3 DEX** | LOC: 252 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/BlockExplorerPanel.tsx` -> **Universal Asset Kernel** | LOC: 605 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/BlogPanel.tsx` -> **Universal Asset Kernel** | LOC: 114 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/BridgePanel.tsx` -> **Universal Asset Kernel** | LOC: 268 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/explorer/CommunityPanel.tsx` -> **Universal Asset Kernel** | LOC: 154 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/explorer/CommunitySubPanel.tsx` -> **Bridge / Router** | LOC: 178 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/explorer/DevDocsPanel.tsx` -> **Universal Asset Kernel** | LOC: 391 | Risks: bridge risk, local-only config risk, replay risk
+- `apps/x3-desktop/src/components/panels/explorer/EarnPanel.tsx` -> **Bridge / Router** | LOC: 196 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/EcosystemPanel.tsx` -> **Universal Asset Kernel** | LOC: 155 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/ExplorerDetailPanel.tsx` -> **X3 DEX** | LOC: 330 | Risks: replay/nonce risk
+- `apps/x3-desktop/src/components/panels/explorer/ExplorerHomePanel.tsx` -> **EVM Integration** | LOC: 200 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/LearnArchitecturePanel.tsx` -> **Universal Asset Kernel** | LOC: 224 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/LearnPanel.tsx` -> **EVM Integration** | LOC: 196 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/MetricsPanel.tsx` -> **Bridge / Router** | LOC: 230 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/NetworkPanel2.tsx` -> **X3 DEX** | LOC: 235 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/NetworkValidatorsPanel.tsx` -> **X3VM / Cross-VM** | LOC: 173 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/PortfolioPanel.tsx` -> **X3 DEX** | LOC: 156 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/PrivacyPanel.tsx` -> **Unclassified** | LOC: 84 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/QuantumEnhancedPanel.tsx` -> **TPS Benchmark Suite** | LOC: 185 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/QuantumPanel.tsx` -> **X3VM / Cross-VM** | LOC: 206 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/SecurityPanel2.tsx` -> **Universal Asset Kernel** | LOC: 183 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/SolutionsDetailPanel.tsx` -> **Universal Asset Kernel** | LOC: 220 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/StakePanel.tsx` -> **Unclassified** | LOC: 189 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/SwapPanel.tsx` -> **Universal Asset Kernel** | LOC: 259 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/TermsPanel.tsx` -> **Universal Asset Kernel** | LOC: 99 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/TreasuryPanel.tsx` -> **Bridge / Router** | LOC: 222 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/X3ChainPanel.tsx` -> **EVM Integration** | LOC: 204 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/X3OSPanel.tsx` -> **EVM Integration** | LOC: 292 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/X3StarPanel.tsx` -> **Universal Asset Kernel** | LOC: 193 | Risks: none
+- `apps/x3-desktop/src/components/panels/explorer/X3SubPagesPanel.tsx` -> **Universal Asset Kernel** | LOC: 294 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/global/AnalyticsAuditPanel.tsx` -> **X3 DEX** | LOC: 362 | Risks: none
+- `apps/x3-desktop/src/components/panels/global/CrashReporterPanel.tsx` -> **X3 DEX** | LOC: 301 | Risks: none
+- `apps/x3-desktop/src/components/panels/global/GlobalSearchPanel.tsx` -> **Universal Asset Kernel** | LOC: 223 | Risks: none
+- `apps/x3-desktop/src/components/panels/global/GovernancePanel.tsx` -> **Governance** | LOC: 347 | Risks: none
+- `apps/x3-desktop/src/components/panels/global/SocialRecoveryPanel.tsx` -> **Unclassified** | LOC: 360 | Risks: none
+- `apps/x3-desktop/src/components/panels/governance/CrmGovernancePanel.tsx` -> **Bridge / Router** | LOC: 234 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/governance/GovernanceProposalsPanel.tsx` -> **Launchpad** | LOC: 284 | Risks: none
+- `apps/x3-desktop/src/components/panels/governance/GovernanceVotingPanel.tsx` -> **Governance** | LOC: 403 | Risks: none
+- `apps/x3-desktop/src/components/panels/governance/TreasuryManagementPanel.tsx` -> **Governance** | LOC: 275 | Risks: none
+- `apps/x3-desktop/src/components/panels/growth/DAOGovernancePanel.tsx` -> **Universal Asset Kernel** | LOC: 297 | Risks: none
+- `apps/x3-desktop/src/components/panels/health/HealthDashboardPanel.tsx` -> **EVM Integration** | LOC: 311 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/APIGatewayPanel.tsx` -> **Unclassified** | LOC: 306 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/AirdropsPanel.tsx` -> **Unclassified** | LOC: 537 | Risks: local-only config risk
+- `apps/x3-desktop/src/components/panels/infrastructure/BridgeStatusPanel.tsx` -> **Universal Asset Kernel** | LOC: 197 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/CrossChainBridgePanel.tsx` -> **Universal Asset Kernel** | LOC: 273 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/DisasterRecoveryPanel.tsx` -> **Unclassified** | LOC: 375 | Risks: atomic rollback risk
+- `apps/x3-desktop/src/components/panels/infrastructure/GeoDistributionPanel.tsx` -> **GPU Validator Swarm** | LOC: 266 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/InfrastructureAutomationPanel.tsx` -> **Validator / LaunchOps** | LOC: 301 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/InfrastructurePanel.tsx` -> **Bridge / Router** | LOC: 556 | Risks: bridge risk, local-only config risk
+- `apps/x3-desktop/src/components/panels/infrastructure/IntegrationMarketplacePanel.tsx` -> **X3 DEX** | LOC: 274 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/QuantumSecurityPanel.tsx` -> **Unclassified** | LOC: 292 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/RpcKeysPanel.tsx` -> **X3 DEX** | LOC: 270 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/RpcStatsPanel.tsx` -> **DEX Liquidity** | LOC: 358 | Risks: local-only config risk
+- `apps/x3-desktop/src/components/panels/infrastructure/ValidatorAlertsPanel.tsx` -> **GPU Validator Swarm** | LOC: 273 | Risks: none
+- `apps/x3-desktop/src/components/panels/infrastructure/WhaleTrackerPanel.tsx` -> **Bridge / Router** | LOC: 326 | Risks: none
+- `apps/x3-desktop/src/components/panels/marketplace/NftMarketplacePanel.tsx` -> **Unclassified** | LOC: 259 | Risks: none
+- `apps/x3-desktop/src/components/panels/marketplace/RealMarketplacePanel.tsx` -> **Genesis / Chain Spec** | LOC: 374 | Risks: none
+- `apps/x3-desktop/src/components/panels/marketplace/TokenMarketplacePanel.tsx` -> **X3 DEX** | LOC: 325 | Risks: none
+- `apps/x3-desktop/src/components/panels/media/MediaStreamingPanel.tsx` -> **Unclassified** | LOC: 286 | Risks: none
+- `apps/x3-desktop/src/components/panels/panelRegistry.tsx` -> **Bridge / Router** | LOC: 1091 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/performance/VirtualizedPanelPanel.tsx` -> **DEX Liquidity** | LOC: 316 | Risks: none
+- `apps/x3-desktop/src/components/panels/security/ComplianceChecklistPanel.tsx` -> **Governance** | LOC: 288 | Risks: none
+- `apps/x3-desktop/src/components/panels/security/PrivacyVaultPanel.tsx` -> **EVM Integration** | LOC: 337 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/CommunitiesPanel.tsx` -> **Unclassified** | LOC: 378 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/ContentModerationPanel.tsx` -> **Governance** | LOC: 298 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/CreatorMonetizationPanel.tsx` -> **Unclassified** | LOC: 303 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/CreatorMonetizationPremiumPanel.tsx` -> **DEX Liquidity** | LOC: 429 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/E2EMessagingPanel.tsx` -> **Launchpad** | LOC: 240 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/E2eMessagesPanel.tsx` -> **Unclassified** | LOC: 309 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/RealCrmBackendPanel.tsx` -> **Validator / LaunchOps** | LOC: 260 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/RealTimeNotificationsPanel.tsx` -> **Unclassified** | LOC: 456 | Risks: none
+- `apps/x3-desktop/src/components/panels/social/SocialPanel.tsx` -> **X3 DEX** | LOC: 378 | Risks: none
+- `apps/x3-desktop/src/components/panels/swarm/SwarmDashboardPanel.tsx` -> **DEX Liquidity** | LOC: 256 | Risks: none
+- `apps/x3-desktop/src/components/panels/terminal/X3TerminalPanel.tsx` -> **X3 DEX** | LOC: 278 | Risks: none
+- `apps/x3-desktop/src/components/panels/trading/AgentMarketplacePanel.tsx` -> **DEX Liquidity** | LOC: 287 | Risks: none
+- `apps/x3-desktop/src/components/panels/trading/BacktestingPanel.tsx` -> **Unclassified** | LOC: 192 | Risks: none
+- `apps/x3-desktop/src/components/panels/trading/BotMarketplacePanel.tsx` -> **Unclassified** | LOC: 214 | Risks: none
+- `apps/x3-desktop/src/components/panels/trading/MevBotPanel.tsx` -> **Unclassified** | LOC: 232 | Risks: none
+- `apps/x3-desktop/src/components/panels/trading/StrategyBuilderPanel.tsx` -> **Unclassified** | LOC: 251 | Risks: none
+- `apps/x3-desktop/src/components/panels/trading/TokenVestingPanel.tsx` -> **Unclassified** | LOC: 288 | Risks: none
+- `apps/x3-desktop/src/components/panels/validators/ValidatorGlobe.tsx` -> **X3 DEX** | LOC: 306 | Risks: none
+- `apps/x3-desktop/src/components/panels/validators/ValidatorLeaderboardPanel.tsx` -> **GPU Validator Swarm** | LOC: 248 | Risks: none
+- `apps/x3-desktop/src/components/panels/validators/ValidatorSetupWizardPanel.tsx` -> **X3 DEX** | LOC: 294 | Risks: none
+- `apps/x3-desktop/src/components/panels/validators/ValidatorsPanel.tsx` -> **GPU Validator Swarm** | LOC: 205 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/HardwareWalletPanel.tsx` -> **X3 DEX** | LOC: 275 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/MultiSignaturePanel.tsx` -> **Unclassified** | LOC: 304 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/NftGalleryPanel.tsx` -> **Validator / LaunchOps** | LOC: 308 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/PrivacyModePanel.tsx` -> **Unclassified** | LOC: 295 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/PrivacyWalletPanel.tsx` -> **Unclassified** | LOC: 331 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/RealTransactionSigningPanel.tsx` -> **X3 DEX** | LOC: 276 | Risks: replay/nonce risk
+- `apps/x3-desktop/src/components/panels/wallet/TokenChartsPanel.tsx` -> **Unclassified** | LOC: 202 | Risks: none
+- `apps/x3-desktop/src/components/panels/wallet/WalletPanel.test.tsx` -> **EVM Integration** | LOC: 172 | Risks: panic risk
+- `apps/x3-desktop/src/components/panels/wallet/WalletPanel.tsx` -> **X3 DEX** | LOC: 1527 | Risks: bridge risk
+- `apps/x3-desktop/src/components/panels/wallet/__tests__/HistoryView.test.tsx` -> **EVM Integration** | LOC: 91 | Risks: panic risk
+- `apps/x3-desktop/src/components/panels/x3intel/X3AgentsPanel.tsx` -> **Unclassified** | LOC: 109 | Risks: none
+- `apps/x3-desktop/src/components/panels/x3intel/X3BondsPanel.tsx` -> **Unclassified** | LOC: 120 | Risks: none
+- `apps/x3-desktop/src/components/panels/x3intel/X3FloorDashboardPanel.tsx` -> **Unclassified** | LOC: 178 | Risks: none
+- `apps/x3-desktop/src/components/panels/x3intel/X3GuidePanel.tsx` -> **EVM Integration** | LOC: 64 | Risks: none
+- `apps/x3-desktop/src/components/panels/x3intel/X3IntentsPanel.tsx` -> **X3 DEX** | LOC: 170 | Risks: none
+- `apps/x3-desktop/src/components/panels/x3intel/X3SlashingPanel.tsx` -> **Proof System** | LOC: 115 | Risks: none
+- `apps/x3-desktop/src/components/panels/x3intel/X3WhyPanel.tsx` -> **EVM Integration** | LOC: 61 | Risks: none
+- `apps/x3-desktop/src/components/results/BenchmarksCarousel.tsx` -> **Universal Asset Kernel** | LOC: 55 | Risks: none
+- `apps/x3-desktop/src/components/systemMetrics/SystemMetricsPanel.test.tsx` -> **Launchpad** | LOC: 338 | Risks: panic risk
+- `apps/x3-desktop/src/components/systemMetrics/SystemMetricsPanel.tsx` -> **X3 DEX** | LOC: 268 | Risks: none
+- `apps/x3-desktop/src/components/terminal/Terminal.tsx` -> **X3 DEX** | LOC: 157 | Risks: none
+- `apps/x3-desktop/src/components/terminal/TerminalChatBot.tsx` -> **Unclassified** | LOC: 53 | Risks: local-only config risk
+- `apps/x3-desktop/src/components/terminal/terminalCommands.ts` -> **Governance** | LOC: 160 | Risks: none
+- `apps/x3-desktop/src/components/theme/ThemeProvider.tsx` -> **Unclassified** | LOC: 28 | Risks: none
+- `apps/x3-desktop/src/components/three/ThreeScene.tsx` -> **X3 DEX** | LOC: 79 | Risks: none
+- `apps/x3-desktop/src/config/appstore.config.ts` -> **Bridge / Router** | LOC: 185 | Risks: bridge risk
+- `apps/x3-desktop/src/config/treasury.config.ts` -> **Unclassified** | LOC: 120 | Risks: none
+- `apps/x3-desktop/src/contexts/AppModeContext.tsx` -> **Unclassified** | LOC: 76 | Risks: none
+- `apps/x3-desktop/src/hooks/useApplicationRegistry.ts` -> **Launchpad** | LOC: 73 | Risks: none
+- `apps/x3-desktop/src/hooks/useAsync.ts` -> **Unclassified** | LOC: 145 | Risks: none
+- `apps/x3-desktop/src/hooks/useCrmApi.ts` -> **Unclassified** | LOC: 335 | Risks: none
+- `apps/x3-desktop/src/hooks/useCursorTracker.ts` -> **Unclassified** | LOC: 52 | Risks: none
+- `apps/x3-desktop/src/hooks/useIdeTelemetry.ts` -> **Launchpad** | LOC: 7 | Risks: none
+- `apps/x3-desktop/src/hooks/useNetworkControl.ts` -> **Launchpad** | LOC: 7 | Risks: none
+- `apps/x3-desktop/src/hooks/useStorageMonitor.ts` -> **Launchpad** | LOC: 7 | Risks: none
+- `apps/x3-desktop/src/hooks/useSubstrate.ts` -> **Universal Asset Kernel** | LOC: 150 | Risks: none
+- `apps/x3-desktop/src/hooks/useSwarmHealth.ts` -> **Launchpad** | LOC: 7 | Risks: none
+- `apps/x3-desktop/src/hooks/useTauriPolling.ts` -> **Unclassified** | LOC: 72 | Risks: none
+- `apps/x3-desktop/src/hooks/useTelemetryStream.ts` -> **Launchpad** | LOC: 87 | Risks: none
+- `apps/x3-desktop/src/hooks/useWindowManager.ts` -> **Launchpad** | LOC: 61 | Risks: none
+- `apps/x3-desktop/src/lib/demoData.ts` -> **Unclassified** | LOC: 349 | Risks: none
+- `apps/x3-desktop/src/lib/demoDorks.ts` -> **TPS Benchmark Suite** | LOC: 446 | Risks: none
+- `apps/x3-desktop/src/lib/substrate/client.ts` -> **Universal Asset Kernel** | LOC: 273 | Risks: local-only config risk, replay/nonce risk
+- `apps/x3-desktop/src/lib/substrate/index.ts` -> **X3 DEX** | LOC: 3 | Risks: none
+- `apps/x3-desktop/src/lib/substrate/queries.ts` -> **Universal Asset Kernel** | LOC: 310 | Risks: replay/nonce risk
+- `apps/x3-desktop/src/lib/three/SceneManager.ts` -> **Unclassified** | LOC: 540 | Risks: none
+- `apps/x3-desktop/src/lib/three/config.ts` -> **Unclassified** | LOC: 21 | Risks: none
+- `apps/x3-desktop/src/lib/three/entities/Core.ts` -> **Unclassified** | LOC: 82 | Risks: none
+- `apps/x3-desktop/src/lib/three/entities/FloatingWindow.ts` -> **Unclassified** | LOC: 98 | Risks: none
+- `apps/x3-desktop/src/main.tsx` -> **Bridge / Router** | LOC: 37 | Risks: none
+- `apps/x3-desktop/src/pages/admin/SystemCommandPanel.tsx` -> **Unclassified** | LOC: 55 | Risks: none
+- `apps/x3-desktop/src/pages/appstore/AppStorePage.tsx` -> **Launchpad** | LOC: 428 | Risks: none
+- `apps/x3-desktop/src/pages/benchmark-ultimate.tsx` -> **Bridge / Router** | LOC: 96 | Risks: none
+- `apps/x3-desktop/src/pages/crm/AgentsPage.tsx` -> **Unclassified** | LOC: 774 | Risks: none
+- `apps/x3-desktop/src/pages/crm/CalendarPage.tsx` -> **EVM Integration** | LOC: 242 | Risks: none
+- `apps/x3-desktop/src/pages/crm/ContactsPage.tsx` -> **Unclassified** | LOC: 219 | Risks: none
+- `apps/x3-desktop/src/pages/crm/CrmApp.tsx` -> **Bridge / Router** | LOC: 28 | Risks: none
+- `apps/x3-desktop/src/pages/crm/CrmShell.tsx` -> **Bridge / Router** | LOC: 110 | Risks: none
+- `apps/x3-desktop/src/pages/crm/DashboardPage.tsx` -> **Bridge / Router** | LOC: 160 | Risks: none
+- `apps/x3-desktop/src/pages/crm/DealsPage.tsx` -> **Unclassified** | LOC: 255 | Risks: none
+- `apps/x3-desktop/src/pages/crm/EmailPage.tsx` -> **Unclassified** | LOC: 232 | Risks: none
+- `apps/x3-desktop/src/pages/crm/SettingsPage.tsx` -> **TPS Benchmark Suite** | LOC: 351 | Risks: none
+- `apps/x3-desktop/src/pages/crm/index.tsx` -> **X3 DEX** | LOC: 204 | Risks: none
+- `apps/x3-desktop/src/pages/crm/panels/CapacityForecastPanel.tsx` -> **TPS Benchmark Suite** | LOC: 202 | Risks: none
+- `apps/x3-desktop/src/pages/crm/panels/EnterpriseIntegrationPanel.tsx` -> **TPS Benchmark Suite** | LOC: 232 | Risks: none
+- `apps/x3-desktop/src/pages/crm/panels/PipelineKanbanPanel.tsx` -> **Proof System** | LOC: 271 | Risks: none
+- `apps/x3-desktop/src/pages/crm/panels/RevenueIntelligencePanel.tsx` -> **Bridge / Router** | LOC: 297 | Risks: bridge risk
+- `apps/x3-desktop/src/pages/crm/panels/ValidatorCapacityPanel.tsx` -> **TPS Benchmark Suite** | LOC: 329 | Risks: none
+- `apps/x3-desktop/src/pages/sales.tsx` -> **TPS Benchmark Suite** | LOC: 177 | Risks: none
+- `apps/x3-desktop/src/pages/social/AuthPage.tsx` -> **Unclassified** | LOC: 206 | Risks: none
+- `apps/x3-desktop/src/pages/social/BlogPage.tsx` -> **Bridge / Router** | LOC: 125 | Risks: none
+- `apps/x3-desktop/src/pages/social/BrowsePage.tsx` -> **Bridge / Router** | LOC: 55 | Risks: none
+- `apps/x3-desktop/src/pages/social/BulletinsPage.tsx` -> **Bridge / Router** | LOC: 115 | Risks: none
+- `apps/x3-desktop/src/pages/social/EditProfilePage.tsx` -> **Bridge / Router** | LOC: 224 | Risks: none
+- `apps/x3-desktop/src/pages/social/FriendsPage.tsx` -> **Bridge / Router** | LOC: 121 | Risks: none
+- `apps/x3-desktop/src/pages/social/GroupsPage.tsx` -> **Unclassified** | LOC: 84 | Risks: none
+- `apps/x3-desktop/src/pages/social/HomePage.tsx` -> **Bridge / Router** | LOC: 190 | Risks: none
+- `apps/x3-desktop/src/pages/social/MessagesPage.tsx` -> **Bridge / Router** | LOC: 144 | Risks: none
+- `apps/x3-desktop/src/pages/social/MusicPage.tsx` -> **TPS Benchmark Suite** | LOC: 94 | Risks: none
+- `apps/x3-desktop/src/pages/social/PhotosPage.tsx` -> **X3 DEX** | LOC: 85 | Risks: none
+- `apps/x3-desktop/src/pages/social/ProfilePage.tsx` -> **Bridge / Router** | LOC: 302 | Risks: none
+- `apps/x3-desktop/src/pages/social/SearchPage.tsx` -> **Bridge / Router** | LOC: 70 | Risks: none
+- `apps/x3-desktop/src/pages/social/SocialApp.tsx` -> **Unclassified** | LOC: 19 | Risks: none
+- `apps/x3-desktop/src/pages/social/SocialShell.tsx` -> **Bridge / Router** | LOC: 142 | Risks: none
+- `apps/x3-desktop/src/pages/social/ViewProfilePage.tsx` -> **Bridge / Router** | LOC: 232 | Risks: none
+- `apps/x3-desktop/src/services/AppLauncherService.ts` -> **Launchpad** | LOC: 331 | Risks: none
+- `apps/x3-desktop/src/services/adminService.ts` -> **Universal Asset Kernel** | LOC: 50 | Risks: none
+- `apps/x3-desktop/src/services/agentService.ts` -> **X3 DEX** | LOC: 773 | Risks: local-only config risk
+- `apps/x3-desktop/src/services/applicationService.ts` -> **Universal Asset Kernel** | LOC: 753 | Risks: bridge risk, local-only config risk, replay risk
+- `apps/x3-desktop/src/services/crmService.ts` -> **Unclassified** | LOC: 709 | Risks: none
+- `apps/x3-desktop/src/services/fileSystemService.ts` -> **Unclassified** | LOC: 57 | Risks: local-only config risk
+- `apps/x3-desktop/src/services/ipcService.ts` -> **Unclassified** | LOC: 217 | Risks: none
+- `apps/x3-desktop/src/services/pluginService.ts` -> **Launchpad** | LOC: 91 | Risks: none
+- `apps/x3-desktop/src/services/socialService.ts` -> **Unclassified** | LOC: 420 | Risks: none
+- `apps/x3-desktop/src/services/x3ChainService.ts` -> **Universal Asset Kernel** | LOC: 1154 | Risks: atomic rollback risk, local-only config risk, panic risk, replay/nonce risk
+- `apps/x3-desktop/src/stores/applicationStore.ts` -> **Launchpad** | LOC: 93 | Risks: none
+- `apps/x3-desktop/src/stores/crmStore.ts` -> **Unclassified** | LOC: 380 | Risks: none
+- `apps/x3-desktop/src/stores/desktopStore.ts` -> **X3 DEX** | LOC: 250 | Risks: none
+- `apps/x3-desktop/src/stores/socialStore.ts` -> **Unclassified** | LOC: 560 | Risks: none
+- `apps/x3-desktop/src/stores/themeStore.ts` -> **Unclassified** | LOC: 45 | Risks: none
+- `apps/x3-desktop/src/stores/walletStore.test.ts` -> **EVM Integration** | LOC: 129 | Risks: panic risk
+- `apps/x3-desktop/src/stores/walletStore.ts` -> **Universal Asset Kernel** | LOC: 271 | Risks: none
+- `apps/x3-desktop/src/test-setup.ts` -> **Unclassified** | LOC: 24 | Risks: none
+- `apps/x3-desktop/src/types/application.ts` -> **Universal Asset Kernel** | LOC: 139 | Risks: none
+- `apps/x3-desktop/src/types/ipc.ts` -> **Launchpad** | LOC: 69 | Risks: none
+- `apps/x3-desktop/src/types/ipc/index.ts` -> **X3 DEX** | LOC: 2 | Risks: none
+- `apps/x3-desktop/src/types/ipc/wallet.types.ts` -> **Universal Asset Kernel** | LOC: 39 | Risks: none
+- `apps/x3-desktop/src/types/panelTelemetry.ts` -> **Universal Asset Kernel** | LOC: 340 | Risks: none
+- `apps/x3-desktop/src/types/window.ts` -> **X3 DEX** | LOC: 75 | Risks: none
+- `apps/x3-desktop/src/utils/errorHandler.test.ts` -> **Unclassified** | LOC: 139 | Risks: panic risk
+- `apps/x3-desktop/src/utils/errorHandler.ts` -> **Unclassified** | LOC: 246 | Risks: none
+- `apps/x3-desktop/src/utils/eventEmitter.ts` -> **Unclassified** | LOC: 68 | Risks: none
+- `apps/x3-desktop/src/utils/geometry.ts` -> **Unclassified** | LOC: 80 | Risks: none
+- `apps/x3-desktop/src/utils/localStorage.ts` -> **Unclassified** | LOC: 50 | Risks: none
+- `apps/x3-desktop/src/vite-env.d.ts` -> **Unclassified** | LOC: 20 | Risks: none
+- `apps/x3-desktop/tailwind.config.ts` -> **X3 DEX** | LOC: 69 | Risks: none
+- `apps/x3-desktop/tests/e2e/full-integration.spec.ts` -> **GPU Validator Swarm** | LOC: 316 | Risks: local-only config risk, panic risk
+- `apps/x3-desktop/tests/e2e/helpers.ts` -> **Unclassified** | LOC: 197 | Risks: none
+- `apps/x3-desktop/tests/e2e/network-edge-cases.spec.ts` -> **Unclassified** | LOC: 325 | Risks: panic risk
+- `apps/x3-desktop/tests/e2e/practical-integration.spec.ts` -> **Proof System** | LOC: 313 | Risks: local-only config risk, panic risk
+- `apps/x3-desktop/tests/e2e/smoke-tests.spec.ts` -> **Unclassified** | LOC: 524 | Risks: local-only config risk, panic risk
+- `apps/x3-desktop/tests/e2e/stress-tests.spec.ts` -> **Launchpad** | LOC: 424 | Risks: panic risk
+- `apps/x3-desktop/tests/e2e/tauri-backend.spec.ts` -> **Launchpad** | LOC: 257 | Risks: panic risk
+- `apps/x3-desktop/tests/e2e/wallet.spec.ts` -> **Unclassified** | LOC: 84 | Risks: panic risk
+- `apps/x3-desktop/tests/e2e/world-monitor.spec.ts` -> **Launchpad** | LOC: 31 | Risks: local-only config risk, panic risk
+- `apps/x3-desktop/tests/unit/WorldMonitorPanel.test.tsx` -> **Launchpad** | LOC: 74 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/applicationRegistry.test.ts` -> **Launchpad** | LOC: 103 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/eyeballTracking.test.ts` -> **Unclassified** | LOC: 162 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/liveTelemetryPanel.test.tsx` -> **Unclassified** | LOC: 58 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/operatorDashboard.test.ts` -> **X3VM / Cross-VM** | LOC: 615 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/panelRegistry.test.tsx` -> **Unclassified** | LOC: 16 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/telemetryStream.test.tsx` -> **Launchpad** | LOC: 94 | Risks: panic risk
+- `apps/x3-desktop/tests/unit/windowManager.test.ts` -> **X3 DEX** | LOC: 206 | Risks: panic risk
+- `apps/x3-desktop/tsconfig.json` -> **Unclassified** | LOC: 26 | Risks: none
+- `apps/x3-desktop/tsconfig.node.json` -> **Unclassified** | LOC: 11 | Risks: none
+- `apps/x3-desktop/vite.config.ts` -> **Unclassified** | LOC: 45 | Risks: local-only config risk
+- `apps/x3-desktop/vitest.config.ts` -> **Unclassified** | LOC: 24 | Risks: none
+- `apps/x3-intelligence/mock-ws-server.js` -> **Proof System** | LOC: 52 | Risks: none
+- `apps/x3-intelligence/package.json` -> **Bridge / Router** | LOC: 49 | Risks: none
+- `apps/x3-intelligence/server.js` -> **X3 DEX** | LOC: 279 | Risks: local-only config risk
+- `apps/x3-intelligence/src/App.tsx` -> **Bridge / Router** | LOC: 73 | Risks: none
+- `apps/x3-intelligence/src/auth-router.ts` -> **Bridge / Router** | LOC: 93 | Risks: none
+- `apps/x3-intelligence/src/auth.ts` -> **Unclassified** | LOC: 125 | Risks: none
+- `apps/x3-intelligence/src/components/AppBar.tsx` -> **Bridge / Router** | LOC: 100 | Risks: none
+- `apps/x3-intelligence/src/components/ArbitrageComponents.tsx` -> **Unclassified** | LOC: 108 | Risks: none
+- `apps/x3-intelligence/src/components/ChainLogo.tsx` -> **Unclassified** | LOC: 136 | Risks: none
+- `apps/x3-intelligence/src/components/Chart.tsx` -> **X3 DEX** | LOC: 199 | Risks: none
+- `apps/x3-intelligence/src/components/Charts.tsx` -> **X3 DEX** | LOC: 239 | Risks: none
+- `apps/x3-intelligence/src/components/DemoDataBanner.tsx` -> **X3 DEX** | LOC: 93 | Risks: none
+- `apps/x3-intelligence/src/components/HelpModal.tsx` -> **Bridge / Router** | LOC: 32 | Risks: none
+- `apps/x3-intelligence/src/components/LoginPage.tsx` -> **TPS Benchmark Suite** | LOC: 121 | Risks: none
+- `apps/x3-intelligence/src/components/ProtectedRoute.tsx` -> **Bridge / Router** | LOC: 72 | Risks: none
+- `apps/x3-intelligence/src/components/UI.tsx` -> **Unclassified** | LOC: 175 | Risks: none
+- `apps/x3-intelligence/src/components/UIComponents.tsx` -> **Unclassified** | LOC: 184 | Risks: none
+- `apps/x3-intelligence/src/components/WalletConnect.tsx` -> **Unclassified** | LOC: 41 | Risks: none
+- `apps/x3-intelligence/src/hooks/useAuth.ts` -> **Unclassified** | LOC: 135 | Risks: none
+- `apps/x3-intelligence/src/hooks/useWebSocket.ts` -> **Unclassified** | LOC: 69 | Risks: none
+- `apps/x3-intelligence/src/main.tsx` -> **Bridge / Router** | LOC: 14 | Risks: none
+- `apps/x3-intelligence/src/pages/AgentsPage.tsx` -> **Unclassified** | LOC: 286 | Risks: none
+- `apps/x3-intelligence/src/pages/ArbitragePage.tsx` -> **X3 DEX** | LOC: 163 | Risks: none
+- `apps/x3-intelligence/src/pages/BondsPage.tsx` -> **Unclassified** | LOC: 187 | Risks: none
+- `apps/x3-intelligence/src/pages/FloorDashboard.tsx` -> **Proof System** | LOC: 428 | Risks: none
+- `apps/x3-intelligence/src/pages/FloorRules.tsx` -> **Universal Asset Kernel** | LOC: 194 | Risks: replay risk
+- `apps/x3-intelligence/src/pages/GuidePage.tsx` -> **Proof System** | LOC: 49 | Risks: none
+- `apps/x3-intelligence/src/pages/IntentsPage.tsx` -> **X3 DEX** | LOC: 318 | Risks: none
+- `apps/x3-intelligence/src/pages/ProofExplorer.tsx` -> **Proof System** | LOC: 166 | Risks: none
+- `apps/x3-intelligence/src/pages/SlashingPage.tsx` -> **Proof System** | LOC: 253 | Risks: replay risk
+- `apps/x3-intelligence/src/pages/WhyPage.tsx` -> **Proof System** | LOC: 40 | Risks: none
+- `apps/x3-intelligence/src/services/api.ts` -> **Proof System** | LOC: 148 | Risks: local-only config risk
+- `apps/x3-intelligence/src/services/authService.ts` -> **TPS Benchmark Suite** | LOC: 217 | Risks: none
+- `apps/x3-intelligence/src/services/dataIntegrity.ts` -> **Unclassified** | LOC: 207 | Risks: none
+- `apps/x3-intelligence/src/services/flashloans.ts` -> **X3 DEX** | LOC: 42 | Risks: none
+- `apps/x3-intelligence/src/session.d.ts` -> **Unclassified** | LOC: 9 | Risks: none
+- `apps/x3-intelligence/src/types/index.ts` -> **Universal Asset Kernel** | LOC: 159 | Risks: none
+- `apps/x3-intelligence/src/vite-env.d.ts` -> **Unclassified** | LOC: 2 | Risks: none
+- `apps/x3-intelligence/tests/__tests__/FloorDashboard.test.tsx` -> **Bridge / Router** | LOC: 69 | Risks: panic risk
+- `apps/x3-intelligence/tests/__tests__/IntentsPage.test.tsx` -> **Bridge / Router** | LOC: 69 | Risks: panic risk
+- `apps/x3-intelligence/tests/__tests__/UIComponents.test.tsx` -> **Unclassified** | LOC: 86 | Risks: panic risk
+- `apps/x3-intelligence/tests/__tests__/api.test.ts` -> **Unclassified** | LOC: 165 | Risks: local-only config risk, panic risk
+- `apps/x3-intelligence/tests/__tests__/comprehensive.test.ts` -> **Unclassified** | LOC: 704 | Risks: local-only config risk, panic risk
+- `apps/x3-intelligence/tests/__tests__/server.test.ts` -> **Unclassified** | LOC: 405 | Risks: local-only config risk, panic risk
+- `apps/x3-intelligence/tests/__tests__/setup.ts` -> **Bridge / Router** | LOC: 55 | Risks: none
+- `apps/x3-intelligence/tests/__tests__/types.test.ts` -> **Unclassified** | LOC: 36 | Risks: panic risk
+- `apps/x3-intelligence/tsconfig.json` -> **Unclassified** | LOC: 28 | Risks: none
+- `apps/x3-intelligence/tsconfig.node.json` -> **Unclassified** | LOC: 11 | Risks: none
+- `apps/x3-intelligence/vite.config.ts` -> **TPS Benchmark Suite** | LOC: 26 | Risks: none
+- `apps/x3-intelligence/vitest.config.ts` -> **Unclassified** | LOC: 27 | Risks: none
+- `benchmarks/x3_chain_tps_multiprocess_7validators_1s.json` -> **Universal Asset Kernel** | LOC: 211 | Risks: replay/nonce risk
+- `benchmarks/x3_chain_tps_sweep.json` -> **TPS Benchmark Suite** | LOC: 107 | Risks: replay/nonce risk
+- `benchmarks/x3_chain_tps_sweep_perf_mode.json` -> **TPS Benchmark Suite** | LOC: 108 | Risks: replay/nonce risk
+- `benchmarks/x3_vs_solana_chain_tps.json` -> **TPS Benchmark Suite** | LOC: 19 | Risks: none
+- `benchmarks/x3_vs_solana_chain_tps_perf_mode.json` -> **TPS Benchmark Suite** | LOC: 16 | Risks: none
+- `chain-specs/x3-mainnet-plain.json` -> **Bridge / Router** | LOC: 11 | Risks: none
+- `chain-specs/x3-mainnet-raw.json` -> **Bridge / Router** | LOC: 11 | Risks: none
+- `chopsticks/x3-dev.yml` -> **Validator / LaunchOps** | LOC: 44 | Risks: replay risk, replay/nonce risk
+- `contracts/ai-swarm/cache/solidity-files-cache.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `contracts/botchain-tri-vm-genesis/.github/workflows/ci.yml` -> **X3VM / Cross-VM** | LOC: 234 | Risks: local-only config risk
+- `contracts/botchain-tri-vm-genesis/compiler/__init__.py` -> **X3VM / Cross-VM** | LOC: 2 | Risks: none
+- `contracts/botchain-tri-vm-genesis/compiler/commandments.json` -> **X3VM / Cross-VM** | LOC: 13 | Risks: none
+- `contracts/botchain-tri-vm-genesis/compiler/compiler.py` -> **X3VM / Cross-VM** | LOC: 420 | Risks: none
+- `contracts/botchain-tri-vm-genesis/compiler/keygen.sh` -> **X3VM / Cross-VM** | LOC: 65 | Risks: none
+- `contracts/botchain-tri-vm-genesis/docker-compose.yml` -> **Bridge / Router** | LOC: 125 | Risks: bridge risk, local-only config risk
+- `contracts/botchain-tri-vm-genesis/hardhat/DEPLOYMENT.md` -> **X3VM / Cross-VM** | LOC: 47 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/PRODUCTION_PREFLIGHT_CHECKLIST.md` -> **X3VM / Cross-VM** | LOC: 54 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/README-HARDHAT-HYGIENE.md` -> **X3VM / Cross-VM** | LOC: 10 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/contracts/AtomicSwapAdapter.sol` -> **EVM Integration** | LOC: 396 | Risks: replay risk, replay/nonce risk
+- `contracts/botchain-tri-vm-genesis/hardhat/contracts/BOT.sol` -> **Universal Asset Kernel** | LOC: 123 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/contracts/HighSupplyToken.sol` -> **Universal Asset Kernel** | LOC: 13 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/contracts/MarriageLicense.sol` -> **X3VM / Cross-VM** | LOC: 719 | Risks: replay risk
+- `contracts/botchain-tri-vm-genesis/hardhat/contracts/SimpleDEX.sol` -> **Universal Asset Kernel** | LOC: 360 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/generated-contracts/AtlasHTLC.sol` -> **EVM Integration** | LOC: 265 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/generated-contracts/AtomicSwapAdapter.sol` -> **EVM Integration** | LOC: 350 | Risks: replay risk, replay/nonce risk
+- `contracts/botchain-tri-vm-genesis/hardhat/generated-contracts/BOT.sol` -> **Universal Asset Kernel** | LOC: 122 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/generated-contracts/CrossVMBridge.sol` -> **Bridge / Router** | LOC: 776 | Risks: atomic rollback risk, bridge risk
+- `contracts/botchain-tri-vm-genesis/hardhat/generated-contracts/MarriageLicense.sol` -> **X3VM / Cross-VM** | LOC: 442 | Risks: replay risk
+- `contracts/botchain-tri-vm-genesis/hardhat/generated-contracts/SimpleDEX.sol` -> **Universal Asset Kernel** | LOC: 358 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/hardhat.config.js` -> **EVM Integration** | LOC: 55 | Risks: local-only config risk
+- `contracts/botchain-tri-vm-genesis/hardhat/package.json` -> **X3VM / Cross-VM** | LOC: 42 | Risks: local-only config risk
+- `contracts/botchain-tri-vm-genesis/hardhat/scripts/deploy.js` -> **X3VM / Cross-VM** | LOC: 128 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/scripts/deploy.production.js` -> **X3VM / Cross-VM** | LOC: 253 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/scripts/preflight.production.js` -> **X3VM / Cross-VM** | LOC: 126 | Risks: none
+- `contracts/botchain-tri-vm-genesis/hardhat/test/AtomicSwap.test.js` -> **X3VM / Cross-VM** | LOC: 773 | Risks: panic risk
+- `contracts/botchain-tri-vm-genesis/hardhat/test/BOT.test.js` -> **Universal Asset Kernel** | LOC: 122 | Risks: panic risk
+- `contracts/botchain-tri-vm-genesis/hardhat/test/MarriageLicense.test.js` -> **EVM Integration** | LOC: 505 | Risks: panic risk, replay risk
+- `contracts/botchain-tri-vm-genesis/hardhat/test/ProjectHygiene.test.js` -> **X3VM / Cross-VM** | LOC: 13 | Risks: panic risk
+- `contracts/botchain-tri-vm-genesis/hardhat/test/SimpleDEX.test.js` -> **Universal Asset Kernel** | LOC: 283 | Risks: panic risk
+- `contracts/botchain-tri-vm-genesis/python/__init__.py` -> **X3VM / Cross-VM** | LOC: 2 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/checker/__init__.py` -> **X3VM / Cross-VM** | LOC: 2 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/checker/checker.py` -> **X3VM / Cross-VM** | LOC: 421 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/cli/__init__.py` -> **X3VM / Cross-VM** | LOC: 2 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/cli/simulate_lifecycle.py` -> **X3VM / Cross-VM** | LOC: 507 | Risks: local-only config risk
+- `contracts/botchain-tri-vm-genesis/python/trainer/__init__.py` -> **X3VM / Cross-VM** | LOC: 2 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/trainer/trainer.py` -> **X3VM / Cross-VM** | LOC: 381 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/utils/__init__.py` -> **X3VM / Cross-VM** | LOC: 2 | Risks: none
+- `contracts/botchain-tri-vm-genesis/python/utils/ipfs_client.py` -> **X3VM / Cross-VM** | LOC: 297 | Risks: local-only config risk
+- `contracts/botchain-tri-vm-genesis/python/utils/web3_client.py` -> **EVM Integration** | LOC: 354 | Risks: local-only config risk, replay/nonce risk
+- `contracts/botchain-tri-vm-genesis/samples/adam_source.py` -> **X3VM / Cross-VM** | LOC: 138 | Risks: none
+- `contracts/botchain-tri-vm-genesis/samples/eve_source.py` -> **X3VM / Cross-VM** | LOC: 235 | Risks: none
+- `contracts/botchain-tri-vm-genesis/tests/conftest.py` -> **X3VM / Cross-VM** | LOC: 104 | Risks: unsafe code
+- `contracts/botchain-tri-vm-genesis/tests/test_checker.py` -> **X3VM / Cross-VM** | LOC: 173 | Risks: unsafe code
+- `contracts/botchain-tri-vm-genesis/tests/test_compiler.py` -> **X3VM / Cross-VM** | LOC: 212 | Risks: none
+- `contracts/botchain-tri-vm-genesis/tests/test_trainer.py` -> **X3VM / Cross-VM** | LOC: 145 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773980190801.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773980221591.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773980266104.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773980298155.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773980328742.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773982002216.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773982037157.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773982067366.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773982098554.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773982126262.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773985594548.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773985602065.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773985609645.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773985616742.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/.vscode_hardhat_config_1773985623798.ts` -> **Unclassified** | LOC: 16 | Risks: none
+- `contracts/core/cache/solidity-files-cache.json` -> **EVM Integration** | LOC: 864 | Risks: none
+- `contracts/evm-hello/cache/solidity-files-cache.json` -> **EVM Integration** | LOC: 1 | Risks: none
+- `contracts/lending/cache/solidity-files-cache.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `crates/apotheosis-tx/Cargo.toml` -> **Universal Asset Kernel** | LOC: 46 | Risks: none
+- `crates/apotheosis-tx/src/builder.rs` -> **Universal Asset Kernel** | LOC: 421 | Risks: bridge risk, panic risk
+- `crates/apotheosis-tx/src/error.rs` -> **Universal Asset Kernel** | LOC: 67 | Risks: atomic rollback risk
+- `crates/apotheosis-tx/src/executor.rs` -> **Universal Asset Kernel** | LOC: 314 | Risks: none
+- `crates/apotheosis-tx/src/lib.rs` -> **Universal Asset Kernel** | LOC: 79 | Risks: bridge risk
+- `crates/apotheosis-tx/src/routes.rs` -> **Universal Asset Kernel** | LOC: 439 | Risks: bridge risk, panic risk
+- `crates/apotheosis-tx/src/types.rs` -> **Universal Asset Kernel** | LOC: 278 | Risks: atomic rollback risk, bridge risk
+- `crates/atomic-swap-orchestrator/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 32 | Risks: none
+- `crates/atomic-swap-orchestrator/src/atomic_lock.rs` -> **X3 DEX** | LOC: 398 | Risks: replay/nonce risk
+- `crates/atomic-swap-orchestrator/src/lib.rs` -> **Universal Asset Kernel** | LOC: 972 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk, unsafe code
+- `crates/chronos-flash/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 57 | Risks: none
+- `crates/chronos-flash/src/config.rs` -> **Bridge / Router** | LOC: 330 | Risks: none
+- `crates/chronos-flash/src/error.rs` -> **Bridge / Router** | LOC: 83 | Risks: atomic rollback risk
+- `crates/chronos-flash/src/intent.rs` -> **Bridge / Router** | LOC: 442 | Risks: none
+- `crates/chronos-flash/src/lib.rs` -> **Bridge / Router** | LOC: 89 | Risks: atomic rollback risk
+- `crates/chronos-flash/src/mempool.rs` -> **X3 DEX** | LOC: 368 | Risks: replay/nonce risk
+- `crates/chronos-flash/src/oracle.rs` -> **Bridge / Router** | LOC: 389 | Risks: panic risk
+- `crates/chronos-flash/src/predictor.rs` -> **X3 DEX** | LOC: 449 | Risks: none
+- `crates/chronos-flash/src/router.rs` -> **Bridge / Router** | LOC: 526 | Risks: bridge risk, panic risk
+- `crates/chronos-flash/src/timewarp.rs` -> **X3 DEX** | LOC: 444 | Risks: atomic rollback risk, bridge risk
+- `crates/chronos-flash/src/types.rs` -> **X3 DEX** | LOC: 165 | Risks: atomic rollback risk
+- `crates/confidential-gpu/Cargo.toml` -> **DEX Liquidity** | LOC: 49 | Risks: none
+- `crates/confidential-gpu/src/attestation.rs` -> **GPU Validator Swarm** | LOC: 201 | Risks: panic risk
+- `crates/confidential-gpu/src/enclave.rs` -> **EVM Integration** | LOC: 188 | Risks: panic risk
+- `crates/confidential-gpu/src/lib.rs` -> **X3 DEX** | LOC: 316 | Risks: panic risk
+- `crates/confidential-gpu/src/threshold.rs` -> **X3 DEX** | LOC: 246 | Risks: panic risk
+- `crates/contention-predictor/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 23 | Risks: none
+- `crates/contention-predictor/benches/inference_latency.rs` -> **TPS Benchmark Suite** | LOC: 17 | Risks: none
+- `crates/contention-predictor/src/fallback.rs` -> **Unclassified** | LOC: 41 | Risks: none
+- `crates/contention-predictor/src/feature_extractor.rs` -> **Unclassified** | LOC: 158 | Risks: replay/nonce risk
+- `crates/contention-predictor/src/lib.rs` -> **Unclassified** | LOC: 709 | Risks: panic risk, replay/nonce risk
+- `crates/contention-predictor/src/model.rs` -> **GPU Validator Swarm** | LOC: 167 | Risks: panic risk, replay/nonce risk
+- `crates/contention-predictor/src/shard_planner.rs` -> **X3 DEX** | LOC: 267 | Risks: panic risk
+- `crates/cross-chain-gpu-validator/Cargo.toml` -> **Universal Asset Kernel** | LOC: 65 | Risks: none
+- `crates/cross-chain-gpu-validator/benches/gpu_kernels.rs` -> **Universal Asset Kernel** | LOC: 53 | Risks: none
+- `crates/cross-chain-gpu-validator/deployment/deploy_testnet.sh` -> **TPS Benchmark Suite** | LOC: 56 | Risks: local-only config risk
+- `crates/cross-chain-gpu-validator/docs/architecture.md` -> **Universal Asset Kernel** | LOC: 77 | Risks: atomic rollback risk
+- `crates/cross-chain-gpu-validator/docs/deployment.md` -> **X3 DEX** | LOC: 168 | Risks: local-only config risk
+- `crates/cross-chain-gpu-validator/docs/monitoring.md` -> **Universal Asset Kernel** | LOC: 254 | Risks: atomic rollback risk, local-only config risk
+- `crates/cross-chain-gpu-validator/docs/security.md` -> **EVM Integration** | LOC: 238 | Risks: atomic rollback risk, local-only config risk
+- `crates/cross-chain-gpu-validator/src/dashboard.rs` -> **X3 DEX** | LOC: 199 | Risks: atomic rollback risk
+- `crates/cross-chain-gpu-validator/src/error.rs` -> **EVM Integration** | LOC: 54 | Risks: none
+- `crates/cross-chain-gpu-validator/src/evm_validator.rs` -> **Universal Asset Kernel** | LOC: 161 | Risks: panic risk
+- `crates/cross-chain-gpu-validator/src/failover.rs` -> **Universal Asset Kernel** | LOC: 140 | Risks: panic risk
+- `crates/cross-chain-gpu-validator/src/kernels.rs` -> **Universal Asset Kernel** | LOC: 207 | Risks: panic risk
+- `crates/cross-chain-gpu-validator/src/lib.rs` -> **Universal Asset Kernel** | LOC: 120 | Risks: atomic rollback risk
+- `crates/cross-chain-gpu-validator/src/main.rs` -> **Universal Asset Kernel** | LOC: 75 | Risks: atomic rollback risk
+- `crates/cross-chain-gpu-validator/src/orchestrator.rs` -> **EVM Integration** | LOC: 210 | Risks: atomic rollback risk, local-only config risk
+- `crates/cross-chain-gpu-validator/src/registry.rs` -> **EVM Integration** | LOC: 184 | Risks: none
+- `crates/cross-chain-gpu-validator/src/svm_validator.rs` -> **SVM Integration** | LOC: 150 | Risks: panic risk
+- `crates/cross-chain-gpu-validator/tests/integration_tests.rs` -> **Universal Asset Kernel** | LOC: 271 | Risks: atomic rollback risk, panic risk
+- `crates/cross-chain-position-manager/Cargo.toml` -> **Unclassified** | LOC: 69 | Risks: none
+- `crates/cross-chain-position-manager/README.md` -> **Universal Asset Kernel** | LOC: 463 | Risks: bridge risk
+- `crates/cross-chain-position-manager/examples/usage_example.rs` -> **Universal Asset Kernel** | LOC: 135 | Risks: bridge risk
+- `crates/cross-chain-position-manager/src/accounting.rs` -> **Universal Asset Kernel** | LOC: 908 | Risks: mock hash risk, panic risk
+- `crates/cross-chain-position-manager/src/adapters.rs` -> **Bridge / Router** | LOC: 398 | Risks: bridge risk, panic risk
+- `crates/cross-chain-position-manager/src/arbitrage.rs` -> **Universal Asset Kernel** | LOC: 513 | Risks: bridge risk, panic risk
+- `crates/cross-chain-position-manager/src/config.rs` -> **Universal Asset Kernel** | LOC: 688 | Risks: bridge risk, local-only config risk
+- `crates/cross-chain-position-manager/src/error.rs` -> **Universal Asset Kernel** | LOC: 540 | Risks: none
+- `crates/cross-chain-position-manager/src/events.rs` -> **Unclassified** | LOC: 488 | Risks: none
+- `crates/cross-chain-position-manager/src/lib.rs` -> **Universal Asset Kernel** | LOC: 475 | Risks: bridge risk, mock hash risk, panic risk
+- `crates/cross-chain-position-manager/src/migration.rs` -> **Universal Asset Kernel** | LOC: 839 | Risks: bridge risk, panic risk
+- `crates/cross-chain-position-manager/src/partner.rs` -> **Unclassified** | LOC: 596 | Risks: mock hash risk, panic risk
+- `crates/cross-chain-position-manager/src/position.rs` -> **Universal Asset Kernel** | LOC: 206 | Risks: none
+- `crates/cross-chain-position-manager/src/rebalance.rs` -> **Universal Asset Kernel** | LOC: 527 | Risks: bridge risk, mock hash risk, panic risk
+- `crates/cross-chain-position-manager/src/rebalancing.rs` -> **Universal Asset Kernel** | LOC: 611 | Risks: bridge risk, panic risk
+- `crates/cross-chain-position-manager/src/risk.rs` -> **Unclassified** | LOC: 464 | Risks: panic risk
+- `crates/cross-chain-position-manager/src/router.rs` -> **Universal Asset Kernel** | LOC: 1094 | Risks: bridge risk, mock hash risk, panic risk
+- `crates/cross-chain-position-manager/src/solvency.rs` -> **Universal Asset Kernel** | LOC: 894 | Risks: mock hash risk, unsafe code
+- `crates/cross-chain-position-manager/src/state.rs` -> **Unclassified** | LOC: 542 | Risks: atomic rollback risk, panic risk
+- `crates/cross-chain-position-manager/src/tracking.rs` -> **Universal Asset Kernel** | LOC: 519 | Risks: panic risk
+- `crates/cross-chain-position-manager/src/types.rs` -> **Universal Asset Kernel** | LOC: 627 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/cross-chain-position-manager/src/utils.rs` -> **Unclassified** | LOC: 696 | Risks: panic risk
+- `crates/cross-chain-position-manager/src/vault_controller.rs` -> **Universal Asset Kernel** | LOC: 411 | Risks: panic risk
+- `crates/cross-chain-position-manager/src/visibility.rs` -> **Universal Asset Kernel** | LOC: 329 | Risks: mock hash risk
+- `crates/cross-chain-position-manager/tests/integration_tests.rs` -> **Universal Asset Kernel** | LOC: 190 | Risks: bridge risk, panic risk
+- `crates/cross-vm-bridge/Cargo.toml` -> **Bridge / Router** | LOC: 38 | Risks: bridge risk
+- `crates/cross-vm-bridge/src/canonical.rs` -> **Universal Asset Kernel** | LOC: 521 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk
+- `crates/cross-vm-bridge/src/lib.rs` -> **Bridge / Router** | LOC: 4770 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk
+- `crates/cross-vm-bridge/src/merkle_proof_validator.rs` -> **Bridge / Router** | LOC: 665 | Risks: bridge risk, panic risk
+- `crates/cross-vm-bridge/src/merkle_settlement_bridge.rs` -> **Universal Asset Kernel** | LOC: 554 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/cross-vm-bridge/src/tests/attack_arbitrage.rs` -> **Bridge / Router** | LOC: 28 | Risks: bridge risk, panic risk
+- `crates/cross-vm-bridge/tests/integration.rs` -> **Universal Asset Kernel** | LOC: 77 | Risks: bridge risk, panic risk
+- `crates/cross-vm-coordinator/Cargo.toml` -> **Bridge / Router** | LOC: 44 | Risks: bridge risk
+- `crates/cross-vm-coordinator/src/abi.rs` -> **EVM Integration** | LOC: 292 | Risks: panic risk
+- `crates/cross-vm-coordinator/src/bridge_integration_tests.rs` -> **Bridge / Router** | LOC: 625 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk
+- `crates/cross-vm-coordinator/src/config.rs` -> **EVM Integration** | LOC: 137 | Risks: none
+- `crates/cross-vm-coordinator/src/flashloan_adapter.rs` -> **Universal Asset Kernel** | LOC: 157 | Risks: none
+- `crates/cross-vm-coordinator/src/htlc.rs` -> **EVM Integration** | LOC: 884 | Risks: replay/nonce risk
+- `crates/cross-vm-coordinator/src/lib.rs` -> **Bridge / Router** | LOC: 57 | Risks: bridge risk
+- `crates/cross-vm-coordinator/src/merkle_settlement.rs` -> **Bridge / Router** | LOC: 10 | Risks: bridge risk
+- `crates/cross-vm-coordinator/src/persistence.rs` -> **X3VM / Cross-VM** | LOC: 525 | Risks: panic risk, replay risk
+- `crates/cross-vm-coordinator/src/relayer.rs` -> **X3VM / Cross-VM** | LOC: 173 | Risks: none
+- `crates/cross-vm-coordinator/src/rpc_client.rs` -> **EVM Integration** | LOC: 338 | Risks: local-only config risk, panic risk
+- `crates/cross-vm-coordinator/src/state_machine.rs` -> **EVM Integration** | LOC: 938 | Risks: panic risk, replay risk
+- `crates/cross-vm-coordinator/src/tests.rs` -> **Universal Asset Kernel** | LOC: 824 | Risks: panic risk, replay risk
+- `crates/cross-vm-coordinator/src/types.rs` -> **Universal Asset Kernel** | LOC: 368 | Risks: none
+- `crates/cross-vm-coordinator/tests/security_regression.rs` -> **Bridge / Router** | LOC: 1452 | Risks: panic risk, replay risk, replay/nonce risk
+- `crates/custody-service/Cargo.toml` -> **Unclassified** | LOC: 36 | Risks: none
+- `crates/custody-service/src/audit.rs` -> **Universal Asset Kernel** | LOC: 305 | Risks: panic risk
+- `crates/custody-service/src/bin/main.rs` -> **Unclassified** | LOC: 47 | Risks: none
+- `crates/custody-service/src/client.rs` -> **Universal Asset Kernel** | LOC: 211 | Risks: panic risk
+- `crates/custody-service/src/error.rs` -> **Unclassified** | LOC: 59 | Risks: none
+- `crates/custody-service/src/hsm.rs` -> **Proof System** | LOC: 198 | Risks: panic risk
+- `crates/custody-service/src/lib.rs` -> **Proof System** | LOC: 20 | Risks: none
+- `crates/custody-service/src/service.rs` -> **Universal Asset Kernel** | LOC: 523 | Risks: panic risk
+- `crates/custody-service/src/types.rs` -> **Universal Asset Kernel** | LOC: 258 | Risks: none
+- `crates/dream-mining/Cargo.toml` -> **GPU Validator Swarm** | LOC: 43 | Risks: none
+- `crates/dream-mining/src/config.rs` -> **X3 DEX** | LOC: 158 | Risks: none
+- `crates/dream-mining/src/error.rs` -> **GPU Validator Swarm** | LOC: 51 | Risks: none
+- `crates/dream-mining/src/lib.rs` -> **X3 DEX** | LOC: 335 | Risks: none
+- `crates/dream-mining/src/monitor.rs` -> **X3VM / Cross-VM** | LOC: 240 | Risks: none
+- `crates/dream-mining/src/scheduler.rs` -> **Unclassified** | LOC: 443 | Risks: panic risk
+- `crates/dream-mining/src/tasks.rs` -> **Bridge / Router** | LOC: 285 | Risks: bridge risk
+- `crates/dylint-determinism/Cargo.toml` -> **Unclassified** | LOC: 24 | Risks: none
+- `crates/dylint-determinism/rust-toolchain.toml` -> **X3VM / Cross-VM** | LOC: 4 | Risks: none
+- `crates/dylint-determinism/src/lib.rs` -> **Validator / LaunchOps** | LOC: 238 | Risks: panic risk
+- `crates/evm-integration/Cargo.toml` -> **EVM Integration** | LOC: 54 | Risks: none
+- `crates/evm-integration/src/frontier.rs` -> **EVM Integration** | LOC: 382 | Risks: replay/nonce risk
+- `crates/evm-integration/src/lib.rs` -> **Universal Asset Kernel** | LOC: 622 | Risks: bridge risk, mock hash risk, panic risk, replay risk, replay/nonce risk
+- `crates/evm-integration/src/mini_evm.rs` -> **EVM Integration** | LOC: 642 | Risks: panic risk, replay/nonce risk
+- `crates/evm-integration/src/state.rs` -> **EVM Integration** | LOC: 422 | Risks: panic risk, replay/nonce risk
+- `crates/evm-integration/tests/erc20_integration.rs` -> **EVM Integration** | LOC: 79 | Risks: panic risk
+- `crates/evm-integration/tests/integration.rs` -> **EVM Integration** | LOC: 44 | Risks: panic risk
+- `crates/external-chains/Cargo.toml` -> **Bridge / Router** | LOC: 56 | Risks: bridge risk
+- `crates/external-chains/abi/l2_standard_bridge.json` -> **Bridge / Router** | LOC: 115 | Risks: none
+- `crates/external-chains/src/adapter.rs` -> **Bridge / Router** | LOC: 514 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/external-chains/src/assets.rs` -> **Universal Asset Kernel** | LOC: 377 | Risks: bridge risk, panic risk
+- `crates/external-chains/src/chains/arbitrum.rs` -> **Bridge / Router** | LOC: 298 | Risks: replay/nonce risk
+- `crates/external-chains/src/chains/avalanche.rs` -> **Bridge / Router** | LOC: 200 | Risks: replay/nonce risk
+- `crates/external-chains/src/chains/base.rs` -> **Bridge / Router** | LOC: 559 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/external-chains/src/chains/bnb.rs` -> **Bridge / Router** | LOC: 219 | Risks: bridge risk, replay/nonce risk
+- `crates/external-chains/src/chains/mod.rs` -> **EVM Integration** | LOC: 69 | Risks: none
+- `crates/external-chains/src/chains/polygon.rs` -> **Bridge / Router** | LOC: 202 | Risks: bridge risk, replay/nonce risk
+- `crates/external-chains/src/chains/registry.rs` -> **EVM Integration** | LOC: 1232 | Risks: panic risk
+- `crates/external-chains/src/chains/universal.rs` -> **Bridge / Router** | LOC: 393 | Risks: bridge risk, panic risk
+- `crates/external-chains/src/env_config.rs` -> **X3 DEX** | LOC: 340 | Risks: none
+- `crates/external-chains/src/error.rs` -> **Bridge / Router** | LOC: 132 | Risks: none
+- `crates/external-chains/src/lib.rs` -> **Universal Asset Kernel** | LOC: 270 | Risks: none
+- `crates/external-chains/src/router.rs` -> **Bridge / Router** | LOC: 840 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `crates/external-chains/src/rpc.rs` -> **Bridge / Router** | LOC: 396 | Risks: panic risk
+- `crates/external-chains/src/rpc_http.rs` -> **Unclassified** | LOC: 31 | Risks: none
+- `crates/external-chains/src/settlement.rs` -> **Proof System** | LOC: 403 | Risks: none
+- `crates/external-chains/src/settlement_integration.rs` -> **Universal Asset Kernel** | LOC: 630 | Risks: bridge risk, mock hash risk, panic risk
+- `crates/flash-finality/Cargo.toml` -> **Unclassified** | LOC: 29 | Risks: none
+- `crates/flash-finality/src/gossip_bridge.rs` -> **Bridge / Router** | LOC: 390 | Risks: bridge risk, panic risk
+- `crates/flash-finality/src/lib.rs` -> **Bridge / Router** | LOC: 1052 | Risks: bridge risk, panic risk
+- `crates/gpu-sig-verifier/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 22 | Risks: none
+- `crates/gpu-sig-verifier/src/lib.rs` -> **GPU Validator Swarm** | LOC: 366 | Risks: panic risk
+- `crates/gpu-swarm.backup/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 104 | Risks: none
+- `crates/gpu-swarm.backup/config/coordinator-config.toml` -> **GPU Validator Swarm** | LOC: 126 | Risks: none
+- `crates/gpu-swarm.backup/config/node-config.toml` -> **DEX Liquidity** | LOC: 95 | Risks: none
+- `crates/gpu-swarm.backup/docker/docker-compose.yml` -> **GPU Validator Swarm** | LOC: 21 | Risks: none
+- `crates/gpu-swarm.backup/node-config.toml` -> **DEX Liquidity** | LOC: 37 | Risks: local-only config risk
+- `crates/gpu-swarm.backup/scripts/start-local-swarm.sh` -> **DEX Liquidity** | LOC: 94 | Risks: none
+- `crates/gpu-swarm.backup/src/admin.rs` -> **GPU Validator Swarm** | LOC: 501 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/gpu-swarm.backup/src/advanced/jury.rs` -> **GPU Validator Swarm** | LOC: 316 | Risks: none
+- `crates/gpu-swarm.backup/src/advanced/social_agents.rs` -> **TPS Benchmark Suite** | LOC: 298 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/agent_bridge.rs` -> **Bridge / Router** | LOC: 401 | Risks: bridge risk, panic risk
+- `crates/gpu-swarm.backup/src/announcer.rs` -> **X3 DEX** | LOC: 1076 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/billing.rs` -> **GPU Validator Swarm** | LOC: 267 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/bin/swarm-coordinator.rs` -> **GPU Validator Swarm** | LOC: 91 | Risks: none
+- `crates/gpu-swarm.backup/src/bin/swarm-node.rs` -> **GPU Validator Swarm** | LOC: 209 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/bip39.rs` -> **Universal Asset Kernel** | LOC: 63 | Risks: bridge risk
+- `crates/gpu-swarm.backup/src/blockchain.rs` -> **X3 DEX** | LOC: 591 | Risks: local-only config risk, panic risk
+- `crates/gpu-swarm.backup/src/cli/mod.rs` -> **GPU Validator Swarm** | LOC: 19 | Risks: none
+- `crates/gpu-swarm.backup/src/config.rs` -> **DEX Liquidity** | LOC: 240 | Risks: none
+- `crates/gpu-swarm.backup/src/coordinator.rs` -> **DEX Liquidity** | LOC: 886 | Risks: none
+- `crates/gpu-swarm.backup/src/crown/auditor.rs` -> **DEX Liquidity** | LOC: 891 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/crown/mod.rs` -> **Governance** | LOC: 927 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/crown/prophet.rs` -> **GPU Validator Swarm** | LOC: 882 | Risks: none
+- `crates/gpu-swarm.backup/src/crown/scrapyard.rs` -> **GPU Validator Swarm** | LOC: 973 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/cu_kernels/build.sh` -> **Universal Asset Kernel** | LOC: 97 | Risks: none
+- `crates/gpu-swarm.backup/src/cu_kernels/do_build.sh` -> **Universal Asset Kernel** | LOC: 13 | Risks: none
+- `crates/gpu-swarm.backup/src/depin_service.rs` -> **Bridge / Router** | LOC: 377 | Risks: none
+- `crates/gpu-swarm.backup/src/error.rs` -> **GPU Validator Swarm** | LOC: 134 | Risks: none
+- `crates/gpu-swarm.backup/src/funding/mod.rs` -> **Bridge / Router** | LOC: 17 | Risks: bridge risk
+- `crates/gpu-swarm.backup/src/funding/novaflux.rs` -> **Bridge / Router** | LOC: 604 | Risks: bridge risk, panic risk
+- `crates/gpu-swarm.backup/src/funding/orchestrator.rs` -> **Bridge / Router** | LOC: 726 | Risks: bridge risk, panic risk
+- `crates/gpu-swarm.backup/src/funding/webhook.rs` -> **Bridge / Router** | LOC: 618 | Risks: bridge risk, local-only config risk, panic risk
+- `crates/gpu-swarm.backup/src/gpu_backends/cuda.rs` -> **X3VM / Cross-VM** | LOC: 772 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/gpu_backends/metal.rs` -> **Proof System** | LOC: 189 | Risks: none
+- `crates/gpu-swarm.backup/src/gpu_backends/mod.rs` -> **Universal Asset Kernel** | LOC: 275 | Risks: none
+- `crates/gpu-swarm.backup/src/gpu_backends/opencl.rs` -> **Proof System** | LOC: 189 | Risks: none
+- `crates/gpu-swarm.backup/src/gpu_backends/vulkan.rs` -> **Proof System** | LOC: 255 | Risks: none
+- `crates/gpu-swarm.backup/src/gpu_backends/webgpu.rs` -> **Proof System** | LOC: 231 | Risks: none
+- `crates/gpu-swarm.backup/src/jobs/chain_indexing.rs` -> **X3 DEX** | LOC: 671 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/jobs/funding_campaign.rs` -> **GPU Validator Swarm** | LOC: 802 | Risks: bridge risk, panic risk
+- `crates/gpu-swarm.backup/src/jobs/mempool_analysis.rs` -> **Bridge / Router** | LOC: 664 | Risks: panic risk, replay/nonce risk
+- `crates/gpu-swarm.backup/src/jobs/mev_discovery.rs` -> **X3 DEX** | LOC: 505 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/jobs/mod.rs` -> **X3 DEX** | LOC: 228 | Risks: none
+- `crates/gpu-swarm.backup/src/jobs/model_training.rs` -> **GPU Validator Swarm** | LOC: 604 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/jobs/x3_simulation.rs` -> **Universal Asset Kernel** | LOC: 391 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/jobs/zk_proving.rs` -> **Proof System** | LOC: 492 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/lib.rs` -> **Bridge / Router** | LOC: 177 | Risks: bridge risk
+- `crates/gpu-swarm.backup/src/monitoring/logging.rs` -> **GPU Validator Swarm** | LOC: 97 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/monitoring/metrics.rs` -> **GPU Validator Swarm** | LOC: 317 | Risks: none
+- `crates/gpu-swarm.backup/src/monitoring/mod.rs` -> **GPU Validator Swarm** | LOC: 116 | Risks: none
+- `crates/gpu-swarm.backup/src/monitoring/tracing.rs` -> **GPU Validator Swarm** | LOC: 53 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/multi_dispatch/mod.rs` -> **X3 DEX** | LOC: 775 | Risks: none
+- `crates/gpu-swarm.backup/src/network.rs` -> **GPU Validator Swarm** | LOC: 1029 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/node.rs` -> **GPU Validator Swarm** | LOC: 403 | Risks: none
+- `crates/gpu-swarm.backup/src/performance/batch_optimization.rs` -> **GPU Validator Swarm** | LOC: 235 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/performance/memory_pooling.rs` -> **DEX Liquidity** | LOC: 350 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/performance/mod.rs` -> **DEX Liquidity** | LOC: 60 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/performance/network_tuning.rs` -> **GPU Validator Swarm** | LOC: 190 | Risks: none
+- `crates/gpu-swarm.backup/src/protocol.rs` -> **GPU Validator Swarm** | LOC: 581 | Risks: replay/nonce risk
+- `crates/gpu-swarm.backup/src/sandbox_manager.rs` -> **X3VM / Cross-VM** | LOC: 316 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/scheduler.rs` -> **X3 DEX** | LOC: 699 | Risks: none
+- `crates/gpu-swarm.backup/src/task.rs` -> **X3 DEX** | LOC: 296 | Risks: none
+- `crates/gpu-swarm.backup/src/verification.rs` -> **Proof System** | LOC: 431 | Risks: replay/nonce risk
+- `crates/gpu-swarm.backup/src/wallet.rs` -> **GPU Validator Swarm** | LOC: 38 | Risks: none
+- `crates/gpu-swarm.backup/src/warden/allocator.rs` -> **GPU Validator Swarm** | LOC: 483 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/warden/governance.rs` -> **Governance** | LOC: 600 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/warden/metrics.rs` -> **GPU Validator Swarm** | LOC: 530 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/warden/mod.rs` -> **Governance** | LOC: 540 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/warden/policy.rs` -> **Genesis / Chain Spec** | LOC: 442 | Risks: none
+- `crates/gpu-swarm.backup/src/warden/predictor.rs` -> **GPU Validator Swarm** | LOC: 526 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/warden/signals.rs` -> **GPU Validator Swarm** | LOC: 485 | Risks: panic risk
+- `crates/gpu-swarm.backup/src/x3_vm.rs` -> **Universal Asset Kernel** | LOC: 535 | Risks: bridge risk, panic risk
+- `crates/gpu-swarm.backup/static/app.js` -> **GPU Validator Swarm** | LOC: 130 | Risks: none
+- `crates/gpu-swarm.backup/tests/admin_api.rs` -> **GPU Validator Swarm** | LOC: 62 | Risks: panic risk
+- `crates/gpu-swarm.backup/tests/bip39_vectors.rs` -> **GPU Validator Swarm** | LOC: 22 | Risks: none
+- `crates/gpu-swarm.backup/tests/blockchain_tests.rs` -> **X3VM / Cross-VM** | LOC: 299 | Risks: local-only config risk, panic risk
+- `crates/gpu-swarm.backup/tests/gpu_cache_analysis.rs` -> **TPS Benchmark Suite** | LOC: 207 | Risks: none
+- `crates/gpu-swarm.backup/tests/gpu_tps_benchmark.rs` -> **TPS Benchmark Suite** | LOC: 223 | Risks: none
+- `crates/gpu-swarm.backup/tests/integration_tests.rs` -> **DEX Liquidity** | LOC: 329 | Risks: local-only config risk, panic risk
+- `crates/gpu-swarm.backup/tests/network_tests.rs` -> **GPU Validator Swarm** | LOC: 171 | Risks: panic risk
+- `crates/gpu-swarm.backup/tests/wallet_derivation.rs` -> **GPU Validator Swarm** | LOC: 21 | Risks: panic risk
+- `crates/import-queue-wrapper/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 24 | Risks: none
+- `crates/import-queue-wrapper/src/lib.rs` -> **DEX Liquidity** | LOC: 487 | Risks: panic risk, replay/nonce risk
+- `crates/invariant-macros/Cargo.toml` -> **Unclassified** | LOC: 22 | Risks: none
+- `crates/invariant-macros/src/lib.rs` -> **Unclassified** | LOC: 139 | Risks: panic risk
+- `crates/invariant-macros/tests/fixtures/empty_registry.toml` -> **Unclassified** | LOC: 2 | Risks: none
+- `crates/invariant-macros/tests/fixtures/valid_registry.toml` -> **Unclassified** | LOC: 4 | Risks: none
+- `crates/invariant-macros/tests/registry_check.rs` -> **Unclassified** | LOC: 77 | Risks: panic risk
+- `crates/invariant-macros/tests/trybuild.rs` -> **Unclassified** | LOC: 7 | Risks: none
+- `crates/invariant-macros/tests/ui/fail_invalid_format.rs` -> **Unclassified** | LOC: 9 | Risks: none
+- `crates/invariant-macros/tests/ui/fail_missing_in_registry.rs` -> **Unclassified** | LOC: 3 | Risks: none
+- `crates/invariant-macros/tests/ui/ok_case.rs` -> **Unclassified** | LOC: 9 | Risks: none
+- `crates/orchestra/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 61 | Risks: none
+- `crates/orchestra/src/agent/identity.rs` -> **Unclassified** | LOC: 170 | Risks: none
+- `crates/orchestra/src/agent/lifecycle.rs` -> **Unclassified** | LOC: 264 | Risks: none
+- `crates/orchestra/src/agent/mod.rs` -> **Unclassified** | LOC: 12 | Risks: none
+- `crates/orchestra/src/agent/off_chain.rs` -> **Unclassified** | LOC: 348 | Risks: panic risk, replay/nonce risk
+- `crates/orchestra/src/agent/on_chain.rs` -> **Unclassified** | LOC: 244 | Risks: none
+- `crates/orchestra/src/jury/aggregation.rs` -> **Unclassified** | LOC: 174 | Risks: panic risk
+- `crates/orchestra/src/jury/mod.rs` -> **Unclassified** | LOC: 12 | Risks: none
+- `crates/orchestra/src/jury/rotation.rs` -> **DEX Liquidity** | LOC: 258 | Risks: none
+- `crates/orchestra/src/jury/session.rs` -> **X3 DEX** | LOC: 369 | Risks: panic risk
+- `crates/orchestra/src/jury/voting.rs` -> **X3 DEX** | LOC: 314 | Risks: panic risk, replay/nonce risk
+- `crates/orchestra/src/rotation.rs` -> **Unclassified** | LOC: 149 | Risks: none
+- `crates/orchestra/src/score.rs` -> **Unclassified** | LOC: 310 | Risks: none
+- `crates/orchestra/src/scrap.rs` -> **Unclassified** | LOC: 195 | Risks: panic risk
+- `crates/orchestra/src/task/executor.rs` -> **EVM Integration** | LOC: 231 | Risks: panic risk
+- `crates/orchestra/src/task/mod.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `crates/orchestra/src/task/queue.rs` -> **X3 DEX** | LOC: 442 | Risks: panic risk
+- `crates/orchestra/src/task/spec.rs` -> **Unclassified** | LOC: 360 | Risks: panic risk
+- `crates/parallel-proposer/Cargo.toml` -> **DEX Liquidity** | LOC: 43 | Risks: none
+- `crates/parallel-proposer/src/integration.rs` -> **X3VM / Cross-VM** | LOC: 121 | Risks: panic risk, replay/nonce risk
+- `crates/parallel-proposer/src/lib.rs` -> **Bridge / Router** | LOC: 1374 | Risks: bridge risk, panic risk, replay/nonce risk, unsafe code
+- `crates/parallel-proposer/src/substrate.rs` -> **X3VM / Cross-VM** | LOC: 556 | Risks: replay/nonce risk
+- `crates/poh-generator/Cargo.toml` -> **Proof System** | LOC: 28 | Risks: none
+- `crates/poh-generator/src/lib.rs` -> **Genesis / Chain Spec** | LOC: 473 | Risks: panic risk
+- `crates/private-mempool/Cargo.toml` -> **DEX Liquidity** | LOC: 42 | Risks: none
+- `crates/private-mempool/src/encryption.rs` -> **DEX Liquidity** | LOC: 233 | Risks: panic risk, replay/nonce risk
+- `crates/private-mempool/src/lib.rs` -> **X3 DEX** | LOC: 283 | Risks: panic risk, replay/nonce risk
+- `crates/private-mempool/src/queue.rs` -> **X3 DEX** | LOC: 157 | Risks: panic risk, replay/nonce risk
+- `crates/quantum-crypto/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 44 | Risks: none
+- `crates/quantum-crypto/src/blake3ext.rs` -> **Unclassified** | LOC: 394 | Risks: none
+- `crates/quantum-crypto/src/dilithium.rs` -> **Unclassified** | LOC: 374 | Risks: replay/nonce risk
+- `crates/quantum-crypto/src/error.rs` -> **Unclassified** | LOC: 42 | Risks: none
+- `crates/quantum-crypto/src/hash.rs` -> **Unclassified** | LOC: 365 | Risks: none
+- `crates/quantum-crypto/src/kyber.rs` -> **Unclassified** | LOC: 351 | Risks: panic risk
+- `crates/quantum-crypto/src/lib.rs` -> **Proof System** | LOC: 150 | Risks: none
+- `crates/quantum-crypto/src/sphincs.rs` -> **Proof System** | LOC: 339 | Risks: none
+- `crates/quantum-crypto/src/types.rs` -> **Unclassified** | LOC: 109 | Risks: none
+- `crates/quantum-swarm/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 75 | Risks: none
+- `crates/quantum-swarm/benches/quantum_bench.rs` -> **TPS Benchmark Suite** | LOC: 104 | Risks: none
+- `crates/quantum-swarm/src/arena/archive.rs` -> **Unclassified** | LOC: 259 | Risks: panic risk
+- `crates/quantum-swarm/src/arena/combatant.rs` -> **Unclassified** | LOC: 262 | Risks: none
+- `crates/quantum-swarm/src/arena/mod.rs` -> **Unclassified** | LOC: 457 | Risks: panic risk
+- `crates/quantum-swarm/src/arena/scheduler.rs` -> **X3 DEX** | LOC: 244 | Risks: panic risk
+- `crates/quantum-swarm/src/arena/tournament.rs` -> **Unclassified** | LOC: 379 | Risks: none
+- `crates/quantum-swarm/src/config.rs` -> **GPU Validator Swarm** | LOC: 332 | Risks: none
+- `crates/quantum-swarm/src/error.rs` -> **Unclassified** | LOC: 142 | Risks: none
+- `crates/quantum-swarm/src/evolution/genome.rs` -> **X3 DEX** | LOC: 531 | Risks: panic risk
+- `crates/quantum-swarm/src/evolution/mod.rs` -> **Unclassified** | LOC: 285 | Risks: none
+- `crates/quantum-swarm/src/evolution/mutation.rs` -> **X3 DEX** | LOC: 160 | Risks: none
+- `crates/quantum-swarm/src/evolution/population.rs` -> **X3 DEX** | LOC: 464 | Risks: panic risk
+- `crates/quantum-swarm/src/evolution/selection.rs` -> **Unclassified** | LOC: 284 | Risks: panic risk
+- `crates/quantum-swarm/src/executor.rs` -> **Unclassified** | LOC: 466 | Risks: panic risk
+- `crates/quantum-swarm/src/lib.rs` -> **Bridge / Router** | LOC: 279 | Risks: none
+- `crates/quantum-swarm/src/quantum/backend.rs` -> **GPU Validator Swarm** | LOC: 451 | Risks: panic risk
+- `crates/quantum-swarm/src/quantum/circuit.rs` -> **X3 DEX** | LOC: 521 | Risks: panic risk
+- `crates/quantum-swarm/src/quantum/mod.rs` -> **Unclassified** | LOC: 21 | Risks: none
+- `crates/quantum-swarm/src/quantum/qaoa.rs` -> **Unclassified** | LOC: 460 | Risks: panic risk
+- `crates/quantum-swarm/src/quantum/qubo.rs` -> **Universal Asset Kernel** | LOC: 527 | Risks: panic risk
+- `crates/quantum-swarm/src/quantum/vqe.rs` -> **Unclassified** | LOC: 468 | Risks: panic risk
+- `crates/quantum-swarm/src/strategy/arbitrage.rs` -> **Universal Asset Kernel** | LOC: 343 | Risks: bridge risk, panic risk
+- `crates/quantum-swarm/src/strategy/market_making.rs` -> **Universal Asset Kernel** | LOC: 360 | Risks: panic risk
+- `crates/quantum-swarm/src/strategy/mod.rs` -> **Universal Asset Kernel** | LOC: 318 | Risks: none
+- `crates/quantum-swarm/src/strategy/portfolio.rs` -> **Universal Asset Kernel** | LOC: 485 | Risks: none
+- `crates/quantum-swarm/src/strategy/trend.rs` -> **Universal Asset Kernel** | LOC: 511 | Risks: panic risk
+- `crates/quantum-swarm/src/types.rs` -> **Universal Asset Kernel** | LOC: 448 | Risks: none
+- `crates/svm-counter/Cargo.toml` -> **SVM Integration** | LOC: 14 | Risks: none
+- `crates/svm-counter/src/lib.rs` -> **SVM Integration** | LOC: 53 | Risks: none
+- `crates/svm-integration/Cargo.toml` -> **SVM Integration** | LOC: 48 | Risks: none
+- `crates/svm-integration/src/interp.rs` -> **SVM Integration** | LOC: 1113 | Risks: panic risk, replay/nonce risk
+- `crates/svm-integration/src/lib.rs` -> **SVM Integration** | LOC: 659 | Risks: panic risk
+- `crates/svm-integration/src/rbpf.rs` -> **SVM Integration** | LOC: 475 | Risks: none
+- `crates/svm-integration/tests/counter_integration.rs` -> **SVM Integration** | LOC: 70 | Risks: panic risk
+- `crates/swarm-media/Cargo.toml` -> **Unclassified** | LOC: 25 | Risks: none
+- `crates/swarm-media/src/lib.rs` -> **Unclassified** | LOC: 8 | Risks: none
+- `crates/swarm-media/src/reputation.rs` -> **DEX Liquidity** | LOC: 358 | Risks: panic risk
+- `crates/swarm-media/src/rpc_api.rs` -> **GPU Validator Swarm** | LOC: 257 | Risks: panic risk
+- `crates/tps-tracker/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 21 | Risks: none
+- `crates/tps-tracker/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 290 | Risks: local-only config risk
+- `crates/tps-tracker/src/main.rs` -> **TPS Benchmark Suite** | LOC: 34 | Risks: local-only config risk
+- `crates/treasury/Cargo.toml` -> **Unclassified** | LOC: 29 | Risks: none
+- `crates/treasury/src/error.rs` -> **Unclassified** | LOC: 11 | Risks: none
+- `crates/treasury/src/lib.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `crates/treasury/src/types.rs` -> **Unclassified** | LOC: 12 | Risks: none
+- `crates/voice-to-x3/Cargo.toml` -> **Unclassified** | LOC: 45 | Risks: none
+- `crates/voice-to-x3/src/error.rs` -> **Unclassified** | LOC: 45 | Risks: none
+- `crates/voice-to-x3/src/generator.rs` -> **Universal Asset Kernel** | LOC: 904 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/voice-to-x3/src/intent.rs` -> **Universal Asset Kernel** | LOC: 400 | Risks: bridge risk, panic risk
+- `crates/voice-to-x3/src/lib.rs` -> **Universal Asset Kernel** | LOC: 86 | Risks: panic risk
+- `crates/voice-to-x3/src/templates.rs` -> **Universal Asset Kernel** | LOC: 921 | Risks: none
+- `crates/x3-agent/Cargo.toml` -> **Proof System** | LOC: 19 | Risks: none
+- `crates/x3-agent/src/error.rs` -> **Unclassified** | LOC: 31 | Risks: none
+- `crates/x3-agent/src/identity.rs` -> **Proof System** | LOC: 87 | Risks: replay/nonce risk
+- `crates/x3-agent/src/lib.rs` -> **Unclassified** | LOC: 26 | Risks: none
+- `crates/x3-agent/src/registry.rs` -> **Proof System** | LOC: 401 | Risks: panic risk
+- `crates/x3-agent/src/reputation.rs` -> **Unclassified** | LOC: 62 | Risks: none
+- `crates/x3-agent/src/types.rs` -> **Bridge / Router** | LOC: 235 | Risks: bridge risk
+- `crates/x3-appzone-factory/Cargo.toml` -> **Unclassified** | LOC: 35 | Risks: none
+- `crates/x3-appzone-factory/src/cli.rs` -> **Unclassified** | LOC: 103 | Risks: none
+- `crates/x3-appzone-factory/src/deploy.rs` -> **Unclassified** | LOC: 81 | Risks: none
+- `crates/x3-appzone-factory/src/lib.rs` -> **Unclassified** | LOC: 908 | Risks: panic risk
+- `crates/x3-appzone-factory/src/registry.rs` -> **Unclassified** | LOC: 117 | Risks: none
+- `crates/x3-appzone-factory/src/templates.rs` -> **Universal Asset Kernel** | LOC: 98 | Risks: none
+- `crates/x3-appzone-factory/src/types.rs` -> **Unclassified** | LOC: 37 | Risks: none
+- `crates/x3-asset-kernel-types/Cargo.toml` -> **Universal Asset Kernel** | LOC: 36 | Risks: none
+- `crates/x3-asset-kernel-types/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1021 | Risks: bridge risk, replay/nonce risk, supply invariant risk, unsafe code
+- `crates/x3-ast/Cargo.toml` -> **Unclassified** | LOC: 11 | Risks: none
+- `crates/x3-ast/src/lib.rs` -> **Unclassified** | LOC: 321 | Risks: none
+- `crates/x3-atomic-client/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 21 | Risks: none
+- `crates/x3-atomic-client/src/lib.rs` -> **Universal Asset Kernel** | LOC: 411 | Risks: local-only config risk, panic risk
+- `crates/x3-atomic-trade/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 17 | Risks: none
+- `crates/x3-atomic-trade/src/lib.rs` -> **X3 DEX** | LOC: 186 | Risks: atomic rollback risk
+- `crates/x3-atomic-trade/src/rollback_listener.rs` -> **Bridge / Router** | LOC: 597 | Risks: atomic rollback risk, panic risk
+- `crates/x3-atomic-trade/src/swap_rpc.rs` -> **X3 DEX** | LOC: 516 | Risks: panic risk
+- `crates/x3-automation/Cargo.toml` -> **Unclassified** | LOC: 25 | Risks: none
+- `crates/x3-automation/src/lib.rs` -> **Universal Asset Kernel** | LOC: 249 | Risks: panic risk
+- `crates/x3-backend/Cargo.toml` -> **Unclassified** | LOC: 28 | Risks: none
+- `crates/x3-backend/src/bc_format.rs` -> **DEX Liquidity** | LOC: 1505 | Risks: panic risk
+- `crates/x3-backend/src/bc_format_helpers.rs` -> **X3VM / Cross-VM** | LOC: 393 | Risks: panic risk
+- `crates/x3-backend/src/emit.rs` -> **DEX Liquidity** | LOC: 913 | Risks: atomic rollback risk, panic risk
+- `crates/x3-backend/src/error.rs` -> **X3 DEX** | LOC: 278 | Risks: none
+- `crates/x3-backend/src/layout.rs` -> **Unclassified** | LOC: 380 | Risks: panic risk
+- `crates/x3-backend/src/lib.rs` -> **EVM Integration** | LOC: 110 | Risks: none
+- `crates/x3-backend/src/lower.rs` -> **X3VM / Cross-VM** | LOC: 1006 | Risks: atomic rollback risk, panic risk
+- `crates/x3-backend/src/mir_lower.rs` -> **X3 DEX** | LOC: 533 | Risks: panic risk
+- `crates/x3-backend/src/opcode.rs` -> **X3VM / Cross-VM** | LOC: 1351 | Risks: atomic rollback risk
+- `crates/x3-bench/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 33 | Risks: none
+- `crates/x3-bench/run_bench.sh` -> **TPS Benchmark Suite** | LOC: 30 | Risks: none
+- `crates/x3-bench/src/comparator.rs` -> **TPS Benchmark Suite** | LOC: 137 | Risks: none
+- `crates/x3-bench/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 24 | Risks: none
+- `crates/x3-bench/src/main.rs` -> **TPS Benchmark Suite** | LOC: 163 | Risks: none
+- `crates/x3-bench/src/pipeline.rs` -> **Bridge / Router** | LOC: 431 | Risks: bridge risk, panic risk
+- `crates/x3-bench/src/runner.rs` -> **TPS Benchmark Suite** | LOC: 300 | Risks: none
+- `crates/x3-bench/src/samples.rs` -> **TPS Benchmark Suite** | LOC: 138 | Risks: none
+- `crates/x3-bot/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 31 | Risks: none
+- `crates/x3-bot/src/api.rs` -> **Bridge / Router** | LOC: 81 | Risks: atomic rollback risk, panic risk
+- `crates/x3-bot/src/config.rs` -> **Bridge / Router** | LOC: 78 | Risks: none
+- `crates/x3-bot/src/executor.rs` -> **Bridge / Router** | LOC: 125 | Risks: replay/nonce risk
+- `crates/x3-bot/src/main.rs` -> **EVM Integration** | LOC: 62 | Risks: none
+- `crates/x3-bot/src/market.rs` -> **X3 DEX** | LOC: 46 | Risks: none
+- `crates/x3-bot/src/rpc_pool.rs` -> **X3 DEX** | LOC: 44 | Risks: none
+- `crates/x3-bot/src/strategy.rs` -> **Unclassified** | LOC: 40 | Risks: none
+- `crates/x3-bot/src/telemetry.rs` -> **X3 DEX** | LOC: 50 | Risks: panic risk
+- `crates/x3-bot/src/tx_manager.rs` -> **Unclassified** | LOC: 63 | Risks: replay/nonce risk
+- `crates/x3-bot/src/wallet.rs` -> **Unclassified** | LOC: 26 | Risks: none
+- `crates/x3-bridge-adapters/Cargo.toml` -> **Universal Asset Kernel** | LOC: 30 | Risks: bridge risk
+- `crates/x3-bridge-adapters/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1269 | Risks: bridge risk, panic risk
+- `crates/x3-bridge-security-council/Cargo.toml` -> **Bridge / Router** | LOC: 14 | Risks: bridge risk
+- `crates/x3-bridge-security-council/src/lib.rs` -> **Bridge / Router** | LOC: 72 | Risks: none
+- `crates/x3-bridge/Cargo.toml` -> **Bridge / Router** | LOC: 25 | Risks: bridge risk
+- `crates/x3-bridge/src/bitcoin_htlc.rs` -> **Bridge / Router** | LOC: 536 | Risks: panic risk
+- `crates/x3-bridge/src/btc_spv.rs` -> **Bridge / Router** | LOC: 407 | Risks: panic risk, replay/nonce risk
+- `crates/x3-bridge/src/cross_chain_account.rs` -> **Bridge / Router** | LOC: 606 | Risks: panic risk, replay risk, replay/nonce risk
+- `crates/x3-bridge/src/cross_chain_proofs.rs` -> **Bridge / Router** | LOC: 741 | Risks: panic risk, unfinished logic
+- `crates/x3-bridge/src/ethereum_bridge.rs` -> **Universal Asset Kernel** | LOC: 783 | Risks: bridge risk, panic risk, replay risk
+- `crates/x3-bridge/src/gas_relayer.rs` -> **Bridge / Router** | LOC: 546 | Risks: panic risk
+- `crates/x3-bridge/src/ibc_light_client.rs` -> **Bridge / Router** | LOC: 666 | Risks: panic risk
+- `crates/x3-bridge/src/l2_bridge.rs` -> **Bridge / Router** | LOC: 588 | Risks: bridge risk, panic risk
+- `crates/x3-bridge/src/lib.rs` -> **Bridge / Router** | LOC: 28 | Risks: bridge risk
+- `crates/x3-bridge/src/security_council.rs` -> **Bridge / Router** | LOC: 532 | Risks: bridge risk, panic risk
+- `crates/x3-bridge/src/wormhole_adapter.rs` -> **Universal Asset Kernel** | LOC: 370 | Risks: bridge risk, replay/nonce risk
+- `crates/x3-circuit-breaker/Cargo.toml` -> **Universal Asset Kernel** | LOC: 13 | Risks: none
+- `crates/x3-circuit-breaker/src/lib.rs` -> **Universal Asset Kernel** | LOC: 194 | Risks: panic risk
+- `crates/x3-cli/Cargo.toml` -> **EVM Integration** | LOC: 77 | Risks: none
+- `crates/x3-cli/src/commands/account.rs` -> **Universal Asset Kernel** | LOC: 216 | Risks: replay/nonce risk
+- `crates/x3-cli/src/commands/build.rs` -> **EVM Integration** | LOC: 421 | Risks: panic risk
+- `crates/x3-cli/src/commands/compile.rs` -> **Unclassified** | LOC: 178 | Risks: panic risk
+- `crates/x3-cli/src/commands/demo.rs` -> **Universal Asset Kernel** | LOC: 119 | Risks: replay risk, replay/nonce risk, supply invariant risk
+- `crates/x3-cli/src/commands/deploy.rs` -> **EVM Integration** | LOC: 202 | Risks: none
+- `crates/x3-cli/src/commands/docgen.rs` -> **X3 DEX** | LOC: 269 | Risks: panic risk
+- `crates/x3-cli/src/commands/init.rs` -> **EVM Integration** | LOC: 55 | Risks: none
+- `crates/x3-cli/src/commands/mod.rs` -> **EVM Integration** | LOC: 91 | Risks: none
+- `crates/x3-cli/src/commands/query.rs` -> **Universal Asset Kernel** | LOC: 223 | Risks: replay/nonce risk
+- `crates/x3-cli/src/commands/repl.rs` -> **X3VM / Cross-VM** | LOC: 590 | Risks: none
+- `crates/x3-cli/src/commands/simulate.rs` -> **EVM Integration** | LOC: 157 | Risks: replay/nonce risk
+- `crates/x3-cli/src/commands/swap.rs` -> **Universal Asset Kernel** | LOC: 643 | Risks: bridge risk, panic risk, replay/nonce risk
+- `crates/x3-cli/src/commands/test.rs` -> **Unclassified** | LOC: 127 | Risks: none
+- `crates/x3-cli/src/commands/trace.rs` -> **EVM Integration** | LOC: 86 | Risks: unsafe code
+- `crates/x3-cli/src/commands/tx.rs` -> **EVM Integration** | LOC: 427 | Risks: none
+- `crates/x3-cli/src/config.rs` -> **EVM Integration** | LOC: 341 | Risks: local-only config risk, panic risk
+- `crates/x3-cli/src/error.rs` -> **Unclassified** | LOC: 64 | Risks: none
+- `crates/x3-cli/src/main.rs` -> **X3 DEX** | LOC: 77 | Risks: none
+- `crates/x3-cli/src/project.rs` -> **EVM Integration** | LOC: 190 | Risks: none
+- `crates/x3-cli/src/templates.rs` -> **X3 DEX** | LOC: 154 | Risks: panic risk
+- `crates/x3-common/Cargo.toml` -> **Unclassified** | LOC: 15 | Risks: none
+- `crates/x3-common/src/lib.rs` -> **X3 DEX** | LOC: 197 | Risks: none
+- `crates/x3-compiler/Cargo.toml` -> **Unclassified** | LOC: 31 | Risks: none
+- `crates/x3-compiler/src/compiler.rs` -> **Unclassified** | LOC: 358 | Risks: panic risk
+- `crates/x3-compiler/src/error.rs` -> **Unclassified** | LOC: 36 | Risks: none
+- `crates/x3-compiler/src/lib.rs` -> **Unclassified** | LOC: 99 | Risks: none
+- `crates/x3-compiler/src/options.rs` -> **Unclassified** | LOC: 155 | Risks: none
+- `crates/x3-compiler/tests/determinism.rs` -> **Unclassified** | LOC: 48 | Risks: panic risk
+- `crates/x3-compiler/tests/e2e_test.rs` -> **Unclassified** | LOC: 192 | Risks: panic risk
+- `crates/x3-compiler/tests/integration_test.rs` -> **Unclassified** | LOC: 68 | Risks: panic risk
+- `crates/x3-consensus/src/finality_proof_api.rs` -> **X3 DEX** | LOC: 375 | Risks: panic risk
+- `crates/x3-consensus/src/ghost_fork_choice.rs` -> **Genesis / Chain Spec** | LOC: 321 | Risks: panic risk
+- `crates/x3-consensus/src/hotstuff.rs` -> **X3 DEX** | LOC: 719 | Risks: panic risk, replay risk
+- `crates/x3-consensus/src/lib.rs` -> **Bridge / Router** | LOC: 20 | Risks: none
+- `crates/x3-consensus/src/network_partition_recovery.rs` -> **Validator / LaunchOps** | LOC: 326 | Risks: panic risk
+- `crates/x3-consensus/src/parallel_proposer.rs` -> **DEX Liquidity** | LOC: 404 | Risks: replay/nonce risk
+- `crates/x3-consensus/src/proof_of_history.rs` -> **Genesis / Chain Spec** | LOC: 311 | Risks: panic risk
+- `crates/x3-constitution/Cargo.toml` -> **Proof System** | LOC: 17 | Risks: none
+- `crates/x3-constitution/src/amendment.rs` -> **Governance** | LOC: 211 | Risks: none
+- `crates/x3-constitution/src/articles.rs` -> **Universal Asset Kernel** | LOC: 144 | Risks: replay risk
+- `crates/x3-constitution/src/engine.rs` -> **Universal Asset Kernel** | LOC: 307 | Risks: panic risk, replay risk
+- `crates/x3-constitution/src/error.rs` -> **Governance** | LOC: 29 | Risks: none
+- `crates/x3-constitution/src/invariants.rs` -> **Universal Asset Kernel** | LOC: 263 | Risks: none
+- `crates/x3-constitution/src/lib.rs` -> **Governance** | LOC: 34 | Risks: replay risk
+- `crates/x3-constitution/src/types.rs` -> **Universal Asset Kernel** | LOC: 115 | Risks: panic risk
+- `crates/x3-court/Cargo.toml` -> **Proof System** | LOC: 19 | Risks: replay risk
+- `crates/x3-court/src/court.rs` -> **X3VM / Cross-VM** | LOC: 556 | Risks: panic risk, replay risk, replay/nonce risk
+- `crates/x3-court/src/docket.rs` -> **Proof System** | LOC: 135 | Risks: none
+- `crates/x3-court/src/error.rs` -> **Proof System** | LOC: 29 | Risks: replay risk
+- `crates/x3-court/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 40 | Risks: replay risk
+- `crates/x3-court/src/replay.rs` -> **X3VM / Cross-VM** | LOC: 58 | Risks: replay risk
+- `crates/x3-court/src/types.rs` -> **Universal Asset Kernel** | LOC: 210 | Risks: replay risk
+- `crates/x3-court/src/verdict.rs` -> **Unclassified** | LOC: 45 | Risks: replay risk
+- `crates/x3-court/src/vm.rs` -> **X3VM / Cross-VM** | LOC: 233 | Risks: none
+- `crates/x3-crosschain-gateway/Cargo.toml` -> **Universal Asset Kernel** | LOC: 23 | Risks: none
+- `crates/x3-crosschain-gateway/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1100 | Risks: panic risk, replay risk, replay/nonce risk
+- `crates/x3-dex/Cargo.toml` -> **X3 DEX** | LOC: 32 | Risks: none
+- `crates/x3-dex/src/amm_pools.rs` -> **Universal Asset Kernel** | LOC: 621 | Risks: panic risk
+- `crates/x3-dex/src/arb_bot_events.rs` -> **X3 DEX** | LOC: 498 | Risks: panic risk
+- `crates/x3-dex/src/batch_swap_router.rs` -> **Bridge / Router** | LOC: 471 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dex/src/concentrated_liquidity.rs` -> **X3 DEX** | LOC: 454 | Risks: panic risk
+- `crates/x3-dex/src/flash_loan.rs` -> **X3 DEX** | LOC: 465 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dex/src/lib.rs` -> **Bridge / Router** | LOC: 87 | Risks: bridge risk
+- `crates/x3-dex/src/limit_order_book.rs` -> **X3 DEX** | LOC: 520 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dex/src/liquidity_mining.rs` -> **X3 DEX** | LOC: 427 | Risks: panic risk
+- `crates/x3-dex/src/lp_position_nft.rs` -> **X3 DEX** | LOC: 627 | Risks: panic risk
+- `crates/x3-dex/src/options.rs` -> **X3 DEX** | LOC: 519 | Risks: panic risk
+- `crates/x3-dex/src/perpetuals.rs` -> **X3 DEX** | LOC: 507 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dex/src/pool_analytics.rs` -> **X3 DEX** | LOC: 517 | Risks: panic risk
+- `crates/x3-dex/src/real_slippage.rs` -> **X3 DEX** | LOC: 471 | Risks: panic risk
+- `crates/x3-dex/src/route_finder.rs` -> **Bridge / Router** | LOC: 429 | Risks: panic risk
+- `crates/x3-dex/src/settlement_bridge.rs` -> **Universal Asset Kernel** | LOC: 635 | Risks: bridge risk, panic risk
+- `crates/x3-dex/src/stop_loss_trigger.rs` -> **X3 DEX** | LOC: 580 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dex/src/tests/attack_liquidation_frontrun.rs` -> **Bridge / Router** | LOC: 38 | Risks: panic risk
+- `crates/x3-dex/src/tests/attack_oracle_frontrun.rs` -> **X3 DEX** | LOC: 24 | Risks: panic risk
+- `crates/x3-dex/src/tests/attack_sandwich.rs` -> **Bridge / Router** | LOC: 69 | Risks: panic risk
+- `crates/x3-dex/src/tests/attack_twap_manipulation.rs` -> **X3 DEX** | LOC: 41 | Risks: panic risk
+- `crates/x3-dex/src/trade_history.rs` -> **X3 DEX** | LOC: 592 | Risks: panic risk
+- `crates/x3-dex/src/twap_executor.rs` -> **X3 DEX** | LOC: 460 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dex/src/ve_governance.rs` -> **X3 DEX** | LOC: 543 | Risks: panic risk, replay/nonce risk
+- `crates/x3-dns-server/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 79 | Risks: none
+- `crates/x3-dns-server/src/api.rs` -> **Bridge / Router** | LOC: 519 | Risks: none
+- `crates/x3-dns-server/src/blockchain.rs` -> **Unclassified** | LOC: 446 | Risks: none
+- `crates/x3-dns-server/src/cache.rs` -> **Unclassified** | LOC: 259 | Risks: none
+- `crates/x3-dns-server/src/config.rs` -> **Unclassified** | LOC: 563 | Risks: panic risk
+- `crates/x3-dns-server/src/domain.rs` -> **Unclassified** | LOC: 563 | Risks: panic risk
+- `crates/x3-dns-server/src/error.rs` -> **Unclassified** | LOC: 284 | Risks: none
+- `crates/x3-dns-server/src/lib.rs` -> **Unclassified** | LOC: 121 | Risks: none
+- `crates/x3-dns-server/src/main.rs` -> **Unclassified** | LOC: 86 | Risks: none
+- `crates/x3-dns-server/src/registry.rs` -> **Unclassified** | LOC: 252 | Risks: none
+- `crates/x3-dns-server/src/server.rs` -> **Governance** | LOC: 468 | Risks: none
+- `crates/x3-dns-server/src/zone.rs` -> **Unclassified** | LOC: 141 | Risks: none
+- `crates/x3-economics/src/inflation_schedule.rs` -> **Universal Asset Kernel** | LOC: 276 | Risks: none
+- `crates/x3-economics/src/lib.rs` -> **DEX Liquidity** | LOC: 12 | Risks: none
+- `crates/x3-economics/src/stake_compounding.rs` -> **DEX Liquidity** | LOC: 269 | Risks: panic risk
+- `crates/x3-economics/src/validator_commission.rs` -> **DEX Liquidity** | LOC: 180 | Risks: none
+- `crates/x3-evolution/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 40 | Risks: none
+- `crates/x3-evolution/src/chromosome.rs` -> **X3 DEX** | LOC: 373 | Risks: panic risk
+- `crates/x3-evolution/src/crossover.rs` -> **Unclassified** | LOC: 365 | Risks: panic risk
+- `crates/x3-evolution/src/error.rs` -> **X3VM / Cross-VM** | LOC: 190 | Risks: none
+- `crates/x3-evolution/src/fitness.rs` -> **X3VM / Cross-VM** | LOC: 483 | Risks: panic risk
+- `crates/x3-evolution/src/lib.rs` -> **X3 DEX** | LOC: 426 | Risks: none
+- `crates/x3-evolution/src/mutation.rs` -> **Unclassified** | LOC: 416 | Risks: panic risk
+- `crates/x3-evolution/src/population.rs` -> **Unclassified** | LOC: 619 | Risks: panic risk
+- `crates/x3-evolution/src/selection.rs` -> **Unclassified** | LOC: 523 | Risks: panic risk
+- `crates/x3-evolution/src/simulator.rs` -> **Universal Asset Kernel** | LOC: 729 | Risks: fake timestamp risk, panic risk
+- `crates/x3-external-route-registry/Cargo.toml` -> **Universal Asset Kernel** | LOC: 14 | Risks: none
+- `crates/x3-external-route-registry/src/lib.rs` -> **Universal Asset Kernel** | LOC: 237 | Risks: panic risk
+- `crates/x3-fees/Cargo.toml` -> **Unclassified** | LOC: 26 | Risks: none
+- `crates/x3-fees/src/calculator.rs` -> **Unclassified** | LOC: 274 | Risks: panic risk
+- `crates/x3-fees/src/curve.rs` -> **Unclassified** | LOC: 213 | Risks: none
+- `crates/x3-fees/src/error.rs` -> **Unclassified** | LOC: 16 | Risks: none
+- `crates/x3-fees/src/kani_proofs.rs` -> **Proof System** | LOC: 136 | Risks: none
+- `crates/x3-fees/src/lib.rs` -> **DEX Liquidity** | LOC: 483 | Risks: none
+- `crates/x3-fees/src/reputation.rs` -> **Unclassified** | LOC: 121 | Risks: none
+- `crates/x3-fees/src/types.rs` -> **X3 DEX** | LOC: 112 | Risks: none
+- `crates/x3-fees/tests/prop_fee_invariants.rs` -> **Unclassified** | LOC: 187 | Risks: none
+- `crates/x3-finality-oracle/Cargo.toml` -> **Unclassified** | LOC: 18 | Risks: none
+- `crates/x3-finality-oracle/src/lib.rs` -> **EVM Integration** | LOC: 198 | Risks: none
+- `crates/x3-finality-oracle/src/test_only_evm.rs` -> **EVM Integration** | LOC: 41 | Risks: none
+- `crates/x3-finality-oracle/src/test_only_solana.rs` -> **Unclassified** | LOC: 41 | Risks: none
+- `crates/x3-flashloan/Cargo.toml` -> **Proof System** | LOC: 22 | Risks: none
+- `crates/x3-flashloan/examples/demo.rs` -> **Universal Asset Kernel** | LOC: 157 | Risks: panic risk, replay risk
+- `crates/x3-flashloan/src/error.rs` -> **Universal Asset Kernel** | LOC: 48 | Risks: none
+- `crates/x3-flashloan/src/executor.rs` -> **EVM Integration** | LOC: 321 | Risks: panic risk
+- `crates/x3-flashloan/src/lib.rs` -> **Universal Asset Kernel** | LOC: 235 | Risks: bridge risk, panic risk
+- `crates/x3-flashloan/src/planner.rs` -> **Universal Asset Kernel** | LOC: 254 | Risks: panic risk
+- `crates/x3-flashloan/src/pool.rs` -> **Universal Asset Kernel** | LOC: 338 | Risks: panic risk
+- `crates/x3-flashloan/src/settlement.rs` -> **Universal Asset Kernel** | LOC: 279 | Risks: bridge risk, panic risk
+- `crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs` -> **Universal Asset Kernel** | LOC: 45 | Risks: panic risk
+- `crates/x3-flashloan/src/tests/attack_reentrancy.rs` -> **Universal Asset Kernel** | LOC: 38 | Risks: panic risk
+- `crates/x3-flashloan/src/tests/attack_repayment_bypass.rs` -> **Universal Asset Kernel** | LOC: 36 | Risks: panic risk
+- `crates/x3-flashloan/src/types.rs` -> **Universal Asset Kernel** | LOC: 235 | Risks: replay/nonce risk
+- `crates/x3-gateway-indexer/Cargo.toml` -> **Bridge / Router** | LOC: 20 | Risks: none
+- `crates/x3-gateway-indexer/src/lib.rs` -> **Universal Asset Kernel** | LOC: 459 | Risks: panic risk
+- `crates/x3-gateway-insurance/Cargo.toml` -> **Unclassified** | LOC: 13 | Risks: none
+- `crates/x3-gateway-insurance/src/lib.rs` -> **Universal Asset Kernel** | LOC: 233 | Risks: panic risk
+- `crates/x3-gateway-risk-engine/Cargo.toml` -> **Unclassified** | LOC: 26 | Risks: none
+- `crates/x3-gateway-risk-engine/src/lib.rs` -> **Universal Asset Kernel** | LOC: 269 | Risks: bridge risk, unfinished logic
+- `crates/x3-gateway/Cargo.toml` -> **X3 DEX** | LOC: 71 | Risks: none
+- `crates/x3-gateway/src/cache.rs` -> **Unclassified** | LOC: 66 | Risks: none
+- `crates/x3-gateway/src/config.rs` -> **X3 DEX** | LOC: 143 | Risks: local-only config risk
+- `crates/x3-gateway/src/db.rs` -> **Bridge / Router** | LOC: 1485 | Risks: bridge risk, replay risk, replay/nonce risk
+- `crates/x3-gateway/src/error.rs` -> **Unclassified** | LOC: 84 | Risks: none
+- `crates/x3-gateway/src/graphql.rs` -> **TPS Benchmark Suite** | LOC: 1502 | Risks: bridge risk, replay risk, replay/nonce risk
+- `crates/x3-gateway/src/main.rs` -> **Bridge / Router** | LOC: 198 | Risks: none
+- `crates/x3-gateway/src/orchestra.rs` -> **Unclassified** | LOC: 257 | Risks: replay risk
+- `crates/x3-gateway/src/rest.rs` -> **Bridge / Router** | LOC: 2257 | Risks: bridge risk, panic risk, replay risk
+- `crates/x3-gateway/tests/loom_mempool_concurrency.rs` -> **DEX Liquidity** | LOC: 297 | Risks: panic risk, replay/nonce risk
+- `crates/x3-gateway/tests/shuttle_validator_async.rs` -> **Validator / LaunchOps** | LOC: 101 | Risks: none
+- `crates/x3-genesis-builder/Cargo.toml` -> **Genesis / Chain Spec** | LOC: 20 | Risks: none
+- `crates/x3-genesis-builder/src/lib.rs` -> **Genesis / Chain Spec** | LOC: 79 | Risks: panic risk
+- `crates/x3-genesis-builder/src/main.rs` -> **Genesis / Chain Spec** | LOC: 40 | Risks: none
+- `crates/x3-gpu-validator-swarm/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 103 | Risks: none
+- `crates/x3-gpu-validator-swarm/benches/e2e_tps.rs` -> **TPS Benchmark Suite** | LOC: 193 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/scripts/x3-swarm.sh` -> **TPS Benchmark Suite** | LOC: 355 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/bin/wallet_sync.rs` -> **TPS Benchmark Suite** | LOC: 226 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/bin/x3_bench.rs` -> **TPS Benchmark Suite** | LOC: 311 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/bin/x3_cpu_validator.rs` -> **TPS Benchmark Suite** | LOC: 250 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/bin/x3_swarm_orchestrator.rs` -> **TPS Benchmark Suite** | LOC: 201 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/bin/x3_validator.rs` -> **TPS Benchmark Suite** | LOC: 224 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/config.rs` -> **TPS Benchmark Suite** | LOC: 319 | Risks: replay risk
+- `crates/x3-gpu-validator-swarm/src/cpu_validator.rs` -> **GPU Validator Swarm** | LOC: 252 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/crypto.rs` -> **GPU Validator Swarm** | LOC: 286 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/deterministic.rs` -> **X3VM / Cross-VM** | LOC: 816 | Risks: replay risk
+- `crates/x3-gpu-validator-swarm/src/error.rs` -> **Proof System** | LOC: 119 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/gpu_bytecode.rs` -> **Bridge / Router** | LOC: 147 | Risks: bridge risk
+- `crates/x3-gpu-validator-swarm/src/gpu_fallback_chain.rs` -> **Universal Asset Kernel** | LOC: 476 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/gpu_memory_pool.rs` -> **Universal Asset Kernel** | LOC: 401 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/gpu_receipt.rs` -> **Universal Asset Kernel** | LOC: 49 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/health.rs` -> **GPU Validator Swarm** | LOC: 200 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/lib.rs` -> **DEX Liquidity** | LOC: 325 | Risks: replay risk
+- `crates/x3-gpu-validator-swarm/src/metrics.rs` -> **X3 DEX** | LOC: 507 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/multi_gpu_dispatcher.rs` -> **X3 DEX** | LOC: 356 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/network.rs` -> **GPU Validator Swarm** | LOC: 314 | Risks: panic risk, replay/nonce risk
+- `crates/x3-gpu-validator-swarm/src/orchestrator.rs` -> **GPU Validator Swarm** | LOC: 434 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/payment.rs` -> **GPU Validator Swarm** | LOC: 680 | Risks: local-only config risk, panic risk
+- `crates/x3-gpu-validator-swarm/src/proof_aggregator.rs` -> **Proof System** | LOC: 435 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/proof_integration.rs` -> **Universal Asset Kernel** | LOC: 350 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/protocol.rs` -> **GPU Validator Swarm** | LOC: 232 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/quarantine.rs` -> **GPU Validator Swarm** | LOC: 443 | Risks: panic risk, replay risk
+- `crates/x3-gpu-validator-swarm/src/state_merkle_proof.rs` -> **X3VM / Cross-VM** | LOC: 559 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/telemetry.rs` -> **GPU Validator Swarm** | LOC: 166 | Risks: none
+- `crates/x3-gpu-validator-swarm/src/unified_proof.rs` -> **Universal Asset Kernel** | LOC: 541 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/src/validator.rs` -> **Proof System** | LOC: 415 | Risks: panic risk, replay risk
+- `crates/x3-gpu-validator-swarm/src/x3_kernel_versioning.rs` -> **Universal Asset Kernel** | LOC: 559 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/tests/chaos_stress_test.rs` -> **TPS Benchmark Suite** | LOC: 576 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/tests/metrics_sliding_window_integration.rs` -> **X3 DEX** | LOC: 290 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/tests/stress_harness.rs` -> **DEX Liquidity** | LOC: 409 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/tests/stress_with_real_time_metrics.rs` -> **TPS Benchmark Suite** | LOC: 279 | Risks: panic risk
+- `crates/x3-gpu-validator-swarm/tests/test_x3_validator.rs` -> **GPU Validator Swarm** | LOC: 393 | Risks: panic risk, replay risk
+- `crates/x3-gpu-validator-swarm/tests/tps_sliding_window_test.rs` -> **TPS Benchmark Suite** | LOC: 308 | Risks: panic risk
+- `crates/x3-gulfstream/Cargo.toml` -> **Unclassified** | LOC: 29 | Risks: none
+- `crates/x3-gulfstream/src/config.rs` -> **DEX Liquidity** | LOC: 58 | Risks: none
+- `crates/x3-gulfstream/src/error.rs` -> **DEX Liquidity** | LOC: 35 | Risks: none
+- `crates/x3-gulfstream/src/forwarder.rs` -> **Unclassified** | LOC: 96 | Risks: none
+- `crates/x3-gulfstream/src/leader.rs` -> **X3 DEX** | LOC: 118 | Risks: none
+- `crates/x3-gulfstream/src/lib.rs` -> **DEX Liquidity** | LOC: 174 | Risks: none
+- `crates/x3-gulfstream/src/mempool.rs` -> **DEX Liquidity** | LOC: 226 | Risks: none
+- `crates/x3-gulfstream/src/metrics.rs` -> **Unclassified** | LOC: 99 | Risks: none
+- `crates/x3-gulfstream/src/transaction.rs` -> **Unclassified** | LOC: 173 | Risks: panic risk
+- `crates/x3-hir/Cargo.toml` -> **Unclassified** | LOC: 18 | Risks: none
+- `crates/x3-hir/src/builder.rs` -> **Unclassified** | LOC: 685 | Risks: atomic rollback risk
+- `crates/x3-hir/src/error.rs` -> **X3VM / Cross-VM** | LOC: 326 | Risks: panic risk
+- `crates/x3-hir/src/hir.rs` -> **X3VM / Cross-VM** | LOC: 594 | Risks: atomic rollback risk
+- `crates/x3-hir/src/lib.rs` -> **EVM Integration** | LOC: 47 | Risks: none
+- `crates/x3-hir/src/lower.rs` -> **Unclassified** | LOC: 1188 | Risks: panic risk
+- `crates/x3-indexer/Cargo.toml` -> **X3 DEX** | LOC: 63 | Risks: none
+- `crates/x3-indexer/indexer.toml` -> **X3 DEX** | LOC: 42 | Risks: local-only config risk
+- `crates/x3-indexer/src/config.rs` -> **EVM Integration** | LOC: 242 | Risks: local-only config risk
+- `crates/x3-indexer/src/db.rs` -> **X3 DEX** | LOC: 458 | Risks: replay/nonce risk
+- `crates/x3-indexer/src/error.rs` -> **X3 DEX** | LOC: 69 | Risks: none
+- `crates/x3-indexer/src/event_schema.rs` -> **Universal Asset Kernel** | LOC: 587 | Risks: none
+- `crates/x3-indexer/src/indexer.rs` -> **X3 DEX** | LOC: 549 | Risks: none
+- `crates/x3-indexer/src/main.rs` -> **X3 DEX** | LOC: 151 | Risks: none
+- `crates/x3-indexer/src/metrics.rs` -> **X3 DEX** | LOC: 134 | Risks: none
+- `crates/x3-indexer/src/models.rs` -> **Universal Asset Kernel** | LOC: 206 | Risks: replay/nonce risk
+- `crates/x3-indexer/src/schema_generator.rs` -> **X3 DEX** | LOC: 53 | Risks: none
+- `crates/x3-indexer/src/server.rs` -> **Bridge / Router** | LOC: 106 | Risks: none
+- `crates/x3-integration/Cargo.toml` -> **EVM Integration** | LOC: 72 | Risks: none
+- `crates/x3-integration/src/compiler_bridge.rs` -> **Bridge / Router** | LOC: 2 | Risks: bridge risk
+- `crates/x3-integration/src/error.rs` -> **X3 DEX** | LOC: 86 | Risks: none
+- `crates/x3-integration/src/executor.rs` -> **Universal Asset Kernel** | LOC: 283 | Risks: bridge risk
+- `crates/x3-integration/src/hostcalls.rs` -> **Universal Asset Kernel** | LOC: 447 | Risks: bridge risk
+- `crates/x3-integration/src/lib.rs` -> **Universal Asset Kernel** | LOC: 71 | Risks: bridge risk
+- `crates/x3-integration/src/mini_x3.rs` -> **X3VM / Cross-VM** | LOC: 1316 | Risks: panic risk
+- `crates/x3-integration/src/types.rs` -> **Universal Asset Kernel** | LOC: 170 | Risks: none
+- `crates/x3-intent/Cargo.toml` -> **Proof System** | LOC: 18 | Risks: none
+- `crates/x3-intent/fuzz/fuzz_targets/intent_decode.rs` -> **Unclassified** | LOC: 48 | Risks: none
+- `crates/x3-intent/src/error.rs` -> **Proof System** | LOC: 45 | Risks: none
+- `crates/x3-intent/src/intent.rs` -> **Proof System** | LOC: 157 | Risks: none
+- `crates/x3-intent/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 31 | Risks: none
+- `crates/x3-intent/src/lifecycle.rs` -> **Proof System** | LOC: 428 | Risks: panic risk
+- `crates/x3-intent/src/registry.rs` -> **Proof System** | LOC: 140 | Risks: none
+- `crates/x3-intent/src/types.rs` -> **Universal Asset Kernel** | LOC: 112 | Risks: none
+- `crates/x3-ixl/Cargo.toml` -> **Unclassified** | LOC: 29 | Risks: atomic rollback risk
+- `crates/x3-ixl/src/instruction.rs` -> **Universal Asset Kernel** | LOC: 136 | Risks: atomic rollback risk
+- `crates/x3-ixl/src/interpreter.rs` -> **Universal Asset Kernel** | LOC: 475 | Risks: panic risk
+- `crates/x3-ixl/src/lib.rs` -> **Universal Asset Kernel** | LOC: 50 | Risks: atomic rollback risk, bridge risk, replay risk
+- `crates/x3-ixl/src/planner.rs` -> **Universal Asset Kernel** | LOC: 295 | Risks: panic risk
+- `crates/x3-ixl/src/receipt.rs` -> **Universal Asset Kernel** | LOC: 96 | Risks: atomic rollback risk
+- `crates/x3-ixl/src/rollback.rs` -> **Universal Asset Kernel** | LOC: 164 | Risks: atomic rollback risk
+- `crates/x3-ixl/src/verifier.rs` -> **Bridge / Router** | LOC: 468 | Risks: none
+- `crates/x3-ixl/tests/properties.rs` -> **Universal Asset Kernel** | LOC: 150 | Risks: atomic rollback risk, panic risk
+- `crates/x3-launch-validator/Cargo.toml` -> **Launchpad** | LOC: 20 | Risks: none
+- `crates/x3-launch-validator/src/checklist.rs` -> **Launchpad** | LOC: 307 | Risks: replay risk
+- `crates/x3-launch-validator/src/checks.rs` -> **Launchpad** | LOC: 311 | Risks: replay risk
+- `crates/x3-launch-validator/src/lib.rs` -> **Launchpad** | LOC: 21 | Risks: none
+- `crates/x3-launch-validator/src/main.rs` -> **Launchpad** | LOC: 80 | Risks: panic risk
+- `crates/x3-launch-validator/src/reporter.rs` -> **Launchpad** | LOC: 66 | Risks: none
+- `crates/x3-lexer/Cargo.toml` -> **Unclassified** | LOC: 10 | Risks: none
+- `crates/x3-lexer/src/lib.rs` -> **Unclassified** | LOC: 365 | Risks: panic risk
+- `crates/x3-liquidity-core/Cargo.toml` -> **X3 DEX** | LOC: 31 | Risks: none
+- `crates/x3-liquidity-core/src/anti_rug.rs` -> **Universal Asset Kernel** | LOC: 262 | Risks: panic risk
+- `crates/x3-liquidity-core/src/launchpad.rs` -> **Universal Asset Kernel** | LOC: 178 | Risks: none
+- `crates/x3-liquidity-core/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 143 | Risks: panic risk
+- `crates/x3-liquidity-core/src/settlement.rs` -> **X3VM / Cross-VM** | LOC: 48 | Risks: none
+- `crates/x3-lsp/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 47 | Risks: none
+- `crates/x3-lsp/src/backend.rs` -> **Unclassified** | LOC: 754 | Risks: panic risk
+- `crates/x3-lsp/src/completion.rs` -> **EVM Integration** | LOC: 358 | Risks: none
+- `crates/x3-lsp/src/diagnostics.rs` -> **EVM Integration** | LOC: 286 | Risks: panic risk
+- `crates/x3-lsp/src/document.rs` -> **Unclassified** | LOC: 181 | Risks: none
+- `crates/x3-lsp/src/hover.rs` -> **EVM Integration** | LOC: 266 | Risks: replay/nonce risk
+- `crates/x3-lsp/src/main.rs` -> **Bridge / Router** | LOC: 45 | Risks: bridge risk
+- `crates/x3-lsp/src/semantic.rs` -> **EVM Integration** | LOC: 469 | Risks: unsafe code
+- `crates/x3-marketplace/Cargo.toml` -> **Unclassified** | LOC: 34 | Risks: none
+- `crates/x3-marketplace/src/fee_distribution.rs` -> **DEX Liquidity** | LOC: 408 | Risks: panic risk
+- `crates/x3-marketplace/src/ipfs_metadata.rs` -> **Unclassified** | LOC: 213 | Risks: panic risk
+- `crates/x3-marketplace/src/lib.rs` -> **DEX Liquidity** | LOC: 62 | Risks: none
+- `crates/x3-marketplace/src/plugin_registry.rs` -> **Bridge / Router** | LOC: 514 | Risks: panic risk
+- `crates/x3-marketplace/src/rating_system.rs` -> **Unclassified** | LOC: 585 | Risks: panic risk
+- `crates/x3-mir/Cargo.toml` -> **Unclassified** | LOC: 16 | Risks: none
+- `crates/x3-mir/src/error.rs` -> **Unclassified** | LOC: 16 | Risks: none
+- `crates/x3-mir/src/lib.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `crates/x3-mir/src/lower.rs` -> **X3 DEX** | LOC: 372 | Risks: panic risk
+- `crates/x3-mir/src/memory.rs` -> **Unclassified** | LOC: 139 | Risks: none
+- `crates/x3-mir/src/mir.rs` -> **Unclassified** | LOC: 83 | Risks: none
+- `crates/x3-mobile-sdk/Cargo.toml` -> **Unclassified** | LOC: 32 | Risks: none
+- `crates/x3-mobile-sdk/src/biometric_auth_mobile.rs` -> **Unclassified** | LOC: 521 | Risks: panic risk
+- `crates/x3-mobile-sdk/src/deeplink_handler.rs` -> **Unclassified** | LOC: 332 | Risks: panic risk
+- `crates/x3-mobile-sdk/src/lib.rs` -> **Bridge / Router** | LOC: 94 | Risks: bridge risk
+- `crates/x3-mobile-sdk/src/mobile_wallet_core.rs` -> **X3 DEX** | LOC: 474 | Risks: local-only config risk, panic risk
+- `crates/x3-mobile-sdk/src/qr_scanner.rs` -> **Unclassified** | LOC: 366 | Risks: panic risk
+- `crates/x3-mobile-sdk/src/transaction_signer_mobile.rs` -> **Unclassified** | LOC: 511 | Risks: panic risk
+- `crates/x3-opt/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 23 | Risks: none
+- `crates/x3-opt/src/cfg.rs` -> **Unclassified** | LOC: 389 | Risks: none
+- `crates/x3-opt/src/dce.rs` -> **X3 DEX** | LOC: 243 | Risks: none
+- `crates/x3-opt/src/edge_const_prop.rs` -> **X3 DEX** | LOC: 428 | Risks: panic risk
+- `crates/x3-opt/src/error.rs` -> **Unclassified** | LOC: 33 | Risks: none
+- `crates/x3-opt/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 133 | Risks: none
+- `crates/x3-opt/src/licm.rs` -> **X3VM / Cross-VM** | LOC: 186 | Risks: none
+- `crates/x3-opt/src/loop_detection.rs` -> **Unclassified** | LOC: 238 | Risks: none
+- `crates/x3-opt/src/loop_pack_v1.rs` -> **TPS Benchmark Suite** | LOC: 179 | Risks: none
+- `crates/x3-opt/src/loop_unswitching.rs` -> **Unclassified** | LOC: 172 | Risks: none
+- `crates/x3-opt/src/memory_analysis.rs` -> **Unclassified** | LOC: 219 | Risks: none
+- `crates/x3-opt/src/optimizer.rs` -> **Unclassified** | LOC: 318 | Risks: panic risk
+- `crates/x3-opt/src/pass.rs` -> **Unclassified** | LOC: 109 | Risks: none
+- `crates/x3-opt/src/passes/block_fusion.rs` -> **Unclassified** | LOC: 415 | Risks: panic risk
+- `crates/x3-opt/src/passes/branch_opt.rs` -> **Unclassified** | LOC: 470 | Risks: panic risk
+- `crates/x3-opt/src/passes/cond_fold.rs` -> **X3 DEX** | LOC: 479 | Risks: panic risk
+- `crates/x3-opt/src/passes/constant_fold.rs` -> **Unclassified** | LOC: 486 | Risks: panic risk
+- `crates/x3-opt/src/passes/copy_propagation.rs` -> **Unclassified** | LOC: 442 | Risks: panic risk
+- `crates/x3-opt/src/passes/dead_code_elimination.rs` -> **Unclassified** | LOC: 329 | Risks: panic risk
+- `crates/x3-opt/src/passes/dom_const_prop.rs` -> **Unclassified** | LOC: 585 | Risks: panic risk
+- `crates/x3-opt/src/passes/edge_const_prop.rs` -> **Unclassified** | LOC: 39 | Risks: none
+- `crates/x3-opt/src/passes/expression_hoist.rs` -> **Unclassified** | LOC: 203 | Risks: none
+- `crates/x3-opt/src/passes/global_const_prop.rs` -> **Unclassified** | LOC: 470 | Risks: panic risk
+- `crates/x3-opt/src/passes/mod.rs` -> **Unclassified** | LOC: 18 | Risks: none
+- `crates/x3-opt/src/passes/peephole.rs` -> **Unclassified** | LOC: 576 | Risks: panic risk
+- `crates/x3-opt/src/passes/pre.rs` -> **Unclassified** | LOC: 918 | Risks: panic risk
+- `crates/x3-opt/src/passes/speculative_hoist.rs` -> **X3 DEX** | LOC: 484 | Risks: panic risk
+- `crates/x3-opt/src/peephole_autogen.rs` -> **X3 DEX** | LOC: 359 | Risks: panic risk
+- `crates/x3-opt/src/regalloc.rs` -> **Unclassified** | LOC: 297 | Risks: panic risk
+- `crates/x3-opt/src/rule_miner.rs` -> **Unclassified** | LOC: 158 | Risks: none
+- `crates/x3-opt/src/run_yolo.rs` -> **Unclassified** | LOC: 155 | Risks: panic risk
+- `crates/x3-opt/src/ssa_lite.rs` -> **Unclassified** | LOC: 319 | Risks: panic risk
+- `crates/x3-opt/src/strength_reduction.rs` -> **Unclassified** | LOC: 190 | Risks: none
+- `crates/x3-opt/src/superoptimizer.rs` -> **Unclassified** | LOC: 377 | Risks: panic risk
+- `crates/x3-opt/src/telemetry.rs` -> **X3VM / Cross-VM** | LOC: 377 | Risks: panic risk
+- `crates/x3-opt/src/value_numbering.rs` -> **Unclassified** | LOC: 242 | Risks: none
+- `crates/x3-opt/tests/loop_pack_integration_bench.rs` -> **TPS Benchmark Suite** | LOC: 514 | Risks: panic risk
+- `crates/x3-opt/tests/optimizer_yolo_smoke.rs` -> **Unclassified** | LOC: 81 | Risks: panic risk
+- `crates/x3-oracle/src/lib.rs` -> **Unclassified** | LOC: 8 | Risks: none
+- `crates/x3-oracle/src/pyth_oracle.rs` -> **Unclassified** | LOC: 391 | Risks: panic risk
+- `crates/x3-orchestra-control-plane/Cargo.toml` -> **Unclassified** | LOC: 25 | Risks: none
+- `crates/x3-orchestra-control-plane/src/client.rs` -> **Unclassified** | LOC: 147 | Risks: none
+- `crates/x3-orchestra-control-plane/src/crm.rs` -> **Unclassified** | LOC: 113 | Risks: none
+- `crates/x3-orchestra-control-plane/src/error.rs` -> **Unclassified** | LOC: 28 | Risks: none
+- `crates/x3-orchestra-control-plane/src/lib.rs` -> **Bridge / Router** | LOC: 21 | Risks: none
+- `crates/x3-orchestra-control-plane/src/main.rs` -> **Bridge / Router** | LOC: 35 | Risks: none
+- `crates/x3-orchestra-control-plane/src/service.rs` -> **Unclassified** | LOC: 870 | Risks: panic risk
+- `crates/x3-orchestra-control-plane/src/storage.rs` -> **Unclassified** | LOC: 41 | Risks: none
+- `crates/x3-orchestra-control-plane/src/transport.rs` -> **Bridge / Router** | LOC: 245 | Risks: none
+- `crates/x3-orchestra-control-plane/src/types.rs` -> **TPS Benchmark Suite** | LOC: 212 | Risks: none
+- `crates/x3-orchestrator/Cargo.toml` -> **Universal Asset Kernel** | LOC: 17 | Risks: replay risk
+- `crates/x3-orchestrator/src/adapters/evm.rs` -> **EVM Integration** | LOC: 38 | Risks: none
+- `crates/x3-orchestrator/src/adapters/mod.rs` -> **EVM Integration** | LOC: 7 | Risks: none
+- `crates/x3-orchestrator/src/adapters/svm.rs` -> **SVM Integration** | LOC: 37 | Risks: none
+- `crates/x3-orchestrator/src/adapters/x3vm.rs` -> **Bridge / Router** | LOC: 38 | Risks: bridge risk
+- `crates/x3-orchestrator/src/error.rs` -> **Universal Asset Kernel** | LOC: 29 | Risks: replay risk
+- `crates/x3-orchestrator/src/executor.rs` -> **EVM Integration** | LOC: 9 | Risks: none
+- `crates/x3-orchestrator/src/invariant.rs` -> **Universal Asset Kernel** | LOC: 41 | Risks: supply invariant risk
+- `crates/x3-orchestrator/src/lib.rs` -> **Universal Asset Kernel** | LOC: 29 | Risks: bridge risk, replay risk
+- `crates/x3-orchestrator/src/message.rs` -> **SVM Integration** | LOC: 37 | Risks: replay risk, replay/nonce risk
+- `crates/x3-orchestrator/src/proof.rs` -> **X3VM / Cross-VM** | LOC: 34 | Risks: none
+- `crates/x3-orchestrator/src/registry.rs` -> **EVM Integration** | LOC: 35 | Risks: none
+- `crates/x3-orchestrator/src/replay.rs` -> **Unclassified** | LOC: 37 | Risks: none
+- `crates/x3-orchestrator/src/router.rs` -> **Bridge / Router** | LOC: 50 | Risks: replay risk
+- `crates/x3-orchestrator/src/types.rs` -> **EVM Integration** | LOC: 38 | Risks: none
+- `crates/x3-orchestrator/tests/orchestrator_smoke.rs` -> **Universal Asset Kernel** | LOC: 133 | Risks: panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `crates/x3-packet-schema/Cargo.toml` -> **Unclassified** | LOC: 25 | Risks: none
+- `crates/x3-packet-schema/src/evm.rs` -> **EVM Integration** | LOC: 122 | Risks: panic risk
+- `crates/x3-packet-schema/src/header.rs` -> **Bridge / Router** | LOC: 281 | Risks: none
+- `crates/x3-packet-schema/src/lib.rs` -> **Bridge / Router** | LOC: 695 | Risks: panic risk
+- `crates/x3-packet-schema/src/svm.rs` -> **SVM Integration** | LOC: 118 | Risks: panic risk
+- `crates/x3-packet-schema/src/x3vm.rs` -> **Universal Asset Kernel** | LOC: 200 | Risks: panic risk
+- `crates/x3-packet-standard/Cargo.toml` -> **Unclassified** | LOC: 29 | Risks: replay risk
+- `crates/x3-packet-standard/src/lib.rs` -> **Bridge / Router** | LOC: 70 | Risks: replay risk
+- `crates/x3-packet-standard/src/packet.rs` -> **Bridge / Router** | LOC: 266 | Risks: replay risk
+- `crates/x3-packet-standard/src/proof.rs` -> **Proof System** | LOC: 44 | Risks: none
+- `crates/x3-packet-standard/src/replay.rs` -> **EVM Integration** | LOC: 146 | Risks: replay risk
+- `crates/x3-packet-standard/src/timeout.rs` -> **EVM Integration** | LOC: 143 | Risks: none
+- `crates/x3-packet-standard/tests/properties.rs` -> **Unclassified** | LOC: 151 | Risks: panic risk, replay risk
+- `crates/x3-parallel-executor/Cargo.toml` -> **Unclassified** | LOC: 10 | Risks: none
+- `crates/x3-parallel-executor/src/access_list.rs` -> **Unclassified** | LOC: 63 | Risks: none
+- `crates/x3-parallel-executor/src/commit.rs` -> **Unclassified** | LOC: 82 | Risks: none
+- `crates/x3-parallel-executor/src/conflict.rs` -> **Unclassified** | LOC: 70 | Risks: none
+- `crates/x3-parallel-executor/src/executor.rs` -> **Unclassified** | LOC: 118 | Risks: none
+- `crates/x3-parallel-executor/src/lib.rs` -> **Proof System** | LOC: 705 | Risks: panic risk
+- `crates/x3-parallel-executor/src/scheduler.rs` -> **X3 DEX** | LOC: 78 | Risks: none
+- `crates/x3-parallel-executor/src/types.rs` -> **Unclassified** | LOC: 66 | Risks: none
+- `crates/x3-parser/Cargo.toml` -> **Unclassified** | LOC: 14 | Risks: none
+- `crates/x3-parser/src/cursor.rs` -> **Unclassified** | LOC: 100 | Risks: panic risk
+- `crates/x3-parser/src/error.rs` -> **Unclassified** | LOC: 60 | Risks: none
+- `crates/x3-parser/src/grammar.rs` -> **X3 DEX** | LOC: 101 | Risks: none
+- `crates/x3-parser/src/lib.rs` -> **Validator / LaunchOps** | LOC: 22 | Risks: none
+- `crates/x3-parser/src/parser.rs` -> **Unclassified** | LOC: 818 | Risks: panic risk
+- `crates/x3-parser/src/tokens.rs` -> **Unclassified** | LOC: 172 | Risks: panic risk
+- `crates/x3-parser/src/validator.rs` -> **Validator / LaunchOps** | LOC: 478 | Risks: none
+- `crates/x3-parser/tests/fixtures/01_minimal_smoke.json` -> **Unclassified** | LOC: 78 | Risks: none
+- `crates/x3-parser/tests/fixtures/02_operator_precedence_torture.json` -> **Unclassified** | LOC: 176 | Risks: none
+- `crates/x3-parser/tests/fixtures/03_deeply_nested_expressions.json` -> **Unclassified** | LOC: 176 | Risks: none
+- `crates/x3-parser/tests/fixtures/04_control_flow_zoo.json` -> **Unclassified** | LOC: 278 | Risks: none
+- `crates/x3-parser/tests/fixtures/05_all_loop_constructs.json` -> **Unclassified** | LOC: 476 | Risks: none
+- `crates/x3-parser/tests/fixtures/06_agents_atomic_blocks.json` -> **Unclassified** | LOC: 244 | Risks: none
+- `crates/x3-parser/tests/fixtures/07_shadowing_scoping_return.json` -> **Unclassified** | LOC: 205 | Risks: none
+- `crates/x3-parser/tests/fixtures/08_multi_function_module.json` -> **Unclassified** | LOC: 245 | Risks: none
+- `crates/x3-parser/tests/fixtures/09_complex_agent.json` -> **Unclassified** | LOC: 222 | Risks: none
+- `crates/x3-parser/tests/fixtures/10_kitchen_sink.json` -> **Unclassified** | LOC: 313 | Risks: none
+- `crates/x3-parser/tests/golden.rs` -> **Unclassified** | LOC: 80 | Risks: panic risk
+- `crates/x3-pq/Cargo.toml` -> **Unclassified** | LOC: 12 | Risks: none
+- `crates/x3-pq/src/lib.rs` -> **Validator / LaunchOps** | LOC: 936 | Risks: panic risk
+- `crates/x3-pq/src/types.rs` -> **Validator / LaunchOps** | LOC: 67 | Risks: none
+- `crates/x3-proof-dispute/Cargo.toml` -> **Proof System** | LOC: 13 | Risks: none
+- `crates/x3-proof-dispute/src/lib.rs` -> **Proof System** | LOC: 163 | Risks: panic risk
+- `crates/x3-proof-envelope/Cargo.toml` -> **Bridge / Router** | LOC: 14 | Risks: none
+- `crates/x3-proof-envelope/src/lib.rs` -> **Universal Asset Kernel** | LOC: 75 | Risks: replay/nonce risk
+- `crates/x3-proof/Cargo.toml` -> **Proof System** | LOC: 23 | Risks: none
+- `crates/x3-proof/fuzz/fuzz_targets/bridge_proof_verify.rs` -> **Bridge / Router** | LOC: 61 | Risks: bridge risk
+- `crates/x3-proof/src/chain.rs` -> **X3 DEX** | LOC: 211 | Risks: panic risk
+- `crates/x3-proof/src/engine.rs` -> **X3VM / Cross-VM** | LOC: 356 | Risks: atomic rollback risk, panic risk, replay risk
+- `crates/x3-proof/src/epoch.rs` -> **Proof System** | LOC: 580 | Risks: panic risk
+- `crates/x3-proof/src/error.rs` -> **X3 DEX** | LOC: 47 | Risks: atomic rollback risk, replay risk
+- `crates/x3-proof/src/hasher.rs` -> **Proof System** | LOC: 197 | Risks: replay risk
+- `crates/x3-proof/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 36 | Risks: replay risk
+- `crates/x3-proof/src/main.rs` -> **Universal Asset Kernel** | LOC: 149 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk
+- `crates/x3-proof/src/types.rs` -> **X3 DEX** | LOC: 126 | Risks: replay risk
+- `crates/x3-proof/src/verifier.rs` -> **X3 DEX** | LOC: 219 | Risks: panic risk, replay risk
+- `crates/x3-readiness-report/Cargo.toml` -> **Unclassified** | LOC: 18 | Risks: none
+- `crates/x3-readiness-report/src/collector.rs` -> **Universal Asset Kernel** | LOC: 307 | Risks: bridge risk, replay risk
+- `crates/x3-readiness-report/src/formatter.rs` -> **Universal Asset Kernel** | LOC: 116 | Risks: bridge risk
+- `crates/x3-readiness-report/src/lib.rs` -> **Universal Asset Kernel** | LOC: 16 | Risks: none
+- `crates/x3-readiness-report/src/tests.rs` -> **Universal Asset Kernel** | LOC: 135 | Risks: bridge risk, panic risk, replay risk
+- `crates/x3-readiness-report/src/types.rs` -> **Universal Asset Kernel** | LOC: 195 | Risks: atomic rollback risk, bridge risk, replay risk
+- `crates/x3-relayer/APRIL21_MAY19_CALENDAR.md` -> **Launchpad** | LOC: 325 | Risks: none
+- `crates/x3-relayer/Cargo.toml` -> **Bridge / Router** | LOC: 29 | Risks: none
+- `crates/x3-relayer/EXCHANGE_INTEGRATION_PROCEDURES.md` -> **Universal Asset Kernel** | LOC: 609 | Risks: bridge risk, replay/nonce risk
+- `crates/x3-relayer/GPU_VALIDATOR_TROUBLESHOOTING.md` -> **Launchpad** | LOC: 867 | Risks: none
+- `crates/x3-relayer/MAINNET_DEPLOYMENT_RUNBOOK.md` -> **Bridge / Router** | LOC: 610 | Risks: atomic rollback risk, bridge risk, local-only config risk
+- `crates/x3-relayer/MAINNET_INCIDENT_RESPONSE.md` -> **Bridge / Router** | LOC: 1327 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay/nonce risk
+- `crates/x3-relayer/MAINNET_PERFORMANCE_BASELINE.md` -> **Bridge / Router** | LOC: 609 | Risks: local-only config risk, replay/nonce risk
+- `crates/x3-relayer/MAINNET_VALIDATION.md` -> **EVM Integration** | LOC: 572 | Risks: bridge risk, local-only config risk
+- `crates/x3-relayer/MEDIA_INVITES_APRIL22.md` -> **Bridge / Router** | LOC: 340 | Risks: none
+- `crates/x3-relayer/PHASE_13D_README.md` -> **Bridge / Router** | LOC: 460 | Risks: bridge risk, local-only config risk, replay/nonce risk
+- `crates/x3-relayer/PHASE_13E_MAINNET_PREP.md` -> **Bridge / Router** | LOC: 555 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `crates/x3-relayer/PHASE_13F_COMPLETION_DECLARATION.md` -> **X3 DEX** | LOC: 332 | Risks: bridge risk
+- `crates/x3-relayer/PHASE_13F_CROSS_REFERENCE_GUIDE.md` -> **Bridge / Router** | LOC: 339 | Risks: none
+- `crates/x3-relayer/PHASE_13F_DAILY_STATUS_TEMPLATE.md` -> **Bridge / Router** | LOC: 363 | Risks: bridge risk
+- `crates/x3-relayer/PHASE_13F_INFRASTRUCTURE_VALIDATION.md` -> **Bridge / Router** | LOC: 840 | Risks: bridge risk, local-only config risk
+- `crates/x3-relayer/PHASE_13F_LAUNCH_ANNOUNCEMENT_TEMPLATES.md` -> **X3 DEX** | LOC: 532 | Risks: bridge risk
+- `crates/x3-relayer/PHASE_13F_MAINNET_LAUNCH_RUNBOOK.md` -> **Bridge / Router** | LOC: 1053 | Risks: atomic rollback risk, bridge risk, local-only config risk
+- `crates/x3-relayer/PHASE_13F_MASTER_INDEX.md` -> **Bridge / Router** | LOC: 688 | Risks: atomic rollback risk, bridge risk
+- `crates/x3-relayer/PHASE_13F_POSTLAUNCH_RETROSPECTIVE.md` -> **Bridge / Router** | LOC: 590 | Risks: none
+- `crates/x3-relayer/PHASE_13F_QUICK_REFERENCE_GUIDE.md` -> **Bridge / Router** | LOC: 240 | Risks: atomic rollback risk
+- `crates/x3-relayer/PHASE_13F_STAKEHOLDER_BRIEFING_SLIDES.md` -> **X3 DEX** | LOC: 516 | Risks: atomic rollback risk, bridge risk
+- `crates/x3-relayer/PHASE_13F_STAKEHOLDER_SUMMARY.md` -> **Bridge / Router** | LOC: 299 | Risks: atomic rollback risk, bridge risk
+- `crates/x3-relayer/PHASE_13F_TEST_RESULTS_TRACKER.md` -> **Bridge / Router** | LOC: 494 | Risks: none
+- `crates/x3-relayer/PHASE_13F_VERIFICATION_EXECUTION_PLAN.md` -> **Launchpad** | LOC: 462 | Risks: none
+- `crates/x3-relayer/PHASE_13F_VERIFICATION_EXERCISES.md` -> **Bridge / Router** | LOC: 876 | Risks: none
+- `crates/x3-relayer/PHASE_14_OUTLINE.md` -> **Launchpad** | LOC: 136 | Risks: none
+- `crates/x3-relayer/RPC_FAILOVER_PROCEDURES.md` -> **Launchpad** | LOC: 836 | Risks: local-only config risk
+- `crates/x3-relayer/TESTNET_DEPLOYMENT.md` -> **Bridge / Router** | LOC: 332 | Risks: bridge risk, local-only config risk, replay/nonce risk
+- `crates/x3-relayer/TESTNET_VALIDATION.md` -> **Bridge / Router** | LOC: 466 | Risks: local-only config risk
+- `crates/x3-relayer/TIGHT_IT_UP_APRIL21.md` -> **Bridge / Router** | LOC: 336 | Risks: local-only config risk
+- `crates/x3-relayer/TOKEN_SYSTEM_IMPLEMENTATION_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 652 | Risks: bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `crates/x3-relayer/VALIDATOR_OPERATIONS.md` -> **Launchpad** | LOC: 770 | Risks: local-only config risk
+- `crates/x3-relayer/VALIDATOR_TOKEN_OPERATIONS.md` -> **Universal Asset Kernel** | LOC: 734 | Risks: local-only config risk
+- `crates/x3-relayer/WAR_GAME_QUICK_START.md` -> **Launchpad** | LOC: 456 | Risks: bridge risk, local-only config risk
+- `crates/x3-relayer/X3_UNIVERSAL_ASSET_KERNEL.md` -> **Universal Asset Kernel** | LOC: 1158 | Risks: bridge risk, replay risk, replay/nonce risk, supply invariant risk, unfinished logic
+- `crates/x3-relayer/deploy-testnet.sh` -> **Bridge / Router** | LOC: 222 | Risks: local-only config risk
+- `crates/x3-relayer/monitor-relayer.sh` -> **Bridge / Router** | LOC: 268 | Risks: none
+- `crates/x3-relayer/relayer-config-mainnet.yaml` -> **Bridge / Router** | LOC: 124 | Risks: none
+- `crates/x3-relayer/relayer-config.testnet.yaml` -> **Bridge / Router** | LOC: 54 | Risks: bridge risk, local-only config risk
+- `crates/x3-relayer/src/lib.rs` -> **EVM Integration** | LOC: 14 | Risks: none
+- `crates/x3-relayer/src/main.rs` -> **EVM Integration** | LOC: 468 | Risks: local-only config risk
+- `crates/x3-relayer/src/relayer.rs` -> **Bridge / Router** | LOC: 1034 | Risks: bridge risk, local-only config risk, replay risk, replay/nonce risk
+- `crates/x3-relayer/src/submitter.rs` -> **Bridge / Router** | LOC: 406 | Risks: bridge risk, local-only config risk, panic risk, replay/nonce risk
+- `crates/x3-relayer/src/types.rs` -> **EVM Integration** | LOC: 159 | Risks: replay/nonce risk
+- `crates/x3-relayer/src/watchers/evm.rs` -> **EVM Integration** | LOC: 189 | Risks: panic risk
+- `crates/x3-relayer/src/watchers/mod.rs` -> **EVM Integration** | LOC: 7 | Risks: none
+- `crates/x3-relayer/src/watchers/svm.rs` -> **SVM Integration** | LOC: 169 | Risks: panic risk
+- `crates/x3-rpc/Cargo.toml` -> **X3 DEX** | LOC: 44 | Risks: none
+- `crates/x3-rpc/src/benchmark.rs` -> **Bridge / Router** | LOC: 805 | Risks: bridge risk, panic risk, replay risk
+- `crates/x3-rpc/src/gas_estimation.rs` -> **EVM Integration** | LOC: 508 | Risks: replay/nonce risk
+- `crates/x3-rpc/src/lib.rs` -> **X3 DEX** | LOC: 31 | Risks: none
+- `crates/x3-rpc/src/wallet_dex_rpc.rs` -> **X3 DEX** | LOC: 299 | Risks: none
+- `crates/x3-runtime-params/Cargo.toml` -> **Unclassified** | LOC: 22 | Risks: none
+- `crates/x3-runtime-params/src/benchmarks.rs` -> **TPS Benchmark Suite** | LOC: 171 | Risks: none
+- `crates/x3-runtime-params/src/block_weights.rs` -> **X3VM / Cross-VM** | LOC: 129 | Risks: none
+- `crates/x3-runtime-params/src/consensus_params.rs` -> **Validator / LaunchOps** | LOC: 68 | Risks: atomic rollback risk
+- `crates/x3-runtime-params/src/gas_limits.rs` -> **Unclassified** | LOC: 96 | Risks: none
+- `crates/x3-runtime-params/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 157 | Risks: none
+- `crates/x3-runtime-params/src/network_params.rs` -> **Unclassified** | LOC: 108 | Risks: none
+- `crates/x3-runtime-params/src/tuning.rs` -> **TPS Benchmark Suite** | LOC: 101 | Risks: none
+- `crates/x3-sdk/Cargo.toml` -> **EVM Integration** | LOC: 55 | Risks: none
+- `crates/x3-sdk/src/client.rs` -> **Universal Asset Kernel** | LOC: 577 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `crates/x3-sdk/src/comit.rs` -> **EVM Integration** | LOC: 341 | Risks: panic risk, replay/nonce risk
+- `crates/x3-sdk/src/error.rs` -> **Universal Asset Kernel** | LOC: 181 | Risks: replay/nonce risk
+- `crates/x3-sdk/src/evm.rs` -> **EVM Integration** | LOC: 432 | Risks: panic risk
+- `crates/x3-sdk/src/lib.rs` -> **Universal Asset Kernel** | LOC: 107 | Risks: local-only config risk
+- `crates/x3-sdk/src/rpc.rs` -> **Universal Asset Kernel** | LOC: 423 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `crates/x3-sdk/src/svm.rs` -> **SVM Integration** | LOC: 484 | Risks: panic risk
+- `crates/x3-sdk/src/types.rs` -> **Universal Asset Kernel** | LOC: 420 | Risks: replay risk, replay/nonce risk
+- `crates/x3-sdk/src/utils.rs` -> **EVM Integration** | LOC: 300 | Risks: panic risk
+- `crates/x3-semantics/Cargo.toml` -> **Unclassified** | LOC: 16 | Risks: none
+- `crates/x3-semantics/src/error.rs` -> **Unclassified** | LOC: 158 | Risks: none
+- `crates/x3-semantics/src/lib.rs` -> **Unclassified** | LOC: 43 | Risks: panic risk
+- `crates/x3-semantics/src/resolver.rs` -> **Unclassified** | LOC: 740 | Risks: panic risk
+- `crates/x3-semantics/src/scope.rs` -> **X3 DEX** | LOC: 305 | Risks: panic risk
+- `crates/x3-semantics/src/symbol.rs` -> **X3 DEX** | LOC: 235 | Risks: panic risk
+- `crates/x3-semantics/tests/golden.rs` -> **Unclassified** | LOC: 340 | Risks: panic risk
+- `crates/x3-sidecar/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 82 | Risks: none
+- `crates/x3-sidecar/src/benchmark.rs` -> **EVM Integration** | LOC: 1043 | Risks: bridge risk, panic risk, replay risk
+- `crates/x3-sidecar/src/config.rs` -> **X3VM / Cross-VM** | LOC: 109 | Risks: local-only config risk
+- `crates/x3-sidecar/src/evm_provider.rs` -> **EVM Integration** | LOC: 586 | Risks: panic risk
+- `crates/x3-sidecar/src/executor.rs` -> **X3VM / Cross-VM** | LOC: 332 | Risks: panic risk
+- `crates/x3-sidecar/src/gateway_client.rs` -> **TPS Benchmark Suite** | LOC: 216 | Risks: local-only config risk
+- `crates/x3-sidecar/src/job.rs` -> **Unclassified** | LOC: 168 | Risks: none
+- `crates/x3-sidecar/src/lib.rs` -> **EVM Integration** | LOC: 550 | Risks: atomic rollback risk, panic risk
+- `crates/x3-sidecar/src/main.rs` -> **Unclassified** | LOC: 93 | Risks: local-only config risk
+- `crates/x3-sidecar/src/receipt.rs` -> **Unclassified** | LOC: 353 | Risks: none
+- `crates/x3-sidecar/src/rpc.rs` -> **Bridge / Router** | LOC: 1115 | Risks: panic risk
+- `crates/x3-sidecar/src/state.rs` -> **Proof System** | LOC: 292 | Risks: atomic rollback risk
+- `crates/x3-sidecar/src/submitter.rs` -> **Unclassified** | LOC: 355 | Risks: panic risk
+- `crates/x3-sidecar/src/telemetry.rs` -> **Unclassified** | LOC: 262 | Risks: none
+- `crates/x3-sidecar/tests/e2e_gateway_integration.rs` -> **Bridge / Router** | LOC: 1098 | Risks: bridge risk, fake timestamp risk, local-only config risk, panic risk, replay risk
+- `crates/x3-slash/Cargo.toml` -> **Proof System** | LOC: 23 | Risks: none
+- `crates/x3-slash/src/bond.rs` -> **X3 DEX** | LOC: 240 | Risks: panic risk
+- `crates/x3-slash/src/engine.rs` -> **X3 DEX** | LOC: 279 | Risks: panic risk, replay risk
+- `crates/x3-slash/src/error.rs` -> **Unclassified** | LOC: 26 | Risks: none
+- `crates/x3-slash/src/lib.rs` -> **Proof System** | LOC: 25 | Risks: replay risk
+- `crates/x3-slash/src/record.rs` -> **X3 DEX** | LOC: 100 | Risks: none
+- `crates/x3-slash/src/types.rs` -> **X3 DEX** | LOC: 165 | Risks: replay risk
+- `crates/x3-staking-analytics/Cargo.toml` -> **Unclassified** | LOC: 19 | Risks: none
+- `crates/x3-staking-analytics/src/lib.rs` -> **Validator / LaunchOps** | LOC: 53 | Risks: none
+- `crates/x3-staking-analytics/src/reward_calculator.rs` -> **Unclassified** | LOC: 365 | Risks: panic risk
+- `crates/x3-staking-analytics/src/slash_tracker.rs` -> **Validator / LaunchOps** | LOC: 409 | Risks: panic risk
+- `crates/x3-staking-analytics/src/staking_ledger.rs` -> **Validator / LaunchOps** | LOC: 545 | Risks: panic risk
+- `crates/x3-staking-analytics/src/staking_simulator.rs` -> **Validator / LaunchOps** | LOC: 369 | Risks: panic risk
+- `crates/x3-staking-analytics/src/validator_stats.rs` -> **Validator / LaunchOps** | LOC: 495 | Risks: panic risk
+- `crates/x3-stdlib/src/lib.rs` -> **Unclassified** | LOC: 320 | Risks: none
+- `crates/x3-svm/src/anchor_idl_parser.rs` -> **SVM Integration** | LOC: 436 | Risks: panic risk
+- `crates/x3-svm/src/lib.rs` -> **Bridge / Router** | LOC: 14 | Risks: bridge risk
+- `crates/x3-svm/src/solana_devnet_fork.rs` -> **SVM Integration** | LOC: 574 | Risks: atomic rollback risk, local-only config risk, panic risk
+- `crates/x3-svm/src/solana_programs.rs` -> **Universal Asset Kernel** | LOC: 477 | Risks: panic risk
+- `crates/x3-svm/src/spl_token_bridge.rs` -> **Universal Asset Kernel** | LOC: 494 | Risks: atomic rollback risk, bridge risk, panic risk, replay/nonce risk
+- `crates/x3-swap-router/Cargo.toml` -> **Bridge / Router** | LOC: 26 | Risks: none
+- `crates/x3-swap-router/src/atomic_execution.rs` -> **Bridge / Router** | LOC: 51 | Risks: none
+- `crates/x3-swap-router/src/fee_calculator.rs` -> **Bridge / Router** | LOC: 75 | Risks: none
+- `crates/x3-swap-router/src/gas_optimization.rs` -> **Bridge / Router** | LOC: 36 | Risks: none
+- `crates/x3-swap-router/src/lib.rs` -> **Universal Asset Kernel** | LOC: 207 | Risks: panic risk
+- `crates/x3-swap-router/src/mev_protection/mod.rs` -> **Bridge / Router** | LOC: 453 | Risks: panic risk
+- `crates/x3-swap-router/src/optimization.rs` -> **Bridge / Router** | LOC: 60 | Risks: none
+- `crates/x3-swap-router/src/quote_engine.rs` -> **Bridge / Router** | LOC: 40 | Risks: none
+- `crates/x3-swap-router/src/routing.rs` -> **Bridge / Router** | LOC: 6 | Risks: none
+- `crates/x3-swap-router/src/slippage_control.rs` -> **Bridge / Router** | LOC: 55 | Risks: none
+- `crates/x3-swap-router/src/tests.rs` -> **Bridge / Router** | LOC: 219 | Risks: panic risk
+- `crates/x3-swap-router/tests/prop_swap_math.rs` -> **Bridge / Router** | LOC: 551 | Risks: none
+- `crates/x3-turbine/Cargo.toml` -> **Unclassified** | LOC: 38 | Risks: none
+- `crates/x3-turbine/src/blockstore.rs` -> **X3 DEX** | LOC: 274 | Risks: panic risk
+- `crates/x3-turbine/src/broadcast.rs` -> **X3 DEX** | LOC: 118 | Risks: none
+- `crates/x3-turbine/src/config.rs` -> **DEX Liquidity** | LOC: 152 | Risks: none
+- `crates/x3-turbine/src/error.rs` -> **Unclassified** | LOC: 42 | Risks: none
+- `crates/x3-turbine/src/lib.rs` -> **X3 DEX** | LOC: 263 | Risks: panic risk
+- `crates/x3-turbine/src/metrics.rs` -> **Unclassified** | LOC: 138 | Risks: none
+- `crates/x3-turbine/src/packet.rs` -> **X3 DEX** | LOC: 185 | Risks: panic risk
+- `crates/x3-turbine/src/peer.rs` -> **Validator / LaunchOps** | LOC: 350 | Risks: panic risk
+- `crates/x3-turbine/src/recovery.rs` -> **Unclassified** | LOC: 165 | Risks: none
+- `crates/x3-turbine/src/shred.rs` -> **X3 DEX** | LOC: 450 | Risks: panic risk
+- `crates/x3-turbine/src/test_utils.rs` -> **X3 DEX** | LOC: 94 | Risks: none
+- `crates/x3-typeck/Cargo.toml` -> **Unclassified** | LOC: 18 | Risks: none
+- `crates/x3-typeck/src/checker.rs` -> **X3 DEX** | LOC: 692 | Risks: none
+- `crates/x3-typeck/src/env.rs` -> **Unclassified** | LOC: 333 | Risks: panic risk
+- `crates/x3-typeck/src/error.rs` -> **SVM Integration** | LOC: 313 | Risks: none
+- `crates/x3-typeck/src/infer.rs` -> **X3 DEX** | LOC: 524 | Risks: panic risk
+- `crates/x3-typeck/src/lib.rs` -> **Universal Asset Kernel** | LOC: 54 | Risks: panic risk
+- `crates/x3-typeck/src/types.rs` -> **EVM Integration** | LOC: 669 | Risks: bridge risk
+- `crates/x3-typeck/tests/golden.rs` -> **X3VM / Cross-VM** | LOC: 495 | Risks: panic risk
+- `crates/x3-universal-contracts/Cargo.toml` -> **Proof System** | LOC: 27 | Risks: none
+- `crates/x3-universal-contracts/src/actions.rs` -> **Universal Asset Kernel** | LOC: 204 | Risks: atomic rollback risk
+- `crates/x3-universal-contracts/src/compiler.rs` -> **Universal Asset Kernel** | LOC: 169 | Risks: bridge risk
+- `crates/x3-universal-contracts/src/error.rs` -> **Universal Asset Kernel** | LOC: 28 | Risks: none
+- `crates/x3-universal-contracts/src/intents.rs` -> **Proof System** | LOC: 139 | Risks: none
+- `crates/x3-universal-contracts/src/lib.rs` -> **Universal Asset Kernel** | LOC: 39 | Risks: none
+- `crates/x3-universal-contracts/src/sdk.rs` -> **X3VM / Cross-VM** | LOC: 173 | Risks: none
+- `crates/x3-universal-contracts/src/tests.rs` -> **Universal Asset Kernel** | LOC: 358 | Risks: panic risk
+- `crates/x3-validator-attestation/Cargo.toml` -> **Validator / LaunchOps** | LOC: 13 | Risks: none
+- `crates/x3-validator-attestation/src/lib.rs` -> **Validator / LaunchOps** | LOC: 104 | Risks: panic risk
+- `crates/x3-verification-router/Cargo.toml` -> **Bridge / Router** | LOC: 13 | Risks: bridge risk
+- `crates/x3-verification-router/src/lib.rs` -> **Bridge / Router** | LOC: 124 | Risks: panic risk
+- `crates/x3-verifier/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `crates/x3-verifier/src/error.rs` -> **Unclassified** | LOC: 33 | Risks: none
+- `crates/x3-verifier/src/gas.rs` -> **Unclassified** | LOC: 207 | Risks: none
+- `crates/x3-verifier/src/lib.rs` -> **Unclassified** | LOC: 47 | Risks: none
+- `crates/x3-verifier/src/rules.rs` -> **Unclassified** | LOC: 429 | Risks: none
+- `crates/x3-verifier/src/verifier.rs` -> **Unclassified** | LOC: 351 | Risks: none
+- `crates/x3-verifier/tests/integration.rs` -> **Unclassified** | LOC: 186 | Risks: panic risk
+- `crates/x3-vm/Cargo.toml` -> **Bridge / Router** | LOC: 56 | Risks: bridge risk
+- `crates/x3-vm/src/bridge.rs` -> **Bridge / Router** | LOC: 863 | Risks: bridge risk, panic risk
+- `crates/x3-vm/src/contract_upgrade_pattern.rs` -> **X3VM / Cross-VM** | LOC: 394 | Risks: none
+- `crates/x3-vm/src/dap_debugging.rs` -> **Universal Asset Kernel** | LOC: 432 | Risks: panic risk
+- `crates/x3-vm/src/error.rs` -> **X3VM / Cross-VM** | LOC: 304 | Risks: atomic rollback risk
+- `crates/x3-vm/src/execution_guards.rs` -> **X3VM / Cross-VM** | LOC: 83 | Risks: none
+- `crates/x3-vm/src/gas_metering_audit.rs` -> **Universal Asset Kernel** | LOC: 326 | Risks: panic risk
+- `crates/x3-vm/src/gpu_hostcalls.rs` -> **Universal Asset Kernel** | LOC: 1171 | Risks: bridge risk, unsafe code
+- `crates/x3-vm/src/hostcall.rs` -> **X3VM / Cross-VM** | LOC: 272 | Risks: none
+- `crates/x3-vm/src/jit_compiler.rs` -> **X3VM / Cross-VM** | LOC: 423 | Risks: panic risk
+- `crates/x3-vm/src/lib.rs` -> **Bridge / Router** | LOC: 89 | Risks: atomic rollback risk, bridge risk
+- `crates/x3-vm/src/verifier.rs` -> **X3VM / Cross-VM** | LOC: 1583 | Risks: panic risk
+- `crates/x3-vm/src/vm.rs` -> **X3VM / Cross-VM** | LOC: 1826 | Risks: atomic rollback risk, panic risk
+- `crates/x3-vm/tests/gpu_integration.rs` -> **Bridge / Router** | LOC: 363 | Risks: panic risk
+- `crates/x3-vrf/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 30 | Risks: none
+- `crates/x3-vrf/src/lib.rs` -> **Proof System** | LOC: 200 | Risks: panic risk
+- `crates/x3-wallet-cli/Cargo.toml` -> **X3 DEX** | LOC: 44 | Risks: none
+- `crates/x3-wallet-cli/src/main.rs` -> **X3 DEX** | LOC: 620 | Risks: none
+- `crates/x3-wallet/Cargo.toml` -> **Unclassified** | LOC: 18 | Risks: none
+- `crates/x3-wallet/src/address_book.rs` -> **Unclassified** | LOC: 451 | Risks: panic risk
+- `crates/x3-wallet/src/approval_manager.rs` -> **Unclassified** | LOC: 354 | Risks: panic risk
+- `crates/x3-wallet/src/biometric_unlock.rs` -> **Unclassified** | LOC: 433 | Risks: panic risk
+- `crates/x3-wallet/src/defi_tracker.rs` -> **DEX Liquidity** | LOC: 532 | Risks: panic risk
+- `crates/x3-wallet/src/hardware_wallet.rs` -> **EVM Integration** | LOC: 418 | Risks: panic risk
+- `crates/x3-wallet/src/lib.rs` -> **DEX Liquidity** | LOC: 28 | Risks: none
+- `crates/x3-wallet/src/multisig_wallet.rs` -> **Unclassified** | LOC: 476 | Risks: panic risk
+- `crates/x3-wallet/src/privacy_mixing.rs` -> **DEX Liquidity** | LOC: 372 | Risks: panic risk
+- `crates/x3-wallet/src/social_recovery.rs` -> **Unclassified** | LOC: 529 | Risks: panic risk
+- `crates/x3-wallet/src/token_manager.rs` -> **Universal Asset Kernel** | LOC: 485 | Risks: panic risk
+- `crates/x3-wallet/src/transaction_signer.rs` -> **Unclassified** | LOC: 485 | Risks: panic risk, replay/nonce risk
+- `dashboard/metadata.json` -> **Proof System** | LOC: 11 | Risks: none
+- `dashboard/proof-score.json` -> **TPS Benchmark Suite** | LOC: 19 | Risks: none
+- `deny.toml` -> **X3VM / Cross-VM** | LOC: 164 | Risks: none
+- `deployment/DEPLOYMENT_READY.sh` -> **X3VM / Cross-VM** | LOC: 210 | Risks: none
+- `deployment/backup-keys.sh` -> **Unclassified** | LOC: 156 | Risks: none
+- `deployment/baremetal/explorer/deploy.sh` -> **Unclassified** | LOC: 29 | Risks: none
+- `deployment/build-and-keygen.sh` -> **Genesis / Chain Spec** | LOC: 418 | Risks: local-only config risk
+- `deployment/build-release-bundle.sh` -> **X3VM / Cross-VM** | LOC: 88 | Risks: none
+- `deployment/chain-specs/x3-dev-new.json` -> **EVM Integration** | LOC: 75 | Risks: none
+- `deployment/chain-specs/x3-dev-plain.json` -> **Genesis / Chain Spec** | LOC: 64 | Risks: none
+- `deployment/chain-specs/x3-staging-plain.json` -> **X3VM / Cross-VM** | LOC: 74 | Risks: none
+- `deployment/chain-specs/x3-testnet-raw-temp.json` -> **Genesis / Chain Spec** | LOC: 49 | Risks: none
+- `deployment/chain-specs/x3-testnet-raw.baseline.json` -> **Governance** | LOC: 333 | Risks: none
+- `deployment/config/alert-rules.yml` -> **GPU Validator Swarm** | LOC: 180 | Risks: none
+- `deployment/config/alertmanager.yml` -> **TPS Benchmark Suite** | LOC: 106 | Risks: local-only config risk
+- `deployment/config/grafana-dashboards.yml` -> **GPU Validator Swarm** | LOC: 13 | Risks: none
+- `deployment/config/grafana-datasources.yml` -> **Unclassified** | LOC: 34 | Risks: none
+- `deployment/config/prometheus.yml` -> **Universal Asset Kernel** | LOC: 74 | Risks: local-only config risk
+- `deployment/configure-firewall.sh` -> **Validator / LaunchOps** | LOC: 76 | Risks: none
+- `deployment/dashboards/gpu-metrics.json` -> **GPU Validator Swarm** | LOC: 97 | Risks: none
+- `deployment/dashboards/gpu-swarm-overview.json` -> **GPU Validator Swarm** | LOC: 134 | Risks: none
+- `deployment/deploy-local-testnet.sh` -> **Genesis / Chain Spec** | LOC: 324 | Risks: local-only config risk
+- `deployment/deploy-multi-server.sh` -> **Genesis / Chain Spec** | LOC: 260 | Risks: none
+- `deployment/deploy-nodes-day1.sh` -> **Genesis / Chain Spec** | LOC: 329 | Risks: local-only config risk
+- `deployment/deploy-to-testnet.sh` -> **Validator / LaunchOps** | LOC: 353 | Risks: local-only config risk
+- `deployment/docker-compose.monitoring.yml` -> **Bridge / Router** | LOC: 169 | Risks: bridge risk
+- `deployment/docker/config/grafana-dashboards/atlas-overview.json` -> **Unclassified** | LOC: 431 | Risks: none
+- `deployment/docker/config/grafana-dashboards/dashboards.yml` -> **Unclassified** | LOC: 14 | Risks: none
+- `deployment/docker/config/grafana-datasources.yml` -> **Unclassified** | LOC: 31 | Risks: none
+- `deployment/docker/config/prometheus.yml` -> **Validator / LaunchOps** | LOC: 76 | Risks: local-only config risk
+- `deployment/docker/docker-compose.production.yml` -> **Validator / LaunchOps** | LOC: 360 | Risks: bridge risk, local-only config risk
+- `deployment/generate-keys-only.sh` -> **TPS Benchmark Suite** | LOC: 309 | Risks: local-only config risk
+- `deployment/genesis/x3-testnet-allocations.baseline.json` -> **Universal Asset Kernel** | LOC: 56 | Risks: none
+- `deployment/genesis/x3-testnet-allocations.json` -> **Universal Asset Kernel** | LOC: 68 | Risks: none
+- `deployment/helm/explorer/Chart.yaml` -> **Unclassified** | LOC: 13 | Risks: none
+- `deployment/helm/explorer/templates/canary-deployment.yaml` -> **Unclassified** | LOC: 44 | Risks: none
+- `deployment/helm/explorer/templates/canary-ingress.yaml` -> **Unclassified** | LOC: 23 | Risks: none
+- `deployment/helm/explorer/templates/canary-service.yaml` -> **Unclassified** | LOC: 18 | Risks: none
+- `deployment/helm/explorer/templates/deployment.yaml` -> **Unclassified** | LOC: 54 | Risks: none
+- `deployment/helm/explorer/templates/hpa.yaml` -> **Unclassified** | LOC: 21 | Risks: none
+- `deployment/helm/explorer/templates/ingress.yaml` -> **Unclassified** | LOC: 25 | Risks: none
+- `deployment/helm/explorer/templates/service.yaml` -> **Unclassified** | LOC: 16 | Risks: none
+- `deployment/helm/explorer/values.production.yaml` -> **Unclassified** | LOC: 23 | Risks: none
+- `deployment/helm/explorer/values.testnet.yaml` -> **Unclassified** | LOC: 23 | Risks: none
+- `deployment/helm/explorer/values.yaml` -> **Unclassified** | LOC: 59 | Risks: none
+- `deployment/helm/gpu-swarm/Chart.yaml` -> **GPU Validator Swarm** | LOC: 17 | Risks: none
+- `deployment/helm/gpu-swarm/templates/coordinator-statefulset.yaml` -> **GPU Validator Swarm** | LOC: 109 | Risks: none
+- `deployment/helm/gpu-swarm/values.yaml` -> **Universal Asset Kernel** | LOC: 73 | Risks: none
+- `deployment/infrastructure-setup.sh` -> **X3VM / Cross-VM** | LOC: 580 | Risks: bridge risk, local-only config risk
+- `deployment/inventory.yaml` -> **X3VM / Cross-VM** | LOC: 194 | Risks: none
+- `deployment/kubernetes/gpu-swarm-production.yaml` -> **DEX Liquidity** | LOC: 434 | Risks: local-only config risk
+- `deployment/kubernetes/grafana-deployment.yaml` -> **Unclassified** | LOC: 109 | Risks: none
+- `deployment/kubernetes/production-deployment.yaml` -> **Validator / LaunchOps** | LOC: 666 | Risks: local-only config risk
+- `deployment/kubernetes/prometheus-deployment.yaml` -> **GPU Validator Swarm** | LOC: 159 | Risks: local-only config risk
+- `deployment/kubernetes/secrets.yaml` -> **GPU Validator Swarm** | LOC: 34 | Risks: none
+- `deployment/kubernetes/swarm-deployment.yaml` -> **Universal Asset Kernel** | LOC: 340 | Risks: local-only config risk
+- `deployment/kubernetes/values.yaml` -> **DEX Liquidity** | LOC: 230 | Risks: none
+- `deployment/manage-testnet.sh` -> **Validator / LaunchOps** | LOC: 205 | Risks: local-only config risk
+- `deployment/monitoring/docker-compose.yml` -> **GPU Validator Swarm** | LOC: 256 | Risks: bridge risk, local-only config risk
+- `deployment/monitoring/grafana-dashboards.json` -> **GPU Validator Swarm** | LOC: 542 | Risks: none
+- `deployment/monitoring/prometheus-alerts.yml` -> **TPS Benchmark Suite** | LOC: 335 | Risks: none
+- `deployment/provision-digitalocean.sh` -> **X3VM / Cross-VM** | LOC: 67 | Risks: none
+- `deployment/public-rpc/run-public-rpc.sh` -> **Genesis / Chain Spec** | LOC: 163 | Risks: local-only config risk, unsafe code
+- `deployment/public-rpc/validate-x3-endpoints.sh` -> **Unclassified** | LOC: 61 | Risks: local-only config risk
+- `deployment/scripts/install-services.sh` -> **GPU Validator Swarm** | LOC: 82 | Risks: none
+- `deployment/scripts/render-rack-config.sh` -> **Validator / LaunchOps** | LOC: 106 | Risks: none
+- `deployment/scripts/startup.sh` -> **GPU Validator Swarm** | LOC: 106 | Risks: local-only config risk
+- `deployment/setup-ibm-server.sh` -> **X3VM / Cross-VM** | LOC: 142 | Risks: none
+- `deployment/systemd/run-x3-node.sh` -> **Genesis / Chain Spec** | LOC: 132 | Risks: none
+- `docs/AGENTS.md` -> **X3VM / Cross-VM** | LOC: 89 | Risks: none
+- `docs/AI_AGENT_API_SPECIFICATION.md` -> **Universal Asset Kernel** | LOC: 1404 | Risks: none
+- `docs/ARCHITECTURE.md` -> **Universal Asset Kernel** | LOC: 253 | Risks: atomic rollback risk, replay/nonce risk
+- `docs/ATLAS_SPHERE_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 84 | Risks: atomic rollback risk
+- `docs/AUTONOMIC_INTEGRATION_COMPLETE.md` -> **Universal Asset Kernel** | LOC: 439 | Risks: unfinished logic
+- `docs/BENCHMARK_E2E_VALIDATION.md` -> **X3 DEX** | LOC: 492 | Risks: bridge risk, local-only config risk
+- `docs/BLOCKCHAIN_STARTUP_GUIDE.md` -> **Universal Asset Kernel** | LOC: 332 | Risks: bridge risk, local-only config risk, unsafe code
+- `docs/BUILD_PHASES.md` -> **Universal Asset Kernel** | LOC: 242 | Risks: atomic rollback risk
+- `docs/CHAINBENCH_INTEGRATION.md` -> **EVM Integration** | LOC: 73 | Risks: none
+- `docs/COMIT_SPEC.md` -> **Universal Asset Kernel** | LOC: 388 | Risks: replay/nonce risk, unsafe code
+- `docs/CROSS_CHAIN_SETTLEMENT_DIAGRAMS.md` -> **Universal Asset Kernel** | LOC: 374 | Risks: none
+- `docs/CURRENT_MAINNET_STATUS.md` -> **Universal Asset Kernel** | LOC: 111 | Risks: atomic rollback risk, bridge risk, replay risk
+- `docs/DEPLOYMENT.md` -> **Universal Asset Kernel** | LOC: 354 | Risks: local-only config risk
+- `docs/DEVELOPMENT_SETUP.md` -> **TPS Benchmark Suite** | LOC: 565 | Risks: unsafe code
+- `docs/DOCUMENTATION_INDEX.md` -> **Universal Asset Kernel** | LOC: 90 | Risks: bridge risk
+- `docs/DRPC_NODECORE_DSHACKLE_INTEGRATION.md` -> **EVM Integration** | LOC: 73 | Risks: none
+- `docs/ECONOMIC_SECURITY.md` -> **Universal Asset Kernel** | LOC: 52 | Risks: bridge risk
+- `docs/ECOSYSTEM_METRICS.md` -> **Bridge / Router** | LOC: 181 | Risks: bridge risk
+- `docs/EXECUTION_BANNER.md` -> **Unclassified** | LOC: 76 | Risks: none
+- `docs/EXTERNAL_CHAIN_PARTNER_ONBOARDING.md` -> **Bridge / Router** | LOC: 98 | Risks: atomic rollback risk, bridge risk
+- `docs/FRONTIER_INTEGRATION_STEPS.md` -> **Universal Asset Kernel** | LOC: 55 | Risks: none
+- `docs/GITHUB_PAGES_SETUP.md` -> **X3 DEX** | LOC: 443 | Risks: local-only config risk
+- `docs/GOVERNANCE_VOTING_GUIDE.md` -> **Governance** | LOC: 409 | Risks: bridge risk
+- `docs/IMPLEMENTATION_CHECKLIST.md` -> **X3VM / Cross-VM** | LOC: 334 | Risks: replay risk, unfinished logic
+- `docs/MAINNET_GENESIS_REVIEW.md` -> **Universal Asset Kernel** | LOC: 33 | Risks: bridge risk
+- `docs/MAINNET_LAUNCH_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 59 | Risks: atomic rollback risk, bridge risk, replay risk
+- `docs/MARKETPLACE_DEVELOPER_GUIDE.md` -> **Universal Asset Kernel** | LOC: 599 | Risks: bridge risk, unsafe code
+- `docs/MOBILE_SDK_SETUP.md` -> **EVM Integration** | LOC: 320 | Risks: panic risk
+- `docs/OWNER_RUNBOOK.md` -> **Universal Asset Kernel** | LOC: 229 | Risks: local-only config risk
+- `docs/QUANTUM_EXECUTION_WHITEPAPER.md` -> **X3VM / Cross-VM** | LOC: 1021 | Risks: atomic rollback risk, panic risk
+- `docs/README.md` -> **EVM Integration** | LOC: 48 | Risks: none
+- `docs/RPC_CONFIGURATION.md` -> **Bridge / Router** | LOC: 384 | Risks: panic risk
+- `docs/RPC_INTEGRATION_GUIDE.md` -> **Universal Asset Kernel** | LOC: 349 | Risks: bridge risk, local-only config risk
+- `docs/RUNTIME_UPGRADE_REHEARSAL.md` -> **Launchpad** | LOC: 31 | Risks: atomic rollback risk
+- `docs/SECURITY_GATES.md` -> **Universal Asset Kernel** | LOC: 612 | Risks: unsafe code
+- `docs/SIDECAR_CONFIGURATION.md` -> **EVM Integration** | LOC: 252 | Risks: local-only config risk
+- `docs/SIDECAR_DEPLOYMENT.md` -> **DEX Liquidity** | LOC: 474 | Risks: atomic rollback risk, local-only config risk
+- `docs/SIDECAR_TROUBLESHOOTING.md` -> **DEX Liquidity** | LOC: 807 | Risks: local-only config risk
+- `docs/SOCIAL_CONSENSUS_VALIDATION.md` -> **X3 DEX** | LOC: 252 | Risks: none
+- `docs/STAKING_OPERATIONS_MANUAL.md` -> **Validator / LaunchOps** | LOC: 417 | Risks: none
+- `docs/TPS TESTING/README.md` -> **TPS Benchmark Suite** | LOC: 3 | Risks: none
+- `docs/TPS TESTING/presentation.md` -> **TPS Benchmark Suite** | LOC: 161 | Risks: replay/nonce risk
+- `docs/TPS TESTING/txps/README.md` -> **Universal Asset Kernel** | LOC: 22 | Risks: none
+- `docs/TPS TESTING/vendor/github.com/izqui/functional/readme.md` -> **TPS Benchmark Suite** | LOC: 3 | Risks: none
+- `docs/TPS TESTING/vendor/github.com/izqui/helpers/README.md` -> **TPS Benchmark Suite** | LOC: 4 | Risks: none
+- `docs/TPS TESTING/vendor/github.com/tv42/base58/README.md` -> **TPS Benchmark Suite** | LOC: 12 | Risks: none
+- `docs/TPS_ARCHITECTURE_EXPLAINED.md` -> **Universal Asset Kernel** | LOC: 300 | Risks: local-only config risk
+- `docs/TRI_VM_ARCHITECTURE.md` -> **EVM Integration** | LOC: 780 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `docs/X3SCRIPT_DSL_SPECIFICATION.md` -> **Universal Asset Kernel** | LOC: 1054 | Risks: unsafe code
+- `docs/X3SCRIPT_STDLIB_REFERENCE.md` -> **Bridge / Router** | LOC: 1503 | Risks: bridge risk, replay/nonce risk
+- `docs/X3_ATOMIC_EXCHANGE_ARCHITECTURE.md` -> **Universal Asset Kernel** | LOC: 454 | Risks: bridge risk, replay risk
+- `docs/X3_AUTONOMIC_DEPLOYMENT.md` -> **GPU Validator Swarm** | LOC: 601 | Risks: local-only config risk, unfinished logic
+- `docs/X3_COIN_LAYER_SPEC.md` -> **Universal Asset Kernel** | LOC: 150 | Risks: replay/nonce risk
+- `docs/X3_CROSS_CHAIN_ATOMIC_SWAP_YOLO.md` -> **Universal Asset Kernel** | LOC: 165 | Risks: replay/nonce risk
+- `docs/X3_Consensus_GPU_Swarm_Design_Booklet.md` -> **X3VM / Cross-VM** | LOC: 893 | Risks: atomic rollback risk, panic risk, replay risk, unsafe code
+- `docs/X3_ENTERPRISE_READINESS.md` -> **Universal Asset Kernel** | LOC: 339 | Risks: atomic rollback risk, replay risk, unfinished logic
+- `docs/X3_GPU_CAPABILITIES_REPORT.md` -> **Universal Asset Kernel** | LOC: 517 | Risks: bridge risk, unsafe code
+- `docs/X3_LANGUAGE_REFERENCE.md` -> **EVM Integration** | LOC: 769 | Risks: atomic rollback risk, bridge risk
+- `docs/X3_LANGUAGE_SPECIFICATION.md` -> **X3VM / Cross-VM** | LOC: 1066 | Risks: none
+- `docs/adr/0001-bonding-collateral.md` -> **Proof System** | LOC: 45 | Risks: none
+- `docs/adr/0002-e2e-determinism-triple-run.md` -> **Genesis / Chain Spec** | LOC: 168 | Risks: local-only config risk, replay risk
+- `docs/apps/inferstructor-dashboard/.claude/agents/accessibility-specialist.md` -> **Unclassified** | LOC: 38 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/agents/api-documenter.md` -> **Unclassified** | LOC: 37 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/agents/frontend-developer.md` -> **Bridge / Router** | LOC: 64 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/agents/react-performance-optimization.md` -> **Unclassified** | LOC: 26 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/agents/typescript-expert.md` -> **Unclassified** | LOC: 37 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/agents/ui-ux-designer.md` -> **Universal Asset Kernel** | LOC: 43 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/commands/act.md` -> **Unclassified** | LOC: 11 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/commands/add-authentication-system.md` -> **Unclassified** | LOC: 83 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/commands/add-changelog.md` -> **TPS Benchmark Suite** | LOC: 87 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/commands/add-package.md` -> **Universal Asset Kernel** | LOC: 89 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/commands/add-performance-monitoring.md` -> **Unclassified** | LOC: 1173 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/commands/add-property-based-testing.md` -> **Unclassified** | LOC: 85 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/skills/docx-js.md` -> **Unclassified** | LOC: 350 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/skills/evaluation.md` -> **Unclassified** | LOC: 602 | Risks: none
+- `docs/apps/inferstructor-dashboard/.claude/skills/ooxml.md` -> **Unclassified** | LOC: 427 | Risks: none
+- `docs/apps/inferstructor-dashboard/README.md` -> **TPS Benchmark Suite** | LOC: 74 | Risks: none
+- `docs/apps/shared/CHANGELOG.md` -> **Unclassified** | LOC: 9 | Risks: none
+- `docs/apps/validators/README.md` -> **X3 DEX** | LOC: 93 | Risks: local-only config risk
+- `docs/apps/x3-desktop/DELIVERY_MANIFEST.md` -> **X3VM / Cross-VM** | LOC: 371 | Risks: unfinished logic
+- `docs/apps/x3-desktop/DESKTOP_APPS_STARTUP.md` -> **Universal Asset Kernel** | LOC: 121 | Risks: local-only config risk
+- `docs/apps/x3-desktop/ERROR_HANDLING.md` -> **Unclassified** | LOC: 262 | Risks: none
+- `docs/apps/x3-desktop/FINAL_DEPLOYMENT_APPROVAL.md` -> **Unclassified** | LOC: 254 | Risks: none
+- `docs/apps/x3-desktop/OPERATOR_DASHBOARD_BOILERPLATE.md` -> **X3VM / Cross-VM** | LOC: 545 | Risks: unfinished logic
+- `docs/apps/x3-desktop/PANEL_PLUGIN_DEPENDENCIES.md` -> **Launchpad** | LOC: 12 | Risks: replay risk
+- `docs/apps/x3-desktop/PRODUCTION_OPERATIONS.md` -> **Unclassified** | LOC: 420 | Risks: atomic rollback risk, local-only config risk
+- `docs/apps/x3-desktop/README.md` -> **X3 DEX** | LOC: 194 | Risks: local-only config risk
+- `docs/apps/x3-desktop/SHIP_CHECKLIST.md` -> **Launchpad** | LOC: 265 | Risks: atomic rollback risk
+- `docs/apps/x3-desktop/SHIP_INDEX.md` -> **X3 DEX** | LOC: 332 | Risks: atomic rollback risk
+- `docs/apps/x3-desktop/TESTING_HISTORY_EXPORT.md` -> **Launchpad** | LOC: 36 | Risks: none
+- `docs/apps/x3-desktop/TEST_COVERAGE_SUMMARY.md` -> **Launchpad** | LOC: 361 | Risks: none
+- `docs/apps/x3-desktop/TEST_SUITE_DOCUMENTATION.md` -> **Launchpad** | LOC: 361 | Risks: local-only config risk
+- `docs/apps/x3-desktop/app-store/COMPLETION_REPORT_12APPS.md` -> **Universal Asset Kernel** | LOC: 313 | Risks: none
+- `docs/apps/x3-desktop/app-store/INTEGRATION_COMPLETE.md` -> **X3 DEX** | LOC: 497 | Risks: none
+- `docs/apps/x3-desktop/app-store/README.md` -> **X3 DEX** | LOC: 514 | Risks: none
+- `docs/apps/x3-desktop/public/docs/BLOCKCHAIN_CONNECTOR.md` -> **Universal Asset Kernel** | LOC: 178 | Risks: replay/nonce risk
+- `docs/apps/x3-desktop/public/docs/BLOCKCHAIN_CONNECTOR_API.md` -> **EVM Integration** | LOC: 376 | Risks: none
+- `docs/apps/x3-desktop/public/docs/BLOCKCHAIN_CONNECTOR_BENCHMARKS.md` -> **Universal Asset Kernel** | LOC: 250 | Risks: bridge risk, local-only config risk, replay/nonce risk
+- `docs/apps/x3-desktop/public/docs/BUILD_REPORT.md` -> **Bridge / Router** | LOC: 495 | Risks: none
+- `docs/apps/x3-desktop/public/docs/CI_CD_GUIDE.md` -> **TPS Benchmark Suite** | LOC: 485 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/DEPLOYMENT.md` -> **Universal Asset Kernel** | LOC: 293 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/DEPLOYMENT_CHECKLIST.md` -> **TPS Benchmark Suite** | LOC: 537 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/DOCS_SUMMARY.md` -> **X3 DEX** | LOC: 491 | Risks: atomic rollback risk
+- `docs/apps/x3-desktop/public/docs/DOCUMENTATION_INDEX.md` -> **X3 DEX** | LOC: 510 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/IMPLEMENTATION_SUMMARY.md` -> **Bridge / Router** | LOC: 324 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/MAKEFILE_REFERENCE.md` -> **GPU Validator Swarm** | LOC: 513 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/PRE_DEPLOYMENT_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 486 | Risks: atomic rollback risk, local-only config risk
+- `docs/apps/x3-desktop/public/docs/PROJECT_COMPLETION.md` -> **X3 DEX** | LOC: 467 | Risks: none
+- `docs/apps/x3-desktop/public/docs/README.md` -> **Bridge / Router** | LOC: 108 | Risks: local-only config risk
+- `docs/apps/x3-desktop/public/docs/SECRETS_SETUP.md` -> **TPS Benchmark Suite** | LOC: 342 | Risks: none
+- `docs/apps/x3-desktop/public/docs/STATUS_AND_NEXT_STEPS.md` -> **X3 DEX** | LOC: 568 | Risks: atomic rollback risk, local-only config risk
+- `docs/apps/x3-desktop/rag-bot/README.md` -> **X3 DEX** | LOC: 24 | Risks: none
+- `docs/apps/x3-desktop/src/components/panels/crm/README.md` -> **Universal Asset Kernel** | LOC: 210 | Risks: none
+- `docs/apps/x3-desktop/tests/e2e/E2E_TESTING_GUIDE.md` -> **GPU Validator Swarm** | LOC: 453 | Risks: local-only config risk
+- `docs/apps/x3-desktop/tests/e2e/README.md` -> **Launchpad** | LOC: 235 | Risks: local-only config risk, panic risk
+- `docs/apps/x3-intelligence/UPGRADE_SUMMARY.md` -> **Unclassified** | LOC: 4 | Risks: none
+- `docs/architecture.md` -> **Universal Asset Kernel** | LOC: 404 | Risks: none
+- `docs/architecture/DATA_WIRING_GUIDE.md` -> **X3 DEX** | LOC: 485 | Risks: none
+- `docs/architecture/adrs/0002-kms-hsm.md` -> **X3 DEX** | LOC: 47 | Risks: replay risk
+- `docs/botchain-tri-vm-genesis/README.md` -> **EVM Integration** | LOC: 257 | Risks: local-only config risk
+- `docs/changes/DEPIN-GPU-001/proposal.md` -> **Bridge / Router** | LOC: 323 | Risks: bridge risk
+- `docs/changes/EXEC-PREDICT-002/proposal.md` -> **DEX Liquidity** | LOC: 352 | Risks: atomic rollback risk
+- `docs/changes/PRIV-ENCLAVE-003/proposal.md` -> **X3 DEX** | LOC: 420 | Risks: replay/nonce risk
+- `docs/contracts/@openzeppelin/contracts-upgradeable/README.md` -> **TPS Benchmark Suite** | LOC: 127 | Risks: unsafe code
+- `docs/contracts/@openzeppelin/contracts/README.md` -> **TPS Benchmark Suite** | LOC: 123 | Risks: unsafe code
+- `docs/contracts/lending/README.md` -> **Universal Asset Kernel** | LOC: 287 | Risks: local-only config risk
+- `docs/crates/atomic-swap-orchestrator/README.md` -> **Universal Asset Kernel** | LOC: 41 | Risks: none
+- `docs/crates/external-chains/CLAUDE.md` -> **Unclassified** | LOC: 7 | Risks: none
+- `docs/crates/gpu-swarm/GPU_NODE_SETUP.md` -> **Universal Asset Kernel** | LOC: 70 | Risks: none
+- `docs/crates/gpu-swarm/README.md` -> **X3VM / Cross-VM** | LOC: 230 | Risks: none
+- `docs/crates/x3-gateway/README.md` -> **EVM Integration** | LOC: 200 | Risks: local-only config risk
+- `docs/crates/x3-gpu-validator-swarm/OPERATORS_MANUAL.md` -> **TPS Benchmark Suite** | LOC: 508 | Risks: panic risk, replay risk
+- `docs/crates/x3-gpu-validator-swarm/README.md` -> **TPS Benchmark Suite** | LOC: 307 | Risks: panic risk, replay risk
+- `docs/crates/x3-indexer/README.md` -> **Universal Asset Kernel** | LOC: 174 | Risks: local-only config risk
+- `docs/cross-chain-gpu-validator/IMPLEMENTATION_COMPLETE.md` -> **X3 DEX** | LOC: 351 | Risks: atomic rollback risk, local-only config risk
+- `docs/cross-chain-gpu-validator/LOCAL_TESTING_QUICKSTART.md` -> **X3 DEX** | LOC: 93 | Risks: none
+- `docs/cross-chain-gpu-validator/README.md` -> **Universal Asset Kernel** | LOC: 57 | Risks: none
+- `docs/cross-chain-gpu-validator/TESTING_SUMMARY.md` -> **EVM Integration** | LOC: 219 | Risks: atomic rollback risk, local-only config risk
+- `docs/cross-chain-gpu-validator/dashboard/README.md` -> **Universal Asset Kernel** | LOC: 6 | Risks: none
+- `docs/cross-chain-gpu-validator/docs/E2E_SECURITY_TESTING.md` -> **X3 DEX** | LOC: 397 | Risks: atomic rollback risk, local-only config risk
+- `docs/cross-chain-gpu-validator/docs/INFERSTRUCTOR_300X_TEST_PLAN.md` -> **Universal Asset Kernel** | LOC: 684 | Risks: local-only config risk, replay risk
+- `docs/cross-chain-gpu-validator/docs/README.md` -> **GPU Validator Swarm** | LOC: 7 | Risks: none
+- `docs/cross-chain-gpu-validator/docs/architecture.md` -> **Universal Asset Kernel** | LOC: 26 | Risks: atomic rollback risk
+- `docs/cross-chain-gpu-validator/docs/deployment.md` -> **GPU Validator Swarm** | LOC: 28 | Risks: none
+- `docs/cross-chain-gpu-validator/docs/monitoring.md` -> **EVM Integration** | LOC: 12 | Risks: atomic rollback risk
+- `docs/cross-chain-gpu-validator/docs/security.md` -> **X3 DEX** | LOC: 19 | Risks: atomic rollback risk
+- `docs/cross-chain-gpu-validator/kernels/README.md` -> **Universal Asset Kernel** | LOC: 21 | Risks: none
+- `docs/cross-chain-gpu-validator/reports/COMPLETION_STATUS_2026-04-15.md` -> **Bridge / Router** | LOC: 143 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/reports/COMPLETION_STATUS_2026-04-23.md` -> **TPS Benchmark Suite** | LOC: 46 | Risks: none
+- `docs/cross-chain-gpu-validator/reports/COMPLETION_STATUS_2026-04-24.md` -> **Universal Asset Kernel** | LOC: 52 | Risks: none
+- `docs/cross-chain-gpu-validator/runbooks/FIX_DEV_NVIDIA_EIO.md` -> **Universal Asset Kernel** | LOC: 156 | Risks: none
+- `docs/cross-chain-gpu-validator/tests/inferstructor/BUILD_COMPLETE.md` -> **Bridge / Router** | LOC: 474 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/tests/inferstructor/INTEGRATION_GUIDE.md` -> **Bridge / Router** | LOC: 604 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/tests/inferstructor/ONBOARDING_COMPLETE.md` -> **Bridge / Router** | LOC: 541 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/tests/inferstructor/PRODUCTION_DEPLOYMENT_GUIDE.md` -> **Universal Asset Kernel** | LOC: 466 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/tests/inferstructor/QUICKREF.md` -> **Universal Asset Kernel** | LOC: 189 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/tests/inferstructor/README.md` -> **Bridge / Router** | LOC: 497 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/tests/inferstructor/VALIDATOR_QUICKSTART.md` -> **Bridge / Router** | LOC: 394 | Risks: bridge risk, local-only config risk
+- `docs/cross-chain-gpu-validator/third_party/secp256k1-cuda-ecc/README.md` -> **Universal Asset Kernel** | LOC: 90 | Risks: none
+- `docs/crypto-bot-architecture.md` -> **Universal Asset Kernel** | LOC: 116 | Risks: none
+- `docs/cryptologos/Cryptocurrency_Logos-mainx/CONTRIBUTING.md` -> **Unclassified** | LOC: 2 | Risks: none
+- `docs/cryptologos/Cryptocurrency_Logos-mainx/INLINE_SVG/ReadME.md` -> **Unclassified** | LOC: 2 | Risks: none
+- `docs/cryptologos/Cryptocurrency_Logos-mainx/PNG/README.md` -> **Unclassified** | LOC: 2 | Risks: none
+- `docs/cryptologos/Cryptocurrency_Logos-mainx/README.md` -> **TPS Benchmark Suite** | LOC: 21 | Risks: none
+- `docs/cryptologos/Cryptocurrency_Logos-mainx/SVG/ReadME.md` -> **Unclassified** | LOC: 2 | Risks: none
+- `docs/deployment/ARCHITECTURE.md` -> **DEX Liquidity** | LOC: 704 | Risks: none
+- `docs/deployment/CUSTODY_SERVICE_DEPLOYMENT_OPS.md` -> **Validator / LaunchOps** | LOC: 1141 | Risks: atomic rollback risk, local-only config risk
+- `docs/deployment/DAY_MINUS_1_COMPLETE.md` -> **X3VM / Cross-VM** | LOC: 331 | Risks: local-only config risk, unfinished logic
+- `docs/deployment/DEPLOYMENT_GUIDE.md` -> **DEX Liquidity** | LOC: 680 | Risks: local-only config risk
+- `docs/deployment/DEPLOYMENT_STATUS.md` -> **X3VM / Cross-VM** | LOC: 346 | Risks: none
+- `docs/deployment/EXPLORER_BAREMETAL.md` -> **X3VM / Cross-VM** | LOC: 41 | Risks: atomic rollback risk
+- `docs/deployment/EXPLORER_HELM.md` -> **TPS Benchmark Suite** | LOC: 73 | Risks: atomic rollback risk, local-only config risk
+- `docs/deployment/HARDWARE_ROLE_PLAN.md` -> **X3VM / Cross-VM** | LOC: 131 | Risks: atomic rollback risk
+- `docs/deployment/IN_HOUSE_DEPLOYMENT.md` -> **Validator / LaunchOps** | LOC: 423 | Risks: local-only config risk
+- `docs/deployment/PRODUCTION_CHECKLIST.md` -> **X3 DEX** | LOC: 450 | Risks: atomic rollback risk
+- `docs/deployment/PUBLIC_RPC.md` -> **Unclassified** | LOC: 72 | Risks: local-only config risk
+- `docs/deployment/QUICKSTART.md` -> **X3VM / Cross-VM** | LOC: 138 | Risks: local-only config risk
+- `docs/deployment/RACK_BRINGUP_RUNBOOK.md` -> **Launchpad** | LOC: 130 | Risks: none
+- `docs/deployment/README.md` -> **X3 DEX** | LOC: 331 | Risks: local-only config risk
+- `docs/deployment/RUNBOOKS.md` -> **X3 DEX** | LOC: 856 | Risks: local-only config risk
+- `docs/deployment/chain-specs/## GitHub Copilot Chat.md` -> **TPS Benchmark Suite** | LOC: 52 | Risks: none
+- `docs/deployment/dns-config.md` -> **X3VM / Cross-VM** | LOC: 72 | Risks: none
+- `docs/deployment/kubernetes-DEPLOYMENT.md` -> **TPS Benchmark Suite** | LOC: 343 | Risks: local-only config risk
+- `docs/deployment/provision-aws.md` -> **X3VM / Cross-VM** | LOC: 76 | Risks: none
+- `docs/deployment/provision-manual.md` -> **Bridge / Router** | LOC: 99 | Risks: bridge risk
+- `docs/deployment/public-rpc-README.md` -> **Unclassified** | LOC: 162 | Risks: local-only config risk
+- `docs/docs/architecture.md` -> **EVM Integration** | LOC: 302 | Risks: bridge risk, local-only config risk
+- `docs/docs/reports/ATLAS_DNS_SERVER_IMPLEMENTATION_COMPLETE.md` -> **X3 DEX** | LOC: 295 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_100_PERCENT_COMPLETE.md` -> **Bridge / Router** | LOC: 166 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_BOTCHAIN_FINAL_STATUS.md` -> **Bridge / Router** | LOC: 126 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_FINAL_PHASE_PLAN.md` -> **Bridge / Router** | LOC: 85 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_FINAL_PROGRESS.md` -> **Bridge / Router** | LOC: 49 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_FRONTEND_FINAL_STATUS.md` -> **Bridge / Router** | LOC: 76 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_PRODUCTION_READY_REPORT.md` -> **Bridge / Router** | LOC: 205 | Risks: none
+- `docs/docs/reports/ATLAS_SPHERE_STATUS_2025-12-04.md` -> **Universal Asset Kernel** | LOC: 329 | Risks: local-only config risk
+- `docs/docs/reports/ATLAS_SPHERE_TPS_REPORT.md` -> **EVM Integration** | LOC: 76 | Risks: none
+- `docs/docs/reports/BACKEND_SPECIALIZATION_SUMMARY.md` -> **X3 DEX** | LOC: 161 | Risks: none
+- `docs/docs/reports/BOUNDARY_GUARD_COMPLETION_STATUS.md` -> **Bridge / Router** | LOC: 257 | Risks: bridge risk
+- `docs/docs/reports/CARTOGRAPHER_REPORT.md` -> **X3 DEX** | LOC: 594 | Risks: atomic rollback risk, local-only config risk, replay risk
+- `docs/docs/reports/COMPILER_STATUS_DASHBOARD.md` -> **X3VM / Cross-VM** | LOC: 287 | Risks: none
+- `docs/docs/reports/COMPLETE_BLOCKCHAIN_BUILD.md` -> **Universal Asset Kernel** | LOC: 222 | Risks: replay/nonce risk
+- `docs/docs/reports/COND_FOLD_EXECUTIVE_SUMMARY.md` -> **Unclassified** | LOC: 427 | Risks: panic risk
+- `docs/docs/reports/COND_FOLD_INTEGRATION_COMPLETE.md` -> **X3 DEX** | LOC: 277 | Risks: unsafe code
+- `docs/docs/reports/COND_FOLD_SUMMARY.md` -> **Unclassified** | LOC: 426 | Risks: unsafe code
+- `docs/docs/reports/DNS_SERVER_BINARY_TARGET_RESOLUTION_FINAL.md` -> **X3 DEX** | LOC: 224 | Risks: local-only config risk
+- `docs/docs/reports/DNS_SERVER_FINAL_SUCCESS_REPORT.md` -> **Governance** | LOC: 224 | Risks: local-only config risk
+- `docs/docs/reports/DNS_SERVER_IMPLEMENTATION_FINAL_COMPLETION.md` -> **Governance** | LOC: 201 | Risks: local-only config risk
+- `docs/docs/reports/E2E_INTEGRATION_TESTS_COMPLETION_REPORT.md` -> **Universal Asset Kernel** | LOC: 219 | Risks: none
+- `docs/docs/reports/E2E_INTEGRATION_TESTS_FINAL_REPORT.md` -> **Bridge / Router** | LOC: 235 | Risks: bridge risk
+- `docs/docs/reports/FEATURE_CHECKLIST_COMPLETE.md` -> **Universal Asset Kernel** | LOC: 328 | Risks: none
+- `docs/docs/reports/FINAL_ATLAS_SPHERE_IMPLEMENTATION_REPORT.md` -> **Bridge / Router** | LOC: 237 | Risks: atomic rollback risk, bridge risk
+- `docs/docs/reports/FINAL_GLOBAL_AUDIT_REPORT.md` -> **Universal Asset Kernel** | LOC: 379 | Risks: local-only config risk, panic risk, unsafe code
+- `docs/docs/reports/FINAL_IMPLEMENTATION_STATUS_REPORT.md` -> **Bridge / Router** | LOC: 132 | Risks: atomic rollback risk, bridge risk
+- `docs/docs/reports/FRAMER_MOTION_FIX_COMPLETE.md` -> **X3 DEX** | LOC: 53 | Risks: none
+- `docs/docs/reports/LOOP_PACK_V1_COMPLETE.md` -> **Unclassified** | LOC: 350 | Risks: unsafe code
+- `docs/docs/reports/LOOP_PACK_V1_INTEGRATION_REPORT.md` -> **TPS Benchmark Suite** | LOC: 168 | Risks: none
+- `docs/docs/reports/MARKDOWN_FILES_AUDIT_FINAL_COMPLETION.md` -> **X3 DEX** | LOC: 213 | Risks: none
+- `docs/docs/reports/MARKDOWN_FILES_AUDIT_REPORT.md` -> **X3 DEX** | LOC: 251 | Risks: none
+- `docs/docs/reports/MARKDOWN_FILES_ORGANIZATION_COMPLETE.md` -> **X3 DEX** | LOC: 222 | Risks: none
+- `docs/docs/reports/MASTER_YOLO_AUDIT_REPORT_X3STAR_X3_CHAIN.md` -> **Universal Asset Kernel** | LOC: 224 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `docs/docs/reports/NEXT_PHASE_SUMMARY.md` -> **X3VM / Cross-VM** | LOC: 265 | Risks: none
+- `docs/docs/reports/PHASE2_EXECUTIVE_SUMMARY.md` -> **Bridge / Router** | LOC: 338 | Risks: panic risk, unsafe code
+- `docs/docs/reports/PHASE2_FINAL_VERIFICATION.md` -> **TPS Benchmark Suite** | LOC: 309 | Risks: none
+- `docs/docs/reports/PHASE2_VALUE_NUMBERING_COMPLETE.md` -> **TPS Benchmark Suite** | LOC: 367 | Risks: unsafe code
+- `docs/docs/reports/PHASE4_BLOCKCHAIN_INTEGRATION_COMPLETE.md` -> **TPS Benchmark Suite** | LOC: 400 | Risks: none
+- `docs/docs/reports/PHASE6_COMPLETE.md` -> **X3 DEX** | LOC: 419 | Risks: none
+- `docs/docs/reports/PHASE_1_7_COMPLETION.md` -> **Universal Asset Kernel** | LOC: 362 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `docs/docs/reports/PLAN_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 306 | Risks: local-only config risk, replay risk, replay/nonce risk
+- `docs/docs/reports/PRE_INTEGRATION_COMPLETE.md` -> **Unclassified** | LOC: 336 | Risks: none
+- `docs/docs/reports/PRODUCTION_FINALIZATION_TODO.md` -> **X3 DEX** | LOC: 58 | Risks: none
+- `docs/docs/reports/SECURITY_AUDIT_REPORT.md` -> **Universal Asset Kernel** | LOC: 559 | Risks: replay risk, replay/nonce risk, unfinished logic
+- `docs/docs/reports/SESSION_COMPLETION_REPORT.md` -> **Universal Asset Kernel** | LOC: 327 | Risks: bridge risk, replay risk, replay/nonce risk
+- `docs/docs/reports/SESSION_SUMMARY.md` -> **TPS Benchmark Suite** | LOC: 299 | Risks: unsafe code
+- `docs/docs/reports/SESSION_SUMMARY_PHASE4.md` -> **Bridge / Router** | LOC: 321 | Risks: bridge risk
+- `docs/docs/reports/SESSION_SUMMARY_PRE_COMPLETE.md` -> **TPS Benchmark Suite** | LOC: 318 | Risks: none
+- `docs/docs/reports/TESTNET_DEPLOYMENT_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 384 | Risks: none
+- `docs/docs/reports/VALIDATION_COMPLETION_STATUS.md` -> **EVM Integration** | LOC: 111 | Risks: none
+- `docs/docs/reports/VISUAL_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 232 | Risks: atomic rollback risk
+- `docs/docs/reports/X3_COMPLETION.md` -> **Universal Asset Kernel** | LOC: 488 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, unfinished logic, unsafe code
+- `docs/docs/reports/X3_GOVERNANCE_STACK_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 383 | Risks: bridge risk, panic risk, replay risk
+- `docs/docs/reports/X3_REAPER_IMPLEMENTATION_COMPLETE.md` -> **EVM Integration** | LOC: 112 | Risks: none
+- `docs/docs/reports/X3_SYSTEM_WIDE_INTEGRATION_COMPLETE.md` -> **Universal Asset Kernel** | LOC: 169 | Risks: atomic rollback risk, bridge risk
+- `docs/docs/reports/YOLO_FEATURES_COMPLETE.md` -> **Universal Asset Kernel** | LOC: 103 | Risks: none
+- `docs/docs/reports/YOLO_INFRASTRUCTURE_COMPLETE.md` -> **TPS Benchmark Suite** | LOC: 401 | Risks: unsafe code
+- `docs/docs/reports/YOLO_LOOP_PACK_V1_SESSION_COMPLETE.md` -> **TPS Benchmark Suite** | LOC: 263 | Risks: unsafe code
+- `docs/docs/reports/YOLO_MODE_COMPLETE.md` -> **EVM Integration** | LOC: 268 | Risks: atomic rollback risk, unsafe code
+- `docs/docs/reports/final-validation-results.md` -> **Universal Asset Kernel** | LOC: 159 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `docs/docs/reports/validation-completion-plan.md` -> **X3VM / Cross-VM** | LOC: 49 | Risks: none
+- `docs/examples/arbitrage_bot_config.rs` -> **Bridge / Router** | LOC: 381 | Risks: panic risk
+- `docs/examples/rpc_integration.rs` -> **Bridge / Router** | LOC: 337 | Risks: none
+- `docs/faq.md` -> **Bridge / Router** | LOC: 332 | Risks: bridge risk, local-only config risk
+- `docs/forge-std/CONTRIBUTING.md` -> **TPS Benchmark Suite** | LOC: 194 | Risks: none
+- `docs/forge-std/README.md` -> **X3VM / Cross-VM** | LOC: 315 | Risks: none
+- `docs/forge-std/RELEASE_CHECKLIST.md` -> **Unclassified** | LOC: 13 | Risks: none
+- `docs/frontend-integration-plan.md` -> **EVM Integration** | LOC: 120 | Risks: none
+- `docs/getting-started.md` -> **Universal Asset Kernel** | LOC: 404 | Risks: none
+- `docs/gpu-kernel-developer-guide.md` -> **Universal Asset Kernel** | LOC: 160 | Risks: none
+- `docs/gpu-node-setup.md` -> **Universal Asset Kernel** | LOC: 69 | Risks: none
+- `docs/gpu-swarm/ADVANCED_FEATURES.md` -> **DEX Liquidity** | LOC: 598 | Risks: panic risk
+- `docs/gpu-swarm/COMPLETION_REPORT.md` -> **Universal Asset Kernel** | LOC: 723 | Risks: panic risk
+- `docs/gpu-swarm/DASHBOARD_UI_SPEC.md` -> **X3 DEX** | LOC: 897 | Risks: local-only config risk, panic risk
+- `docs/gpu-validator-operator-guide.md` -> **Universal Asset Kernel** | LOC: 181 | Risks: atomic rollback risk, bridge risk, local-only config risk
+- `docs/gpu-validator-proof-aggregation.md` -> **Universal Asset Kernel** | LOC: 297 | Risks: none
+- `docs/gpu-validator-security-audit.md` -> **Universal Asset Kernel** | LOC: 104 | Risks: unsafe code
+- `docs/how-to-guides/Untitled-1.md` -> **TPS Benchmark Suite** | LOC: 221 | Risks: none
+- `docs/implementation-artifacts/code-review-1-1-wallet-core.md` -> **Unclassified** | LOC: 69 | Risks: none
+- `docs/implementation-artifacts/code-review-1-3-process-isolation.md` -> **Universal Asset Kernel** | LOC: 38 | Risks: none
+- `docs/implementation-artifacts/sprint-status.yaml` -> **X3 DEX** | LOC: 78 | Risks: none
+- `docs/implementation-artifacts/story-1-1-wallet-core.md` -> **Universal Asset Kernel** | LOC: 87 | Risks: none
+- `docs/implementation-artifacts/story-1-2-multi-chain-display.md` -> **EVM Integration** | LOC: 85 | Risks: none
+- `docs/implementation/IMPLEMENTATION_PLAN.md` -> **Universal Asset Kernel** | LOC: 259 | Risks: bridge risk
+- `docs/implementation/IMPLEMENTATION_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 181 | Risks: bridge risk
+- `docs/implementation/IMPLEMENTATION_SUMMARY_SESSION.md` -> **Universal Asset Kernel** | LOC: 542 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk, unsafe code
+- `docs/implementation/PHASE_4_5_EXECUTION_TICKETS.md` -> **TPS Benchmark Suite** | LOC: 491 | Risks: bridge risk, replay risk
+- `docs/implementation/PHASE_4_5_LIQUIDITY_IMPLEMENTATION_PLAN.md` -> **Universal Asset Kernel** | LOC: 386 | Risks: bridge risk, replay risk
+- `docs/implementation/PHASE_5_EXECUTION_TICKETS.md` -> **Universal Asset Kernel** | LOC: 517 | Risks: atomic rollback risk, bridge risk
+- `docs/infra-structure/README.md` -> **Universal Asset Kernel** | LOC: 132 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/dashboard/README.md` -> **TPS Benchmark Suite** | LOC: 74 | Risks: none
+- `docs/infra-structure/validator/IMPLEMENTATION_COMPLETE.md` -> **X3 DEX** | LOC: 351 | Risks: atomic rollback risk, local-only config risk
+- `docs/infra-structure/validator/LOCAL_TESTING_QUICKSTART.md` -> **X3 DEX** | LOC: 93 | Risks: none
+- `docs/infra-structure/validator/README.md` -> **Universal Asset Kernel** | LOC: 35 | Risks: none
+- `docs/infra-structure/validator/TESTING_SUMMARY.md` -> **EVM Integration** | LOC: 219 | Risks: atomic rollback risk, local-only config risk
+- `docs/infra-structure/validator/dashboard/README.md` -> **Universal Asset Kernel** | LOC: 6 | Risks: none
+- `docs/infra-structure/validator/docs/E2E_SECURITY_TESTING.md` -> **X3 DEX** | LOC: 397 | Risks: atomic rollback risk, local-only config risk
+- `docs/infra-structure/validator/docs/INFERSTRUCTOR_300X_TEST_PLAN.md` -> **Universal Asset Kernel** | LOC: 684 | Risks: local-only config risk, replay risk
+- `docs/infra-structure/validator/docs/README.md` -> **Validator / LaunchOps** | LOC: 7 | Risks: none
+- `docs/infra-structure/validator/docs/architecture.md` -> **Universal Asset Kernel** | LOC: 26 | Risks: atomic rollback risk
+- `docs/infra-structure/validator/docs/deployment.md` -> **Validator / LaunchOps** | LOC: 28 | Risks: none
+- `docs/infra-structure/validator/docs/monitoring.md` -> **EVM Integration** | LOC: 12 | Risks: atomic rollback risk
+- `docs/infra-structure/validator/docs/security.md` -> **X3 DEX** | LOC: 19 | Risks: atomic rollback risk
+- `docs/infra-structure/validator/kernels/README.md` -> **Universal Asset Kernel** | LOC: 21 | Risks: none
+- `docs/infra-structure/validator/tests/inferstructor/BUILD_COMPLETE.md` -> **Bridge / Router** | LOC: 474 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/tests/inferstructor/INTEGRATION_GUIDE.md` -> **Bridge / Router** | LOC: 604 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/tests/inferstructor/ONBOARDING_COMPLETE.md` -> **Bridge / Router** | LOC: 541 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/tests/inferstructor/PRODUCTION_DEPLOYMENT_GUIDE.md` -> **Universal Asset Kernel** | LOC: 466 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/tests/inferstructor/QUICKREF.md` -> **Universal Asset Kernel** | LOC: 189 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/tests/inferstructor/README.md` -> **Bridge / Router** | LOC: 497 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/tests/inferstructor/VALIDATOR_QUICKSTART.md` -> **Bridge / Router** | LOC: 394 | Risks: bridge risk, local-only config risk
+- `docs/infra-structure/validator/third_party/secp256k1-cuda-ecc/README.md` -> **Universal Asset Kernel** | LOC: 90 | Risks: none
+- `docs/infra/API_KEYS_REQUIRED.md` -> **Bridge / Router** | LOC: 127 | Risks: bridge risk
+- `docs/infra/FREE_MODELS_GUIDE.md` -> **Bridge / Router** | LOC: 188 | Risks: none
+- `docs/infra/README-RPC-ENDPOINTS.md` -> **Bridge / Router** | LOC: 134 | Risks: none
+- `docs/master/INDEX.md` -> **Universal Asset Kernel** | LOC: 91 | Risks: none
+- `docs/master/apps/x3-intelligence/UPGRADE_SUMMARY.md` -> **X3 DEX** | LOC: 149 | Risks: none
+- `docs/master/communications/TEAM_COMMUNICATIONS.md` -> **Launchpad** | LOC: 332 | Risks: none
+- `docs/master/desktop/ATLAS_DESKTOP_COMPLETE_GUIDE.md` -> **Universal Asset Kernel** | LOC: 352 | Risks: local-only config risk
+- `docs/master/desktop/ATLAS_DESKTOP_QUICK_REFERENCE.md` -> **X3 DEX** | LOC: 129 | Risks: local-only config risk
+- `docs/master/desktop/ATLAS_DESKTOP_VERIFICATION.md` -> **X3 DEX** | LOC: 259 | Risks: local-only config risk
+- `docs/master/docs-maintenance/DOCUMENTATION_INDEX.md` -> **Universal Asset Kernel** | LOC: 541 | Risks: bridge risk
+- `docs/master/docs-maintenance/MD_CONSOLIDATION_LOG.md` -> **X3 DEX** | LOC: 164 | Risks: unfinished logic
+- `docs/master/docs-maintenance/MD_PATH_UPDATES.md` -> **X3 DEX** | LOC: 49 | Risks: unfinished logic
+- `docs/master/getting-started/PRE_FLIGHT_CHECKLIST.md` -> **Launchpad** | LOC: 289 | Risks: atomic rollback risk, local-only config risk
+- `docs/master/getting-started/QUICKSTART.md` -> **Bridge / Router** | LOC: 138 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk
+- `docs/master/getting-started/SETUP_COMPLETE.md` -> **X3 DEX** | LOC: 209 | Risks: local-only config risk
+- `docs/master/implementation/GPU_SWARM_IMPLEMENTATION_COMPLETION_ARTIFACT.md` -> **X3VM / Cross-VM** | LOC: 394 | Risks: local-only config risk
+- `docs/master/implementation/GPU_SWARM_IMPLEMENTATION_INDEX.md` -> **X3VM / Cross-VM** | LOC: 519 | Risks: local-only config risk
+- `docs/master/implementation/IMPLEMENTATION_ARTIFACTS.md` -> **Universal Asset Kernel** | LOC: 459 | Risks: none
+- `docs/master/implementation/ORCHESTRA_IMPLEMENTATION_PLAN.md` -> **Governance** | LOC: 116 | Risks: replay risk
+- `docs/master/implementation/P3_IMPLEMENTATION_SUMMARY.md` -> **DEX Liquidity** | LOC: 537 | Risks: none
+- `docs/master/implementation/P4_IMPLEMENTATION_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 555 | Risks: none
+- `docs/master/operations/CARGO_BUILD_ISSUES.md` -> **X3VM / Cross-VM** | LOC: 333 | Risks: local-only config risk
+- `docs/master/operations/OPERATIONS_RUNBOOK.md` -> **X3 DEX** | LOC: 470 | Risks: atomic rollback risk, local-only config risk
+- `docs/master/operations/PRODUCTION_READINESS_CHECKPOINT.md` -> **Universal Asset Kernel** | LOC: 370 | Risks: none
+- `docs/master/operations/SYSTEM_MONITORING_IMPLEMENTATION.md` -> **Launchpad** | LOC: 335 | Risks: none
+- `docs/master/operations/TRIAL_SCHEDULE_32_AGENTS.md` -> **Governance** | LOC: 231 | Risks: replay risk, replay/nonce risk
+- `docs/master/releases/FULL_SHIPPING_READY.md` -> **Unclassified** | LOC: 412 | Risks: none
+- `docs/master/releases/PHASE5_EXECUTION_COMPLETE.md` -> **Unclassified** | LOC: 493 | Risks: none
+- `docs/master/releases/PHASE5_FILE_MANIFEST.md` -> **X3 DEX** | LOC: 359 | Risks: atomic rollback risk
+- `docs/master/releases/PHASE5_FINAL_DELIVERY_SUMMARY.md` -> **DEX Liquidity** | LOC: 582 | Risks: atomic rollback risk, bridge risk
+- `docs/master/releases/PHASE5_QUICK_SHIPPING_GUIDE.md` -> **Unclassified** | LOC: 403 | Risks: atomic rollback risk, local-only config risk
+- `docs/master/releases/PHASE5_VERIFICATION_COMPLETE.md` -> **Governance** | LOC: 373 | Risks: none
+- `docs/master/releases/SHIP_IT.md` -> **Universal Asset Kernel** | LOC: 360 | Risks: none
+- `docs/master/roadmaps/P3_QUICK_REFERENCE.md` -> **DEX Liquidity** | LOC: 563 | Risks: local-only config risk
+- `docs/master/roadmaps/P5_DAYS1-5_EVM_GPU_KERNEL_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 348 | Risks: atomic rollback risk
+- `docs/master/roadmaps/P5_DAYS6-10_ATOMIC_SWAP_ORCHESTRATOR_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 61 | Risks: atomic rollback risk, bridge risk
+- `docs/master/roadmaps/P5_STRATEGIC_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 496 | Risks: atomic rollback risk, bridge risk, local-only config risk
+- `docs/master/security/VOIR_DIRE_SPECIFICATION.md` -> **DEX Liquidity** | LOC: 165 | Risks: replay risk
+- `docs/master/status/DAY1_STATUS.md` -> **Universal Asset Kernel** | LOC: 27 | Risks: none
+- `docs/master/status/DAY2_STATUS.md` -> **Universal Asset Kernel** | LOC: 29 | Risks: none
+- `docs/master/status/DAY5_STATUS.md` -> **Universal Asset Kernel** | LOC: 34 | Risks: bridge risk
+- `docs/master/status/DAY6_STATUS.md` -> **Universal Asset Kernel** | LOC: 23 | Risks: none
+- `docs/master/status/P4_EXECUTIVE_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 310 | Risks: none
+- `docs/master/status/P4_MIDPOINT_MILESTONE_REPORT.md` -> **Universal Asset Kernel** | LOC: 308 | Risks: none
+- `docs/master/status/PROGRESS_P4.md` -> **Universal Asset Kernel** | LOC: 293 | Risks: bridge risk
+- `docs/master/status/PROJECT_STATUS.md` -> **Universal Asset Kernel** | LOC: 496 | Risks: none
+- `docs/master/testing/AGI_TEST_RESULTS.md` -> **Governance** | LOC: 106 | Risks: none
+- `docs/ollama-copilot-setup.md` -> **Unclassified** | LOC: 100 | Risks: none
+- `docs/openapi.yaml` -> **TPS Benchmark Suite** | LOC: 447 | Risks: local-only config risk
+- `docs/openspec/AGENTS.md` -> **Unclassified** | LOC: 457 | Risks: atomic rollback risk
+- `docs/openspec/changes/001-deploy-testnet/README.md` -> **DEX Liquidity** | LOC: 29 | Risks: none
+- `docs/openspec/changes/EXEC-MERKLE-BRIDGE-003/proposal.md` -> **Bridge / Router** | LOC: 461 | Risks: atomic rollback risk, bridge risk, panic risk, replay/nonce risk
+- `docs/openspec/changes/TESTNET-ARCH-001/proposal.md` -> **EVM Integration** | LOC: 140 | Risks: none
+- `docs/openspec/changes/add-cross-chain-gpu-validator/design.md` -> **Universal Asset Kernel** | LOC: 36 | Risks: atomic rollback risk
+- `docs/openspec/changes/add-cross-chain-gpu-validator/proposal.md` -> **Universal Asset Kernel** | LOC: 18 | Risks: atomic rollback risk
+- `docs/openspec/changes/add-cross-chain-gpu-validator/specs/cross-chain-gpu-validator/spec.md` -> **EVM Integration** | LOC: 60 | Risks: atomic rollback risk
+- `docs/openspec/changes/add-cross-chain-gpu-validator/tasks.md` -> **Universal Asset Kernel** | LOC: 26 | Risks: atomic rollback risk
+- `docs/openspec/changes/add-inferstructor-dashboard/design.md` -> **X3 DEX** | LOC: 29 | Risks: none
+- `docs/openspec/changes/add-inferstructor-dashboard/proposal.md` -> **X3 DEX** | LOC: 16 | Risks: none
+- `docs/openspec/changes/add-inferstructor-dashboard/specs/inferstructor-dashboard/spec.md` -> **X3 DEX** | LOC: 23 | Risks: none
+- `docs/openspec/changes/add-inferstructor-dashboard/tasks.md` -> **X3 DEX** | LOC: 24 | Risks: none
+- `docs/openspec/changes/add-offchain-jury/COMPLETION_SUMMARY.md` -> **Governance** | LOC: 389 | Risks: replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/DEPLOYMENT.md` -> **Bridge / Router** | LOC: 704 | Risks: bridge risk, local-only config risk
+- `docs/openspec/changes/add-offchain-jury/FINAL_COMPLETION_REPORT.md` -> **X3 DEX** | LOC: 451 | Risks: replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/IMPLEMENTATION_STATUS.md` -> **Governance** | LOC: 197 | Risks: replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/PHASE3_COMPLETION.md` -> **Bridge / Router** | LOC: 471 | Risks: bridge risk
+- `docs/openspec/changes/add-offchain-jury/PHASE4_2_ITERATION_COMPLETE.md` -> **Unclassified** | LOC: 394 | Risks: replay risk, replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/PHASE4_3_ARCHIVAL_COMPLETE.md` -> **Governance** | LOC: 644 | Risks: local-only config risk, replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/PHASE4_COMPLETION.md` -> **Unclassified** | LOC: 419 | Risks: local-only config risk
+- `docs/openspec/changes/add-offchain-jury/PHASE4_EXECUTIVE_SUMMARY.md` -> **TPS Benchmark Suite** | LOC: 268 | Risks: local-only config risk
+- `docs/openspec/changes/add-offchain-jury/PHASE4_ITERATION_ARCHIVAL.md` -> **X3 DEX** | LOC: 661 | Risks: local-only config risk
+- `docs/openspec/changes/add-offchain-jury/PHASE4_PILOT_EXECUTION.md` -> **GPU Validator Swarm** | LOC: 517 | Risks: local-only config risk, replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/PILOT_PLAN.md` -> **Unclassified** | LOC: 473 | Risks: local-only config risk, replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/USAGE.md` -> **Governance** | LOC: 447 | Risks: local-only config risk, replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/analyze_pilot.sh` -> **Unclassified** | LOC: 355 | Risks: local-only config risk
+- `docs/openspec/changes/add-offchain-jury/deploy.sh` -> **GPU Validator Swarm** | LOC: 164 | Risks: local-only config risk
+- `docs/openspec/changes/add-offchain-jury/design.md` -> **Governance** | LOC: 70 | Risks: replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/docker-compose.yml` -> **Bridge / Router** | LOC: 158 | Risks: bridge risk, local-only config risk
+- `docs/openspec/changes/add-offchain-jury/pilot_executor.py` -> **Unclassified** | LOC: 514 | Risks: local-only config risk, replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/proposal.md` -> **Governance** | LOC: 20 | Risks: none
+- `docs/openspec/changes/add-offchain-jury/specs/orchestra-governance/severity-taxonomy.md` -> **Governance** | LOC: 115 | Risks: none
+- `docs/openspec/changes/add-offchain-jury/specs/orchestra-governance/spec.md` -> **Governance** | LOC: 184 | Risks: none
+- `docs/openspec/changes/add-offchain-jury/specs/swarm/spec.md` -> **DEX Liquidity** | LOC: 76 | Risks: replay/nonce risk
+- `docs/openspec/changes/add-offchain-jury/tasks.md` -> **Governance** | LOC: 48 | Risks: none
+- `docs/openspec/changes/add-openspec-swarm-integration/design.md` -> **Governance** | LOC: 33 | Risks: none
+- `docs/openspec/changes/add-openspec-swarm-integration/proposal.md` -> **Unclassified** | LOC: 16 | Risks: none
+- `docs/openspec/changes/add-openspec-swarm-integration/specs/orchestra-ops/spec.md` -> **Unclassified** | LOC: 47 | Risks: none
+- `docs/openspec/changes/add-openspec-swarm-integration/tasks.md` -> **Unclassified** | LOC: 16 | Risks: none
+- `docs/openspec/changes/add-social-agent-swarm/design.md` -> **Unclassified** | LOC: 30 | Risks: none
+- `docs/openspec/changes/add-social-agent-swarm/proposal.md` -> **Unclassified** | LOC: 16 | Risks: none
+- `docs/openspec/changes/add-social-agent-swarm/specs/social-agent-swarm/spec.md` -> **Unclassified** | LOC: 44 | Risks: none
+- `docs/openspec/changes/add-social-agent-swarm/tasks.md` -> **Unclassified** | LOC: 7 | Risks: none
+- `docs/openspec/changes/add-swarm-orchestra-platform/design.md` -> **Governance** | LOC: 16 | Risks: replay risk
+- `docs/openspec/changes/add-swarm-orchestra-platform/proposal.md` -> **Universal Asset Kernel** | LOC: 73 | Risks: replay risk
+- `docs/openspec/changes/add-swarm-orchestra-platform/tasks.md` -> **Governance** | LOC: 33 | Risks: none
+- `docs/openspec/changes/add-x3-coin-layer/design.md` -> **Universal Asset Kernel** | LOC: 36 | Risks: bridge risk, replay risk, replay/nonce risk
+- `docs/openspec/changes/add-x3-coin-layer/proposal.md` -> **Universal Asset Kernel** | LOC: 55 | Risks: bridge risk, replay risk
+- `docs/openspec/changes/add-x3-coin-layer/specs/x3-bonus-pool/spec.md` -> **DEX Liquidity** | LOC: 27 | Risks: none
+- `docs/openspec/changes/add-x3-coin-layer/specs/x3-coin/spec.md` -> **Universal Asset Kernel** | LOC: 53 | Risks: none
+- `docs/openspec/changes/add-x3-coin-layer/specs/x3-mirror-btc/spec.md` -> **Proof System** | LOC: 20 | Risks: none
+- `docs/openspec/changes/add-x3-coin-layer/specs/x3-mirror-evm/spec.md` -> **EVM Integration** | LOC: 27 | Risks: none
+- `docs/openspec/changes/add-x3-coin-layer/specs/x3-mirror-svm/spec.md` -> **SVM Integration** | LOC: 24 | Risks: none
+- `docs/openspec/changes/add-x3-coin-layer/specs/x3-proof-bridge/spec.md` -> **Bridge / Router** | LOC: 37 | Risks: replay risk
+- `docs/openspec/changes/add-x3-coin-layer/tasks.md` -> **Universal Asset Kernel** | LOC: 43 | Risks: replay risk, replay/nonce risk
+- `docs/openspec/changes/jury-blockchain-anchoring/COMPLETE_DELIVERY.md` -> **Unclassified** | LOC: 435 | Risks: none
+- `docs/openspec/changes/jury-blockchain-anchoring/DEPLOYMENT_GUIDE.md` -> **Governance** | LOC: 568 | Risks: atomic rollback risk, local-only config risk
+- `docs/openspec/changes/jury-blockchain-anchoring/FILE_MANIFEST.md` -> **Unclassified** | LOC: 473 | Risks: atomic rollback risk
+- `docs/openspec/changes/jury-blockchain-anchoring/GUIDE.md` -> **Governance** | LOC: 733 | Risks: local-only config risk, replay/nonce risk
+- `docs/openspec/changes/jury-blockchain-anchoring/OPERATIONS_RUNBOOK.md` -> **DEX Liquidity** | LOC: 446 | Risks: atomic rollback risk, local-only config risk
+- `docs/openspec/changes/jury-blockchain-anchoring/PRE_FLIGHT_CHECKLIST.md` -> **Unclassified** | LOC: 442 | Risks: atomic rollback risk, local-only config risk
+- `docs/openspec/changes/jury-blockchain-anchoring/QUICK_REFERENCE.md` -> **TPS Benchmark Suite** | LOC: 301 | Risks: atomic rollback risk
+- `docs/openspec/changes/jury-blockchain-anchoring/TEAM_COMMUNICATIONS.md` -> **Governance** | LOC: 311 | Risks: none
+- `docs/openspec/changes/jury-blockchain-anchoring/design.md` -> **Governance** | LOC: 705 | Risks: replay/nonce risk
+- `docs/openspec/changes/jury-blockchain-anchoring/proposal.md` -> **X3 DEX** | LOC: 193 | Risks: bridge risk
+- `docs/openspec/changes/p4-solana-gpu-acceleration/P4_IMPLEMENTATION_GUIDE.md` -> **Universal Asset Kernel** | LOC: 434 | Risks: none
+- `docs/openspec/changes/p4-solana-gpu-acceleration/proposal.py` -> **Universal Asset Kernel** | LOC: 335 | Risks: none
+- `docs/openspec/changes/refactor-swarm-legacy/proposal.md` -> **GPU Validator Swarm** | LOC: 16 | Risks: none
+- `docs/openspec/changes/refactor-swarm-legacy/specs/inferstructor-runtime/spec.md` -> **Launchpad** | LOC: 13 | Risks: none
+- `docs/openspec/changes/refactor-swarm-legacy/tasks.md` -> **Launchpad** | LOC: 12 | Risks: none
+- `docs/openspec/committee-reexec-fraudproofs-v0/witness.md` -> **Universal Asset Kernel** | LOC: 220 | Risks: replay/nonce risk
+- `docs/openspec/project.md` -> **Universal Asset Kernel** | LOC: 84 | Risks: bridge risk
+- `docs/openspec/specs/operator-dashboard/spec.md` -> **GPU Validator Swarm** | LOC: 27 | Risks: none
+- `docs/openspec/specs/x3-language/spec.md` -> **Validator / LaunchOps** | LOC: 15 | Risks: none
+- `docs/openspec/x3-language-grammar.md` -> **X3 DEX** | LOC: 87 | Risks: atomic rollback risk
+- `docs/operations/MCP_CONFIGURATION.md` -> **Bridge / Router** | LOC: 70 | Risks: none
+- `docs/ops/CODE_IMPORTS_FIX_LOG.md` -> **X3 DEX** | LOC: 605 | Risks: bridge risk
+- `docs/ops/MD_REPORT_INDEX.md` -> **X3 DEX** | LOC: 179 | Risks: unfinished logic
+- `docs/ops/STALE_PATH_CLEANUP_LOG.md` -> **Unclassified** | LOC: 10 | Risks: none
+- `docs/ops/STALE_PATH_SWEEP_FINAL.md` -> **Unclassified** | LOC: 4 | Risks: none
+- `docs/ops/WORD_CORRUPTION_FIX_LOG.md` -> **Unclassified** | LOC: 6434 | Risks: bridge risk, replay risk, unfinished logic
+- `docs/ops/WORD_CORRUPTION_FIX_LOG_2.md` -> **Unclassified** | LOC: 5391 | Risks: bridge risk, replay risk, unfinished logic
+- `docs/overview.md` -> **Bridge / Router** | LOC: 161 | Risks: none
+- `docs/packages/py-sdk/README.md` -> **Universal Asset Kernel** | LOC: 235 | Risks: local-only config risk, replay/nonce risk
+- `docs/packages/ts-sdk/README.md` -> **Universal Asset Kernel** | LOC: 385 | Risks: local-only config risk, replay/nonce risk
+- `docs/patches/README.md` -> **Universal Asset Kernel** | LOC: 78 | Risks: none
+- `docs/patches/ahash/FAQ.md` -> **Launchpad** | LOC: 119 | Risks: none
+- `docs/patches/ahash/README.md` -> **TPS Benchmark Suite** | LOC: 110 | Risks: none
+- `docs/patches/ar_archive_writer/Readme.md` -> **X3VM / Cross-VM** | LOC: 18 | Risks: none
+- `docs/patches/ar_archive_writer/reference/Readme.md` -> **X3VM / Cross-VM** | LOC: 25 | Risks: none
+- `docs/patches/fastbloom/README.md` -> **Universal Asset Kernel** | LOC: 120 | Risks: none
+- `docs/patches/fastrand/CHANGELOG.md` -> **Unclassified** | LOC: 125 | Risks: unsafe code
+- `docs/patches/fastrand/README.md` -> **TPS Benchmark Suite** | LOC: 111 | Risks: none
+- `docs/patches/home/README.md` -> **TPS Benchmark Suite** | LOC: 39 | Risks: none
+- `docs/patches/idna_adapter/README.md` -> **TPS Benchmark Suite** | LOC: 36 | Risks: none
+- `docs/patches/jobserver/README.md` -> **TPS Benchmark Suite** | LOC: 34 | Risks: none
+- `docs/patches/memfd/README.md` -> **Universal Asset Kernel** | LOC: 50 | Risks: none
+- `docs/patches/pallet-collective/README.md` -> **Unclassified** | LOC: 26 | Risks: none
+- `docs/patches/pallet-transaction-payment-rpc-runtime-api/README.md` -> **Unclassified** | LOC: 4 | Risks: none
+- `docs/patches/parity-wasm/README.md` -> **TPS Benchmark Suite** | LOC: 69 | Risks: panic risk
+- `docs/patches/rand_core/CHANGELOG.md` -> **X3 DEX** | LOC: 136 | Risks: unsafe code
+- `docs/patches/rand_core/README.md` -> **TPS Benchmark Suite** | LOC: 57 | Risks: none
+- `docs/patches/sc-executor/README.md` -> **Unclassified** | LOC: 13 | Risks: none
+- `docs/patches/sc-rpc-server/README.md` -> **Unclassified** | LOC: 4 | Risks: none
+- `docs/patches/tempfile/CHANGELOG.md` -> **Universal Asset Kernel** | LOC: 385 | Risks: unsafe code
+- `docs/patches/tempfile/README.md` -> **TPS Benchmark Suite** | LOC: 64 | Risks: panic risk
+- `docs/patches/uuid/README.md` -> **TPS Benchmark Suite** | LOC: 90 | Risks: none
+- `docs/patches/wasm-instrument/README.md` -> **TPS Benchmark Suite** | LOC: 34 | Risks: none
+- `docs/planning-artifacts/AISwarmCoordinator.sol` -> **X3 DEX** | LOC: 880 | Risks: unsafe code
+- `docs/planning-artifacts/PRD.md` -> **Universal Asset Kernel** | LOC: 318 | Risks: atomic rollback risk, bridge risk, replay risk
+- `docs/planning-artifacts/PRD_COMPLETE_PROJECT.md` -> **Universal Asset Kernel** | LOC: 595 | Risks: atomic rollback risk, bridge risk, panic risk, unfinished logic, unsafe code
+- `docs/planning-artifacts/PRD_pentest.md` -> **Unclassified** | LOC: 15 | Risks: none
+- `docs/planning-artifacts/PRIORITY_TASKS_COMPLETION.md` -> **Universal Asset Kernel** | LOC: 376 | Risks: bridge risk, local-only config risk
+- `docs/planning-artifacts/SPRINT_12_PHASE_2_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 341 | Risks: none
+- `docs/planning-artifacts/SPRINT_13_PHASE_2_PLAN.md` -> **Universal Asset Kernel** | LOC: 454 | Risks: none
+- `docs/planning-artifacts/TIER5_DESKTOP_IMPLEMENTATION_PLAN.md` -> **DEX Liquidity** | LOC: 608 | Risks: none
+- `docs/planning-artifacts/TIER5_EXECUTION_PLAN.md` -> **Governance** | LOC: 271 | Risks: none
+- `docs/planning-artifacts/TIER6_7_IMPLEMENTATION_ROADMAP.md` -> **DEX Liquidity** | LOC: 105 | Risks: none
+- `docs/planning-artifacts/architecture.md` -> **Universal Asset Kernel** | LOC: 265 | Risks: bridge risk, replay/nonce risk
+- `docs/planning-artifacts/epics.md` -> **Universal Asset Kernel** | LOC: 355 | Risks: none
+- `docs/planning-artifacts/prd.md` -> **Universal Asset Kernel** | LOC: 153 | Risks: none
+- `docs/planning-artifacts/product-brief-atlas-sphere-master-2026-02-13.md` -> **Universal Asset Kernel** | LOC: 305 | Risks: none
+- `docs/planning-artifacts/ux-design-specification.md` -> **Universal Asset Kernel** | LOC: 321 | Risks: none
+- `docs/proposals/P4_SOLANA_TPS_ACCELERATION.md` -> **DEX Liquidity** | LOC: 477 | Risks: none
+- `docs/release-notes/2026-04-30-launch-evidence-delta.md` -> **EVM Integration** | LOC: 54 | Risks: none
+- `docs/release-notes/CANDIDATE_EVIDENCE_PACK_SPEC.md` -> **GPU Validator Swarm** | LOC: 49 | Risks: replay risk
+- `docs/release-notes/CANDIDATE_SIGNOFF_TEMPLATE.md` -> **EVM Integration** | LOC: 50 | Risks: none
+- `docs/release-notes/RELEASE_CANDIDATE_CHECKLIST.md` -> **EVM Integration** | LOC: 54 | Risks: replay risk
+- `docs/release-notes/gpu-swarm-v0.1.0.md` -> **Universal Asset Kernel** | LOC: 30 | Risks: none
+- `docs/reports/.ai-todo/state/TODO.md` -> **Governance** | LOC: 49 | Risks: atomic rollback risk
+- `docs/reports/.md_files_audit_todo.md` -> **X3 DEX** | LOC: 45 | Risks: none
+- `docs/reports/ACCOMPLISHMENTS.md` -> **Universal Asset Kernel** | LOC: 399 | Risks: atomic rollback risk, replay/nonce risk
+- `docs/reports/AI_SWARM_INTEGRATION_TASKS.md` -> **Bridge / Router** | LOC: 44 | Risks: none
+- `docs/reports/ATLAS_SPHERE_DEFI_IMPLEMENTATION_STATUS.md` -> **Bridge / Router** | LOC: 107 | Risks: none
+- `docs/reports/ATLAS_SPHERE_DEFI_TODO.md` -> **Bridge / Router** | LOC: 184 | Risks: unfinished logic
+- `docs/reports/ATLAS_SPHERE_DNS_SYSTEM.md` -> **X3 DEX** | LOC: 303 | Risks: none
+- `docs/reports/ATLAS_SPHERE_FRONTEND_PROGRESS.md` -> **Bridge / Router** | LOC: 57 | Risks: none
+- `docs/reports/ATLAS_SPHERE_IMPLEMENTATION_PLAN.md` -> **Bridge / Router** | LOC: 70 | Risks: none
+- `docs/reports/ATLAS_SPHERE_STATUS.md` -> **Universal Asset Kernel** | LOC: 349 | Risks: bridge risk, unfinished logic
+- `docs/reports/AUTONOMOUS_SECURITY_CONSTITUTION_WIRING_GAP_LIST.md` -> **Universal Asset Kernel** | LOC: 129 | Risks: atomic rollback risk, bridge risk
+- `docs/reports/BLOCKCHAIN_INTEGRATION_PHASE4.md` -> **Bridge / Router** | LOC: 345 | Risks: none
+- `docs/reports/BLOCKCHAIN_NETWORKS_CHECKLIST.md` -> **Bridge / Router** | LOC: 570 | Risks: bridge risk, panic risk
+- `docs/reports/BRANCH_COVERAGE_IMPROVEMENT_STRATEGY.md` -> **Unclassified** | LOC: 297 | Risks: local-only config risk, panic risk
+- `docs/reports/BRANCH_MERGE_GUIDE.md` -> **Universal Asset Kernel** | LOC: 293 | Risks: atomic rollback risk
+- `docs/reports/CLINE.md` -> **Unclassified** | LOC: 18 | Risks: none
+- `docs/reports/COMPILER_MILESTONE_70_PERCENT.md` -> **TPS Benchmark Suite** | LOC: 370 | Risks: none
+- `docs/reports/COMPREHENSIVE_CODEBASE_ANALYSIS.md` -> **Universal Asset Kernel** | LOC: 392 | Risks: bridge risk
+- `docs/reports/COMPREHENSIVE_TASK_PROGRESS.md` -> **TPS Benchmark Suite** | LOC: 55 | Risks: none
+- `docs/reports/COND_FOLD_BEFORE_AFTER.md` -> **Unclassified** | LOC: 269 | Risks: none
+- `docs/reports/COND_FOLD_ENHANCED.md` -> **Unclassified** | LOC: 170 | Risks: none
+- `docs/reports/COND_FOLD_IMPLEMENTATION.md` -> **X3 DEX** | LOC: 308 | Risks: none
+- `docs/reports/COND_FOLD_INDEX.md` -> **X3 DEX** | LOC: 296 | Risks: none
+- `docs/reports/COND_FOLD_QUICK_REFERENCE.md` -> **Unclassified** | LOC: 339 | Risks: panic risk
+- `docs/reports/CROSS_CHAIN_POSITION_MANAGER_IMPLEMENTATION_STATUS.md` -> **Universal Asset Kernel** | LOC: 408 | Risks: atomic rollback risk
+- `docs/reports/CROSS_CHAIN_POSITION_MANAGER_TASKS.md` -> **Universal Asset Kernel** | LOC: 140 | Risks: atomic rollback risk
+- `docs/reports/CROSS_VM_CROSS_CHAIN_100_TRACKER.md` -> **Bridge / Router** | LOC: 457 | Risks: atomic rollback risk, bridge risk, unfinished logic
+- `docs/reports/DELIVERABLES_MANIFEST.md` -> **Universal Asset Kernel** | LOC: 319 | Risks: bridge risk
+- `docs/reports/DEVELOPER_TOOLS.md` -> **Universal Asset Kernel** | LOC: 393 | Risks: none
+- `docs/reports/DNS_SERVER_BINARY_TARGET_FIX_TASKLIST.md` -> **Unclassified** | LOC: 126 | Risks: none
+- `docs/reports/DNS_SERVER_BINARY_TARGET_RESOLUTION_FINAL.md` -> **Unclassified** | LOC: 120 | Risks: none
+- `docs/reports/DNS_SERVER_BUILD_TASK_LIST.md` -> **Unclassified** | LOC: 34 | Risks: none
+- `docs/reports/DNS_SERVER_IMPLEMENTATION_STATUS.md` -> **Unclassified** | LOC: 106 | Risks: local-only config risk
+- `docs/reports/DNS_SERVER_PHASE2_ROADMAP.md` -> **TPS Benchmark Suite** | LOC: 41 | Risks: none
+- `docs/reports/DOMINANCE_BASED_COND_FOLD.md` -> **Unclassified** | LOC: 350 | Risks: none
+- `docs/reports/E2E_INTEGRATION_TESTS_PRODUCTION_READY.md` -> **GPU Validator Swarm** | LOC: 237 | Risks: local-only config risk
+- `docs/reports/E2E_INTEGRATION_TESTS_TODO.md` -> **Universal Asset Kernel** | LOC: 93 | Risks: unfinished logic
+- `docs/reports/E2E_INTEGRATION_TEST_PLAN.md` -> **Universal Asset Kernel** | LOC: 1041 | Risks: bridge risk, local-only config risk
+- `docs/reports/ECOSYSTEM_STATUS.md` -> **Bridge / Router** | LOC: 197 | Risks: bridge risk
+- `docs/reports/EPIC1-DAILY-CHECKLIST.md` -> **Genesis / Chain Spec** | LOC: 410 | Risks: none
+- `docs/reports/EPIC1-EXECUTION-MASTER.md` -> **X3 DEX** | LOC: 444 | Risks: none
+- `docs/reports/FEATURE_ANALYSIS.md` -> **X3 DEX** | LOC: 398 | Risks: none
+- `docs/reports/FILES_CREATED_MODIFIED.md` -> **TPS Benchmark Suite** | LOC: 472 | Risks: local-only config risk
+- `docs/reports/FILE_MANIFEST.md` -> **Bridge / Router** | LOC: 398 | Risks: local-only config risk
+- `docs/reports/FLASH_FINALITY_PROGRESS.md` -> **Bridge / Router** | LOC: 307 | Risks: bridge risk, unfinished logic
+- `docs/reports/FRAMER_MOTION_FIX_TODO.md` -> **Unclassified** | LOC: 38 | Risks: none
+- `docs/reports/FRONTEND_ECOSYSTEM_INTEGRATION.md` -> **Bridge / Router** | LOC: 190 | Risks: bridge risk, local-only config risk
+- `docs/reports/FRONTEND_SHOWCASE_TASK_LIST.md` -> **X3 DEX** | LOC: 73 | Risks: none
+- `docs/reports/FUNCTIONAL_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 1021 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, replay/nonce risk
+- `docs/reports/GPU_SWARM_MASTER_ARCHITECTURE.md` -> **Bridge / Router** | LOC: 525 | Risks: atomic rollback risk, bridge risk, replay risk
+- `docs/reports/IMPLEMENTATION_AUDIT_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 199 | Risks: bridge risk
+- `docs/reports/IMPLEMENTATION_AUDIT_TASK_LIST.md` -> **EVM Integration** | LOC: 887 | Risks: none
+- `docs/reports/IMPLEMENTATION_COMPLETE.md` -> **Bridge / Router** | LOC: 220 | Risks: bridge risk, unfinished logic
+- `docs/reports/IMPLEMENTATION_REVIEW_CORRECTIONS.md` -> **Universal Asset Kernel** | LOC: 322 | Risks: bridge risk, replay/nonce risk
+- `docs/reports/IMPLEMENTATION_SUMMARY.md` -> **X3 DEX** | LOC: 549 | Risks: local-only config risk
+- `docs/reports/IMPLEMENTATION_VERIFICATION.md` -> **Universal Asset Kernel** | LOC: 342 | Risks: atomic rollback risk, bridge risk
+- `docs/reports/INTEGRATION_COMPILATION_GUIDE.md` -> **Universal Asset Kernel** | LOC: 485 | Risks: bridge risk, local-only config risk
+- `docs/reports/INVARIANT_HASHES.md` -> **Universal Asset Kernel** | LOC: 49 | Risks: atomic rollback risk
+- `docs/reports/L0-01-GENESIS-CONFIGURATION-ENGINE.md` -> **Universal Asset Kernel** | LOC: 1076 | Risks: replay risk, replay/nonce risk
+- `docs/reports/L0-02-APPEND-ONLY-CHANGE-LEDGER.md` -> **Universal Asset Kernel** | LOC: 1003 | Risks: none
+- `docs/reports/L0-03-CAPABILITY-REGISTRY.md` -> **Universal Asset Kernel** | LOC: 791 | Risks: none
+- `docs/reports/L1-01-OPERATOR-REGISTRY.md` -> **Universal Asset Kernel** | LOC: 883 | Risks: none
+- `docs/reports/LOOP_PACK_V1_FRAMEWORK.md` -> **X3VM / Cross-VM** | LOC: 248 | Risks: unsafe code
+- `docs/reports/MD_SUPERVISOR_DELIVERY.md` -> **Bridge / Router** | LOC: 458 | Risks: atomic rollback risk, bridge risk, replay risk, unsafe code
+- `docs/reports/MERGE_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 310 | Risks: atomic rollback risk
+- `docs/reports/MERGE_PROJECT_README.md` -> **Unclassified** | LOC: 271 | Risks: atomic rollback risk
+- `docs/reports/OPTIMIZATION_PASS_A_STATUS.md` -> **Unclassified** | LOC: 542 | Risks: none
+- `docs/reports/PASS_B_ROADMAP.md` -> **X3VM / Cross-VM** | LOC: 424 | Risks: unsafe code
+- `docs/reports/PHASE2_ROADMAP_VALUE_NUMBERING.md` -> **Unclassified** | LOC: 359 | Risks: none
+- `docs/reports/PHASE3_LOAD_HOISTING_GUIDE.md` -> **TPS Benchmark Suite** | LOC: 453 | Risks: unsafe code
+- `docs/reports/PHASE4_5_IMPLEMENTATION.md` -> **DEX Liquidity** | LOC: 352 | Risks: none
+- `docs/reports/PHASE4_DOCUMENTATION_INDEX.md` -> **X3 DEX** | LOC: 285 | Risks: none
+- `docs/reports/PHASE5_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 337 | Risks: none
+- `docs/reports/PHASE6_DOCUMENTATION_INDEX.md` -> **X3 DEX** | LOC: 223 | Risks: none
+- `docs/reports/PHASE6_QUICK_START.md` -> **X3 DEX** | LOC: 160 | Risks: none
+- `docs/reports/PHASE7_CLI_INTEGRATION.md` -> **Unclassified** | LOC: 103 | Risks: none
+- `docs/reports/PHASE_2_TEST_VERIFICATION.md` -> **Universal Asset Kernel** | LOC: 268 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `docs/reports/PRE_STRATEGIC_ROADMAP.md` -> **X3VM / Cross-VM** | LOC: 253 | Risks: none
+- `docs/reports/PRODUCTION_READINESS_STATUS.md` -> **Bridge / Router** | LOC: 99 | Risks: atomic rollback risk
+- `docs/reports/PRODUCTION_READINESS_TODO.md` -> **Universal Asset Kernel** | LOC: 1328 | Risks: atomic rollback risk, bridge risk, panic risk
+- `docs/reports/PROJECT_STATUS.md` -> **Universal Asset Kernel** | LOC: 268 | Risks: bridge risk
+- `docs/reports/QUICK_REFERENCE.md` -> **Universal Asset Kernel** | LOC: 255 | Risks: bridge risk
+- `docs/reports/QUICK_REFERENCE_LOOP_PACK.md` -> **TPS Benchmark Suite** | LOC: 242 | Risks: unsafe code
+- `docs/reports/QUICK_REFERENCE_LOOP_PACK_V1.md` -> **X3 DEX** | LOC: 183 | Risks: none
+- `docs/reports/RXJS_IMPORT_FIX_TODO.md` -> **Unclassified** | LOC: 18 | Risks: none
+- `docs/reports/TASK_PROGRESS.md` -> **Unclassified** | LOC: 26 | Risks: none
+- `docs/reports/TESTNET_ANNOUNCEMENT.md` -> **Universal Asset Kernel** | LOC: 314 | Risks: bridge risk
+- `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST.md` -> **X3VM / Cross-VM** | LOC: 334 | Risks: local-only config risk
+- `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST_OPENSPEC.md` -> **X3VM / Cross-VM** | LOC: 258 | Risks: local-only config risk
+- `docs/reports/TESTNET_DEPLOYMENT_GUIDE.md` -> **Universal Asset Kernel** | LOC: 634 | Risks: bridge risk, local-only config risk
+- `docs/reports/TESTNET_DOCS_PACKAGE.md` -> **Universal Asset Kernel** | LOC: 481 | Risks: bridge risk
+- `docs/reports/TESTNET_QUICKSTART.md` -> **Universal Asset Kernel** | LOC: 306 | Risks: replay/nonce risk
+- `docs/reports/TESTNET_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 494 | Risks: atomic rollback risk, bridge risk
+- `docs/reports/TIER5_FINAL_DELIVERY_VALIDATION.md` -> **Governance** | LOC: 588 | Risks: atomic rollback risk, unsafe code
+- `docs/reports/TIER5_FINAL_VERIFICATION_SUMMARY.md` -> **EVM Integration** | LOC: 395 | Risks: none
+- `docs/reports/TIER5_PERFORMANCE_BENCHMARKS.md` -> **Governance** | LOC: 809 | Risks: none
+- `docs/reports/TIER5_PROGRESS.md` -> **Governance** | LOC: 313 | Risks: unsafe code
+- `docs/reports/TIER5_PROGRESS_PHASE3_COMPLETE.md` -> **Bridge / Router** | LOC: 241 | Risks: bridge risk, unsafe code
+- `docs/reports/TIER5_SECURITY_AUDIT.md` -> **Governance** | LOC: 722 | Risks: replay risk, replay/nonce risk, unsafe code
+- `docs/reports/TIER5_SPRINT_SUMMARY.md` -> **Governance** | LOC: 475 | Risks: atomic rollback risk
+- `docs/reports/TIER5_VALIDATION_REPORT.md` -> **EVM Integration** | LOC: 575 | Risks: none
+- `docs/reports/TIER5_VERIFICATION_FINAL_REPORT.md` -> **Bridge / Router** | LOC: 361 | Risks: bridge risk
+- `docs/reports/TIER6_7_EXECUTION_COMPLETE.md` -> **DEX Liquidity** | LOC: 449 | Risks: atomic rollback risk
+- `docs/reports/TIER6_7_FRONTEND_INTEGRATION.md` -> **Unclassified** | LOC: 581 | Risks: local-only config risk, panic risk
+- `docs/reports/TIER8-COMPLETION-SUMMARY.md` -> **X3 DEX** | LOC: 406 | Risks: none
+- `docs/reports/TIER8-DORKS-FRONTEND-INTEGRATION.md` -> **Bridge / Router** | LOC: 1086 | Risks: none
+- `docs/reports/TIER8-IMPLEMENTATION-CHECKLIST.md` -> **X3 DEX** | LOC: 572 | Risks: none
+- `docs/reports/TIER8-QUICK-REFERENCE.md` -> **X3 DEX** | LOC: 606 | Risks: none
+- `docs/reports/TIER9-DELIVERY-SUMMARY.md` -> **X3 DEX** | LOC: 360 | Risks: none
+- `docs/reports/TIER9-FUNDING-WAR-PLAN-INTEGRATION.md` -> **X3 DEX** | LOC: 521 | Risks: local-only config risk, panic risk
+- `docs/reports/TODO.md` -> **Governance** | LOC: 49 | Risks: atomic rollback risk
+- `docs/reports/TPS_INTEGRATION_SUMMARY.md` -> **TPS Benchmark Suite** | LOC: 390 | Risks: local-only config risk
+- `docs/reports/TPS_OPTIMIZATION_STRATEGY.md` -> **Bridge / Router** | LOC: 223 | Risks: bridge risk
+- `docs/reports/VALIDATION_FACT_SHEET.md` -> **Universal Asset Kernel** | LOC: 146 | Risks: atomic rollback risk, replay/nonce risk
+- `docs/reports/WASM_BUILD_FIXED.md` -> **Bridge / Router** | LOC: 171 | Risks: bridge risk
+- `docs/reports/WASM_BUILD_ISSUE.md` -> **Launchpad** | LOC: 177 | Risks: panic risk
+- `docs/reports/WORKFLOW_FIXES.md` -> **Unclassified** | LOC: 85 | Risks: none
+- `docs/reports/X3_ATLAS_SPHERE_CODEBASE_ANALYSIS.md` -> **Universal Asset Kernel** | LOC: 613 | Risks: bridge risk, local-only config risk, panic risk
+- `docs/reports/X3_BENCHMARK_REPORT_SCHEMA.md` -> **EVM Integration** | LOC: 238 | Risks: replay risk
+- `docs/reports/X3_CONNECT_PRODUCT_BLUEPRINT.md` -> **Bridge / Router** | LOC: 305 | Risks: bridge risk, replay risk
+- `docs/reports/X3_CRM_COMPLETE_SYSTEM.md` -> **X3 DEX** | LOC: 539 | Risks: none
+- `docs/reports/X3_DEPLOYMENT_INDEX.md` -> **Universal Asset Kernel** | LOC: 283 | Risks: replay risk
+- `docs/reports/X3_EXECUTION_ROADMAP.md` -> **Universal Asset Kernel** | LOC: 525 | Risks: atomic rollback risk, replay risk
+- `docs/reports/X3_HOLOGRAPHIC_EXECUTION_FABRIC_SPEC.md` -> **Bridge / Router** | LOC: 243 | Risks: bridge risk, replay risk
+- `docs/reports/X3_MILESTONE_TRACKING.md` -> **Universal Asset Kernel** | LOC: 398 | Risks: atomic rollback risk, bridge risk
+- `docs/reports/X3_QUICK_START.md` -> **Universal Asset Kernel** | LOC: 300 | Risks: none
+- `docs/reports/X3_REBRAND_PHASE1.md` -> **EVM Integration** | LOC: 36 | Risks: none
+- `docs/reports/X3_REBRAND_PHASE2.md` -> **Universal Asset Kernel** | LOC: 68 | Risks: none
+- `docs/reports/X3_REBRAND_PHASE3.md` -> **X3 DEX** | LOC: 41 | Risks: none
+- `docs/reports/XCHECKLIST.md` -> **Universal Asset Kernel** | LOC: 357 | Risks: bridge risk, replay risk
+- `docs/reports/codebase-analysis-plan.md` -> **Unclassified** | LOC: 48 | Risks: none
+- `docs/reports/codebase-analysis-report.md` -> **Universal Asset Kernel** | LOC: 252 | Risks: bridge risk, known issue, unfinished logic
+- `docs/reports/codebase-analysis-todo.md` -> **Universal Asset Kernel** | LOC: 64 | Risks: bridge risk, unfinished logic
+- `docs/reports/p4_day1_bottlenecks.md` -> **Universal Asset Kernel** | LOC: 17 | Risks: none
+- `docs/reports/security_best_practices_report.md` -> **Universal Asset Kernel** | LOC: 87 | Risks: replay risk, replay/nonce risk
+- `docs/reports/validation-progress.md` -> **X3VM / Cross-VM** | LOC: 39 | Risks: none
+- `docs/reports/validation-results-high-priority.md` -> **EVM Integration** | LOC: 72 | Risks: none
+- `docs/roadmap.md` -> **Universal Asset Kernel** | LOC: 399 | Risks: bridge risk
+- `docs/root/DEPENDENCY_AUDIT.md` -> **SVM Integration** | LOC: 44 | Risks: none
+- `docs/root/FEATURE_FLAGS.md` -> **EVM Integration** | LOC: 44 | Risks: none
+- `docs/root/FLASH_FINALITY_QUICKSTART.md` -> **Bridge / Router** | LOC: 322 | Risks: bridge risk, local-only config risk, unfinished logic
+- `docs/root/HARDWARE-ACQUISITION-COMPLETE.md` -> **Proof System** | LOC: 335 | Risks: none
+- `docs/root/HARDWARE-ACQUISITION-INTEGRATION.md` -> **Bridge / Router** | LOC: 401 | Risks: panic risk
+- `docs/root/HARDWARE-ACQUISITION-PLAYBOOK.md` -> **Universal Asset Kernel** | LOC: 539 | Risks: none
+- `docs/root/README.md` -> **Universal Asset Kernel** | LOC: 730 | Risks: bridge risk, replay/nonce risk
+- `docs/root/REPO_LAYOUT.md` -> **X3VM / Cross-VM** | LOC: 39 | Risks: none
+- `docs/root/defi-technical-interview-guide-questions-for-blockchain-engineers.md` -> **Universal Asset Kernel** | LOC: 97 | Risks: bridge risk
+- `docs/rpc.md` -> **Universal Asset Kernel** | LOC: 558 | Risks: local-only config risk, replay/nonce risk
+- `docs/runbooks/deployment/DEPLOYMENT_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 247 | Risks: atomic rollback risk, local-only config risk
+- `docs/runbooks/deployment/DEPLOYMENT_GUIDE.md` -> **Bridge / Router** | LOC: 693 | Risks: local-only config risk
+- `docs/runbooks/deployment/PRODUCTION_DEPLOYMENT_STATUS.md` -> **X3 DEX** | LOC: 413 | Risks: unsafe code
+- `docs/runbooks/deployment/TIER5_DEPLOYMENT_APPROVALS.md` -> **EVM Integration** | LOC: 534 | Risks: atomic rollback risk
+- `docs/runbooks/deployment/TIER5_DEPLOYMENT_APPROVED_SELF_SIGNED.md` -> **X3 DEX** | LOC: 226 | Risks: none
+- `docs/runbooks/deployment/TIER5_DEPLOYMENT_GUIDE.md` -> **Governance** | LOC: 811 | Risks: atomic rollback risk
+- `docs/runbooks/deployment/TIER5_DEPLOYMENT_READINESS_FINAL.md` -> **Bridge / Router** | LOC: 263 | Risks: bridge risk
+- `docs/runbooks/deployment/TIER5_DEPLOYMENT_READY.md` -> **Bridge / Router** | LOC: 371 | Risks: bridge risk
+- `docs/runbooks/deployment/TIER5_PRE_DEPLOYMENT_CHECKLIST.md` -> **X3VM / Cross-VM** | LOC: 535 | Risks: atomic rollback risk
+- `docs/runbooks/getting-started/100GUIDE.md` -> **Universal Asset Kernel** | LOC: 644 | Risks: atomic rollback risk, bridge risk
+- `docs/runbooks/getting-started/AUTHENTICATION_SETUP.md` -> **TPS Benchmark Suite** | LOC: 462 | Risks: local-only config risk
+- `docs/runbooks/getting-started/BOOT_AND_AUTH_SETUP.md` -> **Bridge / Router** | LOC: 260 | Risks: local-only config risk
+- `docs/runbooks/getting-started/QUICK_REFERENCE.md` -> **EVM Integration** | LOC: 224 | Risks: local-only config risk
+- `docs/runbooks/getting-started/QUICK_START.md` -> **TPS Benchmark Suite** | LOC: 169 | Risks: local-only config risk
+- `docs/runbooks/getting-started/README_SETUP.md` -> **Validator / LaunchOps** | LOC: 438 | Risks: local-only config risk
+- `docs/runbooks/getting-started/SETUP_SUMMARY.md` -> **Bridge / Router** | LOC: 507 | Risks: local-only config risk
+- `docs/runbooks/operations/MONITORING_GUIDE.md` -> **Bridge / Router** | LOC: 353 | Risks: bridge risk, local-only config risk
+- `docs/runbooks/testing/E2E_SECURITY_TESTING.md` -> **TPS Benchmark Suite** | LOC: 488 | Risks: none
+- `docs/runbooks/testing/TESTING_FRAMEWORK_SUMMARY.md` -> **X3VM / Cross-VM** | LOC: 482 | Risks: panic risk, replay risk
+- `docs/runbooks/testing/TEST_VALIDATION_REPORT.md` -> **Bridge / Router** | LOC: 701 | Risks: bridge risk, local-only config risk, panic risk
+- `docs/runbooks/testing/VALIDATION_CHECKLIST.md` -> **X3VM / Cross-VM** | LOC: 643 | Risks: local-only config risk, panic risk
+- `docs/runbooks/testing/VALIDATION_COMPLETE.md` -> **Universal Asset Kernel** | LOC: 466 | Risks: bridge risk, local-only config risk, panic risk, unsafe code
+- `docs/runbooks/testing/VALIDATION_INDEX.md` -> **Bridge / Router** | LOC: 373 | Risks: bridge risk, unsafe code
+- `docs/runbooks/testing/VALIDATION_METRICS.md` -> **Bridge / Router** | LOC: 372 | Risks: replay/nonce risk, unsafe code
+- `docs/scripts/ralph/README.md` -> **Bridge / Router** | LOC: 90 | Risks: none
+- `docs/scripts/ralph/prompt.md` -> **TPS Benchmark Suite** | LOC: 113 | Risks: none
+- `docs/security-audit.md` -> **Universal Asset Kernel** | LOC: 259 | Risks: atomic rollback risk, bridge risk
+- `docs/security.md` -> **Bridge / Router** | LOC: 483 | Risks: bridge risk
+- `docs/security/CUSTODY_SERVICE_SECURITY_AUDIT.md` -> **Universal Asset Kernel** | LOC: 498 | Risks: atomic rollback risk, panic risk, replay risk, unsafe code
+- `docs/security/SECURITY.md` -> **Universal Asset Kernel** | LOC: 87 | Risks: none
+- `docs/security/threat-model.md` -> **Universal Asset Kernel** | LOC: 712 | Risks: replay risk, replay/nonce risk
+- `docs/specs/X3_ADAPTIVE_INTELLIGENCE_CHAIN.md` -> **EVM Integration** | LOC: 505 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `docs/specs/X3_LIQUIDITY_INVENTORY_SOLVENCY_SPEC.md` -> **Universal Asset Kernel** | LOC: 260 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `docs/specs/X3_WRAPPED_TOKEN_SPECIFICATION.md` -> **Universal Asset Kernel** | LOC: 218 | Risks: bridge risk
+- `docs/state-merkle-proof-verification.md` -> **X3 DEX** | LOC: 797 | Risks: bridge risk, replay risk
+- `docs/swarm/README_OPENSPEC.md` -> **Unclassified** | LOC: 41 | Risks: none
+- `docs/swarm/README_SKILLS.md` -> **Unclassified** | LOC: 28 | Risks: local-only config risk
+- `docs/swarm/autonomic/README.md` -> **GPU Validator Swarm** | LOC: 261 | Risks: local-only config risk
+- `docs/templates/X3_DEVELOPER_TEMPLATES.md` -> **X3 DEX** | LOC: 70 | Risks: none
+- `docs/templates/proposal-template.md` -> **Unclassified** | LOC: 50 | Risks: none
+- `docs/templates/x3-chain/README.md` -> **X3 DEX** | LOC: 19 | Risks: none
+- `docs/templates/x3-chain/papi-app/README.md` -> **TPS Benchmark Suite** | LOC: 18 | Risks: none
+- `docs/templates/x3-chain/polkadot-sdk-l1/README.md` -> **X3 DEX** | LOC: 18 | Risks: none
+- `docs/templates/x3-chain/polkadot-sdk-l2/README.md` -> **Bridge / Router** | LOC: 18 | Risks: bridge risk
+- `docs/templates/x3-chain/py-substrate-interface/README.md` -> **X3 DEX** | LOC: 18 | Risks: none
+- `docs/templates/x3-chain/substrate-sdk-ios/README.md` -> **TPS Benchmark Suite** | LOC: 18 | Risks: none
+- `docs/testnet-config/GPU-REQUIREMENTS.md` -> **Universal Asset Kernel** | LOC: 58 | Risks: none
+- `docs/testnet-config/RELEASE-NOTES.md` -> **Universal Asset Kernel** | LOC: 118 | Risks: none
+- `docs/testnet-config/SECURITY-AUDIT-REPORT.md` -> **Universal Asset Kernel** | LOC: 77 | Risks: none
+- `docs/testnet-config/TESTNET-VERIFICATION.md` -> **TPS Benchmark Suite** | LOC: 135 | Risks: none
+- `docs/testnet-config/TROUBLESHOOTING.md` -> **Universal Asset Kernel** | LOC: 61 | Risks: none
+- `docs/testnet-config/VALIDATOR-RUNBOOK.md` -> **Universal Asset Kernel** | LOC: 112 | Risks: local-only config risk
+- `docs/testnet-config/alert-rules.json` -> **Universal Asset Kernel** | LOC: 28 | Risks: none
+- `docs/testnet-config/day10-hotfix-results.json` -> **Universal Asset Kernel** | LOC: 63 | Risks: none
+- `docs/testnet-config/day10-validation-results.json` -> **GPU Validator Swarm** | LOC: 72 | Risks: none
+- `docs/testnet-config/day12-ship-report.json` -> **TPS Benchmark Suite** | LOC: 39 | Risks: none
+- `docs/testnet-config/deployment-manifest.json` -> **Universal Asset Kernel** | LOC: 55 | Risks: none
+- `docs/testnet-config/gpu-runtime-config.json` -> **Universal Asset Kernel** | LOC: 45 | Risks: none
+- `docs/testnet-config/grafana-dashboards.json` -> **TPS Benchmark Suite** | LOC: 103 | Risks: none
+- `docs/testnet-config/prometheus-config.json` -> **GPU Validator Swarm** | LOC: 43 | Risks: none
+- `docs/testnet-config/testnet-config.json` -> **X3 DEX** | LOC: 127 | Risks: none
+- `docs/tests/PRE_MAINNET_ROADMAP.md` -> **X3VM / Cross-VM** | LOC: 477 | Risks: replay/nonce risk
+- `docs/tests/README.md` -> **Unclassified** | LOC: 22 | Risks: none
+- `docs/tests/TESTING_STRATEGY.md` -> **X3VM / Cross-VM** | LOC: 108 | Risks: unsafe code
+- `docs/tests/TEST_IMPLEMENTATION_GUIDE.md` -> **Bridge / Router** | LOC: 681 | Risks: atomic rollback risk, panic risk
+- `docs/tests/e2e/README.md` -> **Genesis / Chain Spec** | LOC: 376 | Risks: panic risk, replay risk
+- `docs/tests/perf/TPS_TESTING_README.md` -> **TPS Benchmark Suite** | LOC: 329 | Risks: local-only config risk
+- `docs/tests/security/lib/forge-std/CONTRIBUTING.md` -> **TPS Benchmark Suite** | LOC: 194 | Risks: none
+- `docs/tests/security/lib/forge-std/README.md` -> **X3VM / Cross-VM** | LOC: 315 | Risks: none
+- `docs/tests/security/lib/forge-std/RELEASE_CHECKLIST.md` -> **Unclassified** | LOC: 13 | Risks: none
+- `docs/tools/bmad.md` -> **Unclassified** | LOC: 24 | Risks: none
+- `docs/tools/foundry-hardhat-gui/README.md` -> **Launchpad** | LOC: 41 | Risks: none
+- `docs/tutorials/cross-vm-atomic.md` -> **EVM Integration** | LOC: 490 | Risks: panic risk
+- `docs/tutorials/evm-hello.md` -> **EVM Integration** | LOC: 498 | Risks: local-only config risk, panic risk
+- `docs/tutorials/svm-hello.md` -> **SVM Integration** | LOC: 639 | Risks: local-only config risk, panic risk
+- `docs/validation_checklist.md` -> **EVM Integration** | LOC: 477 | Risks: bridge risk
+- `docs/wallet-api.md` -> **X3 DEX** | LOC: 706 | Risks: local-only config risk
+- `docs/wallet-cli-guide.md` -> **X3 DEX** | LOC: 749 | Risks: local-only config risk
+- `docs/x3-agent-obligations.md` -> **Universal Asset Kernel** | LOC: 121 | Risks: replay risk
+- `docs/x3-app-store/README.md` -> **TPS Benchmark Suite** | LOC: 141 | Risks: local-only config risk
+- `docs/x3-execution-guarantees.md` -> **Bridge / Router** | LOC: 131 | Risks: bridge risk, replay risk
+- `docs/x3-floor-rules.md` -> **Universal Asset Kernel** | LOC: 129 | Risks: bridge risk, replay risk
+- `docs/x3-lang/README-VM.md` -> **X3VM / Cross-VM** | LOC: 26 | Risks: none
+- `docs/x3-lang/README.md` -> **Universal Asset Kernel** | LOC: 222 | Risks: bridge risk
+- `docs/x3-lang/spec/bytecode.md` -> **Bridge / Router** | LOC: 113 | Risks: atomic rollback risk, bridge risk
+- `docs/x3-lang/spec/compiler-backend.md` -> **Unclassified** | LOC: 43 | Risks: none
+- `docs/x3-lang/spec/gas-model.md` -> **Bridge / Router** | LOC: 42 | Risks: bridge risk
+- `docs/x3-lang/spec/opcode_table.md` -> **Bridge / Router** | LOC: 81 | Risks: atomic rollback risk, bridge risk
+- `docs/x3-lang/spec/security.md` -> **X3VM / Cross-VM** | LOC: 43 | Risks: none
+- `docs/x3-lang/spec/vm-architecture.md` -> **EVM Integration** | LOC: 78 | Risks: none
+- `docs/x3-risk-disclosures.md` -> **DEX Liquidity** | LOC: 135 | Risks: replay risk
+- `docs/x3-slashing-constitution.md` -> **Governance** | LOC: 158 | Risks: replay risk
+- `docs/x3-swarm-orchestra/EXECUTIVE_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 91 | Risks: replay risk
+- `docs/x3-swarm-orchestra/README.md` -> **Governance** | LOC: 26 | Risks: replay risk
+- `docs/x3_operator/README.md` -> **Governance** | LOC: 269 | Risks: replay/nonce risk
+- `formal-proofs/README.md` -> **Universal Asset Kernel** | LOC: 45 | Risks: none
+- `formal-proofs/coq/README.md` -> **Universal Asset Kernel** | LOC: 22 | Risks: bridge risk, replay risk, replay/nonce risk
+- `formal-proofs/k/README.md` -> **Universal Asset Kernel** | LOC: 19 | Risks: bridge risk, replay risk
+- `infra-structure/config/mainnet-rpc-endpoints.toml` -> **Bridge / Router** | LOC: 43 | Risks: bridge risk
+- `infra-structure/config/mcp-config.json` -> **EVM Integration** | LOC: 520 | Risks: bridge risk, local-only config risk, replay risk
+- `infra-structure/dashboard/eslint.config.js` -> **Unclassified** | LOC: 24 | Risks: none
+- `infra-structure/dashboard/package.json` -> **Unclassified** | LOC: 45 | Risks: none
+- `infra-structure/dashboard/src-tauri/Cargo.toml` -> **GPU Validator Swarm** | LOC: 18 | Risks: none
+- `infra-structure/dashboard/src-tauri/build.rs` -> **Unclassified** | LOC: 4 | Risks: none
+- `infra-structure/dashboard/src-tauri/gen/schemas/acl-manifests.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `infra-structure/dashboard/src-tauri/gen/schemas/capabilities.json` -> **Unclassified** | LOC: 1 | Risks: none
+- `infra-structure/dashboard/src-tauri/gen/schemas/desktop-schema.json` -> **TPS Benchmark Suite** | LOC: 2244 | Risks: none
+- `infra-structure/dashboard/src-tauri/gen/schemas/linux-schema.json` -> **TPS Benchmark Suite** | LOC: 2244 | Risks: none
+- `infra-structure/dashboard/src-tauri/rust-toolchain.toml` -> **Unclassified** | LOC: 5 | Risks: none
+- `infra-structure/dashboard/src-tauri/src/main.rs` -> **Bridge / Router** | LOC: 63 | Risks: panic risk
+- `infra-structure/dashboard/src-tauri/tauri.conf.json` -> **TPS Benchmark Suite** | LOC: 43 | Risks: local-only config risk, unsafe code
+- `infra-structure/dashboard/src/App.tsx` -> **Unclassified** | LOC: 97 | Risks: none
+- `infra-structure/dashboard/src/api.ts` -> **Bridge / Router** | LOC: 514 | Risks: bridge risk, local-only config risk
+- `infra-structure/dashboard/src/components/AdminDashboard.tsx` -> **GPU Validator Swarm** | LOC: 1305 | Risks: bridge risk
+- `infra-structure/dashboard/src/components/AdminLogin.tsx` -> **Unclassified** | LOC: 102 | Risks: none
+- `infra-structure/dashboard/src/components/ChainExplorer.tsx` -> **EVM Integration** | LOC: 688 | Risks: local-only config risk
+- `infra-structure/dashboard/src/components/Dashboard.tsx` -> **Bridge / Router** | LOC: 526 | Risks: bridge risk, local-only config risk
+- `infra-structure/dashboard/src/components/LoginPage.tsx` -> **Validator / LaunchOps** | LOC: 111 | Risks: none
+- `infra-structure/dashboard/src/components/RegisterPage.tsx` -> **TPS Benchmark Suite** | LOC: 250 | Risks: none
+- `infra-structure/dashboard/src/main.tsx` -> **X3 DEX** | LOC: 11 | Risks: none
+- `infra-structure/dashboard/tsconfig.app.json` -> **Unclassified** | LOC: 29 | Risks: none
+- `infra-structure/dashboard/tsconfig.json` -> **Unclassified** | LOC: 8 | Risks: none
+- `infra-structure/dashboard/tsconfig.node.json` -> **Unclassified** | LOC: 27 | Risks: none
+- `infra-structure/dashboard/vite.config.ts` -> **TPS Benchmark Suite** | LOC: 25 | Risks: none
+- `infra-structure/db/seed/rpc_mega_scraper.py` -> **DEX Liquidity** | LOC: 1378 | Risks: none
+- `infra-structure/db/seed/seed_chains.py` -> **Bridge / Router** | LOC: 493 | Risks: none
+- `infra-structure/db/seed/seed_llm_endpoints.py` -> **Unclassified** | LOC: 51 | Risks: none
+- `infra-structure/db/seed/seed_public_rpcs.py` -> **TPS Benchmark Suite** | LOC: 452 | Risks: none
+- `infra-structure/install.sh` -> **TPS Benchmark Suite** | LOC: 83 | Risks: none
+- `infra-structure/services/blockchain-tps/docker-compose.yml` -> **TPS Benchmark Suite** | LOC: 12 | Risks: none
+- `infra-structure/services/blockchain-tps/package.json` -> **TPS Benchmark Suite** | LOC: 20 | Risks: none
+- `infra-structure/services/blockchain-tps/server.js` -> **EVM Integration** | LOC: 544 | Risks: none
+- `infra-structure/services/blockchain-tps/utils/crypto.js` -> **TPS Benchmark Suite** | LOC: 42 | Risks: none
+- `infra-structure/services/blockchain-tps/utils/mailer.js` -> **TPS Benchmark Suite** | LOC: 70 | Risks: none
+- `infra-structure/services/blockchain-tps/utils/redis.js` -> **TPS Benchmark Suite** | LOC: 36 | Risks: none
+- `infra-structure/services/chain-db/package.json` -> **GPU Validator Swarm** | LOC: 18 | Risks: none
+- `infra-structure/services/chain-db/server.js` -> **EVM Integration** | LOC: 980 | Risks: local-only config risk
+- `infra-structure/services/cloudflare-tunnel/config.yml` -> **DEX Liquidity** | LOC: 97 | Risks: local-only config risk
+- `infra-structure/services/cloudflare-tunnel/placeholder/package.json` -> **Unclassified** | LOC: 12 | Risks: none
+- `infra-structure/services/cloudflare-tunnel/placeholder/server.js` -> **DEX Liquidity** | LOC: 135 | Risks: none
+- `infra-structure/services/cloudflare-tunnel/setup-tunnel.sh` -> **TPS Benchmark Suite** | LOC: 189 | Risks: local-only config risk
+- `infra-structure/services/rpc-crawler/crawler_daemon.py` -> **Bridge / Router** | LOC: 2218 | Risks: bridge risk
+- `infra-structure/services/rpc-crawler/crawler_state.json` -> **EVM Integration** | LOC: 9067 | Risks: bridge risk
+- `infra-structure/services/rpc-crawler/faucet_claimer.py` -> **EVM Integration** | LOC: 515 | Risks: none
+- `infra-structure/services/rpc-crawler/tps_benchmark.py` -> **EVM Integration** | LOC: 435 | Risks: local-only config risk
+- `infra-structure/start-all.sh` -> **TPS Benchmark Suite** | LOC: 206 | Risks: local-only config risk
+- `infra-structure/status.sh` -> **TPS Benchmark Suite** | LOC: 73 | Risks: local-only config risk
+- `infra-structure/stop-all.sh` -> **TPS Benchmark Suite** | LOC: 71 | Risks: none
+- `infra-structure/validator/INVARIANTS_REGISTRY_ENTRIES.toml` -> **X3 DEX** | LOC: 241 | Risks: atomic rollback risk, local-only config risk
+- `infra-structure/validator/benchmarks/gpu_tps_benchmark_results.json` -> **TPS Benchmark Suite** | LOC: 72 | Risks: none
+- `infra-structure/validator/benchmarks/rpc_benchmark_report.json` -> **EVM Integration** | LOC: 674 | Risks: none
+- `infra-structure/validator/benchmarks/tps_benchmark_results.json` -> **TPS Benchmark Suite** | LOC: 38 | Risks: none
+- `infra-structure/validator/dashboard/app.js` -> **EVM Integration** | LOC: 109 | Risks: atomic rollback risk
+- `infra-structure/validator/deployment/docker-compose.yml` -> **GPU Validator Swarm** | LOC: 30 | Risks: none
+- `infra-structure/validator/deployment/pilot/deploy.sh` -> **Universal Asset Kernel** | LOC: 134 | Risks: local-only config risk
+- `infra-structure/validator/deployment/pilot/docker-compose.pilot.yml` -> **Universal Asset Kernel** | LOC: 146 | Risks: none
+- `infra-structure/validator/deployment/pilot/prometheus.yml` -> **GPU Validator Swarm** | LOC: 30 | Risks: none
+- `infra-structure/validator/deployment/pilot/secondary_nodes.toml` -> **GPU Validator Swarm** | LOC: 84 | Risks: none
+- `infra-structure/validator/deployment/pilot/threadripper.toml` -> **Universal Asset Kernel** | LOC: 70 | Risks: none
+- `infra-structure/validator/deployment/run_benchmark.sh` -> **TPS Benchmark Suite** | LOC: 9 | Risks: none
+- `infra-structure/validator/deployment/run_testnet.sh` -> **Validator / LaunchOps** | LOC: 43 | Risks: none
+- `infra-structure/validator/docker-compose.testnet.yml` -> **EVM Integration** | LOC: 179 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/kernels/build.sh` -> **Universal Asset Kernel** | LOC: 81 | Risks: none
+- `infra-structure/validator/prometheus.yml` -> **Validator / LaunchOps** | LOC: 43 | Risks: none
+- `infra-structure/validator/pyproject.toml` -> **GPU Validator Swarm** | LOC: 31 | Risks: none
+- `infra-structure/validator/scripts/generate_chains_json.py` -> **EVM Integration** | LOC: 88 | Risks: none
+- `infra-structure/validator/scripts/healthcheck.sh` -> **Validator / LaunchOps** | LOC: 13 | Risks: local-only config risk
+- `infra-structure/validator/scripts/rpc_benchmark.py` -> **EVM Integration** | LOC: 104 | Risks: none
+- `infra-structure/validator/scripts/run-e2e-tests.sh` -> **GPU Validator Swarm** | LOC: 201 | Risks: none
+- `infra-structure/validator/scripts/run-local-tests.sh` -> **EVM Integration** | LOC: 123 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/__init__.py` -> **EVM Integration** | LOC: 44 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/benchmark.py` -> **EVM Integration** | LOC: 68 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/chain_adapter.py` -> **GPU Validator Swarm** | LOC: 86 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/chain_registry.py` -> **EVM Integration** | LOC: 266 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/cli.py` -> **Universal Asset Kernel** | LOC: 193 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/config.py` -> **Universal Asset Kernel** | LOC: 78 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/consensus/__init__.py` -> **GPU Validator Swarm** | LOC: 34 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/consensus/node_manager.py` -> **EVM Integration** | LOC: 724 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/cosmos/__init__.py` -> **GPU Validator Swarm** | LOC: 38 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/dashboard/__init__.py` -> **GPU Validator Swarm** | LOC: 8 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/dashboard/server.py` -> **Universal Asset Kernel** | LOC: 43 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/evm/__init__.py` -> **EVM Integration** | LOC: 8 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/evm/evm_validator.py` -> **EVM Integration** | LOC: 71 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/evm/state_root.py` -> **EVM Integration** | LOC: 28 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/__init__.py` -> **Universal Asset Kernel** | LOC: 39 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/cuda_loader.py` -> **Universal Asset Kernel** | LOC: 31 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/keccak_gpu.py` -> **Universal Asset Kernel** | LOC: 118 | Risks: replay risk
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/kernel_profiles.py` -> **Universal Asset Kernel** | LOC: 226 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/kernels.py` -> **Universal Asset Kernel** | LOC: 146 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/multi_gpu_scheduler.py` -> **Universal Asset Kernel** | LOC: 264 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/secp256k1_gpu.py` -> **Universal Asset Kernel** | LOC: 320 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/gpu/stream_batcher.py` -> **Universal Asset Kernel** | LOC: 228 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/logging_utils.py` -> **GPU Validator Swarm** | LOC: 34 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/metrics.py` -> **EVM Integration** | LOC: 79 | Risks: atomic rollback risk
+- `infra-structure/validator/src/cross_chain_gpu_validator/orchestrator/__init__.py` -> **X3 DEX** | LOC: 9 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/orchestrator/orchestrator.py` -> **EVM Integration** | LOC: 213 | Risks: atomic rollback risk
+- `infra-structure/validator/src/cross_chain_gpu_validator/orchestrator/registry.py` -> **EVM Integration** | LOC: 175 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/__init__.py` -> **GPU Validator Swarm** | LOC: 85 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/circuit.py` -> **GPU Validator Swarm** | LOC: 155 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/degraded.py` -> **Universal Asset Kernel** | LOC: 268 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/health.py` -> **Universal Asset Kernel** | LOC: 444 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/lanes.py` -> **GPU Validator Swarm** | LOC: 357 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/orchestrator.py` -> **X3 DEX** | LOC: 266 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/signer_lock.py` -> **GPU Validator Swarm** | LOC: 355 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/resilience/tollbooth.py` -> **GPU Validator Swarm** | LOC: 336 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/substrate/__init__.py` -> **GPU Validator Swarm** | LOC: 38 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/svm/__init__.py` -> **SVM Integration** | LOC: 8 | Risks: none
+- `infra-structure/validator/src/cross_chain_gpu_validator/svm/svm_validator.py` -> **SVM Integration** | LOC: 57 | Risks: none
+- `infra-structure/validator/src/resources/chains.json` -> **EVM Integration** | LOC: 21260 | Risks: bridge risk
+- `infra-structure/validator/start_gpu_lanes.sh` -> **X3 DEX** | LOC: 146 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/access_lists.json` -> **Validator / LaunchOps** | LOC: 4 | Risks: none
+- `infra-structure/validator/tests/inferstructor/admin_api.py` -> **Bridge / Router** | LOC: 1417 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/configs/orchestrator.yaml` -> **GPU Validator Swarm** | LOC: 57 | Risks: none
+- `infra-structure/validator/tests/inferstructor/configs/primary_lane.yaml` -> **Universal Asset Kernel** | LOC: 161 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/configs/shadow_lane.yaml` -> **Universal Asset Kernel** | LOC: 189 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/configs/tertiary_lane.yaml` -> **Universal Asset Kernel** | LOC: 190 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/configs/toll_booth.yaml` -> **TPS Benchmark Suite** | LOC: 181 | Risks: none
+- `infra-structure/validator/tests/inferstructor/demo.sh` -> **Bridge / Router** | LOC: 185 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/failover_triggers.py` -> **GPU Validator Swarm** | LOC: 379 | Risks: none
+- `infra-structure/validator/tests/inferstructor/gpu_lane_service.py` -> **Universal Asset Kernel** | LOC: 315 | Risks: none
+- `infra-structure/validator/tests/inferstructor/infrastructure_benchmark.py` -> **Bridge / Router** | LOC: 1244 | Risks: bridge risk, local-only config risk, replay risk
+- `infra-structure/validator/tests/inferstructor/lane_orchestrator.py` -> **Universal Asset Kernel** | LOC: 490 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/load_test.py` -> **Universal Asset Kernel** | LOC: 288 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/load_test_direct.py` -> **Bridge / Router** | LOC: 200 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/load_test_v1.py` -> **Bridge / Router** | LOC: 306 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/metrics_dashboard.py` -> **Bridge / Router** | LOC: 385 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/mock_toll_booth.py` -> **Bridge / Router** | LOC: 67 | Risks: none
+- `infra-structure/validator/tests/inferstructor/monitor_gpus.sh` -> **Bridge / Router** | LOC: 67 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/register_validator.sh` -> **Bridge / Router** | LOC: 125 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/run_300x_test.sh` -> **Bridge / Router** | LOC: 415 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/solana_rpc_proxy.py` -> **GPU Validator Swarm** | LOC: 624 | Risks: local-only config risk
+- `infra-structure/validator/tests/inferstructor/start_inferstructor.sh` -> **Bridge / Router** | LOC: 137 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/stop_inferstructor.sh` -> **Bridge / Router** | LOC: 28 | Risks: bridge risk
+- `infra-structure/validator/tests/inferstructor/tps_bridge.py` -> **Bridge / Router** | LOC: 510 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/validator_registry.py` -> **X3 DEX** | LOC: 449 | Risks: bridge risk, local-only config risk
+- `infra-structure/validator/tests/inferstructor/validators.json` -> **TPS Benchmark Suite** | LOC: 30 | Risks: none
+- `infra-structure/validator/tests/test_atomic_swap_validation.py` -> **EVM Integration** | LOC: 184 | Risks: atomic rollback risk
+- `infra-structure/validator/tests/test_chain_registry.py` -> **GPU Validator Swarm** | LOC: 18 | Risks: none
+- `infra-structure/validator/tests/test_dashboard_e2e.py` -> **EVM Integration** | LOC: 319 | Risks: atomic rollback risk, local-only config risk, unsafe code
+- `infra-structure/validator/tests/test_multi_chain_integration.py` -> **X3 DEX** | LOC: 356 | Risks: local-only config risk
+- `infra-structure/validator/tests/test_multi_gpu_integration.py` -> **Universal Asset Kernel** | LOC: 179 | Risks: none
+- `infra-structure/validator/tests/test_resilience.py` -> **GPU Validator Swarm** | LOC: 651 | Risks: none
+- `infra-structure/validator/tests/test_rpc_endpoints_e2e.py` -> **TPS Benchmark Suite** | LOC: 408 | Risks: local-only config risk
+- `infra-structure/validator/tests/test_security_e2e.py` -> **GPU Validator Swarm** | LOC: 448 | Risks: atomic rollback risk, local-only config risk
+- `infra/blockchain-tps/docker-compose.yml` -> **TPS Benchmark Suite** | LOC: 12 | Risks: none
+- `infra/blockchain-tps/package.json` -> **TPS Benchmark Suite** | LOC: 20 | Risks: none
+- `infra/blockchain-tps/server.js` -> **EVM Integration** | LOC: 537 | Risks: none
+- `infra/blockchain-tps/utils/crypto.js` -> **TPS Benchmark Suite** | LOC: 42 | Risks: none
+- `infra/blockchain-tps/utils/mailer.js` -> **TPS Benchmark Suite** | LOC: 70 | Risks: none
+- `infra/blockchain-tps/utils/redis.js` -> **TPS Benchmark Suite** | LOC: 36 | Risks: none
+- `infra/cloudflare-tunnel/config.yml` -> **DEX Liquidity** | LOC: 97 | Risks: local-only config risk
+- `infra/cloudflare-tunnel/placeholder/package.json` -> **Unclassified** | LOC: 12 | Risks: none
+- `infra/cloudflare-tunnel/placeholder/server.js` -> **DEX Liquidity** | LOC: 135 | Risks: none
+- `infra/cloudflare-tunnel/setup-tunnel.sh` -> **TPS Benchmark Suite** | LOC: 189 | Risks: local-only config risk
+- `infra/docker-compose.yml` -> **Bridge / Router** | LOC: 224 | Risks: local-only config risk
+- `infra/drpc/docker-compose.drpc.yml` -> **Unclassified** | LOC: 30 | Risks: none
+- `infra/drpc/dshackle.yaml` -> **TPS Benchmark Suite** | LOC: 29 | Risks: none
+- `infra/drpc/nodecore.yml` -> **TPS Benchmark Suite** | LOC: 21 | Risks: none
+- `infra/mainnet-rpc-endpoints.toml` -> **Bridge / Router** | LOC: 43 | Risks: bridge risk
+- `infra/mcp-config.json` -> **EVM Integration** | LOC: 520 | Risks: bridge risk, local-only config risk, replay risk
+- `infra/ollama-setup.sh` -> **Bridge / Router** | LOC: 62 | Risks: none
+- `infra/setup-keys.sh` -> **TPS Benchmark Suite** | LOC: 87 | Risks: none
+- `infra/x3star-subdomains/package.json` -> **Unclassified** | LOC: 11 | Risks: none
+- `infra/x3star-subdomains/server.js` -> **Universal Asset Kernel** | LOC: 235 | Risks: none
+- `integration-tests/cross-vm-atomic-test.rs` -> **Universal Asset Kernel** | LOC: 516 | Risks: atomic rollback risk
+- `integration-tests/cross-vm-pallet-test.rs` -> **Universal Asset Kernel** | LOC: 139 | Risks: panic risk
+- `integration-tests/parallel-proposer-integration.rs` -> **GPU Validator Swarm** | LOC: 241 | Risks: panic risk, replay/nonce risk
+- `integration-tests/svm-counter-test/Cargo.toml` -> **SVM Integration** | LOC: 18 | Risks: none
+- `integration-tests/svm-counter-test/src/main.rs` -> **SVM Integration** | LOC: 4 | Risks: none
+- `integration-tests/svm-counter-test/tests/counter.rs` -> **SVM Integration** | LOC: 61 | Risks: panic risk
+- `jsconfig.json` -> **Unclassified** | LOC: 12 | Risks: none
+- `k8s/01-namespace.yaml` -> **Unclassified** | LOC: 8 | Risks: none
+- `k8s/02-configmaps.yaml` -> **X3 DEX** | LOC: 78 | Risks: none
+- `k8s/03-secrets.yaml` -> **X3 DEX** | LOC: 52 | Risks: none
+- `k8s/04-pvcs.yaml` -> **X3 DEX** | LOC: 81 | Risks: none
+- `k8s/05-validators-statefulset.yaml` -> **Validator / LaunchOps** | LOC: 256 | Risks: none
+- `k8s/06-indexer-deployment.yaml` -> **X3 DEX** | LOC: 212 | Risks: none
+- `k8s/07-postgres-statefulset.yaml` -> **X3 DEX** | LOC: 202 | Risks: replay/nonce risk
+- `launch-gates/CHECKLIST_INFRASTRUCTURE_COMPLETE.md` -> **Universal Asset Kernel** | LOC: 549 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/COMPLETE_SYSTEM_SUMMARY.md` -> **Universal Asset Kernel** | LOC: 536 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/DISASTER_RECOVERY_RUNBOOK.md` -> **Universal Asset Kernel** | LOC: 1096 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, replay/nonce risk
+- `launch-gates/DISASTER_RECOVERY_RUNBOOKS.md` -> **Bridge / Router** | LOC: 769 | Risks: bridge risk, local-only config risk
+- `launch-gates/EXECUTION_GUIDE.md` -> **Bridge / Router** | LOC: 425 | Risks: bridge risk, replay risk, replay/nonce risk
+- `launch-gates/EXTERNAL_VALIDATION_REQUIREMENTS.md` -> **Universal Asset Kernel** | LOC: 445 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/GENESIS_CEREMONY_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 426 | Risks: atomic rollback risk, bridge risk
+- `launch-gates/GENESIS_CEREMONY_RUNBOOK.md` -> **X3VM / Cross-VM** | LOC: 1041 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, unsafe code
+- `launch-gates/INFRASTRUCTURE_STATUS.md` -> **Universal Asset Kernel** | LOC: 533 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, supply invariant risk, unfinished logic
+- `launch-gates/MAINNET_AUDIT_WORKFLOW.md` -> **Universal Asset Kernel** | LOC: 396 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unfinished logic
+- `launch-gates/PROOFGATE_EXECUTION_MANUAL.md` -> **Bridge / Router** | LOC: 604 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/PROOF_EXECUTION_GUIDE.md` -> **Universal Asset Kernel** | LOC: 440 | Risks: bridge risk, known issue, local-only config risk, panic risk, unfinished logic
+- `launch-gates/PROOF_EXECUTION_REPORT.md` -> **Bridge / Router** | LOC: 415 | Risks: bridge risk, panic risk, unfinished logic
+- `launch-gates/PUBLIC_TESTNET_LAUNCH_GUIDE.md` -> **X3VM / Cross-VM** | LOC: 580 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk
+- `launch-gates/QUICK_REFERENCE.md` -> **Universal Asset Kernel** | LOC: 279 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/README.md` -> **Bridge / Router** | LOC: 412 | Risks: bridge risk, replay risk, replay/nonce risk
+- `launch-gates/S0_BLOCKER_PRIORITIZATION.md` -> **Universal Asset Kernel** | LOC: 732 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/SECURITY_AUDIT_ENGAGEMENT_GUIDE.md` -> **Universal Asset Kernel** | LOC: 512 | Risks: bridge risk
+- `launch-gates/SETUP_COMPLETE_SUMMARY.md` -> **Bridge / Router** | LOC: 286 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `launch-gates/VALIDATOR_ONBOARDING_RUNBOOK.md` -> **X3VM / Cross-VM** | LOC: 1362 | Risks: atomic rollback risk, local-only config risk
+- `launch-gates/audits/audit-01-wiring-context.json` -> **Launchpad** | LOC: 13 | Risks: none
+- `launch-gates/audits/audit-02-mainnet-context.json` -> **Bridge / Router** | LOC: 18 | Risks: bridge risk
+- `launch-gates/audits/audit-03-bridge-atomic-context.json` -> **Universal Asset Kernel** | LOC: 33 | Risks: bridge risk, replay risk, replay/nonce risk
+- `launch-gates/audits/audit-04-invariant-context.json` -> **Universal Asset Kernel** | LOC: 21 | Risks: bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/audits/audit-05-test-gap-context.json` -> **Bridge / Router** | LOC: 26 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/build-audit-packs.sh` -> **Bridge / Router** | LOC: 150 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/build-repomix-pack.sh` -> **Universal Asset Kernel** | LOC: 254 | Risks: bridge risk
+- `launch-gates/comprehensive-mainnet-readiness.sh` -> **Universal Asset Kernel** | LOC: 527 | Risks: atomic rollback risk, bridge risk, known issue, panic risk, replay risk, supply invariant risk, unfinished logic
+- `launch-gates/embarrassment-scan.sh` -> **Launchpad** | LOC: 297 | Risks: known issue, local-only config risk, panic risk, stub risk, unfinished logic
+- `launch-gates/evidence/ci/embarrassment-evidence-summary.md` -> **Launchpad** | LOC: 30 | Risks: none
+- `launch-gates/evidence/proof-report-20260424-195004.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/evidence/proof-report-20260424-224700.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/evidence/proof-report-20260424-225345.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/evidence/proof-report-20260424-231258.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/evidence/proof-report-20260425-105210.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/evidence/proof-report-20260425-105323.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/evidence/proof-report-20260425-105335.json` -> **Launchpad** | LOC: 9 | Risks: none
+- `launch-gates/fast-audit-builder.sh` -> **Universal Asset Kernel** | LOC: 179 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/fresh-machine-proof.HOST-FAILURE.md` -> **Universal Asset Kernel** | LOC: 97 | Risks: none
+- `launch-gates/fresh-machine-proof.sh` -> **Universal Asset Kernel** | LOC: 247 | Risks: known issue, local-only config risk, panic risk, stub risk, unfinished logic
+- `launch-gates/generate-audit-packs-simple.sh` -> **Universal Asset Kernel** | LOC: 186 | Risks: bridge risk
+- `launch-gates/invariants.yaml` -> **Universal Asset Kernel** | LOC: 299 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/mainnet-go-no-go-template.sh` -> **Universal Asset Kernel** | LOC: 364 | Risks: bridge risk
+- `launch-gates/multi-node-testnet-proof.ROOT-CAUSE.md` -> **Launchpad** | LOC: 76 | Risks: unsafe code
+- `launch-gates/multi-node-testnet-proof.sh` -> **Launchpad** | LOC: 281 | Risks: local-only config risk, unsafe code
+- `launch-gates/prepare-phase3-sources.sh` -> **Bridge / Router** | LOC: 185 | Risks: bridge risk, replay risk
+- `launch-gates/prompts/01-wiring-audit.md` -> **Bridge / Router** | LOC: 67 | Risks: bridge risk, known issue, replay risk, unfinished logic
+- `launch-gates/prompts/02-mainnet-gate.md` -> **Universal Asset Kernel** | LOC: 163 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unfinished logic
+- `launch-gates/prompts/02-mainnet-launch-gate.md` -> **Universal Asset Kernel** | LOC: 64 | Risks: bridge risk, replay risk
+- `launch-gates/prompts/03-bridge-redteam.md` -> **Universal Asset Kernel** | LOC: 180 | Risks: bridge risk, replay risk, replay/nonce risk
+- `launch-gates/prompts/03-bridge-safety-audit.md` -> **Bridge / Router** | LOC: 120 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/prompts/04-invariant-hunter.md` -> **Universal Asset Kernel** | LOC: 94 | Risks: none
+- `launch-gates/prompts/05-test-gap-audit.md` -> **Universal Asset Kernel** | LOC: 139 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/proofs.yaml` -> **Universal Asset Kernel** | LOC: 485 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/repomix-mainnet-pack.sh` -> **Bridge / Router** | LOC: 80 | Risks: bridge risk
+- `launch-gates/reports/MAINNET_GO_NO_GO_DECISION.json` -> **Bridge / Router** | LOC: 208 | Risks: bridge risk, replay/nonce risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260427-173325.md` -> **Universal Asset Kernel** | LOC: 79 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260428-185758.md` -> **Universal Asset Kernel** | LOC: 86 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260429-211927.md` -> **Universal Asset Kernel** | LOC: 79 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260429-212020.md` -> **Universal Asset Kernel** | LOC: 79 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260429-212027.md` -> **Universal Asset Kernel** | LOC: 79 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-103919.md` -> **Universal Asset Kernel** | LOC: 85 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-104145.md` -> **Universal Asset Kernel** | LOC: 85 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-104328.md` -> **Universal Asset Kernel** | LOC: 85 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-104603.md` -> **Universal Asset Kernel** | LOC: 85 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-202053.md` -> **Universal Asset Kernel** | LOC: 85 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-202539.md` -> **Universal Asset Kernel** | LOC: 86 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/X3-MAINNET-GO-NO-GO-20260430-202628.md` -> **Universal Asset Kernel** | LOC: 86 | Risks: atomic rollback risk, bridge risk, replay risk
+- `launch-gates/reports/audit-01-wiring-CORRECTED.json` -> **Universal Asset Kernel** | LOC: 132 | Risks: none
+- `launch-gates/reports/audit-01-wiring-POSTFIX.json` -> **Bridge / Router** | LOC: 105 | Risks: none
+- `launch-gates/reports/audit-01-wiring.json` -> **Universal Asset Kernel** | LOC: 184 | Risks: bridge risk
+- `launch-gates/reports/audit-02-mainnet-scoring-POSTFIX.json` -> **Universal Asset Kernel** | LOC: 232 | Risks: bridge risk, replay risk
+- `launch-gates/reports/audit-02-mainnet-scoring.json` -> **Universal Asset Kernel** | LOC: 327 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/reports/audit-03-bridge-security-POSTFIX.json` -> **Universal Asset Kernel** | LOC: 117 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/reports/audit-03-bridge-security.json` -> **Universal Asset Kernel** | LOC: 416 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/reports/audit-04-invariants-POSTFIX.json` -> **X3VM / Cross-VM** | LOC: 172 | Risks: atomic rollback risk
+- `launch-gates/reports/audit-04-invariants.json` -> **Universal Asset Kernel** | LOC: 409 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `launch-gates/reports/audit-05-test-gaps-POSTFIX.json` -> **Bridge / Router** | LOC: 200 | Risks: none
+- `launch-gates/reports/audit-05-test-gaps.json` -> **Universal Asset Kernel** | LOC: 445 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `launch-gates/reports/mainnet-readiness-20260426_222133.md` -> **Universal Asset Kernel** | LOC: 43 | Risks: supply invariant risk
+- `launch-gates/run-all-proofs.sh` -> **X3 DEX** | LOC: 277 | Risks: bridge risk, known issue, unfinished logic
+- `launch-gates/run-proof-commands.sh` -> **Launchpad** | LOC: 256 | Risks: bridge risk, panic risk
+- `launch-gates/run-startup-gate-tests.sh` -> **Launchpad** | LOC: 179 | Risks: none
+- `launch-gates/run-substrate-proof-pack.sh` -> **Launchpad** | LOC: 196 | Risks: replay risk
+- `launch-gates/sources/pack-01-wiring/01-construct-runtime.rs` -> **Universal Asset Kernel** | LOC: 424 | Risks: bridge risk
+- `launch-gates/sources/pack-01-wiring/pallets/agent-accounts-lib.rs` -> **Launchpad** | LOC: 805 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/agent-memory-lib.rs` -> **Launchpad** | LOC: 995 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/atomic-trade-engine-lib.rs` -> **Universal Asset Kernel** | LOC: 2242 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/cross-chain-validator-lib.rs` -> **EVM Integration** | LOC: 463 | Risks: none
+- `launch-gates/sources/pack-01-wiring/pallets/depin-marketplace-lib.rs` -> **Launchpad** | LOC: 841 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/evolution-core-lib.rs` -> **EVM Integration** | LOC: 860 | Risks: atomic rollback risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/fraud-proofs-lib.rs` -> **Launchpad** | LOC: 11 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/governance-lib.rs` -> **Launchpad** | LOC: 1611 | Risks: atomic rollback risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/meme-overlord-lib.rs` -> **Launchpad** | LOC: 772 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/private-execution-lib.rs` -> **DEX Liquidity** | LOC: 668 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/svm-runtime-lib.rs` -> **SVM Integration** | LOC: 874 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/swarm-lib.rs` -> **Launchpad** | LOC: 1286 | Risks: replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/treasury-lib.rs` -> **Launchpad** | LOC: 1021 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-asset-registry-lib.rs` -> **Universal Asset Kernel** | LOC: 465 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-atomic-kernel-lib.rs` -> **Universal Asset Kernel** | LOC: 1012 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-coin-lib.rs` -> **Universal Asset Kernel** | LOC: 1378 | Risks: replay risk, replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-cross-vm-router-lib.rs` -> **Universal Asset Kernel** | LOC: 607 | Risks: bridge risk, replay/nonce risk, unfinished logic, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-da-lib.rs` -> **X3 DEX** | LOC: 342 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-domain-registry-lib.rs` -> **Launchpad** | LOC: 430 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-invariants-lib.rs` -> **Universal Asset Kernel** | LOC: 470 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-inventory-lib.rs` -> **Universal Asset Kernel** | LOC: 508 | Risks: unfinished logic, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-jury-anchor-lib.rs` -> **X3 DEX** | LOC: 389 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-kernel-lib.rs` -> **Universal Asset Kernel** | LOC: 3218 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-reservation-lib.rs` -> **Launchpad** | LOC: 438 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-sequencer-lib.rs` -> **Launchpad** | LOC: 328 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-settlement-engine-lib.rs` -> **Universal Asset Kernel** | LOC: 2443 | Risks: bridge risk, replay risk, replay/nonce risk, unfinished logic, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-slash-lib.rs` -> **Bridge / Router** | LOC: 545 | Risks: bridge risk, panic risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-solvency-lib.rs` -> **Launchpad** | LOC: 509 | Risks: bridge risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-supply-ledger-lib.rs` -> **Universal Asset Kernel** | LOC: 313 | Risks: supply invariant risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-token-factory-lib.rs` -> **Universal Asset Kernel** | LOC: 413 | Risks: replay/nonce risk, supply invariant risk, unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-verifier-lib.rs` -> **Launchpad** | LOC: 938 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/pallets/x3-wallet-pallet-lib.rs` -> **X3 DEX** | LOC: 360 | Risks: unsafe code
+- `launch-gates/sources/pack-01-wiring/runtime-Cargo.toml` -> **Universal Asset Kernel** | LOC: 209 | Risks: bridge risk
+- `launch-gates/sources/pack-02-mainnet/runtime-config.rs` -> **Universal Asset Kernel** | LOC: 102 | Risks: bridge risk, replay risk
+- `launch-gates/sources/pack-02-mainnet/src-excerpt.rs` -> **X3 DEX** | LOC: 360 | Risks: unsafe code
+- `launch-gates/sources/pack-03-bridge-atomic/x3-cross-vm-router-lib.rs` -> **Universal Asset Kernel** | LOC: 607 | Risks: bridge risk, replay/nonce risk, unfinished logic, unsafe code
+- `launch-gates/sources/pack-03-bridge-atomic/x3-cross-vm-router-tests.rs` -> **Universal Asset Kernel** | LOC: 1161 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk, unfinished logic
+- `launch-gates/sources/pack-04-invariant/agent-accounts/tests.rs` -> **Launchpad** | LOC: 592 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/agent-memory/rpc_tests.rs` -> **X3 DEX** | LOC: 289 | Risks: none
+- `launch-gates/sources/pack-04-invariant/agent-memory/tests.rs` -> **Launchpad** | LOC: 523 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/atomic-trade-engine/tests.rs` -> **Universal Asset Kernel** | LOC: 921 | Risks: atomic rollback risk, mock hash risk, panic risk, replay/nonce risk
+- `launch-gates/sources/pack-04-invariant/cross-chain-validator/tests.rs` -> **EVM Integration** | LOC: 231 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/depin-marketplace/tests.rs` -> **Launchpad** | LOC: 336 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/evolution-core/tests.rs` -> **Launchpad** | LOC: 12 | Risks: none
+- `launch-gates/sources/pack-04-invariant/governance/tests.rs` -> **Launchpad** | LOC: 509 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/integration-tests/cross-vm-atomic-test.rs` -> **Universal Asset Kernel** | LOC: 516 | Risks: atomic rollback risk
+- `launch-gates/sources/pack-04-invariant/integration-tests/cross-vm-pallet-test.rs` -> **Universal Asset Kernel** | LOC: 139 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/integration-tests/parallel-proposer-integration.rs` -> **Launchpad** | LOC: 241 | Risks: panic risk, replay/nonce risk
+- `launch-gates/sources/pack-04-invariant/integration-tests/svm-counter-test/Cargo.toml` -> **SVM Integration** | LOC: 18 | Risks: none
+- `launch-gates/sources/pack-04-invariant/integration-tests/svm-counter-test/src/main.rs` -> **SVM Integration** | LOC: 4 | Risks: none
+- `launch-gates/sources/pack-04-invariant/integration-tests/svm-counter-test/tests/counter.rs` -> **SVM Integration** | LOC: 61 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/meme-overlord/tests.rs` -> **Launchpad** | LOC: 10 | Risks: none
+- `launch-gates/sources/pack-04-invariant/private-execution/tests.rs` -> **Launchpad** | LOC: 249 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/swarm/tests.rs` -> **Launchpad** | LOC: 389 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/treasury/tests.rs` -> **Launchpad** | LOC: 517 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-atomic-kernel/tests.rs` -> **Universal Asset Kernel** | LOC: 299 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-coin/tests.rs` -> **Universal Asset Kernel** | LOC: 876 | Risks: mock hash risk, panic risk, replay risk
+- `launch-gates/sources/pack-04-invariant/x3-cross-vm-router/tests.rs` -> **Universal Asset Kernel** | LOC: 1161 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk, unfinished logic
+- `launch-gates/sources/pack-04-invariant/x3-da/tests.rs` -> **X3 DEX** | LOC: 317 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-domain-registry/tests.rs` -> **Launchpad** | LOC: 90 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-invariants/tests.rs` -> **Universal Asset Kernel** | LOC: 246 | Risks: none
+- `launch-gates/sources/pack-04-invariant/x3-inventory/tests.rs` -> **Universal Asset Kernel** | LOC: 803 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-kernel/chaos_tests.rs` -> **Universal Asset Kernel** | LOC: 641 | Risks: atomic rollback risk, mock hash risk, replay risk, replay/nonce risk
+- `launch-gates/sources/pack-04-invariant/x3-kernel/replay_tests.rs` -> **Universal Asset Kernel** | LOC: 207 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk
+- `launch-gates/sources/pack-04-invariant/x3-kernel/tests.rs` -> **Universal Asset Kernel** | LOC: 2107 | Risks: atomic rollback risk, mock hash risk, panic risk, replay/nonce risk
+- `launch-gates/sources/pack-04-invariant/x3-reservation/tests.rs` -> **Launchpad** | LOC: 554 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-sequencer/tests.rs` -> **Launchpad** | LOC: 348 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-settlement-engine/bridge_tests.rs` -> **Bridge / Router** | LOC: 214 | Risks: bridge risk, mock hash risk
+- `launch-gates/sources/pack-04-invariant/x3-settlement-engine/property_tests.rs` -> **Universal Asset Kernel** | LOC: 485 | Risks: replay/nonce risk
+- `launch-gates/sources/pack-04-invariant/x3-settlement-engine/tests.rs` -> **Universal Asset Kernel** | LOC: 2038 | Risks: panic risk, replay risk
+- `launch-gates/sources/pack-04-invariant/x3-slash/tests.rs` -> **Launchpad** | LOC: 88 | Risks: panic risk
+- `launch-gates/sources/pack-04-invariant/x3-token-factory/tests.rs` -> **Universal Asset Kernel** | LOC: 579 | Risks: panic risk, replay/nonce risk, supply invariant risk
+- `launch-gates/sources/pack-04-invariant/x3-verifier/tests.rs` -> **Launchpad** | LOC: 11 | Risks: none
+- `launch-gates/sources/pack-04-invariant/x3-wallet-pallet/tests.rs` -> **Launchpad** | LOC: 330 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/agent-accounts-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/agent-accounts-tests.rs` -> **Launchpad** | LOC: 592 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/agent-memory-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/agent-memory-tests.rs` -> **Launchpad** | LOC: 523 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/atomic-trade-engine-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/atomic-trade-engine-tests.rs` -> **Universal Asset Kernel** | LOC: 921 | Risks: atomic rollback risk, mock hash risk, panic risk, replay/nonce risk
+- `launch-gates/sources/pack-05-test-gap/pallets/cross-chain-validator-excerpt.rs` -> **EVM Integration** | LOC: 463 | Risks: none
+- `launch-gates/sources/pack-05-test-gap/pallets/cross-chain-validator-tests.rs` -> **EVM Integration** | LOC: 231 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/depin-marketplace-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/depin-marketplace-tests.rs` -> **Launchpad** | LOC: 336 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/evolution-core-excerpt.rs` -> **EVM Integration** | LOC: 501 | Risks: atomic rollback risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/evolution-core-tests.rs` -> **Launchpad** | LOC: 12 | Risks: none
+- `launch-gates/sources/pack-05-test-gap/pallets/fraud-proofs-excerpt.rs` -> **Launchpad** | LOC: 11 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/governance-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/governance-tests.rs` -> **Launchpad** | LOC: 509 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/meme-overlord-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/meme-overlord-tests.rs` -> **Launchpad** | LOC: 10 | Risks: none
+- `launch-gates/sources/pack-05-test-gap/pallets/private-execution-excerpt.rs` -> **DEX Liquidity** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/private-execution-tests.rs` -> **Launchpad** | LOC: 249 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/svm-runtime-excerpt.rs` -> **SVM Integration** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/swarm-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/swarm-tests.rs` -> **Launchpad** | LOC: 389 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/treasury-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/treasury-tests.rs` -> **Launchpad** | LOC: 517 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-asset-registry-excerpt.rs` -> **Universal Asset Kernel** | LOC: 465 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-atomic-kernel-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: atomic rollback risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-atomic-kernel-tests.rs` -> **Universal Asset Kernel** | LOC: 299 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-coin-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: replay risk, replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-coin-tests.rs` -> **Universal Asset Kernel** | LOC: 876 | Risks: mock hash risk, panic risk, replay risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-cross-vm-router-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: bridge risk, replay/nonce risk, unfinished logic, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-cross-vm-router-tests.rs` -> **Universal Asset Kernel** | LOC: 1161 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk, unfinished logic
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-da-excerpt.rs` -> **X3 DEX** | LOC: 342 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-da-tests.rs` -> **X3 DEX** | LOC: 317 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-domain-registry-excerpt.rs` -> **Launchpad** | LOC: 430 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-domain-registry-tests.rs` -> **Launchpad** | LOC: 90 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-invariants-excerpt.rs` -> **Universal Asset Kernel** | LOC: 470 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-invariants-tests.rs` -> **Universal Asset Kernel** | LOC: 246 | Risks: none
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-inventory-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: unfinished logic, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-inventory-tests.rs` -> **Universal Asset Kernel** | LOC: 803 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-jury-anchor-excerpt.rs` -> **X3 DEX** | LOC: 389 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-kernel-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: bridge risk, replay risk, replay/nonce risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-kernel-tests.rs` -> **Universal Asset Kernel** | LOC: 2107 | Risks: atomic rollback risk, mock hash risk, panic risk, replay/nonce risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-reservation-excerpt.rs` -> **Launchpad** | LOC: 438 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-reservation-tests.rs` -> **Launchpad** | LOC: 554 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-sequencer-excerpt.rs` -> **Launchpad** | LOC: 328 | Risks: panic risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-sequencer-tests.rs` -> **Launchpad** | LOC: 348 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-settlement-engine-excerpt.rs` -> **Universal Asset Kernel** | LOC: 501 | Risks: bridge risk, replay risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-settlement-engine-tests.rs` -> **Universal Asset Kernel** | LOC: 2038 | Risks: panic risk, replay risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-slash-excerpt.rs` -> **Bridge / Router** | LOC: 501 | Risks: bridge risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-slash-tests.rs` -> **Launchpad** | LOC: 88 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-solvency-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: bridge risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-supply-ledger-excerpt.rs` -> **Universal Asset Kernel** | LOC: 313 | Risks: supply invariant risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-token-factory-excerpt.rs` -> **Universal Asset Kernel** | LOC: 413 | Risks: replay/nonce risk, supply invariant risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-token-factory-tests.rs` -> **Universal Asset Kernel** | LOC: 579 | Risks: panic risk, replay/nonce risk, supply invariant risk
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-verifier-excerpt.rs` -> **Launchpad** | LOC: 501 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-verifier-tests.rs` -> **Launchpad** | LOC: 11 | Risks: none
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-wallet-pallet-excerpt.rs` -> **X3 DEX** | LOC: 360 | Risks: unsafe code
+- `launch-gates/sources/pack-05-test-gap/pallets/x3-wallet-pallet-tests.rs` -> **Launchpad** | LOC: 330 | Risks: panic risk
+- `launch-gates/sources/pack-05-test-gap/runtime/lib-excerpt.rs` -> **Universal Asset Kernel** | LOC: 1001 | Risks: bridge risk, replay risk, unsafe code
+- `launch-gates/sources/pack-05-test-gap/tests/e2e_settlement_atomic_kernel.rs` -> **Universal Asset Kernel** | LOC: 359 | Risks: bridge risk
+- `launch-gates/summarize-embarrassment-evidence.sh` -> **Launchpad** | LOC: 108 | Risks: none
+- `launch-gates/validate-embarrassment-suppressions.sh` -> **Launchpad** | LOC: 97 | Risks: unfinished logic
+- `launch-gates/verify-p0-blockers.sh` -> **Universal Asset Kernel** | LOC: 179 | Risks: none
+- `monitor-builds.sh` -> **GPU Validator Swarm** | LOC: 32 | Risks: none
+- `monitoring/config/prometheus.yml` -> **Proof System** | LOC: 12 | Risks: local-only config risk
+- `node/Cargo.toml` -> **Universal Asset Kernel** | LOC: 116 | Risks: bridge risk
+- `node/benches/rpc_dex_latency.rs` -> **X3 DEX** | LOC: 233 | Risks: panic risk
+- `node/src/authority.rs` -> **X3 DEX** | LOC: 258 | Risks: none
+- `node/src/chain_spec.rs` -> **Universal Asset Kernel** | LOC: 708 | Risks: none
+- `node/src/cli.rs` -> **Universal Asset Kernel** | LOC: 526 | Risks: bridge risk
+- `node/src/command.rs` -> **X3 DEX** | LOC: 992 | Risks: none
+- `node/src/flash_finality.rs` -> **Bridge / Router** | LOC: 190 | Risks: bridge risk
+- `node/src/lib.rs` -> **Bridge / Router** | LOC: 97 | Risks: bridge risk, unsafe code
+- `node/src/logging.rs` -> **Unclassified** | LOC: 28 | Risks: none
+- `node/src/main.rs` -> **Unclassified** | LOC: 7 | Risks: unsafe code
+- `node/src/main_stub.rs` -> **Universal Asset Kernel** | LOC: 10 | Risks: none
+- `node/src/metrics.rs` -> **EVM Integration** | LOC: 421 | Risks: none
+- `node/src/network.rs` -> **Genesis / Chain Spec** | LOC: 243 | Risks: none
+- `node/src/rpc.rs` -> **Universal Asset Kernel** | LOC: 211 | Risks: unsafe code
+- `node/src/rpc_frontier.rs` -> **Universal Asset Kernel** | LOC: 390 | Risks: panic risk, replay/nonce risk
+- `node/src/rpc_middleware.rs` -> **Universal Asset Kernel** | LOC: 463 | Risks: local-only config risk
+- `node/src/service.rs` -> **Bridge / Router** | LOC: 1615 | Risks: bridge risk, panic risk, unfinished logic, unsafe code
+- `node/tests/flash_finality_network.rs` -> **Validator / LaunchOps** | LOC: 330 | Risks: none
+- `node/tests/node_requirements.rs` -> **Genesis / Chain Spec** | LOC: 480 | Risks: none
+- `node/x3-chain-node.cdx.baseline.json` -> **Unclassified** | LOC: 5272 | Risks: bridge risk, unsafe code
+- `package.json` -> **X3 DEX** | LOC: 20 | Risks: none
+- `packages/atomic-swap-sdk/contracts/AtlasHTLC.sol` -> **EVM Integration** | LOC: 265 | Risks: none
+- `packages/atomic-swap-sdk/package.json` -> **EVM Integration** | LOC: 59 | Risks: none
+- `packages/atomic-swap-sdk/src/dex/client.ts` -> **Universal Asset Kernel** | LOC: 353 | Risks: none
+- `packages/atomic-swap-sdk/src/dex/index.ts` -> **X3 DEX** | LOC: 3 | Risks: none
+- `packages/atomic-swap-sdk/src/dex/websocket.ts` -> **X3 DEX** | LOC: 305 | Risks: none
+- `packages/atomic-swap-sdk/src/htlc/base.ts` -> **X3 DEX** | LOC: 129 | Risks: none
+- `packages/atomic-swap-sdk/src/htlc/bitcoin.ts` -> **X3VM / Cross-VM** | LOC: 590 | Risks: none
+- `packages/atomic-swap-sdk/src/htlc/evm.ts` -> **EVM Integration** | LOC: 309 | Risks: replay/nonce risk
+- `packages/atomic-swap-sdk/src/htlc/index.ts` -> **EVM Integration** | LOC: 76 | Risks: none
+- `packages/atomic-swap-sdk/src/htlc/solana.ts` -> **SVM Integration** | LOC: 284 | Risks: none
+- `packages/atomic-swap-sdk/src/htlc/substrate.ts` -> **Universal Asset Kernel** | LOC: 313 | Risks: replay/nonce risk
+- `packages/atomic-swap-sdk/src/index.ts` -> **Universal Asset Kernel** | LOC: 85 | Risks: none
+- `packages/atomic-swap-sdk/src/orderbook/engine.ts` -> **Universal Asset Kernel** | LOC: 561 | Risks: none
+- `packages/atomic-swap-sdk/src/orderbook/index.ts` -> **X3 DEX** | LOC: 2 | Risks: none
+- `packages/atomic-swap-sdk/src/swap/index.ts` -> **X3 DEX** | LOC: 3 | Risks: none
+- `packages/atomic-swap-sdk/src/swap/monitor.ts` -> **X3 DEX** | LOC: 196 | Risks: none
+- `packages/atomic-swap-sdk/src/swap/orchestrator.ts` -> **EVM Integration** | LOC: 384 | Risks: none
+- `packages/atomic-swap-sdk/src/types.ts` -> **Universal Asset Kernel** | LOC: 394 | Risks: none
+- `packages/atomic-swap-sdk/tsconfig.json` -> **X3 DEX** | LOC: 22 | Risks: none
+- `packages/blockchain-adapter/package.json` -> **X3 DEX** | LOC: 20 | Risks: none
+- `packages/blockchain-adapter/src/jury-anchoring-ui.tsx` -> **Unclassified** | LOC: 190 | Risks: none
+- `packages/blockchain-adapter/src/jury-anchoring.ts` -> **Bridge / Router** | LOC: 196 | Risks: none
+- `packages/blockchain-adapter/src/rpc-client.ts` -> **Unclassified** | LOC: 61 | Risks: none
+- `packages/blockchain-adapter/tsconfig.json` -> **Unclassified** | LOC: 18 | Risks: none
+- `packages/blockchain-connector/docs/openapi.yaml` -> **EVM Integration** | LOC: 766 | Risks: local-only config risk, replay/nonce risk
+- `packages/blockchain-connector/docs/root/README.md` -> **Unclassified** | LOC: 24 | Risks: none
+- `packages/blockchain-connector/package.json` -> **X3 DEX** | LOC: 60 | Risks: none
+- `packages/blockchain-connector/src/adapters/base.ts` -> **EVM Integration** | LOC: 157 | Risks: none
+- `packages/blockchain-connector/src/adapters/bitcoin.ts` -> **TPS Benchmark Suite** | LOC: 97 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/adapters/cosmos.ts` -> **Validator / LaunchOps** | LOC: 88 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/adapters/evm.ts` -> **EVM Integration** | LOC: 124 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/adapters/generic.ts` -> **Unclassified** | LOC: 59 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/adapters/index.ts` -> **EVM Integration** | LOC: 43 | Risks: none
+- `packages/blockchain-connector/src/adapters/near.ts` -> **Validator / LaunchOps** | LOC: 113 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/adapters/solana.ts` -> **TPS Benchmark Suite** | LOC: 107 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/adapters/substrate.ts` -> **TPS Benchmark Suite** | LOC: 197 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/chains/db.ts` -> **EVM Integration** | LOC: 114 | Risks: none
+- `packages/blockchain-connector/src/chains/registry.ts` -> **EVM Integration** | LOC: 884 | Risks: none
+- `packages/blockchain-connector/src/chains/rpc_database.json` -> **EVM Integration** | LOC: 296 | Risks: none
+- `packages/blockchain-connector/src/connector/alerter.ts` -> **Unclassified** | LOC: 78 | Risks: none
+- `packages/blockchain-connector/src/connector/health-monitor.ts` -> **DEX Liquidity** | LOC: 153 | Risks: none
+- `packages/blockchain-connector/src/connector/manager.ts` -> **Unclassified** | LOC: 370 | Risks: none
+- `packages/blockchain-connector/src/index.ts` -> **EVM Integration** | LOC: 92 | Risks: none
+- `packages/blockchain-connector/src/server/billing.test.ts` -> **Unclassified** | LOC: 139 | Risks: panic risk
+- `packages/blockchain-connector/src/server/billing.ts` -> **TPS Benchmark Suite** | LOC: 392 | Risks: none
+- `packages/blockchain-connector/src/server/dev-server.ts` -> **X3 DEX** | LOC: 8 | Risks: none
+- `packages/blockchain-connector/src/server/index.ts` -> **X3 DEX** | LOC: 490 | Risks: local-only config risk
+- `packages/blockchain-connector/src/testing/harness.ts` -> **Universal Asset Kernel** | LOC: 480 | Risks: replay/nonce risk
+- `packages/blockchain-connector/src/types/index.ts` -> **Universal Asset Kernel** | LOC: 377 | Risks: replay/nonce risk
+- `packages/blockchain-connector/test/health-monitor.test.ts` -> **TPS Benchmark Suite** | LOC: 34 | Risks: panic risk
+- `packages/blockchain-connector/test/manager.billing-quota.test.ts` -> **Unclassified** | LOC: 73 | Risks: panic risk
+- `packages/blockchain-connector/test/manager.failover.test.ts` -> **EVM Integration** | LOC: 67 | Risks: panic risk
+- `packages/blockchain-connector/test/server.admin-api.test.ts` -> **X3 DEX** | LOC: 528 | Risks: panic risk
+- `packages/blockchain-connector/test/server.billing-enforcement.test.ts` -> **X3 DEX** | LOC: 111 | Risks: panic risk
+- `packages/blockchain-connector/test/server.connectors-billing.test.ts` -> **EVM Integration** | LOC: 238 | Risks: panic risk
+- `packages/blockchain-connector/test/server.websocket-billing.test.ts` -> **X3 DEX** | LOC: 95 | Risks: panic risk
+- `packages/blockchain-connector/tsconfig.json` -> **Unclassified** | LOC: 24 | Risks: none
+- `packages/polkawallet-bridge-adapter/docs/root/README.md` -> **Bridge / Router** | LOC: 18 | Risks: bridge risk
+- `packages/polkawallet-bridge-adapter/jest.config.js` -> **Bridge / Router** | LOC: 12 | Risks: none
+- `packages/polkawallet-bridge-adapter/package.json` -> **Bridge / Router** | LOC: 50 | Risks: bridge risk
+- `packages/polkawallet-bridge-adapter/src/adapter.ts` -> **Universal Asset Kernel** | LOC: 274 | Risks: bridge risk
+- `packages/polkawallet-bridge-adapter/src/configs.ts` -> **Universal Asset Kernel** | LOC: 207 | Risks: bridge risk
+- `packages/polkawallet-bridge-adapter/src/index.ts` -> **Universal Asset Kernel** | LOC: 25 | Risks: bridge risk
+- `packages/polkawallet-bridge-adapter/tests/bridge.test.ts` -> **Universal Asset Kernel** | LOC: 38 | Risks: bridge risk, panic risk
+- `packages/polkawallet-bridge-adapter/tsconfig.json` -> **Bridge / Router** | LOC: 21 | Risks: none
+- `packages/polkawallet-plugin/docs/root/README.md` -> **X3VM / Cross-VM** | LOC: 20 | Risks: none
+- `packages/polkawallet-plugin/jest.config.js` -> **Unclassified** | LOC: 12 | Risks: none
+- `packages/polkawallet-plugin/package.json` -> **X3VM / Cross-VM** | LOC: 47 | Risks: none
+- `packages/polkawallet-plugin/src/core/api.ts` -> **Bridge / Router** | LOC: 158 | Risks: bridge risk
+- `packages/polkawallet-plugin/src/core/index.ts` -> **X3 DEX** | LOC: 5 | Risks: none
+- `packages/polkawallet-plugin/src/core/tx-helper.ts` -> **Unclassified** | LOC: 112 | Risks: none
+- `packages/polkawallet-plugin/src/domains/index.ts` -> **X3 DEX** | LOC: 9 | Risks: none
+- `packages/polkawallet-plugin/src/governance/index.ts` -> **X3 DEX** | LOC: 14 | Risks: none
+- `packages/polkawallet-plugin/src/index.ts` -> **Universal Asset Kernel** | LOC: 149 | Risks: bridge risk
+- `packages/polkawallet-plugin/src/plugin.ts` -> **Universal Asset Kernel** | LOC: 220 | Risks: none
+- `packages/polkawallet-plugin/src/service/agents.ts` -> **Unclassified** | LOC: 108 | Risks: none
+- `packages/polkawallet-plugin/src/service/atomicTrade.ts` -> **Universal Asset Kernel** | LOC: 137 | Risks: none
+- `packages/polkawallet-plugin/src/service/evolution.ts` -> **Unclassified** | LOC: 100 | Risks: atomic rollback risk
+- `packages/polkawallet-plugin/src/service/flashloan.ts` -> **Universal Asset Kernel** | LOC: 115 | Risks: none
+- `packages/polkawallet-plugin/src/service/governance.ts` -> **Governance** | LOC: 114 | Risks: none
+- `packages/polkawallet-plugin/src/service/kernel.ts` -> **Universal Asset Kernel** | LOC: 89 | Risks: none
+- `packages/polkawallet-plugin/src/service/setting.ts` -> **Unclassified** | LOC: 44 | Risks: none
+- `packages/polkawallet-plugin/src/service/settlement.ts` -> **Universal Asset Kernel** | LOC: 158 | Risks: none
+- `packages/polkawallet-plugin/src/service/x3.ts` -> **Universal Asset Kernel** | LOC: 94 | Risks: none
+- `packages/polkawallet-plugin/src/service/x3domains.ts` -> **EVM Integration** | LOC: 139 | Risks: none
+- `packages/polkawallet-plugin/src/service/x3vm.ts` -> **X3VM / Cross-VM** | LOC: 125 | Risks: replay risk
+- `packages/polkawallet-plugin/src/services/domains.ts` -> **Unclassified** | LOC: 162 | Risks: none
+- `packages/polkawallet-plugin/src/services/governance.ts` -> **Governance** | LOC: 202 | Risks: none
+- `packages/polkawallet-plugin/src/services/kernel.ts` -> **Universal Asset Kernel** | LOC: 218 | Risks: replay/nonce risk
+- `packages/polkawallet-plugin/src/services/settlement.ts` -> **Universal Asset Kernel** | LOC: 290 | Risks: replay/nonce risk
+- `packages/polkawallet-plugin/src/services/svm.ts` -> **SVM Integration** | LOC: 130 | Risks: none
+- `packages/polkawallet-plugin/src/services/trades.ts` -> **Universal Asset Kernel** | LOC: 283 | Risks: replay/nonce risk
+- `packages/polkawallet-plugin/src/services/treasury.ts` -> **Unclassified** | LOC: 210 | Risks: none
+- `packages/polkawallet-plugin/src/services/verifier.ts` -> **X3VM / Cross-VM** | LOC: 166 | Risks: none
+- `packages/polkawallet-plugin/src/settlement/index.ts` -> **Universal Asset Kernel** | LOC: 13 | Risks: none
+- `packages/polkawallet-plugin/src/trades/index.ts` -> **X3VM / Cross-VM** | LOC: 12 | Risks: none
+- `packages/polkawallet-plugin/src/types/index.ts` -> **X3 DEX** | LOC: 3 | Risks: none
+- `packages/polkawallet-plugin/src/types/interfaces.ts` -> **Universal Asset Kernel** | LOC: 451 | Risks: local-only config risk, replay/nonce risk
+- `packages/polkawallet-plugin/src/types/runtime-types.ts` -> **Universal Asset Kernel** | LOC: 474 | Risks: replay/nonce risk
+- `packages/polkawallet-plugin/src/types/x3chain-types.ts` -> **Universal Asset Kernel** | LOC: 366 | Risks: none
+- `packages/polkawallet-plugin/src/x3vm/client.ts` -> **Universal Asset Kernel** | LOC: 395 | Risks: replay/nonce risk
+- `packages/polkawallet-plugin/src/x3vm/index.ts` -> **X3VM / Cross-VM** | LOC: 13 | Risks: none
+- `packages/polkawallet-plugin/tests/plugin.test.ts` -> **Universal Asset Kernel** | LOC: 176 | Risks: panic risk
+- `packages/polkawallet-plugin/tsconfig.json` -> **Unclassified** | LOC: 21 | Risks: none
+- `packages/polkawallet-plugin/tsup.config.ts` -> **X3VM / Cross-VM** | LOC: 28 | Risks: none
+- `packages/polkawallet-sdk/pubspec.yaml` -> **Universal Asset Kernel** | LOC: 25 | Risks: none
+- `packages/py-sdk/pyproject.toml` -> **TPS Benchmark Suite** | LOC: 154 | Risks: none
+- `packages/py-sdk/src/atlas_sphere_sdk/__init__.py` -> **Universal Asset Kernel** | LOC: 53 | Risks: none
+- `packages/py-sdk/src/atlas_sphere_sdk/cli.py` -> **Universal Asset Kernel** | LOC: 197 | Risks: local-only config risk, replay/nonce risk
+- `packages/py-sdk/src/atlas_sphere_sdk/client.py` -> **Universal Asset Kernel** | LOC: 367 | Risks: local-only config risk, replay/nonce risk
+- `packages/py-sdk/src/atlas_sphere_sdk/collateral.py` -> **Universal Asset Kernel** | LOC: 112 | Risks: none
+- `packages/py-sdk/src/atlas_sphere_sdk/comit.py` -> **EVM Integration** | LOC: 390 | Risks: replay/nonce risk
+- `packages/py-sdk/src/atlas_sphere_sdk/evm.py` -> **EVM Integration** | LOC: 178 | Risks: replay/nonce risk
+- `packages/py-sdk/src/atlas_sphere_sdk/query.py` -> **Universal Asset Kernel** | LOC: 110 | Risks: replay/nonce risk
+- `packages/py-sdk/src/atlas_sphere_sdk/svm.py` -> **SVM Integration** | LOC: 182 | Risks: none
+- `packages/py-sdk/src/atlas_sphere_sdk/types.py` -> **Universal Asset Kernel** | LOC: 158 | Risks: replay/nonce risk
+- `packages/py-sdk/src/x3_chain_sdk/__init__.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/cli.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/client.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/collateral.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/comit.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/evm.py` -> **EVM Integration** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/query.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/svm.py` -> **SVM Integration** | LOC: 5 | Risks: none
+- `packages/py-sdk/src/x3_chain_sdk/types.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `packages/py-sdk/tests/__init__.py` -> **Unclassified** | LOC: 2 | Risks: none
+- `packages/py-sdk/tests/conftest.py` -> **Genesis / Chain Spec** | LOC: 80 | Risks: replay/nonce risk
+- `packages/py-sdk/tests/test_comit.py` -> **EVM Integration** | LOC: 140 | Risks: replay/nonce risk
+- `packages/py-sdk/tests/test_evm.py` -> **EVM Integration** | LOC: 97 | Risks: none
+- `packages/py-sdk/tests/test_svm.py` -> **SVM Integration** | LOC: 122 | Risks: none
+- `packages/py-sdk/tests/test_types.py` -> **Universal Asset Kernel** | LOC: 185 | Risks: replay/nonce risk
+- `packages/ts-sdk/docs/root/README.md` -> **Unclassified** | LOC: 26 | Risks: none
+- `packages/ts-sdk/jest.config.js` -> **Unclassified** | LOC: 27 | Risks: none
+- `packages/ts-sdk/package.json` -> **X3 DEX** | LOC: 62 | Risks: none
+- `packages/ts-sdk/src/client.ts` -> **Universal Asset Kernel** | LOC: 789 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `packages/ts-sdk/src/collateral.ts` -> **Universal Asset Kernel** | LOC: 143 | Risks: none
+- `packages/ts-sdk/src/comit.ts` -> **EVM Integration** | LOC: 534 | Risks: replay/nonce risk
+- `packages/ts-sdk/src/constants.ts` -> **Universal Asset Kernel** | LOC: 204 | Risks: none
+- `packages/ts-sdk/src/errors.ts` -> **EVM Integration** | LOC: 325 | Risks: replay/nonce risk
+- `packages/ts-sdk/src/evm.ts` -> **EVM Integration** | LOC: 452 | Risks: replay/nonce risk
+- `packages/ts-sdk/src/index.ts` -> **Universal Asset Kernel** | LOC: 370 | Risks: local-only config risk
+- `packages/ts-sdk/src/query.ts` -> **Universal Asset Kernel** | LOC: 542 | Risks: panic risk, replay/nonce risk
+- `packages/ts-sdk/src/subscriptions.ts` -> **EVM Integration** | LOC: 289 | Risks: local-only config risk
+- `packages/ts-sdk/src/svm.ts` -> **SVM Integration** | LOC: 510 | Risks: none
+- `packages/ts-sdk/src/types.ts` -> **Universal Asset Kernel** | LOC: 341 | Risks: replay/nonce risk
+- `packages/ts-sdk/src/utils.ts` -> **EVM Integration** | LOC: 483 | Risks: replay/nonce risk
+- `packages/ts-sdk/src/x3.ts` -> **Universal Asset Kernel** | LOC: 365 | Risks: replay/nonce risk
+- `packages/ts-sdk/tests/client.test.ts` -> **Universal Asset Kernel** | LOC: 127 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `packages/ts-sdk/tests/collateral.test.ts` -> **Unclassified** | LOC: 17 | Risks: local-only config risk, panic risk
+- `packages/ts-sdk/tests/comit.test.ts` -> **EVM Integration** | LOC: 225 | Risks: panic risk
+- `packages/ts-sdk/tests/evm.test.ts` -> **EVM Integration** | LOC: 282 | Risks: panic risk
+- `packages/ts-sdk/tests/live.integration.test.ts` -> **Unclassified** | LOC: 94 | Risks: panic risk, replay/nonce risk
+- `packages/ts-sdk/tests/subscriptions.test.ts` -> **Unclassified** | LOC: 229 | Risks: local-only config risk, panic risk
+- `packages/ts-sdk/tests/svm.test.ts` -> **SVM Integration** | LOC: 295 | Risks: panic risk
+- `packages/ts-sdk/tests/utils.test.ts` -> **EVM Integration** | LOC: 360 | Risks: panic risk, replay/nonce risk
+- `packages/ts-sdk/tests/x3.test.ts` -> **EVM Integration** | LOC: 393 | Risks: panic risk
+- `packages/ts-sdk/tsconfig.json` -> **Unclassified** | LOC: 28 | Risks: none
+- `packages/ts-sdk/tsup.config.ts` -> **EVM Integration** | LOC: 25 | Risks: none
+- `packages/x3-marketplace-sdk/src/index.ts` -> **Bridge / Router** | LOC: 465 | Risks: bridge risk
+- `pallets/agent-accounts/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 64 | Risks: none
+- `pallets/agent-accounts/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/agent-accounts/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/agent-accounts/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 200 | Risks: panic risk
+- `pallets/agent-accounts/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 805 | Risks: unsafe code
+- `pallets/agent-accounts/src/migrations.rs` -> **Unclassified** | LOC: 25 | Risks: none
+- `pallets/agent-accounts/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 143 | Risks: panic risk
+- `pallets/agent-accounts/src/runtime_api.rs` -> **Unclassified** | LOC: 68 | Risks: none
+- `pallets/agent-accounts/src/tests.rs` -> **Unclassified** | LOC: 592 | Risks: panic risk
+- `pallets/agent-accounts/src/types.rs` -> **Governance** | LOC: 220 | Risks: none
+- `pallets/agent-accounts/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 120 | Risks: none
+- `pallets/agent-memory/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 64 | Risks: none
+- `pallets/agent-memory/OFFCHAIN_INTEGRATION.md` -> **X3 DEX** | LOC: 459 | Risks: unfinished logic
+- `pallets/agent-memory/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/agent-memory/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/agent-memory/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 160 | Risks: panic risk
+- `pallets/agent-memory/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 994 | Risks: unsafe code
+- `pallets/agent-memory/src/migrations.rs` -> **Unclassified** | LOC: 25 | Risks: none
+- `pallets/agent-memory/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 133 | Risks: panic risk
+- `pallets/agent-memory/src/offchain_storage.rs` -> **X3 DEX** | LOC: 345 | Risks: panic risk
+- `pallets/agent-memory/src/rpc_tests.rs` -> **X3 DEX** | LOC: 289 | Risks: none
+- `pallets/agent-memory/src/runtime_api.rs` -> **X3 DEX** | LOC: 176 | Risks: none
+- `pallets/agent-memory/src/tests.rs` -> **Unclassified** | LOC: 523 | Risks: panic risk
+- `pallets/agent-memory/src/types.rs` -> **Unclassified** | LOC: 206 | Risks: none
+- `pallets/agent-memory/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 101 | Risks: none
+- `pallets/atomic-trade-engine/Cargo.toml` -> **Universal Asset Kernel** | LOC: 82 | Risks: none
+- `pallets/atomic-trade-engine/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/atomic-trade-engine/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/atomic-trade-engine/src/amm.rs` -> **EVM Integration** | LOC: 630 | Risks: mock hash risk, panic risk
+- `pallets/atomic-trade-engine/src/benchmarking.rs` -> **Universal Asset Kernel** | LOC: 236 | Risks: mock hash risk, panic risk, replay/nonce risk
+- `pallets/atomic-trade-engine/src/graph.rs` -> **X3VM / Cross-VM** | LOC: 556 | Risks: mock hash risk, panic risk
+- `pallets/atomic-trade-engine/src/lib.rs` -> **Universal Asset Kernel** | LOC: 2286 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unsafe code
+- `pallets/atomic-trade-engine/src/migrations.rs` -> **Unclassified** | LOC: 22 | Risks: none
+- `pallets/atomic-trade-engine/src/mock.rs` -> **Universal Asset Kernel** | LOC: 363 | Risks: panic risk
+- `pallets/atomic-trade-engine/src/runtime_api.rs` -> **EVM Integration** | LOC: 158 | Risks: none
+- `pallets/atomic-trade-engine/src/tests.rs` -> **Universal Asset Kernel** | LOC: 921 | Risks: atomic rollback risk, mock hash risk, panic risk, replay/nonce risk
+- `pallets/atomic-trade-engine/src/types.rs` -> **Universal Asset Kernel** | LOC: 665 | Risks: mock hash risk, panic risk
+- `pallets/atomic-trade-engine/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 123 | Risks: none
+- `pallets/cross-chain-validator/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 43 | Risks: none
+- `pallets/cross-chain-validator/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/cross-chain-validator/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Validator / LaunchOps** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/cross-chain-validator/src/benchmarking.rs` -> **EVM Integration** | LOC: 37 | Risks: none
+- `pallets/cross-chain-validator/src/lib.rs` -> **EVM Integration** | LOC: 485 | Risks: none
+- `pallets/cross-chain-validator/src/mock.rs` -> **X3 DEX** | LOC: 54 | Risks: none
+- `pallets/cross-chain-validator/src/runtime_api.rs` -> **EVM Integration** | LOC: 1 | Risks: none
+- `pallets/cross-chain-validator/src/tests.rs` -> **EVM Integration** | LOC: 239 | Risks: panic risk
+- `pallets/cross-chain-validator/src/weights.rs` -> **EVM Integration** | LOC: 53 | Risks: none
+- `pallets/depin-marketplace/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 60 | Risks: none
+- `pallets/depin-marketplace/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/depin-marketplace/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/depin-marketplace/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 45 | Risks: panic risk
+- `pallets/depin-marketplace/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 841 | Risks: unsafe code
+- `pallets/depin-marketplace/src/mock.rs` -> **X3 DEX** | LOC: 124 | Risks: panic risk
+- `pallets/depin-marketplace/src/tests.rs` -> **TPS Benchmark Suite** | LOC: 336 | Risks: panic risk
+- `pallets/depin-marketplace/src/types.rs` -> **TPS Benchmark Suite** | LOC: 343 | Risks: none
+- `pallets/depin-marketplace/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 126 | Risks: none
+- `pallets/evolution-core/Cargo.toml` -> **Genesis / Chain Spec** | LOC: 57 | Risks: none
+- `pallets/evolution-core/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/evolution-core/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/evolution-core/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 2 | Risks: none
+- `pallets/evolution-core/src/lib.rs` -> **EVM Integration** | LOC: 912 | Risks: atomic rollback risk, unsafe code
+- `pallets/evolution-core/src/migrations.rs` -> **Unclassified** | LOC: 22 | Risks: none
+- `pallets/evolution-core/src/runtime_api.rs` -> **EVM Integration** | LOC: 112 | Risks: none
+- `pallets/evolution-core/src/tests.rs` -> **Unclassified** | LOC: 12 | Risks: none
+- `pallets/evolution-core/src/weights.rs` -> **Unclassified** | LOC: 89 | Risks: atomic rollback risk
+- `pallets/fraud-proofs/Cargo.toml` -> **Proof System** | LOC: 14 | Risks: none
+- `pallets/fraud-proofs/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/fraud-proofs/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Proof System** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/fraud-proofs/src/lib.rs` -> **Proof System** | LOC: 11 | Risks: unsafe code
+- `pallets/governance/Cargo.toml` -> **Governance** | LOC: 61 | Risks: none
+- `pallets/governance/fuzz/Cargo.toml` -> **Governance** | LOC: 27 | Risks: none
+- `pallets/governance/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Governance** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/governance/src/ai_governance.rs` -> **Governance** | LOC: 298 | Risks: atomic rollback risk
+- `pallets/governance/src/benchmarking.rs` -> **Governance** | LOC: 251 | Risks: panic risk
+- `pallets/governance/src/lib.rs` -> **Governance** | LOC: 1719 | Risks: atomic rollback risk, unsafe code
+- `pallets/governance/src/migrations.rs` -> **Governance** | LOC: 22 | Risks: none
+- `pallets/governance/src/mock.rs` -> **Governance** | LOC: 199 | Risks: panic risk
+- `pallets/governance/src/runtime_api.rs` -> **Governance** | LOC: 110 | Risks: none
+- `pallets/governance/src/tests.rs` -> **Governance** | LOC: 623 | Risks: panic risk
+- `pallets/governance/src/types.rs` -> **Universal Asset Kernel** | LOC: 644 | Risks: atomic rollback risk
+- `pallets/governance/src/weights.rs` -> **Governance** | LOC: 136 | Risks: none
+- `pallets/meme-overlord/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 51 | Risks: none
+- `pallets/meme-overlord/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/meme-overlord/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/meme-overlord/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 4 | Risks: none
+- `pallets/meme-overlord/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 828 | Risks: unsafe code
+- `pallets/meme-overlord/src/migrations.rs` -> **Unclassified** | LOC: 22 | Risks: none
+- `pallets/meme-overlord/src/mock.rs` -> **Unclassified** | LOC: 9 | Risks: none
+- `pallets/meme-overlord/src/tests.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `pallets/meme-overlord/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 74 | Risks: none
+- `pallets/private-execution/Cargo.toml` -> **DEX Liquidity** | LOC: 60 | Risks: none
+- `pallets/private-execution/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/private-execution/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/private-execution/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 12 | Risks: none
+- `pallets/private-execution/src/lib.rs` -> **DEX Liquidity** | LOC: 668 | Risks: unsafe code
+- `pallets/private-execution/src/mock.rs` -> **X3 DEX** | LOC: 125 | Risks: panic risk
+- `pallets/private-execution/src/tests.rs` -> **Validator / LaunchOps** | LOC: 249 | Risks: panic risk
+- `pallets/private-execution/src/types.rs` -> **DEX Liquidity** | LOC: 160 | Risks: none
+- `pallets/private-execution/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 94 | Risks: none
+- `pallets/svm-runtime/Cargo.toml` -> **SVM Integration** | LOC: 54 | Risks: none
+- `pallets/svm-runtime/fuzz/Cargo.toml` -> **SVM Integration** | LOC: 27 | Risks: none
+- `pallets/svm-runtime/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **SVM Integration** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/svm-runtime/pallet-svm.cdx.baseline.json` -> **SVM Integration** | LOC: 2344 | Risks: none
+- `pallets/svm-runtime/src/lib.rs` -> **SVM Integration** | LOC: 1071 | Risks: panic risk, unsafe code
+- `pallets/svm-runtime/src/migrations.rs` -> **SVM Integration** | LOC: 22 | Risks: none
+- `pallets/svm-runtime/src/weights.rs` -> **SVM Integration** | LOC: 172 | Risks: none
+- `pallets/swarm/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 67 | Risks: none
+- `pallets/swarm/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/swarm/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/swarm/src/lib.rs` -> **GPU Validator Swarm** | LOC: 1286 | Risks: replay/nonce risk, unsafe code
+- `pallets/swarm/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 141 | Risks: panic risk
+- `pallets/swarm/src/tests.rs` -> **GPU Validator Swarm** | LOC: 389 | Risks: panic risk
+- `pallets/swarm/src/types.rs` -> **DEX Liquidity** | LOC: 356 | Risks: replay/nonce risk
+- `pallets/swarm/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 81 | Risks: none
+- `pallets/treasury/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 58 | Risks: none
+- `pallets/treasury/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/treasury/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/treasury/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 280 | Risks: panic risk
+- `pallets/treasury/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 1021 | Risks: unsafe code
+- `pallets/treasury/src/migrations.rs` -> **Unclassified** | LOC: 24 | Risks: none
+- `pallets/treasury/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 157 | Risks: panic risk
+- `pallets/treasury/src/tests.rs` -> **Unclassified** | LOC: 517 | Risks: panic risk
+- `pallets/treasury/src/types.rs` -> **Governance** | LOC: 219 | Risks: none
+- `pallets/treasury/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 148 | Risks: none
+- `pallets/x3-account-registry/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 46 | Risks: replay/nonce risk
+- `pallets/x3-account-registry/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-account-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-account-registry/src/lib.rs` -> **EVM Integration** | LOC: 191 | Risks: replay risk, replay/nonce risk
+- `pallets/x3-asset-registry/Cargo.toml` -> **Universal Asset Kernel** | LOC: 45 | Risks: none
+- `pallets/x3-asset-registry/fuzz/Cargo.toml` -> **Universal Asset Kernel** | LOC: 27 | Risks: none
+- `pallets/x3-asset-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Universal Asset Kernel** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-asset-registry/src/lib.rs` -> **Universal Asset Kernel** | LOC: 475 | Risks: unsafe code
+- `pallets/x3-atomic-kernel/Cargo.toml` -> **Universal Asset Kernel** | LOC: 58 | Risks: none
+- `pallets/x3-atomic-kernel/fuzz/Cargo.toml` -> **Universal Asset Kernel** | LOC: 48 | Risks: atomic rollback risk
+- `pallets/x3-atomic-kernel/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Universal Asset Kernel** | LOC: 41 | Risks: panic risk
+- `pallets/x3-atomic-kernel/fuzz/fuzz_targets/fuzz_proof_validation.rs` -> **Universal Asset Kernel** | LOC: 55 | Risks: none
+- `pallets/x3-atomic-kernel/fuzz/fuzz_targets/fuzz_rollback.rs` -> **Universal Asset Kernel** | LOC: 36 | Risks: atomic rollback risk
+- `pallets/x3-atomic-kernel/fuzz/fuzz_targets/fuzz_target_1.rs` -> **Universal Asset Kernel** | LOC: 8 | Risks: none
+- `pallets/x3-atomic-kernel/src/benchmarking.rs` -> **Universal Asset Kernel** | LOC: 216 | Risks: atomic rollback risk, panic risk
+- `pallets/x3-atomic-kernel/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1108 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `pallets/x3-atomic-kernel/src/mock.rs` -> **Universal Asset Kernel** | LOC: 209 | Risks: atomic rollback risk, panic risk
+- `pallets/x3-atomic-kernel/src/proof.rs` -> **Universal Asset Kernel** | LOC: 129 | Risks: none
+- `pallets/x3-atomic-kernel/src/tests.rs` -> **Universal Asset Kernel** | LOC: 582 | Risks: atomic rollback risk, panic risk
+- `pallets/x3-atomic-kernel/src/weights.rs` -> **Universal Asset Kernel** | LOC: 140 | Risks: atomic rollback risk
+- `pallets/x3-atomic-kernel/tests/loom_concurrency.rs` -> **Universal Asset Kernel** | LOC: 228 | Risks: atomic rollback risk, panic risk
+- `pallets/x3-atomic-kernel/tests/miri_tests.rs` -> **Universal Asset Kernel** | LOC: 220 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `pallets/x3-atomic-kernel/tests/proptest_tests.rs` -> **Universal Asset Kernel** | LOC: 117 | Risks: atomic rollback risk
+- `pallets/x3-automation/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 48 | Risks: none
+- `pallets/x3-automation/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-automation/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-automation/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 82 | Risks: none
+- `pallets/x3-automation/src/lib.rs` -> **X3 DEX** | LOC: 419 | Risks: unfinished logic, unsafe code
+- `pallets/x3-automation/src/mock.rs` -> **Universal Asset Kernel** | LOC: 125 | Risks: panic risk
+- `pallets/x3-automation/src/tests.rs` -> **Unclassified** | LOC: 123 | Risks: none
+- `pallets/x3-automation/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 115 | Risks: none
+- `pallets/x3-coin/Cargo.toml` -> **Universal Asset Kernel** | LOC: 57 | Risks: none
+- `pallets/x3-coin/README.md` -> **Universal Asset Kernel** | LOC: 162 | Risks: replay risk
+- `pallets/x3-coin/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-coin/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-coin/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 2 | Risks: none
+- `pallets/x3-coin/src/cross_chain.rs` -> **Unclassified** | LOC: 86 | Risks: none
+- `pallets/x3-coin/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1567 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk, unfinished logic, unsafe code
+- `pallets/x3-coin/src/mock.rs` -> **Universal Asset Kernel** | LOC: 212 | Risks: panic risk
+- `pallets/x3-coin/src/tests.rs` -> **Universal Asset Kernel** | LOC: 876 | Risks: mock hash risk, panic risk, replay risk
+- `pallets/x3-coin/src/weights.rs` -> **Universal Asset Kernel** | LOC: 238 | Risks: none
+- `pallets/x3-consensus/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 54 | Risks: none
+- `pallets/x3-consensus/src/lib.rs` -> **X3 DEX** | LOC: 265 | Risks: unsafe code
+- `pallets/x3-consensus/src/mock.rs` -> **X3 DEX** | LOC: 118 | Risks: panic risk
+- `pallets/x3-consensus/src/tests.rs` -> **Validator / LaunchOps** | LOC: 8 | Risks: none
+- `pallets/x3-consensus/src/tests/equivocation_detection.rs` -> **Validator / LaunchOps** | LOC: 34 | Risks: none
+- `pallets/x3-consensus/src/tests/finality_safety.rs` -> **Proof System** | LOC: 39 | Risks: none
+- `pallets/x3-consensus/src/tests/validator_rotation.rs` -> **Validator / LaunchOps** | LOC: 34 | Risks: none
+- `pallets/x3-consensus/src/weights.rs` -> **Validator / LaunchOps** | LOC: 42 | Risks: none
+- `pallets/x3-cross-vm-router/Cargo.toml` -> **Universal Asset Kernel** | LOC: 95 | Risks: bridge risk, replay risk
+- `pallets/x3-cross-vm-router/fuzz/Cargo.toml` -> **Bridge / Router** | LOC: 27 | Risks: none
+- `pallets/x3-cross-vm-router/fuzz/fuzz_targets/router_transfer_validation.rs` -> **Universal Asset Kernel** | LOC: 33 | Risks: none
+- `pallets/x3-cross-vm-router/fuzz/src/lib.rs` -> **Bridge / Router** | LOC: 15 | Risks: none
+- `pallets/x3-cross-vm-router/src/benchmarking.rs` -> **Universal Asset Kernel** | LOC: 92 | Risks: replay/nonce risk
+- `pallets/x3-cross-vm-router/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1095 | Risks: bridge risk, replay risk, replay/nonce risk, unsafe code
+- `pallets/x3-cross-vm-router/src/runtime_api.rs` -> **Bridge / Router** | LOC: 116 | Risks: bridge risk
+- `pallets/x3-cross-vm-router/src/tests.rs` -> **Universal Asset Kernel** | LOC: 1592 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `pallets/x3-da/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 37 | Risks: none
+- `pallets/x3-da/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-da/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-da/src/lib.rs` -> **X3 DEX** | LOC: 342 | Risks: unsafe code
+- `pallets/x3-da/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 107 | Risks: panic risk
+- `pallets/x3-da/src/tests.rs` -> **X3 DEX** | LOC: 317 | Risks: panic risk
+- `pallets/x3-dex/Cargo.toml` -> **Universal Asset Kernel** | LOC: 48 | Risks: none
+- `pallets/x3-dex/fuzz/Cargo.toml` -> **X3 DEX** | LOC: 50 | Risks: none
+- `pallets/x3-dex/fuzz/fuzz_targets/fuzz_add_liquidity.rs` -> **X3 DEX** | LOC: 73 | Risks: none
+- `pallets/x3-dex/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Universal Asset Kernel** | LOC: 52 | Risks: panic risk
+- `pallets/x3-dex/fuzz/fuzz_targets/fuzz_remove_liquidity.rs` -> **Universal Asset Kernel** | LOC: 77 | Risks: none
+- `pallets/x3-dex/fuzz/fuzz_targets/fuzz_swap.rs` -> **X3 DEX** | LOC: 90 | Risks: none
+- `pallets/x3-dex/src/benchmarking.rs` -> **Universal Asset Kernel** | LOC: 128 | Risks: none
+- `pallets/x3-dex/src/lib.rs` -> **Universal Asset Kernel** | LOC: 313 | Risks: unsafe code
+- `pallets/x3-dex/src/mock.rs` -> **Universal Asset Kernel** | LOC: 75 | Risks: panic risk
+- `pallets/x3-dex/src/tests.rs` -> **Universal Asset Kernel** | LOC: 108 | Risks: none
+- `pallets/x3-dex/src/tests_amm_math.rs` -> **Universal Asset Kernel** | LOC: 99 | Risks: panic risk
+- `pallets/x3-dex/src/tests_liquidity_provision.rs` -> **Universal Asset Kernel** | LOC: 125 | Risks: panic risk
+- `pallets/x3-dex/src/tests_swapping.rs` -> **Universal Asset Kernel** | LOC: 138 | Risks: panic risk
+- `pallets/x3-dex/src/weights.rs` -> **X3 DEX** | LOC: 138 | Risks: none
+- `pallets/x3-domain-registry/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 53 | Risks: none
+- `pallets/x3-domain-registry/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-domain-registry/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-domain-registry/src/lib.rs` -> **Governance** | LOC: 430 | Risks: unsafe code
+- `pallets/x3-domain-registry/src/mock.rs` -> **X3 DEX** | LOC: 84 | Risks: panic risk
+- `pallets/x3-domain-registry/src/runtime_api.rs` -> **Unclassified** | LOC: 79 | Risks: none
+- `pallets/x3-domain-registry/src/tests.rs` -> **Unclassified** | LOC: 90 | Risks: panic risk
+- `pallets/x3-invariants/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 61 | Risks: none
+- `pallets/x3-invariants/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-invariants/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-invariants/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 11 | Risks: none
+- `pallets/x3-invariants/src/lib.rs` -> **Universal Asset Kernel** | LOC: 541 | Risks: panic risk, unsafe code
+- `pallets/x3-invariants/src/mock.rs` -> **Universal Asset Kernel** | LOC: 85 | Risks: panic risk
+- `pallets/x3-invariants/src/tests.rs` -> **Universal Asset Kernel** | LOC: 246 | Risks: none
+- `pallets/x3-invariants/src/weights.rs` -> **Universal Asset Kernel** | LOC: 62 | Risks: none
+- `pallets/x3-inventory/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 34 | Risks: none
+- `pallets/x3-inventory/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-inventory/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-inventory/src/inventory.rs` -> **Proof System** | LOC: 153 | Risks: atomic rollback risk
+- `pallets/x3-inventory/src/lib.rs` -> **Universal Asset Kernel** | LOC: 509 | Risks: unfinished logic, unsafe code
+- `pallets/x3-inventory/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 66 | Risks: panic risk
+- `pallets/x3-inventory/src/tests.rs` -> **Universal Asset Kernel** | LOC: 803 | Risks: panic risk
+- `pallets/x3-inventory/src/types.rs` -> **Universal Asset Kernel** | LOC: 527 | Risks: bridge risk, panic risk
+- `pallets/x3-jury-anchor/Cargo.toml` -> **Governance** | LOC: 43 | Risks: none
+- `pallets/x3-jury-anchor/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-jury-anchor/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-jury-anchor/src/lib.rs` -> **X3 DEX** | LOC: 383 | Risks: panic risk, unsafe code
+- `pallets/x3-kernel/Cargo.toml` -> **Universal Asset Kernel** | LOC: 83 | Risks: bridge risk
+- `pallets/x3-kernel/fuzz/Cargo.toml` -> **Universal Asset Kernel** | LOC: 27 | Risks: none
+- `pallets/x3-kernel/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Universal Asset Kernel** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-kernel/src/adapters.rs` -> **Universal Asset Kernel** | LOC: 654 | Risks: bridge risk, panic risk
+- `pallets/x3-kernel/src/authority.rs` -> **Universal Asset Kernel** | LOC: 84 | Risks: panic risk
+- `pallets/x3-kernel/src/benchmarking.rs` -> **Universal Asset Kernel** | LOC: 312 | Risks: mock hash risk, panic risk, replay/nonce risk
+- `pallets/x3-kernel/src/chaos_tests.rs` -> **Universal Asset Kernel** | LOC: 641 | Risks: atomic rollback risk, mock hash risk, replay risk, replay/nonce risk
+- `pallets/x3-kernel/src/lib.rs` -> **Universal Asset Kernel** | LOC: 3396 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unsafe code
+- `pallets/x3-kernel/src/migrations.rs` -> **Universal Asset Kernel** | LOC: 23 | Risks: none
+- `pallets/x3-kernel/src/mock.rs` -> **Universal Asset Kernel** | LOC: 496 | Risks: bridge risk, panic risk
+- `pallets/x3-kernel/src/packet_adapters.rs` -> **Universal Asset Kernel** | LOC: 359 | Risks: bridge risk, panic risk
+- `pallets/x3-kernel/src/packet_integration_tests.rs` -> **Universal Asset Kernel** | LOC: 341 | Risks: panic risk
+- `pallets/x3-kernel/src/replay_tests.rs` -> **Universal Asset Kernel** | LOC: 207 | Risks: bridge risk, panic risk, replay risk, replay/nonce risk
+- `pallets/x3-kernel/src/runtime_api.rs` -> **Universal Asset Kernel** | LOC: 50 | Risks: none
+- `pallets/x3-kernel/src/tests.rs` -> **Universal Asset Kernel** | LOC: 3199 | Risks: atomic rollback risk, bridge risk, mock hash risk, panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `pallets/x3-kernel/src/tests/property_tests.rs` -> **Universal Asset Kernel** | LOC: 538 | Risks: atomic rollback risk, mock hash risk, replay risk, replay/nonce risk
+- `pallets/x3-kernel/src/types.rs` -> **Universal Asset Kernel** | LOC: 702 | Risks: panic risk
+- `pallets/x3-kernel/src/wasm_adapters.rs` -> **Universal Asset Kernel** | LOC: 207 | Risks: none
+- `pallets/x3-kernel/src/weights.rs` -> **Universal Asset Kernel** | LOC: 232 | Risks: none
+- `pallets/x3-oracle/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 48 | Risks: none
+- `pallets/x3-oracle/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 33 | Risks: none
+- `pallets/x3-oracle/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 60 | Risks: panic risk
+- `pallets/x3-oracle/fuzz/fuzz_targets/fuzz_median_calculation.rs` -> **Unclassified** | LOC: 94 | Risks: panic risk
+- `pallets/x3-oracle/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 51 | Risks: none
+- `pallets/x3-oracle/src/lib.rs` -> **Universal Asset Kernel** | LOC: 366 | Risks: unsafe code
+- `pallets/x3-oracle/src/mock.rs` -> **Universal Asset Kernel** | LOC: 102 | Risks: panic risk
+- `pallets/x3-oracle/src/tests.rs` -> **Universal Asset Kernel** | LOC: 166 | Risks: panic risk
+- `pallets/x3-oracle/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 107 | Risks: none
+- `pallets/x3-reservation/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 36 | Risks: none
+- `pallets/x3-reservation/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-reservation/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-reservation/src/lib.rs` -> **Unclassified** | LOC: 440 | Risks: unsafe code
+- `pallets/x3-reservation/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 77 | Risks: panic risk
+- `pallets/x3-reservation/src/tests.rs` -> **Unclassified** | LOC: 554 | Risks: panic risk
+- `pallets/x3-sequencer/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 38 | Risks: none
+- `pallets/x3-sequencer/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-sequencer/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-sequencer/src/lib.rs` -> **Unclassified** | LOC: 328 | Risks: panic risk, unsafe code
+- `pallets/x3-sequencer/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 119 | Risks: panic risk
+- `pallets/x3-sequencer/src/tests.rs` -> **Unclassified** | LOC: 348 | Risks: panic risk
+- `pallets/x3-settlement-engine/Cargo.toml` -> **Universal Asset Kernel** | LOC: 68 | Risks: none
+- `pallets/x3-settlement-engine/PHASE4_BRIDGE_COMPLETE.md` -> **Bridge / Router** | LOC: 464 | Risks: bridge risk, unfinished logic
+- `pallets/x3-settlement-engine/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-settlement-engine/fuzz/fuzz_targets/settlement_intent_validation.rs` -> **Universal Asset Kernel** | LOC: 32 | Risks: none
+- `pallets/x3-settlement-engine/fuzz/src/lib.rs` -> **Unclassified** | LOC: 15 | Risks: none
+- `pallets/x3-settlement-engine/src/atomic_lock.rs` -> **Validator / LaunchOps** | LOC: 386 | Risks: replay/nonce risk
+- `pallets/x3-settlement-engine/src/benchmarking.rs` -> **Universal Asset Kernel** | LOC: 263 | Risks: mock hash risk, replay/nonce risk
+- `pallets/x3-settlement-engine/src/bridge_integration.rs` -> **Bridge / Router** | LOC: 183 | Risks: bridge risk
+- `pallets/x3-settlement-engine/src/bridge_tests.rs` -> **Bridge / Router** | LOC: 245 | Risks: bridge risk, mock hash risk
+- `pallets/x3-settlement-engine/src/btc_gateway.rs` -> **Universal Asset Kernel** | LOC: 599 | Risks: replay risk, replay/nonce risk
+- `pallets/x3-settlement-engine/src/collateral.rs` -> **Universal Asset Kernel** | LOC: 198 | Risks: panic risk
+- `pallets/x3-settlement-engine/src/escrow.rs` -> **Universal Asset Kernel** | LOC: 363 | Risks: none
+- `pallets/x3-settlement-engine/src/finality.rs` -> **EVM Integration** | LOC: 343 | Risks: none
+- `pallets/x3-settlement-engine/src/intent.rs` -> **Universal Asset Kernel** | LOC: 338 | Risks: none
+- `pallets/x3-settlement-engine/src/invariants.rs` -> **Universal Asset Kernel** | LOC: 410 | Risks: none
+- `pallets/x3-settlement-engine/src/lib.rs` -> **Universal Asset Kernel** | LOC: 2467 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, unsafe code
+- `pallets/x3-settlement-engine/src/mock.rs` -> **Universal Asset Kernel** | LOC: 151 | Risks: bridge risk, panic risk
+- `pallets/x3-settlement-engine/src/runtime_api.rs` -> **Governance** | LOC: 124 | Risks: none
+- `pallets/x3-settlement-engine/src/tests.rs` -> **Universal Asset Kernel** | LOC: 2107 | Risks: panic risk, replay risk
+- `pallets/x3-settlement-engine/src/types.rs` -> **Universal Asset Kernel** | LOC: 548 | Risks: replay/nonce risk
+- `pallets/x3-settlement-engine/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 161 | Risks: none
+- `pallets/x3-settlement-engine/tests/property_tests.rs` -> **Universal Asset Kernel** | LOC: 485 | Risks: replay/nonce risk
+- `pallets/x3-slash/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 61 | Risks: none
+- `pallets/x3-slash/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-slash/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-slash/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 68 | Risks: panic risk
+- `pallets/x3-slash/src/lib.rs` -> **Bridge / Router** | LOC: 545 | Risks: bridge risk, panic risk, unsafe code
+- `pallets/x3-slash/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 113 | Risks: panic risk
+- `pallets/x3-slash/src/tests.rs` -> **Unclassified** | LOC: 88 | Risks: panic risk
+- `pallets/x3-slash/src/types.rs` -> **Unclassified** | LOC: 91 | Risks: none
+- `pallets/x3-slash/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 67 | Risks: none
+- `pallets/x3-solvency/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 38 | Risks: none
+- `pallets/x3-solvency/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-solvency/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-solvency/src/lib.rs` -> **Unclassified** | LOC: 509 | Risks: bridge risk, unsafe code
+- `pallets/x3-solvency/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 93 | Risks: panic risk
+- `pallets/x3-solvency/src/types.rs` -> **Bridge / Router** | LOC: 156 | Risks: none
+- `pallets/x3-supply-ledger/Cargo.toml` -> **Universal Asset Kernel** | LOC: 50 | Risks: none
+- `pallets/x3-supply-ledger/fuzz/Cargo.toml` -> **Universal Asset Kernel** | LOC: 27 | Risks: none
+- `pallets/x3-supply-ledger/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Universal Asset Kernel** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-supply-ledger/src/lib.rs` -> **Universal Asset Kernel** | LOC: 710 | Risks: replay risk, replay/nonce risk, supply invariant risk, unsafe code
+- `pallets/x3-supply-ledger/src/mint_idempotency.rs` -> **Universal Asset Kernel** | LOC: 348 | Risks: bridge risk, replay risk, replay/nonce risk
+- `pallets/x3-supply-ledger/src/supply_verification.rs` -> **Universal Asset Kernel** | LOC: 396 | Risks: replay risk, supply invariant risk
+- `pallets/x3-supply-ledger/src/tests_halt.rs` -> **Universal Asset Kernel** | LOC: 229 | Risks: panic risk, supply invariant risk
+- `pallets/x3-supply-ledger/src/tests_s0_1.rs` -> **Universal Asset Kernel** | LOC: 450 | Risks: bridge risk, panic risk, supply invariant risk
+- `pallets/x3-token-factory/Cargo.toml` -> **Universal Asset Kernel** | LOC: 53 | Risks: none
+- `pallets/x3-token-factory/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-token-factory/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-token-factory/src/lib.rs` -> **Universal Asset Kernel** | LOC: 448 | Risks: replay/nonce risk, supply invariant risk, unsafe code
+- `pallets/x3-token-factory/src/tests.rs` -> **Universal Asset Kernel** | LOC: 587 | Risks: panic risk, replay/nonce risk, supply invariant risk
+- `pallets/x3-verifier/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 59 | Risks: none
+- `pallets/x3-verifier/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-verifier/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-verifier/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 2 | Risks: none
+- `pallets/x3-verifier/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 949 | Risks: unsafe code
+- `pallets/x3-verifier/src/migrations.rs` -> **Unclassified** | LOC: 22 | Risks: none
+- `pallets/x3-verifier/src/runtime_api.rs` -> **Bridge / Router** | LOC: 149 | Risks: bridge risk
+- `pallets/x3-verifier/src/tests.rs` -> **Unclassified** | LOC: 11 | Risks: none
+- `pallets/x3-verifier/src/weights.rs` -> **Unclassified** | LOC: 80 | Risks: none
+- `pallets/x3-vrf/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 47 | Risks: none
+- `pallets/x3-vrf/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 43 | Risks: none
+- `pallets/x3-vrf/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Proof System** | LOC: 65 | Risks: panic risk
+- `pallets/x3-vrf/fuzz/fuzz_targets/fuzz_vrf_prove.rs` -> **Proof System** | LOC: 48 | Risks: panic risk
+- `pallets/x3-vrf/fuzz/fuzz_targets/fuzz_vrf_verify.rs` -> **Proof System** | LOC: 58 | Risks: none
+- `pallets/x3-vrf/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 72 | Risks: none
+- `pallets/x3-vrf/src/lib.rs` -> **X3 DEX** | LOC: 373 | Risks: unsafe code
+- `pallets/x3-vrf/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 104 | Risks: panic risk
+- `pallets/x3-vrf/src/tests.rs` -> **Unclassified** | LOC: 240 | Risks: panic risk
+- `pallets/x3-vrf/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 123 | Risks: none
+- `pallets/x3-wallet-pallet/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 37 | Risks: none
+- `pallets/x3-wallet-pallet/fuzz/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `pallets/x3-wallet-pallet/fuzz/fuzz_targets/fuzz_codec_parsing.rs` -> **Unclassified** | LOC: 27 | Risks: panic risk, unfinished logic
+- `pallets/x3-wallet-pallet/src/lib.rs` -> **X3 DEX** | LOC: 404 | Risks: unsafe code
+- `pallets/x3-wallet-pallet/src/mock.rs` -> **Genesis / Chain Spec** | LOC: 68 | Risks: panic risk
+- `pallets/x3-wallet-pallet/src/tests.rs` -> **Unclassified** | LOC: 330 | Risks: panic risk
+- `patches/ahash/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/ahash/.github/workflows/rust.yml` -> **Unclassified** | LOC: 156 | Risks: none
+- `patches/ahash/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 171 | Risks: none
+- `patches/ahash/build.rs` -> **Unclassified** | LOC: 21 | Risks: panic risk
+- `patches/ahash/rustfmt.toml` -> **Unclassified** | LOC: 2 | Risks: none
+- `patches/ahash/src/aes_hash.rs` -> **Unclassified** | LOC: 428 | Risks: none
+- `patches/ahash/src/convert.rs` -> **Unclassified** | LOC: 164 | Risks: panic risk
+- `patches/ahash/src/fallback_hash.rs` -> **TPS Benchmark Suite** | LOC: 362 | Risks: none
+- `patches/ahash/src/hash_map.rs` -> **X3 DEX** | LOC: 502 | Risks: panic risk
+- `patches/ahash/src/hash_quality_test.rs` -> **Unclassified** | LOC: 535 | Risks: none
+- `patches/ahash/src/hash_set.rs` -> **Unclassified** | LOC: 353 | Risks: panic risk
+- `patches/ahash/src/lib.rs` -> **Universal Asset Kernel** | LOC: 398 | Risks: none
+- `patches/ahash/src/operations.rs` -> **X3 DEX** | LOC: 373 | Risks: panic risk, unsafe code
+- `patches/ahash/src/random_state.rs` -> **Unclassified** | LOC: 529 | Risks: panic risk
+- `patches/ahash/src/specialize.rs` -> **Unclassified** | LOC: 219 | Risks: none
+- `patches/ahash/tests/bench.rs` -> **TPS Benchmark Suite** | LOC: 200 | Risks: none
+- `patches/ahash/tests/map_tests.rs` -> **Unclassified** | LOC: 311 | Risks: panic risk
+- `patches/ahash/tests/nopanic.rs` -> **Unclassified** | LOC: 82 | Risks: none
+- `patches/ar_archive_writer/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/ar_archive_writer/.github/workflows/ci.yml` -> **Unclassified** | LOC: 39 | Risks: none
+- `patches/ar_archive_writer/.github/workflows/publish.yml` -> **Unclassified** | LOC: 22 | Risks: none
+- `patches/ar_archive_writer/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 76 | Risks: none
+- `patches/ar_archive_writer/rust-toolchain.toml` -> **X3VM / Cross-VM** | LOC: 4 | Risks: none
+- `patches/ar_archive_writer/src/alignment.rs` -> **X3VM / Cross-VM** | LOC: 22 | Risks: none
+- `patches/ar_archive_writer/src/archive.rs` -> **X3VM / Cross-VM** | LOC: 70 | Risks: none
+- `patches/ar_archive_writer/src/archive_writer.rs` -> **X3VM / Cross-VM** | LOC: 1217 | Risks: known issue, panic risk
+- `patches/ar_archive_writer/src/coff.rs` -> **X3VM / Cross-VM** | LOC: 95 | Risks: none
+- `patches/ar_archive_writer/src/coff_import_file.rs` -> **X3VM / Cross-VM** | LOC: 1064 | Risks: panic risk
+- `patches/ar_archive_writer/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 54 | Risks: none
+- `patches/ar_archive_writer/src/mangler.rs` -> **X3VM / Cross-VM** | LOC: 45 | Risks: panic risk, unfinished logic
+- `patches/ar_archive_writer/src/math_extras.rs` -> **X3VM / Cross-VM** | LOC: 16 | Risks: none
+- `patches/ar_archive_writer/src/object_reader.rs` -> **X3VM / Cross-VM** | LOC: 210 | Risks: known issue, panic risk
+- `patches/ar_archive_writer/tests/common.rs` -> **X3VM / Cross-VM** | LOC: 394 | Risks: known issue, panic risk
+- `patches/ar_archive_writer/tests/import_library.rs` -> **X3VM / Cross-VM** | LOC: 388 | Risks: panic risk
+- `patches/ar_archive_writer/tests/multiple_objects.rs` -> **Unclassified** | LOC: 60 | Risks: panic risk
+- `patches/ar_archive_writer/tests/round_trip.rs` -> **X3VM / Cross-VM** | LOC: 468 | Risks: panic risk
+- `patches/core2/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/core2/.github/workflows/ci.yml` -> **Unclassified** | LOC: 92 | Risks: none
+- `patches/core2/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 32 | Risks: none
+- `patches/core2/README.md` -> **TPS Benchmark Suite** | LOC: 67 | Risks: none
+- `patches/core2/src/error.rs` -> **Unclassified** | LOC: 474 | Risks: panic risk, unsafe code
+- `patches/core2/src/io/buffered.rs` -> **Unclassified** | LOC: 1112 | Risks: known issue, panic risk
+- `patches/core2/src/io/cursor.rs` -> **Unclassified** | LOC: 273 | Risks: panic risk
+- `patches/core2/src/io/error.rs` -> **Unclassified** | LOC: 459 | Risks: panic risk
+- `patches/core2/src/io/impls.rs` -> **Unclassified** | LOC: 177 | Risks: none
+- `patches/core2/src/io/mod.rs` -> **Unclassified** | LOC: 27 | Risks: none
+- `patches/core2/src/io/traits.rs` -> **Unclassified** | LOC: 1364 | Risks: known issue, panic risk, unsafe code
+- `patches/core2/src/io/util.rs` -> **Unclassified** | LOC: 41 | Risks: known issue, unsafe code
+- `patches/core2/src/lib.rs` -> **Unclassified** | LOC: 21 | Risks: none
+- `patches/core2/tests/tests.rs` -> **Unclassified** | LOC: 502 | Risks: panic risk
+- `patches/environmental/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/environmental/Cargo.toml` -> **Unclassified** | LOC: 23 | Risks: none
+- `patches/environmental/src/lib.rs` -> **Unclassified** | LOC: 565 | Risks: panic risk, unsafe code
+- `patches/environmental/src/local_key.rs` -> **TPS Benchmark Suite** | LOC: 56 | Risks: panic risk, unsafe code
+- `patches/errno/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 24 | Risks: none
+- `patches/errno/src/lib.rs` -> **Unclassified** | LOC: 72 | Risks: unsafe code
+- `patches/fastbloom/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/fastbloom/.github/workflows/rust.yml` -> **Unclassified** | LOC: 44 | Risks: none
+- `patches/fastbloom/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 91 | Risks: none
+- `patches/fastbloom/src/bit_vector.rs` -> **X3 DEX** | LOC: 211 | Risks: none
+- `patches/fastbloom/src/builder.rs` -> **Unclassified** | LOC: 291 | Risks: none
+- `patches/fastbloom/src/hasher.rs` -> **TPS Benchmark Suite** | LOC: 195 | Risks: panic risk
+- `patches/fastbloom/src/lib.rs` -> **Unclassified** | LOC: 866 | Risks: panic risk
+- `patches/fastbloom/src/math.rs` -> **Unclassified** | LOC: 24 | Risks: none
+- `patches/fastrand/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/fastrand/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 90 | Risks: none
+- `patches/fastrand/benches/bench.rs` -> **Unclassified** | LOC: 99 | Risks: panic risk
+- `patches/fastrand/src/global_rng.rs` -> **Unclassified** | LOC: 225 | Risks: unfinished logic
+- `patches/fastrand/src/lib.rs` -> **Universal Asset Kernel** | LOC: 690 | Risks: panic risk, unsafe code
+- `patches/fastrand/tests/char.rs` -> **Unclassified** | LOC: 45 | Risks: panic risk
+- `patches/fastrand/tests/smoke.rs` -> **Unclassified** | LOC: 144 | Risks: panic risk
+- `patches/getrandom/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `patches/getrandom/src/lib.rs` -> **Unclassified** | LOC: 210 | Risks: unsafe code
+- `patches/getrandom03/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 26 | Risks: none
+- `patches/getrandom03/src/backends.rs` -> **Unclassified** | LOC: 31 | Risks: none
+- `patches/getrandom03/src/error.rs` -> **Unclassified** | LOC: 35 | Risks: none
+- `patches/getrandom03/src/lib.rs` -> **Unclassified** | LOC: 41 | Risks: unsafe code
+- `patches/getrandom03/src/util.rs` -> **Unclassified** | LOC: 28 | Risks: unsafe code
+- `patches/home/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/home/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 70 | Risks: none
+- `patches/home/src/env.rs` -> **Unclassified** | LOC: 115 | Risks: none
+- `patches/home/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 151 | Risks: none
+- `patches/home/src/windows.rs` -> **Unclassified** | LOC: 79 | Risks: panic risk, unsafe code
+- `patches/icu_properties_stub/Cargo.toml` -> **Unclassified** | LOC: 17 | Risks: none
+- `patches/icu_properties_stub/lib.rs` -> **Unclassified** | LOC: 159 | Risks: none
+- `patches/idna_adapter/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/idna_adapter/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 57 | Risks: none
+- `patches/idna_adapter/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 283 | Risks: none
+- `patches/jobserver/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/jobserver/.github/actions/compile-make/action.yml` -> **TPS Benchmark Suite** | LOC: 37 | Risks: none
+- `patches/jobserver/.github/dependabot.yml` -> **Unclassified** | LOC: 9 | Risks: none
+- `patches/jobserver/.github/workflows/main.yml` -> **TPS Benchmark Suite** | LOC: 111 | Risks: none
+- `patches/jobserver/.github/workflows/publish.yml` -> **Unclassified** | LOC: 16 | Risks: none
+- `patches/jobserver/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 73 | Risks: none
+- `patches/jobserver/src/error.rs` -> **TPS Benchmark Suite** | LOC: 96 | Risks: none
+- `patches/jobserver/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 705 | Risks: panic risk, unsafe code
+- `patches/jobserver/src/unix.rs` -> **TPS Benchmark Suite** | LOC: 636 | Risks: panic risk, unsafe code
+- `patches/jobserver/src/wasm.rs` -> **Unclassified** | LOC: 107 | Risks: panic risk, unfinished logic, unsafe code
+- `patches/jobserver/src/windows.rs` -> **Universal Asset Kernel** | LOC: 270 | Risks: panic risk, unsafe code
+- `patches/jobserver/tests/client-of-myself.rs` -> **Unclassified** | LOC: 60 | Risks: panic risk, unsafe code
+- `patches/jobserver/tests/client.rs` -> **Unclassified** | LOC: 193 | Risks: panic risk, unsafe code
+- `patches/jobserver/tests/helper.rs` -> **Unclassified** | LOC: 77 | Risks: panic risk
+- `patches/jobserver/tests/make-as-a-client.rs` -> **Unclassified** | LOC: 82 | Risks: panic risk
+- `patches/jobserver/tests/server.rs` -> **Unclassified** | LOC: 182 | Risks: panic risk
+- `patches/jsonrpsee-server/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 108 | Risks: none
+- `patches/jsonrpsee-server/src/connection_context.rs` -> **Unclassified** | LOC: 46 | Risks: none
+- `patches/jsonrpsee-server/src/future.rs` -> **X3 DEX** | LOC: 219 | Risks: none
+- `patches/jsonrpsee-server/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 53 | Risks: none
+- `patches/jsonrpsee-server/src/logger.rs` -> **Unclassified** | LOC: 164 | Risks: none
+- `patches/jsonrpsee-server/src/middleware/mod.rs` -> **Unclassified** | LOC: 5 | Risks: none
+- `patches/jsonrpsee-server/src/middleware/proxy_get_request.rs` -> **Unclassified** | LOC: 153 | Risks: panic risk
+- `patches/jsonrpsee-server/src/server.rs` -> **Unclassified** | LOC: 866 | Risks: panic risk
+- `patches/jsonrpsee-server/src/tests/helpers.rs` -> **Unclassified** | LOC: 186 | Risks: panic risk
+- `patches/jsonrpsee-server/src/tests/http.rs` -> **Unclassified** | LOC: 522 | Risks: panic risk
+- `patches/jsonrpsee-server/src/tests/mod.rs` -> **Unclassified** | LOC: 5 | Risks: none
+- `patches/jsonrpsee-server/src/tests/shared.rs` -> **Unclassified** | LOC: 94 | Risks: panic risk
+- `patches/jsonrpsee-server/src/tests/ws.rs` -> **Unclassified** | LOC: 656 | Risks: panic risk
+- `patches/jsonrpsee-server/src/transport/http.rs` -> **Unclassified** | LOC: 444 | Risks: panic risk
+- `patches/jsonrpsee-server/src/transport/mod.rs` -> **Unclassified** | LOC: 3 | Risks: none
+- `patches/jsonrpsee-server/src/transport/ws.rs` -> **Unclassified** | LOC: 527 | Risks: panic risk
+- `patches/memfd/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/memfd/.github/dependabot.yml` -> **Unclassified** | LOC: 11 | Risks: none
+- `patches/memfd/.github/workflows/memfd.yml` -> **Unclassified** | LOC: 104 | Risks: none
+- `patches/memfd/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 80 | Risks: none
+- `patches/memfd/examples/sized.rs` -> **Unclassified** | LOC: 50 | Risks: panic risk
+- `patches/memfd/src/errors.rs` -> **Unclassified** | LOC: 39 | Risks: none
+- `patches/memfd/src/lib.rs` -> **Universal Asset Kernel** | LOC: 53 | Risks: none
+- `patches/memfd/src/memfd.rs` -> **Unclassified** | LOC: 253 | Risks: unsafe code
+- `patches/memfd/src/sealing.rs` -> **Unclassified** | LOC: 80 | Risks: none
+- `patches/memfd/tests/memfd.rs` -> **Unclassified** | LOC: 56 | Risks: panic risk
+- `patches/memfd/tests/sealing.rs` -> **Unclassified** | LOC: 86 | Risks: panic risk
+- `patches/pallet-collective/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 48 | Risks: none
+- `patches/pallet-collective/src/benchmarking.rs` -> **TPS Benchmark Suite** | LOC: 653 | Risks: panic risk
+- `patches/pallet-collective/src/lib.rs` -> **X3 DEX** | LOC: 1339 | Risks: panic risk
+- `patches/pallet-collective/src/migrations/mod.rs` -> **Unclassified** | LOC: 20 | Risks: none
+- `patches/pallet-collective/src/migrations/v4.rs` -> **Unclassified** | LOC: 149 | Risks: none
+- `patches/pallet-collective/src/tests.rs` -> **X3 DEX** | LOC: 1506 | Risks: panic risk
+- `patches/pallet-collective/src/weights.rs` -> **TPS Benchmark Suite** | LOC: 559 | Risks: none
+- `patches/pallet-transaction-payment-rpc-runtime-api/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 31 | Risks: none
+- `patches/pallet-transaction-payment-rpc-runtime-api/src/lib.rs` -> **Unclassified** | LOC: 63 | Risks: none
+- `patches/parity-wasm/Cargo.toml` -> **X3 DEX** | LOC: 58 | Risks: none
+- `patches/parity-wasm/src/builder/code.rs` -> **Unclassified** | LOC: 487 | Risks: none
+- `patches/parity-wasm/src/builder/data.rs` -> **X3 DEX** | LOC: 64 | Risks: none
+- `patches/parity-wasm/src/builder/export.rs` -> **X3 DEX** | LOC: 121 | Risks: none
+- `patches/parity-wasm/src/builder/global.rs` -> **Unclassified** | LOC: 101 | Risks: none
+- `patches/parity-wasm/src/builder/import.rs` -> **X3 DEX** | LOC: 142 | Risks: none
+- `patches/parity-wasm/src/builder/invoke.rs` -> **Unclassified** | LOC: 20 | Risks: none
+- `patches/parity-wasm/src/builder/memory.rs` -> **X3 DEX** | LOC: 88 | Risks: none
+- `patches/parity-wasm/src/builder/misc.rs` -> **Unclassified** | LOC: 71 | Risks: none
+- `patches/parity-wasm/src/builder/mod.rs` -> **Unclassified** | LOC: 28 | Risks: none
+- `patches/parity-wasm/src/builder/module.rs` -> **X3 DEX** | LOC: 659 | Risks: panic risk
+- `patches/parity-wasm/src/builder/table.rs` -> **X3 DEX** | LOC: 82 | Risks: none
+- `patches/parity-wasm/src/elements/export_entry.rs` -> **Unclassified** | LOC: 105 | Risks: none
+- `patches/parity-wasm/src/elements/func.rs` -> **Unclassified** | LOC: 169 | Risks: none
+- `patches/parity-wasm/src/elements/global_entry.rs` -> **Unclassified** | LOC: 53 | Risks: none
+- `patches/parity-wasm/src/elements/import_entry.rs` -> **Unclassified** | LOC: 359 | Risks: none
+- `patches/parity-wasm/src/elements/index_map.rs` -> **X3 DEX** | LOC: 572 | Risks: panic risk
+- `patches/parity-wasm/src/elements/mod.rs` -> **X3 DEX** | LOC: 340 | Risks: none
+- `patches/parity-wasm/src/elements/module.rs` -> **Unclassified** | LOC: 1082 | Risks: panic risk
+- `patches/parity-wasm/src/elements/name_section.rs` -> **X3 DEX** | LOC: 373 | Risks: panic risk
+- `patches/parity-wasm/src/elements/ops.rs` -> **Unclassified** | LOC: 2992 | Risks: panic risk
+- `patches/parity-wasm/src/elements/primitives.rs` -> **Unclassified** | LOC: 918 | Risks: panic risk
+- `patches/parity-wasm/src/elements/reloc_section.rs` -> **X3 DEX** | LOC: 341 | Risks: panic risk
+- `patches/parity-wasm/src/elements/section.rs` -> **X3 DEX** | LOC: 1054 | Risks: panic risk
+- `patches/parity-wasm/src/elements/segment.rs` -> **X3 DEX** | LOC: 292 | Risks: none
+- `patches/parity-wasm/src/elements/types.rs` -> **X3 DEX** | LOC: 275 | Risks: none
+- `patches/parity-wasm/src/io.rs` -> **Unclassified** | LOC: 119 | Risks: none
+- `patches/parity-wasm/src/lib.rs` -> **Unclassified** | LOC: 16 | Risks: none
+- `patches/quinn-proto/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/quinn-proto/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 194 | Risks: none
+- `patches/quinn-proto/src/bloom_token_log.rs` -> **TPS Benchmark Suite** | LOC: 369 | Risks: panic risk, replay/nonce risk
+- `patches/quinn-proto/src/cid_generator.rs` -> **Unclassified** | LOC: 181 | Risks: panic risk, replay/nonce risk
+- `patches/quinn-proto/src/cid_queue.rs` -> **Universal Asset Kernel** | LOC: 304 | Risks: panic risk
+- `patches/quinn-proto/src/coding.rs` -> **Unclassified** | LOC: 131 | Risks: panic risk
+- `patches/quinn-proto/src/config/mod.rs` -> **Universal Asset Kernel** | LOC: 698 | Risks: panic risk
+- `patches/quinn-proto/src/config/transport.rs` -> **Unclassified** | LOC: 786 | Risks: none
+- `patches/quinn-proto/src/congestion.rs` -> **Unclassified** | LOC: 106 | Risks: none
+- `patches/quinn-proto/src/congestion/bbr/bw_estimation.rs` -> **Unclassified** | LOC: 102 | Risks: none
+- `patches/quinn-proto/src/congestion/bbr/min_max.rs` -> **TPS Benchmark Suite** | LOC: 153 | Risks: none
+- `patches/quinn-proto/src/congestion/bbr/mod.rs` -> **X3 DEX** | LOC: 647 | Risks: panic risk
+- `patches/quinn-proto/src/congestion/cubic.rs` -> **Unclassified** | LOC: 273 | Risks: none
+- `patches/quinn-proto/src/congestion/new_reno.rs` -> **TPS Benchmark Suite** | LOC: 173 | Risks: none
+- `patches/quinn-proto/src/connection/ack_frequency.rs` -> **Unclassified** | LOC: 156 | Risks: none
+- `patches/quinn-proto/src/connection/assembler.rs` -> **X3 DEX** | LOC: 664 | Risks: panic risk
+- `patches/quinn-proto/src/connection/cid_state.rs` -> **TPS Benchmark Suite** | LOC: 224 | Risks: panic risk
+- `patches/quinn-proto/src/connection/datagrams.rs` -> **Unclassified** | LOC: 212 | Risks: panic risk
+- `patches/quinn-proto/src/connection/mod.rs` -> **Unclassified** | LOC: 4103 | Risks: panic risk, unfinished logic, unsafe code
+- `patches/quinn-proto/src/connection/mtud.rs` -> **Unclassified** | LOC: 971 | Risks: panic risk
+- `patches/quinn-proto/src/connection/pacing.rs` -> **Universal Asset Kernel** | LOC: 309 | Risks: panic risk
+- `patches/quinn-proto/src/connection/packet_builder.rs` -> **Unclassified** | LOC: 283 | Risks: panic risk
+- `patches/quinn-proto/src/connection/packet_crypto.rs` -> **Unclassified** | LOC: 174 | Risks: panic risk
+- `patches/quinn-proto/src/connection/paths.rs` -> **Unclassified** | LOC: 457 | Risks: none
+- `patches/quinn-proto/src/connection/qlog.rs` -> **Unclassified** | LOC: 191 | Risks: panic risk
+- `patches/quinn-proto/src/connection/send_buffer.rs` -> **Unclassified** | LOC: 395 | Risks: panic risk, unfinished logic, unsafe code
+- `patches/quinn-proto/src/connection/spaces.rs` -> **X3 DEX** | LOC: 1089 | Risks: panic risk, unfinished logic
+- `patches/quinn-proto/src/connection/stats.rs` -> **Unclassified** | LOC: 175 | Risks: none
+- `patches/quinn-proto/src/connection/streams/mod.rs` -> **Unclassified** | LOC: 529 | Risks: panic risk, unfinished logic
+- `patches/quinn-proto/src/connection/streams/recv.rs` -> **Unclassified** | LOC: 544 | Risks: panic risk
+- `patches/quinn-proto/src/connection/streams/send.rs` -> **Unclassified** | LOC: 403 | Risks: none
+- `patches/quinn-proto/src/connection/streams/state.rs` -> **X3 DEX** | LOC: 2103 | Risks: panic risk
+- `patches/quinn-proto/src/connection/timer.rs` -> **Unclassified** | LOC: 66 | Risks: none
+- `patches/quinn-proto/src/constant_time.rs` -> **Unclassified** | LOC: 23 | Risks: none
+- `patches/quinn-proto/src/crypto.rs` -> **Unclassified** | LOC: 224 | Risks: none
+- `patches/quinn-proto/src/crypto/ring_like.rs` -> **Unclassified** | LOC: 58 | Risks: panic risk, replay/nonce risk
+- `patches/quinn-proto/src/crypto/rustls.rs` -> **Unclassified** | LOC: 646 | Risks: panic risk, replay/nonce risk
+- `patches/quinn-proto/src/endpoint.rs` -> **X3 DEX** | LOC: 1332 | Risks: panic risk
+- `patches/quinn-proto/src/frame.rs` -> **Unclassified** | LOC: 1009 | Risks: panic risk
+- `patches/quinn-proto/src/lib.rs` -> **Unclassified** | LOC: 337 | Risks: panic risk, unsafe code
+- `patches/quinn-proto/src/packet.rs` -> **Unclassified** | LOC: 1015 | Risks: panic risk, unfinished logic
+- `patches/quinn-proto/src/range_set/array_range_set.rs` -> **Unclassified** | LOC: 210 | Risks: unfinished logic
+- `patches/quinn-proto/src/range_set/btree_range_set.rs` -> **Unclassified** | LOC: 382 | Risks: panic risk
+- `patches/quinn-proto/src/range_set/mod.rs` -> **Unclassified** | LOC: 8 | Risks: none
+- `patches/quinn-proto/src/range_set/tests.rs` -> **Unclassified** | LOC: 264 | Risks: none
+- `patches/quinn-proto/src/shared.rs` -> **Unclassified** | LOC: 181 | Risks: none
+- `patches/quinn-proto/src/tests/mod.rs` -> **Unclassified** | LOC: 3377 | Risks: local-only config risk, panic risk
+- `patches/quinn-proto/src/tests/token.rs` -> **Unclassified** | LOC: 334 | Risks: panic risk
+- `patches/quinn-proto/src/tests/util.rs` -> **Unclassified** | LOC: 746 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `patches/quinn-proto/src/token.rs` -> **TPS Benchmark Suite** | LOC: 508 | Risks: panic risk, replay risk, replay/nonce risk, unfinished logic
+- `patches/quinn-proto/src/token_memory_cache.rs` -> **X3 DEX** | LOC: 247 | Risks: panic risk
+- `patches/quinn-proto/src/transport_error.rs` -> **Unclassified** | LOC: 133 | Risks: none
+- `patches/quinn-proto/src/transport_parameters.rs` -> **Unclassified** | LOC: 877 | Risks: panic risk, stub risk
+- `patches/quinn-proto/src/varint.rs` -> **Unclassified** | LOC: 194 | Risks: panic risk, unsafe code
+- `patches/rand_core/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/rand_core/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 68 | Risks: none
+- `patches/rand_core/src/block.rs` -> **X3 DEX** | LOC: 535 | Risks: stub risk
+- `patches/rand_core/src/impls.rs` -> **X3 DEX** | LOC: 218 | Risks: none
+- `patches/rand_core/src/le.rs` -> **TPS Benchmark Suite** | LOC: 65 | Risks: panic risk
+- `patches/rand_core/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 772 | Risks: panic risk, stub risk
+- `patches/rand_core/src/os.rs` -> **TPS Benchmark Suite** | LOC: 116 | Risks: panic risk
+- `patches/rfs/Cargo.toml` -> **Unclassified** | LOC: 8 | Risks: none
+- `patches/rfs/src/lib.rs` -> **Unclassified** | LOC: 24 | Risks: none
+- `patches/rustix/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 44 | Risks: none
+- `patches/rustix/src/lib.rs` -> **Unclassified** | LOC: 138 | Risks: none
+- `patches/sc-executor/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 64 | Risks: none
+- `patches/sc-executor/src/executor.rs` -> **TPS Benchmark Suite** | LOC: 752 | Risks: panic risk
+- `patches/sc-executor/src/integration_tests/linux.rs` -> **X3VM / Cross-VM** | LOC: 85 | Risks: panic risk
+- `patches/sc-executor/src/integration_tests/linux/smaps.rs` -> **Universal Asset Kernel** | LOC: 83 | Risks: panic risk
+- `patches/sc-executor/src/integration_tests/mod.rs` -> **DEX Liquidity** | LOC: 824 | Risks: local-only config risk, panic risk, unsafe code
+- `patches/sc-executor/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 94 | Risks: panic risk
+- `patches/sc-executor/src/wasm_runtime.rs` -> **X3 DEX** | LOC: 573 | Risks: panic risk
+- `patches/sc-network/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 71 | Risks: none
+- `patches/sc-network/README.md` -> **TPS Benchmark Suite** | LOC: 288 | Risks: none
+- `patches/sc-network/bitswap/Cargo.toml` -> **X3 DEX** | LOC: 40 | Risks: none
+- `patches/sc-network/bitswap/build.rs` -> **X3 DEX** | LOC: 6 | Risks: panic risk
+- `patches/sc-network/bitswap/src/lib.rs` -> **X3 DEX** | LOC: 528 | Risks: panic risk, unfinished logic
+- `patches/sc-network/bitswap/src/schema.rs` -> **X3 DEX** | LOC: 24 | Risks: none
+- `patches/sc-network/common/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 33 | Risks: none
+- `patches/sc-network/common/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 31 | Risks: none
+- `patches/sc-network/common/src/message.rs` -> **TPS Benchmark Suite** | LOC: 24 | Risks: none
+- `patches/sc-network/common/src/role.rs` -> **TPS Benchmark Suite** | LOC: 124 | Risks: none
+- `patches/sc-network/common/src/sync.rs` -> **TPS Benchmark Suite** | LOC: 462 | Risks: none
+- `patches/sc-network/common/src/sync/message.rs` -> **X3 DEX** | LOC: 247 | Risks: unfinished logic
+- `patches/sc-network/common/src/sync/metrics.rs` -> **TPS Benchmark Suite** | LOC: 26 | Risks: none
+- `patches/sc-network/common/src/sync/warp.rs` -> **Genesis / Chain Spec** | LOC: 113 | Risks: none
+- `patches/sc-network/common/src/types.rs` -> **TPS Benchmark Suite** | LOC: 39 | Risks: none
+- `patches/sc-network/light/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 34 | Risks: none
+- `patches/sc-network/light/build.rs` -> **Unclassified** | LOC: 6 | Risks: panic risk
+- `patches/sc-network/light/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 23 | Risks: none
+- `patches/sc-network/light/src/light_client_requests.rs` -> **Genesis / Chain Spec** | LOC: 60 | Risks: none
+- `patches/sc-network/light/src/light_client_requests/handler.rs` -> **Genesis / Chain Spec** | LOC: 314 | Risks: panic risk
+- `patches/sc-network/light/src/schema.rs` -> **TPS Benchmark Suite** | LOC: 70 | Risks: none
+- `patches/sc-network/src/behaviour.rs` -> **TPS Benchmark Suite** | LOC: 357 | Risks: none
+- `patches/sc-network/src/config.rs` -> **Genesis / Chain Spec** | LOC: 784 | Risks: local-only config risk, panic risk
+- `patches/sc-network/src/discovery.rs` -> **TPS Benchmark Suite** | LOC: 1197 | Risks: mock hash risk, panic risk
+- `patches/sc-network/src/error.rs` -> **TPS Benchmark Suite** | LOC: 79 | Risks: none
+- `patches/sc-network/src/event.rs` -> **TPS Benchmark Suite** | LOC: 136 | Risks: unfinished logic
+- `patches/sc-network/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 306 | Risks: none
+- `patches/sc-network/src/network_state.rs` -> **TPS Benchmark Suite** | LOC: 125 | Risks: none
+- `patches/sc-network/src/peer_info.rs` -> **TPS Benchmark Suite** | LOC: 472 | Risks: none
+- `patches/sc-network/src/peer_store.rs` -> **TPS Benchmark Suite** | LOC: 408 | Risks: unfinished logic
+- `patches/sc-network/src/peerset.rs` -> **X3 DEX** | LOC: 395 | Risks: unfinished logic
+- `patches/sc-network/src/protocol.rs` -> **TPS Benchmark Suite** | LOC: 650 | Risks: panic risk, unfinished logic
+- `patches/sc-network/src/protocol/message.rs` -> **X3 DEX** | LOC: 301 | Risks: unfinished logic
+- `patches/sc-network/src/protocol/notifications.rs` -> **TPS Benchmark Suite** | LOC: 31 | Risks: none
+- `patches/sc-network/src/protocol/notifications/behaviour.rs` -> **TPS Benchmark Suite** | LOC: 4563 | Risks: panic risk
+- `patches/sc-network/src/protocol/notifications/handler.rs` -> **TPS Benchmark Suite** | LOC: 1609 | Risks: panic risk, stub risk
+- `patches/sc-network/src/protocol/notifications/tests.rs` -> **X3 DEX** | LOC: 362 | Risks: panic risk, unfinished logic
+- `patches/sc-network/src/protocol/notifications/upgrade.rs` -> **TPS Benchmark Suite** | LOC: 31 | Risks: none
+- `patches/sc-network/src/protocol/notifications/upgrade/collec.rs` -> **TPS Benchmark Suite** | LOC: 180 | Risks: unfinished logic
+- `patches/sc-network/src/protocol/notifications/upgrade/notifications.rs` -> **TPS Benchmark Suite** | LOC: 699 | Risks: panic risk
+- `patches/sc-network/src/protocol_controller.rs` -> **X3 DEX** | LOC: 1984 | Risks: panic risk
+- `patches/sc-network/src/request_responses.rs` -> **TPS Benchmark Suite** | LOC: 1484 | Risks: panic risk, unfinished logic
+- `patches/sc-network/src/service.rs` -> **TPS Benchmark Suite** | LOC: 1784 | Risks: panic risk, unfinished logic
+- `patches/sc-network/src/service/metrics.rs` -> **TPS Benchmark Suite** | LOC: 297 | Risks: panic risk
+- `patches/sc-network/src/service/out_events.rs` -> **TPS Benchmark Suite** | LOC: 323 | Risks: none
+- `patches/sc-network/src/service/signature.rs` -> **TPS Benchmark Suite** | LOC: 56 | Risks: none
+- `patches/sc-network/src/service/traits.rs` -> **X3 DEX** | LOC: 871 | Risks: unfinished logic
+- `patches/sc-network/src/transport.rs` -> **TPS Benchmark Suite** | LOC: 107 | Risks: panic risk
+- `patches/sc-network/src/types.rs` -> **TPS Benchmark Suite** | LOC: 153 | Risks: none
+- `patches/sc-network/src/utils.rs` -> **TPS Benchmark Suite** | LOC: 89 | Risks: panic risk
+- `patches/sc-network/statement/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `patches/sc-network/statement/src/config.rs` -> **TPS Benchmark Suite** | LOC: 34 | Risks: none
+- `patches/sc-network/statement/src/lib.rs` -> **Genesis / Chain Spec** | LOC: 487 | Risks: panic risk
+- `patches/sc-network/sync/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 53 | Risks: none
+- `patches/sc-network/sync/build.rs` -> **Unclassified** | LOC: 6 | Risks: panic risk
+- `patches/sc-network/sync/src/block_request_handler.rs` -> **Genesis / Chain Spec** | LOC: 467 | Risks: panic risk
+- `patches/sc-network/sync/src/blocks.rs` -> **TPS Benchmark Suite** | LOC: 435 | Risks: panic risk
+- `patches/sc-network/sync/src/engine.rs` -> **Genesis / Chain Spec** | LOC: 921 | Risks: panic risk
+- `patches/sc-network/sync/src/extra_requests.rs` -> **TPS Benchmark Suite** | LOC: 583 | Risks: panic risk, unfinished logic
+- `patches/sc-network/sync/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 4195 | Risks: panic risk
+- `patches/sc-network/sync/src/mock.rs` -> **TPS Benchmark Suite** | LOC: 103 | Risks: none
+- `patches/sc-network/sync/src/schema.rs` -> **TPS Benchmark Suite** | LOC: 24 | Risks: none
+- `patches/sc-network/sync/src/service/chain_sync.rs` -> **TPS Benchmark Suite** | LOC: 259 | Risks: none
+- `patches/sc-network/sync/src/service/mock.rs` -> **TPS Benchmark Suite** | LOC: 136 | Risks: none
+- `patches/sc-network/sync/src/service/mod.rs` -> **TPS Benchmark Suite** | LOC: 24 | Risks: none
+- `patches/sc-network/sync/src/service/network.rs` -> **TPS Benchmark Suite** | LOC: 183 | Risks: none
+- `patches/sc-network/sync/src/state.rs` -> **TPS Benchmark Suite** | LOC: 268 | Risks: none
+- `patches/sc-network/sync/src/state_request_handler.rs` -> **Genesis / Chain Spec** | LOC: 286 | Risks: panic risk
+- `patches/sc-network/sync/src/warp.rs` -> **Genesis / Chain Spec** | LOC: 300 | Risks: panic risk
+- `patches/sc-network/sync/src/warp_request_handler.rs` -> **Genesis / Chain Spec** | LOC: 155 | Risks: none
+- `patches/sc-network/test/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 40 | Risks: none
+- `patches/sc-network/test/src/block_import.rs` -> **X3 DEX** | LOC: 129 | Risks: panic risk
+- `patches/sc-network/test/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 1221 | Risks: panic risk, replay/nonce risk
+- `patches/sc-network/test/src/peerset.rs` -> **X3 DEX** | LOC: 403 | Risks: panic risk
+- `patches/sc-network/test/src/service.rs` -> **TPS Benchmark Suite** | LOC: 814 | Risks: panic risk
+- `patches/sc-network/test/src/sync.rs` -> **TPS Benchmark Suite** | LOC: 1323 | Risks: panic risk, replay/nonce risk
+- `patches/sc-network/transactions/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `patches/sc-network/transactions/src/config.rs` -> **DEX Liquidity** | LOC: 99 | Risks: none
+- `patches/sc-network/transactions/src/lib.rs` -> **Genesis / Chain Spec** | LOC: 510 | Risks: panic risk
+- `patches/sc-rpc-server/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/sc-rpc-server/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 211 | Risks: none
+- `patches/sc-rpc-server/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 311 | Risks: unsafe code
+- `patches/sc-rpc-server/src/middleware/metrics.rs` -> **TPS Benchmark Suite** | LOC: 228 | Risks: none
+- `patches/sc-rpc-server/src/middleware/mod.rs` -> **TPS Benchmark Suite** | LOC: 151 | Risks: none
+- `patches/sc-rpc-server/src/middleware/node_health.rs` -> **TPS Benchmark Suite** | LOC: 208 | Risks: panic risk
+- `patches/sc-rpc-server/src/middleware/rate_limit.rs` -> **TPS Benchmark Suite** | LOC: 48 | Risks: none
+- `patches/sc-rpc-server/src/utils.rs` -> **TPS Benchmark Suite** | LOC: 370 | Risks: local-only config risk, panic risk, unsafe code
+- `patches/sp-io/Cargo.toml` -> **Unclassified** | LOC: 10 | Risks: none
+- `patches/sp-state-machine/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 56 | Risks: none
+- `patches/sp-state-machine/README.md` -> **Unclassified** | LOC: 3 | Risks: none
+- `patches/sp-state-machine/src/backend.rs` -> **Unclassified** | LOC: 457 | Risks: stub risk
+- `patches/sp-state-machine/src/basic.rs` -> **Unclassified** | LOC: 462 | Risks: atomic rollback risk, panic risk, stub risk
+- `patches/sp-state-machine/src/error.rs` -> **Proof System** | LOC: 49 | Risks: none
+- `patches/sp-state-machine/src/ext.rs` -> **X3 DEX** | LOC: 1156 | Risks: atomic rollback risk, panic risk
+- `patches/sp-state-machine/src/in_memory_backend.rs` -> **Unclassified** | LOC: 247 | Risks: panic risk
+- `patches/sp-state-machine/src/lib.rs` -> **X3 DEX** | LOC: 1998 | Risks: atomic rollback risk, panic risk, stub risk
+- `patches/sp-state-machine/src/overlayed_changes/changeset.rs` -> **X3 DEX** | LOC: 856 | Risks: atomic rollback risk, panic risk
+- `patches/sp-state-machine/src/overlayed_changes/mod.rs` -> **X3 DEX** | LOC: 999 | Risks: atomic rollback risk, panic risk
+- `patches/sp-state-machine/src/overlayed_changes/offchain.rs` -> **X3 DEX** | LOC: 132 | Risks: none
+- `patches/sp-state-machine/src/read_only.rs` -> **Unclassified** | LOC: 245 | Risks: atomic rollback risk, panic risk, stub risk
+- `patches/sp-state-machine/src/stats.rs` -> **Unclassified** | LOC: 132 | Risks: none
+- `patches/sp-state-machine/src/testing.rs` -> **Proof System** | LOC: 532 | Risks: panic risk
+- `patches/sp-state-machine/src/trie_backend.rs` -> **Proof System** | LOC: 1547 | Risks: mock hash risk, panic risk, stub risk
+- `patches/sp-state-machine/src/trie_backend_essence.rs` -> **Unclassified** | LOC: 924 | Risks: panic risk, stub risk
+- `patches/sp-trie/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 66 | Risks: none
+- `patches/sp-trie/README.md` -> **Unclassified** | LOC: 3 | Risks: none
+- `patches/sp-trie/benches/bench.rs` -> **TPS Benchmark Suite** | LOC: 32 | Risks: none
+- `patches/sp-trie/src/cache/mod.rs` -> **Unclassified** | LOC: 985 | Risks: panic risk
+- `patches/sp-trie/src/cache/shared_cache.rs` -> **Unclassified** | LOC: 856 | Risks: panic risk
+- `patches/sp-trie/src/error.rs` -> **Unclassified** | LOC: 48 | Risks: none
+- `patches/sp-trie/src/lib.rs` -> **X3 DEX** | LOC: 1009 | Risks: panic risk
+- `patches/sp-trie/src/node_codec.rs` -> **Unclassified** | LOC: 331 | Risks: none
+- `patches/sp-trie/src/node_header.rs` -> **Unclassified** | LOC: 174 | Risks: none
+- `patches/sp-trie/src/proof_size_extension.rs` -> **Proof System** | LOC: 73 | Risks: none
+- `patches/sp-trie/src/recorder.rs` -> **Proof System** | LOC: 722 | Risks: atomic rollback risk, panic risk
+- `patches/sp-trie/src/storage_proof.rs` -> **Proof System** | LOC: 203 | Risks: none
+- `patches/sp-trie/src/trie_codec.rs` -> **Proof System** | LOC: 208 | Risks: none
+- `patches/sp-trie/src/trie_stream.rs` -> **Unclassified** | LOC: 148 | Risks: none
+- `patches/substrate-prometheus-endpoint/Cargo.toml` -> **Unclassified** | LOC: 18 | Risks: none
+- `patches/substrate-prometheus-endpoint/src/lib.rs` -> **Unclassified** | LOC: 119 | Risks: panic risk
+- `patches/substrate-prometheus-endpoint/src/sourced.rs` -> **Unclassified** | LOC: 155 | Risks: none
+- `patches/tempfile/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/tempfile/Cargo.toml` -> **DEX Liquidity** | LOC: 106 | Risks: none
+- `patches/tempfile/src/dir/imp/any.rs` -> **Unclassified** | LOC: 25 | Risks: none
+- `patches/tempfile/src/dir/imp/mod.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `patches/tempfile/src/dir/imp/unix.rs` -> **Unclassified** | LOC: 27 | Risks: none
+- `patches/tempfile/src/dir/mod.rs` -> **Unclassified** | LOC: 515 | Risks: panic risk
+- `patches/tempfile/src/env.rs` -> **Unclassified** | LOC: 52 | Risks: none
+- `patches/tempfile/src/error.rs` -> **Unclassified** | LOC: 46 | Risks: none
+- `patches/tempfile/src/file/imp/mod.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `patches/tempfile/src/file/imp/other.rs` -> **Unclassified** | LOC: 35 | Risks: none
+- `patches/tempfile/src/file/imp/unix.rs` -> **Universal Asset Kernel** | LOC: 140 | Risks: none
+- `patches/tempfile/src/file/imp/windows.rs` -> **Unclassified** | LOC: 120 | Risks: unsafe code
+- `patches/tempfile/src/file/mod.rs` -> **Unclassified** | LOC: 1079 | Risks: none
+- `patches/tempfile/src/lib.rs` -> **DEX Liquidity** | LOC: 758 | Risks: unsafe code
+- `patches/tempfile/src/spooled.rs` -> **DEX Liquidity** | LOC: 250 | Risks: none
+- `patches/tempfile/src/util.rs` -> **Unclassified** | LOC: 83 | Risks: none
+- `patches/tempfile/tests/env.rs` -> **Unclassified** | LOC: 17 | Risks: panic risk
+- `patches/tempfile/tests/namedtempfile.rs` -> **Unclassified** | LOC: 622 | Risks: panic risk
+- `patches/tempfile/tests/spooled.rs` -> **DEX Liquidity** | LOC: 378 | Risks: panic risk
+- `patches/tempfile/tests/tempdir.rs` -> **Unclassified** | LOC: 197 | Risks: panic risk
+- `patches/tempfile/tests/tempfile.rs` -> **Unclassified** | LOC: 79 | Risks: panic risk
+- `patches/uuid/.cargo_vcs_info.json` -> **Unclassified** | LOC: 6 | Risks: none
+- `patches/uuid/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 245 | Risks: none
+- `patches/uuid/src/builder.rs` -> **TPS Benchmark Suite** | LOC: 879 | Risks: unsafe code
+- `patches/uuid/src/error.rs` -> **X3 DEX** | LOC: 177 | Risks: unsafe code
+- `patches/uuid/src/external.rs` -> **Unclassified** | LOC: 9 | Risks: none
+- `patches/uuid/src/external/arbitrary_support.rs` -> **Unclassified** | LOC: 68 | Risks: panic risk
+- `patches/uuid/src/external/borsh_support.rs` -> **Unclassified** | LOC: 24 | Risks: panic risk
+- `patches/uuid/src/external/serde_support.rs` -> **Unclassified** | LOC: 836 | Risks: panic risk
+- `patches/uuid/src/external/slog_support.rs` -> **Unclassified** | LOC: 49 | Risks: none
+- `patches/uuid/src/fmt.rs` -> **Unclassified** | LOC: 1120 | Risks: panic risk, unsafe code
+- `patches/uuid/src/lib.rs` -> **TPS Benchmark Suite** | LOC: 1739 | Risks: panic risk
+- `patches/uuid/src/macros.rs` -> **TPS Benchmark Suite** | LOC: 74 | Risks: panic risk, unsafe code
+- `patches/uuid/src/md5.rs` -> **Unclassified** | LOC: 15 | Risks: none
+- `patches/uuid/src/non_nil.rs` -> **TPS Benchmark Suite** | LOC: 202 | Risks: panic risk, unsafe code
+- `patches/uuid/src/parser.rs` -> **Unclassified** | LOC: 575 | Risks: panic risk
+- `patches/uuid/src/rng.rs` -> **Unclassified** | LOC: 309 | Risks: panic risk
+- `patches/uuid/src/sha1.rs` -> **Unclassified** | LOC: 15 | Risks: none
+- `patches/uuid/src/timestamp.rs` -> **TPS Benchmark Suite** | LOC: 1269 | Risks: panic risk
+- `patches/uuid/src/v1.rs` -> **TPS Benchmark Suite** | LOC: 158 | Risks: panic risk
+- `patches/uuid/src/v3.rs` -> **TPS Benchmark Suite** | LOC: 159 | Risks: none
+- `patches/uuid/src/v4.rs` -> **TPS Benchmark Suite** | LOC: 74 | Risks: none
+- `patches/uuid/src/v5.rs` -> **TPS Benchmark Suite** | LOC: 173 | Risks: none
+- `patches/uuid/src/v6.rs` -> **TPS Benchmark Suite** | LOC: 160 | Risks: panic risk
+- `patches/uuid/src/v7.rs` -> **TPS Benchmark Suite** | LOC: 219 | Risks: panic risk
+- `patches/uuid/src/v8.rs` -> **TPS Benchmark Suite** | LOC: 61 | Risks: none
+- `patches/wasm-instrument/Cargo.toml` -> **TPS Benchmark Suite** | LOC: 82 | Risks: none
+- `patches/wasm-instrument/src/export_globals.rs` -> **X3 DEX** | LOC: 162 | Risks: panic risk
+- `patches/wasm-instrument/src/gas_metering/mod.rs` -> **X3 DEX** | LOC: 1056 | Risks: panic risk, unfinished logic
+- `patches/wasm-instrument/src/gas_metering/validation.rs` -> **X3 DEX** | LOC: 354 | Risks: panic risk
+- `patches/wasm-instrument/src/lib.rs` -> **Unclassified** | LOC: 12 | Risks: none
+- `patches/wasm-instrument/src/stack_limiter/max_height.rs` -> **Unclassified** | LOC: 615 | Risks: panic risk
+- `patches/wasm-instrument/src/stack_limiter/mod.rs` -> **X3 DEX** | LOC: 381 | Risks: panic risk
+- `patches/wasm-instrument/src/stack_limiter/thunk.rs` -> **X3 DEX** | LOC: 140 | Risks: panic risk, unfinished logic
+- `phase-5-executor.sh` -> **X3 DEX** | LOC: 197 | Risks: bridge risk
+- `plans/dual-vm-implementation-plan.md` -> **Universal Asset Kernel** | LOC: 147 | Risks: bridge risk, replay risk
+- `programs/Anchor.toml` -> **X3VM / Cross-VM** | LOC: 34 | Risks: none
+- `programs/amm/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 23 | Risks: none
+- `programs/amm/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1332 | Risks: bridge risk
+- `programs/cross-vm-adapter/Cargo.toml` -> **SVM Integration** | LOC: 26 | Risks: none
+- `programs/cross-vm-adapter/src/lib.rs` -> **Universal Asset Kernel** | LOC: 1009 | Risks: none
+- `programs/htlc/Cargo.toml` -> **SVM Integration** | LOC: 26 | Risks: none
+- `programs/htlc/src/lib.rs` -> **EVM Integration** | LOC: 443 | Risks: none
+- `programs/staking/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 23 | Risks: none
+- `programs/staking/src/lib.rs` -> **SVM Integration** | LOC: 1038 | Risks: panic risk
+- `programs/token-escrow/Cargo.toml` -> **SVM Integration** | LOC: 26 | Risks: none
+- `programs/token-escrow/src/lib.rs` -> **SVM Integration** | LOC: 885 | Risks: none
+- `proof-forge/Cargo.toml` -> **Proof System** | LOC: 30 | Risks: none
+- `proof-forge/src/dashboard/mod.rs` -> **TPS Benchmark Suite** | LOC: 191 | Risks: none
+- `proof-forge/src/feature_proof.rs` -> **Proof System** | LOC: 767 | Risks: known issue, stub risk, unfinished logic
+- `proof-forge/src/gap_proof.rs` -> **Launchpad** | LOC: 491 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk, supply invariant risk
+- `proof-forge/src/lib.rs` -> **Launchpad** | LOC: 15 | Risks: none
+- `proof-forge/src/main.rs` -> **Universal Asset Kernel** | LOC: 875 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, unfinished logic
+- `proof-forge/src/proof.rs` -> **Proof System** | LOC: 290 | Risks: none
+- `proof-forge/src/receipt.rs` -> **Proof System** | LOC: 486 | Risks: panic risk
+- `proof-forge/src/registry/claims.rs` -> **Proof System** | LOC: 24 | Risks: none
+- `proof-forge/src/registry/mod.rs` -> **Proof System** | LOC: 126 | Risks: none
+- `proof-forge/src/runners/asset_kernel.rs` -> **Universal Asset Kernel** | LOC: 304 | Risks: supply invariant risk
+- `proof-forge/src/runners/atomic.rs` -> **Universal Asset Kernel** | LOC: 295 | Risks: atomic rollback risk
+- `proof-forge/src/runners/bridge.rs` -> **Bridge / Router** | LOC: 84 | Risks: bridge risk, replay risk
+- `proof-forge/src/runners/bug_bounty.rs` -> **Launchpad** | LOC: 89 | Risks: none
+- `proof-forge/src/runners/consensus.rs` -> **Governance** | LOC: 137 | Risks: none
+- `proof-forge/src/runners/cross_vm.rs` -> **Bridge / Router** | LOC: 123 | Risks: bridge risk
+- `proof-forge/src/runners/custody.rs` -> **Proof System** | LOC: 90 | Risks: none
+- `proof-forge/src/runners/dex.rs` -> **X3 DEX** | LOC: 123 | Risks: none
+- `proof-forge/src/runners/ecosystem_quality.rs` -> **X3 DEX** | LOC: 80 | Risks: none
+- `proof-forge/src/runners/flashloans.rs` -> **EVM Integration** | LOC: 201 | Risks: none
+- `proof-forge/src/runners/formal_proofs.rs` -> **Universal Asset Kernel** | LOC: 617 | Risks: none
+- `proof-forge/src/runners/governance.rs` -> **Governance** | LOC: 124 | Risks: none
+- `proof-forge/src/runners/gpu.rs` -> **Proof System** | LOC: 324 | Risks: none
+- `proof-forge/src/runners/incident_response.rs` -> **X3 DEX** | LOC: 92 | Risks: none
+- `proof-forge/src/runners/launchpad.rs` -> **Launchpad** | LOC: 135 | Risks: none
+- `proof-forge/src/runners/mod.rs` -> **Universal Asset Kernel** | LOC: 1385 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk, stub risk, supply invariant risk
+- `proof-forge/src/runners/operational.rs` -> **X3 DEX** | LOC: 862 | Risks: none
+- `proof-forge/src/runners/oracle.rs` -> **X3 DEX** | LOC: 133 | Risks: none
+- `proof-forge/src/runners/runtime.rs` -> **Governance** | LOC: 117 | Risks: none
+- `proof-forge/src/runners/smart_contracts.rs` -> **EVM Integration** | LOC: 255 | Risks: none
+- `proof-forge/src/runners/social_consensus.rs` -> **Governance** | LOC: 92 | Risks: none
+- `proof-forge/src/runners/treasury.rs` -> **Proof System** | LOC: 128 | Risks: none
+- `proof-forge/src/runners/upgrade_safety.rs` -> **Governance** | LOC: 89 | Risks: none
+- `proof-forge/src/runners/x3language.rs` -> **X3VM / Cross-VM** | LOC: 84 | Risks: none
+- `proof-forge/src/runners/x3vm.rs` -> **Bridge / Router** | LOC: 122 | Risks: bridge risk
+- `proof-forge/src/scoring/formula.rs` -> **TPS Benchmark Suite** | LOC: 71 | Risks: none
+- `proof-forge/src/scoring/mod.rs` -> **TPS Benchmark Suite** | LOC: 112 | Risks: none
+- `proof-forge/src/todo_proof.rs` -> **Universal Asset Kernel** | LOC: 347 | Risks: bridge risk, known issue, panic risk, stub risk, unfinished logic
+- `proof-score.json` -> **TPS Benchmark Suite** | LOC: 19 | Risks: none
+- `proof/baselines/claim_scores.yml` -> **Universal Asset Kernel** | LOC: 30 | Risks: atomic rollback risk, bridge risk, replay risk
+- `proof/claims/registry.yml` -> **Universal Asset Kernel** | LOC: 346 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `proof/features/feature_matrix.yml` -> **Proof System** | LOC: 1478 | Risks: atomic rollback risk, bridge risk, replay risk, supply invariant risk, unfinished logic
+- `proof/funding/milestone-receipt-map.yml` -> **Universal Asset Kernel** | LOC: 113 | Risks: atomic rollback risk, bridge risk, replay risk, replay/nonce risk
+- `proof/onboarding/ttfv_benchmark.json` -> **EVM Integration** | LOC: 12 | Risks: none
+- `proof/policies/gap_policy.yml` -> **Universal Asset Kernel** | LOC: 208 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk, supply invariant risk
+- `proof/policies/proof_levels.yml` -> **Proof System** | LOC: 97 | Risks: none
+- `proof/policies/quantum_crypto_policy.yml` -> **Launchpad** | LOC: 124 | Risks: none
+- `proof/policies/release_gates.yml` -> **Universal Asset Kernel** | LOC: 144 | Risks: atomic rollback risk, bridge risk, replay risk, unfinished logic
+- `proof/policies/security_policy.yml` -> **Universal Asset Kernel** | LOC: 157 | Risks: atomic rollback risk, replay risk, replay/nonce risk, supply invariant risk
+- `proof/policies/todo_policy.yml` -> **Universal Asset Kernel** | LOC: 177 | Risks: bridge risk, known issue, panic risk, stub risk, unfinished logic
+- `proof/receipts/claims/x3.asset_kernel.supply_conservation.receipt.json` -> **Universal Asset Kernel** | LOC: 58 | Risks: replay risk, supply invariant risk
+- `proof/receipts/claims/x3.atomic.one_terminal_state.receipt.json` -> **Universal Asset Kernel** | LOC: 53 | Risks: atomic rollback risk
+- `proof/receipts/claims/x3.atomic.rollback_safety.receipt.json` -> **Universal Asset Kernel** | LOC: 53 | Risks: atomic rollback risk
+- `proof/receipts/claims/x3.bridge.finality_verification.receipt.json` -> **Bridge / Router** | LOC: 39 | Risks: bridge risk, replay risk
+- `proof/receipts/claims/x3.bridge.replay_protection.receipt.json` -> **Bridge / Router** | LOC: 39 | Risks: bridge risk, replay risk
+- `proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json` -> **Governance** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.consensus.finality_safety.receipt.json` -> **Governance** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.consensus.validator_rotation.receipt.json` -> **Governance** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.contracts.evm_svm_parity.receipt.json` -> **EVM Integration** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.contracts.some_unimplemented.receipt.json` -> **Proof System** | LOC: 38 | Risks: none
+- `proof/receipts/claims/x3.dex.amm_math_safety.receipt.json` -> **X3 DEX** | LOC: 47 | Risks: none
+- `proof/receipts/claims/x3.dex.liquidity_provision.receipt.json` -> **X3 DEX** | LOC: 47 | Risks: none
+- `proof/receipts/claims/x3.dex.swapping_mechanism.receipt.json` -> **X3 DEX** | LOC: 47 | Risks: none
+- `proof/receipts/claims/x3.evolution.no_regression.receipt.json` -> **Proof System** | LOC: 50 | Risks: none
+- `proof/receipts/claims/x3.flashloan.repay_or_revert.receipt.json` -> **Proof System** | LOC: 59 | Risks: none
+- `proof/receipts/claims/x3.flashloans.attack_resistance.receipt.json` -> **Proof System** | LOC: 59 | Risks: none
+- `proof/receipts/claims/x3.funding.milestone_receipts.receipt.json` -> **Proof System** | LOC: 55 | Risks: none
+- `proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json` -> **Governance** | LOC: 44 | Risks: none
+- `proof/receipts/claims/x3.gpu.cpu_gpu_parity.receipt.json` -> **Proof System** | LOC: 62 | Risks: none
+- `proof/receipts/claims/x3.observability.telemetry_pipeline.receipt.json` -> **X3 DEX** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.onboarding.developer_first_value.receipt.json` -> **Launchpad** | LOC: 59 | Risks: none
+- `proof/receipts/claims/x3.proofforge.receipt_integrity.receipt.json` -> **Proof System** | LOC: 45 | Risks: atomic rollback risk
+- `proof/receipts/claims/x3.runtime.full_proof.receipt.json` -> **Governance** | LOC: 55 | Risks: none
+- `proof/receipts/claims/x3.treasury.full_proof.receipt.json` -> **Proof System** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.x3lang.compiler_reproducibility.receipt.json` -> **X3VM / Cross-VM** | LOC: 54 | Risks: none
+- `proof/receipts/claims/x3.x3vm.determinism.receipt.json` -> **Bridge / Router** | LOC: 54 | Risks: bridge risk
+- `proof/receipts/claims/x3.x3vm.full_proof.receipt.json` -> **Bridge / Router** | LOC: 54 | Risks: bridge risk
+- `proof/receipts/launch/receipt-launch-1777682392.json` -> **Universal Asset Kernel** | LOC: 22 | Risks: none
+- `proof/reports/feature_status.json` -> **Proof System** | LOC: 2194 | Risks: atomic rollback risk, bridge risk, replay risk, supply invariant risk
+- `proof/reports/features_report.md` -> **Universal Asset Kernel** | LOC: 45 | Risks: none
+- `proof/reports/receipt_migration_plan.md` -> **Universal Asset Kernel** | LOC: 33 | Risks: atomic rollback risk, bridge risk, replay risk
+- `proof/scenarios/bridge_attack_scenarios.yml` -> **Universal Asset Kernel** | LOC: 224 | Risks: bridge risk, replay risk, replay/nonce risk, supply invariant risk
+- `proof/scenarios/crossvm_attack_scenarios.yml` -> **Bridge / Router** | LOC: 164 | Risks: atomic rollback risk
+- `proof/scenarios/flashloan_attack_scenarios.yml` -> **Bridge / Router** | LOC: 164 | Risks: atomic rollback risk
+- `proof/schema/receipt-v2.schema.json` -> **TPS Benchmark Suite** | LOC: 178 | Risks: none
+- `public/metadata.json` -> **Proof System** | LOC: 11 | Risks: none
+- `public/proof-score.json` -> **TPS Benchmark Suite** | LOC: 19 | Risks: none
+- `quickstart-testnet.sh` -> **Validator / LaunchOps** | LOC: 72 | Risks: none
+- `repomix.config.json` -> **Launchpad** | LOC: 36 | Risks: none
+- `reports/mainnet_rc_report.md` -> **Bridge / Router** | LOC: 18 | Risks: bridge risk
+- `reports/panic_unwrap_audit.md` -> **Bridge / Router** | LOC: 7503 | Risks: atomic rollback risk, bridge risk, local-only config risk, mock hash risk, panic risk, replay risk, replay/nonce risk, supply invariant risk
+- `reports/prompt-runs/latest-full.md` -> **Universal Asset Kernel** | LOC: 274 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, stub risk, unfinished logic
+- `reports/prompt-runs/latest-operator.md` -> **Universal Asset Kernel** | LOC: 83 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk
+- `reports/prompt-runs/prompt-full-20260427T225228Z.md` -> **Universal Asset Kernel** | LOC: 267 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, stub risk, unfinished logic
+- `reports/prompt-runs/prompt-full-20260427T225413Z.md` -> **Universal Asset Kernel** | LOC: 267 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, stub risk, unfinished logic
+- `reports/prompt-runs/prompt-full-20260427T225705Z.md` -> **Universal Asset Kernel** | LOC: 274 | Risks: atomic rollback risk, bridge risk, known issue, replay risk, stub risk, unfinished logic
+- `reports/prompt-runs/prompt-operator-20260427T225228Z.md` -> **Universal Asset Kernel** | LOC: 76 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk
+- `reports/prompt-runs/prompt-operator-20260427T225325Z.md` -> **Universal Asset Kernel** | LOC: 83 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk
+- `reports/prompt-runs/prompt-operator-20260427T225412Z.md` -> **Universal Asset Kernel** | LOC: 83 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk
+- `reports/prompt-runs/prompt-operator-20260427T225554Z.md` -> **Universal Asset Kernel** | LOC: 83 | Risks: atomic rollback risk, bridge risk, replay risk, stub risk
+- `reports/substrate/FRAME_WEIGHTS_BLOCKER_20260426.md` -> **Launchpad** | LOC: 76 | Risks: none
+- `reports/substrate/README.md` -> **Launchpad** | LOC: 62 | Risks: replay risk
+- `reports/substrate/SUBSTRATE_PROOF_PACK_LATEST.md` -> **Launchpad** | LOC: 43 | Risks: replay risk
+- `reports/substrate/substrate-proof-pack-20260426-115335.md` -> **Launchpad** | LOC: 43 | Risks: replay risk
+- `reports/substrate/substrate-proof-pack-20260426-121648.md` -> **Launchpad** | LOC: 43 | Risks: replay risk
+- `reports/substrate/substrate-proof-pack-20260426-121738.md` -> **Launchpad** | LOC: 43 | Risks: replay risk
+- `routing.config.json` -> **Unclassified** | LOC: 8 | Risks: none
+- `runtime/Cargo.toml` -> **Universal Asset Kernel** | LOC: 239 | Risks: bridge risk
+- `runtime/build.rs` -> **Unclassified** | LOC: 53 | Risks: panic risk
+- `runtime/runtime-identity.baseline.json` -> **Universal Asset Kernel** | LOC: 304 | Risks: none
+- `runtime/src/fraud_proofs/committee.rs` -> **X3 DEX** | LOC: 216 | Risks: none
+- `runtime/src/fraud_proofs/freeze.rs` -> **Universal Asset Kernel** | LOC: 182 | Risks: panic risk
+- `runtime/src/fraud_proofs/mod.rs` -> **X3VM / Cross-VM** | LOC: 30 | Risks: none
+- `runtime/src/fraud_proofs/pallet.rs` -> **Governance** | LOC: 410 | Risks: panic risk, replay risk, replay/nonce risk
+- `runtime/src/fraud_proofs/scheduler_v1.rs` -> **X3 DEX** | LOC: 137 | Risks: none
+- `runtime/src/fraud_proofs/startup_gate.rs` -> **Proof System** | LOC: 218 | Risks: panic risk
+- `runtime/src/fraud_proofs/types.rs` -> **Proof System** | LOC: 80 | Risks: replay risk, replay/nonce risk
+- `runtime/src/fraud_proofs/verifier.rs` -> **Universal Asset Kernel** | LOC: 309 | Risks: panic risk, replay risk, replay/nonce risk
+- `runtime/src/fraud_proofs/witness_v1.rs` -> **Proof System** | LOC: 363 | Risks: none
+- `runtime/src/lib.rs` -> **Universal Asset Kernel** | LOC: 2879 | Risks: bridge risk, panic risk, replay/nonce risk, unfinished logic
+- `runtime/src/precompiles.rs` -> **EVM Integration** | LOC: 63 | Risks: none
+- `runtime/src/tests.rs` -> **Universal Asset Kernel** | LOC: 268 | Risks: bridge risk, mock hash risk
+- `runtime/tests/fraud_proofs_proptest.rs` -> **Proof System** | LOC: 236 | Risks: panic risk, replay/nonce risk
+- `runtime/tests/fraud_proofs_witness_v1.rs` -> **X3 DEX** | LOC: 325 | Risks: panic risk
+- `runtime/x3-chain-runtime.cdx.baseline.json` -> **Unclassified** | LOC: 3202 | Risks: bridge risk, unsafe code
+- `rust-toolchain.toml` -> **Unclassified** | LOC: 7 | Risks: none
+- `scripts/bootstrap-validator.sh` -> **Genesis / Chain Spec** | LOC: 161 | Risks: none
+- `scripts/docker-build.sh` -> **X3 DEX** | LOC: 124 | Risks: local-only config risk
+- `scripts/generate-fuzz-harnesses.sh` -> **Universal Asset Kernel** | LOC: 111 | Risks: panic risk, unfinished logic
+- `scripts/gpu-health-monitor.sh` -> **GPU Validator Swarm** | LOC: 195 | Risks: none
+- `scripts/install-testing-tools.sh` -> **X3VM / Cross-VM** | LOC: 81 | Risks: none
+- `scripts/k8s-deploy.sh` -> **X3 DEX** | LOC: 195 | Risks: local-only config risk
+- `scripts/mainnet/fresh_build_check.sh` -> **Proof System** | LOC: 15 | Risks: none
+- `scripts/mainnet/generate_mainnet_chain_spec.sh` -> **Genesis / Chain Spec** | LOC: 19 | Risks: none
+- `scripts/mainnet/genesis_lint.sh` -> **Bridge / Router** | LOC: 79 | Risks: bridge risk
+- `scripts/mainnet/mainnet_rc_gate.sh` -> **Universal Asset Kernel** | LOC: 44 | Risks: none
+- `scripts/mainnet/panic_unwrap_audit.sh` -> **TPS Benchmark Suite** | LOC: 110 | Risks: panic risk
+- `scripts/mainnet/runtime_upgrade_rehearsal.sh` -> **Unclassified** | LOC: 82 | Risks: none
+- `scripts/onboarding/measure_ttfv.sh` -> **EVM Integration** | LOC: 114 | Risks: none
+- `scripts/option-d-validation-suite.sh` -> **GPU Validator Swarm** | LOC: 465 | Risks: none
+- `scripts/peer-consensus-tracker.sh` -> **Validator / LaunchOps** | LOC: 231 | Risks: none
+- `scripts/proof/check-claim-status.sh` -> **Proof System** | LOC: 90 | Risks: none
+- `scripts/proof/lint-status-doc-truth.sh` -> **Proof System** | LOC: 71 | Risks: none
+- `scripts/proof/migrate-receipts.sh` -> **Proof System** | LOC: 53 | Risks: none
+- `scripts/proof/sync-registry-status.sh` -> **Proof System** | LOC: 163 | Risks: none
+- `scripts/proof/verify-receipts.sh` -> **Proof System** | LOC: 33 | Risks: none
+- `scripts/proof/verify_receipts.py` -> **Proof System** | LOC: 393 | Risks: none
+- `scripts/publish-dashboard.sh` -> **X3 DEX** | LOC: 431 | Risks: local-only config risk
+- `scripts/run-all-tests.sh` -> **Universal Asset Kernel** | LOC: 333 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `scripts/run-chopsticks.sh` -> **X3 DEX** | LOC: 286 | Risks: local-only config risk, replay risk, replay/nonce risk
+- `scripts/run-frame-benchmarks.sh` -> **Universal Asset Kernel** | LOC: 436 | Risks: none
+- `scripts/run-full-stack-build-prompt.sh` -> **Unclassified** | LOC: 128 | Risks: none
+- `scripts/run-security-gates.sh` -> **Universal Asset Kernel** | LOC: 170 | Risks: bridge risk
+- `scripts/run-srtool.sh` -> **Governance** | LOC: 385 | Risks: none
+- `scripts/run-substrate-tests.sh` -> **Universal Asset Kernel** | LOC: 333 | Risks: none
+- `scripts/run-substrate-tools.sh` -> **Governance** | LOC: 258 | Risks: replay risk
+- `scripts/run-try-runtime.sh` -> **Unclassified** | LOC: 234 | Risks: none
+- `scripts/run-zombienet.sh` -> **Launchpad** | LOC: 239 | Risks: none
+- `scripts/settlement-timeout-monitor.sh` -> **Unclassified** | LOC: 168 | Risks: none
+- `scripts/start-validator-network.sh` -> **Validator / LaunchOps** | LOC: 145 | Risks: none
+- `scripts/test-all-advanced.sh` -> **Bridge / Router** | LOC: 358 | Risks: bridge risk, unsafe code
+- `scripts/test-gpu-cpu-determinism-benchmark-gate.sh` -> **TPS Benchmark Suite** | LOC: 61 | Risks: none
+- `scripts/test-minimal-stack-replay-failure.sh` -> **Bridge / Router** | LOC: 17 | Risks: bridge risk, replay risk
+- `scripts/testnet-full-launch.sh` -> **X3 DEX** | LOC: 218 | Risks: none
+- `scripts/verify-deployment.sh` -> **Proof System** | LOC: 370 | Risks: none
+- `scripts/x3-option-d-orchestrator.sh` -> **Launchpad** | LOC: 307 | Risks: none
+- `scripts_infrastructure/apps_quality_matrix.sh` -> **X3 DEX** | LOC: 56 | Risks: none
+- `scripts_infrastructure/benchmark-e2e.sh` -> **TPS Benchmark Suite** | LOC: 536 | Risks: bridge risk, local-only config risk, replay risk
+- `scripts_infrastructure/benchmark_latency.sh` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `scripts_infrastructure/benchmark_p3.py` -> **DEX Liquidity** | LOC: 334 | Risks: none
+- `scripts_infrastructure/block_display.py` -> **X3 DEX** | LOC: 220 | Risks: none
+- `scripts_infrastructure/block_milestone.py` -> **Genesis / Chain Spec** | LOC: 124 | Risks: none
+- `scripts_infrastructure/block_visualizer.py` -> **Unclassified** | LOC: 189 | Risks: none
+- `scripts_infrastructure/blue_green_deploy.sh` -> **Unclassified** | LOC: 303 | Risks: atomic rollback risk, local-only config risk
+- `scripts_infrastructure/bootstrap-x3-template-matrix.sh` -> **Unclassified** | LOC: 19 | Risks: none
+- `scripts_infrastructure/build-node-artifact-container.sh` -> **TPS Benchmark Suite** | LOC: 73 | Risks: none
+- `scripts_infrastructure/build-parallel-proposer.sh` -> **GPU Validator Swarm** | LOC: 32 | Risks: none
+- `scripts_infrastructure/check_completion_md.sh` -> **Unclassified** | LOC: 29 | Risks: none
+- `scripts_infrastructure/check_markdown_python_examples.py` -> **X3VM / Cross-VM** | LOC: 75 | Risks: none
+- `scripts_infrastructure/check_phase13f_placeholders.sh` -> **X3 DEX** | LOC: 63 | Risks: none
+- `scripts_infrastructure/check_runmd_examples.sh` -> **X3VM / Cross-VM** | LOC: 25 | Risks: none
+- `scripts_infrastructure/check_staged_test_changes.py` -> **Unclassified** | LOC: 44 | Risks: none
+- `scripts_infrastructure/check_test_changes.sh` -> **Unclassified** | LOC: 58 | Risks: none
+- `scripts_infrastructure/ci/check_canonical_crate_paths.sh` -> **Bridge / Router** | LOC: 36 | Risks: bridge risk
+- `scripts_infrastructure/ci/check_desktop_security.sh` -> **X3 DEX** | LOC: 41 | Risks: unsafe code
+- `scripts_infrastructure/ci/check_finality_oracle_feature_guards.sh` -> **Unclassified** | LOC: 33 | Risks: none
+- `scripts_infrastructure/ci/check_runtime_wasm_non_stub.sh` -> **Unclassified** | LOC: 38 | Risks: none
+- `scripts_infrastructure/ci/configure_release_mainnet_branch_protection.sh` -> **Unclassified** | LOC: 56 | Risks: none
+- `scripts_infrastructure/ci/enforce_cross_vm_safety_wiring.sh` -> **Bridge / Router** | LOC: 52 | Risks: bridge risk
+- `scripts_infrastructure/ci/enforce_launch_validator.sh` -> **Launchpad** | LOC: 69 | Risks: none
+- `scripts_infrastructure/ci/enforce_node_cross_vm_safety_tests.sh` -> **Bridge / Router** | LOC: 30 | Risks: bridge risk
+- `scripts_infrastructure/ci/sanitize_artifacts.sh` -> **Unclassified** | LOC: 88 | Risks: none
+- `scripts_infrastructure/ci/sanitize_artifacts_v2.sh` -> **Unclassified** | LOC: 38 | Risks: none
+- `scripts_infrastructure/ci/verify_cargo_lock_baseline.sh` -> **Unclassified** | LOC: 214 | Risks: none
+- `scripts_infrastructure/ci/verify_chain_spec_baseline.sh` -> **Governance** | LOC: 272 | Risks: none
+- `scripts_infrastructure/ci/verify_genesis_allocations_baseline.sh` -> **Universal Asset Kernel** | LOC: 259 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_artifact_schemas_baseline.sh` -> **Launchpad** | LOC: 215 | Risks: unfinished logic
+- `scripts_infrastructure/ci/verify_launchops_backlog_allowlist_disjoint.sh` -> **Launchpad** | LOC: 57 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_contract_review.sh` -> **Launchpad** | LOC: 63 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_deep_red_flags_baseline.sh` -> **Launchpad** | LOC: 133 | Risks: unfinished logic
+- `scripts_infrastructure/ci/verify_launchops_drift_flags_baseline.sh` -> **Launchpad** | LOC: 135 | Risks: unfinished logic
+- `scripts_infrastructure/ci/verify_launchops_feature_matrix_baseline.sh` -> **Launchpad** | LOC: 154 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_gates_baseline.sh` -> **Launchpad** | LOC: 142 | Risks: unfinished logic
+- `scripts_infrastructure/ci/verify_launchops_no_blockers.sh` -> **Launchpad** | LOC: 60 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_readiness_baseline.sh` -> **Launchpad** | LOC: 171 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_red_flags_baseline.sh` -> **X3 DEX** | LOC: 192 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_requirement_conflicts_baseline.sh` -> **X3 DEX** | LOC: 237 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_rpc_consumer_contracts_baseline.sh` -> **Launchpad** | LOC: 148 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_rpc_matrix_invariants.sh` -> **Launchpad** | LOC: 67 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_runtime_rpc_inventory_baseline.sh` -> **Launchpad** | LOC: 135 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_stale_docs_baseline.sh` -> **Launchpad** | LOC: 141 | Risks: none
+- `scripts_infrastructure/ci/verify_launchops_test_results_baseline.sh` -> **Launchpad** | LOC: 138 | Risks: unfinished logic
+- `scripts_infrastructure/ci/verify_runtime_identity_baseline.sh` -> **X3 DEX** | LOC: 288 | Risks: none
+- `scripts_infrastructure/ci/verify_sbom_baseline.sh` -> **Unclassified** | LOC: 207 | Risks: none
+- `scripts_infrastructure/coordinator/index.js` -> **X3 DEX** | LOC: 16 | Risks: none
+- `scripts_infrastructure/coordinator/package.json` -> **X3 DEX** | LOC: 12 | Risks: none
+- `scripts_infrastructure/deploy-phase5.sh` -> **GPU Validator Swarm** | LOC: 322 | Risks: local-only config risk
+- `scripts_infrastructure/deploy.sh` -> **Launchpad** | LOC: 36 | Risks: local-only config risk
+- `scripts_infrastructure/deploy/testnet_deploy.sh` -> **Unclassified** | LOC: 22 | Risks: none
+- `scripts_infrastructure/deploy_dual_validator.sh` -> **Universal Asset Kernel** | LOC: 42 | Risks: bridge risk
+- `scripts_infrastructure/devnet/adversarial_week.sh` -> **Governance** | LOC: 64 | Risks: none
+- `scripts_infrastructure/devnet/key_ceremony_rehearsal.sh` -> **Genesis / Chain Spec** | LOC: 45 | Risks: none
+- `scripts_infrastructure/devnet/launch_devnet.sh` -> **Launchpad** | LOC: 54 | Risks: none
+- `scripts_infrastructure/devnet/mainnet_countdown.sh` -> **Launchpad** | LOC: 105 | Risks: none
+- `scripts_infrastructure/display_blocks.sh` -> **Unclassified** | LOC: 11 | Risks: none
+- `scripts_infrastructure/drpc/setup-drpc-stack.sh` -> **Launchpad** | LOC: 48 | Risks: none
+- `scripts_infrastructure/drpc/stop-drpc-stack.sh` -> **Unclassified** | LOC: 30 | Risks: none
+- `scripts_infrastructure/enable_tls.sh` -> **TPS Benchmark Suite** | LOC: 170 | Risks: local-only config risk
+- `scripts_infrastructure/enforce_x3_rules.py` -> **Bridge / Router** | LOC: 146 | Risks: bridge risk, panic risk
+- `scripts_infrastructure/fetch-and-normalize-chains.js` -> **EVM Integration** | LOC: 119 | Risks: none
+- `scripts_infrastructure/fetch-chains.js` -> **EVM Integration** | LOC: 68 | Risks: none
+- `scripts_infrastructure/finisher_daemon.py` -> **Bridge / Router** | LOC: 204 | Risks: none
+- `scripts_infrastructure/fix-gpu-drivers.sh` -> **Universal Asset Kernel** | LOC: 240 | Risks: none
+- `scripts_infrastructure/force_gpu_rescan.sh` -> **GPU Validator Swarm** | LOC: 45 | Risks: none
+- `scripts_infrastructure/frontier_rpc_smoke.sh` -> **EVM Integration** | LOC: 73 | Risks: none
+- `scripts_infrastructure/generate-chain-registry.js` -> **X3 DEX** | LOC: 45 | Risks: none
+- `scripts_infrastructure/health-check.sh` -> **Unclassified** | LOC: 124 | Risks: local-only config risk
+- `scripts_infrastructure/install-git-hooks.sh` -> **Unclassified** | LOC: 24 | Risks: none
+- `scripts_infrastructure/install_x3_enforcement.sh` -> **EVM Integration** | LOC: 664 | Risks: replay risk
+- `scripts_infrastructure/install_x3_enforcement_solo.sh` -> **EVM Integration** | LOC: 496 | Risks: atomic rollback risk, replay risk
+- `scripts_infrastructure/keys/insert-validator-keys.sh` -> **Genesis / Chain Spec** | LOC: 146 | Risks: none
+- `scripts_infrastructure/launch-testnet.sh` -> **Launchpad** | LOC: 241 | Risks: local-only config risk, unsafe code
+- `scripts_infrastructure/llm_recon.py` -> **DEX Liquidity** | LOC: 898 | Risks: none
+- `scripts_infrastructure/merge_all_branches.sh` -> **Unclassified** | LOC: 212 | Risks: atomic rollback risk
+- `scripts_infrastructure/monitor_blocks.sh` -> **Unclassified** | LOC: 74 | Risks: none
+- `scripts_infrastructure/ollama_diag_collect.sh` -> **Unclassified** | LOC: 62 | Risks: none
+- `scripts_infrastructure/ollama_recon.py` -> **DEX Liquidity** | LOC: 443 | Risks: none
+- `scripts_infrastructure/ollama_server.py` -> **X3 DEX** | LOC: 522 | Risks: local-only config risk
+- `scripts_infrastructure/ollama_smoke_test.sh` -> **Unclassified** | LOC: 23 | Risks: none
+- `scripts_infrastructure/p4_day10_hotfix.py` -> **Universal Asset Kernel** | LOC: 330 | Risks: none
+- `scripts_infrastructure/p4_day10_validation_testing.py` -> **GPU Validator Swarm** | LOC: 452 | Risks: none
+- `scripts_infrastructure/p4_day11_final_preparation.py` -> **Universal Asset Kernel** | LOC: 699 | Risks: local-only config risk
+- `scripts_infrastructure/p4_day12_testnet_ship.py` -> **Universal Asset Kernel** | LOC: 420 | Risks: none
+- `scripts_infrastructure/p4_day2_sigverifier_optimization.py` -> **Universal Asset Kernel** | LOC: 152 | Risks: none
+- `scripts_infrastructure/p4_day3-4_poh_acceleration.py` -> **DEX Liquidity** | LOC: 164 | Risks: none
+- `scripts_infrastructure/p4_day4-5_tx_validator_acceleration.py` -> **Validator / LaunchOps** | LOC: 251 | Risks: replay/nonce risk
+- `scripts_infrastructure/p4_day5_sigverifier_gpu.py` -> **Universal Asset Kernel** | LOC: 155 | Risks: none
+- `scripts_infrastructure/p4_day6-8_full_gpu_integration.py` -> **TPS Benchmark Suite** | LOC: 179 | Risks: none
+- `scripts_infrastructure/p4_day9_testnet_setup.py` -> **Universal Asset Kernel** | LOC: 473 | Risks: none
+- `scripts_infrastructure/p4_full_orchestration_test.py` -> **TPS Benchmark Suite** | LOC: 209 | Risks: none
+- `scripts_infrastructure/p4_rapid_execution.sh` -> **Universal Asset Kernel** | LOC: 731 | Risks: none
+- `scripts_infrastructure/p4_utils/DAY1_CHECKLIST.md` -> **Universal Asset Kernel** | LOC: 83 | Risks: none
+- `scripts_infrastructure/p4_utils/baseline_measurement.py` -> **TPS Benchmark Suite** | LOC: 113 | Risks: none
+- `scripts_infrastructure/pre-commit-test-tamper.sh` -> **Unclassified** | LOC: 36 | Risks: none
+- `scripts_infrastructure/print_execution_banner.sh` -> **Unclassified** | LOC: 9 | Risks: none
+- `scripts_infrastructure/ralph-ollama.sh` -> **Unclassified** | LOC: 57 | Risks: local-only config risk
+- `scripts_infrastructure/ralph/AGENTS.md` -> **Bridge / Router** | LOC: 53 | Risks: bridge risk
+- `scripts_infrastructure/ralph/prd.json` -> **EVM Integration** | LOC: 271 | Risks: atomic rollback risk, bridge risk, replay/nonce risk
+- `scripts_infrastructure/ralph/ralph-apply.sh` -> **Unclassified** | LOC: 79 | Risks: none
+- `scripts_infrastructure/ralph/ralph-auto.sh` -> **Unclassified** | LOC: 100 | Risks: local-only config risk
+- `scripts_infrastructure/ralph/ralph-check-coverage.sh` -> **Unclassified** | LOC: 36 | Risks: none
+- `scripts_infrastructure/ralph/ralph-repair.sh` -> **Unclassified** | LOC: 24 | Risks: none
+- `scripts_infrastructure/ralph/ralph-summary.sh` -> **Unclassified** | LOC: 52 | Risks: none
+- `scripts_infrastructure/ralph/ralph.sh` -> **Bridge / Router** | LOC: 198 | Risks: none
+- `scripts_infrastructure/relayer/e2e/run-e2e-smoke.sh` -> **Unclassified** | LOC: 29 | Risks: local-only config risk
+- `scripts_infrastructure/relayer/package.json` -> **X3VM / Cross-VM** | LOC: 61 | Risks: none
+- `scripts_infrastructure/relayer/src/event-listener.js` -> **EVM Integration** | LOC: 394 | Risks: none
+- `scripts_infrastructure/relayer/src/event-listener.ts` -> **EVM Integration** | LOC: 503 | Risks: none
+- `scripts_infrastructure/relayer/src/handlers/bitcoin-builder.js` -> **X3 DEX** | LOC: 101 | Risks: none
+- `scripts_infrastructure/relayer/src/handlers/bitcoin-builder.ts` -> **X3 DEX** | LOC: 74 | Risks: none
+- `scripts_infrastructure/relayer/src/handlers/bitcoin.js` -> **Unclassified** | LOC: 53 | Risks: none
+- `scripts_infrastructure/relayer/src/handlers/bitcoin.ts` -> **Unclassified** | LOC: 56 | Risks: none
+- `scripts_infrastructure/relayer/src/handlers/ethereum.ts` -> **EVM Integration** | LOC: 80 | Risks: none
+- `scripts_infrastructure/relayer/src/http-server.ts` -> **X3 DEX** | LOC: 145 | Risks: none
+- `scripts_infrastructure/relayer/src/index.ts` -> **X3VM / Cross-VM** | LOC: 36 | Risks: none
+- `scripts_infrastructure/relayer/src/kms/bootstrap.ts` -> **X3 DEX** | LOC: 17 | Risks: none
+- `scripts_infrastructure/relayer/src/kms/index.ts` -> **X3 DEX** | LOC: 17 | Risks: none
+- `scripts_infrastructure/relayer/src/kms/local-provider.js` -> **Unclassified** | LOC: 71 | Risks: none
+- `scripts_infrastructure/relayer/src/kms/local-provider.ts` -> **X3 DEX** | LOC: 46 | Risks: none
+- `scripts_infrastructure/relayer/src/proof-relayer.js` -> **X3 DEX** | LOC: 316 | Risks: none
+- `scripts_infrastructure/relayer/src/proof-relayer.ts` -> **X3 DEX** | LOC: 437 | Risks: none
+- `scripts_infrastructure/relayer/src/settlement-verifier.js` -> **X3 DEX** | LOC: 235 | Risks: none
+- `scripts_infrastructure/relayer/src/settlement-verifier.ts` -> **X3 DEX** | LOC: 313 | Risks: none
+- `scripts_infrastructure/relayer/src/spv-proof-generator.ts` -> **X3 DEX** | LOC: 348 | Risks: replay/nonce risk
+- `scripts_infrastructure/relayer/src/vault.ts` -> **Unclassified** | LOC: 25 | Risks: none
+- `scripts_infrastructure/relayer/test-runner.js` -> **Unclassified** | LOC: 29 | Risks: none
+- `scripts_infrastructure/relayer/tests/auth.test.js` -> **X3 DEX** | LOC: 47 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/auth.test.ts` -> **X3 DEX** | LOC: 56 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/bitcoin-builder-kms.test.js` -> **Unclassified** | LOC: 45 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/bitcoin-builder-kms.test.ts` -> **Unclassified** | LOC: 49 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/bitcoin-builder.test.js` -> **Unclassified** | LOC: 17 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/bitcoin-builder.test.ts` -> **Unclassified** | LOC: 17 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/bitcoin-handler.test.js` -> **X3 DEX** | LOC: 33 | Risks: local-only config risk, panic risk
+- `scripts_infrastructure/relayer/tests/bitcoin-handler.test.ts` -> **X3 DEX** | LOC: 36 | Risks: local-only config risk, panic risk
+- `scripts_infrastructure/relayer/tests/e2e/kms-regtest.test.js` -> **DEX Liquidity** | LOC: 76 | Risks: none
+- `scripts_infrastructure/relayer/tests/e2e/kms-regtest.test.ts` -> **X3 DEX** | LOC: 139 | Risks: none
+- `scripts_infrastructure/relayer/tests/ethereum-handler-fee.test.js` -> **X3 DEX** | LOC: 38 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `scripts_infrastructure/relayer/tests/ethereum-handler-fee.test.ts` -> **X3 DEX** | LOC: 44 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `scripts_infrastructure/relayer/tests/ethereum-handler.test.js` -> **X3 DEX** | LOC: 48 | Risks: local-only config risk, panic risk
+- `scripts_infrastructure/relayer/tests/ethereum-handler.test.ts` -> **X3 DEX** | LOC: 53 | Risks: local-only config risk, panic risk
+- `scripts_infrastructure/relayer/tests/http.test.js` -> **X3 DEX** | LOC: 25 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/http.test.ts` -> **X3 DEX** | LOC: 29 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/kms.test.js` -> **X3 DEX** | LOC: 36 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/kms.test.ts` -> **X3 DEX** | LOC: 43 | Risks: panic risk
+- `scripts_infrastructure/relayer/tests/relayer.test.js` -> **X3VM / Cross-VM** | LOC: 363 | Risks: local-only config risk, replay/nonce risk
+- `scripts_infrastructure/relayer/tests/relayer.test.ts` -> **X3VM / Cross-VM** | LOC: 431 | Risks: local-only config risk, replay/nonce risk
+- `scripts_infrastructure/relayer/tests/ts-parse-check.test.js` -> **Unclassified** | LOC: 12 | Risks: none
+- `scripts_infrastructure/relayer/tests/ts-parse-check.test.ts` -> **Unclassified** | LOC: 8 | Risks: none
+- `scripts_infrastructure/relayer/tsconfig.json` -> **Unclassified** | LOC: 19 | Risks: none
+- `scripts_infrastructure/reset_4th_gpu.sh` -> **Bridge / Router** | LOC: 75 | Risks: bridge risk
+- `scripts_infrastructure/rpc_cors_smoke.py` -> **Unclassified** | LOC: 96 | Risks: local-only config risk
+- `scripts_infrastructure/rpc_rate_limit_smoke.py` -> **Unclassified** | LOC: 141 | Risks: none
+- `scripts_infrastructure/run-e2e-tests.sh` -> **GPU Validator Swarm** | LOC: 357 | Risks: local-only config risk
+- `scripts_infrastructure/run-foundry-hardhat-gui.sh` -> **Unclassified** | LOC: 6 | Risks: none
+- `scripts_infrastructure/run-hunyuan3d-ollama.sh` -> **Bridge / Router** | LOC: 157 | Risks: bridge risk
+- `scripts_infrastructure/run-node-fresh.sh` -> **Unclassified** | LOC: 59 | Risks: unsafe code
+- `scripts_infrastructure/run-ollama-avatar-demo.sh` -> **Unclassified** | LOC: 42 | Risks: none
+- `scripts_infrastructure/run-qween.sh` -> **Unclassified** | LOC: 36 | Risks: local-only config risk
+- `scripts_infrastructure/run-tps-tests.sh` -> **TPS Benchmark Suite** | LOC: 256 | Risks: local-only config risk
+- `scripts_infrastructure/run-validator.sh` -> **Universal Asset Kernel** | LOC: 16 | Risks: none
+- `scripts_infrastructure/run-x3-gpu-validator-swarm.sh` -> **GPU Validator Swarm** | LOC: 116 | Risks: none
+- `scripts_infrastructure/run_32_agent_trial_with_voir_dire.py` -> **Governance** | LOC: 419 | Risks: none
+- `scripts_infrastructure/seal_release.sh` -> **Unclassified** | LOC: 51 | Risks: none
+- `scripts_infrastructure/secrets_manager.sh` -> **DEX Liquidity** | LOC: 283 | Risks: local-only config risk
+- `scripts_infrastructure/setup-autostart.sh` -> **GPU Validator Swarm** | LOC: 62 | Risks: none
+- `scripts_infrastructure/setup-dev-env.sh` -> **Universal Asset Kernel** | LOC: 213 | Risks: none
+- `scripts_infrastructure/smoke-cross-vm-trade.sh` -> **EVM Integration** | LOC: 63 | Risks: none
+- `scripts_infrastructure/start-beast.sh` -> **Universal Asset Kernel** | LOC: 136 | Risks: local-only config risk
+- `scripts_infrastructure/stop-beast.sh` -> **GPU Validator Swarm** | LOC: 37 | Risks: none
+- `scripts_infrastructure/summarize-validation.js` -> **Unclassified** | LOC: 32 | Risks: none
+- `scripts_infrastructure/test-query.js` -> **Bridge / Router** | LOC: 46 | Risks: local-only config risk
+- `scripts_infrastructure/testnet/authorize-accounts-council.js` -> **Universal Asset Kernel** | LOC: 131 | Risks: replay/nonce risk
+- `scripts_infrastructure/testnet/authorize-accounts.js` -> **Universal Asset Kernel** | LOC: 111 | Risks: replay/nonce risk
+- `scripts_infrastructure/testnet/chainbench_server.py` -> **EVM Integration** | LOC: 1598 | Risks: none
+- `scripts_infrastructure/testnet/continuous-verify.sh` -> **Launchpad** | LOC: 131 | Risks: none
+- `scripts_infrastructure/testnet/cross-vm-harness.py` -> **Universal Asset Kernel** | LOC: 185 | Risks: none
+- `scripts_infrastructure/testnet/e2e-chainbench-infra.sh` -> **TPS Benchmark Suite** | LOC: 51 | Risks: none
+- `scripts_infrastructure/testnet/list-pallets.js` -> **Universal Asset Kernel** | LOC: 14 | Risks: none
+- `scripts_infrastructure/testnet/load-remarks-tps.js` -> **TPS Benchmark Suite** | LOC: 288 | Risks: replay/nonce risk
+- `scripts_infrastructure/testnet/load-x3-comit-v2-tps.js` -> **Universal Asset Kernel** | LOC: 578 | Risks: replay/nonce risk
+- `scripts_infrastructure/testnet/package.json` -> **Unclassified** | LOC: 18 | Risks: none
+- `scripts_infrastructure/testnet/restart-recovery-3v.sh` -> **Validator / LaunchOps** | LOC: 189 | Risks: none
+- `scripts_infrastructure/testnet/run-3-validators-dev.sh` -> **Launchpad** | LOC: 183 | Risks: none
+- `scripts_infrastructure/testnet/run-7-validators-local.sh` -> **Launchpad** | LOC: 433 | Risks: none
+- `scripts_infrastructure/testnet/run-chainbench-stack.sh` -> **TPS Benchmark Suite** | LOC: 121 | Risks: none
+- `scripts_infrastructure/testnet/run-multiprocess-load.py` -> **TPS Benchmark Suite** | LOC: 213 | Risks: replay/nonce risk
+- `scripts_infrastructure/testnet/status-7-validators.sh` -> **Validator / LaunchOps** | LOC: 370 | Risks: none
+- `scripts_infrastructure/testnet/stop-3-validators-dev.sh` -> **Validator / LaunchOps** | LOC: 24 | Risks: none
+- `scripts_infrastructure/testnet/stop-chainbench-stack.sh` -> **Unclassified** | LOC: 15 | Risks: none
+- `scripts_infrastructure/testnet/submit-remark.js` -> **Unclassified** | LOC: 47 | Risks: none
+- `scripts_infrastructure/testnet/verify-testnet.sh` -> **TPS Benchmark Suite** | LOC: 169 | Risks: none
+- `scripts_infrastructure/validate-chains.js` -> **EVM Integration** | LOC: 109 | Risks: none
+- `scripts_infrastructure/validate_alembic.py` -> **Unclassified** | LOC: 64 | Risks: none
+- `scripts_infrastructure/validate_deployment.sh` -> **GPU Validator Swarm** | LOC: 322 | Risks: local-only config risk
+- `scripts_infrastructure/validation-report.json` -> **TPS Benchmark Suite** | LOC: 35998 | Risks: bridge risk
+- `scripts_infrastructure/verify-x3-rpc-methods.sh` -> **SVM Integration** | LOC: 30 | Risks: none
+- `scripts_infrastructure/verify_apps_chain_integration.sh` -> **X3 DEX** | LOC: 93 | Risks: local-only config risk
+- `scripts_infrastructure/verify_jury_decision.sh` -> **TPS Benchmark Suite** | LOC: 129 | Risks: local-only config risk
+- `scripts_infrastructure/verify_ollama_setup.sh` -> **Unclassified** | LOC: 77 | Risks: none
+- `scripts_infrastructure/x3_atomic_swap_scaffold.py` -> **EVM Integration** | LOC: 353 | Risks: replay risk, replay/nonce risk
+- `scripts_infrastructure/x3_audit.sh` -> **Unclassified** | LOC: 464 | Risks: panic risk
+- `scripts_infrastructure/x3_coverage_gate.sh` -> **Launchpad** | LOC: 117 | Risks: none
+- `scripts_infrastructure/x3_enforce.py` -> **X3 DEX** | LOC: 292 | Risks: none
+- `scripts_infrastructure/x3_generate_issues.py` -> **TPS Benchmark Suite** | LOC: 204 | Risks: none
+- `scripts_infrastructure/x3_node_healthcheck.sh` -> **Launchpad** | LOC: 305 | Risks: none
+- `scripts_infrastructure/x3_release_sign.sh` -> **Unclassified** | LOC: 444 | Risks: none
+- `src/agent.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/bot.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/channels/index.js` -> **X3 DEX** | LOC: 2 | Risks: none
+- `src/channels/telegram/index.js` -> **X3 DEX** | LOC: 2 | Risks: none
+- `src/config.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/index.js` -> **X3 DEX** | LOC: 2 | Risks: none
+- `src/llm/claude.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/llm/gemini.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/llm/index.js` -> **X3 DEX** | LOC: 2 | Risks: none
+- `src/llm/ollama.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/llm/openAI.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/llm/types.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/model-routing/index.js` -> **X3 DEX** | LOC: 2 | Risks: none
+- `src/security.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/tools/get-current-time.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `src/tools/index.js` -> **X3 DEX** | LOC: 2 | Risks: none
+- `src/tools/registry.js` -> **Unclassified** | LOC: 2 | Risks: none
+- `stakeholder_comms/CTO_BRIEF_META_BLOCKERS.md` -> **Universal Asset Kernel** | LOC: 345 | Risks: bridge risk, replay risk, supply invariant risk
+- `stakeholder_comms/ENGINEERING_TEAM_ANNOUNCEMENT.md` -> **Universal Asset Kernel** | LOC: 342 | Risks: none
+- `stakeholder_comms/SECURITY_TEAM_SPRINT_PLAN.md` -> **Universal Asset Kernel** | LOC: 821 | Risks: none
+- `swarm_infrastructure/__init__.py` -> **Unclassified** | LOC: 2 | Risks: none
+- `swarm_infrastructure/agents/task_queue.py` -> **Governance** | LOC: 823 | Risks: local-only config risk
+- `swarm_infrastructure/agents/test_openspec_integration.py` -> **Validator / LaunchOps** | LOC: 74 | Risks: none
+- `swarm_infrastructure/agents/test_reconciliation.py` -> **Unclassified** | LOC: 78 | Risks: none
+- `swarm_infrastructure/api_server.py` -> **Governance** | LOC: 3513 | Risks: local-only config risk, replay/nonce risk
+- `swarm_infrastructure/auth.py` -> **Unclassified** | LOC: 121 | Risks: none
+- `swarm_infrastructure/autonomic/__init__.py` -> **GPU Validator Swarm** | LOC: 24 | Risks: none
+- `swarm_infrastructure/autonomic/__main__.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `swarm_infrastructure/autonomic/api_routes.py` -> **GPU Validator Swarm** | LOC: 155 | Risks: none
+- `swarm_infrastructure/autonomic/audit.py` -> **GPU Validator Swarm** | LOC: 153 | Risks: none
+- `swarm_infrastructure/autonomic/bootstrap.py` -> **GPU Validator Swarm** | LOC: 247 | Risks: none
+- `swarm_infrastructure/autonomic/circuit_breaker.py` -> **Unclassified** | LOC: 225 | Risks: none
+- `swarm_infrastructure/autonomic/config.py` -> **Universal Asset Kernel** | LOC: 165 | Risks: none
+- `swarm_infrastructure/autonomic/health_engine.py` -> **GPU Validator Swarm** | LOC: 237 | Risks: none
+- `swarm_infrastructure/autonomic/metrics_bus.py` -> **GPU Validator Swarm** | LOC: 198 | Risks: none
+- `swarm_infrastructure/autonomic/operators.py` -> **GPU Validator Swarm** | LOC: 419 | Risks: none
+- `swarm_infrastructure/autonomic/orchestrator.py` -> **GPU Validator Swarm** | LOC: 382 | Risks: none
+- `swarm_infrastructure/autonomic/sentinels/__init__.py` -> **GPU Validator Swarm** | LOC: 6 | Risks: none
+- `swarm_infrastructure/autonomic/sentinels/gpu_guard.py` -> **X3 DEX** | LOC: 330 | Risks: none
+- `swarm_infrastructure/autonomic/sentinels/log_watcher.py` -> **Universal Asset Kernel** | LOC: 215 | Risks: none
+- `swarm_infrastructure/autonomic/sentinels/resource_monitor.py` -> **X3 DEX** | LOC: 211 | Risks: none
+- `swarm_infrastructure/autonomic/state_machine.py` -> **Unclassified** | LOC: 237 | Risks: none
+- `swarm_infrastructure/autonomic/verify_startup.sh` -> **GPU Validator Swarm** | LOC: 135 | Risks: none
+- `swarm_infrastructure/causal/__init__.py` -> **Unclassified** | LOC: 37 | Risks: none
+- `swarm_infrastructure/causal/attribution.py` -> **Unclassified** | LOC: 302 | Risks: none
+- `swarm_infrastructure/causal/counterfactual.py` -> **Unclassified** | LOC: 328 | Risks: none
+- `swarm_infrastructure/causal/graph.py` -> **X3 DEX** | LOC: 594 | Risks: none
+- `swarm_infrastructure/causal/schema.py` -> **Validator / LaunchOps** | LOC: 153 | Risks: none
+- `swarm_infrastructure/config/autonomic_config.json` -> **Universal Asset Kernel** | LOC: 71 | Risks: none
+- `swarm_infrastructure/config/social_agent.json` -> **Bridge / Router** | LOC: 91 | Risks: bridge risk, local-only config risk
+- `swarm_infrastructure/core/__init__.py` -> **Unclassified** | LOC: 2 | Risks: none
+- `swarm_infrastructure/core/agent.py` -> **Unclassified** | LOC: 516 | Risks: none
+- `swarm_infrastructure/core/enums.py` -> **Governance** | LOC: 30 | Risks: none
+- `swarm_infrastructure/core/lifecycle.py` -> **Bridge / Router** | LOC: 609 | Risks: bridge risk
+- `swarm_infrastructure/core/orchestrator.py` -> **GPU Validator Swarm** | LOC: 172 | Risks: none
+- `swarm_infrastructure/core/wiring.py` -> **Bridge / Router** | LOC: 232 | Risks: bridge risk
+- `swarm_infrastructure/errors.py` -> **Unclassified** | LOC: 43 | Risks: none
+- `swarm_infrastructure/event_bus/__init__.py` -> **Unclassified** | LOC: 12 | Risks: none
+- `swarm_infrastructure/event_bus/bus.py` -> **Unclassified** | LOC: 191 | Risks: none
+- `swarm_infrastructure/event_bus/events.py` -> **Unclassified** | LOC: 171 | Risks: none
+- `swarm_infrastructure/goal_genome/__init__.py` -> **Unclassified** | LOC: 26 | Risks: none
+- `swarm_infrastructure/goal_genome/cemetery.py` -> **Unclassified** | LOC: 86 | Risks: none
+- `swarm_infrastructure/goal_genome/fitness.py` -> **Unclassified** | LOC: 96 | Risks: none
+- `swarm_infrastructure/goal_genome/genome.py` -> **Unclassified** | LOC: 276 | Risks: none
+- `swarm_infrastructure/goal_genome/mutator.py` -> **Unclassified** | LOC: 220 | Risks: none
+- `swarm_infrastructure/goal_genome/schema.py` -> **Unclassified** | LOC: 113 | Risks: none
+- `swarm_infrastructure/governance/jury_tokens.py` -> **DEX Liquidity** | LOC: 297 | Risks: none
+- `swarm_infrastructure/governance/token_lifecycle.py` -> **DEX Liquidity** | LOC: 313 | Risks: none
+- `swarm_infrastructure/gpu_bridge/__init__.py` -> **Bridge / Router** | LOC: 35 | Risks: bridge risk
+- `swarm_infrastructure/gpu_bridge/client.py` -> **Bridge / Router** | LOC: 133 | Risks: bridge risk
+- `swarm_infrastructure/gpu_bridge/provider.py` -> **Bridge / Router** | LOC: 265 | Risks: bridge risk, replay/nonce risk
+- `swarm_infrastructure/gpu_bridge/schema.py` -> **Bridge / Router** | LOC: 132 | Risks: replay/nonce risk
+- `swarm_infrastructure/gpu_compute/__init__.py` -> **GPU Validator Swarm** | LOC: 18 | Risks: none
+- `swarm_infrastructure/gpu_compute/preemptible_scheduler.py` -> **GPU Validator Swarm** | LOC: 202 | Risks: none
+- `swarm_infrastructure/infra/gpu_manager.py` -> **X3 DEX** | LOC: 168 | Risks: none
+- `swarm_infrastructure/jury/__init__.py` -> **Governance** | LOC: 29 | Risks: none
+- `swarm_infrastructure/jury/anchorer.py` -> **Unclassified** | LOC: 394 | Risks: local-only config risk
+- `swarm_infrastructure/jury/appeals.py` -> **DEX Liquidity** | LOC: 364 | Risks: none
+- `swarm_infrastructure/jury/audit.py` -> **Unclassified** | LOC: 345 | Risks: none
+- `swarm_infrastructure/jury/audit_logger.py` -> **Unclassified** | LOC: 273 | Risks: none
+- `swarm_infrastructure/jury/circuit_breaker.py` -> **Unclassified** | LOC: 288 | Risks: local-only config risk
+- `swarm_infrastructure/jury/coordination.py` -> **DEX Liquidity** | LOC: 300 | Risks: none
+- `swarm_infrastructure/jury/jury_types.py` -> **Governance** | LOC: 288 | Risks: none
+- `swarm_infrastructure/jury/manager.py` -> **Governance** | LOC: 548 | Risks: replay/nonce risk
+- `swarm_infrastructure/jury/rate_limiter.py` -> **Unclassified** | LOC: 239 | Risks: none
+- `swarm_infrastructure/jury/redis_cache.py` -> **Unclassified** | LOC: 332 | Risks: local-only config risk
+- `swarm_infrastructure/jury/selector.py` -> **DEX Liquidity** | LOC: 198 | Risks: none
+- `swarm_infrastructure/jury/tokens.py` -> **Governance** | LOC: 252 | Risks: none
+- `swarm_infrastructure/jury/voir_dire.py` -> **DEX Liquidity** | LOC: 398 | Risks: none
+- `swarm_infrastructure/openspec_integration.py` -> **Validator / LaunchOps** | LOC: 175 | Risks: none
+- `swarm_infrastructure/reaper/__init__.py` -> **Unclassified** | LOC: 17 | Risks: none
+- `swarm_infrastructure/reaper/engine.py` -> **Unclassified** | LOC: 349 | Risks: none
+- `swarm_infrastructure/reaper/postmortem.py` -> **Unclassified** | LOC: 322 | Risks: unsafe code
+- `swarm_infrastructure/reaper/scar_mechanics.py` -> **Unclassified** | LOC: 191 | Risks: none
+- `swarm_infrastructure/reaper/schema.py` -> **Unclassified** | LOC: 97 | Risks: none
+- `swarm_infrastructure/self_improve/__init__.py` -> **Unclassified** | LOC: 17 | Risks: none
+- `swarm_infrastructure/self_improve/cost.py` -> **Unclassified** | LOC: 62 | Risks: none
+- `swarm_infrastructure/self_improve/engine.py` -> **Unclassified** | LOC: 245 | Risks: none
+- `swarm_infrastructure/self_improve/scars.py` -> **Unclassified** | LOC: 82 | Risks: none
+- `swarm_infrastructure/self_improve/schema.py` -> **Unclassified** | LOC: 78 | Risks: none
+- `swarm_infrastructure/self_improve/strategy.py` -> **X3 DEX** | LOC: 367 | Risks: none
+- `swarm_infrastructure/self_model/__init__.py` -> **Unclassified** | LOC: 24 | Risks: none
+- `swarm_infrastructure/self_model/decay.py` -> **Unclassified** | LOC: 115 | Risks: none
+- `swarm_infrastructure/self_model/ledger.py` -> **Unclassified** | LOC: 331 | Risks: none
+- `swarm_infrastructure/self_model/projector.py` -> **Unclassified** | LOC: 223 | Risks: none
+- `swarm_infrastructure/self_model/schema.py` -> **Governance** | LOC: 169 | Risks: none
+- `swarm_infrastructure/skills_adapter.py` -> **Unclassified** | LOC: 169 | Risks: local-only config risk
+- `swarm_infrastructure/social/__init__.py` -> **Unclassified** | LOC: 5 | Risks: none
+- `swarm_infrastructure/social/config.py` -> **Unclassified** | LOC: 27 | Risks: none
+- `swarm_infrastructure/social/draft_pipeline.py` -> **Unclassified** | LOC: 223 | Risks: local-only config risk
+- `swarm_infrastructure/social/keywords.py` -> **Unclassified** | LOC: 26 | Risks: none
+- `swarm_infrastructure/social/ollama.py` -> **Unclassified** | LOC: 28 | Risks: none
+- `swarm_infrastructure/social/open_notebook.py` -> **Unclassified** | LOC: 69 | Risks: none
+- `swarm_infrastructure/social/test_draft_pipeline.py` -> **X3VM / Cross-VM** | LOC: 65 | Risks: local-only config risk
+- `swarm_infrastructure/storage/__init__.py` -> **Unclassified** | LOC: 2 | Risks: none
+- `swarm_infrastructure/storage/backend.py` -> **X3 DEX** | LOC: 230 | Risks: none
+- `swarm_infrastructure/storage/pg_store.py` -> **Unclassified** | LOC: 215 | Risks: none
+- `swarm_infrastructure/storage/postgres_store.py` -> **Unclassified** | LOC: 127 | Risks: local-only config risk
+- `swarm_infrastructure/storage/sqlite_store.py` -> **X3 DEX** | LOC: 210 | Risks: none
+- `swarm_infrastructure/storage/tests/test_sqlite_store.py` -> **Unclassified** | LOC: 27 | Risks: none
+- `swarm_infrastructure/telemetry/agent_registry.py` -> **Governance** | LOC: 815 | Risks: none
+- `swarm_infrastructure/tests/test_agent.py` -> **Unclassified** | LOC: 257 | Risks: none
+- `swarm_infrastructure/tests/test_anomaly.py` -> **Unclassified** | LOC: 499 | Risks: none
+- `swarm_infrastructure/tests/test_api_gpu.py` -> **GPU Validator Swarm** | LOC: 92 | Risks: none
+- `swarm_infrastructure/tests/test_api_jury.py` -> **GPU Validator Swarm** | LOC: 43 | Risks: none
+- `swarm_infrastructure/tests/test_causal.py` -> **X3 DEX** | LOC: 550 | Risks: none
+- `swarm_infrastructure/tests/test_e2e_substrate.py` -> **Bridge / Router** | LOC: 484 | Risks: bridge risk
+- `swarm_infrastructure/tests/test_gpu_bridge.py` -> **Bridge / Router** | LOC: 590 | Risks: bridge risk, replay/nonce risk
+- `swarm_infrastructure/tests/test_gpu_manager.py` -> **GPU Validator Swarm** | LOC: 54 | Risks: none
+- `swarm_infrastructure/tests/test_jury.py` -> **Governance** | LOC: 131 | Risks: replay/nonce risk
+- `swarm_infrastructure/tests/test_jury_api.py` -> **Bridge / Router** | LOC: 111 | Risks: replay/nonce risk
+- `swarm_infrastructure/tests/test_jury_audit.py` -> **Unclassified** | LOC: 185 | Risks: none
+- `swarm_infrastructure/tests/test_lifecycle.py` -> **Unclassified** | LOC: 237 | Risks: none
+- `swarm_infrastructure/tests/test_placeholder_hardening.py` -> **Unclassified** | LOC: 40 | Risks: none
+- `swarm_infrastructure/tests/test_prediction_market.py` -> **Unclassified** | LOC: 407 | Risks: none
+- `swarm_infrastructure/tests/test_reaper.py` -> **Governance** | LOC: 387 | Risks: none
+- `swarm_infrastructure/tests/test_rust_gpu_provider_sync.py` -> **Bridge / Router** | LOC: 93 | Risks: bridge risk
+- `swarm_infrastructure/tests/test_self_improve_strategy.py` -> **Unclassified** | LOC: 388 | Risks: none
+- `swarm_infrastructure/tests/test_ui_bridge.py` -> **Bridge / Router** | LOC: 350 | Risks: bridge risk
+- `swarm_infrastructure/tests/test_wiring.py` -> **Unclassified** | LOC: 326 | Risks: none
+- `swarm_infrastructure/tripwire/__init__.py` -> **Unclassified** | LOC: 16 | Risks: none
+- `swarm_infrastructure/tripwire/anomaly.py` -> **Unclassified** | LOC: 489 | Risks: none
+- `swarm_infrastructure/tripwire/detector.py` -> **Unclassified** | LOC: 280 | Risks: none
+- `swarm_infrastructure/tripwire/schema.py` -> **Unclassified** | LOC: 62 | Risks: none
+- `swarm_infrastructure/ui_bridge.py` -> **Bridge / Router** | LOC: 257 | Risks: none
+- `swarm_infrastructure/world_sim/__init__.py` -> **Unclassified** | LOC: 19 | Risks: none
+- `swarm_infrastructure/world_sim/market.py` -> **Unclassified** | LOC: 457 | Risks: none
+- `swarm_infrastructure/world_sim/oracle.py` -> **Unclassified** | LOC: 130 | Risks: none
+- `swarm_infrastructure/world_sim/prediction.py` -> **DEX Liquidity** | LOC: 111 | Risks: none
+- `swarm_infrastructure/world_sim/schema.py` -> **Unclassified** | LOC: 86 | Risks: none
+- `swarm_infrastructure/world_sim/scoreboard.py` -> **Unclassified** | LOC: 135 | Risks: none
+- `swarm_infrastructure/world_sim/state_graph.py` -> **Unclassified** | LOC: 214 | Risks: none
+- `tasks/sprint-0/PHASE_0.1_CANONICAL_SUPPLY_INVARIANT.md` -> **Universal Asset Kernel** | LOC: 254 | Risks: supply invariant risk
+- `tasks/sprint-0/PHASE_0.2_EMERGENCY_HALT.md` -> **Universal Asset Kernel** | LOC: 254 | Risks: none
+- `tasks/sprint-0/PHASE_0.3_MINT_BURN_PERMISSIONS.md` -> **Universal Asset Kernel** | LOC: 196 | Risks: none
+- `tasks/sprint-0/PHASE_0.4_BALANCE_RECONCILIATION.md` -> **Universal Asset Kernel** | LOC: 256 | Risks: none
+- `tasks/sprint-0/PHASE_0.5_READINESS_CRATE.md` -> **Universal Asset Kernel** | LOC: 440 | Risks: none
+- `tests/asset-kernel/supply_conservation_test.rs` -> **Universal Asset Kernel** | LOC: 30 | Risks: bridge risk, supply invariant risk
+- `tests/atomic/cross_vm_rollback_test.rs` -> **EVM Integration** | LOC: 38 | Risks: atomic rollback risk
+- `tests/bridge/bridge_security_test.rs` -> **Bridge / Router** | LOC: 47 | Risks: bridge risk, replay risk, replay/nonce risk
+- `tests/contracts/evm_svm_parity_test.rs` -> **EVM Integration** | LOC: 23 | Risks: none
+- `tests/e2e/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 54 | Risks: none
+- `tests/e2e/TIER5_VALIDATION_SUITE.rs` -> **Governance** | LOC: 541 | Risks: unsafe code
+- `tests/e2e/ci_run_state_root_test.sh` -> **Unclassified** | LOC: 86 | Risks: replay risk
+- `tests/e2e/ci_wrapper.sh` -> **Unclassified** | LOC: 26 | Risks: replay risk
+- `tests/e2e/compare_artifacts.sh` -> **Unclassified** | LOC: 57 | Risks: none
+- `tests/e2e/cross_vm_real_chain_test.rs` -> **EVM Integration** | LOC: 299 | Risks: panic risk
+- `tests/e2e/docker-compose.test.yml` -> **GPU Validator Swarm** | LOC: 245 | Risks: bridge risk, local-only config risk, unsafe code
+- `tests/e2e/fixtures/deterministic_config.toml` -> **Genesis / Chain Spec** | LOC: 58 | Risks: none
+- `tests/e2e/mainnet_rc1.rs` -> **Universal Asset Kernel** | LOC: 626 | Risks: atomic rollback risk, panic risk, replay risk
+- `tests/e2e/monitoring/alertmanager.yml` -> **Unclassified** | LOC: 53 | Risks: local-only config risk
+- `tests/e2e/monitoring/prometheus.yml` -> **GPU Validator Swarm** | LOC: 61 | Risks: local-only config risk
+- `tests/e2e/src/blockchain_integration_tests.rs` -> **Unclassified** | LOC: 366 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `tests/e2e/src/collateral_flow.rs` -> **Unclassified** | LOC: 19 | Risks: panic risk
+- `tests/e2e/src/deterministic_integration_tests.rs` -> **Bridge / Router** | LOC: 279 | Risks: bridge risk, panic risk, replay/nonce risk
+- `tests/e2e/src/internal_mainnet_happy_path.rs` -> **Universal Asset Kernel** | LOC: 723 | Risks: atomic rollback risk, bridge risk, panic risk, replay risk, replay/nonce risk
+- `tests/e2e/src/lib.rs` -> **Universal Asset Kernel** | LOC: 340 | Risks: panic risk, replay risk
+- `tests/e2e/src/minimal_debug_test.rs` -> **Bridge / Router** | LOC: 178 | Risks: bridge risk, panic risk
+- `tests/e2e/src/minimal_test.rs` -> **Unclassified** | LOC: 32 | Risks: none
+- `tests/e2e/src/protocol_e2e_tests.rs` -> **DEX Liquidity** | LOC: 439 | Risks: local-only config risk, panic risk
+- `tests/e2e/src/simple_test.rs` -> **Unclassified** | LOC: 39 | Risks: none
+- `tests/e2e/src/wait_for_rpc.rs` -> **Unclassified** | LOC: 98 | Risks: none
+- `tests/e2e/src/wait_for_rpc_tests.rs` -> **Unclassified** | LOC: 47 | Risks: panic risk
+- `tests/e2e/start_test_environment.sh` -> **Genesis / Chain Spec** | LOC: 191 | Risks: local-only config risk
+- `tests/e2e/state_root_replay.rs` -> **Genesis / Chain Spec** | LOC: 66 | Risks: local-only config risk, replay risk
+- `tests/e2e/stop_test_environment.sh` -> **Unclassified** | LOC: 97 | Risks: none
+- `tests/e2e/utils/assertions.rs` -> **Unclassified** | LOC: 622 | Risks: panic risk
+- `tests/e2e/utils/mock_services.rs` -> **GPU Validator Swarm** | LOC: 554 | Risks: local-only config risk, panic risk
+- `tests/e2e/utils/mod.rs` -> **GPU Validator Swarm** | LOC: 87 | Risks: local-only config risk
+- `tests/e2e/utils/test_accounts.rs` -> **GPU Validator Swarm** | LOC: 304 | Risks: local-only config risk, panic risk
+- `tests/e2e/utils/test_contracts.rs` -> **DEX Liquidity** | LOC: 488 | Risks: local-only config risk
+- `tests/e2e/utils/test_environment.rs` -> **GPU Validator Swarm** | LOC: 465 | Risks: local-only config risk, panic risk
+- `tests/e2e/wait_for_rpc.sh` -> **Unclassified** | LOC: 69 | Risks: none
+- `tests/e2e_settlement_atomic_kernel.rs` -> **Universal Asset Kernel** | LOC: 359 | Risks: bridge risk
+- `tests/flashloan/repay_or_revert_test.rs` -> **Proof System** | LOC: 31 | Risks: panic risk
+- `tests/governance/bypass_prevention_test.rs` -> **Governance** | LOC: 24 | Risks: none
+- `tests/multi_node_consensus_test.rs` -> **Genesis / Chain Spec** | LOC: 301 | Risks: mock hash risk
+- `tests/reports/latest.json` -> **Unclassified** | LOC: 12 | Risks: none
+- `tests/runtime/migration_test.rs` -> **Governance** | LOC: 24 | Risks: none
+- `tests/x3vm/determinism_test.rs` -> **X3VM / Cross-VM** | LOC: 24 | Risks: none
+- `tests_core/L1_CONSENSUS_AND_ATOMICITY.test.ts` -> **DEX Liquidity** | LOC: 430 | Risks: atomic rollback risk, panic risk, replay risk
+- `tests_core/L1_ISOLATION_AND_ATTACKS.test.ts` -> **EVM Integration** | LOC: 376 | Risks: panic risk, replay/nonce risk, unsafe code
+- `tests_core/L1_LOAD_AND_FORMAL.test.ts` -> **X3VM / Cross-VM** | LOC: 407 | Risks: atomic rollback risk, panic risk
+- `tests_core/chaos/autonomic_chaos_test.sh` -> **Unclassified** | LOC: 485 | Risks: none
+- `tests_core/chaos/gpu_determinism_test.rs` -> **Universal Asset Kernel** | LOC: 259 | Risks: atomic rollback risk, replay risk
+- `tests_core/cross_chain_gpu_validator/test_atomic_invariant.py` -> **EVM Integration** | LOC: 108 | Risks: atomic rollback risk
+- `tests_core/cross_chain_gpu_validator/test_benchmark_report.py` -> **EVM Integration** | LOC: 21 | Risks: none
+- `tests_core/cross_chain_gpu_validator/test_ed25519_gpu.py` -> **Universal Asset Kernel** | LOC: 72 | Risks: none
+- `tests_core/cross_chain_gpu_validator/test_gpu_parity.py` -> **Universal Asset Kernel** | LOC: 21 | Risks: none
+- `tests_core/cross_chain_gpu_validator/test_metrics.py` -> **EVM Integration** | LOC: 25 | Risks: atomic rollback risk
+- `tests_core/evm_integration_test.py` -> **EVM Integration** | LOC: 144 | Risks: none
+- `tests_core/fraud_proofs_witness_v1.rs` -> **X3 DEX** | LOC: 334 | Risks: panic risk
+- `tests_core/invariant_registry_check.rs` -> **Unclassified** | LOC: 73 | Risks: panic risk
+- `tests_core/invariants/registry.toml` -> **Universal Asset Kernel** | LOC: 964 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, replay/nonce risk
+- `tests_core/meta/invariant_registry_check.rs` -> **Unclassified** | LOC: 73 | Risks: panic risk
+- `tests_core/p3_deployment_validation.py` -> **GPU Validator Swarm** | LOC: 507 | Risks: local-only config risk
+- `tests_core/p3_integration_tests.py` -> **GPU Validator Swarm** | LOC: 360 | Risks: local-only config risk
+- `tests_core/p3_performance_benchmark.py` -> **TPS Benchmark Suite** | LOC: 310 | Risks: local-only config risk
+- `tests_core/p4_atomic_crossvm_testnet.py` -> **EVM Integration** | LOC: 959 | Risks: replay risk, replay/nonce risk
+- `tests_core/p4_benchmarks/crypto_bench.py` -> **Universal Asset Kernel** | LOC: 573 | Risks: none
+- `tests_core/p4_benchmarks/crypto_bench_report.json` -> **TPS Benchmark Suite** | LOC: 93 | Risks: none
+- `tests_core/p4_determinism_validation.py` -> **X3VM / Cross-VM** | LOC: 508 | Risks: replay risk
+- `tests_core/p4_gpu_integration_tests.py` -> **Proof System** | LOC: 701 | Risks: replay/nonce risk
+- `tests_core/p4_gpu_kernel_integration.py` -> **Universal Asset Kernel** | LOC: 1233 | Risks: none
+- `tests_core/p4_p5_crosschain_gpu_validator.py` -> **Universal Asset Kernel** | LOC: 1047 | Risks: atomic rollback risk
+- `tests_core/p4_p5_deep_stress.py` -> **Universal Asset Kernel** | LOC: 274 | Risks: atomic rollback risk
+- `tests_core/p4_p5_production_release.py` -> **X3 DEX** | LOC: 949 | Risks: atomic rollback risk
+- `tests_core/p4_testnet_ship.py` -> **DEX Liquidity** | LOC: 957 | Risks: atomic rollback risk
+- `tests_core/perf/docker-compose.tps.yml` -> **Bridge / Router** | LOC: 73 | Risks: bridge risk, local-only config risk
+- `tests_core/perf/influxdb-init.sh` -> **TPS Benchmark Suite** | LOC: 23 | Risks: local-only config risk
+- `tests_core/perf/k6/1k_tps_test.js` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `tests_core/perf/run_tps_testing.py` -> **TPS Benchmark Suite** | LOC: 257 | Risks: local-only config risk
+- `tests_core/perf/tps-dashboard/dashboard.py` -> **TPS Benchmark Suite** | LOC: 317 | Risks: local-only config risk, unsafe code
+- `tests_core/phase_2_integration_tests.rs` -> **Universal Asset Kernel** | LOC: 602 | Risks: atomic rollback risk, bridge risk, mock hash risk, panic risk, replay/nonce risk
+- `tests_core/rpc_settlement_validation.rs` -> **Universal Asset Kernel** | LOC: 378 | Risks: local-only config risk, panic risk, replay risk, replay/nonce risk, unfinished logic
+- `tests_core/run-all.sh` -> **Unclassified** | LOC: 18 | Risks: none
+- `tests_core/security/cache/solidity-files-cache.json` -> **X3VM / Cross-VM** | LOC: 1 | Risks: none
+- `tests_core/security/contracts/CrossVMAtomicity.t.sol` -> **Universal Asset Kernel** | LOC: 175 | Risks: none
+- `tests_core/security/contracts/InvariantProperties.sol` -> **Universal Asset Kernel** | LOC: 181 | Risks: atomic rollback risk
+- `tests_core/security/echidna.config.yaml` -> **Universal Asset Kernel** | LOC: 44 | Risks: none
+- `tests_core/security/foundry.toml` -> **Unclassified** | LOC: 39 | Risks: none
+- `tests_core/security/medusa.config.json` -> **Unclassified** | LOC: 50 | Risks: none
+- `tests_core/security/semgrep/x3-security-rules.yml` -> **Universal Asset Kernel** | LOC: 171 | Risks: panic risk, unsafe code
+- `tests_core/security/slither.config.json` -> **X3 DEX** | LOC: 55 | Risks: none
+- `tests_core/solidity_contracts/SimpleStorage.sol` -> **Universal Asset Kernel** | LOC: 162 | Risks: bridge risk
+- `tests_core/startup_smoke.sh` -> **Unclassified** | LOC: 53 | Risks: none
+- `tests_core/test_agi_integration.py` -> **Unclassified** | LOC: 143 | Risks: none
+- `tests_core/test_all_blockchains.py` -> **Universal Asset Kernel** | LOC: 842 | Risks: local-only config risk
+- `tests_core/test_appeals.py` -> **DEX Liquidity** | LOC: 241 | Risks: none
+- `tests_core/test_block_display.py` -> **Unclassified** | LOC: 461 | Risks: none
+- `tests_core/test_coordination.py` -> **Governance** | LOC: 439 | Risks: none
+- `tests_core/test_event_bus.py` -> **Unclassified** | LOC: 111 | Risks: none
+- `tests_core/test_fund_allocations.py` -> **Unclassified** | LOC: 22 | Risks: none
+- `tests_core/test_goal_genome.py` -> **Unclassified** | LOC: 153 | Risks: none
+- `tests_core/test_integration_p3.py` -> **DEX Liquidity** | LOC: 376 | Risks: none
+- `tests_core/test_json_import.py` -> **Unclassified** | LOC: 48 | Risks: none
+- `tests_core/test_jury_anchoring.py` -> **Unclassified** | LOC: 307 | Risks: local-only config risk
+- `tests_core/test_jury_anchoring_load.py` -> **Unclassified** | LOC: 284 | Risks: none
+- `tests_core/test_jury_manager.py` -> **DEX Liquidity** | LOC: 142 | Risks: replay/nonce risk
+- `tests_core/test_jury_selector.py` -> **DEX Liquidity** | LOC: 264 | Risks: none
+- `tests_core/test_jury_tokens.py` -> **DEX Liquidity** | LOC: 281 | Risks: none
+- `tests_core/test_jury_voir_dire_integration.py` -> **DEX Liquidity** | LOC: 156 | Risks: replay/nonce risk
+- `tests_core/test_migrations.py` -> **Unclassified** | LOC: 47 | Risks: local-only config risk
+- `tests_core/test_monitor.sh` -> **Unclassified** | LOC: 498 | Risks: none
+- `tests_core/test_monitor_integration.py` -> **Unclassified** | LOC: 299 | Risks: none
+- `tests_core/test_ollama_wrapper.py` -> **Unclassified** | LOC: 51 | Risks: none
+- `tests_core/test_process_finalized_payouts.py` -> **Unclassified** | LOC: 25 | Risks: none
+- `tests_core/test_ralph_agent.py` -> **GPU Validator Swarm** | LOC: 49 | Risks: none
+- `tests_core/test_release_bundle_verification.py` -> **Unclassified** | LOC: 38 | Risks: none
+- `tests_core/test_self_improve.py` -> **Unclassified** | LOC: 206 | Risks: none
+- `tests_core/test_self_model.py` -> **Unclassified** | LOC: 156 | Risks: none
+- `tests_core/test_token_lifecycle.py` -> **Governance** | LOC: 216 | Risks: none
+- `tests_core/test_tokens.py` -> **DEX Liquidity** | LOC: 183 | Risks: none
+- `tests_core/test_tripwire.py` -> **Unclassified** | LOC: 143 | Risks: none
+- `tests_core/test_voir_dire.py` -> **X3VM / Cross-VM** | LOC: 325 | Risks: none
+- `tests_core/test_world_sim.py` -> **Unclassified** | LOC: 246 | Risks: none
+- `tests_core/unit/x3-lang/compiler/test_deterministic_compilation.rs` -> **Unclassified** | LOC: 46 | Risks: panic risk
+- `tests_core/wallet-integration/package.json` -> **Unclassified** | LOC: 46 | Risks: none
+- `tests_core/wallet-integration/playwright.config.ts` -> **Unclassified** | LOC: 35 | Risks: local-only config risk
+- `tests_core/x3_operator/test_bonding.py` -> **GPU Validator Swarm** | LOC: 117 | Risks: none
+- `tests_core/x3_operator/test_cli.py` -> **Genesis / Chain Spec** | LOC: 76 | Risks: none
+- `tests_core/x3_operator/test_config.py` -> **GPU Validator Swarm** | LOC: 98 | Risks: none
+- `tests_core/x3_operator/test_genesis.py` -> **Genesis / Chain Spec** | LOC: 144 | Risks: none
+- `tests_core/x3_operator/test_governance.py` -> **Governance** | LOC: 100 | Risks: none
+- `tests_core/x3_operator/test_health.py` -> **GPU Validator Swarm** | LOC: 43 | Risks: none
+- `tests_core/x3_operator/test_identity.py` -> **GPU Validator Swarm** | LOC: 81 | Risks: none
+- `tests_core/x3_operator/test_slashing.py` -> **Unclassified** | LOC: 126 | Risks: none
+- `tests_core/x3_operator/test_storage.py` -> **Proof System** | LOC: 112 | Risks: none
+- `tests_core/x3_operator/test_supervisor.py` -> **Unclassified** | LOC: 124 | Risks: none
+- `tests_core/x3_operator/test_telemetry.py` -> **Unclassified** | LOC: 80 | Risks: none
+- `tests_phase4/L1_CONSENSUS_AND_ATOMICITY.test.ts` -> **DEX Liquidity** | LOC: 430 | Risks: atomic rollback risk, panic risk, replay risk
+- `tests_phase4/L1_ISOLATION_AND_ATTACKS.test.ts` -> **EVM Integration** | LOC: 376 | Risks: panic risk, replay/nonce risk, unsafe code
+- `tests_phase4/L1_LOAD_AND_FORMAL.test.ts` -> **X3VM / Cross-VM** | LOC: 407 | Risks: atomic rollback risk, panic risk
+- `tests_phase4/chaos/autonomic_chaos_test.sh` -> **Unclassified** | LOC: 485 | Risks: none
+- `tests_phase4/chaos/gpu_determinism_test.rs` -> **Universal Asset Kernel** | LOC: 259 | Risks: atomic rollback risk, replay risk
+- `tests_phase4/cross_chain_gpu_validator/test_atomic_invariant.py` -> **EVM Integration** | LOC: 108 | Risks: atomic rollback risk
+- `tests_phase4/cross_chain_gpu_validator/test_benchmark_report.py` -> **EVM Integration** | LOC: 21 | Risks: none
+- `tests_phase4/cross_chain_gpu_validator/test_ed25519_gpu.py` -> **Universal Asset Kernel** | LOC: 72 | Risks: none
+- `tests_phase4/cross_chain_gpu_validator/test_gpu_parity.py` -> **Universal Asset Kernel** | LOC: 21 | Risks: none
+- `tests_phase4/cross_chain_gpu_validator/test_metrics.py` -> **EVM Integration** | LOC: 25 | Risks: atomic rollback risk
+- `tests_phase4/e2e/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 33 | Risks: none
+- `tests_phase4/e2e/TIER5_VALIDATION_SUITE.rs` -> **Governance** | LOC: 541 | Risks: unsafe code
+- `tests_phase4/e2e/ci_run_state_root_test.sh` -> **Unclassified** | LOC: 86 | Risks: replay risk
+- `tests_phase4/e2e/ci_wrapper.sh` -> **Unclassified** | LOC: 26 | Risks: replay risk
+- `tests_phase4/e2e/compare_artifacts.sh` -> **Unclassified** | LOC: 57 | Risks: none
+- `tests_phase4/e2e/cross_vm_real_chain_test.rs` -> **EVM Integration** | LOC: 299 | Risks: panic risk
+- `tests_phase4/e2e/docker-compose.test.yml` -> **GPU Validator Swarm** | LOC: 245 | Risks: bridge risk, local-only config risk, unsafe code
+- `tests_phase4/e2e/fixtures/deterministic_config.toml` -> **Genesis / Chain Spec** | LOC: 58 | Risks: none
+- `tests_phase4/e2e/monitoring/alertmanager.yml` -> **Unclassified** | LOC: 53 | Risks: local-only config risk
+- `tests_phase4/e2e/monitoring/prometheus.yml` -> **GPU Validator Swarm** | LOC: 61 | Risks: local-only config risk
+- `tests_phase4/e2e/src/blockchain_integration_tests.rs` -> **Unclassified** | LOC: 366 | Risks: local-only config risk, panic risk, replay/nonce risk
+- `tests_phase4/e2e/src/collateral_flow.rs` -> **Unclassified** | LOC: 19 | Risks: panic risk
+- `tests_phase4/e2e/src/deterministic_integration_tests.rs` -> **Bridge / Router** | LOC: 279 | Risks: bridge risk, panic risk, replay/nonce risk
+- `tests_phase4/e2e/src/lib.rs` -> **GPU Validator Swarm** | LOC: 335 | Risks: panic risk
+- `tests_phase4/e2e/src/minimal_debug_test.rs` -> **Bridge / Router** | LOC: 178 | Risks: bridge risk, panic risk
+- `tests_phase4/e2e/src/minimal_test.rs` -> **Unclassified** | LOC: 32 | Risks: none
+- `tests_phase4/e2e/src/protocol_e2e_tests.rs` -> **DEX Liquidity** | LOC: 439 | Risks: local-only config risk, panic risk
+- `tests_phase4/e2e/src/simple_test.rs` -> **Unclassified** | LOC: 39 | Risks: none
+- `tests_phase4/e2e/src/wait_for_rpc.rs` -> **Unclassified** | LOC: 98 | Risks: none
+- `tests_phase4/e2e/src/wait_for_rpc_tests.rs` -> **Unclassified** | LOC: 47 | Risks: panic risk
+- `tests_phase4/e2e/start_test_environment.sh` -> **Genesis / Chain Spec** | LOC: 191 | Risks: local-only config risk
+- `tests_phase4/e2e/state_root_replay.rs` -> **Genesis / Chain Spec** | LOC: 66 | Risks: local-only config risk, replay risk
+- `tests_phase4/e2e/stop_test_environment.sh` -> **Unclassified** | LOC: 97 | Risks: none
+- `tests_phase4/e2e/utils/assertions.rs` -> **Unclassified** | LOC: 622 | Risks: panic risk
+- `tests_phase4/e2e/utils/mock_services.rs` -> **GPU Validator Swarm** | LOC: 554 | Risks: local-only config risk, panic risk
+- `tests_phase4/e2e/utils/mod.rs` -> **GPU Validator Swarm** | LOC: 87 | Risks: local-only config risk
+- `tests_phase4/e2e/utils/test_accounts.rs` -> **GPU Validator Swarm** | LOC: 304 | Risks: local-only config risk, panic risk
+- `tests_phase4/e2e/utils/test_contracts.rs` -> **DEX Liquidity** | LOC: 488 | Risks: local-only config risk
+- `tests_phase4/e2e/utils/test_environment.rs` -> **GPU Validator Swarm** | LOC: 465 | Risks: local-only config risk, panic risk
+- `tests_phase4/e2e/wait_for_rpc.sh` -> **Unclassified** | LOC: 69 | Risks: none
+- `tests_phase4/evm_integration_test.py` -> **EVM Integration** | LOC: 144 | Risks: none
+- `tests_phase4/fraud_proofs_witness_v1.rs` -> **X3 DEX** | LOC: 334 | Risks: panic risk
+- `tests_phase4/invariant_registry_check.rs` -> **Unclassified** | LOC: 73 | Risks: panic risk
+- `tests_phase4/invariants/registry.toml` -> **Universal Asset Kernel** | LOC: 964 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, replay/nonce risk
+- `tests_phase4/meta/invariant_registry_check.rs` -> **Unclassified** | LOC: 73 | Risks: panic risk
+- `tests_phase4/p3_deployment_validation.py` -> **GPU Validator Swarm** | LOC: 507 | Risks: local-only config risk
+- `tests_phase4/p3_integration_tests.py` -> **GPU Validator Swarm** | LOC: 463 | Risks: local-only config risk
+- `tests_phase4/p3_performance_benchmark.py` -> **TPS Benchmark Suite** | LOC: 389 | Risks: local-only config risk
+- `tests_phase4/p4_atomic_crossvm_testnet.py` -> **EVM Integration** | LOC: 959 | Risks: replay risk, replay/nonce risk
+- `tests_phase4/p4_benchmarks/crypto_bench.py` -> **Universal Asset Kernel** | LOC: 460 | Risks: none
+- `tests_phase4/p4_benchmarks/crypto_bench_report.json` -> **TPS Benchmark Suite** | LOC: 93 | Risks: none
+- `tests_phase4/p4_determinism_validation.py` -> **X3VM / Cross-VM** | LOC: 508 | Risks: replay risk
+- `tests_phase4/p4_gpu_integration_tests.py` -> **Proof System** | LOC: 701 | Risks: replay/nonce risk
+- `tests_phase4/p4_gpu_kernel_integration.py` -> **Universal Asset Kernel** | LOC: 1233 | Risks: none
+- `tests_phase4/p4_p5_crosschain_gpu_validator.py` -> **Universal Asset Kernel** | LOC: 1047 | Risks: atomic rollback risk
+- `tests_phase4/p4_p5_deep_stress.py` -> **Universal Asset Kernel** | LOC: 274 | Risks: atomic rollback risk
+- `tests_phase4/p4_p5_production_release.py` -> **X3 DEX** | LOC: 949 | Risks: atomic rollback risk
+- `tests_phase4/p4_testnet_ship.py` -> **DEX Liquidity** | LOC: 957 | Risks: atomic rollback risk
+- `tests_phase4/perf/docker-compose.tps.yml` -> **Bridge / Router** | LOC: 73 | Risks: bridge risk, local-only config risk
+- `tests_phase4/perf/influxdb-init.sh` -> **TPS Benchmark Suite** | LOC: 23 | Risks: local-only config risk
+- `tests_phase4/perf/k6/1k_tps_test.js` -> **TPS Benchmark Suite** | LOC: 27 | Risks: none
+- `tests_phase4/perf/run_tps_testing.py` -> **TPS Benchmark Suite** | LOC: 257 | Risks: local-only config risk
+- `tests_phase4/perf/tps-dashboard/dashboard.py` -> **TPS Benchmark Suite** | LOC: 317 | Risks: local-only config risk, unsafe code
+- `tests_phase4/phase_2_integration_tests.rs` -> **Universal Asset Kernel** | LOC: 602 | Risks: atomic rollback risk, bridge risk, mock hash risk, panic risk, replay/nonce risk
+- `tests_phase4/run-all.sh` -> **Unclassified** | LOC: 15 | Risks: none
+- `tests_phase4/security/contracts/CrossVMAtomicity.t.sol` -> **Universal Asset Kernel** | LOC: 175 | Risks: none
+- `tests_phase4/security/contracts/InvariantProperties.sol` -> **Universal Asset Kernel** | LOC: 181 | Risks: atomic rollback risk
+- `tests_phase4/security/echidna.config.yaml` -> **Universal Asset Kernel** | LOC: 44 | Risks: none
+- `tests_phase4/security/foundry.toml` -> **Unclassified** | LOC: 39 | Risks: none
+- `tests_phase4/security/medusa.config.json` -> **Unclassified** | LOC: 50 | Risks: none
+- `tests_phase4/security/semgrep/x3-security-rules.yml` -> **Universal Asset Kernel** | LOC: 171 | Risks: panic risk, unsafe code
+- `tests_phase4/security/slither.config.json` -> **X3 DEX** | LOC: 55 | Risks: none
+- `tests_phase4/solidity_contracts/SimpleStorage.sol` -> **Universal Asset Kernel** | LOC: 162 | Risks: bridge risk
+- `tests_phase4/startup_smoke.sh` -> **Unclassified** | LOC: 53 | Risks: none
+- `tests_phase4/test_agi_integration.py` -> **Unclassified** | LOC: 143 | Risks: none
+- `tests_phase4/test_all_blockchains.py` -> **Universal Asset Kernel** | LOC: 842 | Risks: local-only config risk
+- `tests_phase4/test_appeals.py` -> **DEX Liquidity** | LOC: 241 | Risks: none
+- `tests_phase4/test_block_display.py` -> **Unclassified** | LOC: 461 | Risks: none
+- `tests_phase4/test_coordination.py` -> **Governance** | LOC: 439 | Risks: none
+- `tests_phase4/test_event_bus.py` -> **Unclassified** | LOC: 111 | Risks: none
+- `tests_phase4/test_fund_allocations.py` -> **Unclassified** | LOC: 22 | Risks: none
+- `tests_phase4/test_goal_genome.py` -> **Unclassified** | LOC: 153 | Risks: none
+- `tests_phase4/test_integration_p3.py` -> **DEX Liquidity** | LOC: 376 | Risks: none
+- `tests_phase4/test_json_import.py` -> **Unclassified** | LOC: 48 | Risks: none
+- `tests_phase4/test_jury_anchoring.py` -> **Unclassified** | LOC: 307 | Risks: local-only config risk
+- `tests_phase4/test_jury_anchoring_load.py` -> **Unclassified** | LOC: 284 | Risks: none
+- `tests_phase4/test_jury_manager.py` -> **DEX Liquidity** | LOC: 142 | Risks: replay/nonce risk
+- `tests_phase4/test_jury_selector.py` -> **DEX Liquidity** | LOC: 264 | Risks: none
+- `tests_phase4/test_jury_tokens.py` -> **DEX Liquidity** | LOC: 281 | Risks: none
+- `tests_phase4/test_jury_voir_dire_integration.py` -> **DEX Liquidity** | LOC: 156 | Risks: replay/nonce risk
+- `tests_phase4/test_migrations.py` -> **Unclassified** | LOC: 47 | Risks: local-only config risk
+- `tests_phase4/test_monitor.sh` -> **Unclassified** | LOC: 498 | Risks: none
+- `tests_phase4/test_monitor_integration.py` -> **Unclassified** | LOC: 299 | Risks: none
+- `tests_phase4/test_ollama_wrapper.py` -> **Unclassified** | LOC: 51 | Risks: none
+- `tests_phase4/test_process_finalized_payouts.py` -> **Unclassified** | LOC: 25 | Risks: none
+- `tests_phase4/test_ralph_agent.py` -> **GPU Validator Swarm** | LOC: 49 | Risks: none
+- `tests_phase4/test_release_bundle_verification.py` -> **Unclassified** | LOC: 38 | Risks: none
+- `tests_phase4/test_self_improve.py` -> **Unclassified** | LOC: 206 | Risks: none
+- `tests_phase4/test_self_model.py` -> **Unclassified** | LOC: 156 | Risks: none
+- `tests_phase4/test_token_lifecycle.py` -> **Governance** | LOC: 216 | Risks: none
+- `tests_phase4/test_tokens.py` -> **DEX Liquidity** | LOC: 183 | Risks: none
+- `tests_phase4/test_tripwire.py` -> **Unclassified** | LOC: 143 | Risks: none
+- `tests_phase4/test_voir_dire.py` -> **X3VM / Cross-VM** | LOC: 325 | Risks: none
+- `tests_phase4/test_world_sim.py` -> **Unclassified** | LOC: 246 | Risks: none
+- `tests_phase4/unit/x3-lang/compiler/test_deterministic_compilation.rs` -> **Unclassified** | LOC: 46 | Risks: panic risk
+- `tests_phase4/wallet-integration/package.json` -> **Unclassified** | LOC: 46 | Risks: none
+- `tests_phase4/wallet-integration/playwright.config.ts` -> **Unclassified** | LOC: 35 | Risks: local-only config risk
+- `tests_phase4/x3_operator/test_bonding.py` -> **GPU Validator Swarm** | LOC: 117 | Risks: none
+- `tests_phase4/x3_operator/test_cli.py` -> **Genesis / Chain Spec** | LOC: 76 | Risks: none
+- `tests_phase4/x3_operator/test_config.py` -> **GPU Validator Swarm** | LOC: 98 | Risks: none
+- `tests_phase4/x3_operator/test_genesis.py` -> **Genesis / Chain Spec** | LOC: 144 | Risks: none
+- `tests_phase4/x3_operator/test_governance.py` -> **Governance** | LOC: 100 | Risks: none
+- `tests_phase4/x3_operator/test_health.py` -> **GPU Validator Swarm** | LOC: 43 | Risks: none
+- `tests_phase4/x3_operator/test_identity.py` -> **GPU Validator Swarm** | LOC: 81 | Risks: none
+- `tests_phase4/x3_operator/test_slashing.py` -> **Unclassified** | LOC: 126 | Risks: none
+- `tests_phase4/x3_operator/test_storage.py` -> **Proof System** | LOC: 112 | Risks: none
+- `tests_phase4/x3_operator/test_supervisor.py` -> **Unclassified** | LOC: 124 | Risks: none
+- `tests_phase4/x3_operator/test_telemetry.py` -> **Unclassified** | LOC: 80 | Risks: none
+- `tools/launchops/Cargo.toml` -> **Launchpad** | LOC: 17 | Risks: none
+- `tools/launchops/src/audit.rs` -> **Bridge / Router** | LOC: 91 | Risks: bridge risk, replay risk
+- `tools/launchops/src/classifier.rs` -> **Universal Asset Kernel** | LOC: 106 | Risks: bridge risk, replay risk, replay/nonce risk
+- `tools/launchops/src/commands.rs` -> **Launchpad** | LOC: 106 | Risks: none
+- `tools/launchops/src/conflict.rs` -> **Launchpad** | LOC: 226 | Risks: bridge risk, replay risk
+- `tools/launchops/src/contract.rs` -> **X3 DEX** | LOC: 615 | Risks: panic risk
+- `tools/launchops/src/drift.rs` -> **Bridge / Router** | LOC: 136 | Risks: bridge risk, panic risk
+- `tools/launchops/src/evidence.rs` -> **Launchpad** | LOC: 293 | Risks: bridge risk, replay risk, replay/nonce risk
+- `tools/launchops/src/gates.rs` -> **Universal Asset Kernel** | LOC: 177 | Risks: bridge risk
+- `tools/launchops/src/gitdiff.rs` -> **Launchpad** | LOC: 76 | Risks: none
+- `tools/launchops/src/inventory.rs` -> **Launchpad** | LOC: 1258 | Risks: bridge risk, panic risk, unfinished logic
+- `tools/launchops/src/main.rs` -> **X3 DEX** | LOC: 1437 | Risks: bridge risk, panic risk
+- `tools/launchops/src/models.rs` -> **Universal Asset Kernel** | LOC: 738 | Risks: bridge risk, replay risk
+- `tools/launchops/src/parser.rs` -> **Bridge / Router** | LOC: 85 | Risks: panic risk
+- `tools/launchops/src/report.rs` -> **Launchpad** | LOC: 386 | Risks: bridge risk
+- `tools/launchops/src/risk_rules.rs` -> **Bridge / Router** | LOC: 234 | Risks: bridge risk, replay risk, replay/nonce risk
+- `tools/launchops/src/scanner.rs` -> **Launchpad** | LOC: 102 | Risks: none
+- `tools/launchops/src/scoring.rs` -> **Universal Asset Kernel** | LOC: 233 | Risks: bridge risk, replay risk
+- `tools/launchops/src/stale_docs.rs` -> **Launchpad** | LOC: 51 | Risks: none
+- `tools/launchops/src/test_weaken.rs` -> **Bridge / Router** | LOC: 104 | Risks: bridge risk, panic risk, replay risk, stub risk
+- `tools/launchops/src/verify.rs` -> **Universal Asset Kernel** | LOC: 203 | Risks: bridge risk, known issue, panic risk, stub risk, unfinished logic
+- `validator_config/mainnet.toml` -> **Proof System** | LOC: 20 | Risks: none
+- `vitest.config.js` -> **Unclassified** | LOC: 9 | Risks: none
+- `web/mainnet-progress/README.md` -> **X3 DEX** | LOC: 101 | Risks: local-only config risk
+- `web/mainnet-progress/app.js` -> **Unclassified** | LOC: 64 | Risks: none
+- `web/mainnet-progress/data/mainnet_goals.json` -> **Universal Asset Kernel** | LOC: 2516 | Risks: atomic rollback risk, bridge risk, local-only config risk, replay risk, replay/nonce risk, unsafe code
+- `web/mainnet-progress/data/mainnet_progress.json` -> **Bridge / Router** | LOC: 41 | Risks: none
+- `x3-lang/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 103 | Risks: none
+- `x3-lang/compiler/Cargo.toml` -> **Unclassified** | LOC: 16 | Risks: none
+- `x3-lang/compiler/src/emitter.rs` -> **Unclassified** | LOC: 18 | Risks: none
+- `x3-lang/compiler/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 21 | Risks: none
+- `x3-lang/compiler/src/lowering.rs` -> **Unclassified** | LOC: 75 | Risks: none
+- `x3-lang/compiler/src/regalloc.rs` -> **Unclassified** | LOC: 10 | Risks: none
+- `x3-lang/crates/x3-ast/Cargo.toml` -> **X3 DEX** | LOC: 17 | Risks: none
+- `x3-lang/crates/x3-ast/src/ast.rs` -> **X3 DEX** | LOC: 377 | Risks: none
+- `x3-lang/crates/x3-ast/src/lib.rs` -> **Unclassified** | LOC: 12 | Risks: none
+- `x3-lang/crates/x3-ast/src/visitor.rs` -> **Unclassified** | LOC: 23 | Risks: none
+- `x3-lang/crates/x3-ast/tests/basic_ast.rs` -> **Unclassified** | LOC: 55 | Risks: none
+- `x3-lang/crates/x3-common/Cargo.toml` -> **Unclassified** | LOC: 15 | Risks: none
+- `x3-lang/crates/x3-common/src/diagnostic.rs` -> **Unclassified** | LOC: 418 | Risks: none
+- `x3-lang/crates/x3-common/src/error.rs` -> **Unclassified** | LOC: 208 | Risks: panic risk
+- `x3-lang/crates/x3-common/src/lib.rs` -> **Unclassified** | LOC: 18 | Risks: none
+- `x3-lang/crates/x3-common/src/source.rs` -> **X3 DEX** | LOC: 228 | Risks: panic risk
+- `x3-lang/crates/x3-common/src/span.rs` -> **Unclassified** | LOC: 265 | Risks: none
+- `x3-lang/crates/x3-common/src/symbol.rs` -> **Unclassified** | LOC: 327 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `x3-lang/crates/x3-common/src/token.rs` -> **Unclassified** | LOC: 146 | Risks: none
+- `x3-lang/crates/x3-lexer/Cargo.toml` -> **Unclassified** | LOC: 17 | Risks: none
+- `x3-lang/crates/x3-lexer/src/lib.rs` -> **Unclassified** | LOC: 36 | Risks: none
+- `x3-lang/crates/x3-lexer/src/token.rs` -> **Unclassified** | LOC: 829 | Risks: atomic rollback risk, bridge risk, unsafe code
+- `x3-lang/crates/x3-tools/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 17 | Risks: none
+- `x3-lang/crates/x3-tools/src/main.rs` -> **X3VM / Cross-VM** | LOC: 36 | Risks: panic risk
+- `x3-lang/tests/verify_bytecode.rs` -> **X3VM / Cross-VM** | LOC: 16 | Risks: none
+- `x3-lang/tools/run_simple.rs` -> **X3VM / Cross-VM** | LOC: 38 | Risks: panic risk
+- `x3-lang/vm/Cargo.toml` -> **X3VM / Cross-VM** | LOC: 15 | Risks: none
+- `x3-lang/vm/src/executor.rs` -> **X3VM / Cross-VM** | LOC: 219 | Risks: atomic rollback risk
+- `x3-lang/vm/src/jit.rs` -> **X3VM / Cross-VM** | LOC: 22 | Risks: none
+- `x3-lang/vm/src/lib.rs` -> **X3VM / Cross-VM** | LOC: 10 | Risks: none
+- `x3-lang/vm/src/verifier.rs` -> **X3VM / Cross-VM** | LOC: 70 | Risks: none
+- `x3-lang/vm/src/x3_lang_vm.rs` -> **X3VM / Cross-VM** | LOC: 87 | Risks: none
+- `x3-lang/vm/tests/integration.rs` -> **X3VM / Cross-VM** | LOC: 20 | Risks: none
+- `x3-security-swarm/README.md` -> **Governance** | LOC: 23 | Risks: none
+- `x3-security-swarm/agents/prompts/judge.md` -> **Unclassified** | LOC: 6 | Risks: none
+- `x3-security-swarm/agents/prompts/scribe.md` -> **Unclassified** | LOC: 6 | Risks: none
+- `x3-security-swarm/agents/prompts/warden.md` -> **Validator / LaunchOps** | LOC: 6 | Risks: atomic rollback risk
+- `x3-security-swarm/agents/prompts/watcher.md` -> **DEX Liquidity** | LOC: 6 | Risks: none
+- `x3-security-swarm/agents/templates/judge.yaml` -> **Governance** | LOC: 29 | Risks: none
+- `x3-security-swarm/agents/templates/scribe.yaml` -> **Unclassified** | LOC: 26 | Risks: none
+- `x3-security-swarm/agents/templates/warden.yaml` -> **Validator / LaunchOps** | LOC: 30 | Risks: none
+- `x3-security-swarm/agents/templates/watcher.yaml` -> **DEX Liquidity** | LOC: 31 | Risks: none
+- `x3-security-swarm/chaos/safety_locks.yaml` -> **Governance** | LOC: 19 | Risks: atomic rollback risk
+- `x3-security-swarm/chaos/scenarios.yaml` -> **DEX Liquidity** | LOC: 30 | Risks: atomic rollback risk
+- `x3-security-swarm/governance/appeals.yaml` -> **Governance** | LOC: 23 | Risks: atomic rollback risk
+- `x3-security-swarm/governance/charter.md` -> **Governance** | LOC: 12 | Risks: none
+- `x3-security-swarm/postmortems/X3-2026-alpha.md` -> **Universal Asset Kernel** | LOC: 27 | Risks: none
+- `x3-security-swarm/registry/api.md` -> **Unclassified** | LOC: 8 | Risks: none
+- `x3-security-swarm/registry/schema.yaml` -> **Governance** | LOC: 50 | Risks: none
+- `x3-swarm-orchestra/config/master.toml` -> **Governance** | LOC: 28 | Risks: none
+- `x3-swarm-orchestra/docker-compose.yml` -> **Bridge / Router** | LOC: 165 | Risks: bridge risk, local-only config risk
+- `x3-swarm-orchestra/scripts/deploy.sh` -> **X3VM / Cross-VM** | LOC: 36 | Risks: none
+- `x3-swarm-orchestra/tests/e2e_user_test.py` -> **Universal Asset Kernel** | LOC: 144 | Risks: none
+- `x3-testnet-validation.sh` -> **Universal Asset Kernel** | LOC: 285 | Risks: none
+- `x3fronend/.claude/commands/execute-prp.md` -> **Unclassified** | LOC: 40 | Risks: none
+- `x3fronend/.claude/commands/generate-prp.md` -> **Unclassified** | LOC: 71 | Risks: none
+- `x3fronend/CLAUDE.md` -> **X3 DEX** | LOC: 74 | Risks: unfinished logic
+- `x3fronend/INITIAL.md` -> **TPS Benchmark Suite** | LOC: 26 | Risks: none
+- `x3fronend/PRPs/live-stats-dashboard.md` -> **X3 DEX** | LOC: 441 | Risks: local-only config risk, panic risk
+- `x3fronend/PRPs/templates/prp_base.md` -> **Universal Asset Kernel** | LOC: 211 | Risks: local-only config risk, panic risk
+- `x3fronend/data/business-store.json` -> **Universal Asset Kernel** | LOC: 1024 | Risks: bridge risk
+- `x3fronend/examples/README.md` -> **Unclassified** | LOC: 50 | Risks: none
+- `x3fronend/js/x3-data-api.js` -> **X3 DEX** | LOC: 328 | Risks: none
+- `x3fronend/js/x3-page-adapters.js` -> **X3 DEX** | LOC: 3776 | Risks: none
+- `x3fronend/js/x3-site-nav.js` -> **Universal Asset Kernel** | LOC: 202 | Risks: none
+- `x3fronend/package.json` -> **Unclassified** | LOC: 30 | Risks: none
+- `x3fronend/postcss.config.js` -> **Unclassified** | LOC: 1 | Risks: none
+- `x3fronend/scripts/guard-no-synthetic-data.js` -> **Proof System** | LOC: 47 | Risks: none
+- `x3fronend/server.js` -> **X3 DEX** | LOC: 250 | Risks: local-only config risk
+- `x3fronend/server/site-services.js` -> **X3 DEX** | LOC: 1153 | Risks: none
+- `x3fronend/server/store.js` -> **Unclassified** | LOC: 37 | Risks: none
+- `x3fronend/src/hooks/useLiveStats.js` -> **TPS Benchmark Suite** | LOC: 96 | Risks: none
+- `x3fronend/src/mock/README.md` -> **Launchpad** | LOC: 21 | Risks: none
+- `x3fronend/src/mock/frontendShellContractData.js` -> **Launchpad** | LOC: 35 | Risks: none
+- `x3fronend/src/mock/frontendShellData.js` -> **Universal Asset Kernel** | LOC: 463 | Risks: bridge risk
+- `x3fronend/tailwind.config.js` -> **X3 DEX** | LOC: 35 | Risks: none
+- `x3fronend/tests/playwright-smoke.js` -> **Launchpad** | LOC: 41 | Risks: none
+- `x3fronend/tests/server.test.js` -> **TPS Benchmark Suite** | LOC: 97 | Risks: none
+- `x3fronend/vite.config.js` -> **Unclassified** | LOC: 12 | Risks: none
+- `zombienet/x3-local-testnet.toml` -> **Validator / LaunchOps** | LOC: 68 | Risks: none

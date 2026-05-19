@@ -1,0 +1,2515 @@
+{
+  "_generated": "Auto-generated from config/mainnet_goals_config.json + markdown todos. DO NOT edit manually. Update source files and regenerate via scripts/update_mainnet_goals_status.py",
+  "generatedAt": "2026-04-24T17:50:04Z",
+  "generatedDate": "April 24, 2026",
+  "source": "config/mainnet_goals_config.json + markdown todos",
+  "overall": {
+    "percent": 12.4,
+    "done": 83,
+    "todo": 589,
+    "exempt": 0,
+    "actionable": 672
+  },
+  "files": [
+    {
+      "file": "MAINNET_LAUNCH_DOCUMENTATION_INDEX.md",
+      "done": 0,
+      "todo": 19,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 186,
+          "text": "Approve RC-0 Waves 2-7 execution plan"
+        },
+        {
+          "line": 187,
+          "text": "Approve RC-0 budget ($35-50K)"
+        },
+        {
+          "line": 188,
+          "text": "Approve RC-1 budget ($150-200K)"
+        },
+        {
+          "line": 189,
+          "text": "Approve audit budget ($370-580K)"
+        },
+        {
+          "line": 190,
+          "text": "Approve validator incentive budget ($500K-1M)"
+        },
+        {
+          "line": 191,
+          "text": "Confirm team availability (4-5 RC-0, 10-12 RC-1)"
+        },
+        {
+          "line": 194,
+          "text": "Assign Wave 2 owner (router consolidation)"
+        },
+        {
+          "line": 195,
+          "text": "Assign Wave 3 owner (settlement consolidation)"
+        },
+        {
+          "line": 196,
+          "text": "Assign Wave 4 owner (governance consolidation)"
+        },
+        {
+          "line": 197,
+          "text": "Assign Wave 5 owner (GPU dedup)"
+        },
+        {
+          "line": 198,
+          "text": "Assign Wave 6 owner (optimizer dedup)"
+        },
+        {
+          "line": 199,
+          "text": "Assign Wave 7 owner (validation + go/no-go)"
+        },
+        {
+          "line": 200,
+          "text": "Start Wave 2 implementation (Monday)"
+        },
+        {
+          "line": 203,
+          "text": "Issue audit firm RFQ (Trail of Bits, Cantina, SRLabs)"
+        },
+        {
+          "line": 204,
+          "text": "Begin soft Tier 1 validator outreach (5-7 founders)"
+        },
+        {
+          "line": 205,
+          "text": "Confirm governance process (if required)"
+        },
+        {
+          "line": 208,
+          "text": "Create #rc0-cleanup Slack channel"
+        },
+        {
+          "line": 209,
+          "text": "Schedule daily standups (10:00 AM UTC)"
+        },
+        {
+          "line": 210,
+          "text": "Schedule Friday steering update (April 26)"
+        }
+      ]
+    },
+    {
+      "file": "MAINNET_NO_GAPS_EXECUTION_PLAN.md",
+      "done": 3,
+      "todo": 22,
+      "exempt": 0,
+      "percent": 12.0,
+      "openTodos": [
+        {
+          "line": 50,
+          "text": "Freeze the runtime API inventory (keep/rename/deprecate/remove) and assign owners."
+        },
+        {
+          "line": 51,
+          "text": "Add a compatibility table mapping APIs \u2192 sidecar/gateway/indexer/GPU/relayer consumers."
+        },
+        {
+          "line": 52,
+          "text": "Remove/disable duplicate runtime APIs for the same domain concept."
+        },
+        {
+          "line": 53,
+          "text": "Regenerate typed clients (sidecar/gateway/indexer) against the frozen API surface."
+        },
+        {
+          "line": 63,
+          "text": "`x3-gpu-validator-swarm` starts from `node/src/service.rs`, exposes health + telemetry (and any required RPC)."
+        },
+        {
+          "line": 64,
+          "text": "`flash-finality` starts and registers gossip bridge handlers from live node wiring."
+        },
+        {
+          "line": 65,
+          "text": "`parallel-proposer`, PoH, turbine broadcast are confirmed wired into authoring/network paths."
+        },
+        {
+          "line": 66,
+          "text": "DA verification is integrated into block import (including the client-side sampling component)."
+        },
+        {
+          "line": 75,
+          "text": "Expose a single `ChainRegistry` through `node/src/chain_spec.rs`."
+        },
+        {
+          "line": 76,
+          "text": "Build the relayer process and make it the only supported bridge path."
+        },
+        {
+          "line": 77,
+          "text": "Wire relayer outputs into `pallet-x3-verifier` (including external root registration and CPU fallback)."
+        },
+        {
+          "line": 78,
+          "text": "Enforce replay-nonce storage and eviction policy in `pallet-x3-kernel`."
+        },
+        {
+          "line": 79,
+          "text": "Wire governance emergency pause hooks for all bridge flows."
+        },
+        {
+          "line": 80,
+          "text": "Bind cross-vm bridge + coordinator into kernel adapters and settlement registration."
+        },
+        {
+          "line": 91,
+          "text": "Migrate those signing responsibilities into `custody-service`."
+        },
+        {
+          "line": 93,
+          "text": "Run key ceremony + rotation procedures in a rehearsal environment."
+        },
+        {
+          "line": 103,
+          "text": "Finalize event producers and stable event schemas per subsystem."
+        },
+        {
+          "line": 104,
+          "text": "Apply required migrations (including `0005_vote_window_tally.sql` called out in gaps)."
+        },
+        {
+          "line": 105,
+          "text": "Regenerate typed clients and validate against frozen runtime APIs + event model."
+        },
+        {
+          "line": 116,
+          "text": "`x3-launch-validator` checks are enforced as required CI / release gates."
+        },
+        {
+          "line": 117,
+          "text": "Determinism + reproducibility checks are required (runtime + GPU path)."
+        },
+        {
+          "line": 118,
+          "text": "Multi-node integration suite includes relayer + bridge flow + GPU validator coverage."
+        }
+      ]
+    },
+    {
+      "file": "RC0_WAVE_TRACKER.md",
+      "done": 21,
+      "todo": 8,
+      "exempt": 0,
+      "percent": 72.4,
+      "openTodos": [
+        {
+          "line": 215,
+          "text": "Update or add tests: replay rejection, timeout paths, duplicate completion"
+        },
+        {
+          "line": 216,
+          "text": "Run full test suite"
+        },
+        {
+          "line": 261,
+          "text": "Identify unique logic in `pallets/x3-governance/voting_engine.rs`"
+        },
+        {
+          "line": 262,
+          "text": "Port into `pallets/governance/` with proper benchmarks"
+        },
+        {
+          "line": 265,
+          "text": "Update pallet benchmarks and weights"
+        },
+        {
+          "line": 266,
+          "text": "Run tests"
+        },
+        {
+          "line": 326,
+          "text": "Verify `gpu-sig-verifier` owns: ed25519_batch.cu, sr25519_batch.cu, Rust FFI"
+        },
+        {
+          "line": 392,
+          "text": "If staged implementation (v1, v2), rename to distinguish: `pre_v1.rs`, `pre_v2.rs`"
+        }
+      ]
+    },
+    {
+      "file": "X3_AUDIT_VALIDATOR_COORDINATION.md",
+      "done": 0,
+      "todo": 21,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 42,
+          "text": "RFQ issuance (Week 1)"
+        },
+        {
+          "line": 43,
+          "text": "Firm selection (Week 2)"
+        },
+        {
+          "line": 44,
+          "text": "NDA + engagement letter (Week 3)"
+        },
+        {
+          "line": 45,
+          "text": "Code access + detailed scoping (Week 4)"
+        },
+        {
+          "line": 186,
+          "text": "KYC/AML verification"
+        },
+        {
+          "line": 187,
+          "text": "Hardware assessment (4 CPU, 8GB RAM minimum)"
+        },
+        {
+          "line": 188,
+          "text": "Network topology planning"
+        },
+        {
+          "line": 189,
+          "text": "Monitoring setup (Prometheus + Grafana)"
+        },
+        {
+          "line": 192,
+          "text": "Binary installation & syncing"
+        },
+        {
+          "line": 193,
+          "text": "Key generation (custody service integration)"
+        },
+        {
+          "line": 194,
+          "text": "Validator registration"
+        },
+        {
+          "line": 195,
+          "text": "Initial 24-hour monitoring"
+        },
+        {
+          "line": 196,
+          "text": "Troubleshooting support (async Slack + weekly call)"
+        },
+        {
+          "line": 199,
+          "text": "Hardware upgrade (if testnet underperformed)"
+        },
+        {
+          "line": 200,
+          "text": "Collateral deposit"
+        },
+        {
+          "line": 201,
+          "text": "Key rotation to mainnet custody"
+        },
+        {
+          "line": 202,
+          "text": "Final dry run (simulated epoch with mainnet binary)"
+        },
+        {
+          "line": 414,
+          "text": "Schedule RFQ issuance (Week 1)"
+        },
+        {
+          "line": 415,
+          "text": "Soft outreach to Tier 1 validators (Week 1)"
+        },
+        {
+          "line": 416,
+          "text": "Confirm steering committee approval (ASAP)"
+        },
+        {
+          "line": 417,
+          "text": "Publish validator program website (Week 2)"
+        }
+      ]
+    },
+    {
+      "file": "X3_MAINNET_AUDIT_AND_PLAN.md",
+      "done": 9,
+      "todo": 3,
+      "exempt": 0,
+      "percent": 75.0,
+      "openTodos": [
+        {
+          "line": 292,
+          "text": "Verify `runtime/` depends only on no_std crates; move any `std` usage to `node/` or separate service crates."
+        },
+        {
+          "line": 293,
+          "text": "Remove generated `*.cdx.json` from `git` tracking and regenerate in CI via `cargo cyclonedx` so they stay fresh."
+        },
+        {
+          "line": 294,
+          "text": "Add `deny(unsafe_code)` to every pallet and runtime crate; allow only where absolutely needed (e.g. GPU FFI) with a safety comment."
+        }
+      ]
+    },
+    {
+      "file": "X3_MAINNET_DEPLOYMENT_RUNBOOK.md",
+      "done": 19,
+      "todo": 10,
+      "exempt": 0,
+      "percent": 65.5,
+      "openTodos": [
+        {
+          "line": 310,
+          "text": "Mainnet genesis parameters finalized"
+        },
+        {
+          "line": 311,
+          "text": "Validator set confirmed and verified"
+        },
+        {
+          "line": 312,
+          "text": "Bootstrap validator keys generated"
+        },
+        {
+          "line": 313,
+          "text": "Network infrastructure ready"
+        },
+        {
+          "line": 314,
+          "text": "Monitoring systems configured"
+        },
+        {
+          "line": 315,
+          "text": "Alert thresholds tuned"
+        },
+        {
+          "line": 316,
+          "text": "Support team trained"
+        },
+        {
+          "line": 317,
+          "text": "Rollback procedure tested"
+        },
+        {
+          "line": 318,
+          "text": "Stakeholder communication sent"
+        },
+        {
+          "line": 319,
+          "text": "Final go/no-go decision made"
+        }
+      ]
+    },
+    {
+      "file": "X3_MAINNET_GATE_CLOSURE_CHECKLIST_2026_04_24.md",
+      "done": 21,
+      "todo": 143,
+      "exempt": 0,
+      "percent": 12.8,
+      "openTodos": [
+        {
+          "line": 14,
+          "text": "Consensus pallet implementation reviewed and annotated for correctness"
+        },
+        {
+          "line": 15,
+          "text": "Finality startup path tested in multi-node configuration"
+        },
+        {
+          "line": 16,
+          "text": "Replay protection boundaries documented (transaction nonce, account nonce, signature binding)"
+        },
+        {
+          "line": 17,
+          "text": "Try-runtime validation passed for current release candidate"
+        },
+        {
+          "line": 18,
+          "text": "Runtime API duplication audit completed"
+        },
+        {
+          "line": 21,
+          "text": "Audit `pallets/x3-kernel` consensus logic"
+        },
+        {
+          "line": 22,
+          "text": "Document consensus startup and recovery behavior"
+        },
+        {
+          "line": 23,
+          "text": "Create test: multi-node finality startup with 3+ validators"
+        },
+        {
+          "line": 24,
+          "text": "Document nonce binding and replay protection boundaries"
+        },
+        {
+          "line": 25,
+          "text": "Commit documentation to `X3_CONSENSUS_FINALITY_VALIDATION.md`"
+        },
+        {
+          "line": 38,
+          "text": "Cross-VM settlement orchestration path identified and documented"
+        },
+        {
+          "line": 39,
+          "text": "Settlement timeout logic implemented and tested"
+        },
+        {
+          "line": 40,
+          "text": "Settlement refund logic implemented and tested"
+        },
+        {
+          "line": 41,
+          "text": "Duplicate settlement detection implemented and tested"
+        },
+        {
+          "line": 42,
+          "text": "Partial settlement failure handling implemented and tested"
+        },
+        {
+          "line": 43,
+          "text": "Settlement events documented and matched to indexer schema"
+        },
+        {
+          "line": 46,
+          "text": "Identify settlement orchestrator (kernel pallet? bridge pallet?)"
+        },
+        {
+          "line": 47,
+          "text": "Write test: normal settlement flow (A \u2192 bridge \u2192 B \u2192 settlement)"
+        },
+        {
+          "line": 48,
+          "text": "Write test: timeout + refund flow (settlement not completed in time)"
+        },
+        {
+          "line": 49,
+          "text": "Write test: duplicate settlement attempt rejected"
+        },
+        {
+          "line": 50,
+          "text": "Write test: partial settlement failure (e.g., asset exists but amount insufficient)"
+        },
+        {
+          "line": 51,
+          "text": "Generate settlement event schema documentation"
+        },
+        {
+          "line": 52,
+          "text": "Match events to `X3_INDEXER_EVENT_MODEL.md`"
+        },
+        {
+          "line": 53,
+          "text": "All tests passing locally"
+        },
+        {
+          "line": 54,
+          "text": "Commit tests and documentation"
+        },
+        {
+          "line": 67,
+          "text": "External chain router implementation identified and documented"
+        },
+        {
+          "line": 70,
+          "text": "Governance pause mechanism tested for bridge flows"
+        },
+        {
+          "line": 71,
+          "text": "Verifier authority confirmed on-chain and in runtime"
+        },
+        {
+          "line": 72,
+          "text": "Settlement authority confirmed on-chain and in runtime"
+        },
+        {
+          "line": 73,
+          "text": "Chain-specific verification tests (Ethereum, Wormhole, IBC, BTC) exist"
+        },
+        {
+          "line": 78,
+          "text": "Create test: governance pause stops bridge flows (verifier rejects new roots)"
+        },
+        {
+          "line": 79,
+          "text": "Document verifier authority (which account, which pallet method)"
+        },
+        {
+          "line": 80,
+          "text": "Document settlement authority (which account, which pallet method)"
+        },
+        {
+          "line": 81,
+          "text": "For each chain (ETH, Wormhole, IBC, BTC): confirm verification path exists"
+        },
+        {
+          "line": 82,
+          "text": "Create chain-specific test stubs (can be placeholder implementations)"
+        },
+        {
+          "line": 83,
+          "text": "Commit documentation and tests"
+        },
+        {
+          "line": 96,
+          "text": "`crates/x3-gpu-validator-swarm` identified as canonical validator process"
+        },
+        {
+          "line": 97,
+          "text": "`gpu-sig-verifier` identified as canonical signature library"
+        },
+        {
+          "line": 98,
+          "text": "CPU fallback implementation exists and equivalence proven"
+        },
+        {
+          "line": 99,
+          "text": "GPU failure recovery tested"
+        },
+        {
+          "line": 100,
+          "text": "GPU vendor + operator diversity requirement documented (target: 2:1)"
+        },
+        {
+          "line": 103,
+          "text": "Verify `x3-gpu-validator-swarm` builds and integrates with node"
+        },
+        {
+          "line": 104,
+          "text": "Verify `gpu-sig-verifier` is the only signature verification library used by consensus"
+        },
+        {
+          "line": 105,
+          "text": "Review CPU fallback code: confirm CPU path exists if GPU unavailable"
+        },
+        {
+          "line": 106,
+          "text": "Document equivalence claim: CPU produces same signatures as GPU"
+        },
+        {
+          "line": 107,
+          "text": "Create test: validator recovers when GPU fails (restarts on CPU)"
+        },
+        {
+          "line": 108,
+          "text": "Document GPU diversity requirement (testnet validators: at least 2 vendors)"
+        },
+        {
+          "line": 109,
+          "text": "Commit documentation and tests"
+        },
+        {
+          "line": 126,
+          "text": "`custody-service` verified to own validator/treasury/relayer/cross-chain keys"
+        },
+        {
+          "line": 134,
+          "text": "Audit all mainnet-critical signing paths: confirm all use custody-service or wallet"
+        },
+        {
+          "line": 139,
+          "text": "Commit documentation"
+        },
+        {
+          "line": 152,
+          "text": "Runtime API surface frozen (no breaking changes allowed, all APIs defined)"
+        },
+        {
+          "line": 153,
+          "text": "RPC method contracts frozen and versioned"
+        },
+        {
+          "line": 154,
+          "text": "Sidecar contract frozen and versioned"
+        },
+        {
+          "line": 155,
+          "text": "Gateway compiles against final API"
+        },
+        {
+          "line": 156,
+          "text": "Indexer event model final and documented"
+        },
+        {
+          "line": 157,
+          "text": "All required migrations applied (e.g., `0005_vote_window_tally.sql`)"
+        },
+        {
+          "line": 158,
+          "text": "TypeScript/Rust typed clients generated from final contracts"
+        },
+        {
+          "line": 159,
+          "text": "All clients compile cleanly"
+        },
+        {
+          "line": 162,
+          "text": "**HIGH PRIORITY:** Freeze runtime API (Item 2 from RC-1 plan)"
+        },
+        {
+          "line": 167,
+          "text": "Audit RPC method definitions (`node/src/rpc.rs`)"
+        },
+        {
+          "line": 170,
+          "text": "Audit sidecar contract (`crates/x3-sidecar`)"
+        },
+        {
+          "line": 173,
+          "text": "**HIGH PRIORITY:** Regenerate typed clients (Item 3 from RC-1 plan)"
+        },
+        {
+          "line": 178,
+          "text": "Verify indexer event model matches settlement/bridge events"
+        },
+        {
+          "line": 179,
+          "text": "Apply all pending migrations"
+        },
+        {
+          "line": 180,
+          "text": "Commit: \"Typed clients regenerated, migration [X] applied\""
+        },
+        {
+          "line": 193,
+          "text": "Build gate: `cargo build --release` succeeds"
+        },
+        {
+          "line": 195,
+          "text": "Lint gate: `cargo clippy --all-targets -- -D warnings` passes"
+        },
+        {
+          "line": 196,
+          "text": "Dependency audit: `cargo deny check` passes"
+        },
+        {
+          "line": 197,
+          "text": "Unit tests: `cargo test --lib` passes"
+        },
+        {
+          "line": 199,
+          "text": "Multi-node integration: relayer + GPU validator coverage"
+        },
+        {
+          "line": 200,
+          "text": "Bridge tests: pause/governance flow, external chain verification"
+        },
+        {
+          "line": 201,
+          "text": "Replay protection tests: edge cases, nonce binding"
+        },
+        {
+          "line": 202,
+          "text": "Cross-VM adversarial tests: partial failures, timeouts, duplicates"
+        },
+        {
+          "line": 203,
+          "text": "Fuzz targets: parsers, decoders, proof validation (green)"
+        },
+        {
+          "line": 204,
+          "text": "Launch-validator checks: mandatory and passing"
+        },
+        {
+          "line": 207,
+          "text": "**BLOCKING:** Fix test compilation failures (Item 1 from RC-1 plan)"
+        },
+        {
+          "line": 212,
+          "text": "Run `cargo build --release`"
+        },
+        {
+          "line": 214,
+          "text": "Run `cargo clippy --all-targets -- -D warnings`"
+        },
+        {
+          "line": 215,
+          "text": "Run `cargo deny check`"
+        },
+        {
+          "line": 216,
+          "text": "Run `cargo test --lib` (should pass after fix)"
+        },
+        {
+          "line": 218,
+          "text": "Create test stubs: multi-node integration, bridge tests, replay tests, cross-VM tests, fuzz targets"
+        },
+        {
+          "line": 219,
+          "text": "Mark which tests are \"locally passing\" vs \"devnet-required\" vs \"mainnet-only\""
+        },
+        {
+          "line": 220,
+          "text": "Commit: \"CI gates passing, warnings eliminated\""
+        },
+        {
+          "line": 233,
+          "text": "Genesis validator set defined (list of initial validators + keys)"
+        },
+        {
+          "line": 234,
+          "text": "Validator set meets decentralization target (e.g., max 10% from single operator)"
+        },
+        {
+          "line": 235,
+          "text": "Validators span multiple geographies"
+        },
+        {
+          "line": 236,
+          "text": "Validators span multiple infrastructure providers (AWS, GCP, on-prem, etc.)"
+        },
+        {
+          "line": 237,
+          "text": "GPU validator subset defined with vendor diversity (\u22652:1 ratio)"
+        },
+        {
+          "line": 240,
+          "text": "Define decentralization target policy (max per operator, max per geography, etc.)"
+        },
+        {
+          "line": 241,
+          "text": "Create document: `X3_GENESIS_VALIDATOR_SET_POLICY.md`"
+        },
+        {
+          "line": 242,
+          "text": "List proposed initial validators and their properties (geography, operator, GPU vendor)"
+        },
+        {
+          "line": 243,
+          "text": "Verify policy compliance for proposed set"
+        },
+        {
+          "line": 244,
+          "text": "Document GPU vendor diversity (which vendors represented, ratio)"
+        },
+        {
+          "line": 245,
+          "text": "Prepare validator set commitment (once finalized by steering)"
+        },
+        {
+          "line": 258,
+          "text": "Security council elected or appointed for mainnet"
+        },
+        {
+          "line": 259,
+          "text": "Security council multisig setup confirmed (keys, thresholds, emergency pause)"
+        },
+        {
+          "line": 260,
+          "text": "Security council procedures documented (voting, emergency pause, upgrade approval)"
+        },
+        {
+          "line": 261,
+          "text": "Governance transition plan documented (when council takes control from dev team)"
+        },
+        {
+          "line": 262,
+          "text": "Transition rollback procedures documented"
+        },
+        {
+          "line": 265,
+          "text": "Define governance model for mainnet (community, council, stages)"
+        },
+        {
+          "line": 266,
+          "text": "Document security council responsibilities and limits"
+        },
+        {
+          "line": 267,
+          "text": "Document security council operational procedures"
+        },
+        {
+          "line": 268,
+          "text": "Document transition timeline (dev control \u2192 council control)"
+        },
+        {
+          "line": 269,
+          "text": "Create document: `X3_GOVERNANCE_TRANSITION_PLAN.md`"
+        },
+        {
+          "line": 270,
+          "text": "Mark as \"pending steering decision\" if not yet finalized"
+        },
+        {
+          "line": 283,
+          "text": "Audit entry criteria defined (what gets audited, what's in/out of scope)"
+        },
+        {
+          "line": 284,
+          "text": "Audit RFP or engagement finalized"
+        },
+        {
+          "line": 285,
+          "text": "Audit timeline committed by external team"
+        },
+        {
+          "line": 286,
+          "text": "Initial audit scope document created"
+        },
+        {
+          "line": 287,
+          "text": "Critical findings: none remain unresolved"
+        },
+        {
+          "line": 288,
+          "text": "High findings: none remain unresolved (or approved for mainnet with mitigations)"
+        },
+        {
+          "line": 289,
+          "text": "Audit sign-off obtained (formal or conditional)"
+        },
+        {
+          "line": 292,
+          "text": "Create document: `X3_AUDIT_ENTRY_CRITERIA.md`"
+        },
+        {
+          "line": 297,
+          "text": "Define timeline: audit kick-off date, preliminary findings date, final report date"
+        },
+        {
+          "line": 298,
+          "text": "Prepare audit RFP (engage external audit firm)"
+        },
+        {
+          "line": 299,
+          "text": "Document any pre-existing findings or issues auditors should know about"
+        },
+        {
+          "line": 300,
+          "text": "Create tracking: `X3_AUDIT_FINDINGS_TRACKER.md` (initially empty)"
+        },
+        {
+          "line": 313,
+          "text": "Genesis specification document exists (which validators, which token holders, which balances)"
+        },
+        {
+          "line": 314,
+          "text": "Genesis builder tool generates genesis block from spec"
+        },
+        {
+          "line": 315,
+          "text": "Genesis block is reproducible (same spec \u2192 same block hash)"
+        },
+        {
+          "line": 316,
+          "text": "All genesis inputs are version-controlled (no manual steps)"
+        },
+        {
+          "line": 317,
+          "text": "Deployment runbook exists (starting first node, joining validators, etc.)"
+        },
+        {
+          "line": 318,
+          "text": "Deployment procedures tested on testnet"
+        },
+        {
+          "line": 321,
+          "text": "Review `crates/x3-genesis-builder` (or equivalent)"
+        },
+        {
+          "line": 322,
+          "text": "Document genesis specification format"
+        },
+        {
+          "line": 323,
+          "text": "Create genesis specification for mainnet (template)"
+        },
+        {
+          "line": 324,
+          "text": "Verify genesis builder produces deterministic output"
+        },
+        {
+          "line": 325,
+          "text": "Test: generate genesis, verify hash repeatable"
+        },
+        {
+          "line": 326,
+          "text": "Document deployment procedures: first node start, validator onboarding, etc."
+        },
+        {
+          "line": 327,
+          "text": "Create document: `X3_GENESIS_AND_DEPLOYMENT_RUNBOOK.md`"
+        },
+        {
+          "line": 328,
+          "text": "Mark as \"testable on testnet\" or \"mainnet-only\""
+        },
+        {
+          "line": 341,
+          "text": "All 11 gates are GREEN or resolved YELLOW"
+        },
+        {
+          "line": 342,
+          "text": "No known critical vulnerabilities remain"
+        },
+        {
+          "line": 343,
+          "text": "External audit sign-off obtained (or conditional approval)"
+        },
+        {
+          "line": 344,
+          "text": "Validator set finalized and approved"
+        },
+        {
+          "line": 345,
+          "text": "Genesis block generated and verified"
+        },
+        {
+          "line": 346,
+          "text": "Steering committee vote/approval recorded"
+        },
+        {
+          "line": 347,
+          "text": "Community communication plan documented"
+        },
+        {
+          "line": 350,
+          "text": "This gate is decision-only; it depends on all others"
+        },
+        {
+          "line": 351,
+          "text": "Once gates 1-11 are GREEN/YELLOW, request steering vote"
+        },
+        {
+          "line": 352,
+          "text": "Record steering approval and date"
+        },
+        {
+          "line": 353,
+          "text": "Document any conditions or exceptions steering approved"
+        }
+      ]
+    },
+    {
+      "file": "X3_MAINNET_LAUNCH_PLAN.md",
+      "done": 0,
+      "todo": 154,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 52,
+          "text": "Zero unresolved consensus bugs"
+        },
+        {
+          "line": 53,
+          "text": "Finality startup proven with real validator set"
+        },
+        {
+          "line": 54,
+          "text": "Replay protection boundaries explicit and tested"
+        },
+        {
+          "line": 55,
+          "text": "Nonce handling bounded and deterministic"
+        },
+        {
+          "line": 56,
+          "text": "Try-runtime validation passed for release candidate"
+        },
+        {
+          "line": 57,
+          "text": "No runtime API duplication"
+        },
+        {
+          "line": 60,
+          "text": "One canonical cross-VM settlement path"
+        },
+        {
+          "line": 61,
+          "text": "Timeout + refund + duplicate-completion tests green"
+        },
+        {
+          "line": 62,
+          "text": "Settlement events match final indexer model"
+        },
+        {
+          "line": 63,
+          "text": "Collateral bonding per ADR 0001 enforced"
+        },
+        {
+          "line": 66,
+          "text": "One canonical external chain router"
+        },
+        {
+          "line": 67,
+          "text": "`x3-relayer` is only supported bridge path"
+        },
+        {
+          "line": 68,
+          "text": "Governance pause works for all bridge flows"
+        },
+        {
+          "line": 69,
+          "text": "Verifier and settlement authority on-chain + canonical"
+        },
+        {
+          "line": 70,
+          "text": "Ethereum, Wormhole, IBC, BTC verification proven"
+        },
+        {
+          "line": 71,
+          "text": "Required contracts deployed from custody"
+        },
+        {
+          "line": 74,
+          "text": "`x3-gpu-validator-swarm` is canonical validator process"
+        },
+        {
+          "line": 75,
+          "text": "`gpu-sig-verifier` is canonical signature library"
+        },
+        {
+          "line": 76,
+          "text": "CPU fallback equivalence proven"
+        },
+        {
+          "line": 77,
+          "text": "Validator recovery under GPU failure tested"
+        },
+        {
+          "line": 78,
+          "text": "GPU vendor + operator diversity \u2265 2:1"
+        },
+        {
+          "line": 81,
+          "text": "Wallet owns user-facing accounts only"
+        },
+        {
+          "line": 82,
+          "text": "Custody owns validator, treasury, relayer, cross-chain signing"
+        },
+        {
+          "line": 83,
+          "text": "No file-based mainnet-critical signing"
+        },
+        {
+          "line": 84,
+          "text": "Key ceremony + rotation procedures documented"
+        },
+        {
+          "line": 85,
+          "text": "Incident response (key compromise, theft) tested"
+        },
+        {
+          "line": 88,
+          "text": "Runtime API surface frozen and versioned"
+        },
+        {
+          "line": 89,
+          "text": "RPC + sidecar contracts frozen"
+        },
+        {
+          "line": 90,
+          "text": "Gateway compiles against final API"
+        },
+        {
+          "line": 91,
+          "text": "Indexer event model final"
+        },
+        {
+          "line": 92,
+          "text": "Migrations applied (e.g., `0005_vote_window_tally.sql`)"
+        },
+        {
+          "line": 93,
+          "text": "Typed clients regenerated"
+        },
+        {
+          "line": 96,
+          "text": "Build, lint, unit tests required"
+        },
+        {
+          "line": 97,
+          "text": "Determinism checks required"
+        },
+        {
+          "line": 98,
+          "text": "Dependency security + audit checks required"
+        },
+        {
+          "line": 99,
+          "text": "Multi-node integration with relayer + GPU coverage"
+        },
+        {
+          "line": 100,
+          "text": "Bridge, replay, cross-VM adversarial tests green"
+        },
+        {
+          "line": 101,
+          "text": "Fuzz targets for parsers/decoders/proofs green"
+        },
+        {
+          "line": 102,
+          "text": "Launch-validator checks mandatory"
+        },
+        {
+          "line": 105,
+          "text": "Genesis validator set meets decentralization target (25\u201350 validators)"
+        },
+        {
+          "line": 106,
+          "text": "Validators spread across acceptable geography + infrastructure"
+        },
+        {
+          "line": 107,
+          "text": "GPU validators: \u22653 different vendors, \u22653 different operators"
+        },
+        {
+          "line": 108,
+          "text": "Bootnodes, telemetry, dashboards, alerts live"
+        },
+        {
+          "line": 109,
+          "text": "Incident response: pause, rollback, restart runbooks proven"
+        },
+        {
+          "line": 110,
+          "text": "Validator operator SLA defined"
+        },
+        {
+          "line": 113,
+          "text": "Governance authority canonical (not duplicated)"
+        },
+        {
+          "line": 114,
+          "text": "Security council path operational and testable"
+        },
+        {
+          "line": 115,
+          "text": "Sudo (privileged authority) bounded shutdown plan"
+        },
+        {
+          "line": 116,
+          "text": "Emergency pause for bridge + critical backend operational"
+        },
+        {
+          "line": 117,
+          "text": "Governance takeover conditions explicit"
+        },
+        {
+          "line": 120,
+          "text": "General audit (consensus, bridge, economics) complete"
+        },
+        {
+          "line": 121,
+          "text": "GPU kernel audit complete"
+        },
+        {
+          "line": 122,
+          "text": "Substrate-specific audit complete"
+        },
+        {
+          "line": 123,
+          "text": "Critical and high findings resolved"
+        },
+        {
+          "line": 124,
+          "text": "Medium findings accepted (with owners + remediation dates)"
+        },
+        {
+          "line": 125,
+          "text": "Final audit report published"
+        },
+        {
+          "line": 128,
+          "text": "`x3-genesis-builder` or equivalent reproducible"
+        },
+        {
+          "line": 129,
+          "text": "Mainnet chain spec from version-controlled inputs"
+        },
+        {
+          "line": 130,
+          "text": "External contracts deployed from custody"
+        },
+        {
+          "line": 131,
+          "text": "Deployment artifacts versioned + signed"
+        },
+        {
+          "line": 132,
+          "text": "Release candidate hashes recorded"
+        },
+        {
+          "line": 133,
+          "text": "Mainnet validator hardware validated"
+        },
+        {
+          "line": 146,
+          "text": "Zero consensus halts"
+        },
+        {
+          "line": 147,
+          "text": "Finality lag < 30 seconds"
+        },
+        {
+          "line": 148,
+          "text": "Bridge uptime > 99.5%"
+        },
+        {
+          "line": 149,
+          "text": "GPU validator uptime > 99%"
+        },
+        {
+          "line": 150,
+          "text": "Zero state corruption"
+        },
+        {
+          "line": 153,
+          "text": "Set up dedicated monitoring (24/7 oncall)"
+        },
+        {
+          "line": 154,
+          "text": "Document every production issue (even minor ones)"
+        },
+        {
+          "line": 155,
+          "text": "Run chaos tests (network partition, validator crash, relayer pause)"
+        },
+        {
+          "line": 156,
+          "text": "Validate operator procedures (rollback, recovery, failover)"
+        },
+        {
+          "line": 157,
+          "text": "Perform security council threshold signature tests"
+        },
+        {
+          "line": 188,
+          "text": "Monday: Audit team briefing + issue triage"
+        },
+        {
+          "line": 189,
+          "text": "Wednesday: Finding deep-dive (critical + high)"
+        },
+        {
+          "line": 190,
+          "text": "Friday: Remediation status + next week plan"
+        },
+        {
+          "line": 227,
+          "text": "Unit test for the specific bug"
+        },
+        {
+          "line": 228,
+          "text": "Integration test with real (testnet) data"
+        },
+        {
+          "line": 229,
+          "text": "Fuzz test if applicable (parser, decoder, proof validation)"
+        },
+        {
+          "line": 230,
+          "text": "Determinism test if applicable (GPU code, consensus)"
+        },
+        {
+          "line": 261,
+          "text": "No API additions (only removals if deprecated)"
+        },
+        {
+          "line": 262,
+          "text": "No response type changes (only field additions with defaults)"
+        },
+        {
+          "line": 263,
+          "text": "Version numbers bumped for consumers"
+        },
+        {
+          "line": 264,
+          "text": "Compatibility table published (which APIs safe for which clients)"
+        },
+        {
+          "line": 265,
+          "text": "Sidecar, gateway, indexer compile against frozen API"
+        },
+        {
+          "line": 266,
+          "text": "Typed clients regenerated + pinned to released version"
+        },
+        {
+          "line": 284,
+          "text": "**Ethereum mainnet:** X3GatewayEthereum.sol \u2192 audited, deployed to testnet, ready for mainnet"
+        },
+        {
+          "line": 285,
+          "text": "**Solana mainnet:** X3GatewaySolana (Anchor) \u2192 audited, deployed to devnet, ready for mainnet"
+        },
+        {
+          "line": 286,
+          "text": "**Wormhole:** Guardian set rotation \u2192 tested on testnet, ready for mainnet"
+        },
+        {
+          "line": 287,
+          "text": "Other chains: Arbitrum, Base, Optimism, Polygon, Avalanche, BNB Chain"
+        },
+        {
+          "line": 317,
+          "text": "**Input:** Validator set list (25\u201350 entries with:)"
+        },
+        {
+          "line": 322,
+          "text": "**Generate:** `x3-genesis-builder --validators=mainnet_validators.csv`"
+        },
+        {
+          "line": 323,
+          "text": "**Verify:** Hash matches across 3 independent builds (determinism)"
+        },
+        {
+          "line": 324,
+          "text": "**Sign:** SHA-256 + GPG signature"
+        },
+        {
+          "line": 325,
+          "text": "**Distribute:** To all validators with documented build steps"
+        },
+        {
+          "line": 338,
+          "text": "Flash finality startup proven with real validator set"
+        },
+        {
+          "line": 339,
+          "text": "Finality proof validation green"
+        },
+        {
+          "line": 340,
+          "text": "Network partition recovery tested with >50% validators offline"
+        },
+        {
+          "line": 341,
+          "text": "Reorg handling bounded by k blocks"
+        },
+        {
+          "line": 344,
+          "text": "Relayer connected to all external chains (Ethereum, Solana, etc.)"
+        },
+        {
+          "line": 345,
+          "text": "Proof submission flows tested with mainnet light clients"
+        },
+        {
+          "line": 346,
+          "text": "Emergency pause testable from security council"
+        },
+        {
+          "line": 347,
+          "text": "Replay protection proven (no duplicate acceptance)"
+        },
+        {
+          "line": 350,
+          "text": "All GPU validators online and submitting proofs"
+        },
+        {
+          "line": 351,
+          "text": "CPU fallback tested (pull GPU, chain continues)"
+        },
+        {
+          "line": 352,
+          "text": "Signature verification latency < 100ms at full load"
+        },
+        {
+          "line": 353,
+          "text": "No crashes under stress (100+ validators + relayer)"
+        },
+        {
+          "line": 356,
+          "text": "Sudo key held in HSM (e.g., Ledger, Trezor, CloudHSM)"
+        },
+        {
+          "line": 357,
+          "text": "Sudo disabled at block N (automatic via runtime)"
+        },
+        {
+          "line": 358,
+          "text": "Key ceremony procedures (backup, rotation, incident response) tested"
+        },
+        {
+          "line": 359,
+          "text": "Multi-sig threshold for critical operations (security council)"
+        },
+        {
+          "line": 362,
+          "text": "Prometheus scraping all validators"
+        },
+        {
+          "line": 363,
+          "text": "Dashboards live (finality, network, bridge, GPU, custody)"
+        },
+        {
+          "line": 364,
+          "text": "Alerts firing for critical conditions (halted finality, bridge down, GPU offline)"
+        },
+        {
+          "line": 365,
+          "text": "PagerDuty integration for on-call escalation"
+        },
+        {
+          "line": 366,
+          "text": "Slack/Discord notifications for warnings"
+        },
+        {
+          "line": 369,
+          "text": "Pause procedures: <10 seconds from council decision \u2192 bridge frozen"
+        },
+        {
+          "line": 370,
+          "text": "Rollback procedures: <1 hour from issue discovery \u2192 older block height"
+        },
+        {
+          "line": 371,
+          "text": "Restart procedures: <5 minutes from process crash \u2192 chain continues"
+        },
+        {
+          "line": 372,
+          "text": "Key compromise procedures: Documentation only (tested on testnet)"
+        },
+        {
+          "line": 375,
+          "text": "Validator runbook published + validated"
+        },
+        {
+          "line": 376,
+          "text": "Discord support channel staffed 24/7"
+        },
+        {
+          "line": 377,
+          "text": "SLA: <4 hour response for critical issues"
+        },
+        {
+          "line": 378,
+          "text": "Escalation: Core team on call"
+        },
+        {
+          "line": 389,
+          "text": "Validators bootstrapped from genesis"
+        },
+        {
+          "line": 390,
+          "text": "All subsystems (bridge, relayer, GPU, indexer) online"
+        },
+        {
+          "line": 391,
+          "text": "Monitoring dashboards live and healthy"
+        },
+        {
+          "line": 394,
+          "text": "Consensus finalizing (HotStuff + PoH)"
+        },
+        {
+          "line": 395,
+          "text": "Blocks producing at target rate"
+        },
+        {
+          "line": 396,
+          "text": "Finality lag < 30 seconds"
+        },
+        {
+          "line": 397,
+          "text": "Zero crashes or errors in logs"
+        },
+        {
+          "line": 398,
+          "text": "Bridge proofs flowing (testnet \u2192 mainnet bridge for verification)"
+        },
+        {
+          "line": 399,
+          "text": "GPU validators submitting proofs"
+        },
+        {
+          "line": 400,
+          "text": "Sidecar responding to queries"
+        },
+        {
+          "line": 401,
+          "text": "Indexer consuming events"
+        },
+        {
+          "line": 414,
+          "text": "Blog post (features, limitations, roadmap)"
+        },
+        {
+          "line": 415,
+          "text": "Twitter/X announcement"
+        },
+        {
+          "line": 416,
+          "text": "Discord town hall with core team + validators"
+        },
+        {
+          "line": 417,
+          "text": "Community calls (timezone-specific if needed)"
+        },
+        {
+          "line": 427,
+          "text": "Core team on heightened alert (24/7 on-call)"
+        },
+        {
+          "line": 428,
+          "text": "Discord pinned status channel (updates every 4 hours)"
+        },
+        {
+          "line": 429,
+          "text": "Incident hotline for critical issues"
+        },
+        {
+          "line": 430,
+          "text": "Daily sync with all validators"
+        },
+        {
+          "line": 562,
+          "text": "Core team on 24/7 on-call"
+        },
+        {
+          "line": 563,
+          "text": "Daily validator check-ins"
+        },
+        {
+          "line": 564,
+          "text": "Hourly metrics review"
+        },
+        {
+          "line": 565,
+          "text": "Public status page updates (4x daily)"
+        },
+        {
+          "line": 568,
+          "text": "Transfer core team keys to security council (multi-sig)"
+        },
+        {
+          "line": 569,
+          "text": "First community governance proposal (if applicable)"
+        },
+        {
+          "line": 570,
+          "text": "Remove any temporary privileged authority (e.g., sudo)"
+        },
+        {
+          "line": 571,
+          "text": "Transition to normal operational schedule (business hours support)"
+        },
+        {
+          "line": 574,
+          "text": "Collect validator feedback"
+        },
+        {
+          "line": 575,
+          "text": "Plan next feature releases"
+        },
+        {
+          "line": 576,
+          "text": "Enable next-phase governance (validator elections, treasury votes)"
+        },
+        {
+          "line": 577,
+          "text": "Open bug bounty (if not already live)"
+        }
+      ]
+    },
+    {
+      "file": "X3_MAINNET_RC1_EXECUTION_PLAN_2026_04_24.md",
+      "done": 8,
+      "todo": 17,
+      "exempt": 0,
+      "percent": 32.0,
+      "openTodos": [
+        {
+          "line": 80,
+          "text": "Generate warning report and categorize by severity"
+        },
+        {
+          "line": 81,
+          "text": "Create fix plan for fixable warnings (unused variables, imports)"
+        },
+        {
+          "line": 88,
+          "text": "Commit any path normalization changes"
+        },
+        {
+          "line": 91,
+          "text": "Fix remaining test compilation failures"
+        },
+        {
+          "line": 93,
+          "text": "Run clippy/deny/fmt checks"
+        },
+        {
+          "line": 94,
+          "text": "Document evidence for local test suite pass"
+        },
+        {
+          "line": 95,
+          "text": "Update Testing & CI gate to GREEN"
+        },
+        {
+          "line": 98,
+          "text": "Analyze each RED gate to find \"quick wins\""
+        },
+        {
+          "line": 99,
+          "text": "Determine dependency order (which gates unblock others)"
+        },
+        {
+          "line": 100,
+          "text": "Select top 2-3 RED gates for implementation"
+        },
+        {
+          "line": 103,
+          "text": "Close 1 RED gate completely (target: RPC/Sidecar by runtime API freeze)"
+        },
+        {
+          "line": 104,
+          "text": "Advance 1 RED gate materially (target: Cross-VM settlement path tests)"
+        },
+        {
+          "line": 105,
+          "text": "Document evidence for gate completions"
+        },
+        {
+          "line": 106,
+          "text": "Update readiness scorecard to \u226550%"
+        },
+        {
+          "line": 263,
+          "text": "Testing & CI: GREEN (all tests compile/pass, determinism/clippy/deny green)"
+        },
+        {
+          "line": 264,
+          "text": "RPC/Sidecar/Gateway/Indexer: GREEN (API frozen, typed clients regenerated)"
+        },
+        {
+          "line": 265,
+          "text": "Cross-VM/Settlement: YELLOW \u2192 (settlement path tests passing)"
+        }
+      ]
+    },
+    {
+      "file": "X3_PHASE13C_RELAYER_IMPLEMENTATION.md",
+      "done": 2,
+      "todo": 14,
+      "exempt": 0,
+      "percent": 12.5,
+      "openTodos": [
+        {
+          "line": 929,
+          "text": "Connects to X3 RPC endpoint (localhost:9933)"
+        },
+        {
+          "line": 930,
+          "text": "Connects to Sepolia RPC (https://sepolia.infura.io)"
+        },
+        {
+          "line": 931,
+          "text": "Connects to Solana testnet RPC"
+        },
+        {
+          "line": 932,
+          "text": "Header watching loop executes"
+        },
+        {
+          "line": 933,
+          "text": "Proof submission succeeds with valid nonce"
+        },
+        {
+          "line": 934,
+          "text": "Proof deduplication prevents double submission"
+        },
+        {
+          "line": 935,
+          "text": "Governance pause signal stops submissions"
+        },
+        {
+          "line": 936,
+          "text": "Governance unpause resumes submissions"
+        },
+        {
+          "line": 937,
+          "text": "Logs show proof acquisition and submission events"
+        },
+        {
+          "line": 938,
+          "text": "Can handle 10+ consecutive proofs without error"
+        },
+        {
+          "line": 939,
+          "text": "Handles EVM finality (12 blocks, ~3 minutes)"
+        },
+        {
+          "line": 940,
+          "text": "Handles SVM finality (32 slots, ~12.8 seconds)"
+        },
+        {
+          "line": 941,
+          "text": "Graceful shutdown on SIGTERM"
+        },
+        {
+          "line": 942,
+          "text": "Nonce management survives relayer restart"
+        }
+      ]
+    },
+    {
+      "file": "X3_PUBLIC_TESTNET_LAUNCH_PLAN.md",
+      "done": 0,
+      "todo": 74,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 47,
+          "text": "4+ independent validators bootstrapping from genesis"
+        },
+        {
+          "line": 48,
+          "text": "Blocks finalizing at target rate (HotStuff + flash finality)"
+        },
+        {
+          "line": 49,
+          "text": "PoH and turbine gossip working"
+        },
+        {
+          "line": 50,
+          "text": "Network partition recovery tested"
+        },
+        {
+          "line": 51,
+          "text": "Bootnode discovery functional"
+        },
+        {
+          "line": 52,
+          "text": "Telemetry and monitoring live"
+        },
+        {
+          "line": 55,
+          "text": "Relayer polling external chains (Ethereum, Solana, etc.)"
+        },
+        {
+          "line": 56,
+          "text": "Proofs submitting to `pallet-x3-verifier`"
+        },
+        {
+          "line": 57,
+          "text": "Replay protection rejecting duplicates"
+        },
+        {
+          "line": 58,
+          "text": "Emergency pause testable from governance"
+        },
+        {
+          "line": 59,
+          "text": "Sidecar returning settlement status"
+        },
+        {
+          "line": 62,
+          "text": "GPU validator process (`x3-gpu-validator-swarm`) starting from node startup"
+        },
+        {
+          "line": 63,
+          "text": "Signature batch verification working (ed25519 + sr25519)"
+        },
+        {
+          "line": 64,
+          "text": "Proofs aggregating and submitting to chain"
+        },
+        {
+          "line": 65,
+          "text": "CPU fallback path operational"
+        },
+        {
+          "line": 66,
+          "text": "Health/telemetry exposed in RPC"
+        },
+        {
+          "line": 69,
+          "text": "Atomic swaps completing on EVM \u2194 SVM paths"
+        },
+        {
+          "line": 70,
+          "text": "Merkle settlement confirming"
+        },
+        {
+          "line": 71,
+          "text": "Settlement timeouts and refunds working"
+        },
+        {
+          "line": 72,
+          "text": "Indexer events matching settlement lifecycle"
+        },
+        {
+          "line": 75,
+          "text": "Runtime API surface frozen"
+        },
+        {
+          "line": 76,
+          "text": "Sidecar compiles against current API"
+        },
+        {
+          "line": 77,
+          "text": "Gateway returns transaction status"
+        },
+        {
+          "line": 78,
+          "text": "Indexer consuming settlement and bridge events"
+        },
+        {
+          "line": 79,
+          "text": "Typed clients regenerated"
+        },
+        {
+          "line": 82,
+          "text": "Operator runbook validated on testnet"
+        },
+        {
+          "line": 83,
+          "text": "Incident response procedures documented"
+        },
+        {
+          "line": 84,
+          "text": "Monitoring dashboards live"
+        },
+        {
+          "line": 85,
+          "text": "Health check scripts working"
+        },
+        {
+          "line": 86,
+          "text": "Log aggregation functional"
+        },
+        {
+          "line": 222,
+          "text": "Chopsticks/zombienet: 4 validators + 2 relayers + 1 GPU validator"
+        },
+        {
+          "line": 230,
+          "text": "Deploy Phase 8 release to 4 staging machines"
+        },
+        {
+          "line": 231,
+          "text": "Bootstrap validator set from signed genesis"
+        },
+        {
+          "line": 232,
+          "text": "Relayer connecting to testnet Ethereum/Solana"
+        },
+        {
+          "line": 233,
+          "text": "GPU validator integrated and submitting proofs"
+        },
+        {
+          "line": 234,
+          "text": "Metrics + dashboards live"
+        },
+        {
+          "line": 235,
+          "text": "Incident response tests (pause, restart, recovery)"
+        },
+        {
+          "line": 236,
+          "text": "72+ hour stability run"
+        },
+        {
+          "line": 245,
+          "text": "Genesis spec signed and reproducible"
+        },
+        {
+          "line": 246,
+          "text": "Validator onboarding docs complete"
+        },
+        {
+          "line": 247,
+          "text": "Testnet bootstrap checklist"
+        },
+        {
+          "line": 248,
+          "text": "Monitoring dashboards + alerts configured"
+        },
+        {
+          "line": 249,
+          "text": "Incident response contacts established"
+        },
+        {
+          "line": 250,
+          "text": "Bug reporting channel live (Discord/GitHub issues)"
+        },
+        {
+          "line": 251,
+          "text": "RPC endpoints exposed (public + private)"
+        },
+        {
+          "line": 252,
+          "text": "Faucet operational"
+        },
+        {
+          "line": 255,
+          "text": "Blog post with supported features/limitations"
+        },
+        {
+          "line": 256,
+          "text": "Validator operator guide published"
+        },
+        {
+          "line": 257,
+          "text": "Known limitations documented (bridge scope, GPU validator requirements, etc.)"
+        },
+        {
+          "line": 258,
+          "text": "Discord/community channels ready for support"
+        },
+        {
+          "line": 261,
+          "text": "Validators bootstrapping"
+        },
+        {
+          "line": 262,
+          "text": "First blocks finalizing"
+        },
+        {
+          "line": 263,
+          "text": "Telemetry public"
+        },
+        {
+          "line": 264,
+          "text": "Monitoring team on call"
+        },
+        {
+          "line": 271,
+          "text": "Zero consensus halts in 72 hours"
+        },
+        {
+          "line": 272,
+          "text": "Finality lag < 30 seconds on average"
+        },
+        {
+          "line": 273,
+          "text": "< 2% block miss rate"
+        },
+        {
+          "line": 274,
+          "text": "Zero state corruption"
+        },
+        {
+          "line": 277,
+          "text": "Relayer uptime > 99%"
+        },
+        {
+          "line": 278,
+          "text": "Proof submission latency < 5 min"
+        },
+        {
+          "line": 279,
+          "text": "Zero missed proofs"
+        },
+        {
+          "line": 280,
+          "text": "Replay protection: 100% rejection of duplicates"
+        },
+        {
+          "line": 283,
+          "text": "GPU validator uptime > 95%"
+        },
+        {
+          "line": 284,
+          "text": "Zero invalid proofs submitted"
+        },
+        {
+          "line": 285,
+          "text": "CPU fallback triggered < 0.1% of time"
+        },
+        {
+          "line": 286,
+          "text": "Signature verification latency < 100ms"
+        },
+        {
+          "line": 289,
+          "text": "Validator launch checklist passes for all node types"
+        },
+        {
+          "line": 290,
+          "text": "Health checks return expected values"
+        },
+        {
+          "line": 291,
+          "text": "Incident response: pause works in <10 seconds"
+        },
+        {
+          "line": 292,
+          "text": "Rollback procedures tested and working"
+        },
+        {
+          "line": 295,
+          "text": "Indexer events match on-chain settlement"
+        },
+        {
+          "line": 296,
+          "text": "Sidecar settlement status accurate"
+        },
+        {
+          "line": 297,
+          "text": "Gateway transaction history correct"
+        },
+        {
+          "line": 298,
+          "text": "State root commitments verified"
+        }
+      ]
+    },
+    {
+      "file": "X3_RC0_NEXT_STEPS.md",
+      "done": 0,
+      "todo": 5,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 40,
+          "text": "RC-0 tracker and executive summary agree on Wave 1 status."
+        },
+        {
+          "line": 41,
+          "text": "Evidence links added for any completion claim (build/test/log/integration)."
+        },
+        {
+          "line": 42,
+          "text": "Legacy schedule claims removed or marked non-committed."
+        },
+        {
+          "line": 43,
+          "text": "Command snippets validated against canonical workspace roots."
+        },
+        {
+          "line": 44,
+          "text": "Steering brief updated after contradiction closure delta."
+        }
+      ]
+    },
+    {
+      "file": "X3_RC0_TEAM_COORDINATION.md",
+      "done": 0,
+      "todo": 55,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 42,
+          "text": "Merge `router_enhanced.rs` logic into `router.rs`"
+        },
+        {
+          "line": 43,
+          "text": "Merge `router_enhanced_complete.rs` logic into `router.rs`"
+        },
+        {
+          "line": 44,
+          "text": "Delete both `router_enhanced*` files"
+        },
+        {
+          "line": 45,
+          "text": "Update Cargo.toml references"
+        },
+        {
+          "line": 46,
+          "text": "Pass: `cargo check -p external-chains`"
+        },
+        {
+          "line": 47,
+          "text": "Document: 60+ chain support verified intact"
+        },
+        {
+          "line": 62,
+          "text": "Identify which coordinator is canonical"
+        },
+        {
+          "line": 63,
+          "text": "Merge unique logic \u2192 `merkle_settlement_bridge.rs`"
+        },
+        {
+          "line": 64,
+          "text": "Delete unused coordinator files"
+        },
+        {
+          "line": 65,
+          "text": "Collapse `cross-vm-coordinator` if appropriate"
+        },
+        {
+          "line": 66,
+          "text": "Pass: `cargo build --workspace && cargo test settlement*`"
+        },
+        {
+          "line": 67,
+          "text": "Document: Settlement flow unbroken"
+        },
+        {
+          "line": 81,
+          "text": "Extract unique features from `pallet-x3-governance`"
+        },
+        {
+          "line": 82,
+          "text": "Integrate into `pallets/governance`"
+        },
+        {
+          "line": 83,
+          "text": "Update runtime/lib.rs imports"
+        },
+        {
+          "line": 84,
+          "text": "Delete `pallets/x3-governance` directory"
+        },
+        {
+          "line": 85,
+          "text": "Pass: `cargo build -p frame-benchmarks`"
+        },
+        {
+          "line": 86,
+          "text": "Document: Voting engine + emergency pause logic preserved"
+        },
+        {
+          "line": 101,
+          "text": "Remove `gpu-swarm` from runtime/Cargo.toml dependencies"
+        },
+        {
+          "line": 102,
+          "text": "Keep `gpu-sig-verifier` (CUDA batch verification)"
+        },
+        {
+          "line": 103,
+          "text": "Keep `x3-gpu-validator-swarm` (to be wired in RC-1)"
+        },
+        {
+          "line": 104,
+          "text": "Verify NO python in Rust code"
+        },
+        {
+          "line": 105,
+          "text": "Pass: `cargo build --workspace --release`"
+        },
+        {
+          "line": 106,
+          "text": "Document: GPU-swarm as optional sidecar, not consensus-critical"
+        },
+        {
+          "line": 121,
+          "text": "Delete `cond_folding.rs` (keep `cond_fold.rs`)"
+        },
+        {
+          "line": 122,
+          "text": "Delete `branch_inversion.rs` (keep `branch_opt.rs`)"
+        },
+        {
+          "line": 123,
+          "text": "Delete `pre_simple.rs` and `pre_morel.rs` (keep `pre.rs`)"
+        },
+        {
+          "line": 124,
+          "text": "Update `passes/mod.rs` module declarations"
+        },
+        {
+          "line": 125,
+          "text": "Pass: `cargo test -p x3-opt`"
+        },
+        {
+          "line": 126,
+          "text": "Document: Optimizer pass selection rationale"
+        },
+        {
+          "line": 141,
+          "text": "Full build: `cargo build --workspace --release`"
+        },
+        {
+          "line": 142,
+          "text": "Full tests: `cargo test --workspace`"
+        },
+        {
+          "line": 143,
+          "text": "Linting: `cargo fmt --all && cargo clippy --workspace`"
+        },
+        {
+          "line": 144,
+          "text": "Security: `cargo deny check`"
+        },
+        {
+          "line": 145,
+          "text": "Determinism: Verify checksum stability"
+        },
+        {
+          "line": 146,
+          "text": "Document: Go/no-go gate decision"
+        },
+        {
+          "line": 271,
+          "text": "All files to be deleted actually removed"
+        },
+        {
+          "line": 272,
+          "text": "No broken references (grep for deleted names)"
+        },
+        {
+          "line": 273,
+          "text": "Consolidation preserves all original functionality"
+        },
+        {
+          "line": 274,
+          "text": "Tests pass for affected modules"
+        },
+        {
+          "line": 275,
+          "text": "No new dependencies introduced"
+        },
+        {
+          "line": 276,
+          "text": "Cargo.toml clean (no duplicates)"
+        },
+        {
+          "line": 277,
+          "text": "Documentation updated (comments + commit message)"
+        },
+        {
+          "line": 278,
+          "text": "Changes isolated to this wave (no scope creep)"
+        },
+        {
+          "line": 281,
+          "text": "Correct pass variant selected (not just random choice)"
+        },
+        {
+          "line": 282,
+          "text": "No functionality loss from deleted variants"
+        },
+        {
+          "line": 283,
+          "text": "mod.rs module declarations correct"
+        },
+        {
+          "line": 284,
+          "text": "All optimizer tests pass"
+        },
+        {
+          "line": 285,
+          "text": "No performance regression expected"
+        },
+        {
+          "line": 288,
+          "text": "Full workspace builds: `cargo build --workspace --release`"
+        },
+        {
+          "line": 289,
+          "text": "Full test suite passes: `cargo test --workspace`"
+        },
+        {
+          "line": 290,
+          "text": "Zero clippy warnings"
+        },
+        {
+          "line": 291,
+          "text": "Deny check clean"
+        },
+        {
+          "line": 292,
+          "text": "Determinism verified (identical checksums)"
+        },
+        {
+          "line": 293,
+          "text": "All success criteria met"
+        }
+      ]
+    },
+    {
+      "file": "X3_REMEDIATION_ROADMAP_2026_04_23.md",
+      "done": 0,
+      "todo": 18,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 640,
+          "text": "Approve 8-10 engineer team composition"
+        },
+        {
+          "line": 641,
+          "text": "Confirm Wave 0 (compilation fixes) passing in CI"
+        },
+        {
+          "line": 642,
+          "text": "Schedule audit vendor kick-off call"
+        },
+        {
+          "line": 645,
+          "text": "All Wave 1-2 tests passing in CI"
+        },
+        {
+          "line": 646,
+          "text": "Devnet: Relayer successfully syncs headers"
+        },
+        {
+          "line": 647,
+          "text": "GPU swarm coordinates 100+ signatures without OOM"
+        },
+        {
+          "line": 650,
+          "text": "Bridge integration tests pass with real chain simulators"
+        },
+        {
+          "line": 651,
+          "text": "Consensus determinism proof published"
+        },
+        {
+          "line": 652,
+          "text": "Choose canonical governance pallet (vote scheduled)"
+        },
+        {
+          "line": 655,
+          "text": "HSM integration testnet-ready"
+        },
+        {
+          "line": 656,
+          "text": "Validator set rotation tested on devnet (add / remove working)"
+        },
+        {
+          "line": 657,
+          "text": "Mainnet genesis config approved by steering"
+        },
+        {
+          "line": 660,
+          "text": "All RED gates \u2192 YELLOW or GREEN"
+        },
+        {
+          "line": 661,
+          "text": "Workspace compiles + tests pass: `cargo test --workspace` 0 failures"
+        },
+        {
+          "line": 662,
+          "text": "Audit vendor entry criteria met + signed contract"
+        },
+        {
+          "line": 681,
+          "text": "Compilation passes"
+        },
+        {
+          "line": 682,
+          "text": "Router deduplication (delete enhanced_complete.rs)"
+        },
+        {
+          "line": 683,
+          "text": "Static analysis baseline (clippy + deny clean)"
+        }
+      ]
+    },
+    {
+      "file": "X3_RUNTIME_API_INVENTORY.md",
+      "done": 0,
+      "todo": 8,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 437,
+          "text": "Audit CrossChainStateRootApi implementation (line 2734) \u2014 Is it used or dead code?"
+        },
+        {
+          "line": 438,
+          "text": "Remove or document duplicate GovernanceSettlementApi/SettlementFinalityApi declarations (lines 3245, 3261)"
+        },
+        {
+          "line": 439,
+          "text": "Add comprehensive integration tests for all 13 runtime APIs"
+        },
+        {
+          "line": 440,
+          "text": "Document downstream consumer requirements for each API"
+        },
+        {
+          "line": 441,
+          "text": "Implement API versioning support in node RPC handlers"
+        },
+        {
+          "line": 442,
+          "text": "Update sidecar/gateway to support all frozen APIs"
+        },
+        {
+          "line": 443,
+          "text": "Add runtime API change detection to CI/CD gates"
+        },
+        {
+          "line": 444,
+          "text": "Sign off on canonical API surface with architecture review"
+        }
+      ]
+    },
+    {
+      "file": "X3_TESTNET_MAINNET_EXECUTION_PLAN.md",
+      "done": 0,
+      "todo": 18,
+      "exempt": 0,
+      "percent": 0.0,
+      "openTodos": [
+        {
+          "line": 273,
+          "text": "All \u00a74 items from audit (Bridges, Validator economics, Determinism, Key mgmt)"
+        },
+        {
+          "line": 274,
+          "text": "Contract APIs frozen"
+        },
+        {
+          "line": 275,
+          "text": "Testnet deployment successful"
+        },
+        {
+          "line": 276,
+          "text": "Bug bounty live"
+        },
+        {
+          "line": 277,
+          "text": "Incident response runbook complete"
+        },
+        {
+          "line": 295,
+          "text": "`crates/x3-genesis-builder/` creates reproducible `mainnet-spec.json`"
+        },
+        {
+          "line": 296,
+          "text": "Validator set frozen (25\u201350 validators, geo-distributed)"
+        },
+        {
+          "line": 297,
+          "text": "GPU validator subset meets vendor/operator diversity"
+        },
+        {
+          "line": 298,
+          "text": "External contracts deployed (Ethereum, Solana, etc.)"
+        },
+        {
+          "line": 299,
+          "text": "Sudo key held in custody; self-disables at block N"
+        },
+        {
+          "line": 302,
+          "text": "Signed release tarball (checksums + GPG signature)"
+        },
+        {
+          "line": 303,
+          "text": "Operator runbook validated"
+        },
+        {
+          "line": 304,
+          "text": "Monitoring/dashboards live"
+        },
+        {
+          "line": 305,
+          "text": "Incident response contacts established"
+        },
+        {
+          "line": 308,
+          "text": "Validator set online"
+        },
+        {
+          "line": 309,
+          "text": "All subsystems healthy"
+        },
+        {
+          "line": 310,
+          "text": "Finality confirmed"
+        },
+        {
+          "line": 311,
+          "text": "Public announcement"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "project": "X3 Atomic Star",
+  "mode": "level-10",
+  "last_cycle": null,
+  "rule": "many agents analyze, one agent patches, tests decide truth"
+}

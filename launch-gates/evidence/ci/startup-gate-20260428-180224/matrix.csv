@@ -1,0 +1,4 @@
+job,result,exit_code,duration_sec,log_file
+runtime_gate_reference,PASS,0,860,runtime_gate_reference.log
+runtime_gate_deterministic,PASS,0,2,runtime_gate_deterministic.log
+node_gate_reference,FAIL,143,538,node_gate_reference.rerun.log

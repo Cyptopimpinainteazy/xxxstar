@@ -1,0 +1,22 @@
+[package]
+name = "x3-primitives"
+version = "0.1.0"
+edition = "2021"
+description = "X3 Chain shared primitives — types, traits, and interfaces"
+license = "Apache-2.0"
+repository = "https://github.com/x3-chain/x3-chain"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+sp-runtime = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "sp-runtime/std",
+    "sp-std/std",
+]

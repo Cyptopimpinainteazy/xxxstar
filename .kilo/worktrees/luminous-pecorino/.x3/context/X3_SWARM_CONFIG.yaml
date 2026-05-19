@@ -1,0 +1,92 @@
+project: X3 Atomic Star
+mode: level_10
+
+truth_sources:
+  - tests
+  - compiler
+  - invariant reports
+  - risk register
+  - patch log
+  - git diff
+  - launch gates
+
+agents:
+  commander:
+    model: cheap-coder
+    patches_allowed: false
+    job: prioritize, assign, stop unsafe work
+
+  scanner:
+    model: free-scan
+    patches_allowed: false
+    job: file coverage, repo inventory, old/current comparison
+
+  cartographer:
+    model: cheap-coder
+    patches_allowed: false
+    job: graph, dependency map, blast radius
+
+  integrator:
+    model: cheap-coder
+    patches_allowed: true
+    job: implement one scoped P0/P1 task
+
+  fixer:
+    model: cheap-coder
+    patches_allowed: true
+    job: fix current failing command only
+
+  auditor:
+    model: heavy-claude
+    patches_allowed: false
+    job: mainnet blockers, launch gates
+
+  security:
+    model: heavy-claude
+    patches_allowed: false
+    job: bridge, VM, nonce, replay, auth, supply risks
+
+  architect:
+    model: heavy-claude
+    patches_allowed: false
+    job: better designs, simplification, competitive edge
+
+  bench:
+    model: cheap-coder
+    patches_allowed: true
+    job: benchmark, TPS, proof, stress tools
+
+  launchops:
+    model: cheap-coder
+    patches_allowed: true
+    job: chain spec, genesis, validator bootstrap, runtime upgrade rehearsal
+
+  scribe:
+    model: free-scan
+    patches_allowed: true
+    job: reports, docs, patch logs
+
+rules:
+  one_patch_at_a_time: true
+  danger_zone_requires_audit: true
+  require_tests_for_p0_p1: true
+  require_patch_log: true
+  require_risk_register: true
+  require_rollback_plan: true
+  protect_secrets: true
+
+critical_paths:
+  - runtime/**
+  - pallets/**
+  - crates/*bridge*/**
+  - crates/*vm*/**
+  - crates/*asset*/**
+  - crates/*kernel*/**
+  - crates/*dex*/**
+  - crates/*liquidity*/**
+  - contracts/**
+  - chain-spec/**
+  - chain-specs/**
+  - genesis/**
+  - deployment/**
+  - launch-gates/**

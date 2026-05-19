@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 NEXUS — Atlas Cross-Chain Command Deck</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#020810; --nexus:#00FFB2; --atlas:#00E5FF;
+  --btc:#F7931A; --evm:#627EEA; --svm:#9945FF; --x3vm:#FF2D78;
+  --arb:#28A0F0; --poly:#8247E5;
+  --text:#C8DCFF; --dim:rgba(200,220,255,.38);
+  --pw:284px; --hh:54px; --xph:22px; --dh:60px;
+  --panel:rgba(2,8,16,.92);
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;}
+#c{position:fixed;inset:0;z-index:0;cursor:grab;}
+#c.drag{cursor:grabbing;}
+.scanlines{position:fixed;inset:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.005) 2px,rgba(0,229,255,.005) 3px);}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 30%,rgba(2,8,16,.82) 100%);}
+
+/* LAYOUT */
+.ui{position:fixed;inset:0;z-index:2;pointer-events:none;display:grid;grid-template-rows:var(--hh) var(--xph) 1fr var(--dh);grid-template-columns:var(--pw) 1fr var(--pw);}
+
+/* HEADER */
+.hdr{grid-column:1/-1;grid-row:1;pointer-events:all;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,8,16,.98);border-bottom:1px solid rgba(0,229,255,.06);}
+.logo{display:flex;align-items:center;gap:8px;}
+.lhex{width:24px;height:24px;flex-shrink:0;background:var(--nexus);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:lp 3s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(0,255,178,.9));}
+@keyframes lp{0%,100%{filter:drop-shadow(0 0 5px rgba(0,255,178,.7));}50%{filter:drop-shadow(0 0 18px rgba(0,255,178,1)) brightness(1.5);}}
+.ltxt{font-family:'Orbitron',monospace;font-weight:900;font-size:14px;letter-spacing:.28em;color:var(--nexus);}
+.lsub{font-family:'Share Tech Mono',monospace;font-size:6px;letter-spacing:.38em;color:rgba(200,220,255,.22);text-transform:uppercase;}
+.lbadge{font-family:'Share Tech Mono',monospace;font-size:6.5px;letter-spacing:.18em;padding:2px 7px;border:1px solid rgba(0,229,255,.2);border-radius:2px;color:var(--atlas);margin-left:6px;text-transform:uppercase;}
+
+.hnav{display:flex;gap:1px;}
+.ni{font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;padding:4px 11px;cursor:pointer;color:var(--dim);border:1px solid transparent;border-radius:3px;transition:all .14s;}
+.ni:hover,.ni.on{color:var(--nexus);background:rgba(0,255,178,.04);border-color:rgba(0,255,178,.12);}
+
+.hrgt{display:flex;align-items:center;gap:11px;}
+.ticker{display:flex;gap:13px;}
+.tk{font-family:'Share Tech Mono',monospace;font-size:9.5px;}
+.tkl{color:var(--dim);margin-right:2px;}
+.tkv.up{color:#00FFB2;}.tkv.dn{color:#FF4D6D;}
+.bw{font-family:'Orbitron',monospace;font-size:7.5px;font-weight:700;letter-spacing:.16em;padding:5px 13px;background:transparent;border:1px solid var(--nexus);color:var(--nexus);cursor:pointer;border-radius:3px;transition:all .18s;}
+.bw:hover{background:rgba(0,255,178,.08);box-shadow:0 0 20px rgba(0,255,178,.26);}
+.waddr{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--nexus);}
+
+/* XP ROW */
+.xpr{grid-column:1/-1;grid-row:2;pointer-events:all;display:flex;align-items:center;gap:9px;padding:0 12px;background:rgba(2,8,16,.97);border-bottom:1px solid rgba(0,255,178,.04);}
+.xprank{font-family:'Orbitron',monospace;font-size:6.5px;font-weight:700;letter-spacing:.24em;color:var(--nexus);white-space:nowrap;}
+.xptrack{flex:1;height:1.5px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden;}
+.xpfill{height:100%;background:linear-gradient(90deg,rgba(0,255,178,.4),var(--nexus));box-shadow:0 0 8px rgba(0,255,178,.5);transition:width 1.2s ease;}
+.xpnum{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);white-space:nowrap;}
+.xpnxt{font-family:'Share Tech Mono',monospace;font-size:6px;color:rgba(200,220,255,.16);white-space:nowrap;letter-spacing:.06em;}
+.xpevt{font-family:'Share Tech Mono',monospace;font-size:6.5px;color:var(--btc);letter-spacing:.1em;white-space:nowrap;animation:blink 1.8s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* PANELS */
+.lp,.rp{pointer-events:all;padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;overflow-x:hidden;background:linear-gradient(180deg,rgba(2,8,16,.95) 0%,rgba(2,8,16,.55) 100%);}
+.lp{grid-column:1;grid-row:3;border-right:1px solid rgba(0,229,255,.045);}
+.rp{grid-column:3;grid-row:3;border-left:1px solid rgba(0,229,255,.045);}
+::-webkit-scrollbar{width:2px;}::-webkit-scrollbar-thumb{background:rgba(0,255,178,.1);}
+
+.ptitle{font-family:'Orbitron',monospace;font-size:6.5px;font-weight:600;letter-spacing:.4em;color:var(--nexus);text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid rgba(0,255,178,.08);display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.ptitle::before{content:'';width:4px;height:4px;background:var(--nexus);border-radius:50%;box-shadow:0 0 6px var(--nexus);animation:bl 2.6s infinite;}
+@keyframes bl{0%,100%{opacity:1;}50%{opacity:.08;}}
+
+/* PORTFOLIO */
+.pv{display:flex;flex-direction:column;gap:3px;flex-shrink:0;}
+.pvi{display:flex;align-items:center;gap:6px;padding:4px 7px;border-radius:4px;background:rgba(255,255,255,.014);border:1px solid rgba(255,255,255,.032);}
+.pvdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.pvname{font-family:'Share Tech Mono',monospace;font-size:9px;flex:0 0 28px;}
+.pvbar{flex:1;height:2px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden;}
+.pvfill{height:100%;border-radius:1px;}
+.pvval{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text);text-align:right;min-width:48px;}
+.pvusd{color:var(--dim);font-size:6.5px;display:block;text-align:right;}
+
+/* CHAIN CARDS */
+.cc{background:rgba(255,255,255,.016);border:1px solid rgba(255,255,255,.042);border-radius:6px;padding:9px 10px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;flex-shrink:0;}
+.cc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--cc,#00FFB2);transform:scaleY(0);transform-origin:bottom;transition:transform .2s;}
+.cc:hover::before,.cc.on::before{transform:scaleY(1);}
+.cc:hover,.cc.on{background:rgba(255,255,255,.032);}
+.cch{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.ccnr{display:flex;align-items:center;gap:5px;}
+.cdot{width:6px;height:6px;border-radius:50%;background:var(--cc);box-shadow:0 0 7px var(--cc);animation:cp 2.6s ease-in-out infinite;}
+@keyframes cp{0%,100%{transform:scale(1);}50%{transform:scale(1.5);}}
+.cname{font-family:'Orbitron',monospace;font-size:9.5px;font-weight:700;letter-spacing:.04em;}
+.ctag{font-family:'Share Tech Mono',monospace;font-size:5.5px;padding:1px 4px;border-radius:2px;background:rgba(255,255,255,.05);color:var(--dim);letter-spacing:.16em;}
+.cstats{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.cs{display:flex;flex-direction:column;gap:0px;}
+.csl{font-size:5.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;}
+.csv{font-family:'Share Tech Mono',monospace;font-size:9.5px;color:var(--text);}
+.chbar{margin-top:6px;height:1.5px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden;}
+.chfill{height:100%;background:var(--cc);border-radius:1px;}
+.chlive{font-family:'Share Tech Mono',monospace;font-size:5.5px;color:var(--cc);margin-top:3px;letter-spacing:.1em;}
+
+/* PROTOCOL CARDS (crate references) */
+.proto{display:flex;flex-direction:column;gap:3px;flex-shrink:0;}
+.pc{padding:7px 9px;border-radius:5px;background:rgba(255,255,255,.014);border:1px solid rgba(255,255,255,.035);cursor:pointer;transition:all .16s;}
+.pc:hover{border-color:rgba(0,255,178,.18);background:rgba(0,255,178,.022);}
+.pch{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.pcn{font-family:'Orbitron',monospace;font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--atlas);}
+.pcs{font-family:'Share Tech Mono',monospace;font-size:6px;letter-spacing:.12em;padding:1px 5px;border-radius:2px;border:1px solid rgba(0,229,255,.14);color:var(--atlas);}
+.pcd{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);letter-spacing:.03em;line-height:1.35;}
+
+/* MISSIONS */
+.mi{padding:7px 9px;border-radius:5px;background:rgba(255,255,255,.014);border:1px solid rgba(255,255,255,.035);cursor:pointer;transition:all .16s;flex-shrink:0;}
+.mi:hover{background:rgba(0,255,178,.026);border-color:rgba(0,255,178,.12);}
+.mih{display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;}
+.mico{font-size:12px;flex-shrink:0;}
+.min{font-size:10px;font-weight:600;margin-bottom:1px;}
+.midesc{font-size:7.5px;color:var(--dim);letter-spacing:.03em;line-height:1.3;}
+.mft{display:flex;align-items:center;gap:5px;}
+.mpbar{flex:1;height:1.5px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden;}
+.mpfill{height:100%;background:var(--nexus);}
+.mxp{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--nexus);flex-shrink:0;}
+
+/* CENTER */
+.cc2{grid-column:2;grid-row:3;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:8px 10px;}
+.ctop{display:flex;gap:5px;}
+.hm{background:rgba(2,8,16,.82);border:1px solid rgba(0,255,178,.09);border-radius:6px;padding:5px 11px;text-align:center;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);}
+.hmv{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--nexus);}
+.hml{font-family:'Share Tech Mono',monospace;font-size:5.5px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;margin-top:1px;}
+.hint{font-family:'Share Tech Mono',monospace;font-size:7px;color:rgba(200,220,255,.15);letter-spacing:.2em;text-align:center;pointer-events:none;}
+
+/* FOCUS LABEL */
+.focuslbl{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:8;pointer-events:none;text-align:center;opacity:0;transition:opacity .3s;}
+.focuslbl.show{opacity:1;}
+.fln{font-family:'Orbitron',monospace;font-size:17px;font-weight:900;letter-spacing:.24em;}
+.fls{font-family:'Share Tech Mono',monospace;font-size:7.5px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;margin-top:4px;}
+.flrpc{font-family:'Share Tech Mono',monospace;font-size:6px;color:rgba(200,220,255,.2);margin-top:3px;letter-spacing:.08em;}
+
+/* WORLD EVENT */
+.wev{position:fixed;top:calc(var(--hh) + var(--xph) + 9px);left:50%;transform:translateX(-50%) translateY(-80px);z-index:20;pointer-events:none;background:rgba(2,8,16,.99);border:1px solid rgba(255,200,0,.28);border-radius:5px;padding:6px 14px;display:flex;align-items:center;gap:7px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 0 22px rgba(255,200,0,.08);transition:transform .45s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;}
+.wev.show{transform:translateX(-50%) translateY(0);}
+.wei{font-size:11px;}.wet{font-family:'Share Tech Mono',monospace;font-size:7.5px;letter-spacing:.06em;}
+
+/* ACTIVE TRADE */
+.at{position:fixed;bottom:calc(var(--dh) + 11px);left:50%;transform:translateX(-50%) translateY(16px);z-index:20;opacity:0;pointer-events:none;background:rgba(2,8,16,.99);border:1px solid rgba(0,255,178,.2);border-radius:8px;padding:11px 16px;min-width:248px;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 0 30px rgba(0,255,178,.11);transition:all .38s cubic-bezier(.34,1.56,.64,1);}
+.at.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.ath{font-family:'Orbitron',monospace;font-size:6.5px;font-weight:700;letter-spacing:.28em;color:var(--nexus);margin-bottom:5px;display:flex;align-items:center;gap:5px;}
+.ath::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--nexus);box-shadow:0 0 7px var(--nexus);animation:bl 1s infinite;}
+.atr{font-family:'Orbitron',monospace;font-size:10.5px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:.03em;}
+.atp{height:2.5px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden;margin-bottom:7px;}
+.atpf{height:100%;background:linear-gradient(90deg,var(--nexus),#00CFFF);border-radius:1px;transition:width .3s ease;}
+.ats2{display:flex;gap:5px;margin-bottom:5px;}
+.step{font-family:'Share Tech Mono',monospace;font-size:7px;letter-spacing:.1em;padding:2px 6px;border-radius:2px;background:rgba(255,255,255,.03);color:var(--dim);transition:all .3s;flex:1;text-align:center;}
+.step.done{background:rgba(0,255,178,.09);color:var(--nexus);}
+.step.active{background:rgba(0,255,178,.05);color:var(--nexus);animation:stp .8s ease-in-out infinite;}
+@keyframes stp{0%,100%{opacity:1;}50%{opacity:.28;}}
+.atti{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);text-align:right;}
+
+/* ROUTE FORGE */
+.rf{display:flex;flex-direction:column;gap:7px;flex-shrink:0;}
+.asel{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.065);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all .15s;}
+.asel:hover{border-color:rgba(0,255,178,.2);background:rgba(0,255,178,.02);}
+.albl{font-size:5.5px;letter-spacing:.28em;color:var(--dim);text-transform:uppercase;font-family:'Share Tech Mono',monospace;margin-bottom:4px;}
+.avr{display:flex;align-items:center;justify-content:space-between;}
+.aamt{font-family:'Orbitron',monospace;font-size:17px;font-weight:700;color:var(--text);}
+.atok{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);border-radius:14px;padding:2px 7px 2px 3px;cursor:pointer;}
+.tdot{width:12px;height:12px;border-radius:50%;}
+.tnm{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;}
+.acvt{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);margin-top:2px;}
+.rarr{display:flex;align-items:center;justify-content:center;gap:5px;padding:1px 0;}
+.rline{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,178,.16),transparent);}
+.raico{width:21px;height:21px;border-radius:50%;border:1px solid rgba(0,255,178,.2);display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;transition:all .15s;background:rgba(0,255,178,.03);color:var(--nexus);}
+.raico:hover{background:rgba(0,255,178,.1);box-shadow:0 0 9px rgba(0,255,178,.2);}
+.rtypes{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.rtb{padding:5px 3px;border-radius:4px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.012);cursor:pointer;transition:all .14s;text-align:center;}
+.rtb:hover,.rtb.on{border-color:rgba(0,255,178,.22);background:rgba(0,255,178,.045);}
+.rtbi{font-size:11px;margin-bottom:1px;}
+.rtbl{font-family:'Share Tech Mono',monospace;font-size:6.5px;letter-spacing:.07em;color:var(--dim);text-transform:uppercase;}
+.rtb.on .rtbl{color:var(--nexus);}
+.rprev{background:rgba(0,255,178,.02);border:1px solid rgba(0,255,178,.1);border-radius:6px;padding:9px 10px;}
+.rpath{display:flex;align-items:center;gap:2px;margin-bottom:7px;flex-wrap:wrap;}
+.rh{font-family:'Share Tech Mono',monospace;font-size:6.5px;padding:2px 5px;border-radius:2px;border:1px solid rgba(255,255,255,.065);background:rgba(255,255,255,.022);}
+.rh.ah{border-color:var(--nexus);color:var(--nexus);background:rgba(0,255,178,.05);}
+.rha{font-size:8px;color:var(--dim);}
+.rpr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.rpr:last-child{margin-bottom:0;}
+.rpl{font-family:'Share Tech Mono',monospace;font-size:6.5px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;}
+.rpv{font-family:'Share Tech Mono',monospace;font-size:8.5px;color:var(--text);}
+.rpv.g{color:var(--nexus);}.rpv.w{color:#F7931A;}.rpv.r{color:#FF4D6D;}
+.blnch{width:100%;padding:10px;font-family:'Orbitron',monospace;font-size:9.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;background:linear-gradient(135deg,rgba(0,255,178,.1),rgba(0,255,178,.025));border:1px solid var(--nexus);color:var(--nexus);border-radius:6px;cursor:pointer;transition:all .24s;position:relative;overflow:hidden;}
+.blnch:hover{box-shadow:0 0 32px rgba(0,255,178,.3),0 0 65px rgba(0,255,178,.06);transform:translateY(-1px);}
+
+/* CHRONOS ENGINE BADGE */
+.cebadge{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;background:rgba(0,229,255,.03);border:1px solid rgba(0,229,255,.1);flex-shrink:0;}
+.cen{font-family:'Orbitron',monospace;font-size:7px;font-weight:700;letter-spacing:.12em;color:var(--atlas);}
+.ces{font-family:'Share Tech Mono',monospace;font-size:6.5px;color:var(--dim);}
+.cedot{width:5px;height:5px;border-radius:50%;background:var(--nexus);box-shadow:0 0 5px var(--nexus);animation:bl .9s infinite;}
+
+/* LIVE FEED */
+.lf{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;min-height:0;}
+.fi{display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:3px;background:rgba(255,255,255,.012);border:1px solid rgba(255,255,255,.024);font-size:8px;animation:fin .22s ease;flex-shrink:0;}
+@keyframes fin{from{opacity:0;transform:translateX(4px);}to{opacity:1;transform:translateX(0);}}
+.fdot{width:4px;height:4px;border-radius:50%;flex-shrink:0;}
+.ft{flex:1;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ft span{color:var(--text);}
+.ftm{color:rgba(200,220,255,.16);font-family:'Share Tech Mono',monospace;font-size:6.5px;flex-shrink:0;}
+
+/* DOCK */
+.dock{grid-column:1/-1;grid-row:4;pointer-events:all;display:flex;align-items:center;justify-content:center;gap:2px;padding:0 10px;background:rgba(2,8,16,.99);border-top:1px solid rgba(0,255,178,.055);}
+.db{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 12px;border-radius:5px;cursor:pointer;transition:all .14s;border:1px solid transparent;}
+.db:hover,.db.on{background:rgba(0,255,178,.045);border-color:rgba(0,255,178,.12);}
+.di{font-size:14px;line-height:1;}
+.dl{font-family:'Orbitron',monospace;font-size:5.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;}
+.db.on .dl,.db:hover .dl{color:var(--nexus);}
+.ddiv{width:1px;height:22px;background:rgba(255,255,255,.04);}
+.fps{display:flex;gap:2px;}
+.fp{font-family:'Share Tech Mono',monospace;font-size:7px;letter-spacing:.05em;padding:3px 8px;border-radius:12px;border:1px solid rgba(255,255,255,.06);color:var(--dim);cursor:pointer;transition:all .14s;}
+.fpnet{display:flex;align-items:center;gap:6px;margin-left:6px;}
+.fnn{font-family:'Share Tech Mono',monospace;font-size:6.5px;color:var(--dim);letter-spacing:.08em;}
+.fndot{width:5px;height:5px;border-radius:50%;}
+
+/* TOAST */
+.toast{position:fixed;top:calc(var(--hh)+var(--xph)+10px);right:12px;z-index:100;background:rgba(2,8,16,.99);border:1px solid rgba(0,255,178,.2);border-radius:8px;padding:10px 14px;min-width:208px;pointer-events:none;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 0 28px rgba(0,255,178,.11);transform:translateX(108%);transition:transform .34s cubic-bezier(.34,1.56,.64,1);}
+.toast.show{transform:translateX(0);}
+.th{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
+.tico{font-size:13px;}.ttitle{font-family:'Orbitron',monospace;font-size:7.5px;font-weight:700;letter-spacing:.14em;color:var(--nexus);text-transform:uppercase;}
+.tbody{font-size:8px;color:var(--dim);font-family:'Share Tech Mono',monospace;letter-spacing:.04em;line-height:1.5;}
+
+/* ACHIEVE */
+.ach{position:fixed;bottom:calc(var(--dh)+11px);left:calc(var(--pw)+12px);z-index:30;background:rgba(2,8,16,.99);border:1px solid rgba(247,147,26,.28);border-radius:7px;padding:9px 13px;pointer-events:none;transform:translateY(20px);opacity:0;transition:all .38s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 22px rgba(247,147,26,.1);}
+.ach.show{transform:translateY(0);opacity:1;}
+.achi{font-size:16px;margin-bottom:3px;}
+.achn{font-family:'Orbitron',monospace;font-size:7.5px;font-weight:700;letter-spacing:.2em;color:#F7931A;text-transform:uppercase;}
+.achd{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);margin-top:1px;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<div class="focuslbl" id="focuslbl">
+  <div class="fln" id="fln">X3 CHAIN</div>
+  <div class="fls" id="fls">Atlas L1 · Tri-VM</div>
+  <div class="flrpc" id="flrpc">rpc.x3-chain.io · 0x41544C53</div>
+</div>
+<div class="wev" id="wev"><span class="wei" id="wei">⚡</span><span class="wet" id="wet">ChronosFlash: high-confidence intent · 92% match · EVM→X3→SVM</span></div>
+
+<div class="at" id="at">
+  <div class="ath">APOTHEOSIS-TX ACTIVE</div>
+  <div class="atr" id="atr">BTC → X3 → SVM</div>
+  <div class="atp"><div class="atpf" id="atpf" style="width:0%"></div></div>
+  <div class="ats2">
+    <div class="step" id="step0">◉ SOURCE</div>
+    <div class="step" id="step1">◎ X3VM</div>
+    <div class="step" id="step2">◎ SETTLE</div>
+  </div>
+  <div class="atti" id="atti">Awaiting ChronosFlash confirmation...</div>
+</div>
+
+<div class="ach" id="ach">
+  <div class="achi" id="achi">🏆</div>
+  <div class="achn" id="achn">Achievement Unlocked</div>
+  <div class="achd" id="achd">Route complete</div>
+</div>
+<div class="toast" id="toast">
+  <div class="th"><div class="tico" id="t-ico">⚡</div><div class="ttitle" id="t-title">X3 NEXUS</div></div>
+  <div class="tbody" id="t-body">Initializing Atlas command deck...</div>
+</div>
+
+<div class="ui">
+<header class="hdr">
+  <div class="logo">
+    <div class="lhex"></div>
+    <div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="ltxt">X3 NEXUS</div>
+        <div class="lbadge">ATLS · 0x41544C53</div>
+      </div>
+      <div class="lsub">Atlas Cross-Chain Command Deck · x3star.net</div>
+    </div>
+  </div>
+  <nav class="hnav">
+    <div class="ni on" onclick="setNav(this)">Command</div>
+    <div class="ni" onclick="setNav(this)">AtlasDex</div>
+    <div class="ni" onclick="setNav(this)">Routes</div>
+    <div class="ni" onclick="setNav(this)">Arena</div>
+    <div class="ni" onclick="setNav(this)">Vaults</div>
+    <div class="ni" onclick="setNav(this)">Governance</div>
+  </nav>
+  <div class="hrgt">
+    <div class="ticker">
+      <div class="tk"><span class="tkl">ATLS</span><span class="tkv up" id="tp-x3">$24.18</span></div>
+      <div class="tk"><span class="tkl">BTC</span><span class="tkv up" id="tp-btc">$97,441</span></div>
+      <div class="tk"><span class="tkl">ETH</span><span class="tkv up" id="tp-eth">$3,882</span></div>
+      <div class="tk"><span class="tkl">SOL</span><span class="tkv dn" id="tp-sol">$188.42</span></div>
+    </div>
+    <button class="bw" id="wbtn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+</header>
+
+<div class="xpr">
+  <span class="xprank" id="xprank">ELITE ROUTER</span>
+  <div class="xptrack"><div class="xpfill" id="xpfill" style="width:71%"></div></div>
+  <span class="xpnum" id="xpnum">2,840 / 4,000 XP</span>
+  <span class="xpnxt">→ ARCH COMMANDER</span>
+  <span class="xpevt" id="xpevt">⚡ ChronosFlash ONLINE</span>
+</div>
+
+<!-- LEFT -->
+<div class="lp">
+  <div class="ptitle">Portfolio Vault</div>
+  <div class="pv">
+    <div class="pvi"><div class="pvdot" style="background:var(--nexus)"></div><div class="pvname" style="color:var(--nexus)">ATLS</div><div class="pvbar"><div class="pvfill" style="width:62%;background:var(--nexus);box-shadow:0 0 5px var(--nexus)"></div></div><div><div class="pvval">680</div><div class="pvusd">$16,442</div></div></div>
+    <div class="pvi"><div class="pvdot" style="background:var(--btc)"></div><div class="pvname" style="color:var(--btc)">BTC</div><div class="pvbar"><div class="pvfill" style="width:86%;background:var(--btc);box-shadow:0 0 5px var(--btc)"></div></div><div><div class="pvval">1.000</div><div class="pvusd">$97,441</div></div></div>
+    <div class="pvi"><div class="pvdot" style="background:var(--evm)"></div><div class="pvname" style="color:var(--evm)">ETH</div><div class="pvbar"><div class="pvfill" style="width:53%;background:var(--evm);box-shadow:0 0 5px var(--evm)"></div></div><div><div class="pvval">12.44</div><div class="pvusd">$48,272</div></div></div>
+    <div class="pvi"><div class="pvdot" style="background:var(--svm)"></div><div class="pvname" style="color:var(--svm)">SOL</div><div class="pvbar"><div class="pvfill" style="width:33%;background:var(--svm);box-shadow:0 0 5px var(--svm)"></div></div><div><div class="pvval">840</div><div class="pvusd">$30,268</div></div></div>
+  </div>
+
+  <div class="ptitle">Chain Networks</div>
+  <div class="cc on" style="--cc:var(--nexus)" id="cc-x3" onclick="selectChain(this,4)">
+    <div class="cch"><div class="ccnr"><div class="cdot" style="--cc:var(--nexus)"></div><div class="cname">X3 Chain</div></div><div class="ctag">ATLAS L1</div></div>
+    <div class="cstats">
+      <div class="cs"><div class="csl">Block</div><div class="csv">6s</div></div>
+      <div class="cs"><div class="csl">TPS</div><div class="csv" id="x3-tps">65,820</div></div>
+      <div class="cs"><div class="csl">Consensus</div><div class="csv">HotStuff</div></div>
+      <div class="cs"><div class="csl">Validators</div><div class="csv" id="x3-vals">7</div></div>
+    </div>
+    <div class="chbar"><div class="chfill" style="width:95%;background:var(--nexus)"></div></div>
+    <div class="chlive" id="cl-x3">▸ NOMINAL · TURBINE ACTIVE · PoH RUNNING</div>
+  </div>
+  <div class="cc" style="--cc:var(--btc)" id="cc-btc" onclick="selectChain(this,0)">
+    <div class="cch"><div class="ccnr"><div class="cdot" style="--cc:var(--btc)"></div><div class="cname">BTC</div></div><div class="ctag">FORTRESS</div></div>
+    <div class="cstats">
+      <div class="cs"><div class="csl">TVL</div><div class="csv">$847B</div></div>
+      <div class="cs"><div class="csl">Block</div><div class="csv">~10 min</div></div>
+      <div class="cs"><div class="csl">Fee</div><div class="csv" id="btc-fee">18 sat/vB</div></div>
+      <div class="cs"><div class="csl">Routes</div><div class="csv" id="rc-0">142</div></div>
+    </div>
+    <div class="chbar"><div class="chfill" style="width:94%;background:var(--btc)"></div></div>
+    <div class="chlive" id="cl-0">▸ HTLC BRIDGE · VAULT SECURE</div>
+  </div>
+  <div class="cc" style="--cc:var(--evm)" id="cc-evm" onclick="selectChain(this,1)">
+    <div class="cch"><div class="ccnr"><div class="cdot" style="--cc:var(--evm)"></div><div class="cname">Ethereum</div></div><div class="ctag">EVM / ETH-1</div></div>
+    <div class="cstats">
+      <div class="cs"><div class="csl">Chain ID</div><div class="csv">1</div></div>
+      <div class="cs"><div class="csl">Block</div><div class="csv">12s</div></div>
+      <div class="cs"><div class="csl">Gas</div><div class="csv" id="gas-evm">28 gwei</div></div>
+      <div class="cs"><div class="csl">Routes</div><div class="csv" id="rc-1">847</div></div>
+    </div>
+    <div class="chbar"><div class="chfill" style="width:72%;background:var(--evm)"></div></div>
+    <div class="chlive" id="cl-1">▸ eth.llamarpc.com · NOMINAL</div>
+  </div>
+  <div class="cc" style="--cc:var(--svm)" id="cc-svm" onclick="selectChain(this,2)">
+    <div class="cch"><div class="ccnr"><div class="cdot" style="--cc:var(--svm)"></div><div class="cname">Solana</div></div><div class="ctag">SVM / 1399811149</div></div>
+    <div class="cstats">
+      <div class="cs"><div class="csl">Block</div><div class="csv">400ms</div></div>
+      <div class="cs"><div class="csl">TPS</div><div class="csv" id="sol-tps">4,820</div></div>
+      <div class="cs"><div class="csl">Fee</div><div class="csv">$0.0002</div></div>
+      <div class="cs"><div class="csl">Routes</div><div class="csv" id="rc-2">339</div></div>
+    </div>
+    <div class="chbar"><div class="chfill" style="width:99%;background:var(--svm)"></div></div>
+    <div class="chlive" id="cl-2">▸ drpc.live · VELOCITY MAX</div>
+  </div>
+  <div class="cc" style="--cc:var(--arb)" id="cc-arb" onclick="selectChain(this,3)">
+    <div class="cch"><div class="ccnr"><div class="cdot" style="--cc:var(--arb)"></div><div class="cname">Arbitrum</div></div><div class="ctag">EVM / 42161</div></div>
+    <div class="cstats">
+      <div class="cs"><div class="csl">Block</div><div class="csv">250ms</div></div>
+      <div class="cs"><div class="csl">Gas</div><div class="csv">0.1 gwei</div></div>
+      <div class="cs"><div class="csl">Fee</div><div class="csv">~$0.04</div></div>
+      <div class="cs"><div class="csl">Routes</div><div class="csv" id="rc-3">228</div></div>
+    </div>
+    <div class="chbar"><div class="chfill" style="width:81%;background:var(--arb)"></div></div>
+    <div class="chlive" id="cl-3">▸ arb1.arbitrum.io · NOMINAL</div>
+  </div>
+
+  <div class="ptitle">Active Missions</div>
+  <div class="mi">
+    <div class="mih"><div class="mico">⚡</div><div><div class="min">First Cross-VM Route</div><div class="midesc">Complete a route through X3VM using Apotheosis-TX builder</div></div></div>
+    <div class="mft"><div class="mpbar"><div class="mpfill" id="mp0" style="width:0%"></div></div><div class="mxp">+250 XP</div></div>
+  </div>
+  <div class="mi">
+    <div class="mih"><div class="mico">🔮</div><div><div class="min">ChronosFlash Oracle</div><div class="midesc">Execute 3 intent-predicted routes (≥85% confidence)</div></div></div>
+    <div class="mft"><div class="mpbar"><div class="mpfill" style="width:33%"></div></div><div class="mxp">+500 XP</div></div>
+  </div>
+  <div class="mi">
+    <div class="mih"><div class="mico">🏦</div><div><div class="min">BTC HTLC Vault</div><div class="midesc">Settle via bitcoin_htlc.rs bridge to X3 chain</div></div></div>
+    <div class="mft"><div class="mpbar"><div class="mpfill" style="width:0%"></div></div><div class="mxp">+750 XP</div></div>
+  </div>
+  <div class="mi">
+    <div class="mih"><div class="mico">🔥</div><div><div class="min">GPU Swarm Validator</div><div class="midesc">Route during GPU-accelerated block · turbo mode active</div></div></div>
+    <div class="mft"><div class="mpbar"><div class="mpfill" style="width:66%"></div></div><div class="mxp">+300 XP</div></div>
+  </div>
+</div>
+
+<!-- CENTER -->
+<div class="cc2">
+  <div class="ctop">
+    <div class="hm"><div class="hmv" id="hm-routes">1,416</div><div class="hml">Active Routes</div></div>
+    <div class="hm"><div class="hmv" id="hm-vol">$4.2B</div><div class="hml">AtlasDex Vol</div></div>
+    <div class="hm"><div class="hmv" id="hm-tps">65,820</div><div class="hml">X3 Net TPS</div></div>
+    <div class="hm"><div class="hmv">8%→1.5%</div><div class="hml">ATLS Inflation</div></div>
+  </div>
+  <div class="hint">DRAG TO ORBIT · SCROLL TO ZOOM · CLICK NODES</div>
+</div>
+
+<!-- RIGHT -->
+<div class="rp">
+  <div class="ptitle">ChronosFlash Route Forge</div>
+
+  <div class="cebadge">
+    <div><div class="cen">CHRONOSFLASH ORACLE</div><div class="ces" style="margin-top:1px">chronos-flash · intent prediction · 92% confidence</div></div>
+    <div class="cedot"></div>
+  </div>
+
+  <div class="rf">
+    <div class="asel">
+      <div class="albl">FROM — Apotheosis-TX Source</div>
+      <div class="avr">
+        <div class="aamt">1.000</div>
+        <div class="atok"><div class="tdot" style="background:var(--btc)"></div><div class="tnm">BTC</div><span style="color:var(--dim);font-size:9px">▾</span></div>
+      </div>
+      <div class="acvt">≈ $97,441 · via bitcoin_htlc bridge · 32 confirms</div>
+    </div>
+    <div class="rarr">
+      <div class="rline"></div>
+      <div class="raico" onclick="swapDir(this)">⇅</div>
+      <div class="rline"></div>
+    </div>
+    <div class="asel">
+      <div class="albl">TO — Settle Chain</div>
+      <div class="avr">
+        <div class="aamt" id="to-amt">51,204</div>
+        <div class="atok"><div class="tdot" style="background:var(--svm)"></div><div class="tnm">SOL</div><span style="color:var(--dim);font-size:9px">▾</span></div>
+      </div>
+      <div class="acvt">≈ $96,889 · SVM runtime · spl_token_bridge</div>
+    </div>
+    <div class="rtypes">
+      <div class="rtb on" onclick="setRt(this,'BTC,X3VM,SVM','51,204','4m 20s','LOW','Quantum router · x3-swap-router · MEV protected')"><div class="rtbi">⚡</div><div class="rtbl">Fastest</div></div>
+      <div class="rtb" onclick="setRt(this,'BTC,EVM,SVM','51,186','11m 40s','LOW','Flash finality · eth.llamarpc.com · 0.05% fee')"><div class="rtbi">💰</div><div class="rtbl">Cheapest</div></div>
+      <div class="rtb" onclick="setRt(this,'BTC,EVM,SVM','51,120','14m 00s','NONE','Private mempool · anti-MEV · x3-gulfstream')"><div class="rtbi">🛡️</div><div class="rtbl">Safest</div></div>
+      <div class="rtb" onclick="setRt(this,'BTC,X3VM,SVM','51,440','6m 10s','MED','Quantum swarm · AtlasDex AMM · flash finality')"><div class="rtbi">📈</div><div class="rtbl">Max Yield</div></div>
+    </div>
+    <div class="rprev">
+      <div class="rpath" id="rpath">
+        <div class="rh ah">BTC</div><div class="rha">→</div><div class="rh ah">X3VM</div><div class="rha">→</div><div class="rh ah">SVM</div>
+      </div>
+      <div class="rpr"><div class="rpl">Est. Output</div><div class="rpv g" id="rout">51,204.88 SOL</div></div>
+      <div class="rpr"><div class="rpl">Bridge Fee</div><div class="rpv">0.05% · $48.72 · x3-fees</div></div>
+      <div class="rpr"><div class="rpl">Settle Time</div><div class="rpv" id="rstime">~4 min 20 sec</div></div>
+      <div class="rpr"><div class="rpl">Slippage</div><div class="rpv g">0.12% · real_slippage.rs</div></div>
+      <div class="rpr"><div class="rpl">Route Risk</div><div class="rpv g" id="rrisk">LOW</div></div>
+      <div class="rpr" style="margin-top:3px;padding-top:4px;border-top:1px solid rgba(255,255,255,.04)"><div class="rpl">Engine</div><div class="rpv g" id="rengine" style="font-size:7px;color:var(--atlas)">Quantum router · x3-swap-router · MEV protected</div></div>
+    </div>
+    <button class="blnch" id="blnch" onclick="launchRoute()">⚡ Launch via Apotheosis-TX</button>
+  </div>
+
+  <div class="ptitle" style="margin-top:2px;">X3 Protocol Engine</div>
+  <div class="proto">
+    <div class="pc">
+      <div class="pch"><div class="pcn">ChronosFlash</div><div class="pcs">ORACLE</div></div>
+      <div class="pcd">Intent prediction · MEV-front · timewarp · 85% threshold · 50ms latency</div>
+    </div>
+    <div class="pc">
+      <div class="pch"><div class="pcn">AtlasDex</div><div class="pcs">AMM · CL · PERPS</div></div>
+      <div class="pcd">Concentrated liq · flash loans · TWAP · options · ve-governance · x3-dex</div>
+    </div>
+    <div class="pc">
+      <div class="pch"><div class="pcn">x3-Turbine</div><div class="pcs">PROPAGATION</div></div>
+      <div class="pcd">Shred broadcast · erasure coding · peer recovery · x3-gulfstream forwarder</div>
+    </div>
+    <div class="pc">
+      <div class="pch"><div class="pcn">GPU Swarm</div><div class="pcs">VALIDATOR</div></div>
+      <div class="pcd">Multi-GPU dispatch · PoH acceleration · sig-verify GPU · turbo mode</div>
+    </div>
+  </div>
+
+  <div class="ptitle" style="margin-top:2px;">Live Route Feed</div>
+  <div class="lf" id="lfeed">
+    <div class="fi"><div class="fdot" style="background:var(--svm)"></div><div class="ft"><span>apollo_x7</span> ChronosFlash: 12.4 ETH→SOL · 91% intent match</div><div class="ftm">2s</div></div>
+    <div class="fi"><div class="fdot" style="background:var(--btc)"></div><div class="ft"><span>bc1q9r</span> BTC HTLC settled · 0.5 BTC → X3 vault</div><div class="ftm">8s</div></div>
+    <div class="fi"><div class="fdot" style="background:var(--evm)"></div><div class="ft"><span>0xA142</span> Apotheosis-TX: EVM→X3VM bridge opened</div><div class="ftm">15s</div></div>
+    <div class="fi"><div class="fdot" style="background:var(--nexus)"></div><div class="ft"><span>atlas_m</span> AtlasDex AMM route · 380ms via x3-turbine</div><div class="ftm">22s</div></div>
+    <div class="fi"><div class="fdot" style="background:var(--arb)"></div><div class="ft"><span>0xD9F2</span> Arbitrum L2 → X3 quantum route · $8.4k</div><div class="ftm">31s</div></div>
+  </div>
+</div>
+
+<!-- DOCK -->
+<div class="dock">
+  <div class="db on" onclick="setDock(this)"><div class="di">🌐</div><div class="dl">Trade</div></div>
+  <div class="db" onclick="setDock(this)"><div class="di">⚗️</div><div class="dl">AtlasDex</div></div>
+  <div class="db" onclick="setDock(this)"><div class="di">🔗</div><div class="dl">Bridge</div></div>
+  <div class="db" onclick="setDock(this)"><div class="di">🏛️</div><div class="dl">Vaults</div></div>
+  <div class="db" onclick="setDock(this)"><div class="di">⚔️</div><div class="dl">Arena</div></div>
+  <div class="db" onclick="setDock(this)"><div class="di">▶️</div><div class="dl">Replay</div></div>
+  <div class="ddiv"></div>
+  <div class="fps">
+    <div class="fp on" style="background:var(--nexus);border-color:var(--nexus);color:#020810;font-weight:700" onclick="setFaction(this,'X3 Atlas Core','#00FFB2')">X3 Architects</div>
+    <div class="fp" onclick="setFaction(this,'BTC Fortress Guild','#F7931A')">BTC Fortress</div>
+    <div class="fp" onclick="setFaction(this,'EVM Syndicate','#627EEA')">EVM Syndicate</div>
+    <div class="fp" onclick="setFaction(this,'SVM Velocity Club','#9945FF')">SVM Velocity</div>
+  </div>
+  <div class="ddiv"></div>
+  <div class="fpnet">
+    <div class="fndot" style="background:var(--nexus);box-shadow:0 0 5px var(--nexus)"></div>
+    <div class="fnn">x3-chain.io · TESTNET</div>
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+//  THREE.JS — ATLAS NEXUS SCENE
+// ═══════════════════════════════════════════
+const cv = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas:cv, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x020810,1);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x020810, 0.012);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 900);
+
+// ── Orbit state ────────────────────────
+let oTheta=0.06, oPhi=0.26, oR=46;
+let focX=0,focY=0,focZ=0;
+let isDrag=false, dSX=0,dSY=0, dDist=0;
+let hovIdx=-1;
+
+function camPos(){
+  return{
+    x:focX+oR*Math.sin(oTheta)*Math.cos(oPhi),
+    y:focY+oR*Math.sin(oPhi)+1.8,
+    z:focZ+oR*Math.cos(oTheta)*Math.cos(oPhi)
+  };
+}
+
+// ── Lights ─────────────────────────────
+scene.add(new THREE.AmbientLight(0x060820,5));
+const nexLight = new THREE.PointLight(0x00FFB2, 7, 65);
+scene.add(nexLight);
+const atlasLight = new THREE.PointLight(0x00E5FF, 2.5, 40);
+scene.add(atlasLight);
+
+// Chain colors: BTC, EVM(Eth), SVM(Sol), ARB, X3
+const cColors = [0xF7931A, 0x627EEA, 0x9945FF, 0x28A0F0, 0x00FFB2];
+const cLights = cColors.map(c=>{const l=new THREE.PointLight(c,3,30);scene.add(l);return l;});
+scene.add(Object.assign(new THREE.DirectionalLight(0x1A0830,1.3),{position:{x:-18,y:32,z:-22}}));
+
+// ── Stars ──────────────────────────────
+{
+  const n=8000,pos=new Float32Array(n*3);
+  for(let i=0;i<n*3;i++) pos[i]=(Math.random()-.5)*750;
+  const sg=new THREE.BufferGeometry();
+  sg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:0.075,transparent:true,opacity:.44,sizeAttenuation:true})));
+}
+
+// ── Grid Floor ─────────────────────────
+const GY = -12;
+[{c:0x00FFB2,n:72,o:.022},{c:0x002040,n:288,o:.032}].forEach(({c,n,o})=>{
+  const g=new THREE.GridHelper(340,n,c,c);
+  g.material.transparent=true;g.material.opacity=o;
+  g.position.y=GY; scene.add(g);
+});
+// Cross beams
+[[300,.38],[.38,300]].forEach(([w,h])=>{
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+    new THREE.MeshBasicMaterial({color:0x00FFB2,transparent:true,opacity:.05,side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2; m.position.y=GY+0.02; scene.add(m);
+});
+
+// ── NEXUS CORE (Atlas X3 node center) ──
+const nexG=new THREE.Group(); scene.add(nexG);
+const nexCore=new THREE.Mesh(
+  new THREE.SphereGeometry(2.5,64,64),
+  new THREE.MeshStandardMaterial({color:0x00FFB2,emissive:0x00FF99,emissiveIntensity:2.8,metalness:.84,roughness:.06})
+);
+nexG.add(nexCore);
+// Inner structure – X3 tri-VM symbol (3 inner spheres)
+[0,Math.PI*2/3,Math.PI*4/3].forEach((a,i)=>{
+  const inner=new THREE.Mesh(
+    new THREE.SphereGeometry(.22,16,16),
+    new THREE.MeshBasicMaterial({color:[0x627EEA,0x9945FF,0xFF2D78][i],transparent:true,opacity:.85})
+  );
+  inner.position.set(Math.cos(a)*1.1, 0, Math.sin(a)*1.1);
+  nexG.add(inner);
+});
+[2.65,2.95,3.4].forEach((r,i)=>nexG.add(new THREE.Mesh(
+  new THREE.SphereGeometry(r,20,20),
+  new THREE.MeshBasicMaterial({color:0x00FFB2,wireframe:true,transparent:true,opacity:i===0?.065:.026})
+)));
+// Rings (representing HotStuff consensus rounds)
+[[5,.07,Math.PI/3,0],[5.8,.055,-Math.PI/5,.45],[4.2,.042,Math.PI/2,-.3]].forEach(([r,t,rx,rz])=>{
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,t,16,120),
+    new THREE.MeshBasicMaterial({color:0x00FFB2,transparent:true,opacity:.24}));
+  ring.rotation.x=rx; ring.rotation.z=rz; nexG.add(ring);
+});
+const nexRings=nexG.children.filter(c=>c.geometry?.type==='TorusGeometry');
+// Ground beam (x3-turbine downlink)
+nexG.add(Object.assign(new THREE.Mesh(
+  new THREE.CylinderGeometry(.038,.038,Math.abs(GY),8),
+  new THREE.MeshBasicMaterial({color:0x00FFB2,transparent:true,opacity:.07})
+),{position:{x:0,y:GY/2,z:0}}));
+
+// Scan pulse
+const scanMat=new THREE.MeshBasicMaterial({color:0x00FFB2,transparent:true,opacity:0,side:THREE.DoubleSide});
+const scanRing=new THREE.Mesh(new THREE.RingGeometry(.5,1.2,80),scanMat);
+scanRing.rotation.x=-Math.PI/2; scanRing.position.y=GY+0.07; scene.add(scanRing);
+let scanR=0;
+
+// ── CHAIN NODES ────────────────────────
+// Real chains: BTC, ETH(EVM), SOL(SVM), ARB, X3 (center is nexus)
+const chainDefs=[
+  {n:'BTC',   lbl:'FORTRESS',  rpc:'bitcoin_htlc.rs · HTLC',    col:0xF7931A, css:'#F7931A', pos:[-16, 0, -4],  geo:'oct'},
+  {n:'ETH',   lbl:'EVM · 1',   rpc:'eth.llamarpc.com · chain 1', col:0x627EEA, css:'#627EEA', pos:[15,  0, -5],  geo:'ico'},
+  {n:'SOL',   lbl:'SVM · drpc',rpc:'drpc.live · spl_token_bridge',col:0x9945FF,css:'#9945FF', pos:[0,   0,-20],  geo:'sph'},
+  {n:'ARB',   lbl:'EVM · 42161',rpc:'arb1.arbitrum.io · L2',     col:0x28A0F0, css:'#28A0F0', pos:[1,   0, 13],  geo:'dod'},
+];
+
+const chainGroups=chainDefs.map((cd,i)=>{
+  const g=new THREE.Group();
+  g.position.set(...cd.pos);
+  scene.add(g);
+  cLights[i].position.set(...cd.pos);
+  const r=1.6;
+  let geo;
+  if(cd.geo==='oct') geo=new THREE.OctahedronGeometry(r,0);
+  else if(cd.geo==='ico') geo=new THREE.IcosahedronGeometry(r,0);
+  else if(cd.geo==='dod') geo=new THREE.DodecahedronGeometry(r,0);
+  else geo=new THREE.SphereGeometry(r,32,32);
+  const mat=new THREE.MeshStandardMaterial({color:cd.col,emissive:cd.col,emissiveIntensity:2.1,metalness:.84,roughness:.1});
+  const mesh=new THREE.Mesh(geo,mat);
+  g.add(mesh);
+  g.add(new THREE.Mesh(geo.clone(),new THREE.MeshBasicMaterial({color:cd.col,wireframe:true,transparent:true,opacity:.14})));
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(r*2.5,.036,16,64),
+    new THREE.MeshBasicMaterial({color:cd.col,transparent:true,opacity:.3}));
+  halo.rotation.x=Math.PI/2; g.add(halo);
+  const halo2=new THREE.Mesh(new THREE.TorusGeometry(r*3.6,.015,16,64),
+    new THREE.MeshBasicMaterial({color:cd.col,transparent:true,opacity:.12}));
+  halo2.rotation.x=Math.PI/2; g.add(halo2);
+  // Ground beam
+  const bh=Math.abs(GY);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,bh,8),
+    new THREE.MeshBasicMaterial({color:cd.col,transparent:true,opacity:.09}));
+  beam.position.y=-bh/2; g.add(beam);
+  // Territory
+  [[5.8,.26],[6.1,.015]].forEach(([r2,op])=>{
+    const tr=new THREE.Mesh(new THREE.RingGeometry(r2-0.18,r2,80),
+      new THREE.MeshBasicMaterial({color:cd.col,transparent:true,opacity:op,side:THREE.DoubleSide}));
+    tr.rotation.x=-Math.PI/2; tr.position.y=bh-12.04; g.add(tr);
+  });
+  const tf=new THREE.Mesh(new THREE.CircleGeometry(5.8,80),
+    new THREE.MeshBasicMaterial({color:cd.col,transparent:true,opacity:.016,side:THREE.DoubleSide}));
+  tf.rotation.x=-Math.PI/2; tf.position.y=bh-12.06; g.add(tf);
+  return{g,mesh,mat,halo,halo2,data:cd,basePos:[...cd.pos]};
+});
+
+// ── BUILDINGS (per district) ────────────
+chainDefs.forEach((cd,i)=>{
+  const bMat=new THREE.MeshStandardMaterial({color:cd.col,emissive:cd.col,emissiveIntensity:.14,metalness:.92,roughness:.28});
+  const tMat=new THREE.MeshBasicMaterial({color:cd.col,transparent:true,opacity:.7});
+  for(let b=0;b<22;b++){
+    const ang=(b/22)*Math.PI*2+Math.random()*.7;
+    const rad=4.2+Math.random()*5.8;
+    const h=.35+Math.random()*5.8;
+    const w=.1+Math.random()*.32;
+    const bx=cd.pos[0]+Math.cos(ang)*rad;
+    const bz=cd.pos[2]+Math.sin(ang)*rad;
+    const box=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),bMat);
+    box.position.set(bx,GY+h/2,bz);
+    scene.add(box);
+    if(Math.random()>.4){
+      const tip=new THREE.Mesh(new THREE.SphereGeometry(.032,4,4),tMat);
+      tip.position.set(bx,GY+h+.032,bz);
+      scene.add(tip);
+    }
+  }
+});
+
+// ── ROUTE CURVES (apotheosis-tx paths) ─
+const routeData=chainDefs.map((cd,i)=>{
+  const s=new THREE.Vector3(...cd.pos);
+  const e=new THREE.Vector3(0,0,0);
+  const mid=new THREE.Vector3(
+    (s.x*.3+e.x*.7)+(i%2?2.8:-2.8),
+    (s.y+e.y)*.5+2.5,
+    (s.z+e.z)*.5-2.8
+  );
+  const curve=new THREE.QuadraticBezierCurve3(s,mid,e);
+  const mat=new THREE.LineBasicMaterial({color:cd.col,transparent:true,opacity:.09});
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(90)),mat));
+  return{curve,col:cd.col,mat};
+});
+
+// ── PARTICLES (ChronosFlash intents) ───
+const routeParticles=routeData.map(({curve,col})=>{
+  const n=24;
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*3),3));
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({color:col,size:.24,transparent:true,opacity:.9,sizeAttenuation:true}));
+  scene.add(pts);
+  return{pts,curve,offsets:Array.from({length:n},(_,j)=>j/n),speed:.0022+Math.random()*.0028};
+});
+
+// Ambient X3 nebula
+{
+  const n=700,pos=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    pos[i*3]=(Math.random()-.5)*110;
+    pos[i*3+1]=(Math.random()-.5)*50+4;
+    pos[i*3+2]=(Math.random()-.5)*40-10;
+  }
+  const ag=new THREE.BufferGeometry();
+  ag.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(ag,new THREE.PointsMaterial({color:0x00FFB2,size:.045,transparent:true,opacity:.14,sizeAttenuation:true})));
+}
+
+// ── RAYCASTER ──────────────────────────
+const raycaster=new THREE.Raycaster();
+const m2d=new THREE.Vector2();
+function checkHover(mx,my){
+  m2d.x=(mx/innerWidth)*2-1; m2d.y=-(my/innerHeight)*2+1;
+  raycaster.setFromCamera(m2d,camera);
+  const meshes=chainGroups.map(cg=>cg.mesh);
+  const hits=raycaster.intersectObjects(meshes);
+  const ni=hits.length>0?meshes.indexOf(hits[0].object):-1;
+  if(ni!==hovIdx){
+    if(hovIdx>=0) chainGroups[hovIdx].mat.emissiveIntensity=2.1;
+    if(ni>=0) chainGroups[ni].mat.emissiveIntensity=4.2;
+    hovIdx=ni;
+    cv.style.cursor=ni>=0?'pointer':(isDrag?'grabbing':'grab');
+  }
+}
+
+cv.addEventListener('mousedown',e=>{isDrag=true;cv.classList.add('drag');dSX=e.clientX;dSY=e.clientY;dDist=0;});
+document.addEventListener('mouseup',e=>{
+  if(isDrag&&dDist<5){
+    m2d.x=(e.clientX/innerWidth)*2-1;m2d.y=-(e.clientY/innerHeight)*2+1;
+    raycaster.setFromCamera(m2d,camera);
+    const hits=raycaster.intersectObjects(chainGroups.map(cg=>cg.mesh));
+    if(hits.length>0) focusChain(chainGroups.map(cg=>cg.mesh).indexOf(hits[0].object));
+  }
+  isDrag=false;cv.classList.remove('drag');
+});
+document.addEventListener('mousemove',e=>{
+  if(!isDrag){checkHover(e.clientX,e.clientY);return;}
+  const dx=e.clientX-dSX,dy=e.clientY-dSY;
+  dDist+=Math.abs(dx)+Math.abs(dy);
+  oTheta-=dx*.006; oPhi=Math.max(.055,Math.min(1.2,oPhi+dy*.0045));
+  dSX=e.clientX;dSY=e.clientY;
+});
+cv.addEventListener('wheel',e=>{oR=Math.max(14,Math.min(95,oR+e.deltaY*.06));});
+
+// ── ANIMATE ───────────────────────────
+let t=0,activeLaunch=false;
+(function loop(){
+  requestAnimationFrame(loop);
+  t+=.01;
+  if(!isDrag) oTheta+=.0003;
+  const cp=camPos();
+  camera.position.set(cp.x,cp.y,cp.z);
+  camera.lookAt(focX,focY,focZ);
+
+  // Nexus (Atlas HotStuff core)
+  nexG.rotation.y+=.005;
+  nexG.rotation.x=Math.sin(t*.32)*.038;
+  nexCore.scale.setScalar(1+Math.sin(t*1.85)*.052);
+  nexLight.intensity=5+Math.sin(t*1.85)*.9;
+  atlasLight.position.x=Math.sin(t*.42)*8;
+  atlasLight.position.z=Math.cos(t*.42)*8;
+  atlasLight.intensity=2+Math.sin(t*1.1)*.6;
+  nexRings[0].rotation.z+=.009;
+  nexRings[1].rotation.y+=.007;
+  nexRings[2].rotation.x+=.011;
+
+  // Scan pulse (x3-turbine broadcast)
+  scanR+=.2;
+  if(scanR>38) scanR=0;
+  scanRing.scale.setScalar(scanR<.4?.4:scanR);
+  scanMat.opacity=Math.max(0,.5*(1-scanR/38));
+
+  // Chain nodes
+  chainGroups.forEach(({g,halo,halo2,basePos},i)=>{
+    g.rotation.y+=.006+i*.003;
+    g.rotation.x+=.003+i*.0012;
+    g.position.y=basePos[1]+Math.sin(t*.65+i*1.5)*.6;
+    halo.scale.setScalar(1+Math.sin(t*1.2+i*.85)*.11);
+    halo2.rotation.z+=.003+i*.0008;
+    cLights[i].intensity=1.7+Math.sin(t*2+i*.8)*.8;
+    cLights[i].position.y=g.position.y;
+  });
+
+  // Particles (ChronosFlash intents)
+  routeParticles.forEach(({pts,curve,offsets,speed})=>{
+    offsets.forEach((v,j)=>{offsets[j]=(v+speed)%1;});
+    const pa=pts.geometry.attributes.position;
+    offsets.forEach((v,j)=>{const pt=curve.getPoint(v);pa.setXYZ(j,pt.x,pt.y,pt.z);});
+    pa.needsUpdate=true;
+  });
+
+  // Route line pulse
+  routeData.forEach(({mat})=>{mat.opacity=(activeLaunch?.58:.08)+Math.sin(t*.9)*.03;});
+
+  renderer.render(scene,camera);
+})();
+
+// ── Focus node ────────────────────────
+let focTimer=null;
+const focusDefs=[
+  {name:'BTC FORTRESS',    sub:'Bitcoin · HTLC Bridge',          rpc:'bitcoin_htlc.rs · 32 confirms',      col:'#F7931A'},
+  {name:'ETHEREUM EVM',    sub:'Mainnet · Chain ID 1',           rpc:'https://eth.llamarpc.com',            col:'#627EEA'},
+  {name:'SOLANA SVM',      sub:'Mainnet-Beta · 1399811149',      rpc:'drpc.live · spl_token_bridge',       col:'#9945FF'},
+  {name:'ARBITRUM L2',     sub:'EVM Layer 2 · Chain 42161',      rpc:'https://arb1.arbitrum.io/rpc',       col:'#28A0F0'},
+  {name:'X3 CHAIN',        sub:'Atlas L1 · Tri-VM · HotStuff',   rpc:'https://rpc.x3-chain.io · 0x41544C53',col:'#00FFB2'},
+];
+function focusChain(idx){
+  const cd2=idx<4?chainDefs[idx]:{pos:[0,0,0]};
+  const fd=focusDefs[idx];
+  focX=cd2.pos[0]*.26;focY=0;focZ=cd2.pos[2]*.26;
+  oR=20;
+  const lbl=document.getElementById('focuslbl');
+  document.getElementById('fln').textContent=fd.name;
+  document.getElementById('fln').style.color=fd.col;
+  document.getElementById('fln').style.textShadow=`0 0 48px ${fd.col}`;
+  document.getElementById('fls').textContent=fd.sub;
+  document.getElementById('flrpc').textContent=fd.rpc;
+  lbl.classList.add('show');
+  showToast('🎯',fd.name,'→ '+fd.rpc+' · Click to route from this node');
+  clearTimeout(focTimer);
+  focTimer=setTimeout(()=>{focX=0;focY=0;focZ=0;oR=46;lbl.classList.remove('show');},3800);
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+// ═══════════════════════════════════════════
+//  UI LOGIC
+// ═══════════════════════════════════════════
+function setNav(el){document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));el.classList.add('on');}
+function setDock(el){document.querySelectorAll('.db').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+function swapDir(el){el.style.transform='rotate(180deg)';setTimeout(()=>el.style.transform='',340);}
+
+function setRt(el,path,out,time,risk,engine){
+  document.querySelectorAll('.rtb').forEach(b=>b.classList.remove('on'));el.classList.add('on');
+  const parts=path.split(',');
+  document.getElementById('rpath').innerHTML=parts.map((p,i)=>`<div class="rh ah">${p}</div>${i<parts.length-1?'<div class="rha">→</div>':''}`).join('');
+  document.getElementById('to-amt').textContent=out;
+  document.getElementById('rout').textContent=out+'.88 SOL';
+  document.getElementById('rstime').textContent='~'+time;
+  const rr=document.getElementById('rrisk');
+  rr.textContent=risk;
+  rr.className='rpv '+(risk==='NONE'||risk==='LOW'?'g':risk==='MED'?'w':'r');
+  document.getElementById('rengine').textContent=engine;
+}
+
+function selectChain(el,idx){
+  document.querySelectorAll('.cc').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  if(idx===4) focusChain(4); else focusChain(idx);
+}
+
+let walletOk=false;
+function connectWallet(){
+  if(walletOk)return;
+  walletOk=true;
+  const btn=document.getElementById('wbtn');
+  btn.className='waddr';btn.textContent='atls1q7f2...a9c3';btn.onclick=null;
+  addXP(100);
+  showToast('🔐','Wallet Connected','Atlas wallet · x3-wallet-cli · ATLS addr synced · +100 XP');
+}
+
+// ── ROUTE LAUNCH ──────────────────────
+let routeRunning=false;
+function launchRoute(){
+  if(routeRunning)return;
+  routeRunning=true;
+  activeLaunch=true;
+  const el=document.getElementById('at');
+  el.classList.add('show');
+  ['step0','step1','step2'].forEach((id,i)=>{
+    document.getElementById(id).className='step'+(i===0?' active':'');
+  });
+  document.getElementById('atpf').style.width='0%';
+  document.getElementById('atti').textContent='Apotheosis-TX: departing BTC Fortress...';
+  document.getElementById('blnch').style.opacity='.5';
+
+  let prog=0;
+  const iv=setInterval(()=>{
+    prog+=.85;
+    document.getElementById('atpf').style.width=Math.min(prog,100)+'%';
+    if(prog>=33&&prog<66){
+      document.getElementById('step0').className='step done';
+      document.getElementById('step1').className='step active';
+      document.getElementById('atti').textContent='x3-swap-router: converting via X3VM...';
+    } else if(prog>=66&&prog<100){
+      document.getElementById('step1').className='step done';
+      document.getElementById('step2').className='step active';
+      document.getElementById('atti').textContent='spl_token_bridge: settling on SVM...';
+    } else if(prog>=100){
+      clearInterval(iv);
+      document.getElementById('step2').className='step done';
+      document.getElementById('atti').textContent='✓ flash-finality confirmed · +51,204 SOL';
+      activeLaunch=false;routeRunning=false;
+      document.getElementById('blnch').style.opacity='1';
+      document.getElementById('mp0').style.width='100%';
+      addXP(250);addFeed();
+      showToast('✅','Route Confirmed','51,204.88 SOL · flash-finality · +250 XP earned');
+      showAchievement('⚡','Cross-VM Pioneer','Apotheosis-TX: BTC→X3VM→SVM confirmed');
+      setTimeout(()=>el.classList.remove('show'),4000);
+    }
+  },70);
+  showToast('🚀','Apotheosis-TX Launched','BTC → X3VM → SVM · ChronosFlash tracking...');
+}
+
+// ── XP ─────────────────────────────────
+let xp=2840;
+function addXP(n){
+  xp=Math.min(xp+n,4000);
+  document.getElementById('xpfill').style.width=(xp/4000*100).toFixed(1)+'%';
+  document.getElementById('xpnum').textContent=xp.toLocaleString()+' / 4,000 XP';
+  if(xp>=4000) document.getElementById('xprank').textContent='ARCH COMMANDER';
+}
+
+function showAchievement(ico,name,desc){
+  const a=document.getElementById('ach');
+  document.getElementById('achi').textContent=ico;
+  document.getElementById('achn').textContent=name;
+  document.getElementById('achd').textContent=desc;
+  a.classList.add('show');
+  setTimeout(()=>a.classList.remove('show'),4500);
+}
+
+// ── FACTION ────────────────────────────
+function setFaction(el,name,col){
+  document.querySelectorAll('.fp').forEach(p=>{p.style.cssText='';p.classList.remove('on');});
+  el.style.background=col;el.style.borderColor=col;el.style.color='#020810';el.style.fontWeight='700';
+  showToast('⚔️','Faction Locked',name+' · Atlas identity confirmed · cosmetics active');
+}
+
+// ── WORLD EVENTS ───────────────────────
+const events=[
+  {ico:'⚡',col:'#FFD700',bc:'rgba(255,215,0,.25)',txt:'ChronosFlash: high-volume EVM intent detected · 92% match · auto-routing via X3VM'},
+  {ico:'🔴',col:'#FF4D6D',bc:'rgba(255,77,109,.25)',txt:'BTC mempool 94% · HTLC bridge delay +15 min · alternative: EVM route recommended'},
+  {ico:'💜',col:'#9945FF',bc:'rgba(153,69,255,.25)',txt:'SVM velocity surge · drpc.live · spl_token_bridge optimal · 65k TPS peak'},
+  {ico:'🌐',col:'#FF2D78',bc:'rgba(255,45,120,.25)',txt:'X3VM quantum arb window · AtlasDex AMM +2.4% yield · 3 min remaining'},
+  {ico:'✅',col:'#00FFB2',bc:'rgba(0,255,178,.2)',txt:'All bridges nominal · x3-fees at minimum · GPU swarm turbo active · HotStuff finalized'},
+  {ico:'💙',col:'#28A0F0',bc:'rgba(40,160,240,.25)',txt:'Arbitrum L2 → X3 route surge · arb1.arbitrum.io · batch optimization active'},
+  {ico:'🔮',col:'#00E5FF',bc:'rgba(0,229,255,.2)',txt:'Atlas x3-turbine: shred broadcast 0ms latency · PoH hash rate 99.8%'},
+  {ico:'🤖',col:'#9945FF',bc:'rgba(153,69,255,.22)',txt:'GPU Swarm validator: 7 nodes active · multi-GPU dispatch · sig-verify accelerated'},
+];
+function triggerEvent(){
+  const ev=events[Math.floor(Math.random()*events.length)];
+  const w=document.getElementById('wev');
+  document.getElementById('wei').textContent=ev.ico;
+  const wet=document.getElementById('wet');
+  wet.textContent=ev.txt;wet.style.color=ev.col;
+  w.style.borderColor=ev.bc;w.classList.add('show');
+  setTimeout(()=>w.classList.remove('show'),5800);
+}
+setInterval(triggerEvent,15000);
+setTimeout(triggerEvent,5200);
+
+// ── LIVE FEED ──────────────────────────
+const fData=[
+  ['var(--svm)','atlas_x7','ChronosFlash: 22 ETH→SOL route · 91% intent match · 380ms'],
+  ['var(--evm)','0x44Bc','Apotheosis-TX: EVM→X3VM bridge $8.4k confirmed'],
+  ['var(--btc)','bc1p7a','bitcoin_htlc settled · 1.2 BTC → X3 vault'],
+  ['var(--nexus)','atlas_m','AtlasDex CLamm route · x3-turbine 0ms · flash-finality'],
+  ['var(--x3vm)','x3_arb','X3VM quantum arb +$1,840 · private-mempool protected'],
+  ['var(--evm)','0x9D4A','eth.llamarpc.com → arb1 bridge · 0.8 ETH'],
+  ['var(--arb)','arb_neo','Arbitrum L2 → X3 batch route · gas_optimization.rs'],
+  ['var(--svm)','drpc_q9','drpc.live spl_token_bridge · 840 SOL settle'],
+  ['var(--nexus)','gpu_v1','GPU swarm validator confirmed block · 7 signers · PoH✓'],
+  ['var(--evm)','0xAB88','Uniswap V3 → AtlasDex route optimize · $22k'],
+];
+function addFeed(){
+  const feed=document.getElementById('lfeed');
+  const d=fData[Math.floor(Math.random()*fData.length)];
+  const el=document.createElement('div');
+  el.className='fi';
+  el.innerHTML=`<div class="fdot" style="background:${d[0]}"></div><div class="ft"><span>${d[1]}</span> ${d[2]}</div><div class="ftm">now</div>`;
+  feed.insertBefore(el,feed.firstChild);
+  if(feed.children.length>16) feed.removeChild(feed.lastChild);
+  feed.querySelectorAll('.ftm').forEach((e,i)=>{if(!i)return;const v=parseInt(e.textContent)||0;e.textContent=(v+2+Math.floor(Math.random()*3))+'s';});
+}
+setInterval(addFeed,2800);
+
+// ── TICKER ─────────────────────────────
+function tick(){
+  [{id:'tp-x3',b:24.18,r:.65,d:2},{id:'tp-btc',b:97441,r:280,d:0},{id:'tp-eth',b:3882,r:32,d:0},{id:'tp-sol',b:188.4,r:2.8,d:2}].forEach(({id,b,r,d})=>{
+    const el=document.getElementById(id);
+    const ov=parseFloat(el.textContent.replace(/[$,]/g,''))||b;
+    const nv=b+(Math.random()-.48)*r;
+    el.classList.toggle('up',nv>=ov);el.classList.toggle('dn',nv<ov);
+    el.textContent='$'+nv.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+  });
+}
+setInterval(tick,2200);
+
+// ── LIVE METRICS ───────────────────────
+setInterval(()=>{
+  document.getElementById('hm-routes').textContent=(1370+Math.floor(Math.random()*82)).toLocaleString();
+  document.getElementById('hm-tps').textContent=(60000+Math.floor(Math.random()*9000)).toLocaleString();
+  document.getElementById('x3-tps').textContent=(60000+Math.floor(Math.random()*9000)).toLocaleString();
+  document.getElementById('sol-tps').textContent=(4500+Math.floor(Math.random()*800)).toLocaleString();
+  const g=8+Math.floor(Math.random()*180);
+  document.getElementById('gas-evm').textContent=g+' gwei';
+  document.getElementById('btc-fee').textContent=(14+Math.floor(Math.random()*28))+' sat/vB';
+},4400);
+
+// ── CHAIN STATUS ───────────────────────
+const cstats={
+  0:['▸ HTLC BRIDGE · VAULT SECURE','▸ MEMPOOL NORMAL · ROUTING','▸ SPV SYNC · FORT ACTIVE'],
+  1:['▸ eth.llamarpc.com · NOMINAL','▸ GAS ELEVATED · ROUTING','▸ UNISWAP V3 · CURVE ACTIVE'],
+  2:['▸ drpc.live · VELOCITY MAX','▸ spl_token_bridge NOMINAL','▸ JUPITER · ORCA ACTIVE'],
+  3:['▸ arb1.arbitrum.io · L2 LIVE','▸ BATCH ROUTE · OPTIMAL','▸ GAS OPTIMAL · 250ms'],
+};
+setInterval(()=>{
+  [0,1,2,3].forEach(i=>{
+    const s=cstats[i];
+    const el=document.getElementById('cl-'+i);
+    if(el) el.textContent=s[Math.floor(Math.random()*s.length)];
+  });
+  [0,1,2,3].forEach(i=>{
+    const el=document.getElementById('rc-'+i);
+    const bases=[142,847,339,228];
+    if(el) el.textContent=bases[i]+Math.floor(Math.random()*12)-4;
+  });
+  document.getElementById('x3-vals').textContent=7+Math.floor(Math.random()*2);
+},5600);
+
+// ── TOAST ──────────────────────────────
+function showToast(ico,title,body){
+  ['t-ico','t-title','t-body'].forEach((id,i)=>{document.getElementById(id).textContent=[ico,title,body][i];});
+  const t=document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'),4800);
+}
+
+// ── BOOT ───────────────────────────────
+setTimeout(()=>showToast('⚡','X3 Atlas Online','HotStuff finalized · GPU swarm 7/7 · ChronosFlash active · rpc.x3-chain.io'),1600);
+setTimeout(()=>showAchievement('🌐','Atlas Commander','X3 Chain command deck initialized · x3star.net'),5200);
+</script>
+</body>
+</html>

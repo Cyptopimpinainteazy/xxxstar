@@ -1,0 +1,25 @@
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
+
+# Do not force `SKIP_WASM_BUILD` globally.
+# Setting it here causes runtime/build.rs to generate a stub `wasm_binary.rs`
+# (WASM_BINARY = None), which breaks node startup for dev/local chains.
+#
+# Opt-in only when you explicitly want faster compile/check loops without
+# embedded runtime WASM:
+#   SKIP_WASM_BUILD=1 cargo check
+
+# Raise the compiler thread stack size to prevent ICE/SIGSEGV when type-checking
+# deep generic graphs in x3-gpu-validator-swarm + libp2p + Substrate dependencies.
+# Cap parallel jobs to 4: libsecp256k1 + Substrate generics cause memory pressure
+# when many 128 MB-stack rustc processes run concurrently.
+[build]
+jobs = 4
+
+[env]
+RUST_MIN_STACK = "134217728"
+
+

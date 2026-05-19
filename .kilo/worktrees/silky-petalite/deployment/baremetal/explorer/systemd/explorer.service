@@ -1,0 +1,17 @@
+[Unit]
+Description=X3 Chain Explorer (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=explorer
+Group=explorer
+WorkingDirectory=/opt/explorer
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Atomic Star Cloud Credits</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b11;--surface:#0f1720;--text:#f8fafc;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#070b11;color:var(--text);font-family:'Roboto Mono',monospace;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 32px;background:rgba(3,8,16,0.95);border-bottom:1px solid rgba(148,163,184,0.12);position:sticky;top:0;z-index:20;}
+nav .brand{font-family:'Big Shoulders Display',sans-serif;font-size:20px;color:var(--accent);letter-spacing:0.24em;text-transform:uppercase;}
+nav .nav-links{display:flex;gap:18px;}
+nav a{font-size:12px;text-transform:uppercase;color:var(--muted);text-decoration:none;letter-spacing:0.18em;}
+nav a:hover{color:#fff;}
+.hero{padding:72px 32px 24px;max-width:1120px;margin:0 auto;}
+.hero-kicker{font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;}
+.hero-title{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(46px,6vw,82px);line-height:0.95;max-width:860px;margin-bottom:22px;color:#fff;}
+.hero-title span{color:#a5f3fc;}
+.hero-copy{font-size:16px;color:var(--muted);max-width:760px;margin-bottom:32px;}
+.hero-buttons{display:flex;flex-wrap:wrap;gap:14px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 24px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;text-decoration:none;transition:transform 0.2s ease,background 0.2s ease;}
+.btn-primary{background:linear-gradient(135deg,#38bdf8,#22d3ee);color:#04111e;}
+.btn-secondary{background:rgba(255,255,255,0.04);color:var(--text);border:1px solid rgba(148,163,184,0.16);}
+.btn:hover{transform:translateY(-1px);}
+.container{max-width:1120px;margin:0 auto;padding:0 32px;}
+.section{margin-top:36px;padding-bottom:32px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.section:last-of-type{border:none;}
+.section h2{font-family:'Big Shoulders Display',sans-serif;font-size:30px;color:#fff;margin-bottom:16px;}
+.section p{color:var(--muted);font-size:15px;max-width:900px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px;}
+.card{background:rgba(255,255,255,0.03);border:1px solid rgba(148,163,184,0.08);border-radius:20px;padding:24px;}
+.card h3{font-size:18px;color:#fff;margin-bottom:10px;}
+.card p{color:var(--muted);font-size:14px;line-height:1.8;}
+.card ul{margin-top:12px;list-style:none;padding-left:0;display:grid;gap:10px;}
+.card li{padding-left:18px;position:relative;color:var(--muted);font-size:14px;}
+.card li:before{content:'▹';position:absolute;left:0;top:0;color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(200px,1fr));gap:18px;margin-top:28px;}
+.status{background:#0f1720;border:1px solid rgba(56,189,248,0.13);border-radius:18px;padding:22px;}
+.status h4{font-size:13px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:12px;}
+.status p{color:var(--muted);font-size:14px;}
+</style>
+<script src="/js/x3-site-nav.js"></script>
+</head>
+<body>
+<nav>
+  <div class="brand">X3 Atomic Star</div>
+  <div class="nav-links"><a href="/grants/index.html">Grants Portal</a><a href="/x3star-grant-hub.html">Grant Hub</a><a href="/x3star-landing.html">Home</a></div>
+</nav>
+<section class="hero">
+  <div class="hero-kicker">Cloud Credits</div>
+  <h1 class="hero-title">Cloud infrastructure credits for a proof-driven multi-VM testnet.</h1>
+  <p class="hero-copy">X3 Atomic Star needs credits to operate validator/testnet nodes, RPC endpoints, archive/indexers, monitoring, AI workloads, and GPU benchmark infrastructure. This page frames the fund ask as operational readiness, not token marketing.</p>
+  <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Request infrastructure plan</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Sponsor cloud credits</a></div>
+</section>
+<div class="container">
+  <div class="section">
+    <h2>Problem</h2>
+    <p>Serious blockchain infrastructure requires reliable compute, storage, networking, and monitoring before it can safely scale from prototype to shared testnet. Without credits, every benchmark, validator node, and API endpoint is constrained to one-off hardware and brittle environments.</p>
+  </div>
+  <div class="section">
+    <h2>X3 solution</h2>
+    <p>X3 uses cloud credits to build a hardened infrastructure stack for public testnet operations, validator orchestration, AI route/risk compute, benchmark pipelines, and observability dashboards. This is the foundation that proves readiness before a wider launch.</p>
+    <div class="two-col">
+      <div class="card"><h3>Validator / Testnet Nodes</h3><p>Deploy multiple independent validator nodes across regions, with warm backups and recovery orchestration. Cloud credits reduce risk and let us prove validator resilience without buying hardware upfront.</p></div>
+      <div class="card"><h3>RPC / Indexing / Archive</h3><p>Host public RPC endpoints and archive node services for external developers. Reliable RPC access is the minimum infrastructure ask for any ecosystem funder.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Infrastructure needs</h2>
+    <div class="two-col">
+      <div class="card"><ul><li>Validator and testnet nodes</li><li>Archive/indexer nodes</li><li>Grafana / Prometheus monitoring</li><li>Cloudflare edge/API protection</li></ul></div>
+      <div class="card"><ul><li>AI inference and training credits</li><li>GPU benchmark workloads</li><li>backup and disaster recovery</li><li>network/availability stability</li></ul></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>What funding unlocks</h2>
+    <div class="feature-grid">
+      <div class="feature"><h3>Public testnet</h3><p>A testnet that external developers can access reliably, with production-style availability SLAs.</p></div>
+      <div class="feature"><h3>Monitoring and observability</h3><p>Real-time validator health, RPC latency, route success metrics, and readiness score dashboards.</p></div>
+      <div class="feature"><h3>AI workloads</h3><p>Compute for StarSignal routing models and GPU benchmark experiments.</p></div>
+      <div class="feature"><h3>Recovery and resiliency</h3><p>Backup nodes, failover plans, and disaster recovery for infrastructure proof points.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Milestone roadmap</h2>
+    <div class="card"><h3>Phase 1 — Cloud foundation</h3><p>Deploy core validator/testnet cluster, public RPC, and monitoring stack. Validate uptime and pipeline performance.</p></div>
+    <div class="card"><h3>Phase 2 — AI and benchmark layer</h3><p>Provision AI compute and GPU credits for X3 Reactor, telemetry ingestion, and route risk modeling.</p></div>
+    <div class="card"><h3>Phase 3 — public readiness</h3><p>Publish public infrastructure dashboard, benchmark reports, and testnet readiness proof.</p></div>
+  </div>
+  <div class="section">
+    <h2>Funding use breakdown</h2>
+    <div class="status-grid">
+      <div class="status"><h4>Validator/Testnet</h4><p>30% of credits for multi-region validator nodes and warm backup infrastructure.</p></div>
+      <div class="status"><h4>RPC/Indexing</h4><p>20% for public APIs, archive nodes, and developer-facing repeatable endpoints.</p></div>
+      <div class="status"><h4>Monitoring/Security</h4><p>20% for Grafana, Prometheus, endpoint protection, and network resiliency.</p></div>
+      <div class="status"><h4>AI/Benchmarks</h4><p>25% for StarSignal and Reactor workloads, with repeatable benchmark execution.</p></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Proof / demo</h2>
+    <p>We will publish a cloud-funded infrastructure dashboard with uptime, RPC latency, validator count, block height, and readiness score, plus signed benchmark artifacts.</p>
+  </div>
+  <div class="section">
+    <div class="hero-buttons"><a class="btn btn-primary" href="mailto:funding@x3star.io">Provide cloud credits</a><a class="btn btn-secondary" href="mailto:funding@x3star.io">Request infra plan</a></div>
+  </div>
+</div>
+</body>
+</html>

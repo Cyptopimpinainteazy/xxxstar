@@ -1,0 +1,71 @@
+[package]
+name = "x3-x3-integration"
+version = "0.1.0"
+edition = "2021"
+description = "X3 Chain integration for X3 virtual machine and compiler"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# X3 core (std-only — heavy deps; not used in WASM runtime)
+x3-vm = { path = "../x3-vm", optional = true }
+x3-compiler = { path = "../x3-compiler", optional = true }
+x3-backend = { path = "../x3-backend", optional = true }
+x3-common = { path = "../x3-common", default-features = false }
+x3-verifier = { path = "../x3-verifier", optional = true }
+
+# Cross-VM executor traits (real backends are provided by the caller)
+x3-evm-integration = { path = "../evm-integration", default-features = false }
+x3-svm-integration = { path = "../svm-integration", default-features = false }
+
+# Substrate primitives
+sp-core = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+frame-support = { workspace = true, default-features = false }
+
+# Encoding
+codec = { workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+# Error handling
+thiserror = { version = "1.0", optional = true }
+
+# Logging
+log = { version = "0.4", default-features = false }
+
+[dev-dependencies]
+env_logger = "0.10"
+x3-evm-integration = { path = "../evm-integration", default-features = false, features = ["std", "test-utils"] }
+x3-svm-integration = { path = "../svm-integration", default-features = false, features = ["std", "test-utils"] }
+
+[features]
+default = ["std"]
+std = [
+    "sp-core/std",
+    "sp-std/std",
+    "sp-runtime/std",
+    "sp-io/std",
+    "frame-support/std",
+    "codec/std",
+    "scale-info/std",
+    "serde",
+    "thiserror",
+    "log/std",
+    "x3-common/std",
+    "x3-evm-integration/std",
+    "x3-svm-integration/std",
+    "x3-vm",
+    "x3-compiler",
+    "x3-backend",
+    "x3-verifier",
+]
+# Enable contract compilation from source
+compile = []
+# Enable JIT compilation hints
+jit = ["x3-vm/jit-hints"]
+# Enable detailed gas metering
+gas-metering = ["x3-vm/gas-metering"]

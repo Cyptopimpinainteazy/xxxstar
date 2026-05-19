@@ -1,0 +1,270 @@
+{
+  "project": "X3 Chain - Decentralized AI Agent Swarm",
+  "branchName": "ralph/ai-agent-swarm",
+  "description": "Build a revolutionary decentralized AI agent network on X3 Chain leveraging dual-VM execution for trustless, verifiable AI computations.",
+  "userStories": [
+    {
+      "id": "AI-001",
+      "title": "AI Agent Identity Pallet - Decentralized Agent Registry",
+      "description": "Implement a Substrate pallet for registering AI agents with cryptographic identities, capabilities, and reputation scores. Agents are first-class citizens on X3 Chain with on-chain verification of their provider (EVM or SVM).\n\n**Key Requirements:**\n- Agent ID: SS58 address (EVM) or Pubkey (SVM)\n- Metadata: name, description, capabilities (array), model types supported\n- Reputation: score (0-100), total_jobs_completed, total_eth_earned\n- Staking: minimum 100 X3 tokens to register, slashing for malicious behavior\n- Verification: ZK proof of model ownership (commit to model hash)\n\n**Storage Items:**\n- `Agents<T>(AgentId) -> AgentInfo`\n- `CapabilityIndex<T>(Capability) -> Vec<AgentId>`\n- `ReputationLeaderboard<T> -> Vec<(AgentId, u32)>`\n\n**Extrinsics:**\n- `register_agent(metadata, capabilities, model_hash)` - pay deposit\n- `update_agent(metadata, capabilities)` - only owner\n- `submit_reputation(agent_id, job_id, rating)` - verified by job completion\n- `slash_agent(agent_id, reason)` - admin only\n\n**Events:**\n- `AgentRegistered(agent_id, owner)`\n- `AgentUpdated(agent_id)`\n- `ReputationUpdated(agent_id, new_score)`\n- `AgentSlashed(agent_id, amount, reason)`\n\n**Benchmarks:**\n- Register: < 500k gas\n- Reputation update: < 100k gas\n\n**Tests:**\n- Unit tests for all pallet logic\n- Integration test: agent registers, completes job, gets rating\n- Benchmark all extrinsics",
+      "acceptanceCriteria": [
+        "PASS: Agent can register with metadata and capabilities",
+        "PASS: Agent cannot register without minimum stake",
+        "PASS: Reputation updates correctly after job completion",
+        "PASS: Slashing reduces stake and deactivates agent if below threshold",
+        "PASS: Capability index allows querying agents by capability",
+        "PASS: All benchmarks complete and gas estimates documented",
+        "PASS: 100% unit test coverage for pallet"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "This is the foundation - all AI agents must be registered on-chain"
+    },
+    {
+      "id": "AI-002",
+      "title": "Job Marketplace Pallet - Decentralized AI Task Marketplace",
+      "description": "Create a marketplace where users post AI computation jobs and agents bid to complete them. Jobs include inference, training, fine-tuning, and data labeling tasks.\n\n**Job Structure:**\n- `job_id`: H256\n- `poster`: T::AccountId\n- `spec`: JobSpec (model_type, input_schema, output_schema, timeout, max_price)\n- `bids`: Vec<(AgentId, Price, Bond)>`\n- `assigned_agent`: Option<AgentId>\n- `status`: Pending -> Assigned -> InProgress -> Completed -> Verified -> Paid\n- `result_hash`: Option<H256> (commit to result on IPFS/Arweave)\n\n**Extrinsics:**\n- `post_job(spec, max_price, timeout_blocks)` - poster locks max_price\n- `submit_bid(job_id, price, bond)` - agent locks bond as guarantee\n- `assign_job(job_id, agent_id)` - poster selects winning bid\n- `submit_result(job_id, result_hash, zk_proof)` - agent uploads result with proof\n- `verify_result(job_id, accept)` - poster verifies or disputes\n- `release_payment(job_id)` - pay agent after verification\n- `cancel_job(job_id)` - refund to poster if no bids\n\n**Economic Model:**\n- Poster locks max_price + dispute bond\n- Agent locks bid bond (10% of bid price)\n- Dispute: 3-day challenge period with ZK verification\n- Slashing: dishonest agent loses bond, gets reputation penalty\n\n**On-Chain Verifications:**\n- ZK proof that result matches model execution (using zkSNARKs)\n- Timeout enforcement: automatic refund if no result\n- Result hash commitment prevents equivocation\n\n**Tests:**\n- Full job lifecycle: post -> bid -> assign -> complete -> verify -> pay\n- Dispute scenario: agent submits invalid result, gets slashed\n- Timeout scenario: automatic refund\n- Front-running protection",
+      "acceptanceCriteria": [
+        "PASS: User can post job with spec and max price",
+        "PASS: Agents can submit bids with bonded amounts",
+        "PASS: Poster can assign job to specific agent",
+        "PASS: Agent can submit result with ZK proof",
+        "PASS: Poster can verify and release payment",
+        "PASS: Dispute mechanism works with slashing",
+        "PASS: Timeout automatically refunds poster",
+        "PASS: All economic incentives are correctly enforced"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Core marketplace functionality - must be secure against front-running and griefing"
+    },
+    {
+      "id": "AI-003",
+      "title": "ZK Model Verification - Trustless AI Output Verification",
+      "description": "Implement zkSNARK circuits to verify that AI inference results were produced by the claimed model without revealing the model weights or input data. Use Groth16 with Poseidon hash for EVM compatibility.\n\n**Circuit Design:**\n- Inputs: model_hash (private), input_commitment (private), output (public), nonce (private)\n- Constraints: output = f(model_hash, input, nonce) where f is the model's forward pass\n- Verification key stored on-chain, proving key distributed to agents\n\n**On-Chain Components:**\n- `VerificationKeyRegistry<T>` stores VK for each model hash\n- `verify_zk_proof(job_id, proof, public_inputs)` extrinsic\n- Gas cost: < 5M gas per verification (optimize with precompiles)\n\n**Agent Requirements:**\n- Must generate ZK proof for every job completion\n- Proof submission mandatory for payment release\n- Invalid proof = slashing + reputation hit\n\n**Implementation Steps:**\n1. Define circuit in circom/snarkjs\n2. Generate trusted setup (powers of tau)\n3. Compile circuit to verifier contract (Solidity for EVM, Rust for SVM)\n4. Deploy verifier to X3 Chain (EVM pallet)\n5. Integrate verification into job marketplace\n6. Benchmark proof generation and verification times\n\n**Models to Support Initially:**\n- Llama 3.2 3B (instruction-tuned)\n- Stable Diffusion XL (image generation)\n- Whisper V3 (speech-to-text)\n- Custom fine-tuned models (user-provided)\n\n**Performance Targets:**\n- Proof generation: < 30 seconds on GPU\n- On-chain verification: < 500k gas\n- Proof size: < 2KB\n\n**Tests:**\n- End-to-end: agent generates proof, chain verifies, payment released\n- Invalid proof rejection\n- Replay attack prevention",
+      "acceptanceCriteria": [
+        "PASS: ZK circuit correctly verifies model execution",
+        "PASS: On-chain verification costs < 5M gas",
+        "PASS: Proof generation completes in < 30s on RTX 4090",
+        "PASS: Invalid proofs are rejected and agent slashed",
+        "PASS: Verification keys can be updated via governance",
+        "PASS: Circuit is open-source and audit-ready"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "This is the trust layer - critical for decentralized AI trustlessness"
+    },
+    {
+      "id": "AI-004",
+      "title": "EVM-SVM Bridge for AI Model Portability",
+      "description": "Enable AI models trained on SVM (Solana) to be executed on EVM and vice versa through a secure bridge with ZK-proof-based state verification. This allows agents to use models from either ecosystem.\n\n**Bridge Architecture:**\n- Two-way message passing between EVM and SVM\n- Model hash commitments on both sides\n- ZK light client for cross-VM verification\n\n**Components:**\n1. **Bridge Pallet** (runtime):\n   - `lock_model(source_vm, model_hash, owner)` - commit model on source\n   - `unlock_model(dest_vm, proof)` - prove burn on source, mint on dest\n   - `verify_cross_vm_proof(proof)` - ZK verification of source state\n\n2. **EVM Contracts**:\n   - `BridgeRouter.sol` - standard ERC-20 bridge pattern\n   - `ModelPortal.sol` - model mint/burn with ZK verification\n\n3. **SVM Program**:\n   - `bridge_instruction` - handle lock/unlock\n   - `verify_proof_instruction` - verify ZK light client proof\n\n**Security Model:**\n- 2/3 of bridge validators must sign off (same as consensus)\n- 7-day challenge period for suspicious transfers\n- Slashing for malicious validators\n\n**Use Cases:**\n- Agent on EVM uses model originally registered on SVM\n- Cross-VM model marketplace\n- Federated learning across VMs\n\n**Tests:**\n- Lock on EVM, unlock on SVM with valid proof\n- Reject unlock with invalid proof\n- Challenge period enforcement\n- Validator set rotation",
+      "acceptanceCriteria": [
+        "PASS: Model can be locked on EVM and unlocked on SVM with ZK proof",
+        "PASS: Bridge rejects invalid proofs",
+        "PASS: 2/3 validator threshold enforced",
+        "PASS: 7-day challenge period works",
+        "PASS: Cross-VM model transfer preserves ownership",
+        "PASS: All bridge events are indexed for explorer"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Enables unified AI agent ecosystem across both VMs"
+    },
+    {
+      "id": "AI-005",
+      "title": "GPU Validator Integration - Proof-of-Compute for AI",
+      "description": "Integrate the cross-chain-gpu-validator to provide decentralized GPU compute for AI workloads. Validators stake X3 tokens and are randomly selected to verify agent computations.\n\n**Integration Points:**\n1. **Job Assignment**: Marketplace selects GPU validator randomly from active set\n2. **Proof Submission**: Agent submits computation + ZK proof to validator\n3. **Validation**: Validator independently recomputes and attests\n4. **Attestation**: Validator signs attestation, posted on-chain\n5. **Reward**: Both agent and validator receive payment\n\n**Validator Requirements:**\n- Stake: 10,000 X3 tokens\n- Hardware: GPU with 24GB+ VRAM (NVIDIA RTX 4090 or better)\n- Software: CUDA 12+, X3 GPU client\n- Uptime: > 99% availability\n\n**Attestation Logic:**\n- Validator recomputes job using same model and input\n- Compares result hash to agent's submitted result\n- If match: sign attestation, earn 5% of job reward\n- If mismatch: reject, agent gets slashed, validator earns 10% of slashed amount\n\n**On-Chain Components:**\n- `ValidatorSet<T>`: active validators with stakes\n- `Attestations<T>(job_id) -> Vec<ValidatorId, Signature>`\n- `slash_validator(validator_id, reason)` - for offline or malicious\n\n**Reward Distribution:**\n- Agent: 85% of job payment\n- Primary validator: 10%\n- Secondary validators (2): 2.5% each\n- Treasury: 2% (for maintenance)\n\n**Tests:**\n- Validator registration and staking\n- Job assignment to validator\n- Successful attestation flow\n- Slashing for invalid result\n- Validator churn (joining/leaving)\n- DoS resistance (rate limiting)",
+      "acceptanceCriteria": [
+        "PASS: GPU validators can register with 10k X3 stake",
+        "PASS: Jobs are randomly assigned to validators",
+        "PASS: Validators earn rewards for correct attestations",
+        "PASS: Agents get slashed for incorrect results",
+        "PASS: Validators get slashed for offline behavior",
+        "PASS: Reward distribution is automatic and fair",
+        "PASS: Validator set can scale to 100+ nodes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "This provides the decentralized verification layer - critical for trust"
+    },
+    {
+      "id": "AI-006",
+      "title": "TypeScript SDK - AI Agent Client Library",
+      "description": "Build a comprehensive TypeScript SDK for developers to interact with the AI Agent Swarm. Include wallet management, job submission, result retrieval, and agent registration.\n\n**SDK Structure:**\n```\n@x3-chain/ai-sdk/\n  ├── core/\n  │   ├── client.ts - main client\n  │   ├── types.ts - all TypeScript types\n  │   └── wallet.ts - key management\n  ├── agent/\n  │   ├── registry.ts - agent registration\n  │   ├── reputation.ts - reputation queries\n  │   └── models.ts - model management\n  ├── jobs/\n  │   ├── marketplace.ts - job posting/bidding\n  │   ├── submission.ts - result submission\n  │   └── tracking.ts - job status tracking\n  ├── zk/\n  │   ├── proof.ts - ZK proof generation\n  │   └── verification.ts - on-chain verification\n  └── utils/\n      ├── ipfs.ts - IPFS integration for results\n      └── arweave.ts - Arweave for permanent storage\n```\n\n**Key Features:**\n- Wallet generation and management (SS58, EVM addresses)\n- Agent registration with metadata\n- Job posting with flexible specs\n- Real-time job status via WebSocket subscriptions\n- Automatic ZK proof generation (using snarkjs)\n- IPFS/Arweave integration for result storage\n- Type-safe API with full TypeScript definitions\n- React hooks for frontend integration\n\n**Example Usage:**\n```typescript\nimport { X3AIClient } from '@x3-chain/ai-sdk';\n\nconst client = new X3AIClient({ rpcUrl: 'wss://x3-chain.org' });\nawait client.connect();\n\n// Register as an agent\nawait client.agent.register({\n  name: 'CodeReviewerGPT',\n  capabilities: ['code-review', 'security-audit', 'refactoring'],\n  model: 'qwen3:8b',\n  modelHash: '0x1234...'\n});\n\n// Post a job\nconst job = await client.jobs.post({\n  spec: {\n    type: 'code-review',\n    inputSchema: { files: 'string[]', language: 'string' },\n    outputSchema: { issues: 'Issue[]', score: 'number' }\n  },\n  maxPrice: 100n, // in X3 tokens\n  timeout: 1000 // blocks\n});\n\n// Listen for job status\njob.on('assigned', () => console.log('Job assigned!'));\njob.on('completed', (result) => console.log('Result:', result));\n```\n\n**Testing:**\n- Unit tests for all SDK methods\n- Integration tests against local testnet\n- Mock server for offline development\n- E2E tests with real jobs\n\n**Documentation:**\n- API reference (typedoc)\n- Quick start guide\n- Tutorial: building your first AI agent\n- Example projects: code reviewer, image generator, data analyzer\n\n**Publishing:**\n- npm package: `@x3-chain/ai-sdk`\n- Include type definitions\n- Support ESM and CommonJS\n- Semantic versioning",
+      "acceptanceCriteria": [
+        "PASS: Client can connect to X3 Chain RPC",
+        "PASS: Agent can register with all metadata",
+        "PASS: Job can be posted with valid spec",
+        "PASS: Real-time subscriptions work via WebSocket",
+        "PASS: ZK proof generation integrates correctly",
+        "PASS: IPFS/Arweave uploads succeed",
+        "PASS: SDK has 100% TypeScript type coverage",
+        "PASS: All unit tests pass (>90% coverage)",
+        "PASS: Documentation is complete with examples",
+        "PASS: Package published to npm"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Developer experience is critical - SDK must be intuitive and well-documented"
+    },
+    {
+      "id": "AI-007",
+      "title": "Python SDK - AI Agent Library for Data Science",
+      "description": "Create a Python SDK targeting data scientists and ML engineers. Support Jupyter notebooks, async job submission, and seamless integration with popular ML frameworks (PyTorch, TensorFlow, HuggingFace).\n\n**SDK Structure:**\n```\nx3_ai_sdk/\n  ├── __init__.py\n  ├── client.py - async client with asyncio\n  ├── agent.py - Agent class with decorator syntax\n  ├── job.py - Job submission and management\n  ├── models.py - Model registry and loading\n  ├── zk.py - ZK proof generation (using snarkjs/py-snark)\n  ├── storage.py - IPFS/Arweave integration\n  └── utils.py - Helper functions\n```\n\n**Key Features:**\n- Async/await pattern for non-blocking operations\n- Context manager for connection lifecycle\n- Decorator-based agent definition:\n  ```python\n  @agent(capabilities=['image-generation'], model='stable-diffusion-xl')\n  class MyAgent:\n      async def process(self, input):\n          return generate_image(input)\n  ```\n- Automatic ZK proof generation for model outputs\n- Pandas/NumPy integration for data jobs\n- HuggingFace model loading and hashing\n- Jupyter notebook magic commands\n- CLI tool for agent management\n\n**Example Workflow:**\n```python\nimport asyncio\nfrom x3_ai_sdk import X3AIClient\n\nasync def main():\n    client = X3AIClient('wss://x3-chain.org')\n    await client.connect()\n    \n    # Register agent\n    agent = await client.register_agent(\n        name='ImageGenAgent',\n        capabilities=['image-generation', 'inpainting'],\n        model='sdxl-turbo',\n        model_hash=compute_model_hash('sdxl-turbo')\n    )\n    \n    # Post job\n    job = await client.post_job(\n        spec={\n            'type': 'image-generation',\n            'prompt': 'A cyberpunk city at night',\n            'negative_prompt': 'blurry, low quality'\n        },\n        max_price=500\n    )\n    \n    # Wait for completion\n    result = await job.wait(timeout=300)\n    print(f'Generated image: {result.image_url}')\n    \n    # Download result from IPFS\n    image = await client.storage.download(result.image_cid)\n    image.save('output.png')\n\nasyncio.run(main())\n```\n\n**Testing:**\n- Unit tests with pytest (100% coverage)\n- Integration tests against local testnet\n- Property-based testing with Hypothesis\n- Performance benchmarks\n\n**Packaging:**\n- PyPI package: `x3-ai-sdk`\n- Support Python 3.9+\n- Optional GPU dependencies (torch, transformers)\n- Docker image for reproducible environment",
+      "acceptanceCriteria": [
+        "PASS: Client connects and authenticates correctly",
+        "PASS: Agent registration works with all metadata",
+        "PASS: Job posting and tracking works end-to-end",
+        "PASS: ZK proof generation integrates with Python ML stack",
+        "PASS: Async operations don't block event loop",
+        "PASS: Jupyter integration works seamlessly",
+        "PASS: All unit tests pass (>90% coverage)",
+        "PASS: Package installs via pip without errors",
+        "PASS: Documentation includes Python examples"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Python is the language of AI - this SDK is crucial for adoption"
+    },
+    {
+      "id": "AI-008",
+      "title": "Frontend Dashboard - AI Agent Marketplace UI",
+      "description": "Build a beautiful, responsive Next.js dashboard for browsing agents, posting jobs, tracking progress, and managing reputation. Use Tailwind CSS, shadcn/ui components, and real-time updates via WebSocket.\n\n**Pages:**\n1. **Home** - Marketplace overview, featured agents, recent jobs\n2. **Agent Directory** - Search/filter agents by capability, price, reputation\n3. **Agent Detail** - Full agent profile, stats, reviews, portfolio\n4. **Post Job** - Form to create new AI job with spec builder\n5. **My Jobs** - Dashboard for job owners to track and manage\n6. **Agent Dashboard** - For agents to view bids, submit results, track earnings\n7. **Leaderboard** - Top agents by reputation, earnings, jobs completed\n8. **Wallet** - Token balance, staking, withdrawals\n\n**Tech Stack:**\n- Next.js 15 with App Router\n- TypeScript strict mode\n- Tailwind CSS + shadcn/ui\n- TanStack Query for data fetching\n- Zustand for client state\n- Viem for wallet connection\n- WebSocket for real-time updates\n- React Query for server state\n\n**Key Components:**\n- `AgentCard` - preview with avatar, name, capabilities, rating, price\n- `JobCard` - status, spec, budget, deadline\n- `SpecBuilder` - visual editor for job specifications (JSON schema)\n- `ResultViewer` - display results with IPFS/Arweave links\n- `ReputationChart` - agent's rating history\n- `EarningsChart` - agent's earnings over time\n- `WalletConnect` - connect EVM/SVM wallets\n- `NotificationCenter` - real-time alerts\n\n**Real-Time Features:**\n- Job status updates (assigned, in-progress, completed)\n- New job notifications for agents\n- Price alerts\n- Chat between poster and agent (optional)\n\n**Responsive Design:**\n- Mobile-first approach\n- Tablet and desktop optimized\n- Dark mode support\n\n**Accessibility:**\n- WCAG 2.1 AA compliant\n- Keyboard navigation\n- Screen reader support\n- High contrast mode\n\n**Performance:**\n- Core Web Vitals: LCP < 2.5s, CLS < 0.1, INP < 200ms\n- Image optimization with Next.js Image\n- Code splitting and lazy loading\n- Edge caching for static assets\n\n**Tests:**\n- Component tests with Vitest + Testing Library\n- E2E tests with Playwright\n- Visual regression tests\n- Accessibility audits",
+      "acceptanceCriteria": [
+        "PASS: All pages render correctly on mobile, tablet, desktop",
+        "PASS: Real-time updates work via WebSocket (< 1s latency)",
+        "PASS: Wallet connection works for EVM and SVM",
+        "PASS: Job posting flow is intuitive (< 5 steps)",
+        "PASS: Agent search/filter works with 1000+ agents",
+        "PASS: Performance metrics meet Core Web Vitals standards",
+        "PASS: Accessibility audit passes (no violations)",
+        "PASS: All component tests pass (>80% coverage)",
+        "PASS: E2E tests cover critical user journeys"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "This is the user-facing interface - must be polished and performant"
+    },
+    {
+      "id": "AI-009",
+      "title": "IPFS/Arweave Integration - Decentralized Result Storage",
+      "description": "Integrate decentralized storage for AI job results. Use IPFS for temporary storage (pinning with Pinata/Web3.Storage) and Arweave for permanent archival. Implement automatic cleanup and retrieval.\n\n**Storage Strategy:**\n- Small results (< 1MB): IPFS with 30-day TTL\n- Large results (1MB - 1GB): IPFS with paid pinning\n- Permanent archives: Arweave (one-time payment)\n- Metadata: Store on-chain (CID, size, type, timestamp)\n\n**On-Chain Storage:**\n```\nstruct JobResult<T> {\n  job_id: H256,\n  result_cid: Vec<u8>, // IPFS CID or Arweave TX ID\n  result_type: Vec<u8>, // MIME type\n  result_size: u32,\n  storage_proof: Vec<u8>, // proof of storage\n  expires_at: Option<BlockNumber>, // for IPFS TTL\n}\n```\n\n**Extrinsics:**\n- `store_result(job_id, cid, storage_type, proof)` - agent stores result\n- `extend_storage(job_id, duration)` - extend IPFS pinning\n- `verify_storage(job_id)` - check result still available\n- `delete_result(job_id)` - cleanup after dispute period\n\n**Off-Chain Services:**\n1. **Storage Relay**:\n   - Listens for `ResultSubmitted` events\n   - Uploads result to IPFS/Arweave\n   - Submits storage proof on-chain\n   - Manages pinning lifecycle\n\n2. **Retrieval Gateway**:\n   - HTTP API to fetch results by CID\n   - Caches frequently accessed results\n   - Redirects to IPFS/Arweave network\n   - Authenticates access for private results\n\n**Cost Model:**\n- IPFS pinning: $0.50/GB/month (via Pinata/Web3.Storage)\n- Arweave: $5/GB permanent (one-time)\n- Storage relay earns 10% of storage fees\n\n**Tests:**\n- Upload to IPFS, retrieve by CID\n- Upload to Arweave, verify permanent storage\n- TTL expiration and cleanup\n- Proof verification on-chain\n- Retrieval gateway caching\n- Cost calculation accuracy",
+      "acceptanceCriteria": [
+        "PASS: Results can be uploaded to IPFS and retrieved",
+        "PASS: Arweave storage is permanent and verifiable",
+        "PASS: On-chain storage proofs are validated",
+        "PASS: TTL-based cleanup works automatically",
+        "PASS: Retrieval gateway returns results with < 500ms latency",
+        "PASS: Storage costs are accurately calculated and paid",
+        "PASS: Failed uploads are retried with exponential backoff"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Results must be persistently available and retrievable"
+    },
+    {
+      "id": "AI-010",
+      "title": "Reputation System - Sybil Resistance & Quality Metrics",
+      "description": "Implement a robust reputation system that resists Sybil attacks and accurately reflects agent quality. Use a combination of staking, verification, and time-weighted scoring.\n\n**Reputation Components:**\n1. **Base Score**: 100 (new agents)\n2. **Job Completion Bonus**: +5 per completed job (max +100)\n3. **Quality Rating**: Average of poster ratings (1-5 stars) * 20\n4. **Stake Multiplier**: log(stake_amount / min_stake) * 10\n5. **Age Bonus**: +1 per 1000 blocks (max +50)\n6. **Penalties**: -20 for dispute loss, -50 for slashing\n\n**Formula:**\n```\nreputation = base + completion_bonus + (avg_rating * 20) + stake_multiplier + age_bonus - penalties\n```\n\n**Sybil Resistance:**\n- One agent per wallet address (EVM) or public key (SVM)\n- Minimum 100 X3 stake to be listed\n- Stake locked for 30 days after last job\n- KYC optional for high-value agents (> 10k X3 earnings)\n\n**Quality Metrics Tracked:**\n- Average job completion time\n- On-time delivery rate\n- Dispute rate and outcomes\n- Reviewer sentiment analysis (NLP on feedback)\n- Model accuracy (from ZK verification failures)\n\n**On-Chain Storage:**\n```\nstruct Reputation {\n  score: u32, // 0-200\n  total_jobs: u32,\n  successful_jobs: u32,\n  total_earned: Balance,\n  avg_rating: f32,\n  dispute_count: u32,\n  last_updated: BlockNumber,\n}\n```\n\n**Leaderboard:**\n- Top 100 agents by reputation\n- Top 100 by earnings\n- Top 100 by job count\n- Category-specific (best image gen, best code review, etc.)\n\n**Reputation Updates:**\n- Real-time after job completion\n- Daily recalculation of stake multiplier\n- Weekly decay for inactive agents (-5/week after 30 days inactive)\n\n**Dispute Resolution:**\n- Poster can dispute result within 72 hours\n- 3 random validators review ZK proof\n- 2/3 vote determines outcome\n- Loser pays dispute fees, gets reputation penalty\n\n**Tests:**\n- Reputation calculation accuracy\n- Sybil attack resistance (can't create multiple agents)\n- Dispute resolution fairness\n- Leaderboard ranking correctness\n- Inactivity decay",
+      "acceptanceCriteria": [
+        "PASS: Reputation score accurately reflects all factors",
+        "PASS: Sybil attacks are prevented (1 agent = 1 identity)",
+        "PASS: Dispute resolution is fair and decentralized",
+        "PASS: Leaderboard updates in real-time",
+        "PASS: Inactive agents decay appropriately",
+        "PASS: High-stake agents get appropriate bonus",
+        "PASS: All reputation changes are auditable on-chain"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Trust is everything - reputation must be accurate and attack-resistant"
+    },
+    {
+      "id": "AI-011",
+      "title": "Governance - DAO for Protocol Parameters",
+      "description": "Implement on-chain governance for AI agent swarm parameters: fees, staking amounts, verification requirements, treasury allocation. Use X3 Chain's existing governance pallet or build a lightweight custom one.\n\n**Governable Parameters:**\n- Marketplace fee (currently 2%)\n- Minimum agent stake\n- Validator stake requirement\n- ZK proof verification cost\n- Dispute period duration\n- Reputation decay rate\n- Treasury allocation percentages\n\n**Proposal Types:**\n1. **Parameter Update**: Change numeric parameters\n2. **Pallet Upgrade**: Upgrade to new pallet version\n3. **Treasury Spend**: Allocate funds for development/bounties\n4. **Emergency Action**: Fast-track critical fixes (7-day delay)\n\n**Voting:**\n- Token-weighted voting (1 X3 = 1 vote)\n- Delegation allowed\n- Quorum: 20% of total supply\n- Approval threshold: 66.7%\n- Voting period: 7 days\n- Execution delay: 2 days after passing\n\n**Treasury:**\n- Collects 2% of all job payments\n- Funds development, bug bounties, grants\n- Multi-sig for large expenditures (> 100k X3)\n\n**Emergency Committee:**\n- 5 members elected by token holders\n- Can execute emergency actions with 3/5 signatures\n- Actions subject to 30-day veto by token holders\n\n**Implementation:**\n- Use existing governance pallet if available\n- Otherwise, build custom pallet with:\n  - `Proposal` storage\n  - `vote(proposal_id, vote)` extrinsic\n  - `close_vote(proposal_id)` extrinsic\n  - `execute(proposal_id)` extrinsic\n  - `emergency_action` with multi-sig\n\n**UI:**\n- Proposal listing page\n- Vote submission interface\n- Delegation management\n- Treasury dashboard\n- Emergency committee panel\n\n**Tests:**\n- Proposal lifecycle: create -> vote -> close -> execute\n- Quorum and threshold enforcement\n- Delegation voting power calculation\n- Emergency action with multi-sig\n- Treasury fund allocation",
+      "acceptanceCriteria": [
+        "PASS: Token holders can create proposals",
+        "PASS: Voting power correctly reflects token balance",
+        "PASS: Quorum and approval thresholds enforced",
+        "PASS: Successful proposals auto-execute after delay",
+        "PASS: Treasury can receive and spend funds",
+        "PASS: Emergency committee can act quickly",
+        "PASS: All governance actions are transparent on-chain"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Decentralized governance ensures protocol evolves with community input"
+    },
+    {
+      "id": "AI-012",
+      "title": "Monitoring & Analytics - Observability Dashboard",
+      "description": "Build comprehensive monitoring for the AI agent swarm: job throughput, agent performance, network health, economic metrics. Use Prometheus, Grafana, and custom dashboards.\n\n**Metrics to Track:**\n1. **Job Metrics**:\n   - Jobs posted per hour\n   - Jobs completed per hour\n   - Average job duration\n   - Success rate (%)\n   - Dispute rate (%)\n   - Total volume (X3 tokens)\n\n2. **Agent Metrics**:\n   - Active agents count\n   - Average reputation score\n   - Top performing agents\n   - Agent churn rate\n   - Earnings distribution\n\n3. **Validator Metrics**:\n   - Active validators count\n   - Attestation success rate\n   - Average validation time\n   - Slashing events\n   - Stake distribution\n\n4. **Network Metrics**:\n   - Block time\n   - TPS (transactions per second)\n   - Gas usage\n   - Node count and distribution\n   - Peer connections\n\n5. **Economic Metrics**:\n   - Total value locked (TVL)\n   - Token velocity\n   - Fee revenue\n   - Treasury balance\n   - Inflation/deflation rate\n\n**Implementation:**\n- Prometheus exporters for all components\n- Custom metrics in pallets (using frame-support macros)\n- Grafana dashboards with alerts\n- Alert rules for:\n  - Job failure rate > 10%\n  - Validator downtime > 5%\n  - Dispute rate spike\n  - Treasury balance anomaly\n  - Gas price surge\n\n**Dashboards:**\n1. **Overview**: High-level health metrics\n2. **Marketplace**: Job flow and economics\n3. **Agents**: Agent performance and reputation\n4. **Validators**: Validator status and rewards\n5. **Network**: Blockchain metrics\n6. **Economics**: Tokenomics and treasury\n\n**API:**\n- REST endpoints for metrics queries\n- WebSocket for real-time updates\n- Historical data export (CSV, JSON)\n\n**Documentation:**\n- Metric definitions and calculations\n- Alert response procedures\n- Dashboard user guide\n- Incident runbooks",
+      "acceptanceCriteria": [
+        "PASS: All key metrics are collected and stored",
+        "PASS: Grafana dashboards display real-time data",
+        "PASS: Alerts trigger on threshold breaches",
+        "PASS: Historical data retained for 90 days",
+        "PASS: API provides programmatic access to metrics",
+        "PASS: Dashboards are responsive and mobile-friendly",
+        "PASS: Documentation explains all metrics"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Observability is critical for operations and debugging"
+    },
+    {
+      "id": "AI-013",
+      "title": "Security Audit - Comprehensive Security Review",
+      "description": "Conduct a thorough security audit of the entire AI agent swarm system. Include formal verification of critical contracts, penetration testing, and third-party audit.\n\n**Audit Scope:**\n1. **Smart Contracts**:\n   - Agent registry pallet\n   - Job marketplace pallet\n   - Bridge pallet\n   - Governance pallet\n   - Treasury pallet\n   - ZK verification contracts\n\n2. **Cryptography**:\n   - ZK circuit soundness\n   - Key generation and storage\n   - Signature verification\n   - Random number generation (for validator selection)\n\n3. **Economic Security**:\n   - Incentive alignment\n   - Griefing attack vectors\n   - Front-running protection\n   - MEV resistance\n   - Liquidation mechanisms\n\n4. **Network Security**:\n   - DoS resistance\n   - Sybil attack prevention\n   - Eclipse attack mitigation\n   - Peer discovery security\n\n5. **Access Control**:\n   - Admin privilege escalation\n   - Role-based access control\n   - Multi-signature security\n\n**Audit Process:**\n1. **Internal Review**:\n   - Code review by senior engineers\n   - Static analysis with Slither/Mythril\n   - Fuzzing with Echidna\n   - Formal verification with K Framework\n\n2. **External Audit**:\n   - Engage 2-3 reputable audit firms\n   - Provide full codebase and documentation\n   - Address all findings\n   - Re-audit after fixes\n\n3. **Bug Bounty**:\n   - Launch 4-week bug bounty\n   - Rewards: $1k - $100k depending on severity\n   - Use Immunefi platform\n\n**Deliverables:**\n- Audit report with findings and recommendations\n- Fixed vulnerabilities (critical/high)\n- Mitigation plan for medium issues\n- Security documentation updates\n- Incident response playbook\n\n**Acceptance Criteria:**\n- Zero critical vulnerabilities\n- All high-severity issues resolved\n- Medium-severity issues documented with mitigation\n- Formal verification proofs for ZK circuits\n- Bug bounty launched with clear scope\n\n**Timeline:** 2 weeks for internal, 2 weeks for external, 4 weeks bug bounty",
+      "acceptanceCriteria": [
+        "PASS: No critical vulnerabilities remain",
+        "PASS: All high-severity issues are fixed",
+        "PASS: Medium issues have documented mitigations",
+        "PASS: ZK circuits formally verified",
+        "PASS: Bug bounty program launched",
+        "PASS: Security documentation updated",
+        "PASS: Incident response plan documented"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Security is paramount - cannot launch without comprehensive audit"
+    },
+    {
+      "id": "AI-014",
+      "title": "Testnet Deployment - Multi-Node AI Swarm Testnet",
+      "description": "Deploy the complete AI agent swarm on a public testnet with 50+ validators, 100+ agents, and continuous job flow. Run for 30 days to stress-test the system.\n\n**Testnet Setup:**\n- **Network**: X3 Chain testnet (separate from existing testnets)\n- **Validators**: 50+ (mix of GPU and CPU)\n- **Full Nodes**: 100+\n- **Bootnodes**: 5 geographically distributed\n- **Faucet**: Unlimited test X3 tokens (faucet.x3-chain.org)\n- **Explorer**: blockscout.x3-chain.org\n- **Discord**: Community support\n\n**Phased Rollout:**\n\n**Week 1: Validator Onboarding**\n- Day 1-3: Deploy bootnodes and seed nodes\n- Day 4-7: Onboard 50 validators, monitor stability\n\n**Week 2: Agent Registration**\n- Day 8-10: Open agent registration\n- Day 11-14: Encourage 100+ agents to register\n\n**Week 3: Job Marketplace**\n- Day 15-17: Post test jobs (automated)\n- Day 18-21: Real users post jobs\n\n**Week 4: Stress Testing**\n- Day 22-25: Load test with 1000+ concurrent jobs\n- Day 26-28: Dispute and slashing scenarios\n- Day 29-30: Final monitoring and bug fixes\n\n**Test Scenarios:**\n1. **Happy Path**: 1000 jobs complete successfully\n2. **Dispute Storm**: 20% of jobs disputed simultaneously\n3. **Validator Downtime**: 30% validators go offline\n4. **Network Partition**: Split network for 10 minutes\n5. **Sybil Attack**: Attempt to register 1000 fake agents\n6. **ZK Proof Flood**: Submit 1000 invalid proofs\n7. **Economic Attack**: Try to manipulate reputation\n\n**Monitoring:**\n- Grafana dashboards (see AI-010)\n- PagerDuty alerts for critical issues\n- Daily health reports\n- Weekly community calls\n\n**Bug Bounty:**\n- Active during testnet\n- Double rewards for testnet findings\n- Leaderboard for top hunters\n\n**Documentation:**\n- Testnet user guide\n- Troubleshooting FAQ\n- Known issues tracker\n- Community support in Discord\n\n**Success Criteria:**\n- 99% uptime\n- < 5% job failure rate\n- < 1% dispute rate\n- 1000+ jobs completed\n- 100+ active agents\n- 50+ active validators\n- Zero critical security incidents\n\n**Post-Testnet:**\n- Compile lessons learned\n- Fix all critical/high bugs\n- Prepare for mainnet launch\n- Reward testnet participants with mainnet tokens",
+      "acceptanceCriteria": [
+        "PASS: Testnet runs for 30 days with >99% uptime",
+        "PASS: 50+ validators participate actively",
+        "PASS: 100+ agents register and complete jobs",
+        "PASS: 1000+ jobs complete successfully",
+        "PASS: All stress test scenarios handled correctly",
+        "PASS: No critical security incidents",
+        "PASS: Bug bounty identifies and fixes issues",
+        "PASS: Community actively participates and provides feedback"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Testnet is the final integration test before mainnet"
+    },
+    {
+      "id": "AI-015",
+      "title": "Mainnet Launch - Production Deployment",
+      "description": "Launch the AI agent swarm on mainnet with proper ceremony, marketing, and community support. This is the culmination of all previous work.\n\n**Pre-Launch Checklist (T-2 weeks):**\n- [ ] All audits complete and issues fixed\n- [ ] Testnet stable for 30 days\n- [ ] Mainnet binaries built and signed\n- [ ] Genesis file prepared with validator set\n- [ ] Bootnodes deployed and tested\n- [ ] Explorer live with mainnet data\n- [ ] Wallet integrations (MetaMask, Phantom) ready\n- [ ] SDKs published (npm, PyPI)\n- [ ] Documentation complete\n- [ ] Bug bounty live with $1M+ in rewards\n- [ ] Marketing materials ready\n- [ ] Community team trained\n- [ ] Emergency response plan in place\n- [ ] Legal and compliance reviewed\n\n**Launch Sequence:**\n\n**T-7 days:**\n- Announce launch date\n- Publish mainnet specs\n- Open validator sign-ups\n- Release SDKs to public\n\n**T-3 days:**\n- Deploy bootnodes\n- Distribute genesis file to validators\n- Final security check\n\n**T-1 day:**\n- Validators sync to testnet snapshot\n- Final binary checksums published\n- Community call with Q&A\n\n**Launch Day (T=0):**\n- Coordinated UTC launch time\n- Validators start nodes simultaneously\n- Bootnodes begin peer discovery\n- Chain starts block production\n- Monitor block time and finality\n- Announce on social media\n\n**T+1 hour:**\n- First block produced\n- Explorer shows live chain\n- Faucet opens for users\n- SDK examples work\n\n**T+1 day:**\n- 50+ validators online\n- First agent registered\n- First job posted and completed\n- Community Discord active\n\n**T+1 week:**\n- 100+ validators\n- 500+ agents\n- 1000+ jobs completed\n- $1M+ TVL\n\n**T+1 month:**\n- 200+ validators\n- 2000+ agents\n- 10,000+ jobs completed\n- $10M+ TVL\n- Major integrations ( wallets, explorers, analytics)\n\n**Marketing & PR:**\n- Press release to major crypto media\n- Twitter/X thread series\n- YouTube explainer videos\n- Podcast interviews\n- Conference presentations\n- Developer workshops\n- Hackathon with $100k+ in prizes\n\n**Community Building:**\n- Discord server with active moderation\n- Telegram announcements channel\n- Weekly community calls\n- Monthly governance calls\n- Ambassador program\n- Grant program for ecosystem\n\n**Post-Launch:**\n- 24/7 monitoring for first week\n- Daily standups for core team\n- Weekly progress reports\n- Monthly governance proposals\n- Quarterly roadmap updates\n\n**Success Metrics:**\n- 200+ validators within 1 month\n- 2000+ active agents\n- 10,000+ jobs completed\n- $10M+ TVL\n- 10,000+ community members\n- 100+ SDK downloads/day\n- Zero critical incidents\n- Positive media coverage\n\n**Contingency Plans:**\n- If chain doesn't finalize: emergency validator meeting\n- If major bug discovered: pause and rollback plan\n- If economic attack: emergency governance action\n- If validator drop: emergency rewards adjustment",
+      "acceptanceCriteria": [
+        "PASS: Mainnet launches successfully with >50 validators",
+        "PASS: Chain produces blocks with < 6s block time",
+        "PASS: First agent registers and completes job within 24h",
+        "PASS: No critical security incidents in first week",
+        "PASS: Community grows to 5000+ members in first month",
+        "PASS: SDK downloads exceed 1000/day",
+        "PASS: Positive sentiment on social media",
+        "PASS: All pre-launch checklist items complete"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Mainnet launch is the final milestone - must be flawless"
+    }
+  ]
+}

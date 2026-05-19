@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — AI Is The Spine</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Epilogue:ital,wght@0,300;0,400;0,500;0,700;0,800;0,900;1,800;1,900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030407;
+  --ink:#F2F4FF;--muted:rgba(180,190,255,0.35);--dim:#080B14;
+  --spine:#7B2FFF;--spine2:#A855F7;--spineglow:rgba(123,47,255,0.2);
+  --hot:#FF2D7A;--cyan:#00F5FF;--gold:#FFD700;--green:#00FF88;
+  --border:rgba(123,47,255,0.15);
+  --bb:'Bebas Neue',sans-serif;--ep:'Epilogue',sans-serif;--jb:'JetBrains Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--ink);font-family:var(--ep);overflow-x:hidden;}
+
+/* CURSOR */
+*{cursor:none;}
+.cursor{position:fixed;width:12px;height:12px;border-radius:50%;background:var(--spine2);
+  pointer-events:none;z-index:9999;transform:translate(-50%,-50%);
+  transition:transform 0.1s,background 0.2s;mix-blend-mode:screen;}
+.cursor-ring{position:fixed;width:36px;height:36px;border-radius:50%;
+  border:1px solid rgba(123,47,255,0.4);pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);transition:all 0.15s ease;}
+
+/* CANVAS BG */
+#spine-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:60px;
+  display:flex;align-items:center;padding:0 48px;
+  background:rgba(3,4,7,0.9);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);}
+.logo{font-family:var(--bb);font-size:24px;letter-spacing:6px;
+  background:linear-gradient(90deg,var(--spine2),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:auto;}
+.nav-links{display:flex;gap:0;}
+.nl{padding:0 20px;height:60px;display:flex;align-items:center;font-size:10px;
+  letter-spacing:3px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
+.nl:hover{color:var(--spine2);}
+.nav-cta{padding:10px 28px;border-radius:8px;
+  background:linear-gradient(135deg,var(--spine),var(--spine2));
+  color:#fff;border:none;font-size:10px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;cursor:none;font-family:var(--ep);transition:all 0.3s;margin-left:20px;}
+.nav-cta:hover{box-shadow:0 0 40px var(--spineglow);transform:translateY(-1px);}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;
+  padding:120px 48px 80px;position:relative;z-index:1;}
+.hero-eyebrow{font-family:var(--jb);font-size:11px;letter-spacing:5px;
+  color:var(--spine2);text-transform:uppercase;margin-bottom:24px;
+  display:flex;align-items:center;gap:12px;}
+.hero-eyebrow::before{content:'';display:block;width:40px;height:1px;background:var(--spine2);}
+.hero-h1{font-family:var(--bb);font-size:clamp(60px,10vw,160px);line-height:0.9;
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:32px;}
+.hero-h1 .line1{display:block;color:var(--muted);}
+.hero-h1 .line2{display:block;color:var(--muted);}
+.hero-h1 .line3{display:block;
+  background:linear-gradient(90deg,var(--spine2),var(--hot),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:gradShift 4s ease-in-out infinite;}
+@keyframes gradShift{
+  0%,100%{background-position:0%}50%{background-position:100%}
+}
+.hero-sub{font-size:clamp(16px,2vw,22px);color:var(--muted);max-width:640px;
+  line-height:1.7;font-weight:300;margin-bottom:48px;}
+.hero-sub strong{color:var(--ink);font-weight:700;}
+.hero-sub em{color:var(--spine2);font-style:normal;font-weight:600;}
+
+/* DARPA QUOTE */
+.darpa-quote{display:inline-flex;align-items:center;gap:16px;
+  padding:16px 24px;border:1px solid rgba(123,47,255,0.25);border-radius:12px;
+  background:rgba(123,47,255,0.06);max-width:560px;margin-bottom:60px;}
+.dq-icon{font-size:28px;flex-shrink:0;}
+.dq-text{font-family:var(--jb);font-size:13px;line-height:1.6;color:var(--muted);}
+.dq-text strong{color:var(--spine2);}
+.dq-attr{font-size:10px;color:rgba(123,47,255,0.4);margin-top:4px;letter-spacing:2px;}
+
+/* COMPARISON SECTION */
+.compare{padding:80px 48px;position:relative;z-index:1;}
+.section-label{font-family:var(--jb);font-size:10px;letter-spacing:5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:40px;display:flex;align-items:center;gap:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.compare-grid{display:grid;grid-template-columns:1fr 80px 1fr;gap:0;align-items:stretch;
+  max-width:1000px;margin:0 auto;}
+
+/* THEM column */
+.col-them{padding:32px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px 0 0 16px;}
+.col-label{font-family:var(--bb);font-size:28px;letter-spacing:3px;margin-bottom:24px;}
+.them-label{color:rgba(255,255,255,0.2);}
+.us-label{color:var(--spine2);}
+
+.chain-diagram{display:flex;flex-direction:column;gap:8px;}
+.cd-layer{padding:10px 16px;border-radius:8px;font-size:11px;font-weight:600;
+  letter-spacing:1px;text-align:center;position:relative;}
+.cdl-chain{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);}
+.cdl-ai{background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.2);
+  border:1px dashed rgba(255,255,255,0.08);margin-left:16px;margin-right:16px;}
+.cdl-ai::before{content:'🎒';margin-right:8px;}
+.cdl-pain{font-size:9px;color:rgba(255,80,80,0.5);margin-top:3px;font-family:var(--jb);}
+
+/* US column */
+.col-us{padding:32px;background:rgba(123,47,255,0.05);
+  border:1px solid rgba(123,47,255,0.2);border-radius:0 16px 16px 0;position:relative;}
+.col-us::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;
+  background:linear-gradient(180deg,var(--spine),var(--hot),var(--cyan));border-radius:3px 0 0 3px;}
+
+.spine-diagram{position:relative;display:flex;flex-direction:column;gap:0;align-items:center;}
+.spine-center{position:absolute;left:50%;top:0;bottom:0;width:3px;transform:translateX(-50%);
+  background:linear-gradient(180deg,var(--spine),var(--hot),var(--cyan),var(--green));
+  box-shadow:0 0 20px var(--spineglow);}
+.spine-node{display:flex;align-items:center;gap:0;width:100%;padding:8px 0;position:relative;z-index:1;}
+.spine-node:nth-child(odd){justify-content:flex-start;}
+.spine-node:nth-child(even){justify-content:flex-end;}
+.sn-content{padding:10px 16px;border-radius:8px;font-size:11px;font-weight:700;
+  letter-spacing:1px;max-width:45%;}
+.sn-connector{width:20%;height:1px;background:rgba(123,47,255,0.4);}
+.sn-ai{background:linear-gradient(135deg,rgba(123,47,255,0.2),rgba(168,85,247,0.1));
+  border:1px solid rgba(123,47,255,0.3);color:var(--spine2);}
+.sn-exec{background:rgba(0,245,255,0.08);border:1px solid rgba(0,245,255,0.2);color:var(--cyan);}
+.sn-route{background:rgba(255,45,122,0.08);border:1px solid rgba(255,45,122,0.2);color:var(--hot);}
+.sn-settle{background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);color:var(--green);}
+.sn-learn{background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);color:var(--gold);}
+
+/* VS divider */
+.col-vs{display:flex;align-items:center;justify-content:center;}
+.vs-text{font-family:var(--bb);font-size:48px;color:rgba(255,255,255,0.08);letter-spacing:2px;}
+
+/* WHAT THAT MEANS */
+.means{padding:0 48px 80px;position:relative;z-index:1;max-width:1200px;}
+.means-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px;}
+.means-card{padding:28px;border-radius:16px;border:1px solid rgba(255,255,255,0.06);
+  background:rgba(255,255,255,0.02);transition:all 0.3s;position:relative;overflow:hidden;}
+.means-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.mc-1::before{background:linear-gradient(90deg,var(--spine),var(--spine2));}
+.mc-2::before{background:linear-gradient(90deg,var(--hot),var(--spine2));}
+.mc-3::before{background:linear-gradient(90deg,var(--cyan),var(--green));}
+.mc-4::before{background:linear-gradient(90deg,var(--gold),var(--hot));}
+.mc-5::before{background:linear-gradient(90deg,var(--green),var(--cyan));}
+.mc-6::before{background:linear-gradient(90deg,var(--spine2),var(--hot));}
+.means-card:hover{transform:translateY(-4px);border-color:rgba(123,47,255,0.2);
+  box-shadow:0 12px 40px rgba(0,0,0,0.4);}
+.mc-icon{font-size:32px;margin-bottom:14px;}
+.mc-title{font-size:16px;font-weight:800;margin-bottom:8px;}
+.mc-body{font-size:13px;color:var(--muted);line-height:1.7;}
+.mc-body em{color:var(--spine2);font-style:normal;font-weight:600;}
+
+/* ARCHITECTURE CALLOUT */
+.arch{padding:0 48px 80px;position:relative;z-index:1;}
+.arch-box{background:rgba(123,47,255,0.04);border:1px solid rgba(123,47,255,0.2);
+  border-radius:20px;padding:48px;max-width:900px;margin:40px auto 0;position:relative;}
+.arch-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--spine2),var(--hot),transparent);}
+.arch-title{font-family:var(--bb);font-size:42px;letter-spacing:2px;margin-bottom:20px;}
+.arch-title span{color:var(--spine2);}
+.arch-body{font-size:15px;color:var(--muted);line-height:1.9;margin-bottom:28px;}
+.arch-body strong{color:var(--ink);}
+.arch-body em{color:var(--spine2);font-style:normal;}
+.arch-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:rgba(123,47,255,0.1);border-radius:12px;overflow:hidden;margin-bottom:28px;}
+.as-cell{background:var(--bg);padding:16px;text-align:center;}
+.as-val{font-family:var(--jb);font-size:20px;font-weight:600;}
+.as-key{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+
+/* BUYERS SECTION */
+.buyers{padding:0 48px 80px;position:relative;z-index:1;}
+.buyers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:12px;margin-top:40px;}
+.buyer-card{padding:24px;border-radius:14px;border:1px solid rgba(255,255,255,0.05);
+  background:rgba(255,255,255,0.02);cursor:none;transition:all 0.3s;}
+.buyer-card:hover{border-color:var(--border);background:rgba(123,47,255,0.04);
+  transform:translateY(-3px);}
+.bc-emoji{font-size:28px;margin-bottom:12px;}
+.bc-buyer{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.bc-pitch{font-size:13px;color:var(--ink);line-height:1.6;font-weight:500;}
+.bc-get{font-size:11px;color:var(--spine2);margin-top:8px;font-family:var(--jb);}
+
+/* BOTTOM CTA */
+.bottom-cta{padding:80px 48px;text-align:center;position:relative;z-index:1;
+  border-top:1px solid var(--border);}
+.bc-tagline{font-family:var(--bb);font-size:clamp(32px,6vw,80px);letter-spacing:2px;
+  text-transform:uppercase;line-height:1;margin-bottom:20px;}
+.bc-tagline span{
+  background:linear-gradient(90deg,var(--spine2),var(--hot),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.bc-sub{font-size:16px;color:var(--muted);margin-bottom:40px;font-weight:300;}
+.cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+.cta-primary{padding:18px 48px;border-radius:12px;
+  background:linear-gradient(135deg,var(--spine),var(--spine2));
+  color:#fff;border:none;font-size:13px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;cursor:none;font-family:var(--ep);transition:all 0.3s;}
+.cta-primary:hover{box-shadow:0 0 60px var(--spineglow);transform:translateY(-2px);}
+.cta-secondary{padding:18px 48px;border-radius:12px;
+  background:transparent;border:1px solid rgba(123,47,255,0.3);
+  color:var(--spine2);font-size:13px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;cursor:none;font-family:var(--ep);transition:all 0.3s;}
+.cta-secondary:hover{background:rgba(123,47,255,0.08);border-color:var(--spine2);}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursor-ring"></div>
+<canvas id="spine-canvas"></canvas>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <div class="nav-links">
+    <a class="nl" href="x3star-arbitrage-engine.html">Arbitrage</a>
+    <a class="nl" href="x3star-compute-marketplace.html">Compute</a>
+    <a class="nl" href="x3star-tech-deep-dive.html">Architecture</a>
+    <a class="nl" href="x3star-barter-exchange.html">Partner</a>
+    <a class="nl" href="x3star-grant-hub.html">Grants</a>
+  </div>
+  <button class="nav-cta" onclick="location.href='x3star-barter-exchange.html'">Start A Deal →</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-eyebrow">The architecture no one else built</div>
+  <h1 class="hero-h1">
+    <span class="line1">Most blockchains</span>
+    <span class="line2">wear AI as</span>
+    <span class="line3">a backpack.</span>
+  </h1>
+  <p class="hero-sub">
+    Ours has it as <em>the spine</em>. Every execution, every route, every settlement —
+    <strong>the AI is not consulted. It participates.</strong>
+    Built from scratch by one engineer who needed a chain fast enough for his own arbitrage engine.
+    The kernel came first. The blockchain grew around it.
+  </p>
+
+  <div class="darpa-quote">
+    <div class="dq-icon">🧪</div>
+    <div>
+      <div class="dq-text"><strong>"A one-man DARPA lab in a hoodie."</strong></div>
+      <div class="dq-attr">— NotebookLM · Independent AI Analysis of X3STAR Architecture</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;">
+    <button class="nav-cta" style="font-size:13px;padding:16px 36px;" onclick="location.href='x3star-tech-deep-dive.html'">Read The Architecture →</button>
+    <button class="cta-secondary" style="padding:16px 36px;font-size:13px;border-radius:12px;background:transparent;border:1px solid rgba(123,47,255,0.3);color:var(--spine2);font-weight:700;letter-spacing:3px;text-transform:uppercase;cursor:none;font-family:var(--ep);" onclick="location.href='x3star-barter-exchange.html'">Trade Services For Tokens</button>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="compare">
+  <div class="section-label">The architectural difference</div>
+
+  <div class="compare-grid">
+    <!-- THEM -->
+    <div class="col-them">
+      <div class="col-label them-label">Every other chain</div>
+      <div class="chain-diagram">
+        <div class="cd-layer cdl-chain">⛓ Consensus Layer</div>
+        <div class="cd-layer cdl-chain">⚙️ Execution VM (EVM/SVM)</div>
+        <div class="cd-layer cdl-chain">📦 Transaction Pool</div>
+        <div class="cd-layer cdl-chain">🔗 Settlement Layer</div>
+        <div style="height:12px;display:flex;align-items:center;justify-content:center;">
+          <div style="width:1px;height:100%;background:rgba(255,80,80,0.2)"></div>
+        </div>
+        <div class="cd-layer cdl-ai">🎒 AI plugin bolted on top</div>
+        <div class="cdl-pain">separate API call · separate fee · single point of failure</div>
+        <div class="cdl-pain">adds 200-800ms latency · not aware of chain state</div>
+      </div>
+    </div>
+
+    <div class="col-vs"><div class="vs-text">VS</div></div>
+
+    <!-- US -->
+    <div class="col-us">
+      <div class="col-label us-label">X3STAR</div>
+      <div class="spine-diagram">
+        <div class="spine-center"></div>
+        <div class="spine-node">
+          <div class="sn-content sn-ai">🧠 AI Consensus — learns block ordering</div>
+          <div class="sn-connector"></div>
+        </div>
+        <div class="spine-node">
+          <div class="sn-connector"></div>
+          <div class="sn-content sn-exec">⚡ X3VM — AI-scheduled execution</div>
+        </div>
+        <div class="spine-node">
+          <div class="sn-content sn-route">🎯 GPU Router — AI path selection</div>
+          <div class="sn-connector"></div>
+        </div>
+        <div class="spine-node">
+          <div class="sn-connector"></div>
+          <div class="sn-content sn-settle">✅ Atomic Settlement — AI verified</div>
+        </div>
+        <div class="spine-node">
+          <div class="sn-content sn-learn">📈 Swarm learns — gets faster</div>
+          <div class="sn-connector"></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:rgba(123,47,255,0.5);text-align:center;margin-top:12px;font-family:var(--jb);">AI is not a layer. AI is the nervous system.</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT THAT MEANS -->
+<section class="means">
+  <div class="section-label">What that means in practice</div>
+  <div class="means-grid">
+    <div class="means-card mc-1">
+      <div class="mc-icon">⚡</div>
+      <div class="mc-title">The chain gets faster over time</div>
+      <div class="mc-body">Every execution teaches the AI swarm a better route. Every contributor's GPU makes the model smarter. <em>Performance is a floor, not a ceiling.</em></div>
+    </div>
+    <div class="means-card mc-2">
+      <div class="mc-icon">🔮</div>
+      <div class="mc-title">Execution is predictive</div>
+      <div class="mc-body">The X3VM pre-fetches state before you ask. The AI predicts your next instruction and pre-warms the cache. <em>2.4B intra-node TPS</em> is why.</div>
+    </div>
+    <div class="means-card mc-3">
+      <div class="mc-icon">🌐</div>
+      <div class="mc-title">Cross-chain is atomic</div>
+      <div class="mc-body">EVM + SVM + BTC + X3VM in one transaction. No bridges. No wrapping. No slippage between legs. <em>The arbitrage the AI found, executed before the spread closes.</em></div>
+    </div>
+    <div class="means-card mc-4">
+      <div class="mc-icon">🛡️</div>
+      <div class="mc-title">Security is predictive</div>
+      <div class="mc-body">The swarm detects anomalous patterns before they become attacks. Not rule-based detection — <em>pattern recognition trained on every transaction ever executed.</em></div>
+    </div>
+    <div class="means-card mc-5">
+      <div class="mc-icon">🧬</div>
+      <div class="mc-title">Intelligence has a mining economy</div>
+      <div class="mc-body">Contributors who improve the AI model earn X3S emissions. Bad models get voted out. <em>The chain has an immune system and a growth hormone simultaneously.</em></div>
+    </div>
+    <div class="means-card mc-6">
+      <div class="mc-icon">🔌</div>
+      <div class="mc-title">Every chain can plug in</div>
+      <div class="mc-body">License the kernel. Use the X3VM. Plug into the GPU swarm. Take our AI spine and put it under your protocol. <em>We're not competing with your chain — we're the infrastructure underneath it.</em></div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE CALLOUT -->
+<section class="arch">
+  <div class="section-label">The origin story</div>
+  <div class="arch-box">
+    <div class="arch-title">Built for <span>speed</span>.<br>Became something more.</div>
+    <div class="arch-body">
+      This started as an arbitrage engine. One engineer needed atomic cross-chain execution fast enough to capture spreads before they closed. So he built a <strong>custom kernel</strong> — optimized for minimum instruction cycles per trade. Then a <strong>custom programming language</strong> — lightweight enough that the compiler output was 40% smaller than Solidity. Then <strong>GPU routing</strong> — because the CPU couldn't keep up with the kernel's appetite. Then contributors started adding GPUs. Then the routing layer started learning. Then the <em>chain started thinking</em>.<br><br>
+      When NotebookLM analyzed the architecture independently, it called it <em>"a one-man DARPA lab in a hoodie."</em> We kept building.
+    </div>
+    <div class="arch-stats">
+      <div class="as-cell"><div class="as-val" style="color:var(--spine2)">2.4B</div><div class="as-key">Intra-node TPS</div></div>
+      <div class="as-cell"><div class="as-val" style="color:var(--cyan)">4</div><div class="as-key">VMs Supported</div></div>
+      <div class="as-cell"><div class="as-val" style="color:var(--hot)">1</div><div class="as-key">Atomic Transaction</div></div>
+      <div class="as-cell"><div class="as-val" style="color:var(--green)">∞</div><div class="as-key">Self-Improving</div></div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <button class="nav-cta" onclick="location.href='x3star-tech-deep-dive.html'" style="font-size:11px;padding:13px 28px;">Architecture Deep Dive →</button>
+      <button class="nav-cta" onclick="location.href='x3star-benchmark-page.html'" style="font-size:11px;padding:13px 28px;background:linear-gradient(135deg,var(--hot),var(--spine2));">View Benchmarks →</button>
+    </div>
+  </div>
+</section>
+
+<!-- BUYERS -->
+<section class="buyers">
+  <div class="section-label">Who plugs in and what they get</div>
+  <div class="buyers-grid">
+    <div class="buyer-card">
+      <div class="bc-emoji">🏦</div>
+      <div class="bc-buyer">Quant / HFT Firms</div>
+      <div class="bc-pitch">Atomic cross-chain arb at nanosecond execution. The AI finds spreads you haven't programmed yet.</div>
+      <div class="bc-get">→ API access for compute credits or token allocation</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">🤖</div>
+      <div class="bc-buyer">AI Labs & Startups</div>
+      <div class="bc-pitch">GPU compute priced in X3S. On-chain inference verification. A network that learns from your workloads.</div>
+      <div class="bc-get">→ Compute barter: GPU time for X3S tokens</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">⚛️</div>
+      <div class="bc-buyer">Quantum Research</div>
+      <div class="bc-pitch">Post-quantum cryptography baked into the kernel. Co-develop the security layer, get cited as the chain's security foundation.</div>
+      <div class="bc-get">→ Research access for audit services or equity swap</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">🌐</div>
+      <div class="bc-buyer">Web3 Protocols</div>
+      <div class="bc-pitch">Plug your protocol into X3STAR's execution layer. Inherit AI-optimized routing, multi-VM support, and GPU-accelerated TPS.</div>
+      <div class="bc-get">→ Integration grants from our $5M ecosystem pool</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">🏛️</div>
+      <div class="bc-buyer">Governments & Defense</div>
+      <div class="bc-pitch">Sovereign compute on quantum-safe infrastructure. The AI swarm is auditable, versioned, and on-chain.</div>
+      <div class="bc-get">→ DARPA/NSF grants + token allocation</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">☁️</div>
+      <div class="bc-buyer">GPU & VPS Providers</div>
+      <div class="bc-pitch">Contribute compute, earn X3S emissions forever. Your hardware becomes part of a self-improving financial network.</div>
+      <div class="bc-get">→ Hardware for token allocation — zero cash needed</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">🧬</div>
+      <div class="bc-buyer">Biotech & Research</div>
+      <div class="bc-pitch">GPU/quantum hybrid compute for protein folding, genomics, drug discovery — with on-chain result verification.</div>
+      <div class="bc-get">→ Compute credits for research citations and grants</div>
+    </div>
+    <div class="buyer-card">
+      <div class="bc-emoji">🔧</div>
+      <div class="bc-buyer">Developers & Builders</div>
+      <div class="bc-pitch">Write in our lightweight language. Deploy to X3VM. Access GPU compute, AI inference, and 4-chain atomic execution from day one.</div>
+      <div class="bc-get">→ Free testnet access. Ecosystem grants available.</div>
+    </div>
+  </div>
+</section>
+
+<!-- BOTTOM CTA -->
+<section class="bottom-cta">
+  <div class="bc-tagline">The spine is <span>open.</span><br>Plug in.</div>
+  <p class="bc-sub">Trade services for tokens. Apply for grants. License the kernel. Every lane is open.</p>
+  <div class="cta-row">
+    <button class="cta-primary" onclick="location.href='x3star-barter-exchange.html'">Start A Deal →</button>
+    <button class="cta-secondary" onclick="location.href='x3star-grant-hub.html'">Apply For A Grant</button>
+    <button class="cta-secondary" onclick="location.href='x3star-tech-deep-dive.html'">Read The Whitepaper</button>
+  </div>
+</section>
+
+<script>
+// Custom cursor
+const cursor=document.getElementById('cursor');
+const ring=document.getElementById('cursor-ring');
+document.addEventListener('mousemove',e=>{
+  cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px';
+  ring.style.left=e.clientX+'px';ring.style.top=e.clientY+'px';
+});
+document.querySelectorAll('button,a,.buyer-card,.means-card').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cursor.style.transform='translate(-50%,-50%) scale(2)';ring.style.transform='translate(-50%,-50%) scale(1.5)';cursor.style.background='var(--hot)';});
+  el.addEventListener('mouseleave',()=>{cursor.style.transform='translate(-50%,-50%) scale(1)';ring.style.transform='translate(-50%,-50%) scale(1)';cursor.style.background='var(--spine2)';});
+});
+
+// Spine canvas — neural network visualization
+const canvas=document.getElementById('spine-canvas');
+const ctx=canvas.getContext('2d');
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+
+const nodes=[];
+for(let i=0;i<60;i++){
+  nodes.push({
+    x:Math.random()*canvas.width,y:Math.random()*canvas.height,
+    vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,
+    r:Math.random()*2+0.5,
+    pulse:Math.random()*Math.PI*2,
+    color:['rgba(123,47,255','rgba(255,45,122','rgba(0,245,255','rgba(0,255,136'][Math.floor(Math.random()*4)]
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  nodes.forEach(n=>{
+    n.x+=n.vx;n.y+=n.vy;n.pulse+=0.02;
+    if(n.x<0||n.x>canvas.width)n.vx*=-1;
+    if(n.y<0||n.y>canvas.height)n.vy*=-1;
+    const alpha=(0.3+0.2*Math.sin(n.pulse));
+    ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    ctx.fillStyle=n.color+','+alpha+')';ctx.fill();
+  });
+  // Draw connections
+  nodes.forEach((a,i)=>{
+    nodes.slice(i+1).forEach(b=>{
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<120){
+        const alpha=(1-d/120)*0.06;
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+        ctx.strokeStyle='rgba(123,47,255,'+alpha+')';ctx.lineWidth=0.5;ctx.stroke();
+      }
+    });
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+
+// Scroll reveals
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.style.animation='fadeUp 0.6s ease forwards';});
+},{threshold:0.1});
+document.querySelectorAll('.means-card,.buyer-card').forEach((el,i)=>{
+  el.style.opacity='0';el.style.animationDelay=(i*0.05)+'s';observer.observe(el);
+});
+const style=document.createElement('style');
+style.textContent='@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}';
+document.head.appendChild(style);
+</script>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

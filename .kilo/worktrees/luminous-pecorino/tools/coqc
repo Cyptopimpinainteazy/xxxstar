@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SELF_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0")"
+HOST_COQC="$(command -v coqc || true)"
+
+if [[ -n "$HOST_COQC" ]]; then
+  HOST_COQC_PATH="$(readlink -f "$HOST_COQC" 2>/dev/null || realpath "$HOST_COQC")"
+  if [[ "$HOST_COQC_PATH" != "$SELF_PATH" ]]; then
+    exec "$HOST_COQC" "$@"
+  fi
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "coqc unavailable: neither host coqc nor docker found" >&2
+  exit 127
+fi
+
+workspace="${PWD}"
+exec docker run --rm \
+  -v "$workspace":/work \
+  -w /work \
+  coqorg/coq:8.18 \
+  /bin/sh -lc 'coqc "$@"' _ "$@"

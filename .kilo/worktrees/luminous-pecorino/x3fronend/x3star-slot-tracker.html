@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Genesis Slot Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000;--panel:rgba(0,0,0,0.95);
+  --gold:#FFD700;--gold2:#FF9500;--goldfaint:rgba(255,215,0,0.08);
+  --green:#00FF88;--red:#FF3B30;--blue:#40A0FF;
+  --empty:rgba(255,215,0,0.06);--empty-border:rgba(255,215,0,0.12);
+  --reserved:rgba(255,215,0,0.85);--reserved-glow:rgba(255,215,0,0.4);
+  --text:rgba(255,255,255,0.85);--muted:rgba(255,255,255,0.2);
+  --orb:'Orbitron',monospace;--raj:'Rajdhani',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--raj);}
+/* Radial glow */
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(255,215,0,0.04),transparent);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:52px;
+  display:flex;align-items:center;padding:0 24px;gap:16px;
+  background:rgba(0,0,0,0.98);border-bottom:1px solid rgba(255,215,0,0.12);}
+.logo{font-family:var(--orb);font-size:14px;letter-spacing:4px;color:var(--gold);
+  text-shadow:0 0 20px rgba(255,215,0,0.4);}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.nb{padding:8px 20px;border-radius:6px;font-size:10px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;border:none;font-family:var(--raj);}
+.nb-outline{background:transparent;border:1px solid rgba(255,215,0,0.3);color:var(--gold);}
+.nb-solid{background:var(--gold);color:#000;}
+.nb:hover{opacity:0.85;transform:translateY(-1px);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 300px;height:calc(100vh - 52px);
+  margin-top:52px;position:relative;z-index:1;}
+
+/* HEX GRID AREA */
+.hex-area{display:flex;flex-direction:column;padding:24px 24px 0;overflow:hidden;}
+.ha-header{display:flex;align-items:baseline;gap:16px;margin-bottom:20px;flex-shrink:0;}
+.ha-title{font-family:var(--orb);font-size:22px;font-weight:700;letter-spacing:2px;}
+.ha-title span{color:var(--gold);}
+.ha-sub{font-size:12px;color:var(--muted);}
+.legend{display:flex;gap:20px;margin-left:auto;}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);}
+.leg-hex{width:12px;height:12px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);}
+
+/* HEX GRID */
+.hex-grid-wrap{flex:1;overflow-y:auto;padding-bottom:20px;}
+.hex-grid-wrap::-webkit-scrollbar{width:4px;}
+.hex-grid-wrap::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.15);}
+.hex-grid{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;}
+
+/* SINGLE HEX */
+.hex-cell{width:52px;height:60px;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all 0.4s ease;position:relative;font-family:var(--orb);}
+.hex-cell.empty{background:var(--empty);border:none;}
+.hex-cell.empty:hover{background:rgba(255,215,0,0.12);}
+.hex-cell.reserved{
+  background:linear-gradient(135deg,rgba(255,215,0,0.9),rgba(255,149,0,0.8));
+  box-shadow:0 0 12px rgba(255,215,0,0.25);
+  animation:none;}
+.hex-cell.just-reserved{
+  animation:hexFlip 0.8s cubic-bezier(0.34,1.56,0.64,1);}
+@keyframes hexFlip{
+  0%{transform:scale(0.3);background:rgba(255,255,255,0.9);box-shadow:0 0 40px rgba(255,255,255,0.8);}
+  60%{transform:scale(1.15);}
+  100%{transform:scale(1);}
+}
+.hex-num{font-size:9px;font-weight:700;color:rgba(0,0,0,0.7);line-height:1;}
+.hex-cell.empty .hex-num{color:rgba(255,215,0,0.25);}
+.hex-flag{font-size:12px;line-height:1;margin-bottom:1px;}
+
+/* SIDE PANEL */
+.side{background:rgba(5,4,0,0.98);border-left:1px solid rgba(255,215,0,0.1);
+  display:flex;flex-direction:column;overflow-y:auto;}
+.side::-webkit-scrollbar{width:3px;}
+.side::-webkit-scrollbar-thumb{background:rgba(255,215,0,0.12);}
+.sp{padding:18px 20px;border-bottom:1px solid rgba(255,215,0,0.07);}
+.sp-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,215,0,0.35);margin-bottom:10px;}
+
+/* BIG NUMBER */
+.big-num{font-family:var(--orb);font-size:60px;font-weight:900;line-height:1;
+  background:linear-gradient(135deg,var(--gold),#FFF4B0);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.big-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* PROGRESS RING */
+.ring-wrap{display:flex;align-items:center;gap:16px;}
+svg.ring{transform:rotate(-90deg);}
+.ring-text{text-anchor:middle;dominant-baseline:middle;fill:var(--gold);
+  font-family:'Orbitron';font-size:18px;font-weight:700;}
+.ring-sub{fill:rgba(255,255,255,0.3);font-family:'Rajdhani';font-size:10px;}
+
+/* TIER BREAKDOWN */
+.tier-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.tier-box{padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;
+  border:1px solid rgba(255,255,255,0.05);text-align:center;}
+.tb-val{font-family:var(--orb);font-size:18px;font-weight:700;}
+.tb-key{font-size:8px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+.tb-sub{font-size:9px;color:var(--muted);margin-top:2px;}
+
+/* RECENT RESERVATIONS */
+.rec-list{display:flex;flex-direction:column;gap:0;}
+.rec-item{display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+  animation:recIn 0.4s ease;}
+@keyframes recIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+.rec-num{font-family:var(--orb);font-size:11px;color:var(--gold);width:24px;flex-shrink:0;}
+.rec-flag{font-size:14px;flex-shrink:0;}
+.rec-body{flex:1;min-width:0;}
+.rec-name{font-size:11px;font-weight:600;}
+.rec-time{font-size:9px;color:var(--muted);}
+.rec-tier{font-size:8px;letter-spacing:1px;padding:2px 6px;border-radius:4px;flex-shrink:0;}
+
+/* TOOLTIP */
+.tooltip{position:fixed;z-index:200;background:rgba(0,0,0,0.97);
+  border:1px solid var(--gold);border-radius:10px;padding:12px 16px;
+  pointer-events:none;display:none;font-size:11px;min-width:160px;}
+.tt-num{font-family:var(--orb);font-size:14px;font-weight:700;color:var(--gold);margin-bottom:8px;}
+.tt-row{display:flex;justify-content:space-between;gap:12px;padding:2px 0;color:var(--muted);}
+.tt-val{color:var(--text);font-weight:600;}
+
+/* FLASH OVERLAY */
+.flash{position:fixed;inset:0;z-index:300;pointer-events:none;
+  background:rgba(255,215,0,0.05);animation:flashAnim 0.4s ease;display:none;}
+@keyframes flashAnim{0%{opacity:1}100%{opacity:0}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <span style="font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.25)">GENESIS SLOT TRACKER</span>
+  <div class="nav-right">
+    <a href="x3star-proof-wall.html" style="font-size:10px;letter-spacing:2px;color:rgba(255,215,0,0.4);text-decoration:none;padding:6px 14px;border:1px solid rgba(255,215,0,0.12);border-radius:6px;">Proof Wall</a>
+    <a href="x3star-validator-presale.html" style="font-size:10px;letter-spacing:2px;color:rgba(255,215,0,0.4);text-decoration:none;padding:6px 14px;border:1px solid rgba(255,215,0,0.12);border-radius:6px;">All Tiers</a>
+    <button class="nb nb-solid" onclick="location.href='x3star-validator-presale.html'">Reserve Slot →</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- HEX GRID -->
+  <div class="hex-area">
+    <div class="ha-header">
+      <div>
+        <div class="ha-title">Genesis <span>Node Grid</span></div>
+        <div class="ha-sub">200 total slots · Each hexagon = 1 validator node</div>
+      </div>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-hex" style="background:var(--gold)"></div>Reserved</div>
+        <div class="leg-item"><div class="leg-hex" style="background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2)"></div>Available</div>
+      </div>
+    </div>
+    <div class="hex-grid-wrap">
+      <div class="hex-grid" id="hex-grid"></div>
+    </div>
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div class="side">
+    <div class="sp">
+      <div class="sp-label">Available Now</div>
+      <div class="big-num" id="avail-num">--</div>
+      <div class="big-sub">Genesis slots remaining</div>
+    </div>
+
+    <div class="sp">
+      <div class="sp-label">Fill Rate</div>
+      <div class="ring-wrap">
+        <svg class="ring" width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,215,0,0.08)" stroke-width="6"/>
+          <circle id="ring-arc" cx="40" cy="40" r="32" fill="none" stroke="url(#rg)" stroke-width="6"
+            stroke-linecap="round" stroke-dasharray="201.1" stroke-dashoffset="53"/>
+          <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#FFD700"/><stop offset="100%" stop-color="#00FF88"/>
+          </linearGradient></defs>
+        </svg>
+        <div>
+          <div style="font-family:var(--orb);font-size:24px;font-weight:700;color:var(--gold)" id="pct-fill">--</div>
+          <div style="font-size:10px;color:var(--muted)" id="fill-detail">--</div>
+          <div style="font-size:9px;color:var(--green);margin-top:3px" id="rate-label">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp">
+      <div class="sp-label">Tier Breakdown</div>
+      <div class="tier-grid">
+        <div class="tier-box">
+          <div class="tb-val" style="color:var(--gold)" id="tb-genesis">--</div>
+          <div class="tb-key">Genesis</div>
+          <div class="tb-sub" style="color:var(--red)" id="tb-genesis-sub">--</div>
+        </div>
+        <div class="tier-box">
+          <div class="tb-val" style="color:var(--blue)">892</div>
+          <div class="tb-key">Star</div>
+          <div class="tb-sub" style="color:var(--muted)" id="tb-star-sub">--</div>
+        </div>
+        <div class="tier-box">
+          <div class="tb-val" style="color:rgba(255,255,255,0.5)">741</div>
+          <div class="tb-key">Lite</div>
+          <div class="tb-sub" style="color:var(--green)" id="tb-lite-sub">--</div>
+        </div>
+        <div class="tier-box">
+          <div class="tb-val" style="color:var(--green)">1,787</div>
+          <div class="tb-key">Total</div>
+          <div class="tb-sub" style="color:var(--muted)" id="tb-total-sub">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp" style="border:none;flex:1;">
+      <div class="sp-label">Recent Reservations</div>
+      <div class="rec-list" id="rec-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-num" id="tt-num">Slot #001</div>
+  <div class="tt-row"><span>Status</span><span class="tt-val" id="tt-status">Reserved</span></div>
+  <div class="tt-row"><span>Operator</span><span class="tt-val" id="tt-op">David K.</span></div>
+  <div class="tt-row"><span>Country</span><span class="tt-val" id="tt-country">🇺🇸 USA</span></div>
+  <div class="tt-row"><span>Reserved</span><span class="tt-val" id="tt-time">2h ago</span></div>
+</div>
+<div class="flash" id="flash"></div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

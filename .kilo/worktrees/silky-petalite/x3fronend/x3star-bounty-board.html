@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Builder Bounty Board</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0800;--card:#120F00;
+  --amber:#FFB700;--amber2:#FF8C00;--amber3:#FFF4C0;
+  --green:#3EFF8A;--cyan:#00D4FF;--red:#FF3860;--purple:#AA44FF;
+  --white:#FFF8E0;--muted:rgba(255,248,224,0.3);--dim:rgba(255,183,0,0.04);
+  --border:rgba(255,183,0,0.12);
+  --mono:'JetBrains Mono',monospace;--body:'Manrope',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--white);font-family:var(--body);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 70% 40% at 30% 0%,rgba(255,140,0,0.06),transparent);}
+
+nav{position:sticky;top:0;z-index:100;height:56px;display:flex;align-items:center;
+  padding:0 32px;background:rgba(10,8,0,0.98);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);}
+.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:3px;color:var(--amber);}
+.nav-sub{font-size:11px;color:var(--muted);margin-left:16px;padding-left:16px;
+  border-left:1px solid var(--border);letter-spacing:2px;text-transform:uppercase;}
+.nav-right{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.nb{padding:8px 18px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;border:none;font-family:var(--body);transition:all 0.2s;}
+.nb-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.nb-ghost:hover{color:var(--white);}
+.nb-amber{background:var(--amber);color:#000;}
+.nb-amber:hover{box-shadow:0 0 16px rgba(255,183,0,0.4);}
+.pool-badge{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--amber);}
+
+.page{max-width:1100px;margin:0 auto;padding:32px;position:relative;z-index:1;}
+.page-title{font-size:32px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px;}
+.page-title span{color:var(--amber);}
+.page-sub{font-size:14px;color:var(--muted);margin-bottom:32px;}
+
+/* FILTER BAR */
+.filter-bar{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;}
+.fb-chip{padding:7px 16px;border-radius:8px;font-size:11px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;
+  border:1px solid;transition:all 0.2s;background:transparent;font-family:var(--body);}
+.fb-chip.active{background:var(--amber);color:#000;border-color:var(--amber);}
+.fb-chip:not(.active){color:var(--muted);border-color:var(--border);}
+.fb-chip:not(.active):hover{color:var(--white);}
+.sort-wrap{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);}
+select.sort-sel{background:var(--card);border:1px solid var(--border);color:var(--muted);
+  padding:6px 12px;border-radius:6px;font-family:var(--body);font-size:11px;cursor:pointer;}
+
+/* BOUNTY GRID */
+.bounty-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+
+/* BOUNTY CARD */
+.b-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:20px;cursor:pointer;transition:all 0.25s;position:relative;overflow:hidden;}
+.b-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  opacity:0;transition:opacity 0.3s;}
+.b-card:hover::before{opacity:1;}
+.b-card:hover{transform:translateY(-3px);}
+.bc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.bc-cat{font-size:8px;font-weight:700;letter-spacing:2px;padding:3px 10px;
+  border-radius:100px;text-transform:uppercase;font-family:var(--mono);}
+.bc-status{font-size:8px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;
+  border-radius:4px;text-transform:uppercase;font-family:var(--mono);}
+.bs-open{background:rgba(62,255,138,0.1);color:var(--green);border:1px solid rgba(62,255,138,0.2);}
+.bs-claimed{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.2);}
+.bs-hot{background:rgba(255,56,96,0.1);color:var(--red);border:1px solid rgba(255,56,96,0.2);}
+.bc-title{font-size:15px;font-weight:700;margin-bottom:6px;line-height:1.3;}
+.bc-desc{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:14px;}
+.bc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.bc-tag{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:3px;
+  background:rgba(255,183,0,0.06);color:rgba(255,183,0,0.5);border:1px solid rgba(255,183,0,0.12);}
+.bc-footer{display:flex;align-items:center;justify-content:space-between;}
+.bc-reward{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--amber);}
+.bc-reward-sub{font-size:9px;color:var(--muted);}
+.bc-deadline{font-size:10px;color:var(--muted);}
+.bc-claim-btn{padding:8px 18px;background:var(--amber);color:#000;border:none;border-radius:6px;
+  font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;
+  cursor:pointer;font-family:var(--body);transition:all 0.2s;flex-shrink:0;}
+.bc-claim-btn:hover{box-shadow:0 0 16px rgba(255,183,0,0.4);}
+.bc-claim-btn.taken{background:rgba(0,212,255,0.12);color:var(--cyan);
+  border:1px solid rgba(0,212,255,0.2);box-shadow:none;}
+.bc-progress{margin-top:10px;}
+.bcp-label{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-bottom:4px;}
+.bcp-bar{height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;}
+.bcp-fill{height:100%;border-radius:2px;}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;
+  background:var(--border);border-radius:12px;overflow:hidden;
+  border:1px solid var(--border);margin-bottom:28px;}
+.sr-cell{background:var(--bg);padding:18px 16px;text-align:center;}
+.src-val{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1;}
+.src-key{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <div class="nav-sub">Builder Bounty Board</div>
+  <div class="nav-right">
+    <span class="pool-badge" id="bounty-pool">--</span>
+    <button class="nb nb-ghost">Post a Bounty</button>
+    <button class="nb nb-amber" onclick="location.href='x3star-grant-mission-control.html'">Grants →</button>
+  </div>
+</nav>
+
+<div class="page">
+  <h1 class="page-title">Builder <span>Bounty Board</span></h1>
+  <p class="page-sub">Open tasks posted by the X3STAR DAO. Complete a bounty, earn X3S. No application. No gatekeeping. Ship and get paid.</p>
+
+  <div class="stats-row">
+    <div class="sr-cell"><div class="src-val" style="color:var(--amber)" id="bounty-open">--</div><div class="src-key">Open Bounties</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--green)" id="bounty-total-pool">--</div><div class="src-key">Total Pool</div></div>
+    <div class="sr-cell"><div class="src-val" id="bounty-claimed">--</div><div class="src-key">Claimed This Month</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--cyan)" id="bounty-builders">--</div><div class="src-key">Active Builders</div></div>
+    <div class="sr-cell"><div class="src-val" style="color:var(--red)" id="bounty-closing">--</div><div class="src-key">Closing This Week</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="fb-chip active">All</button>
+    <button class="fb-chip">🐛 Bug Bounty</button>
+    <button class="fb-chip">⚡ Features</button>
+    <button class="fb-chip">📝 Docs</button>
+    <button class="fb-chip">🌍 Translation</button>
+    <button class="fb-chip">🎨 Design</button>
+    <button class="fb-chip">🔬 Research</button>
+    <div class="sort-wrap">
+      Sort:
+      <select class="sort-sel">
+        <option>Highest Reward</option>
+        <option>Closing Soon</option>
+        <option>Newest</option>
+        <option>Easiest</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="bounty-grid" id="bounty-grid"></div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+document.querySelectorAll('.fb-chip').forEach(c=>{
+  c.addEventListener('click',()=>{
+    document.querySelectorAll('.fb-chip').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active');
+  });
+});
+if (window.X3PageAdapters) {
+  window.X3PageAdapters.start();
+}
+</script>
+</body>
+</html>

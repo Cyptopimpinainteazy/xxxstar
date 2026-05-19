@@ -1,0 +1,70 @@
+{
+  "health": {
+    "normal_min": 75,
+    "degraded_min": 60,
+    "containment_min": 40,
+    "safe_mode_min": 20
+  },
+  "gpu": {
+    "poll_interval_s": 5.0,
+    "xid_window_s": 300,
+    "xid_threshold": 3,
+    "temp_warn_c": 78,
+    "temp_crit_c": 88,
+    "vram_warn_pct": 90,
+    "vram_crit_pct": 96
+  },
+  "resource": {
+    "poll_interval_s": 10.0,
+    "ram_warn_pct": 85,
+    "ram_crit_pct": 95,
+    "swap_warn_pct": 50,
+    "swap_crit_pct": 80,
+    "disk_warn_pct": 85,
+    "disk_crit_pct": 95,
+    "load_warn_multiplier": 2.0,
+    "load_crit_multiplier": 4.0,
+    "cpu_temp_warn_c": 80,
+    "cpu_temp_crit_c": 95,
+    "fd_warn_pct": 80,
+    "fd_crit_pct": 95
+  },
+  "log_watcher": {
+    "poll_interval_s": 15.0,
+    "patterns": [
+      "Xid",
+      "NVRM",
+      "nvidia",
+      "Out of memory",
+      "oom-kill",
+      "oom_reaper",
+      "segfault",
+      "general protection fault",
+      "kernel panic",
+      "BUG:",
+      "Call Trace:",
+      "Skipping invalid relocation target",
+      "GPU has fallen off the bus",
+      "Xid.*Critical"
+    ]
+  },
+  "circuit_breaker": {
+    "failure_threshold": 5,
+    "recovery_timeout_s": 60.0,
+    "half_open_max_calls": 2
+  },
+  "intervention": {
+    "cooldown_s": 30.0,
+    "max_per_hour": 20
+  },
+  "safe_mode": {
+    "max_gpu_workers": 2,
+    "disable_mutations": true,
+    "reduce_concurrency": true,
+    "max_concurrent_tasks": 2
+  },
+  "metrics_retention_s": 3600,
+  "audit_log_dir": "logs/autonomic",
+  "audit_max_memory": 1000,
+  "swarm_api_url": "http://127.0.0.1:8080"
+}

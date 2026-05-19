@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Whale Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Barlow+Condensed:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#040208;--panel:rgba(6,3,14,0.98);
+  --border:rgba(120,50,255,0.18);
+  --purple:#8833FF;--purple2:#5500CC;
+  --gold:#FFD700;--gold2:#FF9900;
+  --green:#00FF88;--red:#FF2D55;
+  --cyan:#00D4FF;--orange:#FF6600;
+  --text:#F0E8FF;--muted:#3A2260;--dim:#0D0820;
+  --font:'Barlow Condensed',sans-serif;--mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(120,50,255,0.08),transparent);}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;padding:0 24px;height:60px;
+  background:rgba(4,2,8,0.98);border-bottom:1px solid var(--border);backdrop-filter:blur(20px);}
+.logo{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:3px;
+  background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;margin-right:24px;}
+.nav-tab{padding:0 16px;height:60px;display:flex;align-items:center;font-size:12px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all 0.2s;text-decoration:none;}
+.nav-tab:hover,.nav-tab.active{color:var(--purple);border-bottom-color:var(--purple);}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:16px;}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green);
+  font-family:var(--mono);}
+.lb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.btn-sm{padding:7px 18px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;border:none;font-family:var(--font);transition:all 0.2s;}
+.btn-purple{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;}
+.btn-purple:hover{box-shadow:0 0 20px rgba(120,50,255,0.4);}
+
+/* PAGE HEADER */
+.page-head{padding:20px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;}
+.ph-title{font-size:28px;font-weight:900;letter-spacing:1px;}
+.ph-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+.alert-count{display:flex;align-items:center;gap:8px;
+  background:rgba(255,45,85,0.08);border:1px solid rgba(255,45,85,0.25);
+  border-radius:8px;padding:8px 16px;font-size:12px;color:var(--red);cursor:pointer;}
+.ac-num{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red);}
+
+/* BODY GRID */
+.main{display:grid;grid-template-columns:360px 1fr;gap:0;
+  background:var(--border);border-top:1px solid var(--border);position:relative;z-index:1;}
+.left-col{background:var(--bg);border-right:1px solid var(--border);}
+.right-col{background:var(--bg);}
+
+/* SECTION HEADER */
+.sec-head{padding:12px 20px;background:rgba(120,50,255,0.04);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.sh-title{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--purple);}
+.sh-count{font-family:var(--mono);font-size:12px;color:var(--muted);}
+
+/* WHALE CARD */
+.whale-card{padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04);
+  cursor:pointer;transition:background 0.2s;position:relative;}
+.whale-card:hover{background:rgba(120,50,255,0.04);}
+.whale-card.selected{background:rgba(120,50,255,0.08);border-left:2px solid var(--purple);}
+.wc-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.wc-rank{font-family:var(--mono);font-size:11px;color:var(--muted);width:20px;flex-shrink:0;}
+.wc-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:800;font-family:var(--mono);flex-shrink:0;}
+.wc-identity{flex:1;min-width:0;}
+.wc-name{font-size:14px;font-weight:700;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wc-addr{font-size:10px;color:var(--muted);margin-top:1px;}
+.wc-badge{font-size:8px;letter-spacing:1.5px;padding:2px 8px;border-radius:100px;font-weight:700;flex-shrink:0;}
+.wb-whale{background:rgba(255,215,0,0.12);color:var(--gold);border:1px solid rgba(255,215,0,0.25);}
+.wb-inst{background:rgba(120,50,255,0.12);color:var(--purple);border:1px solid rgba(120,50,255,0.25);}
+.wb-val{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.2);}
+.wc-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+.wcb-stat{text-align:center;}
+.wcbs-val{font-family:var(--mono);font-size:12px;font-weight:700;}
+.wcbs-key{font-size:8px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-top:1px;}
+.wc-activity{height:3px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;margin-top:8px;}
+.wca-fill{height:100%;border-radius:100px;transition:width 0.5s ease;}
+
+/* RIGHT: ACTIVITY STREAM */
+.activity-header{padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;}
+.ah-filters{display:flex;gap:6px;flex:1;}
+.filter-chip{padding:5px 12px;border-radius:100px;font-size:10px;font-weight:700;
+  letter-spacing:1.5px;cursor:pointer;border:1px solid;transition:all 0.2s;
+  background:transparent;font-family:var(--font);}
+.fc-all{border-color:rgba(255,255,255,0.12);color:var(--muted);}
+.fc-all.active{background:rgba(255,255,255,0.08);color:var(--text);}
+.fc-buy{border-color:rgba(0,255,136,0.2);color:var(--green);}
+.fc-buy.active{background:rgba(0,255,136,0.08);}
+.fc-sell{border-color:rgba(255,45,85,0.2);color:var(--red);}
+.fc-sell.active{background:rgba(255,45,85,0.08);}
+.fc-stake{border-color:rgba(0,212,255,0.2);color:var(--cyan);}
+.fc-stake.active{background:rgba(0,212,255,0.08);}
+.fc-move{border-color:rgba(255,150,0,0.2);color:var(--orange);}
+.fc-move.active{background:rgba(255,150,0,0.08);}
+
+/* ACTIVITY ITEM */
+.act-stream{overflow-y:auto;max-height:calc(100vh - 280px);}
+.act-stream::-webkit-scrollbar{width:3px;}
+.act-stream::-webkit-scrollbar-thumb{background:var(--border);}
+.act-item{display:grid;grid-template-columns:48px 1fr auto;gap:12px;
+  padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.03);
+  align-items:center;transition:background 0.15s;cursor:pointer;}
+.act-item:hover{background:rgba(255,255,255,0.02);}
+.act-item.new-item{animation:newFade 0.5s ease;}
+@keyframes newFade{from{background:rgba(120,50,255,0.15)}to{background:transparent}}
+.ai-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:18px;flex-shrink:0;}
+.ai-body{}
+.ai-top{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+.ai-wallet{font-family:var(--mono);font-size:12px;font-weight:700;}
+.ai-action{font-size:11px;color:var(--text);}
+.ai-type{font-size:9px;letter-spacing:1.5px;padding:2px 8px;border-radius:100px;font-weight:700;}
+.ait-buy{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.2);}
+.ait-sell{background:rgba(255,45,85,0.1);color:var(--red);border:1px solid rgba(255,45,85,0.2);}
+.ait-stake{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.2);}
+.ait-move{background:rgba(255,150,0,0.1);color:var(--orange);border:1px solid rgba(255,150,0,0.2);}
+.ait-vote{background:rgba(120,50,255,0.1);color:var(--purple);border:1px solid rgba(120,50,255,0.2);}
+.ai-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+.ai-amount{text-align:right;}
+.ai-val{font-family:var(--mono);font-size:14px;font-weight:700;}
+.ai-usd{font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
+.ai-time{font-size:9px;color:var(--muted);margin-top:1px;}
+
+/* BOTTOM STATS ROW */
+.bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border);}
+.br-panel{padding:16px 20px;border-right:1px solid var(--border);}
+.br-panel:last-child{border:none;}
+.br-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+.br-chart{height:80px;position:relative;}
+
+/* SENTIMENT METER */
+.sentiment{display:flex;flex-direction:column;gap:6px;}
+.sent-bar{height:14px;background:rgba(255,255,255,0.04);border-radius:100px;overflow:hidden;position:relative;}
+.sent-fill{height:100%;border-radius:100px;position:relative;transition:width 1s ease;}
+.sent-label{display:flex;justify-content:space-between;font-size:10px;}
+.sent-pct{font-family:var(--mono);font-weight:700;}
+.big-sentiment{font-family:var(--mono);font-size:32px;font-weight:800;color:var(--green);
+  text-align:center;margin:8px 0 4px;}
+.big-sent-label{font-size:9px;letter-spacing:3px;color:var(--muted);text-align:center;text-transform:uppercase;}
+
+/* ACCUMULATION SCORE */
+.accum-score{font-family:var(--mono);font-size:48px;font-weight:800;
+  background:linear-gradient(135deg,var(--gold),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-align:center;line-height:1;}
+.accum-sub{font-size:10px;letter-spacing:2px;color:var(--muted);text-align:center;margin-top:4px;}
+
+/* ALERT TOAST */
+.alert-toast{position:fixed;top:80px;right:24px;z-index:200;
+  background:rgba(4,2,8,0.98);border:1px solid var(--red);border-radius:12px;
+  padding:14px 18px;max-width:320px;animation:toastIn 0.3s ease;
+  box-shadow:0 8px 40px rgba(255,45,85,0.15);}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.at-title{font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.at-body{font-size:12px;color:var(--muted);}
+.at-val{font-family:var(--mono);font-weight:700;color:var(--text);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR</div>
+  <a class="nav-tab active">🐳 Whale Tracker</a>
+  <a class="nav-tab" href="x3star-network-pulse.html">Network Pulse</a>
+  <a class="nav-tab" href="x3star-dashboard.html">Dashboard</a>
+  <a class="nav-tab" href="x3star-token-presale.html">Presale</a>
+  <div class="nav-right">
+    <div class="live-badge"><div class="lb-dot"></div>LIVE DATA</div>
+    <button class="btn-sm btn-purple" onclick="location.href='x3star-token-presale.html'">Buy X3S →</button>
+  </div>
+</nav>
+
+<div class="page-head">
+  <div>
+    <div class="ph-title">🐳 Whale <span style="color:var(--purple)">Intelligence</span></div>
+    <div class="ph-sub">Track the 50 largest X3STAR wallets in real-time. Follow smart money.</div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <div style="font-size:12px;color:var(--muted);font-family:var(--mono);">X3S/USD: <span style="color:var(--gold);font-weight:700;">--</span> <span style="color:var(--green)">--</span></div>
+    <div class="alert-count" id="alert-btn" onclick="showAlert()">
+      <div class="ac-num" id="alert-num">--</div>
+      <div>New Whale<br>Alerts</div>
+      <div style="font-size:18px;">🔔</div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- LEFT: WHALE LIST -->
+  <div class="left-col">
+    <div class="sec-head">
+      <span class="sh-title">Top Wallets</span>
+      <span class="sh-count" id="whale-count">--</span>
+    </div>
+    <div id="whale-list" style="overflow-y:auto;max-height:calc(100vh - 170px);">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- RIGHT: ACTIVITY STREAM + CHARTS -->
+  <div class="right-col">
+    <div class="activity-header">
+      <div class="ah-filters">
+        <button class="filter-chip fc-all active" onclick="setFilter(this,'all')">ALL</button>
+        <button class="filter-chip fc-buy" onclick="setFilter(this,'buy')">BUY</button>
+        <button class="filter-chip fc-sell" onclick="setFilter(this,'sell')">SELL</button>
+        <button class="filter-chip fc-stake" onclick="setFilter(this,'stake')">STAKE</button>
+        <button class="filter-chip fc-move" onclick="setFilter(this,'move')">TRANSFER</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);font-family:var(--mono);">
+        <span id="stream-count">--</span> events today
+      </div>
+    </div>
+
+    <div class="act-stream" id="act-stream">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- BOTTOM STATS -->
+    <div class="bottom-row">
+      <div class="br-panel">
+        <div class="br-title">24h Whale Buy vs Sell Pressure</div>
+        <div class="big-sentiment" id="sent-dominant">BULLISH</div>
+        <div class="big-sent-label">Whale Sentiment</div>
+        <div class="sentiment" style="margin-top:12px;">
+          <div>
+            <div class="sent-label"><span style="color:var(--green)">BUY</span><span class="sent-pct" style="color:var(--green)" id="buy-pct">--</span></div>
+            <div class="sent-bar"><div class="sent-fill" id="buy-bar" style="width:0%;background:var(--green)"></div></div>
+          </div>
+          <div>
+            <div class="sent-label"><span style="color:var(--red)">SELL</span><span class="sent-pct" style="color:var(--red)" id="sell-pct">--</span></div>
+            <div class="sent-bar"><div class="sent-fill" id="sell-bar" style="width:0%;background:var(--red)"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="br-panel">
+        <div class="br-title">Accumulation Score</div>
+        <div class="accum-score" id="accum-score">--</div>
+        <div class="accum-sub" id="accum-sub">out of 10 · updating</div>
+        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;margin-top:12px;">
+          <div id="accum-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--purple));border-radius:100px;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:4px;">
+          <span>Distribution</span><span>Accumulation</span>
+        </div>
+      </div>
+      <div class="br-panel">
+        <div class="br-title">Top Wallet Holdings</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:var(--muted)">Top 1 wallet</span>
+            <span style="font-family:var(--mono);color:var(--gold)" id="whale-top1">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:var(--muted)">Top 10 wallets</span>
+            <span style="font-family:var(--mono);color:var(--gold)" id="whale-top10">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:var(--muted)">Top 50 wallets</span>
+            <span style="font-family:var(--mono);color:var(--gold)" id="whale-top50">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:var(--muted)">% of supply</span>
+            <span style="font-family:var(--mono);color:var(--cyan)" id="whale-supply-pct">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;border-top:1px solid rgba(255,255,255,0.05);padding-top:6px;">
+            <span style="color:var(--text)">24h Whale Net Flow</span>
+            <span style="font-family:var(--mono);color:var(--green);font-weight:700" id="whale-netflow">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ALERT TOAST -->
+<div class="alert-toast" id="alert-toast" style="display:none;">
+  <div class="at-title">🚨 Large Move Detected</div>
+  <div class="at-body">
+    <span class="at-val">apex.eth</span> just purchased <span class="at-val" style="color:var(--green)">500,000 X3S</span>
+    <span class="at-val" style="color:var(--gold)"> ($42,100)</span> from the presale contract.
+    <div style="margin-top:8px;font-size:10px;">2 seconds ago · Block #1,847,341</div>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

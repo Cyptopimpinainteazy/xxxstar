@@ -1,0 +1,287 @@
+
+== cargo test -p pallet-x3-cross-vm-router ==
+status=101 log=reports/cross-vm/cargo-test-pallet-x3-cross-vm-router.log
+     Compiling const_format_proc_macros v0.2.34
+     Compiling bytes v1.11.1
+     Compiling crypto-common v0.1.7
+     Compiling block-buffer v0.10.4
+     Compiling digest v0.10.7
+     Compiling impl-trait-for-tuples v0.2.3
+     Compiling konst_macro_rules v0.2.19
+     Compiling konst v0.2.20
+     Compiling parity-scale-codec-derive v3.7.5
+     Compiling memchr v2.8.0
+     Compiling const_format v0.2.36
+     Compiling parity-scale-codec v3.7.5
+     Compiling crunchy v0.2.4
+     Compiling byte-slice-cast v1.2.3
+     Compiling autocfg v1.5.0
+     Compiling aho-corasick v1.1.4
+     Compiling regex-syntax v0.8.10
+     Compiling regex-automata v0.4.14
+     Compiling regex v1.12.3
+  error: rustc interrupted by SIGSEGV, printing backtrace
+  
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x3c83a9f)[0x7ef380883a9f]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x42520)[0x7ef37c842520]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65da847)[0x7ef3831da847]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65da5bd)[0x7ef3831da5bd]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65da1ea)[0x7ef3831da1ea]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65da0f7)[0x7ef3831da0f7]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x66c129f)[0x7ef3832c129f]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65751c1)[0x7ef3831751c1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6574ea2)[0x7ef383174ea2]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x657a7c5)[0x7ef38317a7c5]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x94ac3)[0x7ef37c894ac3]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x1268d0)[0x7ef37c9268d0]
+  
+  note: we would appreciate a report at https://github.com/rust-lang/rust
+  help: you can increase rustc's stack size by setting RUST_MIN_STACK=17179869184
+  error: could not compile `zerocopy` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name zerocopy --edition=2021 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-0.8.48/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --cfg 'feature="simd"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("__internal_use_only_features_that_work_on_stable", "alloc", "derive", "float-nightly", "simd", "simd-nightly", "std", "zerocopy-derive"))' -C metadata=b5dfc4abc939a1b2 -C extra-filename=-a52874a8a1f1383c --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld --check-cfg 'cfg(no_zerocopy_simd_x86_avx12_1_89_0)' --check-cfg 'cfg(rust, values("1.89.0"))' --check-cfg 'cfg(no_zerocopy_core_error_1_81_0)' --check-cfg 'cfg(rust, values("1.81.0"))' --check-cfg 'cfg(no_zerocopy_diagnostic_on_unimplemented_1_78_0)' --check-cfg 'cfg(rust, values("1.78.0"))' --check-cfg 'cfg(no_zerocopy_generic_bounds_in_const_fn_1_61_0)' --check-cfg 'cfg(rust, values("1.61.0"))' --check-cfg 'cfg(no_zerocopy_target_has_atomics_1_60_0)' --check-cfg 'cfg(rust, values("1.60.0"))' --check-cfg 'cfg(no_zerocopy_aarch64_simd_1_59_0)' --check-cfg 'cfg(rust, values("1.59.0"))' --check-cfg 'cfg(no_zerocopy_aarch64_simd_be_1_87_0)' --check-cfg 'cfg(rust, values("1.87.0"))' --check-cfg 'cfg(no_zerocopy_panic_in_const_and_vec_try_reserve_1_57_0)' --check-cfg 'cfg(rust, values("1.57.0"))' --check-cfg 'cfg(doc_cfg)' --check-cfg 'cfg(kani)' --check-cfg 'cfg(__ZEROCOPY_INTERNAL_USE_ONLY_NIGHTLY_FEATURES_IN_TESTS)' --check-cfg 'cfg(__ZEROCOPY_INTERNAL_USE_ONLY_DEV_MODE)' --check-cfg 'cfg(coverage_nightly)' --check-cfg 'cfg(zerocopy_inline_always)'` (signal: 11, SIGSEGV: invalid memory reference)
+
+== cargo test -p pallet-x3-atomic-kernel ==
+status=101 log=reports/cross-vm/cargo-test-pallet-x3-atomic-kernel.log
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ad6cdf)[0x752adcad6cdf]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ad6ea1)[0x752adcad6ea1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtNtCs1TLFLjNMWqm_16rustc_const_eval10const_eval12eval_queries31eval_to_allocation_raw_provider+0x41c)[0x752adcad7adc]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ad7696)[0x752adcad7696]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches12DefaultCacheINtNtCs7yQwD1uZeK1_12rustc_middle2ty20PseudoCanonicalInputNtNtNtB2y_3mir9interpret8GlobalIdEINtNtNtB2y_5query5erase6ErasedAhj18_EEKb0_KB4A_KB4A_ENtNtB1f_8plumbing9QueryCtxtKB4A_EB1f_+0x414)[0x752adcaccc54]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5acc7f3)[0x752adcacc7f3]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtNtCs1TLFLjNMWqm_16rustc_const_eval10const_eval12eval_queries32eval_to_const_value_raw_provider+0x1d8)[0x752adcacf170]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5acef80)[0x752adcacef80]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches12DefaultCacheINtNtCs7yQwD1uZeK1_12rustc_middle2ty20PseudoCanonicalInputNtNtNtB2y_3mir9interpret8GlobalIdEINtNtNtB2y_5query5erase6ErasedAhj18_EEKb0_Kb1_KB4A_ENtNtB1f_8plumbing9QueryCtxtKB4A_EB1f_+0x42a)[0x752adcace72a]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ace2b5)[0x752adcace2b5]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvMNtNtNtCs7yQwD1uZeK1_12rustc_middle3mir9interpret7queriesNtNtNtB8_2ty7context6TyCtxt18const_eval_resolve+0x3afc)[0x752add39fd4e]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ad1a59)[0x752adcad1a59]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtNtCs1TLFLjNMWqm_16rustc_const_eval10const_eval12eval_queries31eval_to_allocation_raw_provider+0xa21)[0x752adcad80e1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ad7696)[0x752adcad7696]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches12DefaultCacheINtNtCs7yQwD1uZeK1_12rustc_middle2ty20PseudoCanonicalInputNtNtNtB2y_3mir9interpret8GlobalIdEINtNtNtB2y_5query5erase6ErasedAhj18_EEKb0_KB4A_KB4A_ENtNtB1f_8plumbing9QueryCtxtKB4A_EB1f_+0x414)[0x752adcaccc54]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5acc7f3)[0x752adcacc7f3]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtNtCs1TLFLjNMWqm_16rustc_const_eval10const_eval12eval_queries32eval_to_const_value_raw_provider+0x1d8)[0x752adcacf170]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5acef80)[0x752adcacef80]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches12DefaultCacheINtNtCs7yQwD1uZeK1_12rustc_middle2ty20PseudoCanonicalInputNtNtNtB2y_3mir9interpret8GlobalIdEINtNtNtB2y_5query5erase6ErasedAhj18_EEKb0_Kb1_KB4A_ENtNtB1f_8plumbing9QueryCtxtKB4A_EB1f_+0x42a)[0x752adcace72a]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5ace2b5)[0x752adcace2b5]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvCsxoZcjRV8K0_18rustc_hir_analysis11check_crate+0x3dd)[0x752adc5d4dbb]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtCshk0CrVEr7wz_15rustc_interface6passes8analysis+0x33a)[0x752adc5d9004]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x55d8cc7)[0x752adc5d8cc7]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches11SingleCacheINtNtNtCs7yQwD1uZeK1_12rustc_middle5query5erase6ErasedAhj0_EEKb0_KB3s_KB3s_ENtNtB1f_8plumbing9QueryCtxtKB3s_EB1f_+0x1f0)[0x752add4d2b08]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x64d2776)[0x752add4d2776]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6817e0b)[0x752add817e0b]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x66c11f1)[0x752add6c11f1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65751c1)[0x752add5751c1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6574ea2)[0x752add574ea2]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x657a7c5)[0x752add57a7c5]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x94ac3)[0x752ad6c94ac3]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x1268d0)[0x752ad6d268d0]
+  
+  note: we would appreciate a report at https://github.com/rust-lang/rust
+  help: you can increase rustc's stack size by setting RUST_MIN_STACK=17179869184
+  note: backtrace dumped due to SIGSEGV! resuming signal
+  error: could not compile `regex-syntax` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name regex_syntax --edition=2021 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regex-syntax-0.8.10/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --allow=unexpected_cfgs --check-cfg 'cfg(docsrs_regex)' --cfg 'feature="default"' --cfg 'feature="std"' --cfg 'feature="unicode"' --cfg 'feature="unicode-age"' --cfg 'feature="unicode-bool"' --cfg 'feature="unicode-case"' --cfg 'feature="unicode-gencat"' --cfg 'feature="unicode-perl"' --cfg 'feature="unicode-script"' --cfg 'feature="unicode-segment"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("arbitrary", "default", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"))' -C metadata=599180c2190d5ff8 -C extra-filename=-3b2644c6ebd8ed82 --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld` (signal: 11, SIGSEGV: invalid memory reference)
+
+== cargo test -p pallet-x3-settlement-engine ==
+status=101 log=reports/cross-vm/cargo-test-pallet-x3-settlement-engine.log
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit20constructVariableDIEERNS_11DbgVariableEb+0x37c)[0x772d47297c7c]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x177)[0x772d472965b7]
+  
+  ### cycle encountered after 4 frames with period 5
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  ### recursed 8 times
+  
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit25createAndAddScopeChildrenEPNS_12LexicalScopeERNS_3DIEE+0x617)[0x772d47296a57]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DwarfCompileUnit27constructSubprogramScopeDIEEPKNS_12DISubprogramEPNS_12LexicalScopeEPNS_8MCSymbolE+0x2f)[0x772d472999ef]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm10DwarfDebug15endFunctionImplEPKNS_15MachineFunctionE+0x2b3)[0x772d4729b433]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16DebugHandlerBase11endFunctionEPKNS_15MachineFunctionE+0xc3)[0x772d47290d17]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm10AsmPrinter16emitFunctionBodyEv+0x30b3)[0x772d47745ab3]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(+0x85429c0)[0x772d477429c0]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm13FPPassManager13runOnFunctionERNS_8FunctionE+0x8f2)[0x772d4702dc32]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm13FPPassManager11runOnModuleERNS_6ModuleE+0x2f)[0x772d4702d285]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm6legacy15PassManagerImpl3runERNS_6ModuleE+0x2c4)[0x772d475edad8]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x654b5c2)[0x772d4f74b5c2]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x654b137)[0x772d4f74b137]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x654cafe)[0x772d4f74cafe]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCscKkwsb9kWaL_3std3sys9backtrace28___rust_begin_short_backtraceNCINvXs0_CsJjGP0MPhtX_18rustc_codegen_llvmNtB1g_18LlvmCodegenBackendNtNtNtCsc5lr08gZmv6_17rustc_codegen_ssa6traits7backend19ExtraBackendMethods18spawn_named_threadNCINvNtNtB2j_4back5write10spawn_workB1N_E0uE0uEB1g_+0x21d)[0x772d4f750925]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65768c7)[0x772d4f7768c7]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x657a7c5)[0x772d4f77a7c5]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x94ac3)[0x772d48e94ac3]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x1268d0)[0x772d48f268d0]
+  
+  note: rustc unexpectedly overflowed its stack! this is a bug
+  note: we would appreciate a report at https://github.com/rust-lang/rust
+  help: you can increase rustc's stack size by setting RUST_MIN_STACK=17179869184
+  note: backtrace dumped due to SIGSEGV! resuming signal
+  error: could not compile `bitcoin_hashes` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name bitcoin_hashes --edition=2021 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitcoin_hashes-0.14.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("alloc", "bitcoin-io", "default", "io", "schemars", "serde", "small-hash", "std"))' -C metadata=a021ff7d1ea36eaa -C extra-filename=-dcbc852bba8350f7 --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --extern hex=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libhex_conservative-4b5ecd6302261316.rmeta --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld` (signal: 11, SIGSEGV: invalid memory reference)
+
+== cargo test -p pallet-x3-asset-registry ==
+status=101 log=reports/cross-vm/cargo-test-pallet-x3-asset-registry.log
+  warning: patch for `sp-crypto-hashing` uses the features mechanism. default-features and features will not take effect because the patch dependency does not support this mechanism
+     Compiling num-traits v0.2.19
+     Compiling scale-info v2.11.6
+     Compiling futures-core v0.3.32
+     Compiling futures-channel v0.3.32
+     Compiling signature v2.2.0
+     Compiling slab v0.4.12
+     Compiling serdect v0.2.0
+     Compiling futures-util v0.3.32
+     Compiling curve25519-dalek v4.1.3
+  error: rustc interrupted by SIGSEGV, printing backtrace
+  
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x3c83a9f)[0x7158a1a83a9f]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x42520)[0x71589da42520]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16SelectionDAGISel20SelectAllBasicBlocksERKNS_8FunctionE+0x70d)[0x71589be3dd8d]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm16SelectionDAGISel20runOnMachineFunctionERNS_15MachineFunctionE+0x3c4)[0x71589be8f7c4]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm22SelectionDAGISelLegacy20runOnMachineFunctionERNS_15MachineFunctionE+0x254)[0x71589bc32314]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm13FPPassManager13runOnFunctionERNS_8FunctionE+0x8f2)[0x71589bc2dc32]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm13FPPassManager11runOnModuleERNS_6ModuleE+0x2f)[0x71589bc2d285]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/libLLVM.so.20.1-rust-1.90.0-stable(_ZN4llvm6legacy15PassManagerImpl3runERNS_6ModuleE+0x2c4)[0x71589c1edad8]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x654b5c2)[0x7158a434b5c2]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x654b137)[0x7158a434b137]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x654cafe)[0x7158a434cafe]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCscKkwsb9kWaL_3std3sys9backtrace28___rust_begin_short_backtraceNCINvXs0_CsJjGP0MPhtX_18rustc_codegen_llvmNtB1g_18LlvmCodegenBackendNtNtNtCsc5lr08gZmv6_17rustc_codegen_ssa6traits7backend19ExtraBackendMethods18spawn_named_threadNCINvNtNtB2j_4back5write10spawn_workB1N_E0uE0uEB1g_+0x21d)[0x7158a4350925]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65768c7)[0x7158a43768c7]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x657a7c5)[0x7158a437a7c5]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x94ac3)[0x71589da94ac3]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x1268d0)[0x71589db268d0]
+  
+  note: we would appreciate a report at https://github.com/rust-lang/rust
+  help: you can increase rustc's stack size by setting RUST_MIN_STACK=17179869184
+  error: could not compile `curve25519-dalek` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name curve25519_dalek --edition=2021 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/curve25519-dalek-4.1.3/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --cfg 'feature="alloc"' --cfg 'feature="digest"' --cfg 'feature="legacy_compatibility"' --cfg 'feature="precomputed-tables"' --cfg 'feature="zeroize"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("alloc", "default", "digest", "ff", "group", "group-bits", "legacy_compatibility", "precomputed-tables", "rand_core", "serde", "zeroize"))' -C metadata=58d8c0e429794f93 -C extra-filename=-d7faf5dcfc667e9f --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --extern cfg_if=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libcfg_if-fea1223bb5abf9c8.rmeta --extern cpufeatures=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libcpufeatures-293b2d84c6e71567.rmeta --extern curve25519_dalek_derive=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libcurve25519_dalek_derive-c43996aa8f28fd34.so --extern digest=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libdigest-5f41169c73ed086c.rmeta --extern subtle=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libsubtle-076103ebb9fb137a.rmeta --extern zeroize=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libzeroize-b7a462a408044625.rmeta --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld --cfg 'curve25519_dalek_bits="64"' --cfg 'curve25519_dalek_backend="simd"'` (signal: 11, SIGSEGV: invalid memory reference)
+
+== cargo test -p pallet-x3-account-registry ==
+status=101 log=reports/cross-vm/cargo-test-pallet-x3-account-registry.log
+     Compiling num-format v0.4.4
+     Compiling impl-codec v0.7.1
+     Compiling ahash v0.8.12 (/home/lojak/Desktop/X3_ATOMIC_STAR/patches/ahash)
+     Compiling base64 v0.22.1
+     Compiling powerfmt v0.2.0
+     Compiling object v0.37.3
+     Compiling prometheus v0.13.4
+     Compiling itertools v0.11.0
+     Compiling deranged v0.5.8 (/home/lojak/Desktop/X3_ATOMIC_STAR/patches/deranged)
+  error: rustc interrupted by SIGSEGV, printing backtrace
+  
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x3c83a9f)[0x7460dc083a9f]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x42520)[0x7460d8042520]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvXs_NtCsbLuknewgX4c_13rustc_resolve13def_collectorNtB4_12DefCollectorNtNtCshEQEG4PKN4N_9rustc_ast5visit7Visitor10visit_expr+0x38)[0x7460ddbf270e]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvXs_NtCsbLuknewgX4c_13rustc_resolve13def_collectorNtB4_12DefCollectorNtNtCshEQEG4PKN4N_9rustc_ast5visit7Visitor10visit_expr+0x130)[0x7460ddbf2806]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvXs_NtCsbLuknewgX4c_13rustc_resolve13def_collectorNtB4_12DefCollectorNtNtCshEQEG4PKN4N_9rustc_ast5visit7Visitor10visit_expr+0x2d3)[0x7460ddbf29a9]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvXNtCsbLuknewgX4c_13rustc_resolve6macrosNtB4_8ResolverNtNtCsaQjJVayPfGM_12rustc_expand4base14ResolverExpand36visit_ast_fragment_with_placeholders+0x83e)[0x7460ddbfbebe]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvMs1_NtCsaQjJVayPfGM_12rustc_expand6expandNtB5_13MacroExpander21fully_expand_fragment+0xbb4c)[0x7460decff04c]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvMs1_NtCsaQjJVayPfGM_12rustc_expand6expandNtB5_13MacroExpander12expand_crate+0x2a9)[0x7460decf30a9]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5fea67d)[0x7460de3ea67d]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtCshk0CrVEr7wz_15rustc_interface6passes25resolver_for_lowering_raw+0x28b)[0x7460de99ee61]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x659ebcd)[0x7460de99ebcd]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x659eba7)[0x7460de99eba7]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches11SingleCacheINtNtNtCs7yQwD1uZeK1_12rustc_middle5query5erase6ErasedAhj10_EEKb0_KB3t_KB3t_ENtNtB1f_8plumbing9QueryCtxtKB3t_EB1f_+0x207)[0x7460de8d3547]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x64d30d6)[0x7460de8d30d6]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6817d36)[0x7460dec17d36]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x66c11f1)[0x7460deac11f1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65751c1)[0x7460de9751c1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6574ea2)[0x7460de974ea2]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x657a7c5)[0x7460de97a7c5]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x94ac3)[0x7460d8094ac3]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x1268d0)[0x7460d81268d0]
+  
+  note: we would appreciate a report at https://github.com/rust-lang/rust
+  help: you can increase rustc's stack size by setting RUST_MIN_STACK=17179869184
+  note: backtrace dumped due to SIGSEGV! resuming signal
+  error: could not compile `libsecp256k1` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name libsecp256k1 --edition=2018 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libsecp256k1-0.7.2/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --cfg 'feature="sha2"' --cfg 'feature="static-context"' --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("default", "hmac", "hmac-drbg", "lazy-static-context", "lazy_static", "sha2", "static-context", "std", "typenum"))' -C metadata=e5c2f75c78762ab0 -C extra-filename=-5199b66a85868ed6 --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --extern arrayref=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libarrayref-30d351603296f3f2.rmeta --extern base64=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libbase64-eb5091ed893c5d68.rmeta --extern digest=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libdigest-67bdc160ee888b26.rmeta --extern libsecp256k1_core=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/liblibsecp256k1_core-ccf910ac40befdb2.rmeta --extern rand=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/librand-68cb9cd062f27d72.rmeta --extern serde=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libserde-3fc6f3f38589217f.rmeta --extern sha2=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libsha2-51a114246d2ae677.rmeta --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld` (signal: 11, SIGSEGV: invalid memory reference)
+
+== cargo test -p x3-ixl ==
+status=101 log=reports/cross-vm/cargo-test-x3-ixl.log
+  warning: patch for `sp-crypto-hashing` uses the features mechanism. default-features and features will not take effect because the patch dependency does not support this mechanism
+  warning: rustix@1.1.4: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
+  warning: rustix@1.1.4: ignoring 'hints.mostly-unused', pass `-Zprofile-hint-mostly-unused` to enable it
+     Compiling scale-info v2.11.6
+     Compiling sp-debug-derive v14.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#30b95889)
+     Compiling hash-db v0.16.0
+     Compiling sp-storage v22.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#30b95889)
+     Compiling sp-externalities v0.31.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#30b95889)
+     Compiling bounded-collections v0.3.2
+     Compiling crypto-common v0.1.7
+     Compiling libsecp256k1 v0.7.2
+  error: integer literal is too large
+   --> /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/build/libsecp256k1-2e2317c2265b4913/out/const_gen.rs:1:87348
+    |
+  1 | ..., 1961569314, 3701318609, 1298978065, 2797817112, 2778611026, 2986972418), crate::curve::FieldStorage::new(2728592083, 1350107926, 261...
+    |                                                                  ^^^^^^^^^^
+    |
+    = note: value exceeds limit of `340282366920938463463374607431768211455`
+  
+  error: could not compile `libsecp256k1` (lib) due to 1 previous error
+
+== cargo test -p x3-vm ==
+status=101 log=reports/cross-vm/cargo-test-x3-vm.log
+  warning: patch for `sp-crypto-hashing` uses the features mechanism. default-features and features will not take effect because the patch dependency does not support this mechanism
+     Compiling scale-info v2.11.6
+     Compiling futures-util v0.3.32
+     Compiling sec1 v0.7.3
+     Compiling elliptic-curve v0.13.8
+     Compiling sp-storage v22.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#30b95889)
+     Compiling merlin v3.0.0
+  error: rustc interrupted by SIGSEGV, printing backtrace
+  
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x3c83a9f)[0x7a852f483a9f]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x42520)[0x7a852b442520]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RINvNtNtCs7tti7nqLX9w_18rustc_query_system5query8plumbing17try_execute_queryINtCs6K4qnwxST8Z_16rustc_query_impl13DynamicConfigINtNtB4_6caches11SingleCacheINtNtNtCs7yQwD1uZeK1_12rustc_middle5query5erase6ErasedAhj8_EEKb0_KB3s_KB3s_ENtNtB1f_8plumbing9QueryCtxtKB3s_EB1f_+0x14c)[0x7a8531cd568c]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x64d4a10)[0x7a8531cd4a10]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x5f7f992)[0x7a853177f992]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6991a30)[0x7a8532191a30]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtNtCsjF5DPYqSKIc_14rustc_metadata5rmeta7encoder15encode_metadata+0xd2)[0x7a853218ec70]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvNtCsjF5DPYqSKIc_14rustc_metadata2fs25encode_and_write_metadata+0x497)[0x7a8531b47d97]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(_RNvMNtCshk0CrVEr7wz_15rustc_interface7queriesNtB2_6Linker24codegen_and_build_linker+0x1a9)[0x7a853201a2c3]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6817ebc)[0x7a8532017ebc]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x66c11f1)[0x7a8531ec11f1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x65751c1)[0x7a8531d751c1]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x6574ea2)[0x7a8531d74ea2]
+  /home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/lib/librustc_driver-890dfd19c9b338c0.so(+0x657a7c5)[0x7a8531d7a7c5]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x94ac3)[0x7a852b494ac3]
+  /lib/x86_64-linux-gnu/libc.so.6(+0x1268d0)[0x7a852b5268d0]
+  
+  note: we would appreciate a report at https://github.com/rust-lang/rust
+  help: you can increase rustc's stack size by setting RUST_MIN_STACK=17179869184
+  error: could not compile `merlin` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name merlin --edition=2018 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/merlin-3.0.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("debug-transcript", "default", "hex", "nightly", "std"))' -C metadata=935d5fb5587eafe9 -C extra-filename=-7161668fbf9cbc1b --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --extern byteorder=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libbyteorder-03fea3beea780dc4.rmeta --extern keccak=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libkeccak-00a94dc1998a465a.rmeta --extern rand_core=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/librand_core-7627cc225330dabe.rmeta --extern zeroize=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps/libzeroize-b7a462a408044625.rmeta --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld` (signal: 11, SIGSEGV: invalid memory reference)
+
+== cargo test -p x3-proof ==
+status=101 log=reports/cross-vm/cargo-test-x3-proof.log
+  warning: patch for `sp-crypto-hashing` uses the features mechanism. default-features and features will not take effect because the patch dependency does not support this mechanism
+     Compiling syn v2.0.117
+     Compiling generic-array v0.14.7
+     Compiling utf8parse v0.2.2
+     Compiling anstyle-parse v1.0.0
+     Compiling serde_core v1.0.222
+     Compiling colorchoice v1.0.5
+     Compiling anstyle v1.0.14
+     Compiling anstyle-query v1.1.5
+     Compiling serde v1.0.222
+     Compiling is_terminal_polyfill v1.70.2
+     Compiling anstream v1.0.0
+  error: could not compile `serde_core` (lib)
+  
+  Caused by:
+    process didn't exit successfully: `/home/lojak/.rustup/toolchains/1.90.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name serde_core --edition=2021 /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.222/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C codegen-units=256 -C debuginfo=2 --cfg 'feature="result"' --cfg 'feature="std"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("alloc", "default", "rc", "result", "std", "unstable"))' -C metadata=fa24e1889778e189 -C extra-filename=-0c8d432ca612d0ca --out-dir /home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps -L dependency=/home/lojak/Desktop/X3_ATOMIC_STAR/target/crossvm-tests-rust90/debug/deps --cap-lints allow --cfg no_zerocopy_simd_x86_avx12_1_89_0 -C linker=clang -C link-arg=-fuse-ld=lld --check-cfg 'cfg(no_core_cstr)' --check-cfg 'cfg(no_core_error)' --check-cfg 'cfg(no_core_net)' --check-cfg 'cfg(no_core_num_saturating)' --check-cfg 'cfg(no_diagnostic_namespace)' --check-cfg 'cfg(no_serde_derive)' --check-cfg 'cfg(no_std_atomic)' --check-cfg 'cfg(no_std_atomic64)' --check-cfg 'cfg(no_target_has_atomic)'` (signal: 11, SIGSEGV: invalid memory reference)

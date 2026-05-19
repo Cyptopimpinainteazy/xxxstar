@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>X3STAR Compute Marketplace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+    <style>
+      :root { --bg:#0c0f1b; --text:#e6eefb; --muted:rgba(230,238,251,0.6); }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font-family:"JetBrains Mono", monospace; min-height:100vh; }
+      .shell { max-width:900px; margin:0 auto; padding:120px 24px 80px; }
+      h1 { font-family:"Orbitron", sans-serif; letter-spacing:0.12em; font-size:32px; margin:0 0 18px; }
+      p { color:var(--muted); line-height:1.7; font-size:13px; }
+      .card { margin-top:24px; padding:20px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:rgba(255,255,255,0.02); }
+      .meta { margin-top:14px; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <h1>Compute Marketplace</h1>
+      <p>Live marketplace listings and capacity metrics are being integrated from the X3 business store and telemetry feeds.</p>
+      <div class="card">
+        <div>Next: publish market listings, pricing, and capacity availability.</div>
+        <div class="meta">Source: site backlog · Status: pending</div>
+      </div>
+    </main>
+    <script src="js/x3-data-api.js"></script>
+    <script src="js/x3-page-adapters.js"></script>
+    <script>
+    X3PageAdapters.start();
+    </script>
+  </body>
+</html>

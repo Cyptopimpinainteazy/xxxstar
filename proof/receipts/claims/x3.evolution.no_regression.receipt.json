@@ -1,0 +1,50 @@
+{
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "command_run": "x3-proof verify x3.evolution.no_regression",
+  "artifact_hash": "e3f35286e702f1c3033a0a3c303a74272e51f968703beacb9b88b1404ddfaa08",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "proof/claims/registry.yml",
+    "pallets/evolution-core/src/lib.rs",
+    "proof/baselines/claim_scores.yml"
+  ],
+  "timestamp": "2026-05-02T04:16:45.607309262Z",
+  "result": {
+    "claim_id": "x3.evolution.no_regression",
+    "claim": "New generations must beat prior generations without S0/S1 regressions",
+    "status": "verified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "proof/claims/registry.yml",
+      "pallets/evolution-core/src/lib.rs",
+      "proof/baselines/claim_scores.yml"
+    ],
+    "commands_run": [],
+    "passed_checks": [
+      "All 16 S0 claims verified — no S0 regressions",
+      "All 5 S1 claims verified — no S1 regressions",
+      "evolution-core pallet exists",
+      "No score regressions across 26 claim receipts (vs 26 baseline pins)"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "s0_verified": "16",
+      "baseline_entries": "26",
+      "s1_verified": "5",
+      "s1_total": "5",
+      "receipts_compared": "26",
+      "s0_total": "16"
+    },
+    "timestamp": "2026-05-02T04:16:45.603381845Z",
+    "duration_ms": 3
+  },
+  "limitations": [],
+  "binding_hash": "6d8bf49a289097c9726f0518fd436e8e23738b1d2703e263a193f13c82154a79"
+}

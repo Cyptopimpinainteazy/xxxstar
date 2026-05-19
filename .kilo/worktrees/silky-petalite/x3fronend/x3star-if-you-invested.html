@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — If You Had Invested...</title>
+<link href="https://fonts.googleapis.com/css2?family=Neue+Machina:wght@400;600;800&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c12;
+  --panel:#111522;
+  --border:rgba(255,255,255,0.08);
+  --gold:#ffd54f;
+  --green:#00e676;
+  --muted:#8a93a5;
+  --text:#f4f7ff;
+  --display:'Neue Machina',sans-serif;
+  --body:'Space Grotesk',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;}
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:16px;
+  padding:18px 28px;background:rgba(10,12,18,0.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);}
+.logo{font-family:var(--display);font-size:14px;letter-spacing:2px;color:var(--gold);margin-right:auto;}
+.nav-btn{padding:10px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);
+  font-size:11px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;}
+.nav-btn.primary{background:linear-gradient(135deg,var(--gold),#ffb300);color:#111;border:none;}
+.hero{max-width:900px;margin:0 auto;padding:60px 28px 40px;text-align:center;}
+.hero h1{font-family:var(--display);font-size:clamp(30px,5vw,58px);margin-bottom:12px;}
+.hero p{color:var(--muted);font-size:15px;line-height:1.6;}
+.panel{max-width:880px;margin:0 auto 60px;padding:28px;border-radius:18px;background:var(--panel);border:1px solid var(--border);}
+.panel h2{font-family:var(--display);font-size:22px;margin-bottom:10px;}
+.panel p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:20px;}
+.panel .cta{display:inline-flex;align-items:center;gap:8px;padding:14px 22px;border-radius:12px;
+  background:linear-gradient(135deg,var(--gold),#ffb300);color:#0b0d12;font-weight:700;border:none;cursor:pointer;}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">X3STAR Investment Calculator</div>
+  <button class="nav-btn" onclick="location.href='x3star-roi-calculator.html'">Node ROI</button>
+  <button class="nav-btn primary" onclick="location.href='x3star-token-presale.html'">Presale</button>
+</nav>
+
+<section class="hero">
+  <h1>If you had invested...</h1>
+  <p>Historical round pricing and realized returns are being validated against authoritative X3 data sources. This calculator will go live once those feeds are verified for testnet.</p>
+</section>
+
+<section class="panel">
+  <h2>Calculator status</h2>
+  <p>We are wiring the investment calculator to the presale and price feeds. Until then, the results view and sharing tools are disabled to avoid synthetic numbers.</p>
+  <button class="cta" onclick="location.href='x3star-token-presale.html'">View live presale data →</button>
+</section>
+
+<script>
+if (window.X3PageAdapters) {
+  window.X3PageAdapters.start();
+}
+</script>
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — The Deal Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900;1,400;1,700;1,900&family=Libre+Franklin:wght@300;400;500;600;700;800;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0C0C08;--panel:#111108;
+  --ink:#F5F0E0;--muted:rgba(245,240,224,0.3);--dim:#1A1A10;
+  --gold:#C8960C;--gold2:#F0B820;--goldfaint:rgba(200,150,12,0.08);
+  --cream:#F5F0E0;--green:#2D8A4E;--red:#8B2020;
+  --border:rgba(200,150,12,0.15);
+  --pf:'Playfair Display',serif;--lf:'Libre Franklin',sans-serif;--cp:'Courier Prime',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--ink);font-family:var(--lf);min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(200,150,12,0.04),transparent);}
+
+/* NAV */
+nav{height:60px;display:flex;align-items:center;padding:0 48px;
+  background:rgba(12,12,8,0.98);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--pf);font-size:20px;font-weight:700;font-style:italic;
+  color:var(--gold2);letter-spacing:2px;margin-right:auto;}
+.nl{padding:0 18px;height:60px;display:flex;align-items:center;font-size:10px;
+  letter-spacing:3px;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
+.nl:hover{color:var(--gold2);}
+.ncta{padding:10px 28px;background:var(--gold);color:#000;border:none;font-size:10px;
+  font-weight:800;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:var(--lf);}
+.ncta:hover{background:var(--gold2);}
+
+/* MASTHEAD */
+.masthead{padding:80px 48px 60px;position:relative;z-index:1;
+  border-bottom:1px solid var(--border);text-align:center;}
+.mast-rule{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin-bottom:32px;}
+.mast-kicker{font-family:var(--cp);font-size:11px;letter-spacing:6px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:20px;}
+.mast-h1{font-family:var(--pf);font-size:clamp(48px,7vw,100px);font-style:italic;
+  font-weight:900;line-height:1;margin-bottom:16px;}
+.mast-h1 em{color:var(--gold2);font-style:italic;}
+.mast-sub{font-size:16px;color:var(--muted);max-width:640px;margin:0 auto 24px;line-height:1.8;font-weight:300;}
+.mast-sub strong{color:var(--ink);}
+.mast-rule2{width:60%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  margin:32px auto 0;}
+
+/* DEAL PHILOSOPHY */
+.philosophy{padding:60px 48px;position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;
+  border-bottom:1px solid var(--border);}
+.phil-left{}
+.phil-pull{font-family:var(--pf);font-size:clamp(24px,3vw,40px);font-style:italic;
+  line-height:1.3;color:var(--gold2);margin-bottom:24px;border-left:3px solid var(--gold);
+  padding-left:24px;}
+.phil-body{font-size:14px;color:var(--muted);line-height:1.9;font-weight:300;}
+.phil-body p{margin-bottom:14px;}
+.phil-body strong{color:var(--ink);font-weight:600;}
+
+.phil-right{}
+.what-we-have{margin-bottom:32px;}
+.wwh-title{font-family:var(--cp);font-size:10px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--gold);margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px;}
+.wwh-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.wwh-check{color:var(--gold);font-size:12px;flex-shrink:0;margin-top:2px;}
+.wwh-text{font-size:13px;line-height:1.6;}
+.wwh-val{font-family:var(--cp);font-size:11px;color:var(--gold);display:block;margin-top:2px;}
+
+/* DEAL CARDS */
+.deals{padding:60px 48px;position:relative;z-index:1;}
+.deals-title{font-family:var(--pf);font-size:40px;font-weight:700;font-style:italic;
+  margin-bottom:8px;text-align:center;}
+.deals-sub{font-size:14px;color:var(--muted);text-align:center;margin-bottom:48px;}
+.deals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:2px;
+  background:var(--border);}
+
+/* DEAL CARD */
+.deal-card{background:var(--bg);padding:32px;transition:background 0.2s;cursor:pointer;
+  position:relative;overflow:hidden;}
+.deal-card:hover{background:var(--goldfaint);}
+.deal-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:0;
+  background:var(--gold2);transition:height 0.3s;}
+.deal-card:hover::before{height:100%;}
+.dc-cat{font-family:var(--cp);font-size:9px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--gold);margin-bottom:12px;}
+.dc-title{font-family:var(--pf);font-size:22px;font-weight:700;margin-bottom:10px;line-height:1.2;}
+.dc-desc{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;}
+.dc-exchange{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;
+  padding:16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:4px;
+  margin-bottom:16px;}
+.dce-side{text-align:center;}
+.dce-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.dce-val{font-size:13px;font-weight:700;}
+.dce-arrow{font-size:18px;color:var(--gold);text-align:center;}
+.dc-terms{font-size:11px;color:var(--muted);font-family:var(--cp);line-height:1.6;}
+.dc-cta{margin-top:16px;width:100%;padding:11px;background:transparent;
+  border:1px solid var(--border);color:var(--gold2);font-size:10px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:var(--lf);
+  transition:all 0.2s;}
+.dc-cta:hover{background:var(--gold);color:#000;border-color:var(--gold);}
+
+/* DEAL INTAKE FORM */
+.intake{padding:60px 48px;background:var(--panel);border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);position:relative;z-index:1;}
+.intake-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;max-width:1100px;margin:0 auto;}
+.intake-left{}
+.int-title{font-family:var(--pf);font-size:clamp(28px,4vw,52px);font-style:italic;
+  font-weight:900;margin-bottom:16px;line-height:1.1;}
+.int-title span{color:var(--gold2);}
+.int-sub{font-size:14px;color:var(--muted);line-height:1.8;margin-bottom:24px;}
+.int-promise{display:flex;flex-direction:column;gap:10px;}
+.ip-item{display:flex;align-items:flex-start;gap:10px;font-size:13px;}
+.ip-icon{color:var(--gold);flex-shrink:0;}
+.ip-text{color:var(--muted);line-height:1.6;}
+.ip-text strong{color:var(--ink);}
+
+.intake-right{}
+.form-group{margin-bottom:20px;}
+.fg-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);
+  margin-bottom:6px;display:block;font-family:var(--cp);}
+.fg-input{width:100%;padding:12px 16px;background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);color:var(--ink);font-size:13px;
+  font-family:var(--lf);outline:none;transition:border-color 0.2s;}
+.fg-input:focus{border-color:var(--gold);}
+.fg-input::placeholder{color:var(--muted);}
+.fg-select{width:100%;padding:12px 16px;background:#0C0C08;
+  border:1px solid rgba(255,255,255,0.08);color:var(--ink);font-size:13px;
+  font-family:var(--lf);outline:none;appearance:none;cursor:pointer;}
+.fg-select:focus{border-color:var(--gold);}
+.fg-textarea{width:100%;padding:12px 16px;background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);color:var(--ink);font-size:13px;
+  font-family:var(--lf);outline:none;resize:vertical;min-height:120px;}
+.fg-textarea:focus{border-color:var(--gold);}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.submit-btn{width:100%;padding:16px;background:var(--gold);color:#000;border:none;
+  font-size:12px;font-weight:800;letter-spacing:4px;text-transform:uppercase;
+  cursor:pointer;font-family:var(--lf);transition:all 0.2s;margin-top:4px;}
+.submit-btn:hover{background:var(--gold2);box-shadow:0 0 40px rgba(200,150,12,0.3);}
+.form-note{font-size:11px;color:var(--muted);margin-top:12px;font-family:var(--cp);line-height:1.6;}
+
+/* BOTTOM */
+.bottom{padding:60px 48px;text-align:center;position:relative;z-index:1;}
+.bot-title{font-family:var(--pf);font-size:clamp(28px,5vw,64px);font-style:italic;
+  font-weight:900;margin-bottom:12px;line-height:1;}
+.bot-title em{color:var(--gold2);}
+.bot-sub{font-size:15px;color:var(--muted);margin-bottom:32px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR Deal Room</div>
+  <a class="nl" href="x3star-spine.html">The Spine</a>
+  <a class="nl" href="x3star-compute-marketplace.html">Marketplace</a>
+  <a class="nl" href="x3star-grant-hub.html">Grants</a>
+  <a class="nl" href="x3star-arbitrage-engine.html">Engine</a>
+  <button class="ncta" onclick="document.getElementById('intake-form').scrollIntoView({behavior:'smooth'})">Propose A Deal ↓</button>
+</nav>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="mast-rule"></div>
+  <div class="mast-kicker">X3STAR Infrastructure Exchange · Est. 2023</div>
+  <h1 class="mast-h1">We built the spine.<br>Help us wire the <em>world.</em></h1>
+  <p class="mast-sub">
+    We don't just want your money. We want your <strong>compute, your research, your legal work, your audit,
+    your bandwidth, your cloud credits.</strong> In exchange you get tokens, equity, protocol revenue,
+    and a permanent place in the fastest blockchain infrastructure ever built.
+  </p>
+  <div class="mast-rule2"></div>
+</div>
+
+<!-- PHILOSOPHY -->
+<div class="philosophy">
+  <div class="phil-left">
+    <div class="phil-pull">"Every major chain was built on barter, not cash."</div>
+    <div class="phil-body">
+      <p>Ethereum got Consensys. Solana got FTX's infrastructure. Polygon got Alchemy. The chains that won didn't win because they had the most cash — they won because they found the right partners who believed in the architecture before the market did.</p>
+      <p>X3STAR was built by <strong>one engineer</strong> who needed an arbitrage engine fast enough to capture spreads on four chains simultaneously. He built a kernel. Then a language. Then a GPU routing layer. Then contributors added GPUs and the chain started learning. NotebookLM called it <strong>"a one-man DARPA lab in a hoodie."</strong></p>
+      <p>Now we're wiring it to the world. And we're doing it the right way — <strong>by trading infrastructure for infrastructure</strong>, services for tokens, research for equity. Cash is welcome but it's not required.</p>
+    </div>
+  </div>
+  <div class="phil-right">
+    <div class="what-we-have">
+      <div class="wwh-title">What X3STAR brings to the table</div>
+      <div class="wwh-item"><span class="wwh-check">◆</span><div class="wwh-text">GPU-routed kernel with <span id="deal-benchmark-tps">--</span> intra-node TPS<span class="wwh-val">The execution layer everything else plugs into</span></div></div>
+      <div class="wwh-item"><span class="wwh-check">◆</span><div class="wwh-text">AI spine — not a plugin, the nervous system<span class="wwh-val">Self-improving, contributor-governed, on-chain</span></div></div>
+      <div class="wwh-item"><span class="wwh-check">◆</span><div class="wwh-text">4-chain atomic execution: EVM + SVM + BTC + X3VM<span class="wwh-val">Arbitrage no other chain can execute</span></div></div>
+      <div class="wwh-item"><span class="wwh-check">◆</span><div class="wwh-text">X3S token allocation at <span id="deal-presale-price">--</span> presale price<span class="wwh-val">TGE target: $0.12 · Long-term: much higher</span></div></div>
+      <div class="wwh-item"><span class="wwh-check">◆</span><div class="wwh-text">Equity positions for strategic partners<span class="wwh-val">Advisory board, named protocol partner</span></div></div>
+      <div class="wwh-item"><span class="wwh-check">◆</span><div class="wwh-text">Protocol revenue share on mainnet<span class="wwh-val">Permanent fee percentage for infrastructure partners</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- DEAL CARDS -->
+<div class="deals">
+  <div class="deals-title">Open Deal Structures</div>
+  <div class="deals-sub">Every deal below is real and negotiable. Click any to start a conversation.</div>
+  <div class="deals-grid" id="deal-grid"></div>
+</div>
+
+<!-- INTAKE FORM -->
+<div class="intake" id="intake-form">
+  <div class="intake-grid">
+    <div class="intake-left">
+      <div class="int-title">Tell us what<br>you <span>bring.</span></div>
+      <div class="int-sub">Every serious inquiry gets a personal response within 48 hours. No auto-responders. No gatekeeping. The founder reads every submission.</div>
+      <div class="int-promise">
+        <div class="ip-item"><span class="ip-icon">◆</span><div class="ip-text"><strong>48-hour personal response.</strong> Not a bot. The founder.</div></div>
+        <div class="ip-item"><span class="ip-icon">◆</span><div class="ip-text"><strong>NDA available</strong> before you share anything sensitive.</div></div>
+        <div class="ip-item"><span class="ip-icon">◆</span><div class="ip-text"><strong>No deal too small.</strong> A gaming PC and 10 GPU-hours is a valid starting point.</div></div>
+        <div class="ip-item"><span class="ip-icon">◆</span><div class="ip-text"><strong>No deal too large.</strong> We're ready for enterprise and government conversations.</div></div>
+        <div class="ip-item"><span class="ip-icon">◆</span><div class="ip-text"><strong>Everything is negotiable.</strong> Token price, vesting, equity percentage, revenue share — all of it.</div></div>
+      </div>
+    </div>
+    <div class="intake-right">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="fg-label">Your name</label>
+          <input class="fg-input" id="f-name" placeholder="Dr. Jane Smith" type="text">
+        </div>
+        <div class="form-group">
+          <label class="fg-label">Organization</label>
+          <input class="fg-input" id="f-org" placeholder="Acme Labs / Independent" type="text">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="fg-label">Email</label>
+        <input class="fg-input" id="f-email" placeholder="jane@acmelabs.com" type="email">
+      </div>
+      <div class="form-group">
+        <label class="fg-label">Deal type</label>
+        <select class="fg-select fg-input" id="f-type">
+          <option value="">Select deal type...</option>
+          <option>GPU Compute Provider</option>
+          <option>Security Audit</option>
+          <option>Legal Services</option>
+          <option>Quantum Research</option>
+          <option>Web3 Integration</option>
+          <option>AI Lab Partnership</option>
+          <option>Kernel License</option>
+          <option>Custom Deal</option>
+          <option>Government / Defense</option>
+          <option>Academic / University</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="fg-label">What you bring</label>
+        <textarea class="fg-textarea" id="f-bring" placeholder="Tell us what you have: GPU specs, audit firm credentials, legal expertise, research focus, compute capacity, tokens, cloud credits... No detail too small."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="fg-label">What you want in return</label>
+        <textarea class="fg-textarea" id="f-want" placeholder="X3S tokens, equity, revenue share, compute access, co-authorship, named partnership, advisory board seat... Be specific. Everything is negotiable."></textarea>
+      </div>
+      <button class="submit-btn" onclick="submitDeal()">SUBMIT PROPOSAL →</button>
+      <div class="form-note">
+        Your submission goes directly to the founder. NDA available on request before any sensitive details are shared.
+        We have responded to 100% of serious inquiries within 48 hours.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM -->
+<div class="bottom">
+  <div class="bot-title">The spine is open.<br><em>Plug in.</em></div>
+  <div class="bot-sub">One man DARPA lab in a hoodie. Now wiring it to the world.</div>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+    <button onclick="location.href='x3star-compute-marketplace.html'" style="padding:14px 36px;background:var(--gold);color:#000;border:none;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:var(--lf);">View Marketplace →</button>
+    <button onclick="location.href='x3star-grant-hub.html'" style="padding:14px 36px;background:transparent;border:1px solid var(--border);color:var(--gold2);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:var(--lf);">Apply For Grants</button>
+    <button onclick="location.href='x3star-spine.html'" style="padding:14px 36px;background:transparent;border:1px solid var(--border);color:var(--gold2);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:var(--lf);">Read The Architecture</button>
+  </div>
+</div>
+
+<script src="js/x3-data-api.js"></script>
+<script src="js/x3-page-adapters.js"></script>
+<script>
+X3PageAdapters.start();
+function prefillForm(type){
+  document.getElementById('f-type').value=type;
+  document.getElementById('intake-form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function submitDeal(){
+  const name=document.getElementById('f-name').value.trim();
+  const org=document.getElementById('f-org').value.trim();
+  const email=document.getElementById('f-email').value.trim();
+  const type=document.getElementById('f-type').value.trim();
+  const bring=document.getElementById('f-bring').value.trim();
+  const want=document.getElementById('f-want').value.trim();
+  if(!name||!email||!type||!bring||!want){
+    alert('Please fill in your name, email, deal type, and details before submitting.');
+    return;
+  }
+  const btn=document.querySelector('.submit-btn');
+  const original=btn.textContent;
+  btn.textContent='Submitting...';
+  btn.disabled=true;
+  try{
+    await X3API.submitForm('deal',{name,org,email,type,bring,want});
+    btn.textContent='✓ PROPOSAL RECEIVED - RESPONSE WITHIN 48 HOURS';
+    btn.style.background='#2D8A4E';
+  }catch(err){
+    btn.textContent=original;
+    btn.disabled=false;
+    alert('Submission failed. Please try again.');
+  }
+}
+</script>
+</body>
+</html>
