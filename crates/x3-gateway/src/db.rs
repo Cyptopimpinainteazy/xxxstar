@@ -1721,6 +1721,200 @@ pub fn is_public_timeline_item(item: &FundingSwarmTimelineItem) -> bool {
     item.status == "public" || item.status == "published"
 }
 
+// ─── Funding Swarm: job state machine ────────────────────────────────────────
+
+/// Canonical stage ordering for a funding-swarm grant job.
+///
+/// Transitions are validated by `compute_swarm_transition`.  The stages map
+/// 1-to-1 to the `stage` column in `funding_swarm_grants`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwarmJobStage {
+    Discovery,
+    Research,
+    Draft,
+    PendingHumanApproval,
+    Approved,
+    Submitted,
+    AwardPaid,
+    Rejected,
+}
+
+impl SwarmJobStage {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Discovery           => "discovery",
+            Self::Research            => "research",
+            Self::Draft               => "draft",
+            Self::PendingHumanApproval => "pending_human_approval",
+            Self::Approved            => "approved",
+            Self::Submitted           => "submitted",
+            Self::AwardPaid           => "award_paid",
+            Self::Rejected            => "rejected",
+        }
+    }
+
+    /// Parse from the `stage` string stored in the DB.  Returns `None` for
+    /// unknown values (forward-compatible with future stages).
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "discovery"             => Some(Self::Discovery),
+            "research"              => Some(Self::Research),
+            "draft"                 => Some(Self::Draft),
+            "pending_human_approval" => Some(Self::PendingHumanApproval),
+            "approved"              => Some(Self::Approved),
+            "submitted"             => Some(Self::Submitted),
+            "award_paid"            => Some(Self::AwardPaid),
+            "rejected"              => Some(Self::Rejected),
+            _                       => None,
+        }
+    }
+}
+
+/// Whether a swarm audit event may be exposed on the public ledger.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditVisibility {
+    /// Safe to show on the public timeline.
+    Public,
+    /// Internal only — never returned by public API endpoints.
+    Private,
+}
+
+/// A single funding-swarm audit event produced by a state transition.
+/// Callers write this into `funding_swarm_events` with the appropriate
+/// `visibility` value.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SwarmAuditEvent {
+    pub grant_id: String,
+    pub event_type: String,
+    pub visibility: AuditVisibility,
+    pub detail: serde_json::Value,
+}
+
+/// Validate a requested stage transition and return the next state plus the
+/// audit event that should be recorded.
+///
+/// Returns `GatewayError::BadRequest` for illegal transitions so callers get
+/// a 400 rather than a panic.
+pub fn compute_swarm_transition(
+    grant_id: &str,
+    current_stage: SwarmJobStage,
+    action: &str,
+) -> Result<(SwarmJobStage, &'static str, SwarmAuditEvent)> {
+    let (next, new_status, visibility, event_type) = match (current_stage, action) {
+        (SwarmJobStage::Discovery, "research") =>
+            (SwarmJobStage::Research, "open",
+             AuditVisibility::Private, "ai_research_started"),
+        (SwarmJobStage::Research, "draft") =>
+            (SwarmJobStage::Draft, "pending_human_approval",
+             AuditVisibility::Private, "ai_draft_ready"),
+        (SwarmJobStage::Draft, "approve") =>
+            (SwarmJobStage::Approved, "approved",
+             AuditVisibility::Public, "human_approved"),
+        (SwarmJobStage::Draft, "reject") =>
+            (SwarmJobStage::Rejected, "rejected",
+             AuditVisibility::Private, "human_rejected"),
+        (SwarmJobStage::Approved, "submit") =>
+            (SwarmJobStage::Submitted, "submitted",
+             AuditVisibility::Public, "submitted_to_funder"),
+        (SwarmJobStage::Submitted, "award_paid") =>
+            (SwarmJobStage::AwardPaid, "award_paid",
+             AuditVisibility::Public, "award_paid"),
+        _ => return Err(GatewayError::BadRequest(format!(
+            "illegal swarm transition: stage={:?} action='{}'",
+            current_stage, action
+        ))),
+    };
+
+    let event = SwarmAuditEvent {
+        grant_id: grant_id.to_string(),
+        event_type: event_type.to_string(),
+        visibility,
+        detail: serde_json::json!({
+            "action": action,
+            "from_stage": current_stage.as_str(),
+            "to_stage": next.as_str(),
+            "new_status": new_status,
+        }),
+    };
+
+    Ok((next, new_status, event))
+}
+
+// ─── Funding Swarm: AI provider interface (draft-only) ───────────────────────
+
+/// Minimal AI interface used by the funding swarm.
+///
+/// Only `draft_application` is wired — all other AI actions require a human
+/// approval before any external submission occurs.  This keeps the
+/// blast-radius of the AI integration bounded and auditable.
+pub trait AiProvider: Send + Sync {
+    /// Generate a draft application body for review.
+    /// **Never submits externally** — returns raw text for human inspection.
+    fn draft_application(&self, grant: &FundingSwarmGrant) -> String;
+}
+
+/// No-op provider used in tests and when `OPENROUTER_API_KEY` is unset.
+pub struct StubAiProvider;
+
+impl AiProvider for StubAiProvider {
+    fn draft_application(&self, grant: &FundingSwarmGrant) -> String {
+        format!(
+            "[DRAFT — AI not configured] Grant: '{}' | Sponsor: {} | Stage: {}. \
+             Set OPENROUTER_API_KEY to enable AI drafting.",
+            grant.title, grant.sponsor, grant.stage
+        )
+    }
+}
+
+/// OpenRouter-backed provider.
+///
+/// All calls are **draft-only** — no external submission happens in this
+/// crate.  The actual async HTTP call lives in the swarm-worker service; this
+/// struct produces the prompt string that the worker sends to OpenRouter.
+pub struct OpenRouterProvider {
+    /// Base URL — overridable for testing / local proxy.
+    pub base_url: String,
+    /// Bearer token sourced from `OPENROUTER_API_KEY`.
+    pub api_key: String,
+}
+
+impl OpenRouterProvider {
+    /// Construct from environment.  Falls back to `StubAiProvider` when the
+    /// key is absent so callers never need to handle `None`.
+    pub fn from_env() -> Box<dyn AiProvider> {
+        match std::env::var("OPENROUTER_API_KEY") {
+            Ok(key) if !key.trim().is_empty() => Box::new(Self {
+                base_url: "https://openrouter.ai/api/v1".to_string(),
+                api_key: key,
+            }),
+            _ => Box::new(StubAiProvider),
+        }
+    }
+}
+
+impl AiProvider for OpenRouterProvider {
+    /// Returns a formatted prompt string.
+    ///
+    /// The swarm worker reads this string and sends it to OpenRouter
+    /// asynchronously.  No network call is made here; this keeps the DB
+    /// layer free of async I/O and rate-limit concerns.
+    fn draft_application(&self, grant: &FundingSwarmGrant) -> String {
+        format!(
+            "You are a professional grant writer. Draft a compelling application \
+             for the following grant opportunity.\n\n\
+             Grant: {}\n\
+             Sponsor: {}\n\
+             Stage: {}\n\
+             Amount requested: ${:.0}\n\n\
+             Write a concise 3-paragraph application (executive summary, \
+             technical approach, impact). Do not submit — output draft text only.",
+            grant.title, grant.sponsor, grant.stage, grant.amount_usd
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1925,5 +2119,132 @@ mod tests {
         assert_eq!(visible.len(), 2);
         assert_eq!(visible[0].item_id, "public");
         assert_eq!(visible[1].item_id, "published");
+    }
+
+    // ── Swarm state machine unit tests ───────────────────────────────────────
+
+    #[test]
+    fn swarm_stage_roundtrip_from_str() {
+        for stage in [
+            SwarmJobStage::Discovery,
+            SwarmJobStage::Research,
+            SwarmJobStage::Draft,
+            SwarmJobStage::PendingHumanApproval,
+            SwarmJobStage::Approved,
+            SwarmJobStage::Submitted,
+            SwarmJobStage::AwardPaid,
+            SwarmJobStage::Rejected,
+        ] {
+            assert_eq!(SwarmJobStage::from_str(stage.as_str()), Some(stage));
+        }
+    }
+
+    #[test]
+    fn swarm_stage_from_str_unknown_returns_none() {
+        assert_eq!(SwarmJobStage::from_str("nonexistent_stage"), None);
+    }
+
+    #[test]
+    fn swarm_transition_discovery_to_research_is_private() {
+        let (next, status, event) =
+            compute_swarm_transition("g-1", SwarmJobStage::Discovery, "research").unwrap();
+        assert_eq!(next, SwarmJobStage::Research);
+        assert_eq!(status, "open");
+        assert_eq!(event.visibility, AuditVisibility::Private);
+        assert_eq!(event.event_type, "ai_research_started");
+    }
+
+    #[test]
+    fn swarm_transition_draft_approve_is_public() {
+        let (next, status, event) =
+            compute_swarm_transition("g-1", SwarmJobStage::Draft, "approve").unwrap();
+        assert_eq!(next, SwarmJobStage::Approved);
+        assert_eq!(status, "approved");
+        assert_eq!(event.visibility, AuditVisibility::Public);
+        assert_eq!(event.event_type, "human_approved");
+    }
+
+    #[test]
+    fn swarm_transition_draft_reject_is_private() {
+        let (next, _status, event) =
+            compute_swarm_transition("g-1", SwarmJobStage::Draft, "reject").unwrap();
+        assert_eq!(next, SwarmJobStage::Rejected);
+        assert_eq!(event.visibility, AuditVisibility::Private);
+    }
+
+    #[test]
+    fn swarm_transition_illegal_returns_bad_request() {
+        // Can't jump from Discovery directly to Approved.
+        let result = compute_swarm_transition("g-1", SwarmJobStage::Discovery, "approve");
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[test]
+    fn swarm_transition_award_paid_is_public() {
+        let (next, status, event) =
+            compute_swarm_transition("g-1", SwarmJobStage::Submitted, "award_paid").unwrap();
+        assert_eq!(next, SwarmJobStage::AwardPaid);
+        assert_eq!(status, "award_paid");
+        assert_eq!(event.visibility, AuditVisibility::Public);
+    }
+
+    #[test]
+    fn swarm_audit_event_detail_contains_stage_fields() {
+        let (_next, _status, event) =
+            compute_swarm_transition("g-42", SwarmJobStage::Approved, "submit").unwrap();
+        assert_eq!(event.detail["from_stage"], "approved");
+        assert_eq!(event.detail["to_stage"], "submitted");
+        assert_eq!(event.detail["action"], "submit");
+        assert_eq!(event.grant_id, "g-42");
+    }
+
+    // ── AI provider unit tests ────────────────────────────────────────────────
+
+    #[test]
+    fn stub_ai_provider_draft_contains_grant_title() {
+        use chrono::Utc;
+        let grant = FundingSwarmGrant {
+            grant_id: "g-1".into(),
+            external_id: "ext-1".into(),
+            title: "ZK-Rollup Research Grant".into(),
+            sponsor: "Ethereum Foundation".into(),
+            status: "open".into(),
+            stage: "research".into(),
+            score: 80.0,
+            amount_usd: 100_000.0,
+            metadata: serde_json::json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let provider = StubAiProvider;
+        let draft = provider.draft_application(&grant);
+        assert!(draft.contains("ZK-Rollup Research Grant"), "title missing from draft");
+        assert!(draft.contains("Ethereum Foundation"), "sponsor missing from draft");
+    }
+
+    #[test]
+    fn openrouter_provider_draft_contains_prompt_sections() {
+        use chrono::Utc;
+        let grant = FundingSwarmGrant {
+            grant_id: "g-2".into(),
+            external_id: "ext-2".into(),
+            title: "Cross-Chain Bridge".into(),
+            sponsor: "Web3 Foundation".into(),
+            status: "open".into(),
+            stage: "draft".into(),
+            score: 90.0,
+            amount_usd: 50_000.0,
+            metadata: serde_json::json!({}),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let provider = OpenRouterProvider {
+            base_url: "https://openrouter.ai/api/v1".into(),
+            api_key: "test-key".into(),
+        };
+        let draft = provider.draft_application(&grant);
+        assert!(draft.contains("Cross-Chain Bridge"));
+        assert!(draft.contains("Web3 Foundation"));
+        assert!(draft.contains("draft text only"), "must state draft-only");
     }
 }
