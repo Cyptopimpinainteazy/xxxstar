@@ -354,6 +354,39 @@ pub struct FundingSwarmScoreboard {
     pub last_event_at: Option<DateTime<Utc>>,
 }
 
+// ── Funding Swarm admin types ─────────────────────────────────────────────────
+
+/// Input for discovering (creating) a new funding swarm grant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewFundingSwarmGrant {
+    pub external_id: String,
+    pub title: String,
+    pub sponsor: String,
+    pub amount_usd: Option<f64>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Input for publishing a funding swarm publication entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewFundingSwarmPublication {
+    pub kind: String,
+    pub title: String,
+    pub body: String,
+}
+
+/// A funding swarm publication record (returned from admin create-publication).
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct FundingSwarmPublicationRecord {
+    pub publication_id: String,
+    pub grant_id: Option<String>,
+    pub kind: String,
+    pub title: String,
+    pub body: String,
+    pub status: String,
+    pub published_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
 fn require_non_empty(value: &str, field: &str) -> Result<()> {
     if value.trim().is_empty() {
         return Err(GatewayError::BadRequest(format!(
@@ -1035,6 +1068,114 @@ impl Database {
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    // ── Funding Swarm admin methods ───────────────────────────────────────────
+
+    /// List all grants regardless of status (admin view).
+    pub async fn admin_list_funding_swarm_grants(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<FundingSwarmGrant>> {
+        sqlx::query_as(
+            "SELECT * FROM funding_swarm_grants ORDER BY score DESC, created_at DESC LIMIT $1 OFFSET $2",
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    /// Discover (create) a new grant entry at stage='discovery'.
+    pub async fn admin_create_funding_swarm_grant(
+        &self,
+        input: NewFundingSwarmGrant,
+    ) -> Result<FundingSwarmGrant> {
+        if input.external_id.trim().is_empty() {
+            return Err(GatewayError::BadRequest("external_id must not be empty".into()));
+        }
+        if input.title.trim().is_empty() {
+            return Err(GatewayError::BadRequest("title must not be empty".into()));
+        }
+        if input.sponsor.trim().is_empty() {
+            return Err(GatewayError::BadRequest("sponsor must not be empty".into()));
+        }
+
+        let grant_id = Uuid::new_v4().to_string();
+        sqlx::query_as(
+            "INSERT INTO funding_swarm_grants
+                (grant_id, external_id, title, sponsor, status, stage, score, amount_usd, metadata)
+             VALUES ($1, $2, $3, $4, 'open', 'discovery', 0, $5, $6)
+             RETURNING *",
+        )
+        .bind(&grant_id)
+        .bind(&input.external_id)
+        .bind(&input.title)
+        .bind(&input.sponsor)
+        .bind(input.amount_usd.unwrap_or(0.0))
+        .bind(input.metadata.unwrap_or_else(|| serde_json::json!({})))
+        .fetch_one(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    /// Advance a grant to a new stage and status.  Returns `None` if not found.
+    ///
+    /// Workflow transitions:
+    /// - research  → stage='research',  status='open'
+    /// - draft     → stage='draft',     status='pending_human_approval'
+    /// - approve   → stage='approved',  status='approved'  (human approval gate)
+    /// - award_paid → stage='submitted', status='award_paid'
+    pub async fn admin_advance_funding_swarm_stage(
+        &self,
+        grant_id: &str,
+        stage: &str,
+        status: &str,
+    ) -> Result<Option<FundingSwarmGrant>> {
+        sqlx::query_as(
+            "UPDATE funding_swarm_grants
+             SET stage = $2, status = $3, updated_at = NOW()
+             WHERE grant_id = $1
+             RETURNING *",
+        )
+        .bind(grant_id)
+        .bind(stage)
+        .bind(status)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    /// Create a publication entry for a grant and return it.
+    pub async fn admin_create_funding_swarm_publication(
+        &self,
+        grant_id: &str,
+        input: NewFundingSwarmPublication,
+    ) -> Result<FundingSwarmPublicationRecord> {
+        if input.kind.trim().is_empty() {
+            return Err(GatewayError::BadRequest("kind must not be empty".into()));
+        }
+        if input.title.trim().is_empty() {
+            return Err(GatewayError::BadRequest("title must not be empty".into()));
+        }
+
+        let publication_id = Uuid::new_v4().to_string();
+        sqlx::query_as(
+            "INSERT INTO funding_swarm_publications
+                (publication_id, grant_id, kind, title, body, status, published_at)
+             VALUES ($1, $2, $3, $4, $5, 'published', NOW())
+             RETURNING *",
+        )
+        .bind(&publication_id)
+        .bind(grant_id)
+        .bind(&input.kind)
+        .bind(&input.title)
+        .bind(&input.body)
+        .fetch_one(&self.pool)
         .await
         .map_err(Into::into)
     }

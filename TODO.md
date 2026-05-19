@@ -23,8 +23,8 @@
 - [x] Implement demo/seed responses so `site/funding-swarm.html` boot() works immediately.
 
 ## Step 3 — Backend: Admin endpoints (stub + auth placeholder)
-- [ ] Add admin routes for discovery/research/draft/approve/submit-award-paid/publication.
-- [ ] Enforce manual human approval gates.
+- [x] Add admin routes for discovery/research/draft/approve/submit-award-paid/publication.
+- [x] Enforce manual human approval gates.
 
 ## Step 4 — Swarm job flow (compliant)
 - [ ] Implement swarm task state machine and audit event split (public vs private).
@@ -36,19 +36,21 @@
 
 ## Step 6 — Tests + verification
 - [ ] Unit tests: scoring/dedupe/public filtering.
-- [ ] Integration test: endpoint returns JSON with expected shapes.
+- [x] Integration test: endpoint returns JSON with expected shapes.
 
 ## Step 7 — Run verification
 - [ ] Start gateway + Postgres; apply migrations; seed demo rows.
 - [ ] Smoke test with curl for the three public endpoints.
 
-## Live Context (Auto-synced)
-<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./docs/_autodocs/PENDING_SYNC.md&syntax=md) -->
-<!-- The below code snippet is automatically added from ./docs/_autodocs/PENDING_SYNC.md -->
-```md
-> Auto-doc placeholder: this section is managed by markdown-autodocs.
->
-> Next update: replace this shared placeholder with a file-specific snippet source once the related implementation lands.
-```
-<!-- MARKDOWN-AUTO-DOCS:END -->
+## Live Context
+
+| Step | Status | Notes |
+|------|--------|-------|
+| Step 1 — Locate integration points | ✅ Done | Gateway at `crates/x3-gateway`, API base `/api/v1` |
+| Step 2 — Public ledger endpoints | ✅ Done | `/api/public/funding-swarm/{scoreboard,grants,timeline}` + migration `0006_funding_swarm_public_ledger.sql` |
+| Step 3 — Admin endpoints + approval gate | ✅ Done | `GET/POST /api/v1/admin/funding-swarm/grants`, stage transitions (`/research`, `/draft`, `/approve`, `/submit-award-paid`, `/publication`). Auth via `X-Admin-Token` header gated by `FUNDING_SWARM_ADMIN_TOKEN` env var (`authorize_funding_swarm_admin`). |
+| Step 6 — Integration tests | ✅ Done | 3 `#[tokio::test]` tests in `rest.rs` test module: `funding_swarm_scoreboard_returns_ok_with_expected_shape`, `funding_swarm_grants_returns_json_array`, `funding_swarm_timeline_returns_json_array`. Skip cleanly when `X3_GATEWAY_TEST_DATABASE_URL` is unset. |
+| Step 4 — Swarm job flow | ⬜ Pending | Out of scope for current sprint |
+| Step 5 — Frontend | ⬜ Pending | Out of scope for current sprint |
+| Step 7 — Smoke test | ⬜ Pending | Run `cargo test -p x3-gateway` with live DB |
 

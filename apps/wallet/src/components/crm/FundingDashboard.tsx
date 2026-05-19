@@ -89,7 +89,7 @@ export function FundingDashboard() {
               nameKey="name"
               label
             />
-            <Tooltip formatter={(value) => `$${(value / 1000000).toFixed(1)}M`} />
+            <Tooltip formatter={(value) => `$${(Number(value) / 1000000).toFixed(1)}M`} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
@@ -125,7 +125,7 @@ export function FundingDashboard() {
                 <p className="font-semibold">{(match.contactProbability * 100).toFixed(0)}%</p>
               </div>
             </div>
-            <Button size="small" className="w-full mt-2" variant="outline">
+            <Button size="1" className="w-full mt-2" variant="outline">
               View Profile
             </Button>
           </div>

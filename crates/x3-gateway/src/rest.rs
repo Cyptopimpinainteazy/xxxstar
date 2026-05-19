@@ -2,9 +2,10 @@
 
 use crate::cache::RedisCache;
 use crate::db::{
-    ChainStats, Database, FundingSwarmGrant, FundingSwarmScoreboard, FundingSwarmTimelineItem,
-    NewApprovalCase, NewEvidenceBundle, NewOrchestraIntent, NewVoteReceipt, NewVoteWindow,
-    StoredBenchmarkReport,
+    ChainStats, Database, FundingSwarmGrant, FundingSwarmPublicationRecord,
+    FundingSwarmScoreboard, FundingSwarmTimelineItem, NewFundingSwarmGrant,
+    NewFundingSwarmPublication, NewApprovalCase, NewEvidenceBundle, NewOrchestraIntent,
+    NewVoteReceipt, NewVoteWindow, StoredBenchmarkReport,
 };
 use crate::error::GatewayError;
 use crate::graphql::AppSchema;
@@ -139,6 +140,31 @@ fn api_routes() -> Router<AppState> {
         .route(
             "/public/funding-swarm/timeline",
             get(get_funding_swarm_timeline),
+        )
+        // ── Funding Swarm admin (requires X-Admin-Token header — human-gate placeholder) ──
+        .route(
+            "/admin/funding-swarm/grants",
+            get(admin_list_funding_swarm_grants).post(admin_create_funding_swarm_grant),
+        )
+        .route(
+            "/admin/funding-swarm/grants/:grant_id/research",
+            post(admin_research_funding_swarm_grant),
+        )
+        .route(
+            "/admin/funding-swarm/grants/:grant_id/draft",
+            post(admin_draft_funding_swarm_grant),
+        )
+        .route(
+            "/admin/funding-swarm/grants/:grant_id/approve",
+            post(admin_approve_funding_swarm_grant),
+        )
+        .route(
+            "/admin/funding-swarm/grants/:grant_id/submit-award-paid",
+            post(admin_submit_award_paid_funding_swarm_grant),
+        )
+        .route(
+            "/admin/funding-swarm/grants/:grant_id/publication",
+            post(admin_create_funding_swarm_publication),
         )
         .route(
             "/benchmarks/reports",
@@ -567,6 +593,142 @@ async fn get_funding_swarm_timeline(
         .list_funding_swarm_timeline(bounded_limit(pagination.limit), pagination.offset.max(0))
         .await?;
     Ok(Json(timeline))
+}
+
+// ── Funding Swarm admin authorization ────────────────────────────────────────
+//
+// HUMAN APPROVAL GATE — placeholder for production auth.
+// Set FUNDING_SWARM_ADMIN_TOKEN in the environment to enable the gate.
+// When the env var is unset, the gate is open (dev/staging mode).
+// Replace with a real auth middleware before production deployment.
+
+fn authorize_funding_swarm_admin(headers: &axum::http::HeaderMap) -> Result<(), GatewayError> {
+    let expected = std::env::var("FUNDING_SWARM_ADMIN_TOKEN").unwrap_or_default();
+    if expected.is_empty() {
+        // No token configured — open for local dev. Gate is enforced only when the
+        // env var is set, matching the benchmark-publish token pattern.
+        return Ok(());
+    }
+    let provided = headers
+        .get("x-admin-token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if provided == expected {
+        Ok(())
+    } else {
+        Err(GatewayError::BadRequest(
+            "missing or invalid admin token".to_string(),
+        ))
+    }
+}
+
+// ── Funding Swarm admin handlers ─────────────────────────────────────────────
+
+async fn admin_list_funding_swarm_grants(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Query(pagination): Query<Pagination>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    let grants = state
+        .db
+        .admin_list_funding_swarm_grants(
+            bounded_limit(pagination.limit),
+            pagination.offset.max(0),
+        )
+        .await?;
+    Ok(Json(grants))
+}
+
+async fn admin_create_funding_swarm_grant(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(request): Json<NewFundingSwarmGrant>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    let grant = state.db.admin_create_funding_swarm_grant(request).await?;
+    Ok((StatusCode::CREATED, Json(grant)))
+}
+
+async fn admin_research_funding_swarm_grant(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    match state
+        .db
+        .admin_advance_funding_swarm_stage(&grant_id, "research", "open")
+        .await?
+    {
+        Some(g) => Ok(Json(g)),
+        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+    }
+}
+
+async fn admin_draft_funding_swarm_grant(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    match state
+        .db
+        .admin_advance_funding_swarm_stage(&grant_id, "draft", "pending_human_approval")
+        .await?
+    {
+        Some(g) => Ok(Json(g)),
+        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+    }
+}
+
+/// Human approval gate: advances a grant from draft/pending_human_approval to approved.
+/// The `FUNDING_SWARM_ADMIN_TOKEN` env var MUST be set in production; without it a
+/// human cannot distinguish an intentional approve from an accidental call.
+async fn admin_approve_funding_swarm_grant(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    match state
+        .db
+        .admin_advance_funding_swarm_stage(&grant_id, "approved", "approved")
+        .await?
+    {
+        Some(g) => Ok(Json(g)),
+        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+    }
+}
+
+async fn admin_submit_award_paid_funding_swarm_grant(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    match state
+        .db
+        .admin_advance_funding_swarm_stage(&grant_id, "submitted", "award_paid")
+        .await?
+    {
+        Some(g) => Ok(Json(g)),
+        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+    }
+}
+
+async fn admin_create_funding_swarm_publication(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Path(grant_id): Path<String>,
+    Json(request): Json<NewFundingSwarmPublication>,
+) -> Result<impl IntoResponse, GatewayError> {
+    authorize_funding_swarm_admin(&headers)?;
+    let publication = state
+        .db
+        .admin_create_funding_swarm_publication(&grant_id, request)
+        .await?;
+    Ok((StatusCode::CREATED, Json(publication)))
 }
 
 async fn load_chain_stats(state: &AppState) -> Result<ChainStats, GatewayError> {
@@ -2300,6 +2462,108 @@ mod tests {
         );
 
         control_plane_handle.abort();
+        Database::drop_test_schema(&database_url, &schema)
+            .await
+            .expect("drop isolated test schema");
+    }
+
+    // ── Funding Swarm public endpoint integration tests ───────────────────────
+
+    #[tokio::test]
+    async fn funding_swarm_scoreboard_returns_ok_with_expected_shape() {
+        let Some(database_url) = integration_database_url() else {
+            eprintln!("skipping gateway integration test: set X3_GATEWAY_TEST_DATABASE_URL or DATABASE_URL");
+            return;
+        };
+
+        let (db, schema) = Database::connect_isolated_for_test(&database_url)
+            .await
+            .expect("create isolated test database");
+        let app = integration_app(db.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/public/funding-swarm/scoreboard")
+                    .body(Body::empty())
+                    .expect("build scoreboard request"),
+            )
+            .await
+            .expect("scoreboard response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json(response).await;
+        assert!(
+            body.get("total_grants").is_some(),
+            "scoreboard must have total_grants field"
+        );
+        assert!(
+            body.get("total_awarded_usd").is_some(),
+            "scoreboard must have total_awarded_usd field"
+        );
+
+        Database::drop_test_schema(&database_url, &schema)
+            .await
+            .expect("drop isolated test schema");
+    }
+
+    #[tokio::test]
+    async fn funding_swarm_grants_returns_json_array() {
+        let Some(database_url) = integration_database_url() else {
+            eprintln!("skipping gateway integration test: set X3_GATEWAY_TEST_DATABASE_URL or DATABASE_URL");
+            return;
+        };
+
+        let (db, schema) = Database::connect_isolated_for_test(&database_url)
+            .await
+            .expect("create isolated test database");
+        let app = integration_app(db.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/public/funding-swarm/grants")
+                    .body(Body::empty())
+                    .expect("build grants request"),
+            )
+            .await
+            .expect("grants response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json(response).await;
+        assert!(body.is_array(), "grants response must be a JSON array");
+
+        Database::drop_test_schema(&database_url, &schema)
+            .await
+            .expect("drop isolated test schema");
+    }
+
+    #[tokio::test]
+    async fn funding_swarm_timeline_returns_json_array() {
+        let Some(database_url) = integration_database_url() else {
+            eprintln!("skipping gateway integration test: set X3_GATEWAY_TEST_DATABASE_URL or DATABASE_URL");
+            return;
+        };
+
+        let (db, schema) = Database::connect_isolated_for_test(&database_url)
+            .await
+            .expect("create isolated test database");
+        let app = integration_app(db.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/public/funding-swarm/timeline")
+                    .body(Body::empty())
+                    .expect("build timeline request"),
+            )
+            .await
+            .expect("timeline response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json(response).await;
+        assert!(body.is_array(), "timeline response must be a JSON array");
+
         Database::drop_test_schema(&database_url, &schema)
             .await
             .expect("drop isolated test schema");

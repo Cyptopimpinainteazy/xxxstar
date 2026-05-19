@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface FundingRound {
   id: string;
@@ -49,11 +49,12 @@ export function useFundingPipeline(): UseFundingPipelineResult {
     async () => {
       setLoading(true);
       try {
-        const data = await invoke('crm_get_funding_analytics', {});
+        const data = await invoke<any>('crm_get_funding_analytics', {});
         setAnalytics(data);
         return data;
       } catch (err) {
         setError(err as Error);
+        return null;
       } finally {
         setLoading(false);
       }
