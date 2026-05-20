@@ -58,15 +58,15 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.polkadot-core-primitives]
-path = "../../../polkadot/core-primitives"
+path = "../polkadot-core-primitives"
 default-features = false
 
 [dependencies.polkadot-parachain-primitives]
-path = "../../../polkadot/parachain"
+path = "../polkadot-parachain-primitives"
 default-features = false
 
 [dependencies.polkadot-primitives]
-path = "../../../polkadot/primitives"
+path = "../polkadot-primitives"
 default-features = false
 
 [dependencies.scale-info]
@@ -75,15 +75,15 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-api]
-path = "../../../substrate/primitives/api"
+path = "../sp-api"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-trie]
-path = "../../../substrate/primitives/trie"
+path = "../sp-trie"
 default-features = false
 
 [dependencies.tracing]

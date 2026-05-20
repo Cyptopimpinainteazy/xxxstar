@@ -16,8 +16,12 @@
 //
 //   1. **Replay protection (two layers).**
 //      * `UsedMessages` — any derived `message_id` can be consumed once.
-//      * `UsedNonces` — per-(source_domain, sender, nonce) dedup so resubmitting
-//        the same intent under a new message id still fails.
+//      * `NextNonce` / `NonceBatchAllocation` — monotonic per-(source_domain,
+//        sender) nonce sequence. Batch allocation (default 100 slots) reduces
+//        storage contention. A `UsedNonces` point-lookup map is intentionally
+//        absent: the monotonic `NextNonce` subsumes per-sender dedup (see
+//        line comment in `do_initiate_transfer`). Old intents with a lower
+//        nonce than the current `NextNonce` are rejected as replays.
 //
 //   2. **State machine.** Every status transition goes through
 //      `TransferStatus::can_transition_to`. Illegal transitions are rejected.
@@ -175,6 +179,12 @@ pub mod pallet {
     /// Replay protection layer 2: (source_domain, sender_bytes) → next nonce.
     ///
     /// Senders must submit strictly monotonic nonces; duplicates are rejected.
+    ///
+    /// Design note: this storage replaces the `UsedNonces` per-message point-
+    /// lookup map that appears in some older design docs. The monotonic nonce
+    /// guarantee is strictly stronger: any nonce ≤ `NextNonce - 1` is a replay
+    /// regardless of message_id. The `NonceBatchAllocation` companion storage
+    /// reduces write contention at high throughput by pre-allocating batches.
     #[pallet::storage]
     #[pallet::getter(fn next_nonce)]
     pub type NextNonce<T: Config> = StorageDoubleMap<
@@ -270,6 +280,47 @@ pub mod pallet {
     #[pallet::getter(fn ixl_receipt_entries)]
     pub type IxlReceiptEntries<T: Config> = StorageMap<_, Blake2_128Concat, H256, u32>;
 
+    // ── Gap 1: Daily volume accumulators ───────────────────────────────────
+
+    /// Aggregate cross-VM transfer volume per route per epoch-day.
+    ///
+    /// Key: `(asset_id, (src_domain, dst_domain))` → `(epoch_day, cumulative_amount)`.
+    /// `epoch_day = block_number / T::BlocksPerDay`. When the stored epoch_day
+    /// differs from the current day the accumulator is treated as zero (auto-reset).
+    /// Old entries are never explicitly deleted — they become unreachable once the
+    /// epoch advances and are safe to prune with a future storage migration.
+    ///
+    /// Enforces `RouteLimits::daily_limit`.
+    #[pallet::storage]
+    #[pallet::getter(fn daily_volume)]
+    pub type DailyVolume<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        AssetId,
+        Blake2_128Concat,
+        (DomainId, DomainId),
+        (u32, Balance),
+        OptionQuery,
+    >;
+
+    /// Per-wallet aggregate cross-VM transfer volume per epoch-day.
+    ///
+    /// Key: `(sender_bytes, asset_id)` → `(epoch_day, cumulative_amount)`.
+    /// Same epoch-day semantics as `DailyVolume`.
+    ///
+    /// Enforces `RouteLimits::per_wallet_daily_limit`.
+    #[pallet::storage]
+    #[pallet::getter(fn wallet_daily_volume)]
+    pub type WalletDailyVolume<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        AccountBytes,
+        Blake2_128Concat,
+        AssetId,
+        (u32, Balance),
+        OptionQuery,
+    >;
+
     // ── Pallet ─────────────────────────────────────────────────────────────
 
     #[pallet::pallet]
@@ -304,6 +355,14 @@ pub mod pallet {
         /// Typically the on-chain treasury pallet's account id.
         #[pallet::constant]
         type ProtocolTreasury: Get<Self::AccountId>;
+
+        /// Approximate number of blocks per 24-hour window, used to compute the
+        /// daily epoch key for `DailyVolume` and `WalletDailyVolume`.
+        ///
+        /// At 6s block time: 86_400 / 6 = 14_400.
+        /// Override in tests to a small value (e.g., 5) to test day-rollover.
+        #[pallet::constant]
+        type BlocksPerDay: Get<u32>;
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
@@ -449,6 +508,12 @@ pub mod pallet {
         EconomicHaltActive,
         /// Fee payer cannot cover the XVM routing fee (insufficient native balance).
         RoutingFeeNotAffordable,
+        /// Transfer would push the global per-route 24h volume over
+        /// `RouteLimits::daily_limit`. Try again after the epoch rolls over.
+        DailyVolumeLimitExceeded,
+        /// Transfer would push this sender's 24h volume over
+        /// `RouteLimits::per_wallet_daily_limit`. Try again after the epoch rolls over.
+        WalletDailyVolumeLimitExceeded,
     }
 
     // ── Extrinsics ─────────────────────────────────────────────────────────
@@ -847,6 +912,38 @@ pub mod pallet {
                 let now = <frame_system::Pallet<T>>::block_number();
                 ensure!(expires_at > now, Error::<T>::BadExpiry);
 
+                // ── Daily volume enforcement (Gap 1) ──────────────────────────
+                // Uses an epoch-day accumulator keyed by `block_number / BlocksPerDay`.
+                // The accumulator auto-resets when the epoch advances — no periodic
+                // cleanup job required. Limit = `Balance::MAX` disables the cap.
+                let blocks_per_day = T::BlocksPerDay::get() as u64;
+                let epoch_day: u32 =
+                    (now.saturated_into::<u64>() / blocks_per_day.max(1)) as u32;
+
+                if route.limits.daily_limit < Balance::MAX {
+                    let (stored_day, stored_vol) =
+                        DailyVolume::<T>::get(asset_id, (source, destination))
+                            .unwrap_or((epoch_day, 0));
+                    let current_vol =
+                        if stored_day == epoch_day { stored_vol } else { 0u128 };
+                    ensure!(
+                        current_vol.saturating_add(amount) <= route.limits.daily_limit,
+                        Error::<T>::DailyVolumeLimitExceeded
+                    );
+                }
+
+                if route.limits.per_wallet_daily_limit < Balance::MAX {
+                    let (stored_day, stored_vol) =
+                        WalletDailyVolume::<T>::get(sender.clone(), asset_id)
+                            .unwrap_or((epoch_day, 0));
+                    let current_vol =
+                        if stored_day == epoch_day { stored_vol } else { 0u128 };
+                    ensure!(
+                        current_vol.saturating_add(amount) <= route.limits.per_wallet_daily_limit,
+                        Error::<T>::WalletDailyVolumeLimitExceeded
+                    );
+                }
+
                 // ── Nonce reservation ─────────────────────────────────────────
                 // P0 Optimization: Use batch pre-allocation to reduce contention.
                 // reserve_nonce_from_batch() atomically allocates batches of 100 nonces
@@ -917,6 +1014,30 @@ pub mod pallet {
                 // If it fails, the entire transaction (including nonce reservation,
                 // message ID marking, and record insertion) is rolled back.
                 T::Ledger::debit_source_to_pending(&asset_id, source, amount)?;
+
+                // ── Update daily volume accumulators (after successful debit) ──
+                if route.limits.daily_limit < Balance::MAX {
+                    let new_vol = DailyVolume::<T>::get(asset_id, (source, destination))
+                        .and_then(|(d, v)| if d == epoch_day { Some(v) } else { None })
+                        .unwrap_or(0u128)
+                        .saturating_add(amount);
+                    DailyVolume::<T>::insert(
+                        asset_id,
+                        (source, destination),
+                        (epoch_day, new_vol),
+                    );
+                }
+                if route.limits.per_wallet_daily_limit < Balance::MAX {
+                    let new_vol = WalletDailyVolume::<T>::get(sender.clone(), asset_id)
+                        .and_then(|(d, v)| if d == epoch_day { Some(v) } else { None })
+                        .unwrap_or(0u128)
+                        .saturating_add(amount);
+                    WalletDailyVolume::<T>::insert(
+                        sender.clone(),
+                        asset_id,
+                        (epoch_day, new_vol),
+                    );
+                }
 
                 // ── Persist + mark used ───────────────────────────────────────
                 UsedMessages::<T>::insert(message_id, ());

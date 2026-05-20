@@ -47,31 +47,31 @@ features = [
 ]
 
 [dependencies.pallet-transaction-payment-rpc-runtime-api]
-path = "runtime-api"
+path = "../pallet-transaction-payment-rpc-runtime-api"
 default-features = true
 
 [dependencies.sp-api]
-path = "../../../primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-rpc]
-path = "../../../primitives/rpc"
+path = "../sp-rpc"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.sp-weights]
-path = "../../../primitives/weights"
+path = "../sp-weights"
 default-features = true
 
 [lints.clippy.all]

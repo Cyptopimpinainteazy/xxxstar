@@ -66,11 +66,11 @@ version = "0.4.3"
 default-features = true
 
 [dependencies.polkadot-node-primitives]
-path = "../../primitives"
+path = "../polkadot-node-primitives"
 default-features = true
 
 [dependencies.polkadot-primitives]
-path = "../../../primitives"
+path = "../polkadot-primitives"
 default-features = true
 
 [dependencies.rand]
@@ -78,7 +78,7 @@ version = "0.8.5"
 default-features = true
 
 [dependencies.sc-authority-discovery]
-path = "../../../../substrate/client/authority-discovery"
+path = "../sc-authority-discovery"
 default-features = true
 
 [dependencies.sc-network]
@@ -86,11 +86,11 @@ path = "../../../../substrate/client/network"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../../../../substrate/client/network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.strum]

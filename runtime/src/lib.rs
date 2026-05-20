@@ -2296,6 +2296,8 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Currency = Balances;
     type RoutingFeeBps = XvmRoutingFeeBps;
     type ProtocolTreasury = TreasuryAccountId;
+    /// 6-second blocks → 14_400 blocks per 24 h.
+    type BlocksPerDay = ConstU32<14_400>;
 }
 
 impl pallet_x3_token_factory::Config for Runtime {

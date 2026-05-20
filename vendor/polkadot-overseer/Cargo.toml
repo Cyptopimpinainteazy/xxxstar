@@ -64,27 +64,27 @@ path = "../metrics"
 default-features = true
 
 [dependencies.polkadot-node-network-protocol]
-path = "../network/protocol"
+path = "../polkadot-node-network-protocol"
 default-features = true
 
 [dependencies.polkadot-node-primitives]
-path = "../primitives"
+path = "../polkadot-node-primitives"
 default-features = true
 
 [dependencies.polkadot-node-subsystem-types]
-path = "../subsystem-types"
+path = "../polkadot-node-subsystem-types"
 default-features = true
 
 [dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../../../substrate/client/api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../../substrate/primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.tikv-jemalloc-ctl]

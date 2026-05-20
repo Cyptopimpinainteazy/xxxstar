@@ -255,6 +255,20 @@ impl BytecodeCompiler {
                 Ok(())
             }
 
+            HirStmt::Atomic { block_id, body, span } => {
+                // P0 FIX: emit AtomicBegin, compile the body, then emit AtomicCommit.
+                // The previous HIR lowerer returned only AtomicBegin (body was dropped),
+                // so this case was never reached.  It is now the primary path for
+                // atomic blocks produced by the HIR lowerer.
+                self.emitter.set_span(*span);
+                self.emitter.emit_atomic_begin(AtomicId(block_id.0 as u16));
+                for stmt in body {
+                    self.compile_stmt(hir, stmt)?;
+                }
+                self.emitter.emit_atomic_commit(AtomicId(block_id.0 as u16));
+                Ok(())
+            }
+
             HirStmt::AtomicBegin { block_id, span } => {
                 self.emitter.set_span(*span);
                 self.emitter.emit_atomic_begin(AtomicId(block_id.0 as u16));

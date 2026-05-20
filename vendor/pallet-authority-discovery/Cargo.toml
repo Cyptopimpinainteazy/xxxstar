@@ -61,15 +61,15 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.pallet-session]
-path = "../session"
+path = "../pallet-session"
 features = ["historical"]
 default-features = false
 
@@ -79,27 +79,27 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-application-crypto]
-path = "../../primitives/application-crypto"
+path = "../sp-application-crypto"
 default-features = false
 
 [dependencies.sp-authority-discovery]
-path = "../../primitives/authority-discovery"
+path = "../sp-authority-discovery"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dev-dependencies.pallet-balances]
-path = "../balances"
+path = "../pallet-balances"
 default-features = false
 
 [dev-dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dev-dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = true
 
 [lints.clippy.all]

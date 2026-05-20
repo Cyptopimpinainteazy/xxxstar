@@ -40,23 +40,23 @@ default-features = true
 package = "parity-scale-codec"
 
 [dependencies.fork-tree]
-path = "../../../utils/fork-tree"
+path = "../fork-tree"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../../api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-consensus]
-path = "../common"
+path = "../sc-consensus"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [lints.clippy.all]

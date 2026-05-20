@@ -1,6 +1,5 @@
 [workspace]
 exclude = [
-    "quantum-kernel-voyager/src-tauri",
     "apps/x3-desktop/src-tauri",
     "apps/inferstructor-dashboard/src-tauri",
     # X3-contracts is a separate dual-stack contracts workspace
@@ -23,90 +22,22 @@ members = [
     "pallets/meme-overlord",
     "pallets/swarm",
     "pallets/x3-wallet-pallet",
-    "crates/x3-parallel-executor",
-    "crates/x3-appzone-factory",
-    "crates/x3-pq",
-    "crates/evm-integration",
     # "crates/svm-integration",  # excluded: solana-program 3.x mixes solana-address 1.x/2.x (unfixable without upstream fix)
     # "crates/svm-counter",       # excluded: same solana-address dual-version conflict
-    "crates/cross-vm-bridge",
-    "crates/external-chains",
-    "crates/x3-bridge",
-    "crates/x3-atomic-trade",
-    "crates/x3-sdk",
-    "crates/x3-cli",
-    "crates/x3-wallet",
-    "crates/x3-indexer",
     "crates/x3-gateway",
-    "crates/x3-circuit-breaker",
-    "crates/x3-lsp",
-    "crates/x3-integration",
-    "crates/x3-gpu-validator-swarm",
-    "crates/x3-swarm-core",
-    "crates/x3-sidecar",
-    "crates/x3-readiness",
-    "crates/x3-evolution-core",
-    "crates/x3-swarm-core/services/x3-swarm-api",
-    "crates/x3-swarm-core/services/x3-swarm-worker",
-    "crates/x3-evolution",
-    "crates/quantum-swarm",
-    "crates/chronos-flash",
-    "crates/voice-to-x3",
-    "crates/dream-mining",
-    "crates/quantum-crypto",
-    "crates/apotheosis-tx",
-    "crates/tps-tracker",
     "runtime",
     "node",
     "apps/analytics/analytics-service",
-    "crates/x3-common",
-    "crates/x3-lexer",
-    "crates/x3-ast",
-    "crates/x3-parser",
-    "crates/x3-hir",
-    "crates/x3-mir",
-    "crates/x3-semantics",
-    "crates/x3-typeck",
-    "crates/x3-backend",
-    "crates/x3-vm",
-    "crates/x3-opt",
-    "crates/x3-bench",
-    "crates/x3-compiler",
-    "crates/x3-verifier",
-    "crates/x3-dns-server",
     "crates/invariant-macros",
-    "crates/x3-proof",
-    "crates/x3-slash",
-    "crates/x3-fees",
-    "crates/x3-intent",
-    "crates/x3-agent",
-    "crates/x3-court",
-    "crates/x3-flashloan",
-    "crates/x3-dex",
-    "crates/x3-swap-router",
     "pallets/depin-marketplace",
     "pallets/private-execution",
-    "crates/contention-predictor",
-    "crates/parallel-proposer",
-    "crates/private-mempool",
-    "crates/confidential-gpu",
-    "crates/x3-bot",
-    "crates/atomic-swap-orchestrator",
-    "crates/x3-turbine",
     # Phase 3-6: Audit implementation — Flash Finality, PoH, Atomic Kernel, Parallel Proposer
-    "crates/flash-finality",
-    "crates/poh-generator",
     "pallets/x3-atomic-kernel",
     "pallets/x3-sequencer",
     "pallets/x3-da",
     "pallets/fraud-proofs",
     "pallets/x3-slash",
-    "crates/x3-atomic-client",
-    "crates/cross-vm-coordinator",
-    "crates/cross-chain-gpu-validator",
     # vΩ-1.0 Master Architecture additions — constitutional engine, epoch proofs, launch validator
-    "crates/x3-constitution",
-    "crates/x3-launch-validator",
     # On-chain invariant enforcement pallet (Article IV / checklist §10)
     "pallets/x3-invariants",
     # Agent Law pallet for policy enforcement (SECURITY-CRITICAL)
@@ -120,25 +51,7 @@ members = [
     # DEX pallet for AMM operations
     "pallets/x3-dex",
     # Concrete implementations of x3-vm BalanceProvider + CrossVmEscrow for node use
-    "crates/x3-bridge-adapters",
-    "crates/cross-chain-position-manager",
-    "crates/custody-service",
-    "crates/x3-orchestra-control-plane",
-    "crates/x3-orchestrator",
-    "crates/x3-rpc",
     # Phase 4: Unified RPC operational policy layer (health scoring + failover)
-    "crates/x3-rpc-policy",
-    "crates/x3-relayer",
-    "crates/x3-bridge-security-council",
-    "crates/x3-finality-oracle",
-    "crates/x3-verification-router",
-    "crates/x3-validator-attestation",
-    "crates/x3-proof-dispute",
-    "crates/x3-gateway-risk-engine",
-    "crates/x3-vrf",
-    "crates/x3-automation",
-    "crates/x3-swap-router",
-    "crates/x3-genesis-builder",
     "tests/e2e",
         # Phase 4.5: Liquidity, Inventory, and Solvency control plane
         "pallets/x3-inventory",
@@ -148,39 +61,52 @@ members = [
         "pallets/x3-partner",
         "pallets/x3-treasury-policy",
         # Universal Asset Kernel (MVP / Level 1 — cross-VM only)
-        "crates/x3-asset-kernel-types",
         "pallets/x3-asset-registry",
         "pallets/x3-account-registry",
         "pallets/x3-supply-ledger",
-        "crates/x3-packet-schema",
         "pallets/x3-cross-vm-router",
         "pallets/x3-token-factory",
         "tools/launchops",
         # Dispute resolution (Article III: Deterministic Court)
         "pallets/x3-jury-anchor",
         # Phase 0: Sprint 0 Infrastructure
-        "crates/x3-readiness-report",
         # v0.4 internal-mainnet path: packet lifecycle + IXL instruction layer
-        "crates/x3-packet-standard",
-        "crates/x3-ixl",
-        "crates/x3-parallel-executor",
-        "crates/x3-appzone-factory",
-        "crates/x3-liquidity-core",
-        "crates/x3-universal-contracts",
         # On-chain custody map and signer separation (validator key vs. treasury key)
         "pallets/x3-custody",
         # Phase 3: Canonical accounting event types for the X3 revenue spine
-        "crates/x3-accounting-events",
         # Phase 9: Canonical truth types — identity, asset, and treasury models (shared types lib)
-        "crates/x3-canonical-truth",
         # Phase 2: Canonical security event types for the security swarm spine
-        "crates/x3-security-events",
         # ProofForge: Complete proof system for X3 blockchain (v0-v7)
         "proof-forge",
         # Phase 1: Testnet proving harness binary
         "proving",
         # Note: crates/dylint-determinism is intentionally NOT listed here.
-    # It is a standalone workspace (has its own [workspace] and rust-toolchain.toml)
+    # It is a standalone workspace (has its own [workspace
+    "crates/cross-vm-bridge",
+    "crates/evm-integration",
+    "crates/flash-finality",
+    "crates/parallel-proposer",
+    "crates/poh-generator",
+    "crates/x3-accounting-events",
+    "crates/x3-asset-kernel-types",
+    "crates/x3-atomic-trade",
+    "crates/x3-automation",
+    "crates/x3-common",
+    "crates/x3-dex",
+    "crates/x3-gateway-risk-engine",
+    "crates/x3-gpu-validator-swarm",
+    "crates/x3-integration",
+    "crates/x3-ixl",
+    "crates/x3-liquidity-core",
+    "crates/x3-packet-schema",
+    "crates/x3-packet-standard",
+    "crates/x3-proof",
+    "crates/x3-revenue-sharing",
+    "crates/x3-rpc",
+    "crates/x3-slash",
+    "crates/x3-vrf",
+    "crates/x3-wallet",
+# ] and rust-toolchain.toml)
     # compiled by `cargo dylint` with nightly+rustc-dev via workspace.metadata.dylint.
         # Phase 5: Supply reconciliation and governance power mapping
         "pallets/x3-reconciliation",
@@ -193,15 +119,45 @@ members = [
         # Phase 8: On-chain dApp hub — listing, compliance tier, throttle, revenue share
         "pallets/x3-dapp-hub",
         # Phase 8: Revenue-split types crate (shared by dApp hub and marketplace)
-        "crates/x3-revenue-sharing",
         # Phase 10: AI compute marketplace — bot rental, premium execution, swarm sessions
         "pallets/x3-compute-market",
         # Phase 11: Weekly chain proving cycle — onboarding pipeline types and scoring model
-        "crates/x3-chain-onboarding",
         # Phase 12: A-tier hard metrics tracking — throughput, TVL, routes, DAU, incidents
-        "crates/x3-metrics-tracker",
         # Flash loan pallet: atomic borrow-use-repay with repay-or-revert invariant
         "pallets/x3-flashloan",
+    # Northern Swarm RC1: off-chain executor
+    "crates/northern-swarm",
+    # Northern Swarm RC2: on-chain registry v2
+    "pallets/northern-swarm",
+    # P0-FIX: excluded crates referenced as path deps by workspace members
+    "crates/quantum-crypto",           # <- runtime/Cargo.toml
+    "crates/x3-bridge",                # <- node/Cargo.toml
+    "crates/x3-bridge-adapters",       # <- node/Cargo.toml
+    "crates/x3-fees",                  # <- tests/e2e/Cargo.toml
+    "crates/x3-finality-oracle",       # <- node/Cargo.toml
+    "crates/x3-proof-dispute",         # <- node/Cargo.toml
+    "crates/x3-security-events",       # <- pallets/atomic-trade-engine, pallets/x3-invariants, runtime
+    "crates/x3-universal-contracts",   # <- tests/e2e/Cargo.toml
+    "crates/x3-validator-attestation", # <- node/Cargo.toml
+    "crates/x3-verification-router",   # <- node/Cargo.toml
+    # P1-FIX: excluded crates referenced as path deps by workspace members (x3-gateway, x3-gpu-validator-swarm, x3-integration)
+    # Direct imports (level-1):
+    "crates/x3-orchestra-control-plane", # <- x3-gateway, x3-gpu-validator-swarm (required)
+    "crates/x3-vm",                      # <- x3-gpu-validator-swarm (required), x3-integration (optional)
+    "crates/x3-backend",                 # <- x3-gpu-validator-swarm (required), x3-integration (optional), x3-vm
+    "crates/x3-compiler",                # <- x3-integration (optional)
+    "crates/x3-verifier",                # <- x3-integration (optional), x3-compiler (note: separate from pallets/x3-verifier)
+    # Transitive path deps (level-2+, compiler/language toolchain):
+    "crates/x3-ast",                     # <- x3-backend, x3-hir, x3-mir, x3-typeck, x3-parser, x3-opt, x3-semantics, x3-verifier
+    "crates/x3-hir",                     # <- x3-backend, x3-mir, x3-opt, x3-compiler
+    "crates/x3-mir",                     # <- x3-backend, x3-opt, x3-compiler
+    "crates/x3-typeck",                  # <- x3-backend, x3-hir, x3-compiler
+    "crates/x3-parser",                  # <- x3-backend, x3-hir, x3-mir, x3-typeck, x3-semantics, x3-verifier
+    "crates/x3-lexer",                   # <- x3-backend, x3-parser, x3-compiler
+    "crates/x3-opt",                     # <- x3-compiler
+    "crates/x3-semantics",               # <- x3-typeck
+    # Cross-chain intent system: user-facing intent language, compiler, lifecycle, simulation
+    "crates/x3-crosschain-intent",
 ]
 default-members = ["node"]
 resolver = "2"

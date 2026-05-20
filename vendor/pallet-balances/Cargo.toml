@@ -73,16 +73,16 @@ package = "parity-scale-codec"
 version = "0.2.9"
 
 [dependencies.frame-benchmarking]
-path = "../benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.log]
@@ -95,20 +95,20 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dev-dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 features = ["experimental"]
 default-features = true
 
 [dev-dependencies.pallet-transaction-payment]
-path = "../transaction-payment"
+path = "../pallet-transaction-payment"
 default-features = true
 
 [dev-dependencies.paste]
@@ -116,7 +116,7 @@ version = "1.0.15"
 default-features = true
 
 [dev-dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = true
 
 [lints.clippy.all]

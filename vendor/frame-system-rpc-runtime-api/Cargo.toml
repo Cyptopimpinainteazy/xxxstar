@@ -49,7 +49,7 @@ package = "parity-scale-codec"
 version = "0.2.9"
 
 [dependencies.sp-api]
-path = "../../../../primitives/api"
+path = "../sp-api"
 default-features = false
 
 [lints.clippy.all]

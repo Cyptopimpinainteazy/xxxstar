@@ -91,11 +91,11 @@ features = [
 default-features = false
 
 [dependencies.fp-account]
-path = "../../primitives/account"
+path = "../fp-account"
 default-features = false
 
 [dependencies.fp-evm]
-path = "../../primitives/evm"
+path = "../fp-evm"
 default-features = false
 
 [dependencies.frame-benchmarking]
@@ -166,7 +166,7 @@ features = [
 default-features = false
 
 [dev-dependencies.pallet-evm-precompile-simple]
-path = "precompile/simple"
+path = "../pallet-evm-precompile-simple"
 features = ["default"]
 default-features = false
 

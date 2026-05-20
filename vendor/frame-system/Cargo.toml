@@ -75,7 +75,7 @@ package = "parity-scale-codec"
 version = "0.2.9"
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.log]
@@ -99,26 +99,26 @@ features = [
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-version]
-path = "../../primitives/version"
+path = "../sp-version"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-weights]
-path = "../../primitives/weights"
+path = "../sp-weights"
 features = ["serde"]
 default-features = false
 
@@ -127,11 +127,11 @@ version = "0.5.1"
 default-features = true
 
 [dev-dependencies.sp-externalities]
-path = "../../primitives/externalities"
+path = "../sp-externalities"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

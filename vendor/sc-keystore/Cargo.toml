@@ -58,15 +58,15 @@ version = "1.0.132"
 default-features = true
 
 [dependencies.sp-application-crypto]
-path = "../../primitives/application-crypto"
+path = "../sp-application-crypto"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-keystore]
-path = "../../primitives/keystore"
+path = "../sp-keystore"
 default-features = true
 
 [dependencies.thiserror]

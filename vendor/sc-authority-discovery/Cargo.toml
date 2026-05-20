@@ -70,7 +70,7 @@ version = "0.8.5"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-network]
@@ -78,11 +78,11 @@ path = "../network"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.sc-service]
-path = "../service"
+path = "../sc-service"
 default-features = false
 
 [dependencies.serde]
@@ -94,27 +94,27 @@ version = "1.0.132"
 default-features = false
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-authority-discovery]
-path = "../../primitives/authority-discovery"
+path = "../sp-authority-discovery"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-keystore]
-path = "../../primitives/keystore"
+path = "../sp-keystore"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.thiserror]
@@ -133,7 +133,7 @@ version = "1.0.3"
 default-features = false
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

@@ -94,11 +94,11 @@ version = "0.4.22"
 default-features = false
 
 [dependencies.polkadot-core-primitives]
-path = "../core-primitives"
+path = "../polkadot-core-primitives"
 default-features = false
 
 [dependencies.polkadot-parachain-primitives]
-path = "../parachain"
+path = "../polkadot-parachain-primitives"
 default-features = false
 
 [dependencies.scale-info]
@@ -119,57 +119,57 @@ features = [
 default-features = false
 
 [dependencies.sp-api]
-path = "../../substrate/primitives/api"
+path = "../sp-api"
 default-features = false
 
 [dependencies.sp-application-crypto]
-path = "../../substrate/primitives/application-crypto"
+path = "../sp-application-crypto"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-arithmetic]
-path = "../../substrate/primitives/arithmetic"
+path = "../sp-arithmetic"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-authority-discovery]
-path = "../../substrate/primitives/authority-discovery"
+path = "../sp-authority-discovery"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-consensus-slots]
-path = "../../substrate/primitives/consensus/slots"
+path = "../sp-consensus-slots"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-core]
-path = "../../substrate/primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-inherents]
-path = "../../substrate/primitives/inherents"
+path = "../sp-inherents"
 default-features = false
 
 [dependencies.sp-io]
-path = "../../substrate/primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-keystore]
-path = "../../substrate/primitives/keystore"
+path = "../sp-keystore"
 optional = true
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-staking]
-path = "../../substrate/primitives/staking"
+path = "../sp-staking"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-std]
-path = "../../substrate/primitives/std"
+path = "../sp-std-8.0.0"
 optional = true
 default-features = false
 

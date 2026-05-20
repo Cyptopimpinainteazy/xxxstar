@@ -72,7 +72,7 @@ version = "0.12.1"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-network]
@@ -80,35 +80,35 @@ path = "../network"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.sc-transaction-pool-api]
-path = "../transaction-pool/api"
+path = "../sc-transaction-pool-api"
 default-features = true
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-consensus]
-path = "../../primitives/consensus/common"
+path = "../sp-consensus"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-keystore]
-path = "../../primitives/keystore"
+path = "../sp-keystore"
 default-features = true
 
 [dependencies.sp-mixnet]
-path = "../../primitives/mixnet"
+path = "../sp-mixnet"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.thiserror]

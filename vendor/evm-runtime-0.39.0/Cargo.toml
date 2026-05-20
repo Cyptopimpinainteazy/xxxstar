@@ -56,7 +56,7 @@ default-features = false
 
 [dependencies.evm-core]
 version = "0.39"
-path = "../core"
+path = "../evm-core-0.39.0"
 default-features = false
 
 [dependencies.primitive-types]

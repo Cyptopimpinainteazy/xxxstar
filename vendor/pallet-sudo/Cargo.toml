@@ -66,16 +66,16 @@ package = "parity-scale-codec"
 version = "0.2.9"
 
 [dependencies.frame-benchmarking]
-path = "../benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.scale-info]
@@ -84,11 +84,11 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [lints.clippy.all]

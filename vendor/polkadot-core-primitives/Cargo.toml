@@ -51,11 +51,11 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-core]
-path = "../../substrate/primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [lints.clippy.all]

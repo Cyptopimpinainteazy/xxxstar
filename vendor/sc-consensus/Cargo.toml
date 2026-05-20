@@ -57,15 +57,15 @@ default-features = true
 package = "substrate-prometheus-endpoint"
 
 [dependencies.sc-client-api]
-path = "../../api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../../network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.sc-utils]
-path = "../../utils"
+path = "../sc-utils"
 default-features = true
 
 [dependencies.serde]
@@ -74,23 +74,23 @@ features = ["derive"]
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-consensus]
-path = "../../../primitives/consensus/common"
+path = "../sp-consensus"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.sp-state-machine]
-path = "../../../primitives/state-machine"
+path = "../sp-state-machine"
 default-features = true
 
 [dependencies.thiserror]

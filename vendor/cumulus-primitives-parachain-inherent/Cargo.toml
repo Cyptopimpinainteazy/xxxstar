@@ -53,7 +53,7 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.cumulus-primitives-core]
-path = "../core"
+path = "../cumulus-primitives-core"
 default-features = false
 
 [dependencies.scale-info]
@@ -62,15 +62,15 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-core]
-path = "../../../substrate/primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-inherents]
-path = "../../../substrate/primitives/inherents"
+path = "../sp-inherents"
 default-features = false
 
 [dependencies.sp-trie]
-path = "../../../substrate/primitives/trie"
+path = "../sp-trie"
 default-features = false
 
 [lints.clippy.all]

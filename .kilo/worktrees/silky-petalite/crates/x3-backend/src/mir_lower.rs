@@ -16,7 +16,7 @@ use crate::bc_format::{BytecodeModule, ModuleFlags};
 use crate::emit::BytecodeEmitter;
 use crate::error::{BackendError, BackendErrorKind, BackendResult};
 use crate::layout::LayoutComputer;
-use crate::opcode::{FuncIdx, Register};
+use crate::opcode::{AtomicId, FuncIdx, Register};
 
 /// Compiles MIR modules to bytecode.
 ///
@@ -262,6 +262,16 @@ impl MirBytecodeCompiler {
                         }
                     }
                 }
+            }
+            MirRhs::AtomicBegin { block_id } => {
+                // Side-effecting; `dst` is a unit placeholder — not written to.
+                let _ = dst;
+                self.emitter.emit_atomic_begin(AtomicId(*block_id));
+            }
+            MirRhs::AtomicCommit { block_id } => {
+                // Side-effecting; `dst` is a unit placeholder — not written to.
+                let _ = dst;
+                self.emitter.emit_atomic_commit(AtomicId(*block_id));
             }
         }
 

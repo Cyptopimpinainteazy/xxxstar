@@ -49,19 +49,19 @@ features = ["futures_channel"]
 default-features = false
 
 [dependencies.polkadot-node-network-protocol]
-path = "../network/protocol"
+path = "../polkadot-node-network-protocol"
 default-features = true
 
 [dependencies.polkadot-node-primitives]
-path = "../primitives"
+path = "../polkadot-node-primitives"
 default-features = true
 
 [dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 default-features = true
 
 [dependencies.polkadot-statement-table]
-path = "../../statement-table"
+path = "../polkadot-statement-table"
 default-features = true
 
 [dependencies.prometheus-endpoint]
@@ -70,7 +70,7 @@ default-features = true
 package = "substrate-prometheus-endpoint"
 
 [dependencies.sc-client-api]
-path = "../../../substrate/client/api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-network]
@@ -78,11 +78,11 @@ path = "../../../substrate/client/network"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../../../substrate/client/network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.sc-transaction-pool-api]
-path = "../../../substrate/client/transaction-pool/api"
+path = "../sc-transaction-pool-api"
 default-features = true
 
 [dependencies.smallvec]
@@ -90,23 +90,23 @@ version = "1.11.0"
 default-features = true
 
 [dependencies.sp-api]
-path = "../../../substrate/primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-authority-discovery]
-path = "../../../substrate/primitives/authority-discovery"
+path = "../sp-authority-discovery"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../../substrate/primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-consensus-babe]
-path = "../../../substrate/primitives/consensus/babe"
+path = "../sp-consensus-babe"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.thiserror]

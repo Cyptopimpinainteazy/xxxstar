@@ -83,20 +83,20 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-benchmarking]
-path = "../benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.frame-election-provider-support]
-path = "../election-provider-support"
+path = "../frame-election-provider-support"
 default-features = false
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.log]
@@ -104,11 +104,11 @@ version = "0.4.22"
 default-features = false
 
 [dependencies.pallet-authorship]
-path = "../authorship"
+path = "../pallet-authorship"
 default-features = false
 
 [dependencies.pallet-session]
-path = "../session"
+path = "../pallet-session"
 features = ["historical"]
 default-features = false
 
@@ -134,34 +134,34 @@ features = [
 default-features = false
 
 [dependencies.sp-application-crypto]
-path = "../../primitives/application-crypto"
+path = "../sp-application-crypto"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-staking]
-path = "../../primitives/staking"
+path = "../sp-staking"
 features = ["serde"]
 default-features = false
 
 [dev-dependencies.frame-benchmarking]
-path = "../benchmarking"
+path = "../frame-benchmarking"
 default-features = true
 
 [dev-dependencies.frame-election-provider-support]
-path = "../election-provider-support"
+path = "../frame-election-provider-support"
 default-features = true
 
 [dev-dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 features = ["experimental"]
 default-features = true
 
@@ -170,7 +170,7 @@ path = "../bags-list"
 default-features = true
 
 [dev-dependencies.pallet-balances]
-path = "../balances"
+path = "../pallet-balances"
 default-features = true
 
 [dev-dependencies.pallet-staking-reward-curve]
@@ -178,7 +178,7 @@ path = "reward-curve"
 default-features = true
 
 [dev-dependencies.pallet-timestamp]
-path = "../timestamp"
+path = "../pallet-timestamp"
 default-features = true
 
 [dev-dependencies.rand_chacha]
@@ -186,15 +186,15 @@ version = "0.3.1"
 default-features = true
 
 [dev-dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dev-dependencies.sp-npos-elections]
-path = "../../primitives/npos-elections"
+path = "../sp-npos-elections"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-utils]

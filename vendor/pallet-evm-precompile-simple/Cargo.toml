@@ -37,7 +37,7 @@ name = "pallet_evm_precompile_simple"
 path = "src/lib.rs"
 
 [dependencies.fp-evm]
-path = "../../../../primitives/evm"
+path = "../fp-evm"
 default-features = false
 
 [dependencies.ripemd]

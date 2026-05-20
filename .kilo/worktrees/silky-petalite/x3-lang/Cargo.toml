@@ -1,9 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/x3-common",
     "crates/x3-lexer",
     "crates/x3-ast",
-    "crates/x3-common",
+    "crates/x3-parser",
+    "crates/x3-ir",
     "crates/x3-tools",
     "compiler",
     "vm",
@@ -22,7 +24,7 @@ description = "X3 - A systems language for agent swarms, atomic cross-chain exec
 logos = "0.14"
 chumsky = "0.9"
 ariadne = "0.4"
-internment = "0.8"
+internment = { version = "0.8", features = ["serde"] }
 petgraph = "0.6"
 indexmap = "2.1"
 smallvec = "1.11"
@@ -39,7 +41,6 @@ tokio = { version = "1.34", features = ["full"] }
 async-trait = "0.1"
 crossbeam = "0.8"
 parking_lot = "0.12"
-apps/dash-legacy-2-legacy-2map = "5.5"
 flume = "0.11"
 rayon = "1.8"
 

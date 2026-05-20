@@ -1,0 +1,26 @@
+[package]
+name = "x3-metrics-tracker"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "A-tier hard metrics types for Phase 12 throughput, TVL, route volume, DAU, treasury growth, and incident tracking"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-std = { workspace = true, default-features = false }
+serde = { workspace = true, optional = true, features = ["derive"] }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "sp-std/std",
+    "serde",
+    "serde/std",
+]

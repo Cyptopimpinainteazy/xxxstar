@@ -68,15 +68,15 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.frame-try-runtime]
-path = "../try-runtime"
+path = "../frame-try-runtime"
 optional = true
 default-features = false
 
@@ -90,19 +90,19 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = false
 
 [dev-dependencies.array-bytes]
@@ -110,27 +110,27 @@ version = "6.2.2"
 default-features = true
 
 [dev-dependencies.pallet-balances]
-path = "../balances"
+path = "../pallet-balances"
 default-features = true
 
 [dev-dependencies.pallet-transaction-payment]
-path = "../transaction-payment"
+path = "../pallet-transaction-payment"
 default-features = true
 
 [dev-dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dev-dependencies.sp-inherents]
-path = "../../primitives/inherents"
+path = "../sp-inherents"
 default-features = true
 
 [dev-dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = true
 
 [dev-dependencies.sp-version]
-path = "../../primitives/version"
+path = "../sp-version"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

@@ -89,7 +89,7 @@ version = "6.2.2"
 default-features = false
 
 [dependencies.binary-merkle-tree]
-path = "../../utils/binary-merkle-tree"
+path = "../binary-merkle-tree"
 default-features = false
 
 [dependencies.bitflags]
@@ -161,70 +161,70 @@ features = ["alloc"]
 default-features = false
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 features = ["frame-metadata"]
 default-features = false
 
 [dependencies.sp-arithmetic]
-path = "../../primitives/arithmetic"
+path = "../sp-arithmetic"
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-crypto-hashing-proc-macro]
-path = "../../primitives/crypto/hashing/proc-macro"
+path = "../sp-crypto-hashing-proc-macro"
 default-features = true
 
 [dependencies.sp-debug-derive]
-path = "../../primitives/debug-derive"
+path = "../sp-debug-derive"
 default-features = false
 
 [dependencies.sp-genesis-builder]
-path = "../../primitives/genesis-builder"
+path = "../sp-genesis-builder"
 default-features = false
 
 [dependencies.sp-inherents]
-path = "../../primitives/inherents"
+path = "../sp-inherents"
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-metadata-ir]
-path = "../../primitives/metadata-ir"
+path = "../sp-metadata-ir"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-staking]
-path = "../../primitives/staking"
+path = "../sp-staking"
 default-features = false
 
 [dependencies.sp-state-machine]
-path = "../../primitives/state-machine"
+path = "../sp-state-machine"
 optional = true
 default-features = false
 
 [dependencies.sp-std]
-path = "../../primitives/std"
+path = "../sp-std-8.0.0"
 default-features = false
 
 [dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = false
 
 [dependencies.sp-trie]
-path = "../../primitives/trie"
+path = "../sp-trie"
 default-features = false
 
 [dependencies.sp-weights]
-path = "../../primitives/weights"
+path = "../sp-weights"
 default-features = false
 
 [dependencies.tt-call]
@@ -234,18 +234,18 @@ version = "1.0.8"
 version = "0.11.4"
 
 [dev-dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = true
 
 [dev-dependencies.pretty_assertions]
 version = "1.3.0"
 
 [dev-dependencies.sp-crypto-hashing]
-path = "../../primitives/crypto/hashing"
+path = "../sp-crypto-hashing"
 default-features = true
 
 [dev-dependencies.sp-timestamp]
-path = "../../primitives/timestamp"
+path = "../sp-timestamp"
 default-features = true
 
 [lints.clippy.all]
