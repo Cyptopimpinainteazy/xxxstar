@@ -103,6 +103,8 @@ impl TypeChecker {
                 Item::Agent(agent) => self.collect_agent_type(agent, resolved),
                 Item::GlobalLet(global) => self.collect_global_type(global, resolved),
                 Item::Const(const_item) => self.collect_const_type(const_item, resolved),
+                // Arb programs are lowered by later compilation phases.
+                Item::ArbProgram(_) => {}
             }
         }
     }
@@ -185,6 +187,9 @@ impl TypeChecker {
                     let ty = self.resolve_type_annotation(&const_item.ty);
                     fields.push((const_item.name.name.clone(), ty));
                 }
+                Item::ArbProgram(_) => {
+                    // Not supported as an inner agent item.
+                }
                 Item::Agent(_) => {
                     // Nested agents are handled by semantics - skip here
                 }
@@ -242,6 +247,7 @@ impl TypeChecker {
             Item::Agent(agent) => self.check_agent(agent, resolved),
             Item::GlobalLet(global) => self.check_global_let(global, resolved),
             Item::Const(const_item) => self.check_const(const_item, resolved),
+            Item::ArbProgram(_) => {}
         }
     }
 

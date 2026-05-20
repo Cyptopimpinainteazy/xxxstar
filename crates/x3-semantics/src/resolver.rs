@@ -117,6 +117,9 @@ impl Resolver {
                 Item::Const(const_item) => {
                     self.declare_const(const_item);
                 }
+                // Arbitrage programs are validated in later lowering/type phases.
+                // Name resolution does not currently register program-level symbols.
+                Item::ArbProgram(_) => {}
                 Item::Agent(agent) => {
                     self.declare_agent(agent);
                 }
@@ -261,6 +264,7 @@ impl Resolver {
             Item::Function(func) => self.resolve_function(func),
             Item::GlobalLet(global) => self.resolve_global_let(global),
             Item::Const(const_item) => self.resolve_const(const_item),
+            Item::ArbProgram(_) => {}
             Item::Agent(agent) => self.resolve_agent(agent),
         }
     }
@@ -339,6 +343,12 @@ impl Resolver {
                 Item::Function(func) => self.declare_function(func),
                 Item::GlobalLet(global) => self.declare_global_let(global),
                 Item::Const(const_item) => self.declare_const(const_item),
+                Item::ArbProgram(_) => {
+                    self.errors.push(SemanticError::new(
+                        crate::error::SemanticErrorKind::NestedAgent,
+                        agent.span,
+                    ));
+                }
                 Item::Agent(_) => {
                     self.errors.push(SemanticError::new(
                         crate::error::SemanticErrorKind::NestedAgent,

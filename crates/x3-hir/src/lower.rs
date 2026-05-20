@@ -97,6 +97,8 @@ impl HirLowerer {
                     // Their fields become storage declarations and methods become functions
                     // Agent lowering deferred to MIR phase
                 }
+                // Arb program lowering is handled in a dedicated pipeline stage.
+                Item::ArbProgram(_) => {}
             }
         }
 
@@ -150,6 +152,7 @@ impl HirLowerer {
                         agent.span,
                     )?;
                 }
+                Item::ArbProgram(_) => {}
             }
         }
         Ok(())

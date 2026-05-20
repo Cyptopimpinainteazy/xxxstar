@@ -14,6 +14,7 @@ pub enum Item {
     Function(Function),
     GlobalLet(GlobalLet),
     Const(Const),
+    ArbProgram(ArbProgram),
     Agent(Agent),
 }
 

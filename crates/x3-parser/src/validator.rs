@@ -52,6 +52,8 @@ impl StructuralValidator {
                 Item::Function(func) => self.validate_function(func)?,
                 Item::GlobalLet(global) => self.validate_global_let(global)?,
                 Item::Const(const_item) => self.validate_const(const_item)?,
+                // Arb programs are validated by dedicated arb-specific passes.
+                Item::ArbProgram(_) => {}
                 Item::Agent(agent) => self.validate_agent(agent)?,
             }
         }
@@ -140,6 +142,7 @@ impl StructuralValidator {
                 Item::Function(func) => self.validate_function(func)?,
                 Item::GlobalLet(global) => self.validate_global_let(global)?,
                 Item::Const(const_item) => self.validate_const(const_item)?,
+                Item::ArbProgram(_) => {}
                 Item::Agent(nested_agent) => self.validate_agent(nested_agent)?,
             }
         }
