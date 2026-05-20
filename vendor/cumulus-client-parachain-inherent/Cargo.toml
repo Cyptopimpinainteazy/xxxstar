@@ -40,51 +40,51 @@ default-features = true
 package = "parity-scale-codec"
 
 [dependencies.cumulus-primitives-core]
-path = "../../primitives/core"
+path = "../cumulus-primitives-core"
 default-features = true
 
 [dependencies.cumulus-primitives-parachain-inherent]
-path = "../../primitives/parachain-inherent"
+path = "../cumulus-primitives-parachain-inherent"
 default-features = true
 
 [dependencies.cumulus-relay-chain-interface]
-path = "../relay-chain-interface"
+path = "../cumulus-relay-chain-interface"
 default-features = true
 
 [dependencies.cumulus-test-relay-sproof-builder]
-path = "../../test/relay-sproof-builder"
+path = "../cumulus-test-relay-sproof-builder"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../../../substrate/client/api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-consensus-babe]
-path = "../../../substrate/client/consensus/babe"
+path = "../sc-consensus-babe"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../../../substrate/client/network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.sp-crypto-hashing]
-path = "../../../substrate/primitives/crypto/hashing"
+path = "../sp-crypto-hashing"
 default-features = true
 
 [dependencies.sp-inherents]
-path = "../../../substrate/primitives/inherents"
+path = "../sp-inherents"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.sp-state-machine]
-path = "../../../substrate/primitives/state-machine"
+path = "../sp-state-machine"
 default-features = true
 
 [dependencies.sp-storage]
-path = "../../../substrate/primitives/storage"
+path = "../sp-storage"
 default-features = true
 
 [dependencies.tracing]

@@ -75,6 +75,15 @@ pub mod pallet {
     pub type AccountKinds<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, AccountKind, OptionQuery>;
 
+    /// **DEPRECATED (application-layer only) — NOT consumed by consensus.**
+    ///
+    /// This per-account nonce counter is NOT read by `pallet-x3-cross-vm-router`
+    /// and plays NO role in replay protection. The router uses its own
+    /// `NextNonce`/`NonceBatchAllocation` storage (monotonic per-(domain, sender)
+    /// sequence). This storage exists only for off-chain tooling or future
+    /// application-layer use. Do NOT rely on this value for security decisions.
+    ///
+    /// See also: `anchor_nonce` extrinsic (also application-layer only).
     #[pallet::storage]
     #[pallet::getter(fn cross_vm_nonce)]
     pub type CrossVmNonces<T: Config> =
@@ -163,6 +172,14 @@ pub mod pallet {
             Ok(())
         }
 
+        /// **DEPRECATED (application-layer only) — NOT a consensus nonce anchor.**
+        ///
+        /// Emits `NonceAnchored` with the caller's current `CrossVmNonces` value.
+        /// This extrinsic does NOT advance any nonce counter and has NO effect on
+        /// cross-VM replay protection (which is enforced entirely by
+        /// `pallet-x3-cross-vm-router`'s `NextNonce` storage). This call exists
+        /// only for off-chain indexers and explorers that want to snapshot a
+        /// sender's application-layer nonce on-chain.
         #[pallet::call_index(2)]
         #[pallet::weight(10_000)]
         pub fn anchor_nonce(origin: OriginFor<T>) -> DispatchResult {
@@ -190,10 +207,14 @@ pub mod pallet {
             AtlasRegistry::<T>::get(atlas_id)
         }
 
+        /// Returns the caller's application-layer `CrossVmNonces` value.
+        /// **DEPRECATED — not used in cross-VM replay protection.**
         pub fn get_next_cross_vm_nonce(account: &T::AccountId) -> u64 {
             CrossVmNonces::<T>::get(account)
         }
 
+        /// Increments the application-layer `CrossVmNonces` value.
+        /// **DEPRECATED — not used in cross-VM replay protection.**
         pub fn increment_cross_vm_nonce(account: &T::AccountId) {
             CrossVmNonces::<T>::mutate(account, |nonce| *nonce = nonce.saturating_add(1));
         }

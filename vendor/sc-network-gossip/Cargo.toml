@@ -65,14 +65,14 @@ path = "../network/sync"
 default-features = true
 
 [dependencies.sc-network-types]
-path = "../network/types"
+path = "../sc-network-types"
 default-features = true
 
 [dependencies.schnellru]
 version = "0.2.3"
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.tracing]

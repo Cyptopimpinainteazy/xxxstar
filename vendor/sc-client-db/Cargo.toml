@@ -92,42 +92,42 @@ default-features = true
 package = "substrate-prometheus-endpoint"
 
 [dependencies.sc-client-api]
-path = "../api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-state-db]
-path = "../state-db"
+path = "../sc-state-db"
 default-features = true
 
 [dependencies.schnellru]
 version = "0.2.3"
 
 [dependencies.sp-arithmetic]
-path = "../../primitives/arithmetic"
+path = "../sp-arithmetic"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-database]
-path = "../../primitives/database"
+path = "../sp-database"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.sp-state-machine]
-path = "../../primitives/state-machine"
+path = "../sp-state-machine"
 default-features = true
 
 [dependencies.sp-trie]
-path = "../../primitives/trie"
+path = "../sp-trie"
 default-features = true
 
 [dependencies.sysinfo]
@@ -152,7 +152,7 @@ version = "0.8.5"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

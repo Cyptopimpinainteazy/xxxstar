@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>X3 Funding Swarm — Ledger</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -217,25 +218,39 @@
       font-size: 1.05rem;
     }
 
-    .chart-placeholder {
-      height: 280px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px dashed rgba(26,26,46,0.9);
-      border-radius: 14px;
-      color: var(--muted);
-      background: rgba(7,7,13,0.15);
-      padding: 1rem;
-      text-align: center;
-      font-size: 0.95rem;
-      line-height: 1.45;
-    }
 
     .small-note {
       color: var(--muted);
       font-size: 0.85rem;
       margin-top: 0.55rem;
+    }
+
+    .pipeline-chart-wrap {
+      position: relative;
+      height: 200px;
+      margin-top: 0.75rem;
+    }
+
+    .pipeline-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem 1rem;
+      margin-top: 0.65rem;
+    }
+
+    .pipeline-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .pipeline-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
     }
 
     .timeline {
@@ -290,19 +305,19 @@
           <h2>Scoreboard (public)</h2>
           <div class="kpi-row">
             <div class="kpi">
-              <div class="label">Total found</div>
+              <div class="label">Grants found</div>
               <div class="value" id="kpi_found">0</div>
             </div>
             <div class="kpi">
-              <div class="label">Total requested</div>
-              <div class="value" id="kpi_requested">$0</div>
+              <div class="label">Approved</div>
+              <div class="value" id="kpi_approved">0</div>
             </div>
             <div class="kpi">
-              <div class="label">Total paid</div>
+              <div class="label">Total awarded</div>
               <div class="value" id="kpi_paid">$0</div>
             </div>
           </div>
-          <div class="small-note">Wire this to `/api/public/funding-swarm/*` once the backend is connected.</div>
+          <div class="small-note">Live data from <code>/api/public/funding-swarm/scoreboard</code>.</div>
         </div>
       </div>
     </div>
@@ -338,10 +353,11 @@
 
       <div class="card">
         <h2>Funding pipeline</h2>
-        <div class="chart-placeholder" id="pipeline_chart">
-          Graph placeholder (Recharts) — connect to `/api/public/funding-swarm/scoreboard`.
+        <div class="pipeline-chart-wrap">
+          <canvas id="pipeline_chart" aria-label="Grant pipeline funnel"></canvas>
         </div>
-        <div class="small-note">When wired, this section will render: total found, qualified, applied, awarded, paid.</div>
+        <div class="pipeline-legend" id="pipeline_legend"></div>
+        <div class="small-note" id="pipeline_note">Fetching pipeline data…</div>
       </div>
     </div>
 
@@ -372,14 +388,88 @@
   </div>
 
   <div class="footer">
-    X3 Funding Swarm — public ledger view (starter static page). Replace placeholders with live data via backend APIs.
+    X3 Funding Swarm — public ledger &mdash; data served by <code>/api/public/funding-swarm/*</code>.
   </div>
 
   <script>
-    // Minimal client-side wiring stub.
-    // Replace with real API calls once `/api/public/funding-swarm/*` is available.
+    /* ─── Pipeline chart ─────────────────────────────────────────────────── */
+    const PIPELINE_COLORS = ['#ff6b35', '#00e5c3', '#a78bfa', '#fbbf24', '#34d399'];
+    const PIPELINE_LABELS = ['Found', 'Open', 'Submitted', 'Approved', 'Funded'];
+
+    let _pipelineChart = null;
+
+    function renderPipelineChart(s) {
+      const ctx = document.getElementById('pipeline_chart');
+      if (!ctx) return;
+
+      const data = [
+        s.total_grants ?? 0,
+        s.open_grants ?? 0,
+        s.submitted_proposals ?? 0,
+        s.approved_grants ?? 0,
+        s.funded_grants ?? 0,
+      ];
+
+      if (_pipelineChart) {
+        _pipelineChart.data.datasets[0].data = data;
+        _pipelineChart.update();
+      } else {
+        _pipelineChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: PIPELINE_LABELS,
+            datasets: [{
+              label: 'Grants',
+              data,
+              backgroundColor: PIPELINE_COLORS,
+              borderRadius: 6,
+              borderSkipped: false,
+            }],
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+              label: ctx => ` ${ctx.parsed.x.toLocaleString()} grants`,
+            }}},
+            scales: {
+              x: {
+                ticks: { color: '#888', font: { size: 11 } },
+                grid: { color: 'rgba(255,255,255,0.05)' },
+              },
+              y: {
+                ticks: { color: '#e0e0e0', font: { size: 12 } },
+                grid: { display: false },
+              },
+            },
+          },
+        });
+      }
+
+      // Colour-coded legend
+      const legend = document.getElementById('pipeline_legend');
+      if (legend) {
+        legend.innerHTML = PIPELINE_LABELS.map((label, i) =>
+          `<div class="pipeline-legend-item">
+            <span class="pipeline-legend-dot" style="background:${PIPELINE_COLORS[i]}"></span>
+            <span>${label}: <strong>${data[i].toLocaleString()}</strong></span>
+          </div>`
+        ).join('');
+      }
+
+      const note = document.getElementById('pipeline_note');
+      if (note) {
+        const awarded = typeof s.total_awarded_usd === 'number'
+          ? `$${s.total_awarded_usd.toLocaleString()}` : '$0';
+        note.textContent =
+          `Pipeline: ${s.total_grants ?? 0} found → ${s.funded_grants ?? 0} funded (${awarded} awarded)`;
+      }
+    }
+
+    /* ─── Boot ───────────────────────────────────────────────────────────── */
     async function boot() {
-      // Try fetch endpoints if same-origin. If not present, keep placeholders.
+      // Fetch all three public endpoints concurrently.
       const endpoints = {
         scoreboard: '/api/public/funding-swarm/scoreboard',
         grants: '/api/public/funding-swarm/grants',
@@ -395,11 +485,11 @@
 
         if (scoreRes.ok) {
           const s = await scoreRes.json();
-          document.getElementById('kpi_found').textContent = s.total_found ?? s.totalGrantsFound ?? 0;
-          const req = s.total_requested_usd ?? s.totalRequestedUsd;
-          document.getElementById('kpi_requested').textContent = (typeof req === 'number') ? `$${req.toLocaleString()}` : '$0';
-          const paid = s.total_paid_usd ?? s.totalPaidUsd;
+          document.getElementById('kpi_found').textContent = s.total_grants ?? 0;
+          document.getElementById('kpi_approved').textContent = s.approved_grants ?? 0;
+          const paid = s.total_awarded_usd;
           document.getElementById('kpi_paid').textContent = (typeof paid === 'number') ? `$${paid.toLocaleString()}` : '$0';
+          renderPipelineChart(s);
         }
 
         if (grantsRes.ok) {

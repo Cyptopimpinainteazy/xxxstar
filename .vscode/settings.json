@@ -2,5 +2,6 @@
     "todo-tree.tree.scanMode": "workspace only",
     "secondaryExplorer.paths": [
         "${workspaceFolder}"
-    ]
+    ],
+    "git.ignoreLimitWarning": true
 }

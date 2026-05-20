@@ -20,19 +20,18 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ],
       "@/components/*": [
-        "src/components/*"
+        "./src/components/*"
       ],
       "@/lib/*": [
-        "src/lib/*"
+        "./src/lib/*"
       ],
       "@/app/*": [
-        "src/app/*"
+        "./src/app/*"
       ]
     },
     "allowJs": true,

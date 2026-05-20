@@ -65,7 +65,7 @@ version = "0.99.17"
 default-features = true
 
 [dependencies.polkadot-core-primitives]
-path = "../core-primitives"
+path = "../polkadot-core-primitives"
 default-features = false
 
 [dependencies.scale-info]
@@ -85,17 +85,17 @@ features = [
 default-features = false
 
 [dependencies.sp-core]
-path = "../../substrate/primitives/core"
+path = "../sp-core"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../substrate/primitives/runtime"
+path = "../sp-runtime"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-weights]
-path = "../../substrate/primitives/weights"
+path = "../sp-weights"
 default-features = false
 
 [lints.clippy.all]

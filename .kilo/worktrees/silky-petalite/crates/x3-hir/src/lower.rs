@@ -453,24 +453,16 @@ impl HirLowerer {
 
                 self.current_atomic = None;
 
-                // Wrap in begin/end markers
-                // For now, flatten into the parent - the real implementation
-                // would structure this as a transaction
-                let mut stmts = Vec::with_capacity(body.len() + 2);
-                stmts.push(HirStmt::AtomicBegin {
+                // P0 FIX: Return an `Atomic` wrapper that preserves the full body.
+                // The previous code only returned `AtomicBegin` via `stmts.remove(0)`,
+                // silently discarding the body and `AtomicEnd`.  Downstream passes
+                // (MIR lowerer, bytecode compiler) match on `HirStmt::Atomic` and
+                // emit the correct begin/commit/rollback sequence around the body.
+                Ok(HirStmt::Atomic {
                     block_id,
+                    body,
                     span: atomic_block.span,
-                });
-                stmts.extend(body);
-                stmts.push(HirStmt::AtomicEnd {
-                    block_id,
-                    commit: true,
-                    span: atomic_block.span,
-                });
-
-                // Return just the begin marker - caller should handle flattening
-                // For simplicity, we return a block expression as a statement
-                Ok(stmts.remove(0))
+                })
             }
             Statement::Emit(emit_stmt) => {
                 // For emit, we just lower the value expression

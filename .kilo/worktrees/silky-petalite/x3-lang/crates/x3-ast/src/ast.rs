@@ -39,7 +39,11 @@ pub enum Item {
     Mod(ModDecl),
     Import(ImportDecl),
     Const(ConstDecl),
-    // More can be added
+    // Cross-chain top-level declarations
+    Bridge(BridgeDecl),
+    AtomicSwap(AtomicSwapDecl),
+    Strategy(CrossChainStrategy),
+    Proposal(ProposalDecl),
 }
 
 /// A `use` declaration
@@ -207,6 +211,51 @@ pub enum Statement {
     Loop(Block),
     Atomic(AtomicBlock),
     Emit(EventEmit),
+
+    // ===== Cross-chain asset operations =====
+    /// `lock chain.ASSET amount <expr> from <expr>`
+    Lock {
+        chain: ChainRef,
+        asset: AssetRef,
+        amount: Expression,
+        from: Expression,
+    },
+    /// `mint chain.ASSET amount <expr> to <expr>`
+    Mint {
+        asset: AssetRef,
+        amount: Expression,
+        to: Expression,
+    },
+    /// `burn chain.ASSET amount <expr> from <expr>`
+    Burn {
+        asset: AssetRef,
+        amount: Expression,
+        from: Expression,
+    },
+    /// `release chain.ASSET to <expr>`
+    Release {
+        chain: ChainRef,
+        asset: AssetRef,
+        to: Expression,
+    },
+    /// `swap from.ASSET -> to.ASSET [route <expr>] [dex <expr>]`
+    Swap {
+        from: AssetRef,
+        to: AssetRef,
+        route: Option<Expression>,
+        dex: Option<Expression>,
+    },
+
+    // ===== Cross-chain guards =====
+    /// `require <kind> [subject] <value_expr>`
+    Require(RequireGuard),
+    /// `on_fail <action>`
+    OnFail(FailureAction),
+    /// `on_timeout <duration> <action>`
+    OnTimeout {
+        duration: Expression,
+        action: FailureAction,
+    },
 }
 
 /// Pattern is used in `let`, `for`, `match` (keep simple for now)
@@ -231,6 +280,131 @@ pub struct AtomicBlock {
 pub struct EventEmit {
     pub name: Symbol,
     pub payload: Vec<Expression>,
+}
+
+// ============================================================
+// Cross-chain types
+// ============================================================
+
+/// Reference to a blockchain network (e.g., "eth", "sol", "btc", "x3").
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ChainRef(pub Symbol);
+
+impl ChainRef {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+/// Qualified asset reference on a specific chain (e.g., `eth.USDC`, `x3.USDC_e`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AssetRef {
+    pub chain: ChainRef,
+    pub name: Symbol,
+}
+
+impl AssetRef {
+    pub fn new(chain: ChainRef, name: Symbol) -> Self {
+        AssetRef { chain, name }
+    }
+}
+
+/// Kind of runtime requirement guard.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RequireKind {
+    /// `require finality <chain> >= <confirmations>`
+    Finality,
+    /// `require slippage <= <pct>`
+    Slippage,
+    /// `require profit > <amount>`
+    Profit,
+    /// `require invariant <name> == <expected>`
+    InvariantCheck,
+    /// `require risk < <score>`
+    RiskScore,
+    /// `require nonce unused`
+    Nonce,
+    /// `require audit_gate <name>`
+    AuditGate,
+    /// `require bridge_liquidity >= <amount>`
+    BridgeLiquidity,
+    /// `require canonical_supply <asset>`
+    CanonicalSupply,
+    /// Custom / catch-all require
+    Custom(Symbol),
+}
+
+/// A `require` guard inside a cross-chain declaration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequireGuard {
+    /// What property is being asserted.
+    pub kind: RequireKind,
+    /// Optional subject: chain name for Finality, invariant name for InvariantCheck, etc.
+    pub subject: Option<Symbol>,
+    /// The threshold or target expression (the RHS of the comparison).
+    pub value: Expression,
+}
+
+/// What to do when a cross-chain operation fails or times out.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FailureAction {
+    /// Roll back all state changes in the current atomic scope.
+    Rollback,
+    /// Refund a specific asset/amount back to an account.
+    Refund(Expression),
+    /// Halt the bridge / freeze settlement.
+    Halt,
+    /// Quarantine the operation for manual review.
+    Quarantine,
+}
+
+/// Top-level `bridge` declaration.
+/// Declares a named bridge route with its invariant guards and failure policy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeDecl {
+    pub name: Symbol,
+    pub from_asset: AssetRef,
+    pub to_asset: AssetRef,
+    /// The ordered list of operations in the bridge body.
+    pub body: Vec<Statement>,
+    /// Compiled list of `require` guards (also present inline in `body`).
+    pub requires: Vec<RequireGuard>,
+    /// What to do on failure.
+    pub on_fail: Option<FailureAction>,
+    /// Maximum execution time before timeout fires.
+    pub timeout: Option<Expression>,
+}
+
+/// `atomic <name> { ... }` block — a named atomic multi-step cross-chain swap.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AtomicSwapDecl {
+    pub name: Symbol,
+    pub body: Vec<Statement>,
+    pub on_fail: Option<FailureAction>,
+    pub timeout: Option<Expression>,
+}
+
+/// `strategy <name> { ... }` — a constrained execution strategy (arb, liquidation, etc.).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossChainStrategy {
+    pub name: Symbol,
+    /// Maximum number of execution steps.
+    pub max_steps: Option<Expression>,
+    /// Maximum gas the strategy may consume.
+    pub max_gas: Option<Expression>,
+    pub body: Vec<Statement>,
+    pub requires: Vec<RequireGuard>,
+    pub on_fail: Option<FailureAction>,
+}
+
+/// `proposal { ... }` — an on-chain governance proposal.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProposalDecl {
+    pub name: Symbol,
+    /// Human-readable title expression (usually a string literal).
+    pub title: Option<Expression>,
+    pub body: Vec<Statement>,
+    pub requires: Vec<RequireGuard>,
 }
 
 /// Types used in the AST
@@ -365,6 +539,10 @@ impl Program {
                 Item::Function(f) => v.visit_function(f),
                 Item::Struct(s) => v.visit_struct(s),
                 Item::Enum(e) => v.visit_enum(e),
+                Item::Bridge(b) => v.visit_bridge(b),
+                Item::AtomicSwap(a) => v.visit_atomic_swap(a),
+                Item::Strategy(s) => v.visit_cross_chain_strategy(s),
+                Item::Proposal(p) => v.visit_proposal(p),
                 _ => (),
             }
             v.exit_item(item);

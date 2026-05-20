@@ -53,27 +53,27 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.cumulus-primitives-core]
-path = "../core"
+path = "../cumulus-primitives-core"
 default-features = false
 
 [dependencies.cumulus-primitives-proof-size-hostfunction]
-path = "../proof-size-hostfunction"
+path = "../cumulus-primitives-proof-size-hostfunction"
 default-features = false
 
 [dependencies.docify]
 version = "0.2.9"
 
 [dependencies.frame-benchmarking]
-path = "../../../substrate/frame/benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.frame-support]
-path = "../../../substrate/frame/support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../../../substrate/frame/system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.log]
@@ -86,18 +86,18 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../../substrate/primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dev-dependencies.cumulus-test-runtime]
 path = "../../test/runtime"
 
 [dev-dependencies.sp-io]
-path = "../../../substrate/primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dev-dependencies.sp-trie]
-path = "../../../substrate/primitives/trie"
+path = "../sp-trie"
 default-features = false
 
 [lints.clippy.all]

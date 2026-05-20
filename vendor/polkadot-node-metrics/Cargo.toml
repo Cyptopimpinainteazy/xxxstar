@@ -62,7 +62,7 @@ default-features = false
 package = "prioritized-metered-channel"
 
 [dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 default-features = true
 
 [dependencies.prometheus-endpoint]
@@ -71,15 +71,15 @@ default-features = true
 package = "substrate-prometheus-endpoint"
 
 [dependencies.sc-cli]
-path = "../../../substrate/client/cli"
+path = "../sc-cli"
 default-features = false
 
 [dependencies.sc-service]
-path = "../../../substrate/client/service"
+path = "../sc-service"
 default-features = false
 
 [dependencies.sc-tracing]
-path = "../../../substrate/client/tracing"
+path = "../sc-tracing"
 default-features = true
 
 [dev-dependencies.http-body-util]
@@ -106,11 +106,11 @@ features = ["runtime-metrics"]
 version = "0.2.2"
 
 [dev-dependencies.sc-service]
-path = "../../../substrate/client/service"
+path = "../sc-service"
 default-features = true
 
 [dev-dependencies.sp-keyring]
-path = "../../../substrate/primitives/keyring"
+path = "../sp-keyring"
 default-features = true
 
 [dev-dependencies.tokio]

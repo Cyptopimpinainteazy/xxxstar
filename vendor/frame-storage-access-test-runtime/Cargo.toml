@@ -55,28 +55,28 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.cumulus-pallet-parachain-system]
-path = "../../../../cumulus/pallets/parachain-system"
+path = "../cumulus-pallet-parachain-system"
 optional = true
 default-features = false
 
 [dependencies.sp-core]
-path = "../../../primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-state-machine]
-path = "../../../primitives/state-machine"
+path = "../sp-state-machine"
 default-features = false
 
 [dependencies.sp-trie]
-path = "../../../primitives/trie"
+path = "../sp-trie"
 default-features = false
 
 [build-dependencies.substrate-wasm-builder]
-path = "../../wasm-builder"
+path = "../substrate-wasm-builder"
 optional = true
 default-features = true
 

@@ -1,0 +1,17 @@
+[package]
+name = "x3-finality-oracle"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Chain finality oracle primitives for X3 cross-chain settlement flows."
+
+[lib]
+name = "x3_finality_oracle"
+path = "src/lib.rs"
+
+[dependencies]
+
+[features]
+default = []
+test-verifier = []
+production = []

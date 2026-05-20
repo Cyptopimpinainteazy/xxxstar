@@ -42,7 +42,7 @@ default-features = true
 package = "tracing-gum"
 
 [dependencies.polkadot-primitives]
-path = "../primitives"
+path = "../polkadot-primitives"
 default-features = true
 
 [lints.clippy.all]

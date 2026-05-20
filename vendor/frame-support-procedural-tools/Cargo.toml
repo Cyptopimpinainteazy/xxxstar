@@ -34,7 +34,7 @@ name = "frame_support_procedural_tools"
 path = "src/lib.rs"
 
 [dependencies.frame-support-procedural-tools-derive]
-path = "derive"
+path = "../frame-support-procedural-tools-derive"
 default-features = true
 
 [dependencies.proc-macro-crate]

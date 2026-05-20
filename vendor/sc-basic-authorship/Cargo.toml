@@ -51,47 +51,47 @@ default-features = true
 package = "substrate-prometheus-endpoint"
 
 [dependencies.sc-block-builder]
-path = "../block-builder"
+path = "../sc-block-builder"
 default-features = true
 
 [dependencies.sc-proposer-metrics]
-path = "../proposer-metrics"
+path = "../sc-proposer-metrics"
 default-features = true
 
 [dependencies.sc-telemetry]
-path = "../telemetry"
+path = "../sc-telemetry"
 default-features = true
 
 [dependencies.sc-transaction-pool-api]
-path = "../transaction-pool/api"
+path = "../sc-transaction-pool-api"
 default-features = true
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-consensus]
-path = "../../primitives/consensus/common"
+path = "../sp-consensus"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-inherents]
-path = "../../primitives/inherents"
+path = "../sp-inherents"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.sp-trie]
-path = "../../primitives/trie"
+path = "../sp-trie"
 default-features = true
 
 [dev-dependencies.parking_lot]
@@ -99,11 +99,11 @@ version = "0.12.1"
 default-features = true
 
 [dev-dependencies.sc-client-api]
-path = "../api"
+path = "../sc-client-api"
 default-features = true
 
 [dev-dependencies.sc-transaction-pool]
-path = "../transaction-pool"
+path = "../sc-transaction-pool"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

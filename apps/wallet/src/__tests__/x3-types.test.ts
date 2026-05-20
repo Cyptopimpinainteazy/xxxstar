@@ -11,7 +11,7 @@ import {
   DisputeState,
   VerdictOutcome,
   ChainKind,
-} from "../../lib/x3/types";
+} from "../lib/x3/types";
 
 describe("IntentState enum", () => {
   it("has all required lifecycle states", () => {

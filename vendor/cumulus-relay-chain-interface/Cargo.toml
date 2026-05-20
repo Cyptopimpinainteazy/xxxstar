@@ -39,7 +39,7 @@ default-features = true
 package = "parity-scale-codec"
 
 [dependencies.cumulus-primitives-core]
-path = "../../primitives/core"
+path = "../cumulus-primitives-core"
 default-features = true
 
 [dependencies.futures]
@@ -49,11 +49,11 @@ version = "0.3.31"
 version = "0.24.10"
 
 [dependencies.polkadot-overseer]
-path = "../../../polkadot/node/overseer"
+path = "../polkadot-overseer"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../../../substrate/client/api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-network]
@@ -61,19 +61,19 @@ path = "../../../substrate/client/network"
 default-features = true
 
 [dependencies.sp-api]
-path = "../../../substrate/primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../../substrate/primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-state-machine]
-path = "../../../substrate/primitives/state-machine"
+path = "../sp-state-machine"
 default-features = true
 
 [dependencies.sp-version]
-path = "../../../substrate/primitives/version"
+path = "../sp-version"
 default-features = false
 
 [dependencies.thiserror]

@@ -1,0 +1,21 @@
+[package]
+name = "northern-swarm"
+version = "0.1.0"
+edition = "2021"
+description = "Northern Swarm: off-chain executor, registry-v2 interface, deterministic proof loop (RC1–RC5)"
+license = "MIT"
+
+[[bin]]
+name = "northern-swarm"
+path = "src/main.rs"
+
+[dependencies]
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+thiserror   = { workspace = true }
+hex         = { workspace = true }
+sha2        = "0.10"
+chrono      = { version = "0.4", default-features = false, features = ["clock"] }

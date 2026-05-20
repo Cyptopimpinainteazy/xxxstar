@@ -67,6 +67,14 @@ pub enum MirRhs {
         addr: MirValue,
         val: MirValue,
     },
+
+    /// Mark the start of an atomic block.  Side-effecting; target is a unit
+    /// placeholder that is never read.
+    AtomicBegin { block_id: u16 },
+
+    /// Commit (successfully close) an atomic block.  Side-effecting; target is
+    /// a unit placeholder.
+    AtomicCommit { block_id: u16 },
 }
 
 /// Terminators that control the flow between blocks.

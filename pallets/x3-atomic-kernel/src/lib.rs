@@ -84,12 +84,12 @@ pub mod pallet {
     use frame_support::{
         dispatch::DispatchResult,
         pallet_prelude::*,
-        traits::{Currency, ReservableCurrency},
+        traits::{Currency, EnsureOrigin, ReservableCurrency},
     };
     use frame_system::offchain::SubmitTransaction;
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
-    use sp_io::hashing::sha2_256;
+    use sp_io::hashing::{blake2_256, sha2_256};
     use sp_runtime::offchain::StorageKind;
     use sp_runtime::traits::{SaturatedConversion, Saturating};
     use sp_runtime::transaction_validity::{
@@ -134,6 +134,16 @@ pub mod pallet {
 
         /// Read-only economic halt gate.
         type EconomicHalt: EconomicHaltInspect;
+
+        /// Origin that is allowed to call `finalize_with_settlement`.
+        ///
+        /// In production this should be restricted to the settlement pallet's
+        /// signed origin (e.g. `EnsureSignedBy<SettlementPalletAccount, _>`).
+        /// For testnet/dev a permissive origin such as `EnsureSigned<_>` may be
+        /// used.  Never leave this as the default `EnsureSigned` on mainnet —
+        /// that allows any funded account to finalize any bundle as if it were
+        /// a settlement result.
+        type SettlementOrigin: EnsureOrigin<Self::RuntimeOrigin>;
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -195,6 +205,32 @@ pub mod pallet {
         Finalized,
         /// Execution failed or deadline expired; bond partially slashed.
         RolledBack,
+    }
+
+    /// Structured pre-image that every `receipt_root` MUST commit to.
+    ///
+    /// Both the on-chain verifier and every off-chain executor MUST produce:
+    ///   `receipt_root = blake2_256(SCALE_encode(ReceiptRootData { .. }))`
+    ///
+    /// Field order is part of the consensus protocol — do **not** reorder.
+    /// This check is enforced only when neither `dev` nor `testnet` feature
+    /// is active; see `do_finalize_bundle`.
+    #[derive(Encode)]
+    pub struct ReceiptRootData {
+        /// The bundle being finalized.
+        pub bundle_id: H256,
+        /// Hash of the ordered leg list committed at submission time.
+        pub legs_hash: H256,
+        /// Number of legs in the bundle.
+        pub leg_count: u32,
+        /// `blake2_256(executor_account_id.encode())`, or `H256::zero()` if
+        /// no executor has been assigned yet.
+        pub executor_hash: H256,
+        /// Block number at which the bundle is being finalized.
+        pub finalized_block: u64,
+        /// Flash Finality / GRANDPA certificate hash.  `H256::zero()` is only
+        /// valid on dev / testnet (guarded separately by the cert zero-check).
+        pub finality_cert: H256,
     }
 
     /// On-chain record for a submitted atomic bundle.
@@ -842,9 +878,11 @@ pub mod pallet {
             receipt_root: H256,
             finality_cert: H256,
         ) -> DispatchResult {
-            // Phase 1b: For now, accept any signed call. In Phase 1c, restrict to
-            // settlement pallet calls only via a whitelist or signed dispatcher trait.
-            let _caller = ensure_signed(origin)?;
+            // Phase 1c: Restrict to settlement pallet calls only via the
+            // `SettlementOrigin` associated type defined in `Config`.
+            // Runtimes MUST configure this to a settlement-pallet-specific origin
+            // before mainnet — see pallet doc for guidance.
+            T::SettlementOrigin::ensure_origin(origin)?;
 
             let now = <frame_system::Pallet<T>>::block_number();
 
@@ -992,8 +1030,17 @@ pub mod pallet {
             frame_support::storage::with_storage_layer(|| {
                 ensure!(receipt_root != H256::zero(), Error::<T>::InvalidReceiptRoot);
 
-                // STRICT finality cert validation for production:
-                // - If finality_cert is zero, Flash Finality is not running — allowed.
+                // P0 FIX: On mainnet (neither `dev` nor `testnet` feature), zero
+                // finality certs are forbidden.  Flash Finality MUST be operational.
+                // On dev/testnet, zero certs are accepted so the OCW can operate
+                // before Flash Finality is running.
+                #[cfg(not(any(feature = "dev", feature = "testnet")))]
+                ensure!(
+                    finality_cert != H256::zero(),
+                    Error::<T>::InvalidFinalityCert
+                );
+
+                // STRICT finality cert validation:
                 // - If finality_cert is non-zero, it MUST match an on-chain anchor
                 //   written by the OCW. No tentative acceptance — reject unknown certs.
                 if finality_cert != H256::zero() {
@@ -1022,6 +1069,34 @@ pub mod pallet {
                 // S0-005: Consistency verification before finalizing
                 // Verify the bundle record is in a valid state for finalization
                 Self::verify_bundle_consistency(&record)?;
+
+                // P1a FIX: On mainnet require receipt_root to commit to the
+                // on-chain-verifiable bundle fields via a deterministic hash.
+                //
+                // PROTOCOL CONTRACT — off-chain executors must compute:
+                //   executor_hash = blake2_256(executor_account_id.encode())
+                //                   (H256::zero() if no executor assigned)
+                //   receipt_root  = blake2_256(SCALE_encode(ReceiptRootData{..}))
+                //
+                // On dev / testnet this check is skipped so the stub OCW can
+                // submit any non-zero receipt_root during early integration.
+                #[cfg(not(any(feature = "dev", feature = "testnet")))]
+                {
+                    let executor_hash: H256 = match record.executor.as_ref() {
+                        Some(acc) => H256::from(blake2_256(&acc.encode())),
+                        None => H256::zero(),
+                    };
+                    let commitment = ReceiptRootData {
+                        bundle_id,
+                        legs_hash: record.legs_hash,
+                        leg_count: record.leg_count,
+                        executor_hash,
+                        finalized_block: finalized_block.try_into().unwrap_or(0u64),
+                        finality_cert,
+                    };
+                    let expected = H256::from(blake2_256(&commitment.encode()));
+                    ensure!(receipt_root == expected, Error::<T>::InvalidReceiptRoot);
+                }
 
                 let proof = PoaeProof {
                     bundle_id,

@@ -53,15 +53,15 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [lints.clippy.all]

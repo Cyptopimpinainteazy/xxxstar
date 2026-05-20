@@ -34,7 +34,7 @@
 ### Internal Cross-VM Execution
 - **X3Native ↔ X3Evm ↔ X3Svm** — all 6 internal routes implemented
 - Atomic source-debit / destination-credit semantics
-- Replay protection: `UsedMessages` + `UsedNonces` stores
+- Replay protection: `UsedMessages` (message-id dedup) + `NextNonce`/`NonceBatchAllocation` (monotonic per-sender sequence); no `UsedNonces` point-lookup map — superseded by the monotonic nonce scheme
 - Expiry + cancel: `cancel_expired_xvm_transfer` returns pending supply to source
 - Supply invariant: `represented_total ≤ canonical_supply` enforced on every operation
 - Scope freeze: external bridges disabled by default; require governance to open

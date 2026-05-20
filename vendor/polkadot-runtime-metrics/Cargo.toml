@@ -55,16 +55,16 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-benchmarking]
-path = "../../../substrate/frame/benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 default-features = false
 
 [dependencies.sp-tracing]
-path = "../../../substrate/primitives/tracing"
+path = "../sp-tracing"
 default-features = false
 
 [lints.clippy.all]

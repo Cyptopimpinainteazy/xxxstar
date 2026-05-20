@@ -81,23 +81,23 @@ features = ["with-codec"]
 default-features = false
 
 [dependencies.fp-consensus]
-path = "../../primitives/consensus"
+path = "../fp-consensus"
 default-features = false
 
 [dependencies.fp-ethereum]
-path = "../../primitives/ethereum"
+path = "../fp-ethereum"
 default-features = false
 
 [dependencies.fp-evm]
-path = "../../primitives/evm"
+path = "../fp-evm"
 default-features = false
 
 [dependencies.fp-rpc]
-path = "../../primitives/rpc"
+path = "../fp-rpc"
 default-features = false
 
 [dependencies.fp-storage]
-path = "../../primitives/storage"
+path = "../fp-storage"
 default-features = false
 
 [dependencies.frame-support]

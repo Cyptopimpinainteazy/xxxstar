@@ -70,11 +70,11 @@ version = "6.2.2"
 default-features = true
 
 [dev-dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dev-dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [lints.clippy.all]

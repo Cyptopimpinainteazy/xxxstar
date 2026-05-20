@@ -65,15 +65,15 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-election-provider-solution-type]
-path = "solution-type"
+path = "../frame-election-provider-solution-type"
 default-features = true
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.scale-info]
@@ -82,23 +82,23 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-arithmetic]
-path = "../../primitives/arithmetic"
+path = "../sp-arithmetic"
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-npos-elections]
-path = "../../primitives/npos-elections"
+path = "../sp-npos-elections"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-std]
-path = "../../primitives/std"
+path = "../sp-std-8.0.0"
 default-features = false
 
 [dev-dependencies.rand]
@@ -107,11 +107,11 @@ features = ["small_rng"]
 default-features = true
 
 [dev-dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = true
 
 [dev-dependencies.sp-npos-elections]
-path = "../../primitives/npos-elections"
+path = "../sp-npos-elections"
 default-features = true
 
 [lints.clippy.all]

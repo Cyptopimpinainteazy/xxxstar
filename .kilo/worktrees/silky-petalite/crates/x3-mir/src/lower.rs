@@ -133,8 +133,16 @@ impl MirFunctionBuilder {
             HirStmt::Break { .. } | HirStmt::Continue { .. } => {
                 // Break/continue with labels requires label resolution
             }
+            HirStmt::Atomic { block_id, body, .. } => {
+                // P0 FIX: lower the atomic block to MIR atomic begin/commit pairs.
+                // Previously AtomicBegin/AtomicEnd were silently ignored (no-op).
+                self.emit_assignment(MirRhs::AtomicBegin { block_id: block_id.0 as u16 });
+                self.lower_statements(body)?;
+                self.emit_assignment(MirRhs::AtomicCommit { block_id: block_id.0 as u16 });
+            }
             HirStmt::AtomicBegin { .. } | HirStmt::AtomicEnd { .. } => {
-                // Atomic blocks require atomic operation support
+                // Legacy flat markers — kept for hand-constructed HIR compatibility.
+                // New HIR from the lowerer produces HirStmt::Atomic instead.
             }
             HirStmt::Emit { .. } | HirStmt::AgentInit { .. } => {
                 // Emit/agent init require event system

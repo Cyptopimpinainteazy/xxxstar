@@ -85,16 +85,16 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-benchmarking]
-path = "../benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.log]
@@ -102,11 +102,11 @@ version = "0.4.22"
 default-features = false
 
 [dependencies.pallet-authorship]
-path = "../authorship"
+path = "../pallet-authorship"
 default-features = false
 
 [dependencies.pallet-session]
-path = "../session"
+path = "../pallet-session"
 default-features = false
 
 [dependencies.scale-info]
@@ -118,35 +118,35 @@ features = [
 default-features = false
 
 [dependencies.sp-application-crypto]
-path = "../../primitives/application-crypto"
+path = "../sp-application-crypto"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-consensus-grandpa]
-path = "../../primitives/consensus/grandpa"
+path = "../sp-consensus-grandpa"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-session]
-path = "../../primitives/session"
+path = "../sp-session"
 default-features = false
 
 [dependencies.sp-staking]
-path = "../../primitives/staking"
+path = "../sp-staking"
 features = ["serde"]
 default-features = false
 
@@ -156,23 +156,23 @@ features = ["derive-codec"]
 default-features = true
 
 [dev-dependencies.frame-benchmarking]
-path = "../benchmarking"
+path = "../frame-benchmarking"
 default-features = true
 
 [dev-dependencies.frame-election-provider-support]
-path = "../election-provider-support"
+path = "../frame-election-provider-support"
 default-features = true
 
 [dev-dependencies.pallet-balances]
-path = "../balances"
+path = "../pallet-balances"
 default-features = true
 
 [dev-dependencies.pallet-offences]
-path = "../offences"
+path = "../pallet-offences"
 default-features = true
 
 [dev-dependencies.pallet-staking]
-path = "../staking"
+path = "../pallet-staking"
 default-features = true
 
 [dev-dependencies.pallet-staking-reward-curve]
@@ -180,15 +180,15 @@ path = "../staking/reward-curve"
 default-features = true
 
 [dev-dependencies.pallet-timestamp]
-path = "../timestamp"
+path = "../pallet-timestamp"
 default-features = true
 
 [dev-dependencies.sp-keyring]
-path = "../../primitives/keyring"
+path = "../sp-keyring"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [lints.clippy.all]

@@ -56,12 +56,12 @@ default-features = true
 package = "parity-scale-codec"
 
 [dev-dependencies.frame-election-provider-support]
-path = ".."
+path = "../frame-election-provider-support"
 features = ["std"]
 default-features = true
 
 [dev-dependencies.frame-support]
-path = "../../support"
+path = "../frame-support"
 default-features = true
 
 [dev-dependencies.scale-info]
@@ -69,7 +69,7 @@ version = "2.11.6"
 default-features = true
 
 [dev-dependencies.sp-arithmetic]
-path = "../../../primitives/arithmetic"
+path = "../sp-arithmetic"
 default-features = true
 
 [dev-dependencies.trybuild]

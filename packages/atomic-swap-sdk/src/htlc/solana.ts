@@ -181,7 +181,7 @@ export class SolanaHTLCAdapter implements IHTLCAdapter {
   private deriveHTLCPda(hashLockBytes: Uint8Array): string {
     // PDA = findProgramAddress([b"htlc", hashLock], programId)
     const [pda] = web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("htlc"), ...hashLockBytes],
+      [new Uint8Array(Buffer.from("htlc")), hashLockBytes],
       new web3.PublicKey(this.programId)
     );
     return pda.toBase58();

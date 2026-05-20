@@ -14,6 +14,11 @@ pub trait AstVisitor {
     fn visit_function(&mut self, _f: &Function) {}
     fn visit_struct(&mut self, _s: &StructDecl) {}
     fn visit_enum(&mut self, _e: &EnumDecl) {}
+    // Cross-chain visitors (default no-op)
+    fn visit_bridge(&mut self, _b: &BridgeDecl) {}
+    fn visit_atomic_swap(&mut self, _a: &AtomicSwapDecl) {}
+    fn visit_cross_chain_strategy(&mut self, _s: &CrossChainStrategy) {}
+    fn visit_proposal(&mut self, _p: &ProposalDecl) {}
 }
 
 // Helper module alias for Spanned to avoid cyclic dependencies in imports

@@ -1,0 +1,53 @@
+# X3 Relayer Configuration for Testnet Deployment
+# Targets: Sepolia EVM testnet + Solana testnet
+
+# X3 Runtime Configuration
+x3:
+  # X3 RPC endpoint (must be accessible and fully synced)
+  rpc_url: "http://localhost:9933"
+  
+  # Relayer account (sudo account recommended for testnet, full account path required)
+  relayer_account: "5GrwvaEF5zXb26Fz9rcQkEvVkd7FcWI4twpBD6CFPhxGwwQ"
+  
+  # Optional: Seed phrase for relayer account (store securely, use env vars in production)
+  # relayer_seed_phrase: "twelve word seed phrase here..."
+  # Optional: custody key ID for staging rehearsals
+  # relayer_custody_key_id: "custody://x3-testnet/relayer"
+
+# EVM Chains Configuration
+evm_chains:
+  - name: "Sepolia Testnet"
+    chain_id: 11155111
+    x3_domain_id: 200
+    rpc_endpoint: "https://sepolia.infura.io/v3/YOUR_INFURA_KEY"
+    state_root_contract: "0x0000000000000000000000000000000000000000"
+    finality_threshold: 12        # 12 blocks ≈ 3 minutes on Sepolia (12s blocks)
+    block_poll_interval_ms: 13000  # Poll every 13 seconds
+    max_concurrent_requests: 5
+
+# SVM (Solana) Clusters Configuration
+svm_clusters:
+  - name: "Solana Testnet"
+    cluster_name: "testnet"
+    x3_domain_id: 501
+    rpc_endpoint: "https://api.testnet.solana.com"
+    finality_threshold: 32        # 32 slots ≈ 12.8 seconds (400ms per slot)
+    slot_poll_interval_ms: 15000  # Poll every 15 seconds
+    max_concurrent_requests: 5
+
+# Submission Configuration
+submission:
+  batch_size: 1                # Submit proofs one at a time (avoid batching for testnet)
+  timeout_secs: 60             # Wait up to 60 seconds for RPC response
+  max_retries: 3               # Retry up to 3 times on RPC failure
+  retry_backoff_ms: 1000       # Wait 1 second between retries
+
+# Governance Configuration
+governance:
+  poll_interval_secs: 5        # Check bridge pause status every 5 seconds
+  enable_graceful_shutdown: true
+
+# Logging Configuration
+logging:
+  level: "info"                # Log level: debug, info, warn, error
+  format: "default"            # Log format: default or json

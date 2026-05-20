@@ -391,7 +391,8 @@ parameter_types! {
     pub const DaRetentionBlocks: BlockNumber = 432_000;
 }
 
-// construct_runtime! is split into four explicit variants (dev×frontier) because
+// construct_runtime! is split into six explicit variants (dev×frontier, plus
+// two mainnet-rc1 narrow variants) because
 // the stable2512 proc-macro does NOT evaluate #[cfg(feature)] inside its body —
 // it generates references to all listed pallets unconditionally. Optional deps
 // (pallet-evm/pallet-ethereum) that are absent when `frontier` is off would
@@ -539,7 +540,7 @@ construct_runtime!(
     }
 );
 
-#[cfg(all(not(feature = "dev"), not(feature = "frontier")))]
+#[cfg(all(not(feature = "dev"), not(feature = "frontier"), not(feature = "mainnet-rc1")))]
 construct_runtime!(
     pub enum Runtime {
         System: frame_system,
@@ -607,8 +608,100 @@ construct_runtime!(
     }
 );
 
+// ── mainnet-rc1 + no-frontier ─────────────────────────────────────────────────
+// Narrow pallet set for the first public testnet / mainnet release candidate.
+// Excludes all experimental pallets (DEX, flashloan, launchpad, auction, meme,
+// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
+// DePIN marketplace, private execution). Build with:
+//   cargo build -p x3-runtime --features mainnet-rc1 --release
+#[cfg(all(feature = "mainnet-rc1", not(feature = "frontier")))]
+construct_runtime!(
+    pub enum Runtime {
+        // ── Consensus / system ──────────────────────────────────────────────
+        System: frame_system,
+        Timestamp: pallet_timestamp,
+        Aura: pallet_aura,
+        Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
+        // ── Economy ─────────────────────────────────────────────────────────
+        Balances: pallet_balances,
+        TransactionPayment: pallet_transaction_payment,
+        Scheduler: pallet_scheduler,
+        Preimage: pallet_preimage,
+        // ── X3 security core ─────────────────────────────────────────────────
+        AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
+        // ── Governance ───────────────────────────────────────────────────────
+        Council: pallet_collective::<Instance1>,
+        Governance: pallet_governance,
+        Treasury: pallet_treasury,
+        // ── Cross-VM settlement stack ─────────────────────────────────────────
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3SettlementEngine: pallet_x3_settlement_engine,
+        SvmRuntime: pallet_svm_runtime,
+        // ── Supporting infrastructure ─────────────────────────────────────────
+        X3Verifier: pallet_x3_verifier,
+        X3DomainRegistry: pallet_x3_domain_registry,
+        X3AccountRegistry: pallet_x3_account_registry,
+        CrossChainValidator: pallet_cross_chain_validator,
+        FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Slash: pallet_x3_slash,
+    }
+);
+
+// ── mainnet-rc1 + frontier (EVM support enabled) ──────────────────────────────
+#[cfg(all(feature = "mainnet-rc1", feature = "frontier"))]
+construct_runtime!(
+    pub enum Runtime {
+        // ── Consensus / system ──────────────────────────────────────────────
+        System: frame_system,
+        Timestamp: pallet_timestamp,
+        Aura: pallet_aura,
+        Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
+        // ── Economy ─────────────────────────────────────────────────────────
+        Balances: pallet_balances,
+        TransactionPayment: pallet_transaction_payment,
+        Scheduler: pallet_scheduler,
+        Preimage: pallet_preimage,
+        // ── X3 security core ─────────────────────────────────────────────────
+        AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
+        // ── Governance ───────────────────────────────────────────────────────
+        Council: pallet_collective::<Instance1>,
+        Governance: pallet_governance,
+        Treasury: pallet_treasury,
+        // ── Cross-VM settlement stack ─────────────────────────────────────────
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3SettlementEngine: pallet_x3_settlement_engine,
+        SvmRuntime: pallet_svm_runtime,
+        // ── Supporting infrastructure ─────────────────────────────────────────
+        X3Verifier: pallet_x3_verifier,
+        X3DomainRegistry: pallet_x3_domain_registry,
+        X3AccountRegistry: pallet_x3_account_registry,
+        CrossChainValidator: pallet_cross_chain_validator,
+        FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Slash: pallet_x3_slash,
+        // ── EVM stack ─────────────────────────────────────────────────────────
+        Evm: pallet_evm,
+        Ethereum: pallet_ethereum,
+    }
+);
+
 // ── production + frontier (post-RC1: no sudo, full EVM stack) ────────────────
-#[cfg(all(not(feature = "dev"), feature = "frontier"))]
+#[cfg(all(not(feature = "dev"), feature = "frontier", not(feature = "mainnet-rc1")))]
 construct_runtime!(
     pub enum Runtime {
         System: frame_system,
@@ -720,11 +813,12 @@ pub type SignedExtra = (
     // X3 SECURITY GATES (SECURITY-CRITICAL ORDER - DO NOT REORDER)
     // =====================================================================
     // 1. CRITICAL INVARIANTS CHECKED FIRST (hard-fail gates)
-    // 1. CRITICAL INVARIANTS CHECKED FIRST — stub pending full InvariantCheck impl
-    // pallet_x3_invariants::InvariantCheck,  // TODO RC+1: add when implemented
+    //    InvariantCheck rejects all txs when the constitutional Halted flag
+    //    is set (raised by on_finalize when HaltOnViolation is enabled).
+    pallet_x3_invariants::InvariantCheck<Runtime>,
     // 2. POLICY ENFORCEMENT (Agent Law)
     pallet_x3_agent_law::AgentLawCheck<Runtime>,
-    // 3-5. CROSS-VM SECURITY GATES — stubs pending kernel impl
+    // 3-5. CROSS-VM SECURITY GATES — reserved for RC+1 when kernel extensions are complete
     // pallet_x3_kernel::CapabilityEnvelopeCheck,  // TODO RC+1
     // pallet_x3_kernel::AtomicSettlementCheck,    // TODO RC+1
     // pallet_x3_kernel::FlashFinalityExtension,   // TODO RC+1
@@ -2202,6 +2296,8 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Currency = Balances;
     type RoutingFeeBps = XvmRoutingFeeBps;
     type ProtocolTreasury = TreasuryAccountId;
+    /// 6-second blocks → 14_400 blocks per 24 h.
+    type BlocksPerDay = ConstU32<14_400>;
 }
 
 impl pallet_x3_token_factory::Config for Runtime {

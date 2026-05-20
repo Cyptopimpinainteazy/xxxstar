@@ -138,21 +138,21 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-benchmarking]
-path = "../../../substrate/frame/benchmarking"
+path = "../frame-benchmarking"
 optional = true
 default-features = false
 
 [dependencies.frame-election-provider-support]
-path = "../../../substrate/frame/election-provider-support"
+path = "../frame-election-provider-support"
 optional = true
 default-features = false
 
 [dependencies.frame-support]
-path = "../../../substrate/frame/support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-system]
-path = "../../../substrate/frame/system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.impl-trait-for-tuples]
@@ -163,56 +163,56 @@ version = "0.4.22"
 default-features = false
 
 [dependencies.pallet-authority-discovery]
-path = "../../../substrate/frame/authority-discovery"
+path = "../pallet-authority-discovery"
 default-features = false
 
 [dependencies.pallet-authorship]
-path = "../../../substrate/frame/authorship"
+path = "../pallet-authorship"
 default-features = false
 
 [dependencies.pallet-babe]
-path = "../../../substrate/frame/babe"
+path = "../pallet-babe"
 default-features = false
 
 [dependencies.pallet-balances]
-path = "../../../substrate/frame/balances"
+path = "../pallet-balances"
 default-features = false
 
 [dependencies.pallet-broker]
-path = "../../../substrate/frame/broker"
+path = "../pallet-broker"
 default-features = false
 
 [dependencies.pallet-message-queue]
-path = "../../../substrate/frame/message-queue"
+path = "../pallet-message-queue"
 default-features = false
 
 [dependencies.pallet-mmr]
-path = "../../../substrate/frame/merkle-mountain-range"
+path = "../pallet-mmr"
 optional = true
 default-features = false
 
 [dependencies.pallet-session]
-path = "../../../substrate/frame/session"
+path = "../pallet-session"
 default-features = false
 
 [dependencies.pallet-staking]
-path = "../../../substrate/frame/staking"
+path = "../pallet-staking"
 default-features = false
 
 [dependencies.pallet-timestamp]
-path = "../../../substrate/frame/timestamp"
+path = "../pallet-timestamp"
 default-features = false
 
 [dependencies.polkadot-core-primitives]
-path = "../../core-primitives"
+path = "../polkadot-core-primitives"
 default-features = false
 
 [dependencies.polkadot-parachain-primitives]
-path = "../../parachain"
+path = "../polkadot-parachain-primitives"
 default-features = false
 
 [dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 default-features = false
 
 [dependencies.polkadot-runtime-metrics]
@@ -241,57 +241,57 @@ features = [
 default-features = false
 
 [dependencies.sp-api]
-path = "../../../substrate/primitives/api"
+path = "../sp-api"
 default-features = false
 
 [dependencies.sp-application-crypto]
-path = "../../../substrate/primitives/application-crypto"
+path = "../sp-application-crypto"
 optional = true
 default-features = false
 
 [dependencies.sp-arithmetic]
-path = "../../../substrate/primitives/arithmetic"
+path = "../sp-arithmetic"
 default-features = false
 
 [dependencies.sp-core]
-path = "../../../substrate/primitives/core"
+path = "../sp-core"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-inherents]
-path = "../../../substrate/primitives/inherents"
+path = "../sp-inherents"
 default-features = false
 
 [dependencies.sp-io]
-path = "../../../substrate/primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-keystore]
-path = "../../../substrate/primitives/keystore"
+path = "../sp-keystore"
 optional = true
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../../substrate/primitives/runtime"
+path = "../sp-runtime"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-session]
-path = "../../../substrate/primitives/session"
+path = "../sp-session"
 default-features = false
 
 [dependencies.sp-staking]
-path = "../../../substrate/primitives/staking"
+path = "../sp-staking"
 features = ["serde"]
 default-features = false
 
 [dependencies.sp-std]
-path = "../../../substrate/primitives/std"
+path = "../sp-std-8.0.0"
 optional = true
 default-features = false
 
 [dependencies.sp-tracing]
-path = "../../../substrate/primitives/tracing"
+path = "../sp-tracing"
 optional = true
 default-features = false
 
@@ -321,7 +321,7 @@ version = "0.4.1"
 default-features = true
 
 [dev-dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 features = ["test"]
 default-features = false
 
@@ -335,7 +335,7 @@ version = "1.3.0"
 version = "0.18.2"
 
 [dev-dependencies.sc-keystore]
-path = "../../../substrate/client/keystore"
+path = "../sc-keystore"
 default-features = true
 
 [dev-dependencies.serde_json]
@@ -343,15 +343,15 @@ version = "1.0.132"
 default-features = true
 
 [dev-dependencies.sp-crypto-hashing]
-path = "../../../substrate/primitives/crypto/hashing"
+path = "../sp-crypto-hashing"
 default-features = true
 
 [dev-dependencies.sp-keyring]
-path = "../../../substrate/primitives/keyring"
+path = "../sp-keyring"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../../substrate/primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.thousands]

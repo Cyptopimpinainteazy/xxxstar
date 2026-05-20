@@ -67,7 +67,7 @@ default-features = false
 package = "parity-scale-codec"
 
 [dependencies.frame-support]
-path = "../support"
+path = "../frame-support"
 default-features = false
 
 [dependencies.frame-support-procedural]
@@ -75,7 +75,7 @@ path = "../support/procedural"
 default-features = false
 
 [dependencies.frame-system]
-path = "../system"
+path = "../frame-system"
 default-features = false
 
 [dependencies.linregress]
@@ -101,31 +101,31 @@ optional = true
 default-features = true
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 default-features = false
 
 [dependencies.sp-application-crypto]
-path = "../../primitives/application-crypto"
+path = "../sp-application-crypto"
 default-features = false
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = false
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-runtime-interface]
-path = "../../primitives/runtime-interface"
+path = "../sp-runtime-interface"
 default-features = false
 
 [dependencies.sp-storage]
-path = "../../primitives/storage"
+path = "../sp-storage"
 default-features = false
 
 [dependencies.static_assertions]
@@ -141,19 +141,19 @@ version = "0.3.0"
 default-features = false
 
 [dev-dependencies.sc-client-db]
-path = "../../client/db"
+path = "../sc-client-db"
 default-features = false
 
 [dev-dependencies.sp-externalities]
-path = "../../primitives/externalities"
+path = "../sp-externalities"
 default-features = false
 
 [dev-dependencies.sp-keystore]
-path = "../../primitives/keystore"
+path = "../sp-keystore"
 default-features = true
 
 [dev-dependencies.sp-state-machine]
-path = "../../primitives/state-machine"
+path = "../sp-state-machine"
 default-features = false
 
 [lints.clippy.all]

@@ -63,54 +63,54 @@ version = "0.12.1"
 default-features = true
 
 [dependencies.sc-executor-common]
-path = "common"
+path = "../sc-executor-common"
 default-features = true
 
 [dependencies.sc-executor-polkavm]
-path = "polkavm"
+path = "../sc-executor-polkavm"
 default-features = true
 
 [dependencies.sc-executor-wasmtime]
-path = "wasmtime"
+path = "../sc-executor-wasmtime"
 default-features = true
 
 [dependencies.schnellru]
 version = "0.2.3"
 
 [dependencies.sp-api]
-path = "../../primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-externalities]
-path = "../../primitives/externalities"
+path = "../sp-externalities"
 default-features = true
 
 [dependencies.sp-io]
-path = "../../primitives/io"
+path = "../sp-io"
 default-features = true
 
 [dependencies.sp-panic-handler]
-path = "../../primitives/panic-handler"
+path = "../sp-panic-handler"
 default-features = true
 
 [dependencies.sp-runtime-interface]
-path = "../../primitives/runtime-interface"
+path = "../sp-runtime-interface"
 default-features = true
 
 [dependencies.sp-trie]
-path = "../../primitives/trie"
+path = "../sp-trie"
 default-features = true
 
 [dependencies.sp-version]
-path = "../../primitives/version"
+path = "../sp-version"
 default-features = true
 
 [dependencies.sp-wasm-interface]
-path = "../../primitives/wasm-interface"
+path = "../sp-wasm-interface"
 default-features = true
 
 [dependencies.tracing]
@@ -143,7 +143,7 @@ path = "../tracing"
 default-features = true
 
 [dev-dependencies.sp-crypto-hashing]
-path = "../../primitives/crypto/hashing"
+path = "../sp-crypto-hashing"
 default-features = true
 
 [dev-dependencies.sp-maybe-compressed-blob]
@@ -151,15 +151,15 @@ path = "../../primitives/maybe-compressed-blob"
 default-features = true
 
 [dev-dependencies.sp-runtime]
-path = "../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dev-dependencies.sp-state-machine]
-path = "../../primitives/state-machine"
+path = "../sp-state-machine"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime]

@@ -54,15 +54,15 @@ path = "../.."
 default-features = false
 
 [dependencies.sp-api]
-path = "../../../../primitives/api"
+path = "../sp-api"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../../../primitives/runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-weights]
-path = "../../../../primitives/weights"
+path = "../sp-weights"
 default-features = false
 
 [lints.clippy.all]

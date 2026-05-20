@@ -42,7 +42,7 @@ default-features = true
 package = "parity-scale-codec"
 
 [dependencies.fork-tree]
-path = "../../../utils/fork-tree"
+path = "../fork-tree"
 default-features = true
 
 [dependencies.futures]
@@ -62,74 +62,74 @@ default-features = true
 package = "substrate-prometheus-endpoint"
 
 [dependencies.sc-block-builder]
-path = "../../block-builder"
+path = "../sc-block-builder"
 default-features = true
 
 [dependencies.sc-client-api]
-path = "../../api"
+path = "../sc-client-api"
 default-features = true
 
 [dependencies.sc-consensus]
-path = "../common"
+path = "../sc-consensus"
 default-features = true
 
 [dependencies.sc-consensus-slots]
-path = "../slots"
+path = "../sc-consensus-slots"
 default-features = true
 
 [dependencies.sc-telemetry]
-path = "../../telemetry"
+path = "../sc-telemetry"
 default-features = true
 
 [dependencies.sp-api]
-path = "../../../primitives/api"
+path = "../sp-api"
 default-features = true
 
 [dependencies.sp-application-crypto]
-path = "../../../primitives/application-crypto"
+path = "../sp-application-crypto"
 default-features = true
 
 [dependencies.sp-block-builder]
-path = "../../../primitives/block-builder"
+path = "../sp-block-builder"
 default-features = true
 
 [dependencies.sp-blockchain]
-path = "../../../primitives/blockchain"
+path = "../sp-blockchain"
 default-features = true
 
 [dependencies.sp-consensus]
-path = "../../../primitives/consensus/common"
+path = "../sp-consensus"
 default-features = true
 
 [dependencies.sp-consensus-aura]
-path = "../../../primitives/consensus/aura"
+path = "../sp-consensus-aura"
 default-features = true
 
 [dependencies.sp-consensus-slots]
-path = "../../../primitives/consensus/slots"
+path = "../sp-consensus-slots"
 default-features = true
 
 [dependencies.sp-core]
-path = "../../../primitives/core"
+path = "../sp-core"
 default-features = true
 
 [dependencies.sp-inherents]
-path = "../../../primitives/inherents"
+path = "../sp-inherents"
 default-features = true
 
 [dependencies.sp-keystore]
-path = "../../../primitives/keystore"
+path = "../sp-keystore"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../../primitives/runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.thiserror]
 version = "1.0.64"
 
 [dev-dependencies.sc-keystore]
-path = "../../keystore"
+path = "../sc-keystore"
 default-features = true
 
 [dev-dependencies.sc-network]
@@ -140,15 +140,15 @@ default-features = true
 path = "../../network/test"
 
 [dev-dependencies.sp-keyring]
-path = "../../../primitives/keyring"
+path = "../sp-keyring"
 default-features = true
 
 [dev-dependencies.sp-timestamp]
-path = "../../../primitives/timestamp"
+path = "../sp-timestamp"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

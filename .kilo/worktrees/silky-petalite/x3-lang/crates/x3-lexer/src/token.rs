@@ -309,6 +309,30 @@ pub enum Keyword {
     Fee,
     Stake,
     Reward,
+
+    // ===== X3 Cross-Chain Asset Operations =====
+    Lock,
+    Mint,
+    Burn,
+    Release,
+
+    // ===== X3 Cross-Chain Guards =====
+    Finality,
+    Slippage,
+    Profit,
+    Invariant,
+    Nonce,
+    Risk,
+    Timeout,
+    OnFail,
+    OnTimeout,
+
+    // ===== X3 Governance =====
+    Proposal,
+    Quorum,
+    Multisig,
+    Spend,
+    Refund,
 }
 
 impl Keyword {
@@ -422,6 +446,30 @@ impl Keyword {
             "stake" => Some(Keyword::Stake),
             "reward" => Some(Keyword::Reward),
 
+            // Cross-chain asset operations
+            "lock" => Some(Keyword::Lock),
+            "mint" => Some(Keyword::Mint),
+            "burn" => Some(Keyword::Burn),
+            "release" => Some(Keyword::Release),
+
+            // Cross-chain guards
+            "finality" => Some(Keyword::Finality),
+            "slippage" => Some(Keyword::Slippage),
+            "profit" => Some(Keyword::Profit),
+            "invariant" => Some(Keyword::Invariant),
+            "nonce" => Some(Keyword::Nonce),
+            "risk" => Some(Keyword::Risk),
+            "timeout" => Some(Keyword::Timeout),
+            "on_fail" => Some(Keyword::OnFail),
+            "on_timeout" => Some(Keyword::OnTimeout),
+
+            // Governance
+            "proposal" => Some(Keyword::Proposal),
+            "quorum" => Some(Keyword::Quorum),
+            "multisig" => Some(Keyword::Multisig),
+            "spend" => Some(Keyword::Spend),
+            "refund" => Some(Keyword::Refund),
+
             _ => None,
         }
     }
@@ -504,6 +552,24 @@ impl Keyword {
             Keyword::Fee => "fee",
             Keyword::Stake => "stake",
             Keyword::Reward => "reward",
+            Keyword::Lock => "lock",
+            Keyword::Mint => "mint",
+            Keyword::Burn => "burn",
+            Keyword::Release => "release",
+            Keyword::Finality => "finality",
+            Keyword::Slippage => "slippage",
+            Keyword::Profit => "profit",
+            Keyword::Invariant => "invariant",
+            Keyword::Nonce => "nonce",
+            Keyword::Risk => "risk",
+            Keyword::Timeout => "timeout",
+            Keyword::OnFail => "on_fail",
+            Keyword::OnTimeout => "on_timeout",
+            Keyword::Proposal => "proposal",
+            Keyword::Quorum => "quorum",
+            Keyword::Multisig => "multisig",
+            Keyword::Spend => "spend",
+            Keyword::Refund => "refund",
         }
     }
 }

@@ -154,14 +154,14 @@ pub mod kw {
             /// Check if a symbol is a keyword.
             pub fn is_keyword(sym: Symbol) -> bool {
                 $(
-                    if sym == **$name { return true; }
+                    if sym == *$name { return true; }
                 )*
                 false
             }
 
             /// Get all keywords.
             pub fn all_keywords() -> Vec<Symbol> {
-                vec![$(**$name),*]
+                vec![$(*$name),*]
             }
         };
     }
@@ -277,7 +277,7 @@ pub mod primitives {
             /// Check if a symbol is a primitive type.
             pub fn is_primitive(sym: Symbol) -> bool {
                 $(
-                    if sym == **$name { return true; }
+                    if sym == *$name { return true; }
                 )*
                 false
             }

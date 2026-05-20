@@ -770,16 +770,31 @@ pub mod pallet {
                 now
             );
 
-            // TESTNET_ONLY: OCW stub — logs that the hook is wired and active.
-            // DISABLED_POST_RC1: Replace with full OCW implementation:
-            //   Phase 1c plan:
-            //   1. Iterate PendingIntents for intents in Finalized state
-            //   2. Check off-chain storage for settlement finalization markers
-            //   3. Extract bundle_id, receipt_root, finality_cert
-            //   4. Submit unsigned tx: atomic-kernel::finalize_with_settlement
+            // P1b FIX: Fail at compile time on mainnet until this stub is
+            // replaced with the full Phase 1c OCW implementation.
+            //
+            // Phase 1c implementation plan:
+            //   1. Iterate PendingIntents for intents in `Finalized` state.
+            //   2. Read off-chain storage key:
+            //        `b"x3settle:" || intent_id (32 bytes)` = 96-byte marker
+            //        layout: bundle_id(32) || receipt_root(32) || finality_cert(32)
+            //   3. Extract bundle_id, receipt_root, finality_cert.
+            //   4. Submit unsigned tx:
+            //        atomic-kernel::finalize_with_settlement(bundle_id,
+            //            receipt_root, finality_cert, current_block)
+            //
+            // Remove this compile_error once Phase 1c is complete.
+            #[cfg(not(any(feature = "dev", feature = "testnet")))]
+            compile_error!(
+                "x3-settlement-engine: OCW is a testnet stub. \
+                 Implement Phase 1c before mainnet deployment \
+                 (see offchain_worker comments for the plan)."
+            );
+
+            #[cfg(any(feature = "dev", feature = "testnet"))]
             log::info!(
                 target: "x3-settlement-engine",
-                "[OCW] Settlement finalization hook active at block {:?}",
+                "[OCW] Settlement finalization hook active at block {:?} (testnet stub — Phase 1c pending)",
                 now
             );
         }

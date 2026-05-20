@@ -237,6 +237,21 @@ pub enum HirStmt {
     Continue { label: Option<LabelId>, span: Span },
 
     // === X3-Specific Statements ===
+    /// Atomic transaction block with its full enclosed body.
+    ///
+    /// The lowered form of an `atomic { ... }` source block.  Carries the body
+    /// verbatim so downstream passes (MIR lowerer, bytecode compiler) can emit
+    /// `AtomicBegin`/`AtomicCommit`/`AtomicRollback` with the correct block ID
+    /// surrounding the actual body statements.
+    ///
+    /// The flat `AtomicBegin` / `AtomicEnd` variants below remain for any legacy
+    /// or hand-constructed HIR; new lowering should produce only this variant.
+    Atomic {
+        block_id: AtomicBlockId,
+        body: Vec<HirStmt>,
+        span: Span,
+    },
+
     /// Begin an atomic transaction block.
     AtomicBegin { block_id: AtomicBlockId, span: Span },
 
@@ -528,6 +543,7 @@ impl HirStmt {
             HirStmt::While { span, .. } => *span,
             HirStmt::Break { span, .. } => *span,
             HirStmt::Continue { span, .. } => *span,
+            HirStmt::Atomic { span, .. } => *span,
             HirStmt::AtomicBegin { span, .. } => *span,
             HirStmt::AtomicEnd { span, .. } => *span,
             HirStmt::Emit { span, .. } => *span,

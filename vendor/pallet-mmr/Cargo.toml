@@ -66,14 +66,14 @@ features = ["derive"]
 default-features = false
 
 [dependencies.sp-mmr-primitives]
-path = "../../primitives/merkle-mountain-range"
+path = "../sp-mmr-primitives"
 default-features = false
 
 [dev-dependencies.itertools]
 version = "0.11"
 
 [dev-dependencies.sp-tracing]
-path = "../../primitives/tracing"
+path = "../sp-tracing"
 default-features = true
 
 [lints.clippy.all]

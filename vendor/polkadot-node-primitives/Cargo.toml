@@ -51,15 +51,15 @@ version = "0.3.31"
 version = "3.0.2"
 
 [dependencies.polkadot-parachain-primitives]
-path = "../../parachain"
+path = "../polkadot-parachain-primitives"
 default-features = false
 
 [dependencies.polkadot-primitives]
-path = "../../primitives"
+path = "../polkadot-primitives"
 default-features = true
 
 [dependencies.sc-keystore]
-path = "../../../substrate/client/keystore"
+path = "../sc-keystore"
 default-features = false
 
 [dependencies.schnorrkel]
@@ -72,23 +72,23 @@ features = ["derive"]
 default-features = true
 
 [dependencies.sp-application-crypto]
-path = "../../../substrate/primitives/application-crypto"
+path = "../sp-application-crypto"
 default-features = true
 
 [dependencies.sp-consensus-babe]
-path = "../../../substrate/primitives/consensus/babe"
+path = "../sp-consensus-babe"
 default-features = true
 
 [dependencies.sp-consensus-slots]
-path = "../../../substrate/primitives/consensus/slots"
+path = "../sp-consensus-slots"
 default-features = false
 
 [dependencies.sp-keystore]
-path = "../../../substrate/primitives/keystore"
+path = "../sp-keystore"
 default-features = true
 
 [dependencies.sp-maybe-compressed-blob]
-path = "../../../substrate/primitives/maybe-compressed-blob"
+path = "../../primitives/maybe-compressed-blob"
 default-features = true
 
 [dependencies.thiserror]
