@@ -583,3 +583,9 @@ Before Sprint 0 starts, ensure:
 - [ ] Release process documented
 - [ ] All team members trained on workflow
 
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

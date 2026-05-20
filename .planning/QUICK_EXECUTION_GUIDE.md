@@ -587,3 +587,9 @@ When Sprint 8 ends (Sep 12), we should have:
 
 **Deployment:** Public testnet goes live Sep 15 🚀
 
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

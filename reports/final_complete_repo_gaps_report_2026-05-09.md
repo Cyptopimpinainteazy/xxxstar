@@ -93,3 +93,9 @@ P2 (hardening and auditability):
 
 Run a single clean end-to-end readiness pipeline and overwrite all current readiness artifacts, then re-issue this report from fresh outputs.
 
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

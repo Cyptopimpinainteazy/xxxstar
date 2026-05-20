@@ -251,3 +251,10 @@ cargo test -p x3-kernel test_emergency_halt -- --nocapture
 - Recovery must preserve ALL state
 - No data loss allowed during halt/resume cycle
 - Timing: Must halt instantly (no pending operations)
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

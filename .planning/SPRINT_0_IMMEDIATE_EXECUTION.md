@@ -451,3 +451,9 @@ git push origin sprint-0/foundation/kernel-audit
 
 🔥 **GO TIME** 🔥
 
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

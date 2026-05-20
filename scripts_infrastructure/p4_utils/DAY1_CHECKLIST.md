@@ -80,3 +80,10 @@
 - [x] Signature verification tests runnable
 - [x] CPU baseline captured
 - [x] Ready for Day 2 kernel development (PyNaCl interim)
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

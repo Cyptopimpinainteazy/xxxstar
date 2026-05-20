@@ -251,3 +251,10 @@ test result: ok. XX passed; 0 failed; 0 ignored
 - Any failure here blocks all downstream work
 - Document any edge cases or assumptions found
 - Update test names if they don't match actual function names in codebase
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

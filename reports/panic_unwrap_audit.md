@@ -7500,3 +7500,10 @@ Generated: 2026-05-01T16:40:44Z
 
 - runtime hook panic path gate: PASS
 - user-triggerable unwrap/expect gate: FAIL
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

@@ -818,3 +818,10 @@ Mainnet Status: HONESTLY ASSESSED ✅
 - **Security Resources:**
   - Trail of Bits DeFi: https://appsec.guide
   - DeFi Security: https://github.com/OffcierCia/DeFi-Developer-Road-Map
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

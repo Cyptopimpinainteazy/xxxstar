@@ -7404,3 +7404,10 @@ runtime/src/lib.rs:2789:        fn get_domain(domain: Vec<u8>) -> Option<pallet_
 runtime/src/lib.rs:2790:            pallet_x3_domain_registry::Pallet::<Runtime>::runtime_get_domain(domain)
 runtime/src/lib.rs:2793:        fn list_domains() -> Vec<Vec<u8>> {
 runtime/src/lib.rs:2794:            pallet_x3_domain_registry::Pallet::<Runtime>::runtime_list_domains()
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

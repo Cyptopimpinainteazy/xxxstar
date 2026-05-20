@@ -253,3 +253,10 @@ cargo test -p x3-kernel test_no_balance_drift -- --nocapture
 - Storage must be consistent across all domains
 - Drift detection catches silent balance leaks
 - Finalization must preserve state
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

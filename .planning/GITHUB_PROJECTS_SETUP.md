@@ -300,3 +300,9 @@ Updated: May 3, 2026 EOD
 
 **Go live:** When Sprint 0 starts (Monday, Apr 29)
 
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

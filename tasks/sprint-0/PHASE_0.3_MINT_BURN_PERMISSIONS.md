@@ -193,3 +193,10 @@ cargo test -p x3-kernel test_burn_token_holder -- --nocapture
 - Any permission bypass is a security vulnerability
 - Test both positive (allowed) and negative (denied) cases
 - If burn() has different API, adjust tests accordingly
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

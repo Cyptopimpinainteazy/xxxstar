@@ -1089,3 +1089,9 @@ Sprint 8: Testnet Milestone ← (all complete)
 - [ ] 1,000 TPS demonstrated (parallel executor)
 - [ ] Zero critical bugs in audit
 
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./FEATURE_REGISTRY.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

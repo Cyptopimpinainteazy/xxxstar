@@ -437,3 +437,10 @@ git checkout -b sprint-1/packets/standard
 ```
 
 Ready for next phase! 🚀
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->

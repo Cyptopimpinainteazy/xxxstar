@@ -161,3 +161,10 @@ verification, and team verification."
 - No further action needed for deployment; ready for legal handoff
 
 **Deployment Status: ✅ COMPLETE AND VERIFIED**
+
+---
+
+## Auto-synced Reference
+
+<!-- GITHUB_DOCS:START (CODE_BLOCK:src=./TESTNET_FEATURE_FLAGS.toml&syntax=toml) -->
+<!-- GITHUB_DOCS:END -->
