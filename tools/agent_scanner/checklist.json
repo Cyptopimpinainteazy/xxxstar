@@ -1,0 +1,93 @@
+{
+  "generated": "2026-05-22T23:34:37.610190+00:00",
+  "items": [
+    {
+      "id": "dup-1",
+      "type": "duplicate",
+      "summary": "2 files with same content",
+      "paths": [
+        "cargo-check-v2.log",
+        "cargo-check.log"
+      ],
+      "evidence": "hash:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "todo-1",
+      "type": "todo-marker",
+      "summary": "service.rs",
+      "path": "node/src/service.rs",
+      "last_used": "2026-05-22T21:37:31+00:00",
+      "matches": [
+        {
+          "marker": "TODO",
+          "snippet": "               // Perform health check (TODO(t5-1): implement actual process detecti"
+        },
+        {
+          "marker": "todo",
+          "snippet": "ection + RPC probe \u2014 tracked in session todo 't5-1')"
+        },
+        {
+          "marker": "TODO",
+          "snippet": "hour sleep loop."
+        },
+        {
+          "marker": "todo",
+          "snippet": "      // TODO(t5-2): tracked in session todo 't5-2' \u2014 implement dispatcher wiring an"
+        }
+      ]
+    },
+    {
+      "id": "todo-2",
+      "type": "todo-marker",
+      "summary": "T5_PROPOSALS.md",
+      "path": "docs/T5_PROPOSALS.md",
+      "last_used": "2026-05-22T21:07:46+00:00",
+      "matches": [
+        {
+          "marker": "TODO",
+          "snippet": "1 (node/src/service.rs:1355)"
+        },
+        {
+          "marker": "TODO",
+          "snippet": "iew required) Precompile setup includes TODO markers \u2014 may affect gas accounting or "
+        }
+      ]
+    },
+    {
+      "id": "todo-3",
+      "type": "todo-marker",
+      "summary": "embarrassment-raw-findings.txt",
+      "path": "launch-gates/evidence/ci/embarrassment-raw-findings.txt",
+      "last_used": "2026-05-15T01:03:58.687948+00:00",
+      "matches": [
+        {
+          "marker": "TODO",
+          "snippet": "tches"
+        }
+      ]
+    },
+    {
+      "id": "todo-4",
+      "type": "todo-marker",
+      "summary": "main.rs",
+      "path": "crates/x3-sidecar/src/main.rs",
+      "last_used": "2026-05-22T21:38:13+00:00",
+      "matches": [
+        {
+          "marker": "panic!(",
+          "snippet": "s[3]]) >> 2) as usize,"
+        }
+      ]
+    },
+    {
+      "id": "halfdone-1",
+      "type": "half-done",
+      "summary": "service.rs",
+      "path": "node/src/service.rs",
+      "last_used": "2026-05-22T21:37:31+00:00",
+      "signals": [
+        "Dead code allowed (suppressed warning)"
+      ]
+    }
+  ]
+}
