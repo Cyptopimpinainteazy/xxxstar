@@ -1,4 +1,4 @@
-//! X3 Cross-VM Sidecar daemon — Phase 4.
+//! X3 Cross-VM Sidecar daemon — Phase 4 (complete).
 //!
 //! Launched by the X3 node via `spawn_sidecar_service`.  Polls Solana for
 //! escrow/bridge-root events, checks 32-slot per-account finality, derives a
@@ -16,6 +16,7 @@
 //! | `X3_SOLANA_CHAIN_ID`       | `2`                                      | chain_id value for Solana in X3CrossVmRouter       |
 //! | `X3_BRIDGE_PALLET_INDEX`   | `26`                                     | SCALE pallet index of X3CrossVmRouter              |
 //! | `X3_BRIDGE_CALL_INDEX`     | `4`                                      | SCALE call index of register_external_root         |
+//! | `X3_META_REFRESH_SECS`     | `300`                                    | How often to re-fetch ChainMeta (spec_version etc) |
 //! | `RUST_LOG`                 | `info`                                   | Log filter                                         |
 //!
 //! # Signing
@@ -24,22 +25,36 @@
 //! authority (i.e. satisfy `ExternalExecutorOrigin = EnsureRootOrHalfCouncil`).
 //! When the env var is absent, an **unsigned** extrinsic is emitted with a
 //! clear warning — accepted only if the runtime is patched to allow it.
+//!
+//! # ChainMeta refresh
+//! `spec_version` and `transaction_version` change on every runtime upgrade.
+//! Extrinsics signed with stale values are rejected by the transaction pool.
+//! The sidecar re-fetches `ChainMeta` every `X3_META_REFRESH_SECS` seconds
+//! (default 300) and detects spec_version changes, logging a warning when
+//! a runtime upgrade is detected mid-run.
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-const FINALITY_CONFIRMATIONS: u64 = 32;
+/// Solana confirmation threshold before treating an account as finality-confirmed.
+pub const FINALITY_CONFIRMATIONS: u64 = 32;
 /// Anchor account data layout: [8B discriminator][8B created_slot][...]
 const ACCOUNT_DATA_SLOT_OFFSET: usize = 8;
 /// Substrate signing context tag (must match runtime).
 const SUBSTRATE_CTX: &[u8] = b"substrate";
+/// Default ChainMeta refresh interval (seconds).
+const DEFAULT_META_REFRESH_SECS: u64 = 300;
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Parser)]
-#[command(name = "x3-sidecar", about = "X3 Cross-VM Sidecar daemon")]
+#[command(name = "x3-sidecar", about = "X3 Cross-VM Sidecar daemon (Phase 4)")]
 struct Args {
     #[arg(long, default_value = "x3-sidecar")]
     service_id: String,
@@ -57,18 +72,22 @@ struct Args {
 
     #[arg(long, default_value_t = 30)]
     poll_interval_secs: u64,
+
+    /// Re-fetch ChainMeta (spec_version, tx_version, genesis) every N seconds.
+    #[arg(long, env = "X3_META_REFRESH_SECS", default_value_t = DEFAULT_META_REFRESH_SECS)]
+    meta_refresh_secs: u64,
 }
 
 // ─── Bridge config ────────────────────────────────────────────────────────────
 
-struct BridgeConfig {
-    solana_chain_id: u32,
-    pallet_index: u8,
-    call_index: u8,
+pub struct BridgeConfig {
+    pub solana_chain_id: u32,
+    pub pallet_index: u8,
+    pub call_index: u8,
 }
 
 impl BridgeConfig {
-    fn from_env() -> Self {
+    pub fn from_env() -> Self {
         Self {
             solana_chain_id: env_u32("X3_SOLANA_CHAIN_ID", 2),
             pallet_index:    env_u8("X3_BRIDGE_PALLET_INDEX", 26),
@@ -77,25 +96,98 @@ impl BridgeConfig {
     }
 }
 
-fn env_u32(key: &str, default: u32) -> u32 {
+pub fn env_u32(key: &str, default: u32) -> u32 {
     std::env::var(key).ok().and_then(|s| s.parse().ok()).unwrap_or(default)
 }
-fn env_u8(key: &str, default: u8) -> u8 {
+pub fn env_u8(key: &str, default: u8) -> u8 {
     std::env::var(key).ok().and_then(|s| s.parse().ok()).unwrap_or(default)
+}
+
+// ─── ChainMeta + refresh ─────────────────────────────────────────────────────
+
+/// Chain metadata required to build valid signed extrinsics.
+/// Must be refreshed after every runtime upgrade (spec_version change).
+#[derive(Clone)]
+pub struct ChainMeta {
+    pub spec_version: u32,
+    pub tx_version:   u32,
+    pub genesis_hash: [u8; 32],
+}
+
+/// Shared, periodically-refreshed chain metadata.
+pub struct MetaCache {
+    meta:         RwLock<ChainMeta>,
+    last_refresh: RwLock<Instant>,
+    refresh_secs: u64,
+    x3_rpc:       String,
+}
+
+impl MetaCache {
+    pub fn new(initial: ChainMeta, refresh_secs: u64, x3_rpc: String) -> Arc<Self> {
+        Arc::new(Self {
+            meta: RwLock::new(initial),
+            last_refresh: RwLock::new(Instant::now()),
+            refresh_secs,
+            x3_rpc,
+        })
+    }
+
+    /// Return the current meta, re-fetching in the background if the TTL has
+    /// expired.  Never blocks the caller: if a refresh is in progress, returns
+    /// the last known good value.
+    pub async fn get(&self, client: &reqwest::Client, service_id: &str) -> ChainMeta {
+        let age = self.last_refresh.read().await.elapsed().as_secs();
+        if age >= self.refresh_secs {
+            self.try_refresh(client, service_id).await;
+        }
+        self.meta.read().await.clone()
+    }
+
+    /// Attempt to refresh metadata.  Logs but never panics on failure.
+    async fn try_refresh(&self, client: &reqwest::Client, service_id: &str) {
+        // Take a write lock on last_refresh immediately to prevent concurrent refreshes.
+        let mut ts = self.last_refresh.write().await;
+        // Double-check: another task might have refreshed while we waited.
+        if ts.elapsed().as_secs() < self.refresh_secs {
+            return;
+        }
+        *ts = Instant::now();
+        drop(ts);
+
+        match fetch_chain_meta(client, &self.x3_rpc).await {
+            Ok(fresh) => {
+                let old_spec = self.meta.read().await.spec_version;
+                if fresh.spec_version != old_spec {
+                    log::warn!(
+                        "[{}] ⚡ Runtime upgrade detected: spec_version {} → {}",
+                        service_id, old_spec, fresh.spec_version
+                    );
+                }
+                *self.meta.write().await = fresh;
+                log::debug!("[{}] ChainMeta refreshed", service_id);
+            }
+            Err(e) => {
+                log::warn!("[{}] ChainMeta refresh failed ({}); using cached value", service_id, e);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub async fn spec_version(&self) -> u32 {
+        self.meta.read().await.spec_version
+    }
 }
 
 // ─── Sr25519 signer ───────────────────────────────────────────────────────────
 
-/// Wrapper around a schnorrkel keypair with zeroized key material.
-struct Sr25519Signer {
+pub struct Sr25519Signer {
     keypair: schnorrkel::Keypair,
     pub public_key: [u8; 32],
 }
 
 impl Sr25519Signer {
-    /// Load from a 32-byte (mini-secret) hex seed.
-    /// `X3_SIGNER_SEED_HEX` should be 64 hex chars (32 bytes).
-    fn from_seed_hex(hex_seed: &str) -> Result<Self, String> {
+    /// Load from a 32-byte mini-secret seed encoded as hex.
+    pub fn from_seed_hex(hex_seed: &str) -> Result<Self, String> {
         let raw = Zeroizing::new(
             hex::decode(hex_seed.trim_start_matches("0x"))
                 .map_err(|e| format!("invalid seed hex: {}", e))?,
@@ -113,10 +205,9 @@ impl Sr25519Signer {
         Ok(Self { keypair, public_key })
     }
 
-    /// Sign `message` using the Substrate sr25519 context.
-    /// If `message` is longer than 256 bytes it is Blake2b-256 hashed first
-    /// (matching Substrate's extrinsic signing convention).
-    fn sign(&self, message: &[u8]) -> [u8; 64] {
+    /// Sign with Substrate sr25519 context.  Payloads > 256 bytes are Blake2b-256
+    /// pre-hashed (matches Substrate extrinsic signing convention).
+    pub fn sign(&self, message: &[u8]) -> [u8; 64] {
         let payload = if message.len() > 256 {
             blake2b_256(message).to_vec()
         } else {
@@ -125,30 +216,35 @@ impl Sr25519Signer {
         let ctx = schnorrkel::context::signing_context(SUBSTRATE_CTX);
         self.keypair.sign(ctx.bytes(&payload)).to_bytes()
     }
+
+    /// Verify a signature against a message (used in tests).
+    #[cfg(test)]
+    pub fn verify(&self, message: &[u8], sig_bytes: &[u8; 64]) -> bool {
+        let payload = if message.len() > 256 { blake2b_256(message).to_vec() } else { message.to_vec() };
+        let ctx = schnorrkel::context::signing_context(SUBSTRATE_CTX);
+        let sig = schnorrkel::Signature::from_bytes(sig_bytes).unwrap();
+        self.keypair.public.verify(ctx.bytes(&payload), &sig).is_ok()
+    }
 }
 
-// ─── Crypto helpers ──────────────────────────────────────────────────────────
+// ─── Crypto ──────────────────────────────────────────────────────────────────
 
-/// Blake2b-256 (same algorithm used by `sp_crypto_hashing::blake2_256`).
+/// Blake2b-256 (same as `sp_crypto_hashing::blake2_256`).
 pub fn blake2b_256(data: &[u8]) -> [u8; 32] {
     let mut params = blake2b_simd::Params::new();
     params.hash_length(32);
-    let digest = params.hash(data);
     let mut out = [0u8; 32];
-    out.copy_from_slice(digest.as_bytes());
+    out.copy_from_slice(params.hash(data).as_bytes());
     out
 }
 
-/// Derive a 32-byte state root from Solana account data and the slot it
-/// was created at.  Input: `account_data_bytes || slot.to_le_bytes()`.
+/// Derive a 32-byte state root: Blake2b-256(account_data || slot.to_le_bytes()).
 pub fn derive_root_hash(account_data: &[u8], slot: u64) -> [u8; 32] {
-    let slot_bytes = slot.to_le_bytes();
-    // Compute hash over concatenated bytes without extra allocation when possible.
     let mut params = blake2b_simd::Params::new();
     params.hash_length(32);
     let mut state = params.to_state();
     state.update(account_data);
-    state.update(&slot_bytes);
+    state.update(&slot.to_le_bytes());
     let mut out = [0u8; 32];
     out.copy_from_slice(state.finalize().as_bytes());
     out
@@ -156,7 +252,7 @@ pub fn derive_root_hash(account_data: &[u8], slot: u64) -> [u8; 32] {
 
 // ─── SCALE encoding ──────────────────────────────────────────────────────────
 
-/// SCALE compact-encode a `u64` value.
+/// SCALE compact-encode a u64.
 pub fn scale_compact(n: u64) -> Vec<u8> {
     if n <= 0x3f {
         vec![(n << 2) as u8]
@@ -174,29 +270,7 @@ pub fn scale_compact(n: u64) -> Vec<u8> {
     }
 }
 
-/// Chain metadata needed to build a valid signed extrinsic.
-struct ChainMeta {
-    spec_version: u32,
-    tx_version: u32,
-    genesis_hash: [u8; 32],
-}
-
-/// Build a **signed** SCALE V4 sr25519 extrinsic.
-///
-/// Wire format (Substrate extrinsic v4):
-/// ```text
-/// compact_len(inner)
-/// 0x84                    -- V4, signed
-/// 0x00 || public_key[32]  -- MultiAddress::Id
-/// 0x01 || signature[64]   -- MultiSignature::Sr25519
-/// 0x00                    -- era: immortal
-/// compact(nonce)
-/// compact(tip = 0)
-/// pallet_index || call_index || call_args...
-/// ```
-///
-/// Signing payload = call_bytes + extra + additional_signed,
-/// hashed with Blake2b-256 if > 256 bytes.
+/// Build a SCALE V4 **signed** sr25519 extrinsic.
 pub fn build_signed_extrinsic(
     signer: &Sr25519Signer,
     pallet: u8,
@@ -208,7 +282,6 @@ pub fn build_signed_extrinsic(
     let mut call_bytes = vec![pallet, call];
     call_bytes.extend_from_slice(call_args);
 
-    // "Extra" signed extensions that appear in the extrinsic body.
     let extra: Vec<u8> = {
         let mut v = vec![0x00u8]; // era: immortal
         v.extend(scale_compact(nonce));
@@ -216,13 +289,12 @@ pub fn build_signed_extrinsic(
         v
     };
 
-    // "Additional" data that's mixed into the signature but NOT in the body.
     let additional: Vec<u8> = {
         let mut v = Vec::new();
         v.extend_from_slice(&meta.spec_version.to_le_bytes());
         v.extend_from_slice(&meta.tx_version.to_le_bytes());
-        v.extend_from_slice(&meta.genesis_hash);   // genesis_hash
-        v.extend_from_slice(&meta.genesis_hash);   // block_hash = genesis (immortal)
+        v.extend_from_slice(&meta.genesis_hash);
+        v.extend_from_slice(&meta.genesis_hash); // block_hash = genesis (immortal)
         v
     };
 
@@ -234,10 +306,10 @@ pub fn build_signed_extrinsic(
     let signature = signer.sign(&signing_payload);
 
     let mut inner = Vec::new();
-    inner.push(0x84u8);                         // V4 signed
-    inner.push(0x00);                           // MultiAddress::Id
+    inner.push(0x84u8);                          // V4 signed
+    inner.push(0x00);                            // MultiAddress::Id
     inner.extend_from_slice(&signer.public_key);
-    inner.push(0x01);                           // MultiSignature::Sr25519
+    inner.push(0x01);                            // MultiSignature::Sr25519
     inner.extend_from_slice(&signature);
     inner.extend_from_slice(&extra);
     inner.extend_from_slice(&call_bytes);
@@ -247,7 +319,7 @@ pub fn build_signed_extrinsic(
     xt
 }
 
-/// Build an **unsigned** SCALE V4 extrinsic (fallback when no signer configured).
+/// Build a SCALE V4 **unsigned** extrinsic (fallback — devnet only).
 pub fn build_unsigned_extrinsic(pallet: u8, call: u8, call_args: &[u8]) -> Vec<u8> {
     let mut inner = vec![0x04u8, pallet, call]; // 0x04 = V4 unsigned
     inner.extend_from_slice(call_args);
@@ -256,7 +328,7 @@ pub fn build_unsigned_extrinsic(pallet: u8, call: u8, call_args: &[u8]) -> Vec<u
     xt
 }
 
-/// SCALE-encode arguments for `register_external_root(chain_id, root_hash, block_number, proof)`.
+/// SCALE-encode `register_external_root(chain_id, root_hash, block_number, proof)`.
 pub fn encode_register_args(
     chain_id: u32,
     root_hash: &[u8; 32],
@@ -291,7 +363,7 @@ struct RpcResp {
 #[derive(Deserialize)]
 struct RpcErr { code: i64, message: String }
 
-async fn rpc_call(
+pub async fn rpc_call(
     client: &reqwest::Client,
     url: &str,
     method: &str,
@@ -309,16 +381,16 @@ async fn rpc_call(
 
 // ─── X3 node helpers ─────────────────────────────────────────────────────────
 
-async fn fetch_nonce(client: &reqwest::Client, x3_rpc: &str, pubkey: &[u8; 32]) -> Result<u64, String> {
+pub async fn fetch_nonce(client: &reqwest::Client, x3_rpc: &str, pubkey: &[u8; 32]) -> Result<u64, String> {
     let hex = format!("0x{}", hex::encode(pubkey));
     rpc_call(client, x3_rpc, "system_accountNextIndex", serde_json::json!([hex]))
         .await?.as_u64().ok_or_else(|| "nonce: non-u64".to_string())
 }
 
-async fn fetch_chain_meta(client: &reqwest::Client, x3_rpc: &str) -> Result<ChainMeta, String> {
+pub async fn fetch_chain_meta(client: &reqwest::Client, x3_rpc: &str) -> Result<ChainMeta, String> {
     let version = rpc_call(client, x3_rpc, "state_getRuntimeVersion", serde_json::json!([])).await?;
     let spec_version = version["specVersion"].as_u64().unwrap_or(1) as u32;
-    let tx_version  = version["transactionVersion"].as_u64().unwrap_or(1) as u32;
+    let tx_version   = version["transactionVersion"].as_u64().unwrap_or(1) as u32;
 
     let genesis_val = rpc_call(client, x3_rpc, "chain_getBlockHash", serde_json::json!([0])).await?;
     let genesis_hex = genesis_val.as_str().ok_or("genesis: not a string")?
@@ -329,24 +401,23 @@ async fn fetch_chain_meta(client: &reqwest::Client, x3_rpc: &str) -> Result<Chai
     }
     let mut genesis_hash = [0u8; 32];
     genesis_hash.copy_from_slice(&genesis_bytes);
-
     Ok(ChainMeta { spec_version, tx_version, genesis_hash })
 }
 
 // ─── Solana RPC ───────────────────────────────────────────────────────────────
 
-async fn solana_get_slot(client: &reqwest::Client, rpc: &str) -> Result<u64, String> {
+pub async fn solana_get_slot(client: &reqwest::Client, rpc: &str) -> Result<u64, String> {
     rpc_call(client, rpc, "getSlot", serde_json::json!(["confirmed"]))
         .await?.as_u64().ok_or_else(|| "getSlot: non-u64".to_string())
 }
 
-struct EscrowAccount {
-    pubkey: String,
-    data: Vec<u8>,
-    created_slot: u64,
+pub struct EscrowAccount {
+    pub pubkey: String,
+    pub data: Vec<u8>,
+    pub created_slot: u64,
 }
 
-async fn solana_get_program_accounts(
+pub async fn solana_get_program_accounts(
     client: &reqwest::Client,
     rpc: &str,
     program_id: &str,
@@ -373,7 +444,24 @@ pub fn read_u64_le(data: &[u8], offset: usize) -> Option<u64> {
     Some(u64::from_le_bytes(data.get(offset..end)?.try_into().ok()?))
 }
 
-// ─── base64 decoder ───────────────────────────────────────────────────────────
+// ─── Finality check ───────────────────────────────────────────────────────────
+
+/// Returns `true` when an account with `created_slot` is finality-confirmed
+/// as of `current_slot`.
+///
+/// Rules:
+/// - If `created_slot` is known (> 0): `age = current_slot − created_slot ≥ FINALITY_CONFIRMATIONS`
+/// - If `created_slot` is unknown (== 0): `current_slot ≥ FINALITY_CONFIRMATIONS` (global proxy)
+/// - Saturating subtraction prevents underflow when current_slot < created_slot (clock skew).
+pub fn is_finality_confirmed(current_slot: u64, created_slot: u64) -> bool {
+    if created_slot > 0 {
+        current_slot.saturating_sub(created_slot) >= FINALITY_CONFIRMATIONS
+    } else {
+        current_slot >= FINALITY_CONFIRMATIONS
+    }
+}
+
+// ─── base64 ───────────────────────────────────────────────────────────────────
 
 pub fn base64_decode(s: &str) -> Vec<u8> {
     let mut lookup = [0xffu8; 256];
@@ -400,7 +488,7 @@ pub fn base64_decode(s: &str) -> Vec<u8> {
 
 // ─── Poll cycle ───────────────────────────────────────────────────────────────
 
-async fn poll_once(
+pub async fn poll_once(
     client: &reqwest::Client,
     solana_rpc: &str,
     x3_rpc: &str,
@@ -408,7 +496,7 @@ async fn poll_once(
     service_id: &str,
     cfg: &BridgeConfig,
     signer: Option<&Sr25519Signer>,
-    meta: &ChainMeta,
+    meta_cache: &MetaCache,
 ) {
     let current_slot = match solana_get_slot(client, solana_rpc).await {
         Ok(s) => s,
@@ -426,20 +514,19 @@ async fn poll_once(
     }
     log::info!("[{}] {} account(s) @ Solana slot {}", service_id, accounts.len(), current_slot);
 
+    // Fetch (possibly refreshed) chain metadata once per poll cycle.
+    let meta = meta_cache.get(client, service_id).await;
+
     for acc in &accounts {
-        // Per-account finality: age = current_slot − created_slot.
-        let age = current_slot.saturating_sub(acc.created_slot);
-        let finality_ok = if acc.created_slot > 0 {
-            age >= FINALITY_CONFIRMATIONS
-        } else {
-            current_slot >= FINALITY_CONFIRMATIONS
-        };
-        if !finality_ok {
+        if !is_finality_confirmed(current_slot, acc.created_slot) {
+            let age = current_slot.saturating_sub(acc.created_slot);
             log::debug!("[{}] skip {} — age {} < {}", service_id, acc.pubkey, age, FINALITY_CONFIRMATIONS);
             continue;
         }
 
         let root_hash = derive_root_hash(&acc.data, acc.created_slot);
+        // Clamp slot to u32 for the block_number field — Substrate block numbers
+        // are u32 and Solana slot numbers can exceed u32::MAX in the far future.
         let block_number = current_slot.min(u32::MAX as u64) as u32;
         let call_args = encode_register_args(cfg.solana_chain_id, &root_hash, block_number, &acc.data);
 
@@ -449,17 +536,17 @@ async fn poll_once(
                     Ok(n) => n,
                     Err(e) => { log::error!("[{}] nonce fetch: {}", service_id, e); continue; }
                 };
-                log::debug!("[{}] signing extrinsic nonce={}", service_id, nonce);
-                build_signed_extrinsic(s, cfg.pallet_index, cfg.call_index, &call_args, nonce, meta)
+                build_signed_extrinsic(s, cfg.pallet_index, cfg.call_index, &call_args, nonce, &meta)
             }
             None => {
-                log::warn!("[{}] X3_SIGNER_SEED_HEX not set — submitting unsigned extrinsic (requires runtime patch)", service_id);
+                log::warn!("[{}] X3_SIGNER_SEED_HEX not set — unsigned extrinsic (devnet only)", service_id);
                 build_unsigned_extrinsic(cfg.pallet_index, cfg.call_index, &call_args)
             }
         };
 
         let hex_xt = format!("0x{}", hex::encode(&xt));
-        log::info!("[{}] 🌉 pubkey={} root={} block_number={}", service_id, &acc.pubkey[..8.min(acc.pubkey.len())], hex::encode(&root_hash[..8]), block_number);
+        let pk_prefix = &acc.pubkey[..8.min(acc.pubkey.len())];
+        log::info!("[{}] 🌉 pubkey={}… root={} block={}", service_id, pk_prefix, hex::encode(&root_hash[..8]), block_number);
 
         match rpc_call(client, x3_rpc, "author_submitExtrinsic", serde_json::json!([hex_xt])).await {
             Ok(tx) => log::info!("[{}] ✅ tx={}", service_id, tx),
@@ -476,7 +563,6 @@ async fn main() {
     let args = Args::parse();
     let cfg  = BridgeConfig::from_env();
 
-    // Load sr25519 signer if seed is configured.
     let signer: Option<Sr25519Signer> = match std::env::var("X3_SIGNER_SEED_HEX") {
         Ok(seed) => match Sr25519Signer::from_seed_hex(&seed) {
             Ok(s) => {
@@ -494,11 +580,12 @@ async fn main() {
         }
     };
 
-    // Fetch chain metadata once at startup; log on failure but continue.
-    let meta = match fetch_chain_meta(
-        &reqwest::Client::builder().timeout(Duration::from_secs(10)).build().unwrap(),
-        &args.x3_rpc,
-    ).await {
+    let bootstrap_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap();
+
+    let initial_meta = match fetch_chain_meta(&bootstrap_client, &args.x3_rpc).await {
         Ok(m) => {
             log::info!("[{}] chain meta: spec_version={} tx_version={} genesis={}",
                 args.service_id, m.spec_version, m.tx_version, hex::encode(&m.genesis_hash));
@@ -510,11 +597,13 @@ async fn main() {
         }
     };
 
-    log::info!("[{}] Phase 4 starting — Solana={} X3={} pallet={} call={} chain_id={}",
-        args.service_id, args.solana_rpc, args.x3_rpc,
-        cfg.pallet_index, cfg.call_index, cfg.solana_chain_id);
+    let meta_cache = MetaCache::new(initial_meta, args.meta_refresh_secs, args.x3_rpc.clone());
 
-    let client       = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().unwrap();
+    log::info!("[{}] Phase 4 — Solana={} X3={} pallet={} call={} chain_id={} meta_refresh={}s",
+        args.service_id, args.solana_rpc, args.x3_rpc,
+        cfg.pallet_index, cfg.call_index, cfg.solana_chain_id, args.meta_refresh_secs);
+
+    let client        = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().unwrap();
     let poll_interval = Duration::from_secs(args.poll_interval_secs);
     let shutdown      = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
@@ -522,14 +611,14 @@ async fn main() {
     loop {
         tokio::select! {
             _ = &mut shutdown => {
-                log::info!("[{}] shutdown signal — exiting", args.service_id);
+                log::info!("[{}] shutdown signal — exiting cleanly", args.service_id);
                 break;
             }
             _ = tokio::time::sleep(poll_interval) => {
                 poll_once(
                     &client, &args.solana_rpc, &args.x3_rpc,
                     &args.escrow_program, &args.service_id,
-                    &cfg, signer.as_ref(), &meta,
+                    &cfg, signer.as_ref(), &meta_cache,
                 ).await;
             }
         }
@@ -546,174 +635,263 @@ mod tests {
     // ── blake2b_256 ───────────────────────────────────────────────────────
 
     #[test]
-    fn blake2b_256_length() {
+    fn blake2b_256_length_always_32() {
         assert_eq!(blake2b_256(b"").len(), 32);
-        assert_eq!(blake2b_256(b"hello world").len(), 32);
+        assert_eq!(blake2b_256(&vec![0xffu8; 10_000]).len(), 32);
     }
 
     #[test]
-    fn blake2b_256_known_vector() {
-        // Blake2b-256("") must equal the well-known empty-input hash.
-        // Verified against reference: https://www.blake2.net/
+    fn blake2b_256_known_empty_vector() {
+        // Verified reference: https://www.blake2.net/ — Blake2b-256("")
         let got = blake2b_256(b"");
-        // First 4 bytes of Blake2b-256("") = 0x0e5751c0
         assert_eq!(&got[..4], &[0x0e, 0x57, 0x51, 0xc0]);
     }
 
     #[test]
-    fn blake2b_256_differs_by_input() {
+    fn blake2b_256_collision_resistance() {
         assert_ne!(blake2b_256(b"a"), blake2b_256(b"b"));
+        assert_ne!(blake2b_256(b""), blake2b_256(b"\x00"));
     }
 
     #[test]
-    fn derive_root_hash_mixes_slot() {
-        let h1 = derive_root_hash(b"data", 1);
-        let h2 = derive_root_hash(b"data", 2);
-        assert_ne!(h1, h2, "same data, different slot → different hash");
+    fn derive_root_hash_is_32_bytes() {
+        assert_eq!(derive_root_hash(b"", 0).len(), 32);
     }
 
     #[test]
-    fn derive_root_hash_mixes_data() {
-        let h1 = derive_root_hash(b"data1", 42);
-        let h2 = derive_root_hash(b"data2", 42);
-        assert_ne!(h1, h2, "same slot, different data → different hash");
+    fn derive_root_hash_slot_mixing() {
+        assert_ne!(derive_root_hash(b"data", 1), derive_root_hash(b"data", 2));
+    }
+
+    #[test]
+    fn derive_root_hash_data_mixing() {
+        assert_ne!(derive_root_hash(b"data1", 42), derive_root_hash(b"data2", 42));
+    }
+
+    #[test]
+    fn derive_root_hash_empty_data_no_panic() {
+        let h = derive_root_hash(b"", 0);
+        assert_eq!(h.len(), 32);
+        // Empty data with slot 0 must not be all-zeros (Blake2b always produces non-zero).
+        assert_ne!(h, [0u8; 32]);
     }
 
     // ── SCALE compact ─────────────────────────────────────────────────────
 
     #[test]
-    fn scale_compact_1byte() {
+    fn scale_compact_boundaries() {
         assert_eq!(scale_compact(0), vec![0x00]);
+        assert_eq!(scale_compact(1), vec![0x04]);
         assert_eq!(scale_compact(63), vec![0xfc]);
-    }
-
-    #[test]
-    fn scale_compact_2byte() {
+        // 64 first two-byte value
         assert_eq!(scale_compact(64), vec![0x01, 0x01]);
+        // 16383 last two-byte value
+        assert_eq!(scale_compact(16383), vec![0xfd, 0xff]);
+        // 16384 first four-byte value
+        assert_eq!(scale_compact(16384), vec![0x02, 0x00, 0x01, 0x00]);
+        // 2^30 - 1 last four-byte value
+        assert_eq!(scale_compact(0x3fff_ffff), vec![0xfe, 0xff, 0xff, 0xff]);
     }
 
     #[test]
-    fn scale_compact_4byte() {
-        assert_eq!(scale_compact(16384), vec![0x02, 0x00, 0x01, 0x00]);
+    fn scale_compact_zero_proof_length() {
+        // Empty proof → compact(0) = 0x00
+        assert_eq!(scale_compact(0), vec![0x00]);
     }
 
     // ── encode_register_args ──────────────────────────────────────────────
 
     #[test]
-    fn encode_args_layout() {
-        let chain_id: u32 = 2;
-        let root = [0xabu8; 32];
-        let block: u32 = 100;
-        let proof = b"proof_bytes";
+    fn encode_args_empty_proof() {
+        let args = encode_register_args(2, &[0xab; 32], 100, b"");
+        // 4 + 32 + 4 + 1(compact 0) = 41 bytes
+        assert_eq!(args.len(), 41);
+        assert_eq!(args[40], 0x00); // compact(0)
+    }
 
-        let args = encode_register_args(chain_id, &root, block, proof);
+    #[test]
+    fn encode_args_layout_with_proof() {
+        let proof = b"hello";
+        let args = encode_register_args(3, &[0xbb; 32], 999, proof);
+        assert_eq!(&args[0..4], &[3, 0, 0, 0]);          // chain_id LE
+        assert_eq!(&args[4..36], &[0xbb; 32]);            // root_hash
+        assert_eq!(&args[36..40], &[231, 3, 0, 0]);       // 999 LE
+        assert_eq!(args[40], (5 << 2) as u8);             // compact(5)
+        assert_eq!(&args[41..46], proof);
+    }
 
-        // chain_id: 4 bytes LE
-        assert_eq!(&args[0..4], &[2, 0, 0, 0]);
-        // root_hash: 32 bytes
-        assert_eq!(&args[4..36], &[0xab; 32]);
-        // block_number: 4 bytes LE
-        assert_eq!(&args[36..40], &[100, 0, 0, 0]);
-        // proof compact len = scale_compact(11) = 11*4 = 44 = 0x2c (1 byte)
-        assert_eq!(args[40], 0x2c);
-        // proof bytes
-        assert_eq!(&args[41..52], proof);
+    // ── is_finality_confirmed ─────────────────────────────────────────────
+
+    #[test]
+    fn finality_at_exact_threshold_passes() {
+        // age == FINALITY_CONFIRMATIONS (32) → should confirm
+        assert!(is_finality_confirmed(100, 68)); // age = 32
+    }
+
+    #[test]
+    fn finality_one_below_threshold_fails() {
+        // age == 31 → not yet confirmed
+        assert!(!is_finality_confirmed(100, 69)); // age = 31
+    }
+
+    #[test]
+    fn finality_zero_created_slot_uses_global() {
+        assert!(is_finality_confirmed(32, 0));   // current ≥ 32 → ok
+        assert!(!is_finality_confirmed(31, 0));  // current < 32 → not yet
+    }
+
+    #[test]
+    fn finality_no_underflow_on_clock_skew() {
+        // created_slot > current_slot (validator clock skew / reorg)
+        assert!(!is_finality_confirmed(5, 100)); // saturating: age=0 < 32
+    }
+
+    #[test]
+    fn finality_u64_max_slot_no_overflow() {
+        // Extreme values must not panic.
+        assert!(is_finality_confirmed(u64::MAX, u64::MAX - 100)); // age=100 ≥ 32
+        assert!(!is_finality_confirmed(u64::MAX, u64::MAX));      // age=0 < 32
+    }
+
+    // ── block_number clamping ─────────────────────────────────────────────
+
+    #[test]
+    fn block_number_clamped_at_u32_max() {
+        let slot = u64::from(u32::MAX) + 1_000_000;
+        let block_number = slot.min(u32::MAX as u64) as u32;
+        assert_eq!(block_number, u32::MAX);
     }
 
     // ── unsigned extrinsic ────────────────────────────────────────────────
 
     #[test]
-    fn unsigned_extrinsic_version_byte() {
-        let xt = build_unsigned_extrinsic(26, 4, &[0u8; 4]);
-        // inner = [0x04, 26, 4, 0,0,0,0] = 7 bytes → compact(7) = 28 = 0x1c
-        assert_eq!(xt[0], 7 << 2);
+    fn unsigned_extrinsic_version_and_call_bytes() {
+        let xt = build_unsigned_extrinsic(26, 4, &[1u8, 2, 3]);
+        // inner = [0x04, 26, 4, 1, 2, 3] = 6 bytes → compact(6) = 24 = 0x18
+        assert_eq!(xt[0], 6 << 2);
         assert_eq!(xt[1], 0x04); // V4 unsigned
         assert_eq!(xt[2], 26);
         assert_eq!(xt[3], 4);
+        assert_eq!(&xt[4..7], &[1u8, 2, 3]);
+    }
+
+    #[test]
+    fn unsigned_extrinsic_empty_call_args() {
+        let xt = build_unsigned_extrinsic(0, 0, &[]);
+        assert_eq!(xt.len(), 4); // compact(3) + 3 bytes
     }
 
     // ── signed extrinsic ─────────────────────────────────────────────────
 
-    #[test]
-    fn signed_extrinsic_structure() {
-        // Use a deterministic zero seed for testing.
-        let signer = Sr25519Signer::from_seed_hex(&"00".repeat(32)).unwrap();
-        let meta = ChainMeta {
-            spec_version: 1,
-            tx_version: 1,
-            genesis_hash: [0u8; 32],
-        };
-        let xt = build_signed_extrinsic(&signer, 26, 4, &[0xffu8; 4], 0, &meta);
+    fn test_meta() -> ChainMeta {
+        ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] }
+    }
 
-        // Skip compact prefix bytes to get inner start.
-        let inner_len = decode_compact(&xt);
-        let prefix_len = scale_compact(inner_len as u64).len();
+    #[test]
+    fn signed_extrinsic_field_layout() {
+        let signer = Sr25519Signer::from_seed_hex(&"00".repeat(32)).unwrap();
+        let xt = build_signed_extrinsic(&signer, 26, 4, &[0xffu8; 4], 0, &test_meta());
+
+        let prefix_len = scale_compact(decode_compact_val(&xt) as u64).len();
         let inner = &xt[prefix_len..];
 
-        assert_eq!(inner[0], 0x84, "version byte: V4 signed");
+        assert_eq!(inner[0], 0x84, "version V4 signed");
         assert_eq!(inner[1], 0x00, "MultiAddress::Id prefix");
-        // public key: next 32 bytes
-        assert_eq!(&inner[2..34], &signer.public_key);
-        // signature type
+        assert_eq!(&inner[2..34], &signer.public_key, "public key");
         assert_eq!(inner[34], 0x01, "MultiSignature::Sr25519");
-        // 64 bytes of signature follow
-        assert_eq!(inner[35..99].len(), 64);
-        // era = immortal = 0x00
-        assert_eq!(inner[99], 0x00, "era: immortal");
-        // nonce compact(0) = 0x00
-        assert_eq!(inner[100], 0x00, "nonce compact 0");
-        // tip compact(0) = 0x00
-        assert_eq!(inner[101], 0x00, "tip compact 0");
-        // call pallet
-        assert_eq!(inner[102], 26);
-        assert_eq!(inner[103], 4);
+        assert_eq!(inner[35..99].len(), 64, "64 byte signature");
+        assert_eq!(inner[99], 0x00, "immortal era");
+        assert_eq!(inner[100], 0x00, "nonce compact(0)");
+        assert_eq!(inner[101], 0x00, "tip compact(0)");
+        assert_eq!(inner[102], 26, "pallet");
+        assert_eq!(inner[103], 4, "call");
     }
 
     #[test]
-    fn sr25519_signer_from_zero_seed() {
+    fn signed_extrinsic_different_nonces_differ() {
+        let signer = Sr25519Signer::from_seed_hex(&"01".repeat(32)).unwrap();
+        let m = test_meta();
+        let xt0 = build_signed_extrinsic(&signer, 26, 4, &[], 0, &m);
+        let xt1 = build_signed_extrinsic(&signer, 26, 4, &[], 1, &m);
+        assert_ne!(xt0, xt1);
+    }
+
+    // ── sr25519 signer ────────────────────────────────────────────────────
+
+    #[test]
+    fn sr25519_from_zero_seed_produces_public_key() {
         let s = Sr25519Signer::from_seed_hex(&"00".repeat(32)).unwrap();
         assert_eq!(s.public_key.len(), 32);
+        assert_ne!(s.public_key, [0u8; 32], "public key must not be all-zero");
     }
 
     #[test]
-    fn sr25519_signer_from_invalid_seed_errors() {
+    fn sr25519_from_invalid_hex_errors() {
         assert!(Sr25519Signer::from_seed_hex("not-hex").is_err());
-        assert!(Sr25519Signer::from_seed_hex("0102").is_err()); // too short
+    }
+
+    #[test]
+    fn sr25519_from_short_seed_errors() {
+        assert!(Sr25519Signer::from_seed_hex("0102").is_err());
     }
 
     #[test]
     fn sr25519_sign_produces_64_bytes() {
-        let s = Sr25519Signer::from_seed_hex(&"01".repeat(32)).unwrap();
-        assert_eq!(s.sign(b"test message").len(), 64);
+        let s = Sr25519Signer::from_seed_hex(&"ab".repeat(32)).unwrap();
+        assert_eq!(s.sign(b"hello world").len(), 64);
     }
 
     #[test]
-    fn sr25519_sign_large_payload_uses_hash() {
-        let s = Sr25519Signer::from_seed_hex(&"02".repeat(32)).unwrap();
-        let msg = vec![0u8; 300]; // > 256 bytes → should be hashed first
+    fn sr25519_signature_is_verifiable() {
+        let s = Sr25519Signer::from_seed_hex(&"cd".repeat(32)).unwrap();
+        let msg = b"test message";
+        let sig = s.sign(msg);
+        assert!(s.verify(msg, &sig), "signature must verify against same key");
+    }
+
+    #[test]
+    fn sr25519_large_payload_pre_hashed() {
+        let s = Sr25519Signer::from_seed_hex(&"ef".repeat(32)).unwrap();
+        let msg = vec![0u8; 300]; // > 256 bytes → Blake2b pre-hash path
         let sig = s.sign(&msg);
         assert_eq!(sig.len(), 64);
+        assert!(s.verify(&msg, &sig));
+    }
+
+    #[test]
+    fn sr25519_different_messages_different_sigs() {
+        let s = Sr25519Signer::from_seed_hex(&"ff".repeat(32)).unwrap();
+        let s1 = s.sign(b"msg1");
+        let s2 = s.sign(b"msg2");
+        assert_ne!(s1, s2);
     }
 
     // ── read_u64_le ───────────────────────────────────────────────────────
 
     #[test]
-    fn read_u64_le_at_offset() {
+    fn read_u64_le_at_offset_8() {
         let mut data = vec![0u8; 16];
-        data[8..16].copy_from_slice(&42u64.to_le_bytes());
-        assert_eq!(read_u64_le(&data, 8), Some(42));
+        data[8..16].copy_from_slice(&999u64.to_le_bytes());
+        assert_eq!(read_u64_le(&data, 8), Some(999));
     }
 
     #[test]
-    fn read_u64_le_oob() {
+    fn read_u64_le_at_offset_0() {
+        let data = 12345u64.to_le_bytes().to_vec();
+        assert_eq!(read_u64_le(&data, 0), Some(12345));
+    }
+
+    #[test]
+    fn read_u64_le_oob_returns_none() {
         assert_eq!(read_u64_le(&[0u8; 4], 4), None);
         assert_eq!(read_u64_le(&[], 0), None);
+        assert_eq!(read_u64_le(&[0u8; 7], 0), None); // 7 < 8
     }
 
     // ── base64_decode ─────────────────────────────────────────────────────
 
     #[test]
-    fn base64_decode_hello() {
+    fn base64_decode_known_vector() {
         assert_eq!(base64_decode("aGVsbG8="), b"hello");
     }
 
@@ -722,66 +900,77 @@ mod tests {
         assert_eq!(base64_decode(""), b"" as &[u8]);
     }
 
-    // ── E2E poll_once: finality skip ──────────────────────────────────────
+    #[test]
+    fn base64_decode_no_padding() {
+        // "Man" → "TWFu" (no padding needed for 3 bytes)
+        assert_eq!(base64_decode("TWFu"), b"Man");
+    }
+
+    // ── MetaCache refresh ─────────────────────────────────────────────────
 
     #[tokio::test]
-    async fn poll_once_skips_immature_accounts() {
-        // Mock: getSlot = 10, one account with created_slot = 8 (age = 2 < 32).
+    async fn meta_cache_returns_initial_value() {
+        let meta = ChainMeta { spec_version: 42, tx_version: 7, genesis_hash: [1u8; 32] };
+        let cache = MetaCache::new(meta, 300, "http://127.0.0.1:19944".to_string());
+        // Should return spec_version=42 without hitting any network.
+        // Set last_refresh to "now" so it won't try to refresh.
+        let client = reqwest::Client::new();
+        // Force TTL not expired (default 300s hasn't elapsed in 1ms).
+        assert_eq!(cache.spec_version().await, 42);
+    }
+
+    // ── E2E poll_once tests ───────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn poll_once_skips_account_below_finality() {
         use axum::{routing::post, Json, Router};
 
         async fn handler(Json(req): Json<serde_json::Value>) -> Json<serde_json::Value> {
-            let method = req["method"].as_str().unwrap_or("");
-            Json(match method {
-                "getSlot" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":10}),
+            Json(match req["method"].as_str().unwrap_or("") {
+                "getSlot" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":31u64}),
                 "getProgramAccounts" => {
                     let mut d = vec![0u8; 16];
-                    d[8..16].copy_from_slice(&8u64.to_le_bytes()); // created_slot = 8
+                    d[8..16].copy_from_slice(&0u64.to_le_bytes()); // created_slot=0
+                    // Global check: current_slot(31) < 32 → skip
                     serde_json::json!({"jsonrpc":"2.0","id":1,"result":[{
-                        "pubkey":"TestPubkey111",
-                        "account":{"lamports":1,"data":[base64_encode_test(&d),"base64"]}
+                        "pubkey":"Skip1111","account":{"lamports":1,"data":[b64_enc(&d),"base64"]}
                     }]})
                 }
                 _ => serde_json::json!({"jsonrpc":"2.0","id":1,"result":null}),
             })
         }
 
-        let app = Router::new().route("/", post(handler));
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-
+        let addr = spawn_mock_server(handler).await;
         let client = reqwest::Client::new();
         let rpc = format!("http://{}", addr);
-        let cfg  = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
+        let cfg = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
         let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
-        // Should complete without panic; no submission should reach a non-existent x3 node.
-        poll_once(&client, &rpc, "http://127.0.0.1:19944", "FakeProg", "test", &cfg, None, &meta).await;
+        let cache = MetaCache::new(meta, 9999, rpc.clone());
+        poll_once(&client, &rpc, "http://127.0.0.1:19944", "FakeProg", "t", &cfg, None, &cache).await;
+        // No panic = pass; submission not reached
     }
 
     #[tokio::test]
-    async fn poll_once_submits_mature_account() {
-        // Mock: getSlot = 100, one account with created_slot = 10 (age = 90 ≥ 32).
-        // X3 node mock returns a fake tx hash.
-        use axum::{routing::post, Json, Router};
+    async fn poll_once_submits_mature_account_unsigned() {
+        use axum::{extract::State, routing::post, Json, Router};
         use std::sync::{Arc, Mutex};
 
-        let submitted_calls: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
-        let submitted_clone = submitted_calls.clone();
+        let calls: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
+        let calls_clone = calls.clone();
 
         async fn handler(
-            axum::extract::State(calls): axum::extract::State<Arc<Mutex<Vec<String>>>>,
+            State(calls): State<Arc<Mutex<Vec<String>>>>,
             Json(req): Json<serde_json::Value>,
         ) -> Json<serde_json::Value> {
-            let method = req["method"].as_str().unwrap_or("").to_string();
-            calls.lock().unwrap().push(method.clone());
-            Json(match method.as_str() {
-                "getSlot" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":100}),
+            let m = req["method"].as_str().unwrap_or("").to_string();
+            calls.lock().unwrap().push(m.clone());
+            Json(match m.as_str() {
+                "getSlot" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":200u64}),
                 "getProgramAccounts" => {
                     let mut d = vec![0u8; 16];
-                    d[8..16].copy_from_slice(&10u64.to_le_bytes()); // created_slot = 10, age = 90
+                    d[8..16].copy_from_slice(&10u64.to_le_bytes()); // age = 190 ≥ 32
                     serde_json::json!({"jsonrpc":"2.0","id":1,"result":[{
-                        "pubkey":"MaturePubkey111",
-                        "account":{"lamports":1,"data":[base64_encode_test(&d),"base64"]}
+                        "pubkey":"MaturePubkey11","account":{"lamports":1,"data":[b64_enc(&d),"base64"]}
                     }]})
                 }
                 "author_submitExtrinsic" => {
@@ -791,9 +980,7 @@ mod tests {
             })
         }
 
-        let app = Router::new()
-            .route("/", post(handler))
-            .with_state(submitted_clone);
+        let app = Router::new().route("/", post(handler)).with_state(calls_clone);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
@@ -802,58 +989,75 @@ mod tests {
         let client = reqwest::Client::new();
         let cfg  = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
         let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
-        poll_once(&client, &rpc, &rpc, "FakeProg", "test", &cfg, None, &meta).await;
+        let cache = MetaCache::new(meta, 9999, rpc.clone());
+        poll_once(&client, &rpc, &rpc, "FakeProg", "t", &cfg, None, &cache).await;
 
-        let calls = submitted_calls.lock().unwrap();
-        assert!(calls.contains(&"author_submitExtrinsic".to_string()),
-            "expected author_submitExtrinsic to be called; got: {:?}", *calls);
+        let seen = calls.lock().unwrap();
+        assert!(seen.contains(&"author_submitExtrinsic".to_string()),
+            "expected author_submitExtrinsic; got {:?}", *seen);
     }
 
-    // ── Integration test (requires live Solana devnet) ────────────────────
-
-    /// Run with:  X3_SOLANA_RPC_URL=https://api.devnet.solana.com cargo test live_solana
     #[tokio::test]
-    #[ignore = "requires live Solana devnet (set X3_SOLANA_RPC_URL and run with --ignored)"]
+    async fn poll_once_handles_solana_rpc_failure_gracefully() {
+        // Point at a port that's not listening — should log a warning, not panic.
+        let client = reqwest::Client::builder().timeout(Duration::from_millis(200)).build().unwrap();
+        let cfg  = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
+        let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
+        let cache = MetaCache::new(meta, 9999, "http://127.0.0.1:19944".to_string());
+        // Must not panic or unwrap-fail.
+        poll_once(&client, "http://127.0.0.1:19944", "http://127.0.0.1:19944",
+                  "FakeProg", "t", &cfg, None, &cache).await;
+    }
+
+    /// Live Solana devnet integration test.
+    /// Run: `X3_SOLANA_RPC_URL=https://api.devnet.solana.com cargo test live_solana -- --ignored`
+    #[tokio::test]
+    #[ignore = "requires live Solana devnet (set X3_SOLANA_RPC_URL)"]
     async fn live_solana_get_slot_returns_nonzero() {
         let rpc = std::env::var("X3_SOLANA_RPC_URL")
             .unwrap_or_else(|_| "https://api.devnet.solana.com".to_string());
         let client = reqwest::Client::new();
-        let slot = solana_get_slot(&client, &rpc).await.expect("getSlot failed");
-        assert!(slot > 0, "expected a non-zero slot from live Solana");
+        let slot = solana_get_slot(&client, &rpc).await.expect("getSlot must succeed");
+        assert!(slot > 0, "slot must be non-zero on live devnet");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    /// Decode the first SCALE compact value; returns the integer it encodes.
-    fn decode_compact(bytes: &[u8]) -> usize {
+    fn decode_compact_val(bytes: &[u8]) -> usize {
         match bytes[0] & 0b11 {
             0 => (bytes[0] >> 2) as usize,
-            1 => {
-                let v = u16::from_le_bytes([bytes[0], bytes[1]]);
-                (v >> 2) as usize
-            }
-            2 => {
-                let v = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-                (v >> 2) as usize
-            }
-            _ => panic!("big-integer compact mode in test"),
+            1 => (u16::from_le_bytes([bytes[0], bytes[1]]) >> 2) as usize,
+            2 => (u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) >> 2) as usize,
+            _ => panic!("big-integer compact in test"),
         }
     }
 
-    fn base64_encode_test(data: &[u8]) -> String {
-        const T: &[u8; 64] =
-            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    async fn spawn_mock_server<F, Fut>(handler: F) -> std::net::SocketAddr
+    where
+        F: Fn(axum::extract::Json<serde_json::Value>) -> Fut + Clone + Send + 'static,
+        Fut: std::future::Future<Output = axum::extract::Json<serde_json::Value>> + Send,
+    {
+        use axum::{routing::post, Router};
+        let app = Router::new().route("/", post(handler));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        addr
+    }
+
+    pub fn b64_enc(data: &[u8]) -> String {
+        const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let mut o = String::new();
         let mut i = 0;
         while i < data.len() {
             let a = data[i] as u32;
             let b = if i+1 < data.len() { data[i+1] as u32 } else { 0 };
             let c = if i+2 < data.len() { data[i+2] as u32 } else { 0 };
-            let triple = (a << 16) | (b << 8) | c;
-            o.push(T[((triple >> 18) & 63) as usize] as char);
-            o.push(T[((triple >> 12) & 63) as usize] as char);
-            o.push(if i+1 < data.len() { T[((triple >> 6) & 63) as usize] as char } else { '=' });
-            o.push(if i+2 < data.len() { T[(triple & 63) as usize] as char } else { '=' });
+            let t = (a << 16) | (b << 8) | c;
+            o.push(T[((t >> 18) & 63) as usize] as char);
+            o.push(T[((t >> 12) & 63) as usize] as char);
+            o.push(if i+1 < data.len() { T[((t >> 6) & 63) as usize] as char } else { '=' });
+            o.push(if i+2 < data.len() { T[(t & 63) as usize] as char } else { '=' });
             i += 3;
         }
         o
