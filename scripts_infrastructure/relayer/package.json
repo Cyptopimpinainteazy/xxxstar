@@ -24,7 +24,7 @@
     "node-fetch": "^2.7.0",
     "picomatch": "^4.0.4",
     "serialize-javascript": "^7.0.5",
-    "ws": "^8.20.1"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.5",
