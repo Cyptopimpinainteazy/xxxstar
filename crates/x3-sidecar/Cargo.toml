@@ -10,7 +10,11 @@ name = "x3-sidecar"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full", "signal"] }
+clap = { version = "4", features = ["derive", "env"] }
 log = "0.4"
 env_logger = "0.11"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
