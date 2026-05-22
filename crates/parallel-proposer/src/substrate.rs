@@ -437,7 +437,7 @@ pub fn extract_tx_metadata<E: Encode>(extrinsic: &E, tx_hash: [u8; 32]) -> TxMet
                 sender.copy_from_slice(account.as_ref());
             }
 
-            let (_, _, _, _, _, check_nonce, _, _, _) = extra;
+            let (_, _, _, _, _, check_nonce, _, _, _, _) = extra;
             nonce = check_nonce.0.saturated_into::<u64>();
         }
 
