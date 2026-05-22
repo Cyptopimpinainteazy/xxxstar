@@ -52,21 +52,9 @@ const AURA: KeyTypeId = KeyTypeId(*b"aura");
 /// Key type for GRANDPA finality
 const GRANDPA: KeyTypeId = KeyTypeId(*b"gran");
 
-/// Txpool sizing aligned to X3 throughput targets.
-/// Default Substrate pool (8 192/512) is 12x too small for 100k TPS goals.
-/// Tuned per audit recommendation: 100k ready / 50k future, 256 MiB / 64 MiB.
-/// NOTE: Default sizing (100k ready / 50k future) scales dynamically based on network speed.
-/// See NetworkSpeed enum for speed-specific pool configurations.
-#[allow(dead_code)]
-const TX_POOL_READY_COUNT: usize = 100_000;
-#[allow(dead_code)]
-const TX_POOL_FUTURE_COUNT: usize = 50_000;
-#[allow(dead_code)]
-const TX_POOL_READY_BYTES: usize = 256 * 1024 * 1024; // 256 MiB
-#[allow(dead_code)]
-const TX_POOL_FUTURE_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
-#[allow(dead_code)]
-const TX_POOL_BAN_TIME_SECS: u64 = 60; // 60s ban (vs default 1800s) — faster retry under burst
+/// Txpool sizing is determined dynamically by NetworkSpeed::detect().
+/// Design targets: 100k ready / 50k future, 256 MiB / 64 MiB, 60s ban.
+/// See NetworkSpeed enum and tuned_transaction_pool_options for runtime values.
 
 /// GPU Validator Sidecar health check interval (blocks).
 /// Health check runs every N blocks to detect sidecar crashes.
@@ -1254,9 +1242,11 @@ pub fn new_full<
                         {
                             last_checked_block = current_block;
 
-                            // Perform health check (TODO(t5-1): implement actual process detection + RPC probe — tracked in session todo 't5-1')
-                            let health_status = health_monitor.check_health(current_block);
-                            health_monitor.record_check(health_status, current_block);
+                            // Probe orchestrator health — feeds actual sidecar status into the monitor.
+                            let orch_guard = orch_for_monitor.read().await;
+                            let healthy = orch_guard.health_check().is_ok();
+                            drop(orch_guard);
+                            health_monitor.record_check(healthy, current_block);
 
                             if health_monitor.needs_restart() {
                                 // Restart GPU sidecar via orchestrator
@@ -1364,11 +1354,6 @@ pub fn new_full<
                 ));
 
                 {
-                    // C-002: replace the no-op keep-alive loop with a real
-                    // cross-VM bridge poller backed by RuntimeCrossVmDispatcher,
-                    // so pending EVM/SVM operations are actually submitted to the
-                    // runtime rather than discarded inside a 1-hour sleep loop.
-                    // TODO(t5-2): tracked in session todo 't5-2' — implement dispatcher wiring and remove no-op loop
                     let dispatcher = Arc::new(RuntimeCrossVmDispatcher::new(client.clone()));
                     let bridge = Arc::new(std::sync::Mutex::new(CrossVmBridge::new()));
                     let bridge_safety_gate = CrossVmBridgeSafetyGate::default();
@@ -1660,6 +1645,12 @@ async fn spawn_gpu_sidecar(
     );
 
     let mut health_check_counter = 0u32;
+    // Reuse a single HTTP client across ticks — avoids spawning a new connection
+    // pool every 10 seconds and exhausting file-descriptor limits under load.
+    let http_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("GPU Sidecar: HTTP client build failed: {}", e))?;
 
     loop {
         tokio::select! {
@@ -1679,16 +1670,71 @@ async fn spawn_gpu_sidecar(
                     health_check_counter
                 );
 
-                // Dispatch pending validation tasks to the GPU swarm every tick.
-                // Each task carries a heartbeat payload (service_id + tick counter)
-                // that the orchestrator hashes deterministically.  When real block
-                // headers arrive via RPC this payload is replaced with the header bytes.
+                // Dispatch a validation task carrying real block state bytes.
+                // We query `chain_getHeader` on the local X3 node to get the
+                // latest block hash + number as deterministic task inputs.
+                let block_inputs: Vec<Vec<u8>> = {
+                    let x3_rpc = &sidecar_config.rpc_endpoint;
+                    let rpc_body = serde_json::json!({
+                        "jsonrpc": "2.0", "id": 1,
+                        "method": "chain_getHeader",
+                        "params": []
+                    });
+                    match http_client
+                        .post(x3_rpc)
+                        .json(&rpc_body)
+                        .send()
+                        .await
+                        .and_then(|r| r.error_for_status())
+                    {
+                        Ok(resp) => {
+                            match resp.json::<serde_json::Value>().await {
+                                Ok(v) => {
+                                    let hash = v["result"]["parentHash"]
+                                        .as_str()
+                                        .unwrap_or("")
+                                        .trim_start_matches("0x")
+                                        .as_bytes()
+                                        .to_vec();
+                                    let num_hex = v["result"]["number"]
+                                        .as_str()
+                                        .unwrap_or("0x0")
+                                        .trim_start_matches("0x");
+                                    let num = u64::from_str_radix(num_hex, 16).unwrap_or(0);
+                                    log::debug!(
+                                        "🎮 GPU Sidecar '{}' tick #{}: block #{} hash_len={}",
+                                        sidecar_config.service_id,
+                                        health_check_counter,
+                                        num,
+                                        hash.len()
+                                    );
+                                    vec![hash, num.to_le_bytes().to_vec()]
+                                }
+                                Err(e) => {
+                                    log::warn!("🎮 GPU Sidecar: JSON decode error: {}", e);
+                                    vec![
+                                        sidecar_config.service_id.as_bytes().to_vec(),
+                                        health_check_counter.to_le_bytes().to_vec(),
+                                    ]
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "🎮 GPU Sidecar '{}' tick #{}: chain_getHeader failed ({}), using fallback",
+                                sidecar_config.service_id, health_check_counter, e
+                            );
+                            vec![
+                                sidecar_config.service_id.as_bytes().to_vec(),
+                                health_check_counter.to_le_bytes().to_vec(),
+                            ]
+                        }
+                    }
+                };
+
                 let task = DeterministicTask::new(
                     TaskType::Hash,
-                    vec![
-                        sidecar_config.service_id.as_bytes().to_vec(),
-                        health_check_counter.to_le_bytes().to_vec(),
-                    ],
+                    block_inputs,
                     HashAlgorithm::Blake2b,
                 );
 
@@ -1761,19 +1807,34 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
     let solana_rpc = std::env::var("X3_SOLANA_RPC_URL")
         .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
 
+    // X3 node RPC for extrinsic submission (bridge events).
+    let x3_node_rpc = std::env::var("X3_NODE_RPC_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string());
+
+    // Escrow program ID to monitor on Solana.
+    let escrow_program = std::env::var("X3_ESCROW_PROGRAM").unwrap_or_default();
+
     log::info!(
-        "🔌 Spawning sidecar '{}' via binary '{}' (Solana RPC: {})",
+        "🔌 Spawning sidecar '{}' via binary '{}' (Solana RPC: {}, X3 RPC: {})",
         service_id,
         bin_path,
-        solana_rpc
+        solana_rpc,
+        x3_node_rpc
     );
 
-    let status = tokio::process::Command::new(&bin_path)
-        .arg("--service-id")
+    let mut cmd = tokio::process::Command::new(&bin_path);
+    cmd.arg("--service-id")
         .arg(service_id)
         .arg("--solana-rpc")
         .arg(&solana_rpc)
-        .kill_on_drop(true)
+        .arg("--x3-rpc")
+        .arg(&x3_node_rpc)
+        .kill_on_drop(true);
+    if !escrow_program.is_empty() {
+        cmd.arg("--escrow-program").arg(&escrow_program);
+    }
+
+    let status = cmd
         .status()
         .await
         .map_err(|e| format!("failed to launch '{}': {}", bin_path, e))?;
