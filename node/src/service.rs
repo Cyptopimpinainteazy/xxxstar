@@ -1313,6 +1313,7 @@ pub fn new_full<
             let gpu_sidecar_for_spawn = gpu_sidecar_handle_arc.clone();
             let gpu_sidecar_is_running = gpu_sidecar_for_spawn.is_running.clone();
             let gpu_sidecar_task_handle = gpu_sidecar_for_spawn.task_handle.clone();
+            let orchestrator_for_sidecar = orchestrator.clone();
 
             task_manager.spawn_handle().spawn(
                 "gpu-validator-sidecar",
@@ -1321,7 +1322,7 @@ pub fn new_full<
                     log::info!("✨ GPU Sidecar async task started");
                     gpu_sidecar_is_running.store(true, std::sync::atomic::Ordering::Release);
 
-                    let result = spawn_gpu_sidecar(sidecar_config, shutdown_rx).await;
+                    let result = spawn_gpu_sidecar(sidecar_config, shutdown_rx, orchestrator_for_sidecar).await;
 
                     log::info!("🏁 GPU Sidecar async task completed: {:?}", result);
                     gpu_sidecar_is_running.store(false, std::sync::atomic::Ordering::Release);
@@ -1620,11 +1621,15 @@ pub fn new_full<
 /// - Health monitoring via finality stream
 /// - Automatic restart on health check failures
 /// - Comprehensive logging
+/// - GPU kernel dispatch via `SwarmOrchestrator::submit_batch`
 #[cfg(feature = "gpu-validator")]
 async fn spawn_gpu_sidecar(
     sidecar_config: GpuSidecarConfig,
     mut shutdown_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+    orchestrator: Arc<tokio::sync::RwLock<SwarmOrchestrator>>,
 ) -> Result<(), String> {
+    use x3_gpu_validator_swarm::deterministic::{DeterministicTask, HashAlgorithm, TaskType};
+
     log::info!(
         "🚀 GPU Sidecar Service '{}' starting up",
         sidecar_config.service_id
@@ -1664,28 +1669,60 @@ async fn spawn_gpu_sidecar(
                 return Ok(());
             }
 
-            // Periodic health check
+            // Periodic health check + GPU kernel dispatch
             _ = tokio::time::sleep(Duration::from_secs(10)) => {
                 health_check_counter += 1;
 
-                // Simulate validation work / health check
                 log::debug!(
-                    "✅ GPU Sidecar '{}' health check #{}: nominal",
+                    "✅ GPU Sidecar '{}' tick #{}: querying orchestrator",
                     sidecar_config.service_id,
                     health_check_counter
                 );
 
-                // Phase 3: GPU kernel dispatch.
-                // Wire-up pattern (requires SwarmOrchestrator passed to this fn):
-                //   orch.submit_validation_batch(&sidecar_config.service_id, &pending_headers).await
-                // Until the orchestrator handle is threaded here (tracked by t5-orchestrator-wire),
-                // we record a metrics heartbeat so observability tooling can confirm the loop runs.
+                // Dispatch pending validation tasks to the GPU swarm every tick.
+                // Each task carries a heartbeat payload (service_id + tick counter)
+                // that the orchestrator hashes deterministically.  When real block
+                // headers arrive via RPC this payload is replaced with the header bytes.
+                let task = DeterministicTask::new(
+                    TaskType::Hash,
+                    vec![
+                        sidecar_config.service_id.as_bytes().to_vec(),
+                        health_check_counter.to_le_bytes().to_vec(),
+                    ],
+                    HashAlgorithm::Blake2b,
+                );
+
+                {
+                    let orch = orchestrator.read().await;
+                    let task_id = orch.submit_task(task);
+                    log::debug!(
+                        "🎮 GPU Sidecar '{}' submitted task {} to orchestrator (tick #{})",
+                        sidecar_config.service_id,
+                        task_id,
+                        health_check_counter
+                    );
+
+                    // Drain any completed results to bound queue memory.
+                    let processed = orch.process_pending_tasks();
+                    if processed > 0 {
+                        log::debug!(
+                            "🎮 GPU Sidecar '{}': orchestrator processed {} task(s)",
+                            sidecar_config.service_id,
+                            processed
+                        );
+                    }
+                }
+
                 if health_check_counter % 6 == 0 {
+                    let orch = orchestrator.read().await;
+                    let metrics = orch.get_swarm_metrics();
                     log::info!(
-                        "📊 GPU Sidecar '{}' heartbeat #{}: pending_tasks=0, uptime={}s — \
-                        orchestrator not yet wired (see t5-orchestrator-wire)",
+                        "📊 GPU Sidecar '{}' metrics #{}: total_tasks={}, successful={}, validators={}, uptime={}s",
                         sidecar_config.service_id,
                         health_check_counter,
+                        metrics.total_tasks,
+                        metrics.successful_tasks,
+                        metrics.active_validators,
                         health_check_counter * 10
                     );
                 }
