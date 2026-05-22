@@ -1660,6 +1660,12 @@ async fn spawn_gpu_sidecar(
     );
 
     let mut health_check_counter = 0u32;
+    // Reuse a single HTTP client across ticks — avoids spawning a new connection
+    // pool every 10 seconds and exhausting file-descriptor limits under load.
+    let http_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("GPU Sidecar: HTTP client build failed: {}", e))?;
 
     loop {
         tokio::select! {
@@ -1689,10 +1695,9 @@ async fn spawn_gpu_sidecar(
                         "method": "chain_getHeader",
                         "params": []
                     });
-                    match reqwest::Client::new()
+                    match http_client
                         .post(x3_rpc)
                         .json(&rpc_body)
-                        .timeout(Duration::from_secs(5))
                         .send()
                         .await
                         .and_then(|r| r.error_for_status())
