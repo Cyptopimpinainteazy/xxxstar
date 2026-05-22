@@ -1679,16 +1679,72 @@ async fn spawn_gpu_sidecar(
                     health_check_counter
                 );
 
-                // Dispatch pending validation tasks to the GPU swarm every tick.
-                // Each task carries a heartbeat payload (service_id + tick counter)
-                // that the orchestrator hashes deterministically.  When real block
-                // headers arrive via RPC this payload is replaced with the header bytes.
+                // Dispatch a validation task carrying real block state bytes.
+                // We query `chain_getHeader` on the local X3 node to get the
+                // latest block hash + number as deterministic task inputs.
+                let block_inputs: Vec<Vec<u8>> = {
+                    let x3_rpc = &sidecar_config.rpc_endpoint;
+                    let rpc_body = serde_json::json!({
+                        "jsonrpc": "2.0", "id": 1,
+                        "method": "chain_getHeader",
+                        "params": []
+                    });
+                    match reqwest::Client::new()
+                        .post(x3_rpc)
+                        .json(&rpc_body)
+                        .timeout(Duration::from_secs(5))
+                        .send()
+                        .await
+                        .and_then(|r| r.error_for_status())
+                    {
+                        Ok(resp) => {
+                            match resp.json::<serde_json::Value>().await {
+                                Ok(v) => {
+                                    let hash = v["result"]["parentHash"]
+                                        .as_str()
+                                        .unwrap_or("")
+                                        .trim_start_matches("0x")
+                                        .as_bytes()
+                                        .to_vec();
+                                    let num_hex = v["result"]["number"]
+                                        .as_str()
+                                        .unwrap_or("0x0")
+                                        .trim_start_matches("0x");
+                                    let num = u64::from_str_radix(num_hex, 16).unwrap_or(0);
+                                    log::debug!(
+                                        "🎮 GPU Sidecar '{}' tick #{}: block #{} hash_len={}",
+                                        sidecar_config.service_id,
+                                        health_check_counter,
+                                        num,
+                                        hash.len()
+                                    );
+                                    vec![hash, num.to_le_bytes().to_vec()]
+                                }
+                                Err(e) => {
+                                    log::warn!("🎮 GPU Sidecar: JSON decode error: {}", e);
+                                    vec![
+                                        sidecar_config.service_id.as_bytes().to_vec(),
+                                        health_check_counter.to_le_bytes().to_vec(),
+                                    ]
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "🎮 GPU Sidecar '{}' tick #{}: chain_getHeader failed ({}), using fallback",
+                                sidecar_config.service_id, health_check_counter, e
+                            );
+                            vec![
+                                sidecar_config.service_id.as_bytes().to_vec(),
+                                health_check_counter.to_le_bytes().to_vec(),
+                            ]
+                        }
+                    }
+                };
+
                 let task = DeterministicTask::new(
                     TaskType::Hash,
-                    vec![
-                        sidecar_config.service_id.as_bytes().to_vec(),
-                        health_check_counter.to_le_bytes().to_vec(),
-                    ],
+                    block_inputs,
                     HashAlgorithm::Blake2b,
                 );
 
@@ -1761,19 +1817,34 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
     let solana_rpc = std::env::var("X3_SOLANA_RPC_URL")
         .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
 
+    // X3 node RPC for extrinsic submission (bridge events).
+    let x3_node_rpc = std::env::var("X3_NODE_RPC_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string());
+
+    // Escrow program ID to monitor on Solana.
+    let escrow_program = std::env::var("X3_ESCROW_PROGRAM").unwrap_or_default();
+
     log::info!(
-        "🔌 Spawning sidecar '{}' via binary '{}' (Solana RPC: {})",
+        "🔌 Spawning sidecar '{}' via binary '{}' (Solana RPC: {}, X3 RPC: {})",
         service_id,
         bin_path,
-        solana_rpc
+        solana_rpc,
+        x3_node_rpc
     );
 
-    let status = tokio::process::Command::new(&bin_path)
-        .arg("--service-id")
+    let mut cmd = tokio::process::Command::new(&bin_path);
+    cmd.arg("--service-id")
         .arg(service_id)
         .arg("--solana-rpc")
         .arg(&solana_rpc)
-        .kill_on_drop(true)
+        .arg("--x3-rpc")
+        .arg(&x3_node_rpc)
+        .kill_on_drop(true);
+    if !escrow_program.is_empty() {
+        cmd.arg("--escrow-program").arg(&escrow_program);
+    }
+
+    let status = cmd
         .status()
         .await
         .map_err(|e| format!("failed to launch '{}': {}", bin_path, e))?;
