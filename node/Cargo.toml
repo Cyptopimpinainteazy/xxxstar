@@ -47,6 +47,7 @@ log = "0.4"
 env_logger = "0.10"
 serde = { workspace = true }
 serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"], optional = true }
 codec = { package = "parity-scale-codec", version = "3.6", default-features = false, features = ["derive"] }
 x3-common = { path = "../crates/x3-common" }
 jsonrpsee = { workspace = true }
@@ -93,7 +94,7 @@ cli = []
 
 # GPU validator orchestrator feature (requires x3-gpu-validator-swarm crate).
 # Enable to spawn the GPU validator swarm orchestrator during node startup.
-gpu-validator = ["x3-gpu-validator-swarm", "x3-chain-runtime/gpu-validator"]
+gpu-validator = ["x3-gpu-validator-swarm", "x3-chain-runtime/gpu-validator", "reqwest"]
 
 # Optional flags to enable Frontier JSON-RPC and EVM runtime features.  
 # Enabling `frontier` will opt-in to Frontier crates and runtime adapters.
