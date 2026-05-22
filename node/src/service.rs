@@ -1522,10 +1522,8 @@ pub fn new_full<
                             chain_name_for_sidecar
                         );
 
-                        // Sidecar service spawn attempt
-                        // TODO: Replace with actual sidecar spawning logic once x3-sidecar
-                        // crate exports a public start_sidecar() function.
-                        // Placeholder demonstrates intended lifecycle management:
+                        // Spawn the sidecar binary. On clean exit break; on error the
+                        // outer restart loop applies exponential back-off (up to 60s).
                         match spawn_sidecar_service(&sidecar_task_name).await {
                             Ok(()) => {
                                 // If sidecar completed normally, exit loop
@@ -1677,18 +1675,17 @@ async fn spawn_gpu_sidecar(
                     health_check_counter
                 );
 
-                // TODO Phase 3: Wire actual GPU kernel execution here
-                // In production this would:
-                // 1. Query pending EVM/SVM headers via RPC
-                // 2. Dispatch to GPU validation kernels
-                // 3. Verify results with CPU
-                // 4. Submit proofs to pallet-x3-verifier via extrinsic
-                //
-                // For now, stub implementation logs and continues
+                // Phase 3: GPU kernel dispatch.
+                // Wire-up pattern (requires SwarmOrchestrator passed to this fn):
+                //   orch.submit_validation_batch(&sidecar_config.service_id, &pending_headers).await
+                // Until the orchestrator handle is threaded here (tracked by t5-orchestrator-wire),
+                // we record a metrics heartbeat so observability tooling can confirm the loop runs.
                 if health_check_counter % 6 == 0 {
                     log::info!(
-                        "📊 GPU Sidecar '{}' health metrics: active_tasks=0, gpu_util=0%, uptime={}s",
+                        "📊 GPU Sidecar '{}' heartbeat #{}: pending_tasks=0, uptime={}s — \
+                        orchestrator not yet wired (see t5-orchestrator-wire)",
                         sidecar_config.service_id,
+                        health_check_counter,
                         health_check_counter * 10
                     );
                 }
@@ -1699,25 +1696,58 @@ async fn spawn_gpu_sidecar(
 
 /// Spawn the X3 Sidecar Service for cross-VM bridge monitoring.
 ///
-/// This function was previously a placeholder. It now integrates GPU sidecar spawning
-/// into the node's async runtime with proper lifecycle management.
+/// Attempts to launch the `x3-sidecar` binary as a child process.  The binary
+/// path is resolved in order:
+/// 1. `X3_SIDECAR_BIN` environment variable
+/// 2. Same directory as the running node executable
+/// 3. `PATH` lookup (`x3-sidecar`)
+///
+/// If the binary cannot be found or fails to start the function returns `Err`
+/// so the caller's restart loop engages with exponential back-off.  If the
+/// binary exits cleanly (status 0) the function returns `Ok(())`.
 async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
-    log::debug!(
-        "🔌 Cross-VM Sidecar Service '{}': platform-dependent initialization",
-        service_id
+    // Resolve sidecar binary path.
+    let bin_path = if let Ok(explicit) = std::env::var("X3_SIDECAR_BIN") {
+        explicit
+    } else if let Ok(mut exe) = std::env::current_exe() {
+        exe.set_file_name("x3-sidecar");
+        if exe.exists() {
+            exe.to_string_lossy().into_owned()
+        } else {
+            "x3-sidecar".to_string()
+        }
+    } else {
+        "x3-sidecar".to_string()
+    };
+
+    // Optional Solana RPC endpoint forwarded to the child process.
+    let solana_rpc = std::env::var("X3_SOLANA_RPC_URL")
+        .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
+
+    log::info!(
+        "🔌 Spawning sidecar '{}' via binary '{}' (Solana RPC: {})",
+        service_id,
+        bin_path,
+        solana_rpc
     );
 
-    // TODO: Implement actual cross-VM bridge monitoring here
-    // The sidecar should:
-    // 1. Connect to Solana RPC (for SPL monitoring)
-    // 2. Listen for escrow events
-    // 3. Validate finality (32 confirmations)
-    // 4. Submit bridge extrinsics to X3 node via RPC
+    let status = tokio::process::Command::new(&bin_path)
+        .arg("--service-id")
+        .arg(service_id)
+        .arg("--solana-rpc")
+        .arg(&solana_rpc)
+        .kill_on_drop(true)
+        .status()
+        .await
+        .map_err(|e| format!("failed to launch '{}': {}", bin_path, e))?;
 
-    // For now, simulate a running sidecar that logs periodically
-    loop {
-        tokio::time::sleep(Duration::from_secs(30)).await;
-        log::debug!("🔌 Sidecar '{}' health check: OK", service_id);
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "x3-sidecar exited with status {}",
+            status.code().unwrap_or(-1)
+        ))
     }
 }
 
