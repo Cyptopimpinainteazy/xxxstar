@@ -488,39 +488,45 @@ pub fn base64_decode(s: &str) -> Vec<u8> {
 
 // ─── Poll cycle ───────────────────────────────────────────────────────────────
 
+/// Groups the connection-oriented params for `poll_once`, keeping argument count
+/// within clippy's `too_many_arguments` limit.
+pub struct PollerContext<'a> {
+    pub solana_rpc:     &'a str,
+    pub x3_rpc:         &'a str,
+    pub escrow_program: &'a str,
+    pub service_id:     &'a str,
+    pub cfg:            &'a BridgeConfig,
+}
+
 pub async fn poll_once(
-    client: &reqwest::Client,
-    solana_rpc: &str,
-    x3_rpc: &str,
-    escrow_program: &str,
-    service_id: &str,
-    cfg: &BridgeConfig,
-    signer: Option<&Sr25519Signer>,
+    client:     &reqwest::Client,
+    ctx:        &PollerContext<'_>,
+    signer:     Option<&Sr25519Signer>,
     meta_cache: &MetaCache,
 ) {
-    let current_slot = match solana_get_slot(client, solana_rpc).await {
+    let current_slot = match solana_get_slot(client, ctx.solana_rpc).await {
         Ok(s) => s,
-        Err(e) => { log::warn!("[{}] getSlot: {}", service_id, e); return; }
+        Err(e) => { log::warn!("[{}] getSlot: {}", ctx.service_id, e); return; }
     };
 
-    let accounts = match solana_get_program_accounts(client, solana_rpc, escrow_program).await {
+    let accounts = match solana_get_program_accounts(client, ctx.solana_rpc, ctx.escrow_program).await {
         Ok(a) => a,
-        Err(e) => { log::warn!("[{}] getProgramAccounts: {}", service_id, e); return; }
+        Err(e) => { log::warn!("[{}] getProgramAccounts: {}", ctx.service_id, e); return; }
     };
 
     if accounts.is_empty() {
-        log::debug!("[{}] no escrow accounts (slot={})", service_id, current_slot);
+        log::debug!("[{}] no escrow accounts (slot={})", ctx.service_id, current_slot);
         return;
     }
-    log::info!("[{}] {} account(s) @ Solana slot {}", service_id, accounts.len(), current_slot);
+    log::info!("[{}] {} account(s) @ Solana slot {}", ctx.service_id, accounts.len(), current_slot);
 
     // Fetch (possibly refreshed) chain metadata once per poll cycle.
-    let meta = meta_cache.get(client, service_id).await;
+    let meta = meta_cache.get(client, ctx.service_id).await;
 
     for acc in &accounts {
         if !is_finality_confirmed(current_slot, acc.created_slot) {
             let age = current_slot.saturating_sub(acc.created_slot);
-            log::debug!("[{}] skip {} — age {} < {}", service_id, acc.pubkey, age, FINALITY_CONFIRMATIONS);
+            log::debug!("[{}] skip {} — age {} < {}", ctx.service_id, acc.pubkey, age, FINALITY_CONFIRMATIONS);
             continue;
         }
 
@@ -528,29 +534,29 @@ pub async fn poll_once(
         // Clamp slot to u32 for the block_number field — Substrate block numbers
         // are u32 and Solana slot numbers can exceed u32::MAX in the far future.
         let block_number = current_slot.min(u32::MAX as u64) as u32;
-        let call_args = encode_register_args(cfg.solana_chain_id, &root_hash, block_number, &acc.data);
+        let call_args = encode_register_args(ctx.cfg.solana_chain_id, &root_hash, block_number, &acc.data);
 
         let xt = match signer {
             Some(s) => {
-                let nonce = match fetch_nonce(client, x3_rpc, &s.public_key).await {
+                let nonce = match fetch_nonce(client, ctx.x3_rpc, &s.public_key).await {
                     Ok(n) => n,
-                    Err(e) => { log::error!("[{}] nonce fetch: {}", service_id, e); continue; }
+                    Err(e) => { log::error!("[{}] nonce fetch: {}", ctx.service_id, e); continue; }
                 };
-                build_signed_extrinsic(s, cfg.pallet_index, cfg.call_index, &call_args, nonce, &meta)
+                build_signed_extrinsic(s, ctx.cfg.pallet_index, ctx.cfg.call_index, &call_args, nonce, &meta)
             }
             None => {
-                log::warn!("[{}] X3_SIGNER_SEED_HEX not set — unsigned extrinsic (devnet only)", service_id);
-                build_unsigned_extrinsic(cfg.pallet_index, cfg.call_index, &call_args)
+                log::warn!("[{}] X3_SIGNER_SEED_HEX not set — unsigned extrinsic (devnet only)", ctx.service_id);
+                build_unsigned_extrinsic(ctx.cfg.pallet_index, ctx.cfg.call_index, &call_args)
             }
         };
 
         let hex_xt = format!("0x{}", hex::encode(&xt));
         let pk_prefix = &acc.pubkey[..8.min(acc.pubkey.len())];
-        log::info!("[{}] 🌉 pubkey={}… root={} block={}", service_id, pk_prefix, hex::encode(&root_hash[..8]), block_number);
+        log::info!("[{}] 🌉 pubkey={}… root={} block={}", ctx.service_id, pk_prefix, hex::encode(&root_hash[..8]), block_number);
 
-        match rpc_call(client, x3_rpc, "author_submitExtrinsic", serde_json::json!([hex_xt])).await {
-            Ok(tx) => log::info!("[{}] ✅ tx={}", service_id, tx),
-            Err(e) => log::error!("[{}] ❌ submit failed: {}", service_id, e),
+        match rpc_call(client, ctx.x3_rpc, "author_submitExtrinsic", serde_json::json!([hex_xt])).await {
+            Ok(tx) => log::info!("[{}] ✅ tx={}", ctx.service_id, tx),
+            Err(e) => log::error!("[{}] ❌ submit failed: {}", ctx.service_id, e),
         }
     }
 }
@@ -566,7 +572,7 @@ async fn main() {
     let signer: Option<Sr25519Signer> = match std::env::var("X3_SIGNER_SEED_HEX") {
         Ok(seed) => match Sr25519Signer::from_seed_hex(&seed) {
             Ok(s) => {
-                log::info!("[{}] sr25519 signer loaded (pubkey={})", args.service_id, hex::encode(&s.public_key));
+                log::info!("[{}] sr25519 signer loaded (pubkey={})", args.service_id, hex::encode(s.public_key));
                 Some(s)
             }
             Err(e) => {
@@ -588,7 +594,7 @@ async fn main() {
     let initial_meta = match fetch_chain_meta(&bootstrap_client, &args.x3_rpc).await {
         Ok(m) => {
             log::info!("[{}] chain meta: spec_version={} tx_version={} genesis={}",
-                args.service_id, m.spec_version, m.tx_version, hex::encode(&m.genesis_hash));
+                args.service_id, m.spec_version, m.tx_version, hex::encode(m.genesis_hash));
             m
         }
         Err(e) => {
@@ -615,11 +621,14 @@ async fn main() {
                 break;
             }
             _ = tokio::time::sleep(poll_interval) => {
-                poll_once(
-                    &client, &args.solana_rpc, &args.x3_rpc,
-                    &args.escrow_program, &args.service_id,
-                    &cfg, signer.as_ref(), &meta_cache,
-                ).await;
+                let ctx = PollerContext {
+                    solana_rpc:     &args.solana_rpc,
+                    x3_rpc:         &args.x3_rpc,
+                    escrow_program: &args.escrow_program,
+                    service_id:     &args.service_id,
+                    cfg:            &cfg,
+                };
+                poll_once(&client, &ctx, signer.as_ref(), &meta_cache).await;
             }
         }
     }
@@ -946,7 +955,8 @@ mod tests {
         let cfg = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
         let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
         let cache = MetaCache::new(meta, 9999, rpc.clone());
-        poll_once(&client, &rpc, "http://127.0.0.1:19944", "FakeProg", "t", &cfg, None, &cache).await;
+        let ctx = PollerContext { solana_rpc: &rpc, x3_rpc: "http://127.0.0.1:19944", escrow_program: "FakeProg", service_id: "t", cfg: &cfg };
+        poll_once(&client, &ctx, None, &cache).await;
         // No panic = pass; submission not reached
     }
 
@@ -990,7 +1000,8 @@ mod tests {
         let cfg  = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
         let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
         let cache = MetaCache::new(meta, 9999, rpc.clone());
-        poll_once(&client, &rpc, &rpc, "FakeProg", "t", &cfg, None, &cache).await;
+        let ctx = PollerContext { solana_rpc: &rpc, x3_rpc: &rpc, escrow_program: "FakeProg", service_id: "t", cfg: &cfg };
+        poll_once(&client, &ctx, None, &cache).await;
 
         let seen = calls.lock().unwrap();
         assert!(seen.contains(&"author_submitExtrinsic".to_string()),
@@ -1004,9 +1015,12 @@ mod tests {
         let cfg  = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
         let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
         let cache = MetaCache::new(meta, 9999, "http://127.0.0.1:19944".to_string());
+        let ctx = PollerContext {
+            solana_rpc: "http://127.0.0.1:19944", x3_rpc: "http://127.0.0.1:19944",
+            escrow_program: "FakeProg", service_id: "t", cfg: &cfg,
+        };
         // Must not panic or unwrap-fail.
-        poll_once(&client, "http://127.0.0.1:19944", "http://127.0.0.1:19944",
-                  "FakeProg", "t", &cfg, None, &cache).await;
+        poll_once(&client, &ctx, None, &cache).await;
     }
 
     /// Live Solana devnet integration test.
