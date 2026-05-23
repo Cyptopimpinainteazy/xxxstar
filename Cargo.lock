@@ -601,6 +601,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arcstr"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03918c3dbd7701a85c6b9887732e2921175f26c350b4563841d0958c21d57e6d"
+
+[[package]]
 name = "ark-bls12-377"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12734,10 +12740,12 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.32.7"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "014cc767fefab6a3e798ca45112bccad9c6e0e218fbd49720042716c73cfef44"
+checksum = "72d32a1ac9123f0d84fda64bfc02a271d9868483162dd2d9099b5c362ece064c"
 dependencies = [
+ "arcstr",
+ "async-lock",
  "bytes",
  "cfg-if",
  "combine 4.6.7",
@@ -12752,6 +12760,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "url 2.5.8",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -22589,6 +22598,7 @@ dependencies = [
  "pallet-x3-verifier",
  "parallel-proposer",
  "parity-scale-codec",
+ "reqwest 0.11.27",
  "sc-basic-authorship",
  "sc-cli",
  "sc-client-api",
@@ -23454,6 +23464,12 @@ checksum = "d7d8a75eaf6557bb84a65ace8609883db44a29951042ada9b393151532e41fcb"
 dependencies = [
  "xml-rs",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "yaml-rust"
