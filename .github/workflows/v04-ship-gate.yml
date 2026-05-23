@@ -120,9 +120,9 @@ jobs:
             register_external_root_rejected_when_bridges_disabled \
             only_root_can_toggle_external_bridges \
             register_external_root_works_only_after_governance_enables \
-            test_duplicate_nonce_rejected
+            duplicate_message_id_rejected
 
-          cargo test -p x3-sidecar --bin x3-sidecar -- \
+          cargo test --manifest-path crates/x3-sidecar/Cargo.toml --bin x3-sidecar -- \
             poll_once_signed_submit_handles_bad_origin_rejection \
             poll_once_signed_submit_handles_duplicate_rejection
 
