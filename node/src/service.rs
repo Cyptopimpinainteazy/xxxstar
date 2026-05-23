@@ -1261,7 +1261,7 @@ pub fn new_full<
                                     health_monitor.reset();
                                 }
                                 drop(orch);
-                            } else if health_status {
+                            } else if healthy {
                                 log::debug!(
                                     "✅ GPU sidecar health check passed at block {}",
                                     current_block

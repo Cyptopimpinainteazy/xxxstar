@@ -18,18 +18,18 @@ Status as of cleanup pass (2026-05-22).
   Stale C-002 and TODO(t5-2) comments removed.
 
 ## t5-3 (runtime/src/precompiles.rs)
-- **Status: OPEN** — Precompile TODO markers may affect gas accounting or address
-  checks. Do not change runtime logic without governance/consensus review. Draft
-  concrete changes and tests in a separate RFC before merging.
+- **Status: RFC DRAFTED** — see [`docs/rfc/RFC-t5-3-precompile-gas-addresses.md`](rfc/RFC-t5-3-precompile-gas-addresses.md)
+- Precompile TODO markers affect gas accounting and address validation.
+  Do not merge without benchmarks, governance review, and testnet soak.
 
 ## t5-5..t5-7 (pallets/x3-invariants/src/lib.rs)
-- **Status: OPEN** — Invariant-related governance controls and emergency authority
-  APIs. Flagged by scanner; changes require unit tests that exercise invalid
-  constitution hash / authority expiry. Do not enable chain-halting by default.
-  Open a governance RFC before merging.
+- **Status: RFC DRAFTED** — see [`docs/rfc/RFC-t5-5-7-invariant-governance.md`](rfc/RFC-t5-5-7-invariant-governance.md)
+- Invariant governance controls and emergency authority APIs need events,
+  boundary tests, timelock on pause, and bounded violation storage.
+  Do not enable chain-halting by default. Requires governance RFC sign-off.
 
 ---
 
 Next steps:
-1. t5-3: Open RFC with concrete diff + tests for precompile gas/address changes.
-2. t5-5..t5-7: Add unit tests for invariant edge cases, then governance proposal.
+1. t5-3: Assign RFC reviewer; run precompile benchmarks; open PR after testnet validation.
+2. t5-5..t5-7: Assign RFC reviewer; add unit tests for boundary cases; governance proposal.

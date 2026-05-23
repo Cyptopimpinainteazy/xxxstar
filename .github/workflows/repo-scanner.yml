@@ -25,6 +25,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Run unit tests
+        run: python3 -m pytest tools/agent_scanner/test_scan.py -v
+
       - name: Run scanner
         run: |
           python3 tools/agent_scanner/scan.py \
