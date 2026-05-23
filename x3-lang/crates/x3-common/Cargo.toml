@@ -1,0 +1,14 @@
+[package]
+name = "x3-lang-common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Common utilities for the X3 compiler"
+
+[dependencies]
+internment = { workspace = true }
+rustc-hash = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
