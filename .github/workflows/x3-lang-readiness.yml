@@ -1,0 +1,79 @@
+name: x3-lang-readiness
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/x3-*/**"
+      - "crates/evm-integration/**"
+      - "crates/svm-integration/**"
+      - "patches/**"
+      - "vendor/**"
+      - ".github/workflows/x3-lang-readiness.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/x3-*/**"
+      - "crates/evm-integration/**"
+      - "crates/svm-integration/**"
+      - "patches/**"
+      - "vendor/**"
+      - ".github/workflows/x3-lang-readiness.yml"
+
+jobs:
+  x3_lang_combined_gate:
+    name: x3-lang + vm + evm + svm combined gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Prepare artifact directory
+        run: |
+          mkdir -p artifacts/readiness
+
+      - name: Capture dependency lineage snapshot
+        run: |
+          cargo tree -p x3-svm-integration > artifacts/readiness/lineage-tree.txt
+          cargo tree -p x3-svm-integration --duplicates > artifacts/readiness/lineage-duplicates.txt
+
+      - name: Fail on known Solana lineage regressions
+        run: |
+          if grep -E "solana-hash v4\\.|solana-pubkey v4\\.|solana-address v2\\.5\\.0" artifacts/readiness/lineage-tree.txt; then
+            echo "Detected forbidden Solana lineage entry in SVM dependency graph"
+            exit 1
+          fi
+
+      - name: Combined gate run #1
+        run: |
+          cargo test -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-1-core.log
+          cargo test -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-vm-evm.log
+          cargo test -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-svm.log
+
+      - name: Combined gate run #2 (stability repeat)
+        run: |
+          cargo test -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-2-core.log
+          cargo test -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-vm-evm.log
+          cargo test -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-svm.log
+
+      - name: Upload readiness artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-lang-readiness-artifacts
+          path: |
+            artifacts/readiness/**
+            reports/rc3/x3-lang-readiness-rerun-2026-05-23-source-evidence.md
+            Cargo.toml
+            Cargo.lock
