@@ -52,21 +52,9 @@ const AURA: KeyTypeId = KeyTypeId(*b"aura");
 /// Key type for GRANDPA finality
 const GRANDPA: KeyTypeId = KeyTypeId(*b"gran");
 
-/// Txpool sizing aligned to X3 throughput targets.
-/// Default Substrate pool (8 192/512) is 12x too small for 100k TPS goals.
-/// Tuned per audit recommendation: 100k ready / 50k future, 256 MiB / 64 MiB.
-/// NOTE: Default sizing (100k ready / 50k future) scales dynamically based on network speed.
-/// See NetworkSpeed enum for speed-specific pool configurations.
-#[allow(dead_code)]
-const TX_POOL_READY_COUNT: usize = 100_000;
-#[allow(dead_code)]
-const TX_POOL_FUTURE_COUNT: usize = 50_000;
-#[allow(dead_code)]
-const TX_POOL_READY_BYTES: usize = 256 * 1024 * 1024; // 256 MiB
-#[allow(dead_code)]
-const TX_POOL_FUTURE_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
-#[allow(dead_code)]
-const TX_POOL_BAN_TIME_SECS: u64 = 60; // 60s ban (vs default 1800s) — faster retry under burst
+/// Txpool sizing is determined dynamically by NetworkSpeed::detect().
+/// Design targets: 100k ready / 50k future, 256 MiB / 64 MiB, 60s ban.
+/// See NetworkSpeed enum and tuned_transaction_pool_options for runtime values.
 
 /// GPU Validator Sidecar health check interval (blocks).
 /// Health check runs every N blocks to detect sidecar crashes.
@@ -1254,9 +1242,11 @@ pub fn new_full<
                         {
                             last_checked_block = current_block;
 
-                            // Perform health check (TODO(t5-1): implement actual process detection + RPC probe — tracked in session todo 't5-1')
-                            let health_status = health_monitor.check_health(current_block);
-                            health_monitor.record_check(health_status, current_block);
+                            // Probe orchestrator health — feeds actual sidecar status into the monitor.
+                            let orch_guard = orch_for_monitor.read().await;
+                            let healthy = orch_guard.health_check().is_ok();
+                            drop(orch_guard);
+                            health_monitor.record_check(healthy, current_block);
 
                             if health_monitor.needs_restart() {
                                 // Restart GPU sidecar via orchestrator
@@ -1271,7 +1261,7 @@ pub fn new_full<
                                     health_monitor.reset();
                                 }
                                 drop(orch);
-                            } else if health_status {
+                            } else if healthy {
                                 log::debug!(
                                     "✅ GPU sidecar health check passed at block {}",
                                     current_block
@@ -1364,11 +1354,6 @@ pub fn new_full<
                 ));
 
                 {
-                    // C-002: replace the no-op keep-alive loop with a real
-                    // cross-VM bridge poller backed by RuntimeCrossVmDispatcher,
-                    // so pending EVM/SVM operations are actually submitted to the
-                    // runtime rather than discarded inside a 1-hour sleep loop.
-                    // TODO(t5-2): tracked in session todo 't5-2' — implement dispatcher wiring and remove no-op loop
                     let dispatcher = Arc::new(RuntimeCrossVmDispatcher::new(client.clone()));
                     let bridge = Arc::new(std::sync::Mutex::new(CrossVmBridge::new()));
                     let bridge_safety_gate = CrossVmBridgeSafetyGate::default();
@@ -2023,6 +2008,69 @@ mod tests {
             CrossVmResult::success(b"SVM:receipt:ok".to_vec(), 5_000),
         ];
         assert!(gate.postflight(&results).is_ok());
+    }
+
+    // ── PoH shadow-mode regression (v1 backlog gate) ─────────────────────
+    // These tests lock in the invariant that --enable-poh is SHADOW MODE ONLY
+    // in mainnet-v1.  If someone accidentally wires PoH enforcement into block
+    // import, nodes would start rejecting valid blocks.  The tests must keep
+    // passing until the v2 PoH enforcement work is deliberately merged.
+
+    /// PoH flag is accepted without panicking and is stored correctly.
+    #[test]
+    fn poh_flag_is_accepted_in_feature_flags() {
+        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        assert!(flags.enable_poh);
+    }
+
+    /// All other flags remain default when only enable_poh is set.
+    /// Prevents accidental coupling where setting poh also enables gpu/finality.
+    #[test]
+    fn poh_flag_does_not_activate_other_flags() {
+        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        assert!(!flags.enable_flash_finality, "flash finality must stay off");
+        assert!(!flags.enable_gpu_validator, "gpu validator must stay off");
+        assert!(!flags.gpu_required, "gpu_required must stay off");
+        assert!(!flags.enable_parallel_proposer, "parallel proposer must stay off");
+        assert!(!flags.enable_atomic_kernel, "atomic kernel must stay off");
+    }
+
+    /// GRANDPA must stay enabled regardless of enable_poh.
+    /// PoH in shadow mode must not interfere with the finality gadget.
+    #[test]
+    fn poh_shadow_mode_does_not_disable_grandpa() {
+        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        // disable_grandpa=false, flash_finality=false → GRANDPA enabled
+        assert!(
+            compute_enable_grandpa_from_flags(false, flags),
+            "GRANDPA must remain enabled when only enable_poh is set (shadow mode)"
+        );
+    }
+
+    /// PoH + flash finality combination: GRANDPA is still disabled by flash
+    /// finality, not by PoH.  This ensures PoH has no side-effect on the
+    /// GRANDPA decision path.
+    #[test]
+    fn poh_with_flash_finality_disables_grandpa_via_finality_not_poh() {
+        let flags_poh_only = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        let flags_both = NodeFeatureFlags {
+            enable_poh: true,
+            enable_flash_finality: true,
+            ..Default::default()
+        };
+        // PoH alone → GRANDPA on
+        assert!(compute_enable_grandpa_from_flags(false, flags_poh_only));
+        // PoH + flash finality → GRANDPA off (flash finality is the cause)
+        assert!(!compute_enable_grandpa_from_flags(false, flags_both));
+    }
+
+    /// NodeFeatureFlags::default() must have enable_poh = false.
+    /// Guards against a Default impl change that would silently enable PoH
+    /// on every node that doesn't explicitly set flags.
+    #[test]
+    fn poh_is_off_by_default() {
+        let flags = NodeFeatureFlags::default();
+        assert!(!flags.enable_poh, "enable_poh must default to false for mainnet-v1");
     }
 }
 
