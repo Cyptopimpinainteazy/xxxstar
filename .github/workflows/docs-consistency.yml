@@ -1,0 +1,36 @@
+name: docs-consistency
+
+on:
+  pull_request:
+    paths:
+      - '.ai/SESSION_UPDATE_SUMMARY_*.md'
+      - '.prompt.md'
+      - '.agent.md'
+      - '.instructions.md'
+      - '.github/prompts/**'
+      - 'tools/docs/**'
+      - '**/*.md'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.ai/SESSION_UPDATE_SUMMARY_*.md'
+      - '.prompt.md'
+      - '.agent.md'
+      - '.instructions.md'
+      - '.github/prompts/**'
+      - 'tools/docs/**'
+      - '**/*.md'
+
+jobs:
+  validate-session-summary-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run session summary format checks
+        run: |
+          chmod +x tools/docs/check-session-summary.sh
+          tools/docs/check-session-summary.sh
