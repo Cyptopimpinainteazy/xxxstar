@@ -4,8 +4,6 @@ members = [
     "crates/x3-common",
     "crates/x3-lexer",
     "crates/x3-ast",
-    "crates/x3-parser",
-    "crates/x3-ir",
     "crates/x3-tools",
     "compiler",
     "vm",
