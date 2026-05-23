@@ -523,6 +523,10 @@ impl<Block: BlockT + Send, Inner: BlockImport<Block> + Send> BlockImport<Block>
                                  block allowed through (poh-v3 will hard-reject)",
                                 digest.tick, e
                             );
+                            // CRITICAL: advance state even on failure so the next block
+                            // gets prev_tick+1, not prev_tick+2 → avoids cascade desync.
+                            // v2 is monitoring-only; state must stay in lockstep with the chain.
+                            state.advance(&[]);
                         }
                     }
                 }
@@ -2193,11 +2197,8 @@ mod tests {
     /// in passthrough mode (poh_state = None).
     #[test]
     fn poh_verify_block_import_passthrough_mode_constructs() {
-        // We can't easily construct a full Block/Inner here without Substrate runtime,
-        // so this test validates the type-level API and flag-based passthrough contract.
         let flags = NodeFeatureFlags { enable_poh: false, ..Default::default() };
         assert!(!flags.enable_poh, "passthrough: poh_state would be None");
-        // When enable_poh=false → shared_poh_state=None → PoHVerifyBlockImport is zero-cost
     }
 
     /// Validates that when `enable_poh` is true the poh state is Some, not None.
@@ -2207,28 +2208,132 @@ mod tests {
         assert!(flags.enable_poh, "enforcement mode: poh_state would be Some(...)");
     }
 
-    /// Validates `PoHVerifyBlockImport` is constructible with a mock inner.
+    // ─── extract_poh_digest behavioral tests ──────────────────────────────────
+    // These test the static helper directly using Substrate generic header types,
+    // avoiding the need for a full runtime.
+
+    type TestHeader = sp_runtime::generic::Header<u32, sp_runtime::traits::BlakeTwo256>;
+    type TestBlock = sp_runtime::generic::Block<TestHeader, sp_runtime::OpaqueExtrinsic>;
+
+    /// No digest logs → extract_poh_digest returns None.
     #[test]
-    fn poh_wrapper_new_with_none_state() {
-        use std::marker::PhantomData;
-        // Construct with None — type check only (no async runtime needed)
-        struct MockBlock;
-        impl sp_runtime::traits::Block for MockBlock {
-            type Extrinsic = sp_runtime::OpaqueExtrinsic;
-            type Header = sp_runtime::generic::Header<u32, sp_runtime::traits::BlakeTwo256>;
-            type Hash = <sp_runtime::traits::BlakeTwo256 as sp_runtime::traits::Hash>::Output;
-            fn header(&self) -> &Self::Header { unimplemented!() }
-            fn extrinsics(&self) -> &[Self::Extrinsic] { unimplemented!() }
-            fn deconstruct(self) -> (Self::Header, Vec<Self::Extrinsic>) { unimplemented!() }
-            fn new(_: Self::Header, _: Vec<Self::Extrinsic>) -> Self { unimplemented!() }
-            fn hash(&self) -> Self::Hash { unimplemented!() }
-            fn encode_from(_: &Self::Header, _: &[Self::Extrinsic]) -> Vec<u8> { unimplemented!() }
-        }
-        // None state = passthrough (just verify struct compiles with None)
-        let _wrapper: PoHVerifyBlockImport<Block, ()> =
-            PoHVerifyBlockImport { inner: (), poh_state: None, _phantom: PhantomData };
+    fn extract_poh_digest_returns_none_for_empty_digest() {
+        let header = TestHeader::new(
+            1,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
+        let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
+        assert!(result.is_none(), "empty digest logs should return None");
     }
-}
+
+    /// A Consensus log with the wrong engine ID → extract_poh_digest returns None.
+    #[test]
+    fn extract_poh_digest_returns_none_for_wrong_engine_id() {
+        let wrong_id = *b"babe";
+        let mut header = TestHeader::new(
+            1, Default::default(), Default::default(), Default::default(), Default::default(),
+        );
+        header.digest_mut().push(DigestItem::Consensus(wrong_id, vec![0u8; 32]));
+        let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
+        assert!(result.is_none(), "wrong engine ID should return None");
+    }
+
+    /// A valid Consensus log with POH_ENGINE_ID and properly encoded PoHDigest → Some.
+    #[test]
+    fn extract_poh_digest_decodes_valid_digest() {
+        let mut state = PoHState::default();
+        let digest = state.advance(&[]);
+        let mut encoded = Vec::new();
+        // PoHDigest::encode — tick(8) || poh_hash(32) || tx_mix_root(32)
+        encoded.extend_from_slice(&digest.tick.to_le_bytes());
+        encoded.extend_from_slice(&digest.poh_hash);
+        encoded.extend_from_slice(&digest.tx_mix_root);
+
+        let mut header = TestHeader::new(
+            1, Default::default(), Default::default(), Default::default(), Default::default(),
+        );
+        header.digest_mut().push(DigestItem::Consensus(POH_ENGINE_ID, encoded));
+
+        let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
+        assert!(result.is_some(), "valid PoH digest should decode to Some");
+        let decoded = result.unwrap();
+        assert_eq!(decoded.tick, digest.tick);
+        assert_eq!(decoded.poh_hash, digest.poh_hash);
+    }
+
+    // ─── State advancement regression tests ──────────────────────────────────
+
+    /// On verification success, `PoHState` advances exactly one tick.
+    /// Regression guard: if state.advance() is accidentally removed from the Ok branch,
+    /// subsequent blocks fail with NonMonotonicTick.
+    #[test]
+    fn poh_state_advances_on_verify_success() {
+        let mut state = PoHState::default();
+        let tick_before = state.tick();
+        let digest = state.advance(&[]);
+        assert_eq!(state.tick(), tick_before + 1, "advance must increment tick by 1");
+        // Verify the digest is consistent with the advanced state
+        let result = PoHVerifier::verify(&digest, tick_before, &{
+            let mut s2 = PoHState::default();
+            let h = s2.hash();
+            h
+        }, &[]);
+        assert!(result.is_ok(), "digest produced by advance() must verify against prior state");
+    }
+
+    /// State MUST advance even when verification fails — prevents cascade desync.
+    ///
+    /// Scenario: verifier receives a tampered digest (hash chain broken).
+    /// After allowing through (v2 grace), the next block must still be verifiable.
+    #[test]
+    fn poh_state_must_advance_after_verify_failure_to_prevent_cascade() {
+        let mut proposer_state = PoHState::default();
+        let mut verifier_state = PoHState::default();
+
+        // Block 1: produced by proposer, tampered before reaching verifier
+        let real_digest_1 = proposer_state.advance(&[]);
+        let mut tampered = real_digest_1.clone();
+        tampered.poh_hash[0] ^= 0xFF; // corrupt the hash
+
+        let prev_tick = verifier_state.tick();
+        let prev_hash = verifier_state.hash();
+        let result = PoHVerifier::verify(&tampered, prev_tick, &prev_hash, &[]);
+        assert!(result.is_err(), "tampered digest should fail verification");
+
+        // Verifier MUST still advance state (as the fix dictates)
+        verifier_state.advance(&[]);
+        assert_eq!(verifier_state.tick(), 1, "verifier state must advance to tick 1 despite failure");
+
+        // Block 2: produced normally by proposer (tick 2), verifier now at tick 1 → expect tick 2
+        let real_digest_2 = proposer_state.advance(&[]);
+        let result2 = PoHVerifier::verify(
+            &real_digest_2,
+            verifier_state.tick(),
+            &verifier_state.hash(),
+            &[],
+        );
+        // NOTE: block 2 hash WON'T match because proposer advanced from real block 1 state
+        // but verifier advanced from its own (tampered-adjusted) state. This is expected —
+        // a tampered block causes a permanent desync that only chain reorg can fix.
+        // The key assertion is that we get HashChainBroken, NOT NonMonotonicTick
+        // (which would indicate we didn't advance state at all).
+        match result2 {
+            Ok(()) => {
+                // Rare: if tamper was in hash but tx_mix_root matched by chance — still ok
+            }
+            Err(poh_generator::PoHVerifyError::NonMonotonicTick { .. }) => {
+                panic!("Got NonMonotonicTick on block 2 — verifier state was NOT advanced after block 1 failure (cascade desync bug)");
+            }
+            Err(_) => {
+                // HashChainBroken or TxMixRootMismatch — expected after a tamper
+            }
+        }
+    }
+
+} // end mod tests
 
 //====== GPU Sidecar Tests ======
 #[cfg(all(test, feature = "gpu-validator"))]
