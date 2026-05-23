@@ -461,6 +461,17 @@ pub fn is_finality_confirmed(current_slot: u64, created_slot: u64) -> bool {
     }
 }
 
+// ─── string utilities ─────────────────────────────────────────────────────────
+
+/// Return the first `max_chars` Unicode characters from `s` as an owned String.
+/// This is char-boundary-safe: byte-slicing at an arbitrary byte offset panics
+/// when multi-byte UTF-8 sequences straddle the cut point.  A hostile RPC can
+/// return arbitrary UTF-8 in JSON string fields, so all log-prefix truncations
+/// must go through this helper.
+pub fn safe_str_prefix(s: &str, max_chars: usize) -> String {
+    s.chars().take(max_chars).collect()
+}
+
 // ─── base64 ───────────────────────────────────────────────────────────────────
 
 pub fn base64_decode(s: &str) -> Vec<u8> {
@@ -551,7 +562,10 @@ pub async fn poll_once(
         };
 
         let hex_xt = format!("0x{}", hex::encode(&xt));
-        let pk_prefix = &acc.pubkey[..8.min(acc.pubkey.len())];
+        // Use char-boundary-safe truncation: a hostile RPC could return a pubkey
+        // string with multi-byte UTF-8 chars; byte-slicing at position 8 would
+        // panic if that byte is inside a multi-byte sequence.
+        let pk_prefix = safe_str_prefix(&acc.pubkey, 8);
         log::info!("[{}] 🌉 pubkey={}… root={} block={}", ctx.service_id, pk_prefix, hex::encode(&root_hash[..8]), block_number);
 
         match rpc_call(client, ctx.x3_rpc, "author_submitExtrinsic", serde_json::json!([hex_xt])).await {
@@ -586,10 +600,16 @@ async fn main() {
         }
     };
 
-    let bootstrap_client = reqwest::Client::builder()
+    let bootstrap_client = match reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .build()
-        .unwrap();
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("failed to build HTTP client (TLS init?): {e}");
+            std::process::exit(1);
+        }
+    };
 
     let initial_meta = match fetch_chain_meta(&bootstrap_client, &args.x3_rpc).await {
         Ok(m) => {
@@ -609,7 +629,13 @@ async fn main() {
         args.service_id, args.solana_rpc, args.x3_rpc,
         cfg.pallet_index, cfg.call_index, cfg.solana_chain_id, args.meta_refresh_secs);
 
-    let client        = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().unwrap();
+    let client = match reqwest::Client::builder().timeout(Duration::from_secs(15)).build() {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("failed to build polling HTTP client: {e}");
+            std::process::exit(1);
+        }
+    };
     let poll_interval = Duration::from_secs(args.poll_interval_secs);
     let shutdown      = tokio::signal::ctrl_c();
     tokio::pin!(shutdown);
@@ -913,6 +939,70 @@ mod tests {
     fn base64_decode_no_padding() {
         // "Man" → "TWFu" (no padding needed for 3 bytes)
         assert_eq!(base64_decode("TWFu"), b"Man");
+    }
+
+    // ── safe_str_prefix — panic regression for todo-4 ────────────────────
+    // These tests reproduce the exact byte-boundary patterns that would have
+    // caused a panic with the old `&acc.pubkey[..8.min(acc.pubkey.len())]`
+    // approach when a hostile Solana RPC returns non-ASCII UTF-8 pubkeys.
+
+    #[test]
+    fn safe_str_prefix_pure_ascii_longer_than_max() {
+        // Normal Solana base58 pubkey — always ASCII, always safe.
+        let s = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf8Ss623VQ5DA";
+        assert_eq!(safe_str_prefix(s, 8), "Tokenkeg");
+    }
+
+    #[test]
+    fn safe_str_prefix_pure_ascii_shorter_than_max() {
+        assert_eq!(safe_str_prefix("abc", 8), "abc");
+    }
+
+    #[test]
+    fn safe_str_prefix_empty_string() {
+        assert_eq!(safe_str_prefix("", 8), "");
+    }
+
+    #[test]
+    fn safe_str_prefix_multibyte_straddles_byte8_case1() {
+        // "aaaaaa\u{1234}x": U+1234 = 3-byte seq at bytes 6-8; byte 8 = 0x88 (cont).
+        // The old byte-slice would panic; safe_str_prefix must return 8 chars.
+        let s = "aaaaaa\u{1234}x";
+        let got = safe_str_prefix(s, 8);
+        assert_eq!(got.chars().count(), 8);
+        assert_eq!(got, "aaaaaa\u{1234}x");
+    }
+
+    #[test]
+    fn safe_str_prefix_multibyte_straddles_byte8_case2() {
+        // "aaaaaaa\u{1234}": U+1234 starts at byte 7; byte 8 = 0xe1 (lead byte).
+        // The old byte-slice would panic; safe_str_prefix must return 8 chars.
+        let s = "aaaaaaa\u{1234}x";
+        let got = safe_str_prefix(s, 8);
+        assert_eq!(got.chars().count(), 8);
+        assert_eq!(got, "aaaaaaa\u{1234}");
+    }
+
+    #[test]
+    fn safe_str_prefix_four_byte_emoji_at_boundary() {
+        // "abcd🦀cde": 4 ASCII + 1 emoji (4 bytes) + 3 ASCII = 8 chars, 11 bytes.
+        // The emoji occupies bytes 4-7; the old byte-slice at byte 8 would land
+        // on 'c' (ASCII, safe), but any byte-based cut inside the 4-byte emoji
+        // would have panicked.  Verify char-count and content are correct.
+        let s = "abcd\u{1F980}cde";  // 8 chars, 11 bytes
+        let got = safe_str_prefix(s, 8);
+        assert_eq!(got.chars().count(), 8);
+        assert_eq!(got, "abcd\u{1F980}cde");
+    }
+
+    #[test]
+    fn safe_str_prefix_max_chars_zero() {
+        assert_eq!(safe_str_prefix("hello", 0), "");
+    }
+
+    #[test]
+    fn safe_str_prefix_exact_length() {
+        assert_eq!(safe_str_prefix("exactly8", 8), "exactly8");
     }
 
     // ── MetaCache refresh ─────────────────────────────────────────────────
