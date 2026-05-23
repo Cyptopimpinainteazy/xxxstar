@@ -2009,6 +2009,69 @@ mod tests {
         ];
         assert!(gate.postflight(&results).is_ok());
     }
+
+    // ── PoH shadow-mode regression (v1 backlog gate) ─────────────────────
+    // These tests lock in the invariant that --enable-poh is SHADOW MODE ONLY
+    // in mainnet-v1.  If someone accidentally wires PoH enforcement into block
+    // import, nodes would start rejecting valid blocks.  The tests must keep
+    // passing until the v2 PoH enforcement work is deliberately merged.
+
+    /// PoH flag is accepted without panicking and is stored correctly.
+    #[test]
+    fn poh_flag_is_accepted_in_feature_flags() {
+        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        assert!(flags.enable_poh);
+    }
+
+    /// All other flags remain default when only enable_poh is set.
+    /// Prevents accidental coupling where setting poh also enables gpu/finality.
+    #[test]
+    fn poh_flag_does_not_activate_other_flags() {
+        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        assert!(!flags.enable_flash_finality, "flash finality must stay off");
+        assert!(!flags.enable_gpu_validator, "gpu validator must stay off");
+        assert!(!flags.gpu_required, "gpu_required must stay off");
+        assert!(!flags.enable_parallel_proposer, "parallel proposer must stay off");
+        assert!(!flags.enable_atomic_kernel, "atomic kernel must stay off");
+    }
+
+    /// GRANDPA must stay enabled regardless of enable_poh.
+    /// PoH in shadow mode must not interfere with the finality gadget.
+    #[test]
+    fn poh_shadow_mode_does_not_disable_grandpa() {
+        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        // disable_grandpa=false, flash_finality=false → GRANDPA enabled
+        assert!(
+            compute_enable_grandpa_from_flags(false, flags),
+            "GRANDPA must remain enabled when only enable_poh is set (shadow mode)"
+        );
+    }
+
+    /// PoH + flash finality combination: GRANDPA is still disabled by flash
+    /// finality, not by PoH.  This ensures PoH has no side-effect on the
+    /// GRANDPA decision path.
+    #[test]
+    fn poh_with_flash_finality_disables_grandpa_via_finality_not_poh() {
+        let flags_poh_only = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        let flags_both = NodeFeatureFlags {
+            enable_poh: true,
+            enable_flash_finality: true,
+            ..Default::default()
+        };
+        // PoH alone → GRANDPA on
+        assert!(compute_enable_grandpa_from_flags(false, flags_poh_only));
+        // PoH + flash finality → GRANDPA off (flash finality is the cause)
+        assert!(!compute_enable_grandpa_from_flags(false, flags_both));
+    }
+
+    /// NodeFeatureFlags::default() must have enable_poh = false.
+    /// Guards against a Default impl change that would silently enable PoH
+    /// on every node that doesn't explicitly set flags.
+    #[test]
+    fn poh_is_off_by_default() {
+        let flags = NodeFeatureFlags::default();
+        assert!(!flags.enable_poh, "enable_poh must default to false for mainnet-v1");
+    }
 }
 
 //====== GPU Sidecar Tests ======
