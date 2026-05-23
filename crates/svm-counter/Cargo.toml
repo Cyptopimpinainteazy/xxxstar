@@ -10,4 +10,4 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-solana-program = "3.0.0"
+solana-program = "=3.0.0"
