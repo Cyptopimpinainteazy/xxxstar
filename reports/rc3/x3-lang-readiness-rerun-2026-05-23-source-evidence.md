@@ -128,3 +128,5 @@ x3-lang and cross-VM readiness is complete when all are true:
 5. Evidence artifacts are generated and reviewable per run.
 
 Current state: core x3-lang + VM + EVM + SVM paths verified from source locally; release readiness still depends on CI-enforced cross-VM gates and dependency drift prevention.
+
+CI retrigger note: 2026-05-23 second-run evidence refresh.
