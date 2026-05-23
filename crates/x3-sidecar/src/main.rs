@@ -12,7 +12,8 @@
 //! | `X3_SOLANA_RPC_URL`        | `https://api.mainnet-beta.solana.com`    | Solana JSON-RPC endpoint                           |
 //! | `X3_NODE_RPC_URL`          | `http://127.0.0.1:9944`                  | X3 node RPC endpoint                              |
 //! | `X3_ESCROW_PROGRAM`        | *(empty — disables Solana polling)*      | Solana escrow program ID (base58)                  |
-//! | `X3_SIGNER_SEED_HEX`       | *(empty — unsigned fallback)*            | 32-byte sr25519 mini-secret key as hex             |
+//! | `X3_SIGNER_SEED_HEX`       | *(none — required in production)*        | 32-byte sr25519 mini-secret key as hex             |
+//! | `X3_ALLOW_UNSIGNED_DEV`    | `false`                                  | Explicit dev-only unsigned mode gate               |
 //! | `X3_SOLANA_CHAIN_ID`       | `2`                                      | chain_id value for Solana in X3CrossVmRouter       |
 //! | `X3_BRIDGE_PALLET_INDEX`   | `26`                                     | SCALE pallet index of X3CrossVmRouter              |
 //! | `X3_BRIDGE_CALL_INDEX`     | `4`                                      | SCALE call index of register_external_root         |
@@ -23,8 +24,8 @@
 //! When `X3_SIGNER_SEED_HEX` is set the sidecar produces a proper SCALE V4
 //! signed sr25519 extrinsic.  The signer account must hold council or sudo
 //! authority (i.e. satisfy `ExternalExecutorOrigin = EnsureRootOrHalfCouncil`).
-//! When the env var is absent, an **unsigned** extrinsic is emitted with a
-//! clear warning — accepted only if the runtime is patched to allow it.
+//! If the env var is absent, startup fails closed unless
+//! `X3_ALLOW_UNSIGNED_DEV=true` is explicitly set.
 //!
 //! # ChainMeta refresh
 //! `spec_version` and `transaction_version` change on every runtime upgrade.
@@ -101,6 +102,45 @@ pub fn env_u32(key: &str, default: u32) -> u32 {
 }
 pub fn env_u8(key: &str, default: u8) -> u8 {
     std::env::var(key).ok().and_then(|s| s.parse().ok()).unwrap_or(default)
+}
+
+fn env_bool(key: &str, default: bool) -> bool {
+    match std::env::var(key) {
+        Ok(v) => matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => default,
+    }
+}
+
+fn allow_unsigned_dev_mode() -> bool {
+    env_bool("X3_ALLOW_UNSIGNED_DEV", false)
+}
+
+fn load_signer_from_env(service_id: &str) -> Result<Option<Sr25519Signer>, String> {
+    match std::env::var("X3_SIGNER_SEED_HEX") {
+        Ok(seed) => {
+            let signer = Sr25519Signer::from_seed_hex(&seed)
+                .map_err(|e| format!("invalid X3_SIGNER_SEED_HEX: {}", e))?;
+            log::info!(
+                "[{}] sr25519 signer loaded (pubkey={})",
+                service_id,
+                hex::encode(signer.public_key)
+            );
+            Ok(Some(signer))
+        }
+        Err(_) if allow_unsigned_dev_mode() => {
+            log::warn!(
+                "[{}] X3_SIGNER_SEED_HEX not set — unsigned mode enabled by X3_ALLOW_UNSIGNED_DEV=true",
+                service_id
+            );
+            Ok(None)
+        }
+        Err(_) => Err(
+            "X3_SIGNER_SEED_HEX is required for production. Refusing unsigned mode; set X3_ALLOW_UNSIGNED_DEV=true only for devnet testing".to_string()
+        ),
+    }
 }
 
 // ─── ChainMeta + refresh ─────────────────────────────────────────────────────
@@ -583,20 +623,11 @@ async fn main() {
     let args = Args::parse();
     let cfg  = BridgeConfig::from_env();
 
-    let signer: Option<Sr25519Signer> = match std::env::var("X3_SIGNER_SEED_HEX") {
-        Ok(seed) => match Sr25519Signer::from_seed_hex(&seed) {
-            Ok(s) => {
-                log::info!("[{}] sr25519 signer loaded (pubkey={})", args.service_id, hex::encode(s.public_key));
-                Some(s)
-            }
-            Err(e) => {
-                log::error!("[{}] invalid X3_SIGNER_SEED_HEX: {} — aborting", args.service_id, e);
-                std::process::exit(1);
-            }
-        },
-        Err(_) => {
-            log::warn!("[{}] X3_SIGNER_SEED_HEX not set — unsigned extrinsic mode (devnet only)", args.service_id);
-            None
+    let signer: Option<Sr25519Signer> = match load_signer_from_env(&args.service_id) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("[{}] {} — aborting", args.service_id, e);
+            std::process::exit(1);
         }
     };
 
@@ -666,6 +697,12 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     // ── blake2b_256 ───────────────────────────────────────────────────────
 
@@ -901,6 +938,42 @@ mod tests {
         assert_ne!(s1, s2);
     }
 
+    #[test]
+    fn allow_unsigned_dev_mode_parses_truthy_values() {
+        let _guard = env_test_lock().lock().unwrap();
+        std::env::set_var("X3_ALLOW_UNSIGNED_DEV", "true");
+        assert!(allow_unsigned_dev_mode());
+        std::env::set_var("X3_ALLOW_UNSIGNED_DEV", "1");
+        assert!(allow_unsigned_dev_mode());
+        std::env::set_var("X3_ALLOW_UNSIGNED_DEV", "on");
+        assert!(allow_unsigned_dev_mode());
+        std::env::remove_var("X3_ALLOW_UNSIGNED_DEV");
+    }
+
+    #[test]
+    fn load_signer_requires_seed_when_unsigned_not_allowed() {
+        let _guard = env_test_lock().lock().unwrap();
+        std::env::remove_var("X3_SIGNER_SEED_HEX");
+        std::env::remove_var("X3_ALLOW_UNSIGNED_DEV");
+        match load_signer_from_env("test-svc") {
+            Ok(_) => panic!("expected production fail-closed behavior without signer seed"),
+            Err(err) => assert!(
+                err.contains("required for production"),
+                "unexpected error: {err}"
+            ),
+        }
+    }
+
+    #[test]
+    fn load_signer_allows_unsigned_only_with_explicit_dev_gate() {
+        let _guard = env_test_lock().lock().unwrap();
+        std::env::remove_var("X3_SIGNER_SEED_HEX");
+        std::env::set_var("X3_ALLOW_UNSIGNED_DEV", "true");
+        let signer = load_signer_from_env("test-svc").unwrap();
+        assert!(signer.is_none());
+        std::env::remove_var("X3_ALLOW_UNSIGNED_DEV");
+    }
+
     // ── read_u64_le ───────────────────────────────────────────────────────
 
     #[test]
@@ -1013,7 +1086,6 @@ mod tests {
         let cache = MetaCache::new(meta, 300, "http://127.0.0.1:19944".to_string());
         // Should return spec_version=42 without hitting any network.
         // Set last_refresh to "now" so it won't try to refresh.
-        let client = reqwest::Client::new();
         // Force TTL not expired (default 300s hasn't elapsed in 1ms).
         assert_eq!(cache.spec_version().await, 42);
     }
@@ -1022,7 +1094,7 @@ mod tests {
 
     #[tokio::test]
     async fn poll_once_skips_account_below_finality() {
-        use axum::{routing::post, Json, Router};
+        use axum::Json;
 
         async fn handler(Json(req): Json<serde_json::Value>) -> Json<serde_json::Value> {
             Json(match req["method"].as_str().unwrap_or("") {
@@ -1111,6 +1183,129 @@ mod tests {
         };
         // Must not panic or unwrap-fail.
         poll_once(&client, &ctx, None, &cache).await;
+    }
+
+    #[tokio::test]
+    async fn poll_once_signed_submit_handles_bad_origin_rejection() {
+        use axum::{extract::State, routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+
+        let calls: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
+        let calls_clone = calls.clone();
+
+        async fn handler(
+            State(calls): State<Arc<Mutex<Vec<String>>>>,
+            Json(req): Json<serde_json::Value>,
+        ) -> Json<serde_json::Value> {
+            let m = req["method"].as_str().unwrap_or("").to_string();
+            calls.lock().unwrap().push(m.clone());
+            Json(match m.as_str() {
+                "getSlot" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":200u64}),
+                "getProgramAccounts" => {
+                    let mut d = vec![0u8; 16];
+                    d[8..16].copy_from_slice(&10u64.to_le_bytes()); // mature account
+                    serde_json::json!({"jsonrpc":"2.0","id":1,"result":[{
+                        "pubkey":"BadOrigin111","account":{"lamports":1,"data":[b64_enc(&d),"base64"]}
+                    }]})
+                }
+                "system_accountNextIndex" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":0u64}),
+                "author_submitExtrinsic" => serde_json::json!({
+                    "jsonrpc":"2.0",
+                    "id":1,
+                    "error":{"code":1010,"message":"Invalid Transaction: BadOrigin"}
+                }),
+                _ => serde_json::json!({"jsonrpc":"2.0","id":1,"result":null}),
+            })
+        }
+
+        let app = Router::new().route("/", post(handler)).with_state(calls_clone);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let rpc = format!("http://{}", addr);
+        let client = reqwest::Client::new();
+        let cfg = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
+        let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
+        let cache = MetaCache::new(meta, 9999, rpc.clone());
+        let ctx = PollerContext { solana_rpc: &rpc, x3_rpc: &rpc, escrow_program: "FakeProg", service_id: "t", cfg: &cfg };
+
+        let signer = Sr25519Signer::from_seed_hex(&"11".repeat(32)).unwrap();
+        poll_once(&client, &ctx, Some(&signer), &cache).await;
+
+        let seen = calls.lock().unwrap();
+        assert!(seen.contains(&"system_accountNextIndex".to_string()));
+        assert!(seen.contains(&"author_submitExtrinsic".to_string()));
+    }
+
+    #[tokio::test]
+    async fn poll_once_signed_submit_handles_duplicate_rejection() {
+        use axum::{extract::State, routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone)]
+        struct MockState {
+            calls: Arc<Mutex<Vec<String>>>,
+            submit_count: Arc<Mutex<u32>>,
+        }
+
+        let state = MockState {
+            calls: Arc::new(Mutex::new(vec![])),
+            submit_count: Arc::new(Mutex::new(0)),
+        };
+
+        async fn handler(
+            State(state): State<MockState>,
+            Json(req): Json<serde_json::Value>,
+        ) -> Json<serde_json::Value> {
+            let m = req["method"].as_str().unwrap_or("").to_string();
+            state.calls.lock().unwrap().push(m.clone());
+            Json(match m.as_str() {
+                "getSlot" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":250u64}),
+                "getProgramAccounts" => {
+                    // Two mature accounts with identical payload roots to exercise duplicate boundary behavior.
+                    let mut d = vec![0u8; 16];
+                    d[8..16].copy_from_slice(&10u64.to_le_bytes());
+                    serde_json::json!({"jsonrpc":"2.0","id":1,"result":[
+                        {"pubkey":"DupRootA11","account":{"lamports":1,"data":[b64_enc(&d),"base64"]}},
+                        {"pubkey":"DupRootB22","account":{"lamports":1,"data":[b64_enc(&d),"base64"]}}
+                    ]})
+                }
+                "system_accountNextIndex" => serde_json::json!({"jsonrpc":"2.0","id":1,"result":0u64}),
+                "author_submitExtrinsic" => {
+                    let mut c = state.submit_count.lock().unwrap();
+                    *c += 1;
+                    if *c == 1 {
+                        serde_json::json!({"jsonrpc":"2.0","id":1,"result":"0xabc123"})
+                    } else {
+                        serde_json::json!({
+                            "jsonrpc":"2.0",
+                            "id":1,
+                            "error":{"code":1010,"message":"Invalid Transaction: Duplicate"}
+                        })
+                    }
+                }
+                _ => serde_json::json!({"jsonrpc":"2.0","id":1,"result":null}),
+            })
+        }
+
+        let app = Router::new().route("/", post(handler)).with_state(state.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let rpc = format!("http://{}", addr);
+        let client = reqwest::Client::new();
+        let cfg = BridgeConfig { solana_chain_id: 2, pallet_index: 26, call_index: 4 };
+        let meta = ChainMeta { spec_version: 1, tx_version: 1, genesis_hash: [0u8; 32] };
+        let cache = MetaCache::new(meta, 9999, rpc.clone());
+        let ctx = PollerContext { solana_rpc: &rpc, x3_rpc: &rpc, escrow_program: "FakeProg", service_id: "t", cfg: &cfg };
+
+        let signer = Sr25519Signer::from_seed_hex(&"22".repeat(32)).unwrap();
+        poll_once(&client, &ctx, Some(&signer), &cache).await;
+
+        let submits = *state.submit_count.lock().unwrap();
+        assert_eq!(submits, 2, "expected one accepted submit and one duplicate rejection");
     }
 
     /// Live Solana devnet integration test.
