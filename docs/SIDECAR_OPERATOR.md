@@ -75,7 +75,8 @@ vote.  The sidecar's first extrinsic will succeed once the motion passes.
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
-| `X3_SIGNER_SEED_HEX` | *(none)* | **Yes** (production) | 32-byte sr25519 mini-secret as 64 hex chars. Without this the sidecar sends unsigned extrinsics — accepted only on patched devnets. |
+| `X3_SIGNER_SEED_HEX` | *(none)* | **Yes** (production) | 32-byte sr25519 mini-secret as 64 hex chars. Startup fails closed when missing unless explicit dev override is enabled. |
+| `X3_ALLOW_UNSIGNED_DEV` | `false` | No | Dev-only override. Set to `true` to allow unsigned submissions for patched devnets. Never enable in production. |
 | `X3_SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` | Yes | Solana JSON-RPC endpoint |
 | `X3_NODE_RPC_URL` | `http://127.0.0.1:9944` | Yes | X3 node WebSocket/HTTP RPC |
 | `X3_ESCROW_PROGRAM` | *(empty)* | Yes | Base58 program ID of the Solana escrow program. If empty, Solana polling is disabled. |
@@ -157,7 +158,8 @@ Log lines to watch:
 | `✅ tx=0x...` | Extrinsic accepted by X3 node |
 | `❌ submit failed: ...` | Extrinsic rejected — check origin/nonce/spec_version |
 | `⚡ Runtime upgrade detected` | Spec version changed; metadata refreshed |
-| `X3_SIGNER_SEED_HEX not set` | Running in unsigned mode (devnet only) |
+| `X3_SIGNER_SEED_HEX is required for production` | Sidecar refused startup because signer is missing and unsigned dev mode is not enabled |
+| `X3_ALLOW_UNSIGNED_DEV=true` warning | Unsigned mode was explicitly enabled for devnet testing |
 | `chain meta unavailable` | Node RPC unreachable at startup; using defaults |
 | `getSlot: ...` | Solana RPC unreachable; poll cycle skipped |
 
@@ -192,6 +194,7 @@ in a future runtime upgrade.
 
 ### Sidecar exits immediately on startup
 - `X3_SIGNER_SEED_HEX` contains invalid hex or wrong length → regenerate key.
+- `X3_SIGNER_SEED_HEX` is missing and `X3_ALLOW_UNSIGNED_DEV` is not set to `true` → provide signer seed for production or enable explicit dev-only unsigned mode.
 
 ### `getSlot: HTTP getSlot: error sending request`
 - Solana RPC endpoint is unreachable.  Check `X3_SOLANA_RPC_URL` and network.

@@ -374,10 +374,19 @@ errno = { path = "patches/errno" }
 expander = { path = "patches/expander" }
 # Fix getrandom for wasm32-unknown-unknown (Substrate WASM runtime)
 getrandom = { path = "patches/getrandom" }
-# Fix solana-program-entrypoint 3.1.1: downgrade solana-pubkey 4.x -> 3.x so AccountInfo::new types are consistent (avoids solana-address 1.x/2.x dual-version E0308)
+# Keep SVM tests on the patched Solana crates to avoid split address/hash lineages.
+solana-account-info = { path = "patches/solana-account-info" }
+solana-cpi = { path = "patches/solana-cpi" }
+solana-epoch-stake = { path = "patches/solana-epoch-stake" }
+solana-sha256-hasher = { path = "patches/solana-sha256-hasher" }
+solana-blake3-hasher = { path = "patches/solana-blake3-hasher" }
+solana-keccak-hasher = { path = "patches/solana-keccak-hasher" }
+solana-epoch-rewards-hasher = { path = "patches/solana-epoch-rewards-hasher" }
+solana-shred-version = { path = "patches/solana-shred-version" }
 solana-program-entrypoint = { path = "patches/solana-program-entrypoint" }
-# Fix solana-address 1.0.0 ownership error in syscalls.rs for RC3 validation builds.
-solana-address = { path = "patches/solana-address" }
+# solana-address patch is intentionally disabled; Cargo resolves 2.6.0 directly
+# and the wider patched Solana hash/pubkey family already converges SVM builds.
+# solana-address = { path = "patches/solana-address" }
 # core2 0.4.0 was yanked from crates.io; pin to local copy.
 core2 = { path = "patches/core2" }
 # Patch native crates that pulled getrandom 0.3/0.4 back down to 0.2.17
