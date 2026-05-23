@@ -1,8 +1,0 @@
-fn f(x) {
-    let x = x + 1;
-    if (true) {
-        let x = x * 2;
-        return x;
-    }
-    return 0;
-}

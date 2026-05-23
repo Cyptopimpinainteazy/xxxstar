@@ -1,5 +1,0 @@
-# main codeowner @paritytech/subxt-team
-* @paritytech/subxt-team
-
-# CI
-/.github/ @paritytech/ci @paritytech/subxt-team

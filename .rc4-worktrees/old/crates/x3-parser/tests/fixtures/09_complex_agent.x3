@@ -1,9 +1,0 @@
-agent Trader {
-    fn act(ctx) {
-        if (ctx.price_in < ctx.price_out) {
-            atomic {
-                emit ctx.price_out - ctx.price_in;
-            }
-        }
-    }
-}

@@ -1,9 +1,0 @@
-[package]
-name = "x3-lexer"
-version = "0.1.0"
-edition = "2021"
-license.workspace = true
-publish = false
-
-[dependencies]
-x3-common = { path = "../x3-common" }
