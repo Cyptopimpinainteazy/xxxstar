@@ -129,15 +129,13 @@ mod tests {
 
     #[test]
     fn known_addresses_are_precompiles() {
-        // All 7 registered addresses must be recognised
+        // All 7 registered addresses must be recognised by used_addresses()
+        let registered = FrontierPrecompiles::<()>::used_addresses();
         for &id in &[1u64, 2, 3, 4, 5, 1024, 1025] {
             let addr = H160::from_low_u64_be(id);
             assert!(
-                [H160::from_low_u64_be(1), H160::from_low_u64_be(2),
-                 H160::from_low_u64_be(3), H160::from_low_u64_be(4),
-                 H160::from_low_u64_be(5), H160::from_low_u64_be(1024),
-                 H160::from_low_u64_be(1025)].contains(&addr),
-                "Address {} should be in the registered set", id,
+                registered.contains(&addr),
+                "Address {} must be in used_addresses()", id,
             );
         }
     }
@@ -197,11 +195,43 @@ mod tests {
     }
 
     #[test]
-    fn execute_returns_none_for_unknown_address() {
-        // We can't easily invoke PrecompileSet::execute() without a full handle,
-        // but we can verify the address match logic by checking used_addresses().
+    fn unknown_address_not_in_used_addresses() {
+        // Verify the address-lookup table doesn't include random non-precompile addresses.
+        // (Full execute() coverage requires a PrecompileHandle mock — tested in integration.)
         let unknown = H160::from_low_u64_be(42);
         assert!(!FrontierPrecompiles::<()>::used_addresses().contains(&unknown));
+    }
+
+    /// Every address in `used_addresses()` must map to a non-zero `extra_cost_for()` value,
+    /// and every address NOT in `used_addresses()` must map to zero.
+    /// This guards against adding an address to one table but forgetting the other.
+    #[test]
+    fn used_addresses_and_extra_cost_for_are_consistent() {
+        let registered = FrontierPrecompiles::<()>::used_addresses();
+
+        // All registered addresses → non-zero extra_cost
+        for addr in &registered {
+            let cost = FrontierPrecompiles::<()>::extra_cost_for(*addr);
+            assert!(
+                cost > 0,
+                "used_addresses() contains {:?} but extra_cost_for returns 0 — \
+                 add a GAS_* constant for this precompile",
+                addr,
+            );
+        }
+
+        // Spot-check: addresses just outside the known set → zero extra_cost
+        for &id in &[0u64, 6, 1023, 1026, u16::MAX as u64] {
+            let addr = H160::from_low_u64_be(id);
+            if !registered.contains(&addr) {
+                assert_eq!(
+                    FrontierPrecompiles::<()>::extra_cost_for(addr),
+                    0,
+                    "Non-precompile address {} should have extra_cost 0",
+                    id,
+                );
+            }
+        }
     }
 
     #[test]
