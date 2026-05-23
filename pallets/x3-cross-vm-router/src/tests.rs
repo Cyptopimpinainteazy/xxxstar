@@ -121,6 +121,7 @@ parameter_types! {
     pub const MaxAssets: u32 = 64;
     pub const RoutingFeeBps: u16 = 0;
     pub const ProtocolTreasury: u64 = 99;
+    pub const BlocksPerDay: u32 = 14_400;
 }
 
 impl pallet_x3_asset_registry::Config for Test {
@@ -146,6 +147,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Currency = Balances;
     type RoutingFeeBps = RoutingFeeBps;
     type ProtocolTreasury = ProtocolTreasury;
+    type BlocksPerDay = BlocksPerDay;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {
