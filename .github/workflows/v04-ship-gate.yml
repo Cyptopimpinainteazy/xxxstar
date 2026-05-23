@@ -110,6 +110,22 @@ jobs:
         run: |
           cargo test -p pallet-x3-cross-vm-router --lib
 
+      # Cross-VM / cross-chain submission guardrails:
+      # 1) Runtime enforces ExternalExecutorOrigin and nonce dedup semantics.
+      # 2) Sidecar handles signed submit rejection paths (BadOrigin, Duplicate)
+      # deterministically without panicking.
+      - name: cargo test (router+sidecar rejection-path gate)
+        run: |
+          cargo test -p pallet-x3-cross-vm-router --lib -- \
+            register_external_root_rejected_when_bridges_disabled \
+            only_root_can_toggle_external_bridges \
+            register_external_root_works_only_after_governance_enables \
+            duplicate_message_id_rejected
+
+          cargo test --manifest-path crates/x3-sidecar/Cargo.toml --bin x3-sidecar -- \
+            poll_once_signed_submit_handles_bad_origin_rejection \
+            poll_once_signed_submit_handles_duplicate_rejection
+
       # Readiness report must NEVER claim ready when offline. This is the
       # single most likely place for "demo theater" to creep back in.
       - name: cargo test (readiness honesty)

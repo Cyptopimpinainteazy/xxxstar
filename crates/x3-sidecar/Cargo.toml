@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "X3 Cross-VM Sidecar — monitors Solana/EVM chains and bridges events into X3"
 license = "MIT"
+autolib = false
 
 [[bin]]
 name = "x3-sidecar"
@@ -25,3 +26,5 @@ zeroize      = "1"          # Secure key material zeroization
 
 [dev-dependencies]
 axum     = "0.7"
+
+[workspace]
