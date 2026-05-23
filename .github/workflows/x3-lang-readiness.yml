@@ -77,3 +77,5 @@ jobs:
             reports/rc3/x3-lang-readiness-rerun-2026-05-23-source-evidence.md
             Cargo.toml
             Cargo.lock
+
+# retrigger: 2026-05-23T20260523040402
