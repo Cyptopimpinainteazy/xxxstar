@@ -23,6 +23,11 @@ ARTIFACT_DIR_NAMES = {'target', 'node_modules', 'dist', 'build', '.cache', 'out'
 # Skip these extensions when hashing (compiled objects, large binaries)
 SKIP_EXTENSIONS = {'.o', '.a', '.so', '.dylib', '.dll', '.exe', '.pdb', '.wasm', '.rlib', '.rmeta', '.d', '.bc'}
 
+# Paths whose TODO markers are intentional (governance docs, test fixtures, etc.)
+TODO_SCAN_EXCLUDE_PREFIXES = (
+    'docs/',       # Documentation — TODOs are open action items, not code stubs
+)
+
 TODO_PATTERNS = re.compile(r"\bTODO\b|\bFIXME\b|unimplemented!\(|todo!\(|panic!\(|TODO:\s|FIXME:", re.I)
 
 # Language-specific half-done heuristics
@@ -57,6 +62,43 @@ HALF_DONE_RULES = {
         (re.compile(r'TODO'), 'Solidity TODO'),
     ],
 }
+
+def is_todo_scan_excluded(rel_path):
+    """Return True if this path's TODO markers should be ignored (intentional open items)."""
+    norm = rel_path.replace(os.sep, '/')
+    return any(norm.startswith(p) for p in TODO_SCAN_EXCLUDE_PREFIXES)
+
+
+def strip_test_blocks(text, ext):
+    """For Rust files, remove content inside #[cfg(test)] mod blocks to avoid false positives."""
+    if ext != '.rs':
+        return text
+    result = []
+    i = 0
+    length = len(text)
+    # Find all #[cfg(test)] mod ... { ... } blocks using brace-counting
+    cfg_test_pat = re.compile(r'#\[cfg\(test\)\]\s*(?:mod\s+\w+\s*\{)', re.DOTALL)
+    last_end = 0
+    for m in cfg_test_pat.finditer(text):
+        result.append(text[last_end:m.start()])
+        # Find the matching closing brace by counting
+        brace_start = text.index('{', m.start())
+        depth = 0
+        pos = brace_start
+        while pos < length:
+            if text[pos] == '{':
+                depth += 1
+            elif text[pos] == '}':
+                depth -= 1
+                if depth == 0:
+                    last_end = pos + 1
+                    break
+            pos += 1
+        else:
+            last_end = length
+    result.append(text[last_end:])
+    return ''.join(result)
+
 
 def detect_half_done(path, text):
     """Return list of half-done signals for a file based on its extension."""
@@ -207,10 +249,13 @@ def gather(repo_root, stale_days, artifact_days):
                 try:
                     with open(path, 'r', encoding='utf-8', errors='ignore') as fh:
                         txt = fh.read()
-                        for m in TODO_PATTERNS.finditer(txt):
-                            snippet = txt[max(0, m.start()-40):m.end()+40].splitlines()[0]
-                            info['todo_matches'].append({'marker': m.group(0), 'snippet': snippet})
-                        # language-specific half-done detection
+                        if not is_todo_scan_excluded(info['path']):
+                            # Strip test blocks before scanning for panic!/todo markers
+                            scan_txt = strip_test_blocks(txt, ext)
+                            for m in TODO_PATTERNS.finditer(scan_txt):
+                                snippet = scan_txt[max(0, m.start()-40):m.end()+40].splitlines()[0]
+                                info['todo_matches'].append({'marker': m.group(0), 'snippet': snippet})
+                        # language-specific half-done detection (always run)
                         info['half_done'] = detect_half_done(info['path'], txt)
                 except Exception:
                     pass

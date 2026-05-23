@@ -2246,11 +2246,9 @@ mod tests {
     fn extract_poh_digest_decodes_valid_digest() {
         let mut state = PoHState::default();
         let digest = state.advance(&[]);
-        let mut encoded = Vec::new();
-        // PoHDigest::encode — tick(8) || poh_hash(32) || tx_mix_root(32)
-        encoded.extend_from_slice(&digest.tick.to_le_bytes());
-        encoded.extend_from_slice(&digest.poh_hash);
-        encoded.extend_from_slice(&digest.tx_mix_root);
+        // Use the canonical encode_payload() so this test stays in sync with
+        // PoHDigest's SCALE layout — never couple test encoding to manual byte math.
+        let encoded = digest.encode_payload();
 
         let mut header = TestHeader::new(
             1, Default::default(), Default::default(), Default::default(), Default::default(),
@@ -2262,6 +2260,27 @@ mod tests {
         let decoded = result.unwrap();
         assert_eq!(decoded.tick, digest.tick);
         assert_eq!(decoded.poh_hash, digest.poh_hash);
+        assert_eq!(decoded.tx_mix_root, digest.tx_mix_root);
+    }
+
+    /// Malformed bytes (wrong length) → extract_poh_digest returns None (not panic).
+    #[test]
+    fn extract_poh_digest_returns_none_for_malformed_bytes() {
+        let mut header = TestHeader::new(
+            1, Default::default(), Default::default(), Default::default(), Default::default(),
+        );
+        // 71 bytes — one short of the required 72; must return None, not panic.
+        header.digest_mut().push(DigestItem::Consensus(POH_ENGINE_ID, vec![0u8; 71]));
+        let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
+        assert!(result.is_none(), "71-byte payload is malformed and must return None");
+
+        // 0 bytes edge case
+        let mut header2 = TestHeader::new(
+            1, Default::default(), Default::default(), Default::default(), Default::default(),
+        );
+        header2.digest_mut().push(DigestItem::Consensus(POH_ENGINE_ID, vec![]));
+        let result2 = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header2);
+        assert!(result2.is_none(), "empty payload must return None");
     }
 
     // ─── State advancement regression tests ──────────────────────────────────

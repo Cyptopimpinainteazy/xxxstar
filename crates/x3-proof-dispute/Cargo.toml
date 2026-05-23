@@ -1,0 +1,12 @@
+[package]
+name = "x3-proof-dispute"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Proof dispute lifecycle and voting primitives for X3."
+
+[lib]
+name = "x3_proof_dispute"
+path = "src/lib.rs"
+
+[dependencies]

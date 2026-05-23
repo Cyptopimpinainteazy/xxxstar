@@ -1,0 +1,51 @@
+[package]
+name = "x3-rpc"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain Team"]
+description = "X3 Chain RPC Server - JSON-RPC endpoints for block exploration, gas estimation, wallet operations, and DEX integration"
+license = "Apache-2.0"
+
+[dependencies]
+# JSON-RPC
+jsonrpc-core = { version = "18.0", default-features = false }
+jsonrpc-core-client = { version = "18.0", default-features = false }
+jsonrpc-derive = { version = "18.0", default-features = false }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Runtime
+x3-chain-runtime = { path = "../../runtime", features = ["std", "native-real-vm-adapters"] }
+pallet-x3-kernel = { path = "../../pallets/x3-kernel", features = ["std"] }
+
+# Substrate RPC infrastructure
+sp-api = { workspace = true }
+sp-blockchain = { workspace = true }
+sp-runtime = { workspace = true }
+sp-core = { workspace = true }
+sc-rpc-api = { workspace = true }
+sc-client-api = { workspace = true }
+sc-transaction-pool-api = { workspace = true }
+sp-block-builder = { workspace = true }
+jsonrpsee = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+futures = "0.3"
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+uuid = { version = "1.7", features = ["v4", "serde"] }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# Serialization helpers
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
