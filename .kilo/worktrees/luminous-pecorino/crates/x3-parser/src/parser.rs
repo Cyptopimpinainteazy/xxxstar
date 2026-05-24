@@ -537,6 +537,22 @@ impl Parser {
                 let token = self.bump();
                 let rhs = self.parse_expression_bp(PREFIX_BP)?;
                 let span = token.span.merge(rhs.span());
+
+                // Collapse `-<number>` into a signed literal when the operand is a
+                // numeric literal expression. This makes `-42` behave as a true
+                // signed numeric literal instead of a unary negation operator.
+                if let Expression::Literal(lit_expr) = &rhs {
+                    let lit = match &lit_expr.literal {
+                        Literal::Integer(value) => Literal::Integer(-value),
+                        Literal::Float(value) => Literal::Float(-value),
+                        other => other.clone(),
+                    };
+
+                    if matches!(lit, Literal::Integer(_) | Literal::Float(_)) {
+                        return Ok(Expression::Literal(LiteralExpression { literal: lit, span }));
+                    }
+                }
+
                 Ok(Expression::Unary(UnaryExpression {
                     op: UnaryOp::Negate,
                     expr: Box::new(rhs),
@@ -813,5 +829,32 @@ fn main() {
         let mut parser = Parser::from_source(source);
         let module = parser.parse_module();
         assert!(module.is_ok(), "Failed: {:?}", module.err());
+    }
+
+    #[test]
+    fn parse_negative_integer_literal_as_literal() {
+        let source = "fn test() { greet(-42); }";
+        let mut parser = Parser::from_source(source);
+        let module = parser.parse_module().expect("should parse module");
+
+        let function = match &module.items[0] {
+            Item::Function(func) => func,
+            _ => panic!("expected function item"),
+        };
+
+        let statement = match &function.body.statements[0] {
+            Statement::Expr(expr) => expr,
+            _ => panic!("expected expression statement"),
+        };
+
+        let call = match statement {
+            Expression::Call(call_expr) => call_expr,
+            _ => panic!("expected call expression"),
+        };
+
+        assert!(matches!(
+            call.args.as_slice(),
+            [Expression::Literal(LiteralExpression { literal: Literal::Integer(-42), .. })]
+        ));
     }
 }

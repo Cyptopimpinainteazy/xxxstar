@@ -1,0 +1,28 @@
+// Domain test: AMM constant-product token swap
+// Models: Uniswap-style xy=k invariant (integer arithmetic approximation)
+// Tests: multi-arg arithmetic, integer division, function composition
+
+fn swap_output(reserve_in: i64, reserve_out: i64, amount_in: i64) -> i64 {
+    // Constant-product formula: new_out = k / (reserve_in + amount_in)
+    // output_amount = reserve_out - new_out
+    let k = reserve_in * reserve_out;
+    let new_reserve_in = reserve_in + amount_in;
+    let new_reserve_out = k / new_reserve_in;
+    return reserve_out - new_reserve_out;
+}
+
+fn fee_adjusted_input(amount_in: i64, fee_bps: i64) -> i64 {
+    // Apply basis-point fee: amount_in * (10000 - fee_bps) / 10000
+    let numerator = amount_in * (10000 - fee_bps);
+    return numerator / 10000;
+}
+
+fn swap_with_fee(reserve_in: i64, reserve_out: i64, amount_in: i64, fee_bps: i64) -> i64 {
+    let adjusted = fee_adjusted_input(amount_in, fee_bps);
+    return swap_output(reserve_in, reserve_out, adjusted);
+}
+
+fn main() -> i64 {
+    // Pool: 1000 X, 2000 Y; swap 100 X with 30 bps fee
+    return swap_with_fee(1000, 2000, 100, 30);
+}

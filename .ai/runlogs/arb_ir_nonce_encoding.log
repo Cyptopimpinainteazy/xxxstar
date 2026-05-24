@@ -1,0 +1,11 @@
+cargo test -p x3-compiler
+
+Summary:
+- Unittests (src/lib.rs): 55 passed, 0 failed
+- Determinism tests (tests/determinism.rs): 1 passed, 0 failed
+- End-to-end tests (tests/e2e_test.rs): 9 passed, 0 failed
+- Integration tests (tests/integration_test.rs): 3 passed, 0 failed
+- Doc-tests: 0 passed, 0 failed, 2 ignored
+No failures were reported.
+Notes:
+- Warnings about unused imports/variables were reported in x3-vm and x3-compiler.

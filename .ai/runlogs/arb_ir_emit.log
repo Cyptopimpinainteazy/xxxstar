@@ -1,0 +1,9 @@
+cargo test -p x3-compiler
+
+Summary:
+- Unit tests: 52 passed, 0 failed
+- Crate tests: 1 passed, 0 failed
+- Additional tests: 9 passed, 0 failed
+- Integration tests: 3 passed, 0 failed
+- Doc-tests: 0 passed, 0 failed, 2 ignored
+Overall result: ok

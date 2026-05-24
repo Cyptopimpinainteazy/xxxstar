@@ -1,0 +1,256 @@
+warning: patch for `sp-crypto-hashing` uses the features mechanism. default-features and features will not take effect because the patch dependency does not support this mechanism
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#30b95889)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/vendor/sp-wasm-interface
+warning: Patch `rustix v1.1.2 (/home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+   Compiling x3-vm v0.1.0 (/home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/crates/x3-vm)
+warning: unused import: `std::collections::BTreeMap`
+ --> crates/x3-vm/src/isolation.rs:7:5
+  |
+7 | use std::collections::BTreeMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+note: the lint level is defined here
+ --> crates/x3-vm/src/lib.rs:1:20
+  |
+1 | #![warn(dead_code, unused_imports, unused_variables)]
+  |                    ^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+ --> crates/x3-vm/src/storage.rs:6:34
+  |
+6 | use std::collections::{BTreeMap, HashMap};
+  |                                  ^^^^^^^
+
+warning: unused imports: `ConstValue` and `GlobalEntry`
+    --> crates/x3-vm/src/vm.rs:1964:37
+     |
+1964 |         use x3_backend::bc_format::{ConstValue, FunctionEntry, GlobalEntry};
+     |                                     ^^^^^^^^^^                 ^^^^^^^^^^^
+     |
+note: the lint level is defined here
+    --> crates/x3-vm/src/lib.rs:1:20
+     |
+   1 | #![warn(dead_code, unused_imports, unused_variables)]
+     |                    ^^^^^^^^^^^^^^
+
+warning: unused imports: `ConstValue` and `GlobalEntry`
+    --> crates/x3-vm/src/vm.rs:2165:37
+     |
+2165 |         use x3_backend::bc_format::{ConstValue, FunctionEntry, GlobalEntry, MAGIC, VERSION};
+     |                                     ^^^^^^^^^^                 ^^^^^^^^^^^
+
+warning: unused import: `std::collections::BTreeMap`
+ --> crates/x3-vm/src/isolation.rs:7:5
+  |
+7 | use std::collections::BTreeMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `FINALITY_CONFIRMATIONS` is never used
+  --> crates/x3-vm/src/vm.rs:53:7
+   |
+53 | const FINALITY_CONFIRMATIONS: u8 = 2;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> crates/x3-vm/src/lib.rs:1:9
+   |
+ 1 | #![warn(dead_code, unused_imports, unused_variables)]
+   |         ^^^^^^^^^
+
+warning: constant `NONCE_MODE_VALUE` is never used
+  --> crates/x3-vm/src/vm.rs:55:7
+   |
+55 | const NONCE_MODE_VALUE: u8 = 1;
+   |       ^^^^^^^^^^^^^^^^
+
+   Compiling x3-opt v0.1.0 (/home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/crates/x3-opt)
+warning: unused variable: `case`
+   --> crates/x3-vm/src/gpu.rs:126:23
+    |
+126 |     fn execute(&self, case: &DeterminismTestCase) -> ExecutionOutput {
+    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_case`
+    |
+note: the lint level is defined here
+   --> crates/x3-vm/src/lib.rs:1:36
+    |
+  1 | #![warn(dead_code, unused_imports, unused_variables)]
+    |                                    ^^^^^^^^^^^^^^^^
+
+warning: `x3-vm` (lib) generated 4 warnings (run `cargo fix --lib -p x3-vm` to apply 2 suggestions)
+   Compiling x3-compiler v0.1.0 (/home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/crates/x3-compiler)
+warning: unused import: `std::collections::BTreeMap`
+ --> crates/x3-compiler/src/codegen.rs:7:5
+  |
+7 | use std::collections::BTreeMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `BlockId`
+ --> crates/x3-compiler/src/optimizer.rs:5:17
+  |
+5 | use crate::ir::{BlockId, IrBinOp, IrFunction, IrInstr, Val};
+  |                 ^^^^^^^
+
+warning: `x3-vm` (lib test) generated 5 warnings (1 duplicate) (run `cargo fix --lib -p x3-vm --tests` to apply 3 suggestions)
+warning: unused variable: `fname`
+   --> crates/x3-compiler/src/codegen.rs:180:43
+    |
+180 |                     IrInstr::Call { func: fname, .. } => {
+    |                                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_fname`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: `x3-compiler` (lib) generated 3 warnings (run `cargo fix --lib -p x3-compiler` to apply 2 suggestions)
+warning: unused import: `OptLevel`
+ --> crates/x3-compiler/tests/integration_test.rs:5:53
+  |
+5 |     use x3_compiler::{CompilationOptions, Compiler, OptLevel};
+  |                                                     ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Val`
+   --> crates/x3-compiler/src/optimizer.rs:147:50
+    |
+147 |     use crate::ir::{IrFunction, IrInstr, IrType, Val};
+    |                                                  ^^^
+
+warning: unused imports: `FnDecl` and `Param`
+   --> crates/x3-compiler/src/typechecker.rs:188:25
+    |
+188 |     use crate::parser::{FnDecl, Param, TypeExpr};
+    |                         ^^^^^^  ^^^^^
+
+warning: `x3-compiler` (test "integration_test") generated 1 warning (run `cargo fix --test "integration_test"` to apply 1 suggestion)
+warning: `x3-compiler` (lib test) generated 5 warnings (3 duplicates) (run `cargo fix --lib -p x3-compiler --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.54s
+warning: the following packages contain code that will be rejected by a future version of Rust: trie-db v0.30.0
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/debug/deps/x3_backend-5beeb9670142f883)
+
+running 35 tests
+test bc_format::tests::feature_flags_min_version ... ok
+test bc_format::tests::module_roundtrip ... ok
+test bc_format::tests::module_with_metadata ... ok
+test bc_format::tests::module_flags ... ok
+test bc_format::tests::const_pool_dedup ... ok
+test bc_format::tests::module_version_roundtrip ... ok
+test bc_format::tests::version_satisfies ... ok
+test bc_format::tests::version_compatibility ... ok
+test bc_format::tests::version_info_packing ... ok
+test bc_format_helpers::tests::branch_module_parses ... ok
+test bc_format_helpers::tests::halt_module_parses ... ok
+test bc_format_helpers::tests::param_module_parses ... ok
+test emit::tests::emit_basic_instructions ... ok
+test emit::tests::emit_constants ... ok
+test emit::tests::emit_with_labels ... ok
+test emit::tests::forward_reference_patching ... ok
+test bc_format_helpers::tests::simple_module_parses ... ok
+test layout::tests::function_layout_registers ... ok
+test error::tests::error_accumulator ... ok
+test layout::tests::loop_context_stack ... ok
+test error::tests::error_display ... ok
+test layout::tests::layout_computer_functions ... ok
+test lower::tests::bytecode_roundtrip ... ok
+test lower::tests::compile_with_locals ... ok
+test mir_lower::tests::compile_arithmetic_mir ... ok
+test mir_lower::tests::compile_simple_mir ... ok
+test lower::tests::compile_simple_function ... ok
+test opcode::tests::opcode_vm_hints ... ok
+test opcode::tests::register_display ... ok
+test layout::tests::type_tags ... ok
+test mir_lower::tests::optimized_smaller_than_unoptimized ... ok
+test opcode::tests::opcode_dual_vm_coverage ... ok
+test opcode::tests::opcode_names ... ok
+test opcode::tests::opcode_roundtrip ... ok
+test opcode::tests::opcode_classifications ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/x3_compiler-dd66f3d0e984f6c0)
+
+running 55 tests
+test abi::tests::test_abi_type_from_str ... ok
+test abi::tests::test_different_signatures_produce_different_selectors ... ok
+test abi::tests::test_build_signature ... ok
+test abi::tests::test_empty_contract_abi ... ok
+test abi::tests::test_selector_is_deterministic ... ok
+test abi::tests::test_json_round_trip_preserves_selector ... ok
+test abi::tests::test_serialize_and_deserialize ... ok
+test codegen::tests::test_codegen_add_opcode ... ok
+test codegen::tests::test_codegen_const_pool_populated ... ok
+test arb_ir::tests::lowers_arb_ops_to_ir ... ok
+test codegen::tests::test_codegen_crosschain_opcodes ... ok
+test codegen::tests::test_codegen_empty_module ... ok
+test codegen::tests::test_codegen_ends_with_ret ... ok
+test codegen::tests::test_codegen_ld_const_for_constants ... ok
+test codegen::tests::test_codegen_nonce_value_encoding ... ok
+test codegen::tests::test_codegen_produces_instructions ... ok
+test codegen::tests::test_codegen_rejects_oversized_confirmations ... ok
+test compiler::tests::test_compilation_options_builder ... ok
+test compiler::tests::test_compilation_options_defaults ... ok
+test ir::tests::test_binop_instr ... ok
+test ir::tests::test_new_block ... ok
+test compiler::tests::test_compile_emits_arb_ir ... ok
+test compiler::tests::test_compile_simple_source ... FAILED
+test compiler::tests::test_compile_with_gas_analysis ... FAILED
+test ir::tests::test_validate_terminated_block_no_error ... ok
+test ir::tests::test_validate_unterminated_block_reports_error ... ok
+test ir::tests::test_const_instr ... ok
+test ir::tests::test_new_val_increments ... ok
+test optimizer::tests::test_constant_folding_div ... ok
+test optimizer::tests::test_constant_folding_add ... ok
+test optimizer::tests::test_optimize_o0_is_identity ... ok
+test optimizer::tests::test_dce_removes_unreachable_blocks ... ok
+test optimizer::tests::test_constant_folding_div_by_zero_not_folded ... ok
+test ir::tests::test_push_and_terminated ... ok
+test optimizer::tests::test_dce_removes_nops ... ok
+test optimizer::tests::test_optimize_o1_folds_constants ... ok
+test parser::tests::test_parse_empty_fn ... ok
+test parser::tests::test_parse_multiple_fns ... ok
+test parser::tests::test_parse_pub_fn ... ok
+test parser::tests::test_tokenize_arrow ... ok
+test parser::tests::test_tokenize_bool_literals ... ok
+test parser::tests::test_tokenize_fn_keyword ... ok
+test parser::tests::test_tokenize_integer_literal ... ok
+test parser::tests::test_tokenize_operators ... ok
+test typechecker::tests::test_binop_add_i64 ... ok
+test typechecker::tests::test_binop_type_mismatch_error ... ok
+test typechecker::tests::test_bool_lit_infers_bool ... ok
+test typechecker::tests::test_comparison_returns_bool ... ok
+test typechecker::tests::test_empty_file_no_errors ... ok
+test typechecker::tests::test_int_lit_infers_i64 ... ok
+test typechecker::tests::test_let_binding_updates_env ... ok
+test typechecker::tests::test_let_type_annotation_mismatch_error ... ok
+test typechecker::tests::test_undefined_variable_error ... ok
+test compiler::tests::test_compile_with_artifacts ... ok
+test compiler::tests::test_contract_mode ... ok
+
+failures:
+
+---- compiler::tests::test_compile_simple_source stdout ----
+
+thread 'compiler::tests::test_compile_simple_source' panicked at crates/x3-compiler/src/compiler.rs:320:9:
+Compilation should succeed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- compiler::tests::test_compile_with_gas_analysis stdout ----
+
+thread 'compiler::tests::test_compile_with_gas_analysis' panicked at crates/x3-compiler/src/compiler.rs:391:9:
+assertion failed: result.is_ok()
+
+
+failures:
+    compiler::tests::test_compile_simple_source
+    compiler::tests::test_compile_with_gas_analysis
+
+test result: FAILED. 53 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p x3-compiler --lib`

@@ -39,11 +39,14 @@ pub mod pallet {
     use sp_core::H256;
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
+        AssetAction,
         AssetStatus,
+        CrossVmAssetMessage,
+        CrossVmMessageValidationError,
         traits::{
             AssetRegistryInspect, EconomicHaltInspect, SupplyLedgerGovern, SupplyLedgerWrite,
         },
-        AssetId, Balance, DomainId, SupplyLedger, SupplyPolicy,
+        AssetId, Balance, DomainId, SupplyLedger, SupplyPolicy, UniversalAssetKernel,
     };
 
     /// Keep only the latest N block proofs to prevent unbounded storage growth.
@@ -609,6 +612,68 @@ pub mod pallet {
         /// S0-2: Get the current nonce for an origin (for UI/wallet integration).
         pub fn get_current_nonce(origin: &T::AccountId) -> u64 {
             MinterNonce::<T>::get(origin)
+        }
+
+        /// Build a universal-kernel view for the asset from the current ledger state.
+        ///
+        /// This allows cross-VM components to reason over canonical/native/wrapped/locked
+        /// accounting with one shape while preserving the existing ledger storage model.
+        pub fn universal_kernel_snapshot(asset_id: &AssetId) -> Option<UniversalAssetKernel> {
+            Ledgers::<T>::get(asset_id).map(|ledger| UniversalAssetKernel::from_supply_ledger(&ledger))
+        }
+
+        /// Validate a cross-VM asset message using deterministic checks and registry policy.
+        pub fn validate_cross_vm_asset_message(
+            msg: &CrossVmAssetMessage,
+            now_ms: u64,
+        ) -> Result<(), DispatchError> {
+            ensure!(T::Registry::exists(&msg.canonical_asset_id), Error::<T>::UnknownAsset);
+            ensure!(
+                T::Registry::is_active(&msg.canonical_asset_id),
+                Error::<T>::AssetNotActive
+            );
+
+            if let Err(
+                CrossVmMessageValidationError::InvalidVersion
+                | CrossVmMessageValidationError::ZeroAmount
+                | CrossVmMessageValidationError::Expired
+                | CrossVmMessageValidationError::SameSourceAndTarget
+                | CrossVmMessageValidationError::RecipientDomainMismatch
+                | CrossVmMessageValidationError::SenderDomainMismatch
+                | CrossVmMessageValidationError::InvalidDecimals
+                | CrossVmMessageValidationError::MessageIdMismatch,
+            ) = msg.validate_at(now_ms)
+            {
+                return Err(Error::<T>::InvariantViolation.into());
+            }
+
+            // Enforce supported lifecycle actions while routing is being tightened.
+            ensure!(
+                matches!(
+                    msg.action,
+                    AssetAction::Lock
+                        | AssetAction::MintWrapped
+                        | AssetAction::BurnWrapped
+                        | AssetAction::ReleaseNative
+                        | AssetAction::ReleaseExternal
+                        | AssetAction::Refund
+                ),
+                Error::<T>::InvariantViolation
+            );
+
+            // Bridge-critical actions must provide a non-empty proof hash.
+            // This enforces a fail-closed posture for mint/release paths.
+            if matches!(
+                msg.action,
+                AssetAction::MintWrapped
+                    | AssetAction::ReleaseNative
+                    | AssetAction::ReleaseExternal
+                    | AssetAction::Refund
+            ) {
+                ensure!(msg.proof_hash != H256::zero(), Error::<T>::InvariantViolation);
+            }
+
+            Ok(())
         }
 
         /// Integrate with the X3AssetRegistry to fetch metadata and enforce policies.

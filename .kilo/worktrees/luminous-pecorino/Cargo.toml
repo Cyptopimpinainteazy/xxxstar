@@ -7,6 +7,9 @@ exclude = [
     # (Foundry for EVM, Anchor for SVM). Excluding it prevents the parent
     # cargo from picking up SVM program crates and confusing build graphs.
     "X3-contracts",
+    # x3-gateway was previously excluded for a broken dependency chain.
+    # The current worktree contains `primitives/` and the required runtime path,
+    # so this crate is now restored to the workspace.
 ]
 members = [
     "pallets/x3-kernel",

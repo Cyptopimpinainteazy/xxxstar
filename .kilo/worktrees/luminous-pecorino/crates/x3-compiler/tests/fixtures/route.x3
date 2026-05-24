@@ -1,0 +1,22 @@
+// Domain test: route cost calculation
+// Models: weighted edge traversal, multi-hop path cost aggregation
+// Tests: multi-arg functions, local bindings, arithmetic accumulation
+
+fn edge_cost(distance: i64, toll: i64) -> i64 {
+    return distance * 10 + toll;
+}
+
+fn route_total(d1: i64, t1: i64, d2: i64, t2: i64, d3: i64, t3: i64) -> i64 {
+    let c1 = edge_cost(d1, t1);
+    let c2 = edge_cost(d2, t2);
+    let c3 = edge_cost(d3, t3);
+    return c1 + c2 + c3;
+}
+
+fn main() -> i64 {
+    // hop 1: distance=5, toll=2  → 52
+    // hop 2: distance=3, toll=1  → 31
+    // hop 3: distance=7, toll=4  → 74
+    // total: 157
+    return route_total(5, 2, 3, 1, 7, 4);
+}

@@ -1,0 +1,7 @@
+cargo test -p x3-compiler -p x3-backend -p x3-vm
+
+Summary:
+- x3-compiler: 35 passed, 0 failed
+- x3-backend: 55 passed, 0 failed
+- x3-vm: 136 passed, 0 failed
+All tests passed.

@@ -1,0 +1,7 @@
+cargo test -p x3-compiler
+
+Summary:
+- Unit tests: 63 passed, 0 failed
+- Integration tests: 3 passed, 0 failed
+- Doc tests: 0 passed, 0 failed (2 ignored)
+Total: 66 passed, 0 failed, 2 ignored

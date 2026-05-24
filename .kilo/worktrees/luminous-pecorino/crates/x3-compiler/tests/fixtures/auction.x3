@@ -1,0 +1,41 @@
+// Domain test: English auction — highest-bid winner selection
+// Models: 4-bidder on-chain English auction
+// Tests: nested conditionals, multi-arg comparison, multi-return paths
+
+fn highest_bid(b0: i64, b1: i64, b2: i64, b3: i64) -> i64 {
+    if b1 > b0 {
+        if b2 > b1 {
+            if b3 > b2 {
+                return b3;
+            }
+            return b2;
+        }
+        if b3 > b1 {
+            return b3;
+        }
+        return b1;
+    }
+    if b2 > b0 {
+        if b3 > b2 {
+            return b3;
+        }
+        return b2;
+    }
+    if b3 > b0 {
+        return b3;
+    }
+    return b0;
+}
+
+fn is_reserve_met(winning_bid: i64, reserve: i64) -> i64 {
+    if winning_bid >= reserve {
+        return 1;
+    }
+    return 0;
+}
+
+fn main() -> i64 {
+    // bids: 100, 350, 200, 275 → winner = 350
+    let winner = highest_bid(100, 350, 200, 275);
+    return is_reserve_met(winner, 300);
+}

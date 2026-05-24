@@ -263,6 +263,21 @@ mod error_tests {
         );
     }
 
+    fn assert_only_argument_type_mismatch(errors: &[TypeError]) {
+        assert!(!errors.is_empty(), "Expected at least one type error");
+        assert!(
+            errors
+                .iter()
+                .all(|e| matches!(e.kind, TypeErrorKind::ArgumentTypeMismatch { .. })),
+            "Expected only ArgumentTypeMismatch error(s), got: {:?}",
+            errors
+        );
+    }
+
+    // This test enforces the numeric argument mismatch policy defined in
+    // `docs/rfc/RFC-t5-6-numeric-coercion-policy.md`.
+    // It ensures incompatible literal arguments are diagnosed as
+    // `ArgumentTypeMismatch` rather than generic type/unification failures.
     /// Test argument type mismatch.
     #[test]
     fn test_argument_type_mismatch() {
@@ -278,13 +293,76 @@ mod error_tests {
         let result = parse_resolve_check(source);
         assert!(result.is_err(), "Should detect argument type mismatch");
         let errors = result.unwrap_err();
-        assert!(
-            errors
-                .iter()
-                .any(|e| matches!(e.kind, TypeErrorKind::ArgumentTypeMismatch { .. })),
-            "Should have ArgumentTypeMismatch error, got: {:?}",
-            errors
-        );
+        assert_only_argument_type_mismatch(&errors);
+    }
+
+    /// Test literal argument type mismatches across numeric types.
+    #[test]
+    fn test_argument_type_mismatch_numeric_literals() {
+        let cases = [
+            (
+                "i64 literal to u64 parameter",
+                r#"
+                    fn greet(x: u64) {
+                        return;
+                    }
+                    fn test() {
+                        greet(-42);
+                    }
+                "#,
+            ),
+            (
+                "u64 literal to i64 parameter",
+                r#"
+                    fn greet(x: i64) {
+                        return;
+                    }
+                    fn test() {
+                        greet(42);
+                    }
+                "#,
+            ),
+            (
+                "u64 literal to u32 parameter",
+                r#"
+                    fn greet(x: u32) {
+                        return;
+                    }
+                    fn test() {
+                        greet(42);
+                    }
+                "#,
+            ),
+            (
+                "u64 literal to i32 parameter",
+                r#"
+                    fn greet(x: i32) {
+                        return;
+                    }
+                    fn test() {
+                        greet(42);
+                    }
+                "#,
+            ),
+            (
+                "u64 literal to u128 parameter",
+                r#"
+                    fn greet(x: u128) {
+                        return;
+                    }
+                    fn test() {
+                        greet(42);
+                    }
+                "#,
+            ),
+        ];
+
+        for (case, source) in cases {
+            let result = parse_resolve_check(source);
+            assert!(result.is_err(), "{} should produce a type error", case);
+            let errors = result.unwrap_err();
+            assert_only_argument_type_mismatch(&errors);
+        }
     }
 
     /// Test while loop condition.

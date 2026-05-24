@@ -133,6 +133,25 @@ pub fn codegen_module(module: &IrModule) -> Result<Vec<FunctionCode>, CodegenErr
     module.functions.iter().map(codegen_function).collect()
 }
 
+/// Validate that a function name is a legal bytecode identifier.
+///
+/// Rules:
+/// - Non-empty
+/// - First character: ASCII letter (`a–z`, `A–Z`) or underscore (`_`)
+/// - Remaining characters: ASCII alphanumeric or underscore
+pub fn validate_function_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        None => false,
+        Some(first) => {
+            if !first.is_ascii_alphabetic() && first != '_' {
+                return false;
+            }
+            chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

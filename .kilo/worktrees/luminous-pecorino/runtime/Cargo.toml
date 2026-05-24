@@ -113,7 +113,7 @@ pallet-x3-dapp-hub = { path = "../pallets/x3-dapp-hub", default-features = false
 x3-revenue-sharing = { path = "../crates/x3-revenue-sharing", default-features = false }
 pallet-x3-compute-market = { path = "../pallets/x3-compute-market", default-features = false }
 pallet-x3-flashloan = { path = "../pallets/x3-flashloan", default-features = false }
-pallet-x3-identity-verifier = { path = "../pallets/x3-identity-verifier", default-features = false }
+pallet-x3-identity-verifier = { path = "../pallets/x3-identity-verifier", default-features = false, optional = true }
 pallet-x3-keyring = { path = "../pallets/x3-keyring", default-features = false, optional = true }
 pallet-svm-runtime = { package = "pallet-svm", path = "../pallets/svm-runtime", default-features = false }
 
@@ -314,7 +314,7 @@ frontier = [
 advanced-analytics = []
 
 # Enable x3-keyring pallet (on-chain keyring verification with registered attestors)
-x3-keyring = ["pallet-x3-keyring", "x3-primitives"]
+x3-keyring = ["pallet-x3-keyring", "x3-primitives/std"]
 
 # Enable x3-identity-verifier pallet (cross-VM identity verification with ZK proofs)
 x3-identity-verifier = ["pallet-x3-identity-verifier"]

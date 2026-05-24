@@ -1,0 +1,8 @@
+cargo test -p x3-parser -p x3-hir -p x3-mir -p x3-compiler
+
+Summary:
+- x3-compiler: 3 passed, 0 failed, 2 ignored (doc-tests)
+- x3-hir: 18 passed, 0 failed, 1 ignored (doc-test)
+- x3-mir: 6 passed, 0 failed
+- x3-parser: 7 passed, 0 failed
+- integration tests (golden.rs): 2 passed, 0 failed

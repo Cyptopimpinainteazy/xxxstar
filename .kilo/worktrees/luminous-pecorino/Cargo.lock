@@ -1340,7 +1340,7 @@ dependencies = [
  "fast_chemail",
  "fnv",
  "futures-util",
- "handlebars 6.4.0",
+ "handlebars 6.4.1",
  "http 1.4.0",
  "indexmap 2.14.0",
  "mime",
@@ -6972,9 +6972,9 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
-version = "6.4.0"
+version = "6.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b3f9296c208515b87bd915a2f5d1163d4b3f863ba83337d7713cf478055948e"
+checksum = "d43ccdfe15a81ab0a8af639e90254227c9a46afd9c5f5b6ec7efaa345c4b0f00"
 dependencies = [
  "derive_builder",
  "log",
@@ -12596,6 +12596,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-identity-verifier"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-api",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+ "x3-primitives",
+]
+
+[[package]]
 name = "pallet-x3-invariants"
 version = "0.1.0"
 dependencies = [
@@ -12674,6 +12693,25 @@ dependencies = [
  "x3-packet-schema",
  "x3-svm-integration",
  "x3-x3-integration",
+]
+
+[[package]]
+name = "pallet-x3-keyring"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-api",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0",
+ "x3-primitives",
 ]
 
 [[package]]
@@ -12917,6 +12955,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0",
+ "x3-primitives",
 ]
 
 [[package]]
@@ -26538,10 +26577,12 @@ dependencies = [
  "pallet-x3-dex",
  "pallet-x3-domain-registry",
  "pallet-x3-flashloan",
+ "pallet-x3-identity-verifier",
  "pallet-x3-invariants",
  "pallet-x3-inventory",
  "pallet-x3-jury-anchor",
  "pallet-x3-kernel",
+ "pallet-x3-keyring",
  "pallet-x3-launchpad",
  "pallet-x3-oracle",
  "pallet-x3-partner",
@@ -26583,6 +26624,7 @@ dependencies = [
  "x3-cross-vm-bridge",
  "x3-ixl",
  "x3-packet-standard",
+ "x3-primitives",
  "x3-revenue-sharing",
  "x3-security-events",
  "x3-svm-integration",
@@ -26641,6 +26683,7 @@ name = "x3-compiler"
 version = "0.1.0"
 dependencies = [
  "blake2 0.10.6",
+ "criterion",
  "invariant-macros",
  "serde",
  "serde_json",
@@ -27265,6 +27308,14 @@ dependencies = [
  "sp-io",
  "sp-std 14.0.0",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "x3-primitives"
+version = "0.1.0"
+dependencies = [
+ "sp-runtime",
+ "sp-std 14.0.0",
 ]
 
 [[package]]
