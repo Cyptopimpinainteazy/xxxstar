@@ -47,3 +47,8 @@ kore-exec.tar.gz
 X3-contracts/**/target/
 
 3d/Alien Floor.zip
+
+# Local git corruption/recovery artifacts
+.git.corrupt-*
+.git.corrupt-backup-*
+.git.recovery-snapshot-*

@@ -958,7 +958,6 @@ pub fn get_canonical_source<T: crate::pallet::Config>(
 // Wire this into `SignedExtra` *before* `AgentLawCheck` so that a halted chain
 // stops even calls that would normally be privileged.
 
-use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
 use sp_runtime::{
     traits::Dispatchable,

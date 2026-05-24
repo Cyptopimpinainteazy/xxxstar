@@ -4991,7 +4991,7 @@ dependencies = [
  "sc-client-api",
  "sc-client-db",
  "sc-executor",
- "sc-executor-common 0.43.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sc-executor-common",
  "sc-executor-wasmtime",
  "sc-runtime-utilities",
  "sc-service",
@@ -13449,17 +13449,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sc-allocator"
-version = "35.0.0"
-source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#53aa95a9cbafe2e5e279c9a37dd9f9f4475917da"
-dependencies = [
- "log",
- "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-wasm-interface",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "sc-authority-discovery"
 version = "0.55.0"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#53aa95a9cbafe2e5e279c9a37dd9f9f4475917da"
@@ -13838,7 +13827,7 @@ source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#53aa9
 dependencies = [
  "parity-scale-codec",
  "parking_lot 0.12.5",
- "sc-executor-common 0.43.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sc-executor-common",
  "sc-executor-polkavm",
  "sc-executor-wasmtime",
  "schnellru",
@@ -13859,21 +13848,8 @@ name = "sc-executor-common"
 version = "0.43.0"
 dependencies = [
  "polkavm",
- "sc-allocator 35.0.0",
+ "sc-allocator",
  "sp-maybe-compressed-blob 11.1.0",
- "sp-wasm-interface",
- "thiserror 1.0.69",
- "wasm-instrument",
-]
-
-[[package]]
-name = "sc-executor-common"
-version = "0.43.0"
-source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#53aa95a9cbafe2e5e279c9a37dd9f9f4475917da"
-dependencies = [
- "polkavm",
- "sc-allocator 35.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-maybe-compressed-blob 11.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-wasm-interface",
  "thiserror 1.0.69",
  "wasm-instrument",
@@ -13886,7 +13862,7 @@ source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#53aa9
 dependencies = [
  "log",
  "polkavm",
- "sc-executor-common 0.43.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sc-executor-common",
  "sp-wasm-interface",
 ]
 
@@ -13898,8 +13874,8 @@ dependencies = [
  "log",
  "parking_lot 0.12.5",
  "rustix",
- "sc-allocator 35.0.0",
- "sc-executor-common 0.43.0",
+ "sc-allocator",
+ "sc-executor-common",
  "sp-runtime-interface 33.0.0",
  "sp-wasm-interface",
  "wasmtime",
@@ -14262,7 +14238,7 @@ source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#53aa9
 dependencies = [
  "parity-scale-codec",
  "sc-executor",
- "sc-executor-common 0.43.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sc-executor-common",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-state-machine",

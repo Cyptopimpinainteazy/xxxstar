@@ -441,6 +441,7 @@ sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 [patch."https://github.com/paritytech/polkadot-sdk"]
 substrate-wasm-builder = { path = "vendor/substrate-wasm-builder" }
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
+sc-executor-common = { path = "vendor/sc-executor-common" }
 sc-executor-wasmtime = { path = "vendor/sc-executor-wasmtime" }
 sp-wasm-interface = { path = "vendor/sp-wasm-interface" }
 # X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
