@@ -62,7 +62,7 @@ prometheus = "0.14.0"
 log = "0.4"
 
 # HTTP server
-axum = "0.7"
+axum = "0.8"
 hyper = "1.8"
 tower-http = { version = "0.4", features = ["fs", "trace"] }
 
