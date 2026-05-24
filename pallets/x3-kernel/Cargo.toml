@@ -28,7 +28,7 @@ minicbor = { version = "0.24.0", default-features = false, features = ["derive",
 parity-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 serde = { workspace = true, features = ["alloc"] }
-serde_json = { version = "=1.0.143", default-features = false, features = ["alloc"] }
+serde_json = { version = "=1.0.150", default-features = false, features = ["alloc"] }
 sp-core = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
