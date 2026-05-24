@@ -36,7 +36,7 @@ tokio = { version = "1.0", features = ["full", "net", "time"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.12", features = ["json"] }
-tokio-tungstenite = "0.20"
+tokio-tungstenite = "0.29"
 hex = "0.4"
 
 # X3 SDK and core crates
