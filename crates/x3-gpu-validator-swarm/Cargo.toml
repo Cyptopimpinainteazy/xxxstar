@@ -51,7 +51,7 @@ blake2 = "0.10"
 blake3 = "1.5"
 sha2 = "0.10"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
-secp256k1 = { version = "0.28", features = ["recovery", "global-context"] }
+secp256k1 = { version = "0.30", features = ["recovery", "global-context"] }
 rand = "0.8"
 getrandom = "0.2"
 
