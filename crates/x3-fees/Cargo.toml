@@ -16,7 +16,7 @@ std = [
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 thiserror = "1.0"
-bincode = "1.3"
+bincode = "3.0"
 sp-core = { workspace = true }
 sp-runtime = { workspace = true }
 
