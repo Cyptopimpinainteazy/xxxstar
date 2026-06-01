@@ -62,55 +62,59 @@ impl DomConstPropPass {
         let mut defs: BTreeMap<MirValue, ConstVal> = BTreeMap::new();
 
         for stmt in stmts {
-            match &stmt.rhs {
-                MirRhs::Literal(lit) => {
-                    defs.insert(stmt.target, ConstVal::Known(lit.clone()));
-                }
-                MirRhs::Call { .. } => {
-                    // Calls may have side effects - mark target as unknown
-                    // and conservatively kill all definitions (they may be aliased)
-                    defs.insert(stmt.target, ConstVal::Unknown);
-                    // Note: In a more sophisticated analysis, we would only kill
-                    // values that could be aliased by the call's effects
-                }
-                MirRhs::Binary(op, left, right) => {
-                    // Try to fold if both operands are known constants
-                    let left_val = defs.get(left);
-                    let right_val = defs.get(right);
+            match stmt {
+                MirStatement::Assign { target, rhs } => match rhs {
+                    MirRhs::Literal(lit) => {
+                        defs.insert(*target, ConstVal::Known(lit.clone()));
+                    }
+                    MirRhs::Call { .. } => {
+                        // Calls may have side effects - mark target as unknown
+                        // and conservatively kill all definitions (they may be aliased)
+                        defs.insert(*target, ConstVal::Unknown);
+                        // Note: In a more sophisticated analysis, we would only kill
+                        // values that could be aliased by the call's effects
+                    }
+                    MirRhs::Binary(op, left, right) => {
+                        // Try to fold if both operands are known constants
+                        let left_val = defs.get(left);
+                        let right_val = defs.get(right);
 
-                    match (left_val, right_val) {
-                        (Some(ConstVal::Known(l)), Some(ConstVal::Known(r))) => {
-                            if let Some(result) = self.fold_binary(*op, l, r) {
-                                defs.insert(stmt.target, ConstVal::Known(result));
-                            } else {
-                                defs.insert(stmt.target, ConstVal::Unknown);
+                        match (left_val, right_val) {
+                            (Some(ConstVal::Known(l)), Some(ConstVal::Known(r))) => {
+                                if let Some(result) = self.fold_binary(*op, l, r) {
+                                    defs.insert(*target, ConstVal::Known(result));
+                                } else {
+                                    defs.insert(*target, ConstVal::Unknown);
+                                }
+                            }
+                            _ => {
+                                defs.insert(*target, ConstVal::Unknown);
                             }
                         }
-                        _ => {
-                            defs.insert(stmt.target, ConstVal::Unknown);
-                        }
                     }
-                }
-                MirRhs::Unary(op, src) => {
-                    if let Some(ConstVal::Known(val)) = defs.get(src) {
-                        if let Some(result) = self.fold_unary(*op, val) {
-                            defs.insert(stmt.target, ConstVal::Known(result));
+                    MirRhs::Unary(op, src) => {
+                        if let Some(ConstVal::Known(val)) = defs.get(src) {
+                            if let Some(result) = self.fold_unary(*op, val) {
+                                defs.insert(*target, ConstVal::Known(result));
+                            } else {
+                                defs.insert(*target, ConstVal::Unknown);
+                            }
                         } else {
-                            defs.insert(stmt.target, ConstVal::Unknown);
+                            defs.insert(*target, ConstVal::Unknown);
                         }
-                    } else {
-                        defs.insert(stmt.target, ConstVal::Unknown);
                     }
-                }
-                MirRhs::Load { .. } => {
-                    // Loads are conservative - mark as unknown (may vary)
-                    defs.insert(stmt.target, ConstVal::Unknown);
-                }
-                MirRhs::Store { .. } => {
-                    // Stores don't produce a value but have side effects
-                    // Mark all existing defs as potentially invalid (conservative)
-                    defs.clear();
-                }
+                    MirRhs::Load { .. } => {
+                        // Loads are conservative - mark as unknown (may vary)
+                        defs.insert(*target, ConstVal::Unknown);
+                    }
+                    MirRhs::Store { .. } => {
+                        // Stores don't produce a value but have side effects
+                        // Mark all existing defs as potentially invalid (conservative)
+                        defs.clear();
+                    }
+                },
+                // Atomic markers are optimization barriers — skip.
+                MirStatement::AtomicBegin { .. } | MirStatement::AtomicEnd { .. } => {}
             }
         }
 
@@ -298,10 +302,19 @@ impl Pass for DomConstPropPass {
                 let mut new_statements = Vec::with_capacity(block.statements.len());
 
                 for stmt in block.statements.drain(..) {
-                    let new_rhs = match &stmt.rhs {
+                    // Atomic markers are optimization barriers — pass through unchanged.
+                    if stmt.is_atomic_marker() {
+                        new_statements.push(stmt);
+                        continue;
+                    }
+                    let (target, rhs) = match stmt {
+                        MirStatement::Assign { target, rhs } => (target, rhs),
+                        _ => unreachable!(),
+                    };
+                    let new_rhs = match &rhs {
                         MirRhs::Literal(lit) => {
-                            local_constants.insert(stmt.target, ConstVal::Known(lit.clone()));
-                            stmt.rhs.clone()
+                            local_constants.insert(target, ConstVal::Known(lit.clone()));
+                            rhs.clone()
                         }
                         MirRhs::Binary(op, left, right) => {
                             let left_const = local_constants.get(left);
@@ -311,54 +324,53 @@ impl Pass for DomConstPropPass {
                                 (Some(ConstVal::Known(l)), Some(ConstVal::Known(r))) => {
                                     if let Some(result) = self.fold_binary(*op, l, r) {
                                         local_constants
-                                            .insert(stmt.target, ConstVal::Known(result.clone()));
+                                            .insert(target, ConstVal::Known(result.clone()));
                                         total_changes += 1;
                                         MirRhs::Literal(result)
                                     } else {
-                                        local_constants.insert(stmt.target, ConstVal::Unknown);
-                                        stmt.rhs.clone()
+                                        local_constants.insert(target, ConstVal::Unknown);
+                                        rhs.clone()
                                     }
                                 }
                                 _ => {
-                                    local_constants.insert(stmt.target, ConstVal::Unknown);
-                                    stmt.rhs.clone()
+                                    local_constants.insert(target, ConstVal::Unknown);
+                                    rhs.clone()
                                 }
                             }
                         }
                         MirRhs::Unary(op, src) => {
                             if let Some(ConstVal::Known(val)) = local_constants.get(src) {
                                 if let Some(result) = self.fold_unary(*op, val) {
-                                    local_constants
-                                        .insert(stmt.target, ConstVal::Known(result.clone()));
+                                    local_constants.insert(target, ConstVal::Known(result.clone()));
                                     total_changes += 1;
                                     MirRhs::Literal(result)
                                 } else {
-                                    local_constants.insert(stmt.target, ConstVal::Unknown);
-                                    stmt.rhs.clone()
+                                    local_constants.insert(target, ConstVal::Unknown);
+                                    rhs.clone()
                                 }
                             } else {
-                                local_constants.insert(stmt.target, ConstVal::Unknown);
-                                stmt.rhs.clone()
+                                local_constants.insert(target, ConstVal::Unknown);
+                                rhs.clone()
                             }
                         }
                         MirRhs::Call { .. } => {
                             // Calls are side-effecting - mark result as unknown
-                            local_constants.insert(stmt.target, ConstVal::Unknown);
-                            stmt.rhs.clone()
+                            local_constants.insert(target, ConstVal::Unknown);
+                            rhs.clone()
                         }
                         MirRhs::Load { .. } => {
-                            local_constants.insert(stmt.target, ConstVal::Unknown);
-                            stmt.rhs.clone()
+                            local_constants.insert(target, ConstVal::Unknown);
+                            rhs.clone()
                         }
                         MirRhs::Store { .. } => {
                             // Stores invalidate all existing constants (conservative)
                             local_constants.clear();
-                            stmt.rhs.clone()
+                            rhs.clone()
                         }
                     };
 
-                    new_statements.push(MirStatement {
-                        target: stmt.target,
+                    new_statements.push(MirStatement::Assign {
+                        target,
                         rhs: new_rhs,
                     });
                 }
@@ -403,7 +415,7 @@ mod tests {
             blocks: vec![
                 MirBlock {
                     id: MirBlockId(0),
-                    statements: vec![MirStatement {
+                    statements: vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Integer(42)),
                     }],
@@ -412,11 +424,11 @@ mod tests {
                 MirBlock {
                     id: MirBlockId(1),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(1),
                             rhs: MirRhs::Literal(Literal::Integer(1)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(2),
                             rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
                         },
@@ -438,9 +450,12 @@ mod tests {
         let v2_stmt = bb1
             .statements
             .iter()
-            .find(|s| s.target == MirValue(2))
+            .find(|s| s.target() == Some(MirValue(2)))
             .unwrap();
-        assert_eq!(v2_stmt.rhs, MirRhs::Literal(Literal::Integer(43)));
+        assert_eq!(
+            v2_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(43))
+        );
     }
 
     #[test]
@@ -458,11 +473,11 @@ mod tests {
                 MirBlock {
                     id: MirBlockId(0),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(99), // condition
                             rhs: MirRhs::Literal(Literal::Bool(true)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(0),
                             rhs: MirRhs::Literal(Literal::Integer(10)),
                         },
@@ -476,11 +491,11 @@ mod tests {
                 MirBlock {
                     id: MirBlockId(1),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(10),
                             rhs: MirRhs::Literal(Literal::Integer(2)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(1),
                             rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(10)),
                         },
@@ -490,11 +505,11 @@ mod tests {
                 MirBlock {
                     id: MirBlockId(2),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(20),
                             rhs: MirRhs::Literal(Literal::Integer(5)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(2),
                             rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(20)),
                         },
@@ -516,18 +531,24 @@ mod tests {
         let v1_stmt = bb1
             .statements
             .iter()
-            .find(|s| s.target == MirValue(1))
+            .find(|s| s.target() == Some(MirValue(1)))
             .unwrap();
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Integer(20)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(20))
+        );
 
         // Check bb2: v2 should be 15
         let bb2 = &module.functions[0].blocks[2];
         let v2_stmt = bb2
             .statements
             .iter()
-            .find(|s| s.target == MirValue(2))
+            .find(|s| s.target() == Some(MirValue(2)))
             .unwrap();
-        assert_eq!(v2_stmt.rhs, MirRhs::Literal(Literal::Integer(15)));
+        assert_eq!(
+            v2_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(15))
+        );
     }
 
     #[test]
@@ -541,7 +562,7 @@ mod tests {
             blocks: vec![
                 MirBlock {
                     id: MirBlockId(0),
-                    statements: vec![MirStatement {
+                    statements: vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Call {
                             target: SymbolId(1),
@@ -553,11 +574,11 @@ mod tests {
                 MirBlock {
                     id: MirBlockId(1),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(1),
                             rhs: MirRhs::Literal(Literal::Integer(1)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(2),
                             rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
                         },
@@ -577,8 +598,14 @@ mod tests {
         let v2_stmt = bb1
             .statements
             .iter()
-            .find(|s| s.target == MirValue(2))
+            .find(|s| s.target() == Some(MirValue(2)))
             .unwrap();
-        assert!(matches!(v2_stmt.rhs, MirRhs::Binary(BinaryOp::Add, _, _)));
+        assert!(matches!(
+            v2_stmt,
+            MirStatement::Assign {
+                rhs: MirRhs::Binary(BinaryOp::Add, _, _),
+                ..
+            }
+        ));
     }
 }

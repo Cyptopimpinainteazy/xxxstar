@@ -39,8 +39,7 @@ impl Config {
                 .unwrap_or_else(|_| "ws://127.0.0.1:9944".into()),
             ipfs_gateway: std::env::var("NS_IPFS_GATEWAY")
                 .unwrap_or_else(|_| "http://127.0.0.1:8080".into()),
-            executor_key: std::env::var("NS_EXECUTOR_KEY")
-                .unwrap_or_else(|_| "//Alice".into()),
+            executor_key: std::env::var("NS_EXECUTOR_KEY").unwrap_or_else(|_| "//Alice".into()),
             parallelism: std::env::var("NS_PARALLELISM")
                 .ok()
                 .and_then(|s| s.parse().ok())

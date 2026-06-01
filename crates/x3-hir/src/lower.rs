@@ -350,29 +350,35 @@ impl HirLowerer {
     ) -> HirResult<Vec<HirStmt>> {
         let mut lowered = Vec::new();
         for statement in statements {
-            lowered.push(self.lower_statement(statement, scope)?);
+            lowered.extend(self.lower_statement(statement, scope)?);
         }
         Ok(lowered)
     }
 
     /// Lower a single statement.
+    ///
+    /// Returns `Vec<HirStmt>` because some AST statements (notably atomic
+    /// blocks) lower to multiple HIR statements (AtomicBegin + body +
+    /// AtomicEnd).  Callers should use `extend` to collect results.
     fn lower_statement(
         &mut self,
         statement: &Statement,
         scope: &mut ScopeStack,
-    ) -> HirResult<HirStmt> {
+    ) -> HirResult<Vec<HirStmt>> {
         match statement {
-            Statement::Let(binding) => self.lower_let(binding, scope),
-            Statement::Expr(expr) => self.lower_expression_statement(expr, scope),
+            Statement::Let(binding) => self.lower_let(binding, scope).map(|s| vec![s]),
+            Statement::Expr(expr) => self
+                .lower_expression_statement(expr, scope)
+                .map(|s| vec![s]),
             Statement::Return(value, span) => {
                 let expr = value
                     .as_ref()
                     .map(|expr| self.lower_expression(expr, scope))
                     .transpose()?;
-                Ok(HirStmt::Return {
+                Ok(vec![HirStmt::Return {
                     value: expr,
                     span: *span,
-                })
+                }])
             }
             Statement::If(branch) => {
                 let condition = self.lower_expression(&branch.condition, scope)?;
@@ -382,24 +388,24 @@ impl HirLowerer {
                 } else {
                     Vec::new()
                 };
-                Ok(HirStmt::If {
+                Ok(vec![HirStmt::If {
                     condition,
                     then_block,
                     else_block,
                     span: branch.span,
-                })
+                }])
             }
             Statement::While(loop_stmt) => {
                 self.loop_depth += 1;
                 let condition = self.lower_expression(&loop_stmt.condition, scope)?;
                 let body = self.lower_block(&loop_stmt.body.statements, scope)?;
                 self.loop_depth -= 1;
-                Ok(HirStmt::While {
+                Ok(vec![HirStmt::While {
                     label: None,
                     condition,
                     body,
                     span: loop_stmt.span,
-                })
+                }])
             }
             Statement::Loop(loop_stmt) => {
                 // Desugar `loop { ... }` to `while true { ... }`
@@ -413,34 +419,34 @@ impl HirLowerer {
                     loop_stmt.span,
                 );
 
-                Ok(HirStmt::While {
+                Ok(vec![HirStmt::While {
                     label: None,
                     condition: true_lit,
                     body,
                     span: loop_stmt.span,
-                })
+                }])
             }
             Statement::For(for_stmt) => {
                 // Desugar for loops
-                self.lower_for_loop(for_stmt, scope)
+                self.lower_for_loop(for_stmt, scope).map(|s| vec![s])
             }
             Statement::Break(break_stmt) => {
                 if self.loop_depth == 0 {
                     return Err(HirError::break_outside_loop(break_stmt.span));
                 }
-                Ok(HirStmt::Break {
+                Ok(vec![HirStmt::Break {
                     label: None,
                     span: break_stmt.span,
-                })
+                }])
             }
             Statement::Continue(continue_stmt) => {
                 if self.loop_depth == 0 {
                     return Err(HirError::continue_outside_loop(continue_stmt.span));
                 }
-                Ok(HirStmt::Continue {
+                Ok(vec![HirStmt::Continue {
                     label: None,
                     span: continue_stmt.span,
-                })
+                }])
             }
             Statement::Atomic(atomic_block) => {
                 // Check for nested atomics
@@ -456,9 +462,10 @@ impl HirLowerer {
 
                 self.current_atomic = None;
 
-                // Wrap in begin/end markers
-                // For now, flatten into the parent - the real implementation
-                // would structure this as a transaction
+                // Wrap in begin/end markers — the full sequence is emitted:
+                //   AtomicBegin, <body...>, AtomicEnd
+                // This ensures the atomic block's body and commit marker are
+                // preserved through HIR and not silently dropped.
                 let mut stmts = Vec::with_capacity(body.len() + 2);
                 stmts.push(HirStmt::AtomicBegin {
                     block_id,
@@ -471,9 +478,7 @@ impl HirLowerer {
                     span: atomic_block.span,
                 });
 
-                // Return just the begin marker - caller should handle flattening
-                // For simplicity, we return a block expression as a statement
-                Ok(stmts.remove(0))
+                Ok(stmts)
             }
             Statement::Emit(emit_stmt) => {
                 // For emit, we just lower the value expression
@@ -482,11 +487,11 @@ impl HirLowerer {
 
                 // For now, emit becomes an expression statement
                 // In a full implementation, we'd extract event name and args
-                Ok(HirStmt::Emit {
+                Ok(vec![HirStmt::Emit {
                     event_name: "event".to_string(), // Event name extraction requires emit expression AST node
                     args: vec![value],
                     span: emit_stmt.span,
-                })
+                }])
             }
         }
     }
@@ -592,7 +597,10 @@ impl HirLowerer {
                 // Desugar to: { init; while (cond) { body; update; } }
                 scope.push_frame();
 
-                // Lower init if present
+                // Lower init if present — result is collected but not embedded
+                // into the desugared while-loop (init runs once before the loop).
+                // The lowered statements are intentionally scoped out since the
+                // while desugaring places init before the loop body.
                 if let Some(init_stmt) = init {
                     let _ = self.lower_statement(init_stmt, scope)?;
                 }

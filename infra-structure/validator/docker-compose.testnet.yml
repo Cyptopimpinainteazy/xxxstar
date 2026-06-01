@@ -92,8 +92,8 @@ services:
       CCGV_SVM_RPC: "http://solana-testnet:8899"
       
       # Redis Configuration
-      CCGV_REDIS_HOST: "redis"
-      CCGV_REDIS_PORT: "6379"
+       # Use unified Redis URL as expected by validator code
+       CCGV_REDIS_URL: "redis://redis:6379"
       
       # GPU Configuration
       CCGV_REQUIRE_GPU: "false"  # Disabled for containerized testing
@@ -133,8 +133,7 @@ services:
     environment:
       CCGV_EVM_RPC: "http://ethereum-testnet:8545"
       CCGV_SVM_RPC: "http://solana-testnet:8899"
-      CCGV_REDIS_HOST: "redis"
-      CCGV_REDIS_PORT: "6379"
+       CCGV_REDIS_URL: "redis://redis:6379"
       CCGV_VALIDATOR_HOST: "ccgv-validator"
       CCGV_VALIDATOR_PORT: "8000"
     volumes:
@@ -160,7 +159,8 @@ services:
     networks:
       - ccgv-testnet
     healthcheck:
-      test: ["CMD", "wget", "-q", "http://localhost:9090/graph"]
+       # Updated healthcheck to probe the /health endpoint which returns 200 when ready
+       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 5s
       timeout: 2s
       retries: 3

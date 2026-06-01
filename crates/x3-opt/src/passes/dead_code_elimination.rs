@@ -19,7 +19,7 @@ use crate::dce::run_dce;
 use crate::pass::{Pass, PassResult};
 use crate::OptResult;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use x3_mir::{MirBlockId, MirModule, MirRhs, MirTerminator, MirValue};
+use x3_mir::{MirBlockId, MirModule, MirRhs, MirStatement, MirTerminator, MirValue};
 
 /// Dead code elimination pass.
 pub struct DeadCodeEliminationPass;
@@ -94,7 +94,15 @@ impl Pass for DeadCodeEliminationPass {
             let removed_blocks = before_blocks - func.blocks.len();
             total_changes += removed_blocks;
 
-            if run_dce(func, |stmt| matches!(stmt.rhs, MirRhs::Call { .. })) {
+            if run_dce(func, |stmt| {
+                matches!(
+                    stmt,
+                    MirStatement::Assign {
+                        rhs: MirRhs::Call { .. },
+                        ..
+                    }
+                )
+            }) {
                 total_changes += 1;
             }
         }
@@ -140,7 +148,7 @@ mod tests {
                 },
                 MirBlock {
                     id: MirBlockId(1),
-                    statements: vec![MirStatement {
+                    statements: vec![MirStatement::Assign {
                         target: MirValue(99),
                         rhs: MirRhs::Literal(Literal::Integer(42)),
                     }],
@@ -177,11 +185,11 @@ mod tests {
             blocks: vec![MirBlock {
                 id: MirBlockId(0),
                 statements: vec![
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Integer(42)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(1),
                         rhs: MirRhs::Literal(Literal::Integer(99)),
                     },
@@ -198,7 +206,9 @@ mod tests {
         assert!(result.changed);
         assert_eq!(module.functions[0].blocks[0].statements.len(), 1);
         assert_eq!(
-            module.functions[0].blocks[0].statements[0].target,
+            module.functions[0].blocks[0].statements[0]
+                .target()
+                .unwrap(),
             MirValue(0)
         );
     }
@@ -213,7 +223,7 @@ mod tests {
             entry: MirBlockId(0),
             blocks: vec![MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Call {
                         target: SymbolId(1),
@@ -248,19 +258,19 @@ mod tests {
             blocks: vec![MirBlock {
                 id: MirBlockId(0),
                 statements: vec![
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Integer(1)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(1),
                         rhs: MirRhs::Binary(x3_ast::BinaryOp::Add, MirValue(0), MirValue(0)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(2),
                         rhs: MirRhs::Binary(x3_ast::BinaryOp::Add, MirValue(1), MirValue(0)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(3),
                         rhs: MirRhs::Literal(Literal::Integer(42)),
                     },
@@ -278,7 +288,9 @@ mod tests {
         // Only v3 = 42 should remain
         assert_eq!(module.functions[0].blocks[0].statements.len(), 1);
         assert_eq!(
-            module.functions[0].blocks[0].statements[0].target,
+            module.functions[0].blocks[0].statements[0]
+                .target()
+                .unwrap(),
             MirValue(3)
         );
     }

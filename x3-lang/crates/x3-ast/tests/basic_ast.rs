@@ -34,6 +34,7 @@ fn build_and_serialize_sample_agent() {
             span,
         )],
         visibility: Visibility::Pub,
+        annotations: vec![],
     };
 
     let program = Program::new(vec![Spanned::new(Item::Agent(agent), span)]);

@@ -84,6 +84,8 @@ parameter_types! {
     pub const SomeDeposit: u128 = 1000;
     pub const MockBridgeEvmEscrow: H160 = H160([0x00; 20]);
     pub const MockBridgeSvmEscrow: [u8; 32] = [0x00; 32];
+    pub const SettlementFeeBps: u32 = 0;
+    pub const ProtocolTreasury: u64 = 99;
 }
 
 impl pallet_x3_kernel::Config for Test {
@@ -131,6 +133,8 @@ impl pallet_x3_settlement_engine::Config for Test {
     type MinBtcConfirmations = frame_support::traits::ConstU32<1>;
     type ChallengePeriod = frame_support::traits::ConstU64<10>;
     type SettlementTimeoutBlocks = frame_support::traits::ConstU64<28800>; // ~24 hours at 3s blocks
+    type SettlementFeeBps = SettlementFeeBps;
+    type ProtocolTreasury = ProtocolTreasury;
     type CrossChainValidator =
         pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator; // Phase 4: Use no-op for tests
 }

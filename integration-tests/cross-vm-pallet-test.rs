@@ -3,7 +3,7 @@
 //! This file complements `integration-tests/cross-vm-atomic-test.rs` by using
 //! real pallet `TestExternalities` and a node-level WebSocket JSON-RPC check.
 
-use frame_support::{assert_ok, BoundedVec};
+use frame_support::{assert_ok, assert_err, BoundedVec};
 use pallet_x3_atomic_kernel::{self as atomic_kernel, BundleStatus};
 use pallet_x3_atomic_kernel::mock::{
     new_test_ext, run_to_block, test_leg, ALICE, BOB, CHARLIE, AtomicKernel, RuntimeEvent,
@@ -74,6 +74,127 @@ fn submit_assign_finalize_transitions_bundle_status_and_emits_events() {
                 RuntimeEvent::AtomicKernel(atomic_kernel::Event::BundleFinalized { bundle_id: id, .. }) if *id == bundle_id
             )
         }));
+    });
+}
+
+/// Settlement origin separation: only CHARLIE (SettlementOnlyOrigin) may call
+/// `finalize_with_settlement`. ALICE (X3LangOrigin) must not.
+#[test]
+fn settlement_origin_gated_finalize() {
+    new_test_ext().execute_with(|| {
+        // Submit and assign a bundle for settlement finalization test
+        let legs_vec = vec![test_leg(VmType::Evm), test_leg(VmType::Svm)];
+        let legs: BoundedVec<BundleLeg, <Test as atomic_kernel::Config>::MaxLegsPerBundle> =
+            legs_vec.try_into().expect("legs should fit into MaxLegsPerBundle");
+
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            legs,
+            10,
+        ));
+
+        run_to_block(2);
+
+        let bundle_id = System::events()
+            .iter()
+            .find_map(|record| match &record.event {
+                RuntimeEvent::AtomicKernel(atomic_kernel::Event::BundleSubmitted { bundle_id, .. }) => {
+                    Some(*bundle_id)
+                }
+                _ => None,
+            })
+            .expect("BundleSubmitted event must exist");
+
+        assert_ok!(AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+        ));
+
+        run_to_block(3);
+
+        // ALICE (non-settlement origin) must NOT be able to call finalize_with_settlement
+        assert_err!(
+            AtomicKernel::finalize_with_settlement(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                H256::repeat_byte(0xBB),
+                H256::repeat_byte(0xAA),
+                H256::zero(),
+            ),
+            sp_runtime::DispatchError::BadOrigin,
+        );
+
+        // BOB (non-settlement origin) must NOT be able to call finalize_with_settlement
+        assert_err!(
+            AtomicKernel::finalize_with_settlement(
+                RuntimeOrigin::signed(BOB),
+                bundle_id,
+                H256::repeat_byte(0xBB),
+                H256::repeat_byte(0xAA),
+                H256::zero(),
+            ),
+            sp_runtime::DispatchError::BadOrigin,
+        );
+
+        // CHARLIE (settlement origin) CAN call finalize_with_settlement
+        assert_ok!(AtomicKernel::finalize_with_settlement(
+            RuntimeOrigin::signed(CHARLIE),
+            bundle_id,
+            H256::repeat_byte(0xBB),
+            H256::repeat_byte(0xAA),
+            H256::zero(),
+        ));
+
+        run_to_block(4);
+
+        let finalized = atomic_kernel::Bundles::<Test>::get(bundle_id).expect("bundle must exist");
+        assert_eq!(finalized.status, BundleStatus::Finalized);
+    });
+}
+
+/// Rollback cleans up BundleLegReceipts storage and the NoopVmReverter
+/// is invoked for any executed legs (logging a warning).
+#[test]
+fn rollback_with_leg_receipts_cleans_up_storage() {
+    new_test_ext().execute_with(|| {
+        let legs_vec = vec![test_leg(VmType::Evm), test_leg(VmType::Svm)];
+        let legs: BoundedVec<BundleLeg, <Test as atomic_kernel::Config>::MaxLegsPerBundle> =
+            legs_vec.try_into().expect("legs should fit");
+
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            legs,
+            10,
+            1,
+            1,
+        ));
+
+        let bundle_id = System::events()
+            .iter()
+            .find_map(|record| match &record.event {
+                RuntimeEvent::AtomicKernel(atomic_kernel::Event::BundleSubmitted { bundle_id, .. }) => {
+                    Some(*bundle_id)
+                }
+                _ => None,
+            })
+            .expect("BundleSubmitted event must exist");
+
+        // Verify receipts were initialized
+        let receipts = atomic_kernel::BundleLegReceipts::<Test>::get(bundle_id);
+        assert_eq!(receipts.len(), 2, "should have 2 leg receipts");
+        assert!(!receipts[0].executed, "first leg not yet executed");
+        assert!(!receipts[1].executed, "second leg not yet executed");
+
+        // Rollback the bundle
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            bundle_id,
+            atomic_kernel::BundleRollbackReason::SubmitterCancelled,
+        ));
+
+        // Receipts should be cleaned up
+        let receipts_after = atomic_kernel::BundleLegReceipts::<Test>::get(bundle_id);
+        assert!(receipts_after.is_empty(), "receipts should be cleaned up after rollback");
     });
 }
 

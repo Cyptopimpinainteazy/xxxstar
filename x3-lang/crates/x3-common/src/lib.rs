@@ -2,6 +2,7 @@
 //!
 //! Shared types, spans, symbols, and utilities used across the X3 compiler.
 
+pub mod capability;
 pub mod diagnostic;
 pub mod error;
 pub mod source;
@@ -9,6 +10,9 @@ pub mod span;
 pub mod symbol;
 pub mod token;
 
+pub use capability::{
+    decode_capability_payload, encode_capability_payload, CapabilityCodecError, CapabilityPayload,
+};
 pub use diagnostic::{Diagnostic, DiagnosticBuilder, DiagnosticLevel};
 pub use error::{X3Error, X3Result};
 pub use source::{SourceFile, SourceMap};

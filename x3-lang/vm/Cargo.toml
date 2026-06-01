@@ -9,6 +9,7 @@ description = "X3 Virtual Machine core runtime (executor, JIT, and glue)"
 [dependencies]
 x3-lang-common = { path = "../crates/x3-common" }
 serde = { workspace = true, features = ["derive"] }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

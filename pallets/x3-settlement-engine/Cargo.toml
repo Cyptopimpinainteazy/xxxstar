@@ -29,6 +29,7 @@ frame-benchmarking = { workspace = true, default-features = false, optional = tr
 
 # Internal dependencies
 pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
+pallet-x3-atomic-kernel = { path = "../x3-atomic-kernel", default-features = false }
 pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
 
 [dev-dependencies]
@@ -53,6 +54,7 @@ std = [
     "serde/std",
     "ripemd/std",
     "pallet-x3-kernel/std",
+    "pallet-x3-atomic-kernel/std",
     "pallet-atomic-trade-engine/std",
 ]
 runtime-benchmarks = [
@@ -65,3 +67,5 @@ try-runtime = [
     "frame-support/try-runtime",
 ]
 dev-bypass = []
+dev = []
+testnet = []

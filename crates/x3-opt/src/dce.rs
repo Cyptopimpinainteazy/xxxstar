@@ -106,7 +106,9 @@ where
         for stmt in block.statements.iter().rev() {
             let defs = defs_of(stmt);
             let uses = uses_of(stmt);
-            let keep = has_side_effect(stmt) || defs.iter().any(|d| live.contains(d));
+            let keep = stmt.is_atomic_marker()
+                || has_side_effect(stmt)
+                || defs.iter().any(|d| live.contains(d));
             if keep {
                 for def in defs.iter() {
                     live.remove(def);
@@ -127,18 +129,26 @@ where
 }
 
 fn uses_of(stmt: &MirStatement) -> Vec<MirValue> {
-    match &stmt.rhs {
-        MirRhs::Literal(_) => vec![],
-        MirRhs::Unary(_, operand) => vec![*operand],
-        MirRhs::Binary(_, left, right) => vec![*left, *right],
-        MirRhs::Call { args, .. } => args.clone(),
-        MirRhs::Load { addr, .. } => vec![*addr],
-        MirRhs::Store { addr, val, .. } => vec![*addr, *val],
+    match stmt {
+        MirStatement::Assign { rhs, .. } => match rhs {
+            MirRhs::Literal(_) => vec![],
+            MirRhs::Unary(_, operand) => vec![*operand],
+            MirRhs::Binary(_, left, right) => vec![*left, *right],
+            MirRhs::Call { args, .. } => args.clone(),
+            MirRhs::Load { addr, .. } => vec![*addr],
+            MirRhs::Store { addr, val, .. } => vec![*addr, *val],
+        },
+        // Atomic markers use/def no SSA values, but they are side-effecting
+        // and must never be removed by DCE.
+        MirStatement::AtomicBegin { .. } | MirStatement::AtomicEnd { .. } => vec![],
     }
 }
 
 fn defs_of(stmt: &MirStatement) -> Vec<MirValue> {
-    vec![stmt.target]
+    match stmt {
+        MirStatement::Assign { target, .. } => vec![*target],
+        MirStatement::AtomicBegin { .. } | MirStatement::AtomicEnd { .. } => vec![],
+    }
 }
 
 #[cfg(test)]
@@ -174,11 +184,11 @@ mod tests {
         let func = mk_function(vec![mk_block(
             0,
             vec![
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(1)),
                 },
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Literal(Literal::Integer(2)),
                 },
@@ -197,7 +207,7 @@ mod tests {
     fn keep_side_effecting_call() {
         let mut func = mk_function(vec![mk_block(
             0,
-            vec![MirStatement {
+            vec![MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Call {
                     target: SymbolId(1),
@@ -207,7 +217,15 @@ mod tests {
             MirTerminator::Return(None),
         )]);
 
-        let changed = run_dce(&mut func, |stmt| matches!(&stmt.rhs, MirRhs::Call { .. }));
+        let changed = run_dce(&mut func, |stmt| {
+            matches!(
+                stmt,
+                MirStatement::Assign {
+                    rhs: MirRhs::Call { .. },
+                    ..
+                }
+            )
+        });
         assert!(!changed);
         assert_eq!(func.blocks[0].statements.len(), 1);
     }
@@ -217,7 +235,7 @@ mod tests {
         let mut func = mk_function(vec![
             mk_block(
                 0,
-                vec![MirStatement {
+                vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(1)),
                 }],
@@ -225,7 +243,7 @@ mod tests {
             ),
             mk_block(
                 1,
-                vec![MirStatement {
+                vec![MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(0)),
                 }],
@@ -238,5 +256,34 @@ mod tests {
         assert!(!changed);
         assert_eq!(func.blocks[0].statements.len(), 1);
         assert_eq!(func.blocks[1].statements.len(), 1);
+    }
+
+    #[test]
+    fn atomic_markers_are_never_dead() {
+        use x3_mir::MirAtomicBlockId;
+        // Atomic markers have no defs but must never be removed by DCE
+        let func = mk_function(vec![mk_block(
+            0,
+            vec![
+                MirStatement::AtomicBegin {
+                    block_id: MirAtomicBlockId(0),
+                },
+                MirStatement::Assign {
+                    target: MirValue(0),
+                    rhs: MirRhs::Literal(Literal::Integer(42)),
+                },
+                MirStatement::AtomicEnd {
+                    block_id: MirAtomicBlockId(0),
+                    commit: true,
+                },
+            ],
+            MirTerminator::Return(Some(MirValue(0))),
+        )]);
+
+        let mut func = func;
+        let changed = run_dce(&mut func, |_| false);
+        // v0 is live (returned), atomic markers are always kept
+        assert!(!changed);
+        assert_eq!(func.blocks[0].statements.len(), 3);
     }
 }

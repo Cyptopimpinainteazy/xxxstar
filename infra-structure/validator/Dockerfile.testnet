@@ -25,7 +25,8 @@ RUN mkdir -p /app/logs
 COPY scripts/healthcheck.sh /healthcheck.sh
 RUN chmod +x /healthcheck.sh
 
-EXPOSE 8000 9000
+EXPOSE 8000
 
 # Run the validator service
+# Start the validator service using the provided CLI entrypoint
 CMD ["python", "-m", "cross_chain_gpu_validator.cli", "serve", "--host", "0.0.0.0", "--port", "8000"]

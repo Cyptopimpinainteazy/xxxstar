@@ -4,6 +4,8 @@
 //! This module provides the determinism contract: same inputs → same outputs
 //! regardless of execution path. Includes a harness for parity testing.
 
+use crate::{VMConfig, Value, VM};
+
 /// The canonical output of a single VM execution.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExecutionOutput {
@@ -76,54 +78,87 @@ pub fn run_parity_suite(
         .collect()
 }
 
-/// Stub CPU backend for testing.
-#[cfg(test)]
-pub struct StubCpuBackend;
+/// CPU backend backed by the real X3VM interpreter.
+pub struct RealVmCpuBackend;
 
-#[cfg(test)]
-impl ExecutionBackend for StubCpuBackend {
+impl ExecutionBackend for RealVmCpuBackend {
     fn execute(&self, case: &DeterminismTestCase) -> ExecutionOutput {
-        // Deterministic stub: return_value = sum of inputs
-        let return_value = case.inputs.iter().copied().fold(0u64, u64::wrapping_add);
-        ExecutionOutput {
-            return_value,
-            gas_consumed: case.inputs.len() as u64 * 10,
-            success: true,
-            state_root: [0u8; 32],
+        let mut vm = match VM::from_bytes(&case.bytecode) {
+            Ok(vm) => vm,
+            Err(_) => {
+                return ExecutionOutput {
+                    return_value: 0,
+                    gas_consumed: 0,
+                    success: false,
+                    state_root: state_root(0, 0, false),
+                };
+            }
+        };
+        vm.config = VMConfig {
+            gas_limit: case.gas_limit,
+            ..vm.config.clone()
+        };
+        let args: Vec<Value> = case
+            .inputs
+            .iter()
+            .map(|value| Value::I64(*value as i64))
+            .collect();
+        match vm.call_function(0, &args) {
+            Ok(result) => {
+                let return_value = match result.value {
+                    Some(Value::I64(value)) => value as u64,
+                    Some(Value::Bool(value)) => u64::from(value),
+                    _ => 0,
+                };
+                ExecutionOutput {
+                    return_value,
+                    gas_consumed: result.gas_used,
+                    success: true,
+                    state_root: state_root(return_value, result.gas_used, true),
+                }
+            }
+            Err(_) => ExecutionOutput {
+                return_value: 0,
+                gas_consumed: case.gas_limit,
+                success: false,
+                state_root: state_root(0, case.gas_limit, false),
+            },
         }
     }
     fn name(&self) -> &'static str {
-        "cpu-stub"
+        "cpu-vm"
     }
 }
 
-/// Stub GPU backend for testing (identical output to CPU stub → parity passes).
+/// Simulated GPU backend for testing (mirrors the interpreter output).
 #[cfg(test)]
-pub struct StubGpuBackend;
+pub struct SimulatedGpuBackend;
 
 #[cfg(test)]
-impl ExecutionBackend for StubGpuBackend {
+impl ExecutionBackend for SimulatedGpuBackend {
     fn execute(&self, case: &DeterminismTestCase) -> ExecutionOutput {
-        let return_value = case.inputs.iter().copied().fold(0u64, u64::wrapping_add);
-        ExecutionOutput {
-            return_value,
-            gas_consumed: case.inputs.len() as u64 * 10,
-            success: true,
-            state_root: [0u8; 32],
-        }
+        RealVmCpuBackend.execute(case)
     }
     fn name(&self) -> &'static str {
-        "gpu-stub"
+        "gpu-simulated"
     }
 }
 
-/// Divergent GPU stub — used to verify parity failures are detected.
+fn state_root(return_value: u64, gas_consumed: u64, success: bool) -> [u8; 32] {
+    let mut root = [0u8; 32];
+    root[..8].copy_from_slice(&return_value.to_le_bytes());
+    root[8..16].copy_from_slice(&gas_consumed.to_le_bytes());
+    root[16] = u8::from(success);
+    root
+}
+
+/// Divergent GPU backend — used to verify parity failures are detected.
 #[cfg(test)]
 pub struct DivergentGpuBackend;
 
 #[cfg(test)]
 impl ExecutionBackend for DivergentGpuBackend {
-    fn execute(&self, case: &DeterminismTestCase) -> ExecutionOutput {
+    fn execute(&self, _case: &DeterminismTestCase) -> ExecutionOutput {
         ExecutionOutput {
             return_value: 0xDEADBEEF,
             gas_consumed: 999,
@@ -143,7 +178,7 @@ mod tests {
     fn case(name: &'static str, inputs: Vec<u64>) -> DeterminismTestCase {
         DeterminismTestCase {
             name,
-            bytecode: vec![],
+            bytecode: x3_backend::bc_format_helpers::assemble_simple_module(),
             inputs,
             gas_limit: 10_000,
         }
@@ -155,7 +190,7 @@ mod tests {
             case("add_two", vec![1, 2]),
             case("add_three", vec![10, 20, 30]),
         ];
-        let results = run_parity_suite(&cases, &StubCpuBackend, &StubGpuBackend);
+        let results = run_parity_suite(&cases, &RealVmCpuBackend, &SimulatedGpuBackend);
         assert!(
             results.iter().all(|r| r.passed),
             "parity failed: {results:?}"
@@ -165,7 +200,7 @@ mod tests {
     #[test]
     fn test_cpu_gpu_parity_detects_divergence() {
         let cases = vec![case("test_div", vec![5, 6])];
-        let results = run_parity_suite(&cases, &StubCpuBackend, &DivergentGpuBackend);
+        let results = run_parity_suite(&cases, &RealVmCpuBackend, &DivergentGpuBackend);
         assert!(results.iter().any(|r| !r.passed));
     }
 

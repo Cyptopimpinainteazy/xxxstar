@@ -156,13 +156,17 @@ impl GasAnalyzer {
 
     /// Get opcode name from a MIR statement
     fn statement_opcode(&self, stmt: &MirStatement) -> String {
-        match &stmt.rhs {
-            MirRhs::Literal(_) => "const".to_string(),
-            MirRhs::Unary(op, _) => format!("{:?}", op).to_lowercase(),
-            MirRhs::Binary(op, _, _) => format!("{:?}", op).to_lowercase(),
-            MirRhs::Call { .. } => "call".to_string(),
-            MirRhs::Load { .. } => "load".to_string(),
-            MirRhs::Store { .. } => "store".to_string(),
+        match stmt {
+            MirStatement::Assign { rhs, .. } => match rhs {
+                MirRhs::Literal(_) => "const".to_string(),
+                MirRhs::Unary(op, _) => format!("{:?}", op).to_lowercase(),
+                MirRhs::Binary(op, _, _) => format!("{:?}", op).to_lowercase(),
+                MirRhs::Call { .. } => "call".to_string(),
+                MirRhs::Load { .. } => "load".to_string(),
+                MirRhs::Store { .. } => "store".to_string(),
+            },
+            MirStatement::AtomicBegin { .. } => "atomic_begin".to_string(),
+            MirStatement::AtomicEnd { .. } => "atomic_end".to_string(),
         }
     }
 
@@ -177,7 +181,13 @@ impl GasAnalyzer {
 
     /// Check if statement is an external call
     fn is_external_call_stmt(&self, stmt: &MirStatement) -> bool {
-        matches!(&stmt.rhs, MirRhs::Call { .. })
+        matches!(
+            stmt,
+            MirStatement::Assign {
+                rhs: MirRhs::Call { .. },
+                ..
+            }
+        )
     }
 
     /// Check if terminator represents a loop (backward branch)

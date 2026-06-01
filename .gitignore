@@ -52,3 +52,26 @@ X3-contracts/**/target/
 .git.corrupt-*
 .git.corrupt-backup-*
 .git.recovery-snapshot-*
+
+# AutoClaw KDream data
+.autoclaw/
+# CocoIndex Code (ccc)
+/.cocoindex_code/
+
+# Quarantined old roots and transient artifacts
+_junk/
+.kilo/
+.reports/
+
+# Old contract roots (moved under _junk/old-contract-roots/)
+/contracts/
+/governance/
+/treasury/
+/staking/
+
+# Duplicated test trees (moved under _junk/)
+/tests_core/
+/tests_phase4/
+
+# Deprecated scripts root (moved under _junk/)
+/scripts_infrastructure/

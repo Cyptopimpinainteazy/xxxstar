@@ -61,6 +61,14 @@ jobs:
           cache-directories: target
           cache-all-crates: true
 
+      - name: Build CUDA kernels
+        run: |
+          cd infra-structure/validator/kernels
+          chmod +x build.sh
+          ./build.sh
+        env:
+          GPU_ARCH: sm_61
+
       - name: Run GPU validator swarm determinism gate
         run: |
           chmod +x scripts/test-gpu-cpu-determinism-benchmark-gate.sh

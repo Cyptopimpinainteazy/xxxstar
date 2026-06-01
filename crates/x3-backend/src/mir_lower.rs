@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use x3_ast::{BinaryOp, UnaryOp};
 use x3_common::{Literal, Span};
 use x3_mir::{
-    memory::MemoryModel, MirBlock, MirBlockId, MirFunction, MirModule, MirRhs, MirStatement,
-    MirTerminator, MirValue, SymbolId,
+    memory::MemoryModel, MirAtomicBlockId, MirBlock, MirBlockId, MirFunction, MirModule, MirRhs,
+    MirStatement, MirTerminator, MirValue, SymbolId,
 };
 
 use crate::bc_format::{BytecodeModule, ModuleFlags};
@@ -176,91 +176,96 @@ impl MirBytecodeCompiler {
     }
 
     fn compile_statement(&mut self, stmt: &MirStatement) -> BackendResult<()> {
-        let dst = self.get_or_alloc_reg(stmt.target);
-
-        match &stmt.rhs {
-            MirRhs::Literal(lit) => {
-                self.compile_literal(lit, dst)?;
-            }
-            MirRhs::Unary(op, val) => {
-                let src = self.get_reg(*val)?;
-                self.compile_unary(*op, dst, src)?;
-            }
-            MirRhs::Binary(op, left, right) => {
-                let left_reg = self.get_reg(*left)?;
-                let right_reg = self.get_reg(*right)?;
-                self.compile_binary(*op, dst, left_reg, right_reg)?;
-            }
-            MirRhs::Call { target, args } => {
-                let arg_regs: Vec<Register> = args
-                    .iter()
-                    .map(|a| self.get_reg(*a))
-                    .collect::<BackendResult<Vec<_>>>()?;
-
-                let func_idx = self.function_indices.get(target).copied().ok_or_else(|| {
-                    BackendError::new(
-                        BackendErrorKind::UnknownFunction {
-                            name: format!("{target:?}"),
-                        },
-                        self.current_span,
-                    )
-                })?;
-
-                self.emitter.emit_call(dst, func_idx, &arg_regs);
-            }
-            MirRhs::Load { model, addr } => {
-                let addr_reg = self.get_reg(*addr)?;
-                match model {
-                    MemoryModel::Register => {
-                        // Register-to-register move (pure operation)
-                        self.emitter.emit_load_register(dst, addr_reg);
+        match stmt {
+            MirStatement::Assign { target, rhs } => {
+                let dst = self.get_or_alloc_reg(*target);
+                match rhs {
+                    MirRhs::Literal(lit) => {
+                        self.compile_literal(lit, dst)?;
                     }
-                    MemoryModel::Stack => {
-                        // Load from function-local stack slot
-                        self.emitter.emit_load_stack(dst, addr_reg);
+                    MirRhs::Unary(op, val) => {
+                        let src = self.get_reg(*val)?;
+                        self.compile_unary(*op, dst, src)?;
                     }
-                    MemoryModel::Heap => {
-                        // Load from heap memory (may alias, bounds-checked)
-                        self.emitter.emit_load_heap(dst, addr_reg);
+                    MirRhs::Binary(op, left, right) => {
+                        let left_reg = self.get_reg(*left)?;
+                        let right_reg = self.get_reg(*right)?;
+                        self.compile_binary(*op, dst, left_reg, right_reg)?;
                     }
-                    MemoryModel::GlobalStorage => {
-                        // Load from on-chain persistent storage
-                        // For now, interpret addr_reg as a constant pool index
-                        // (In production, would encode the address differently)
-                        if let Some(idx) = self.extract_constant_index(addr_reg) {
-                            self.emitter.emit_load_global_storage(dst, idx);
-                        } else {
-                            // Fallback: treat as heap for addresses not in const pool
-                            self.emitter.emit_load_heap(dst, addr_reg);
+                    MirRhs::Call { target, args } => {
+                        let arg_regs: Vec<Register> = args
+                            .iter()
+                            .map(|a| self.get_reg(*a))
+                            .collect::<BackendResult<Vec<_>>>()?;
+
+                        let func_idx =
+                            self.function_indices.get(target).copied().ok_or_else(|| {
+                                BackendError::new(
+                                    BackendErrorKind::UnknownFunction {
+                                        name: format!("{target:?}"),
+                                    },
+                                    self.current_span,
+                                )
+                            })?;
+
+                        self.emitter.emit_call(dst, func_idx, &arg_regs);
+                    }
+                    MirRhs::Load { model, addr } => {
+                        let addr_reg = self.get_reg(*addr)?;
+                        match model {
+                            MemoryModel::Register => {
+                                self.emitter.emit_load_register(dst, addr_reg);
+                            }
+                            MemoryModel::Stack => {
+                                self.emitter.emit_load_stack(dst, addr_reg);
+                            }
+                            MemoryModel::Heap => {
+                                self.emitter.emit_load_heap(dst, addr_reg);
+                            }
+                            MemoryModel::GlobalStorage => {
+                                if let Some(idx) = self.extract_constant_index(addr_reg) {
+                                    self.emitter.emit_load_global_storage(dst, idx);
+                                } else {
+                                    self.emitter.emit_load_heap(dst, addr_reg);
+                                }
+                            }
+                        }
+                    }
+                    MirRhs::Store { model, addr, val } => {
+                        let addr_reg = self.get_reg(*addr)?;
+                        let val_reg = self.get_reg(*val)?;
+                        match model {
+                            MemoryModel::Register => {
+                                self.emitter.emit_store_register(addr_reg, val_reg);
+                            }
+                            MemoryModel::Stack => {
+                                self.emitter.emit_store_stack(addr_reg, val_reg);
+                            }
+                            MemoryModel::Heap => {
+                                self.emitter.emit_store_heap(addr_reg, val_reg);
+                            }
+                            MemoryModel::GlobalStorage => {
+                                if let Some(idx) = self.extract_constant_index(addr_reg) {
+                                    self.emitter.emit_store_global_storage(idx, val_reg);
+                                } else {
+                                    self.emitter.emit_store_heap(addr_reg, val_reg);
+                                }
+                            }
                         }
                     }
                 }
             }
-            MirRhs::Store { model, addr, val } => {
-                let addr_reg = self.get_reg(*addr)?;
-                let val_reg = self.get_reg(*val)?;
-                match model {
-                    MemoryModel::Register => {
-                        // Register-to-register move (pure operation)
-                        self.emitter.emit_store_register(addr_reg, val_reg);
-                    }
-                    MemoryModel::Stack => {
-                        // Store to function-local stack slot
-                        self.emitter.emit_store_stack(addr_reg, val_reg);
-                    }
-                    MemoryModel::Heap => {
-                        // Store to heap memory (may alias, bounds-checked)
-                        self.emitter.emit_store_heap(addr_reg, val_reg);
-                    }
-                    MemoryModel::GlobalStorage => {
-                        // Store to on-chain persistent storage (side-effecting)
-                        if let Some(idx) = self.extract_constant_index(addr_reg) {
-                            self.emitter.emit_store_global_storage(idx, val_reg);
-                        } else {
-                            // Fallback: treat as heap for addresses not in const pool
-                            self.emitter.emit_store_heap(addr_reg, val_reg);
-                        }
-                    }
+            MirStatement::AtomicBegin { block_id } => {
+                self.emitter
+                    .emit_atomic_begin(crate::opcode::AtomicId(block_id.0));
+            }
+            MirStatement::AtomicEnd { block_id, commit } => {
+                if *commit {
+                    self.emitter
+                        .emit_atomic_commit(crate::opcode::AtomicId(block_id.0));
+                } else {
+                    self.emitter
+                        .emit_atomic_rollback(crate::opcode::AtomicId(block_id.0));
                 }
             }
         }
@@ -429,7 +434,7 @@ mod tests {
                 entry: MirBlockId(0),
                 blocks: vec![MirBlock {
                     id: MirBlockId(0),
-                    statements: vec![MirStatement {
+                    statements: vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Integer(42)),
                     }],
@@ -451,15 +456,15 @@ mod tests {
                 blocks: vec![MirBlock {
                     id: MirBlockId(0),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(0),
                             rhs: MirRhs::Literal(Literal::Integer(10)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(1),
                             rhs: MirRhs::Literal(Literal::Integer(20)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(2),
                             rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
                         },
@@ -481,7 +486,7 @@ mod tests {
                 entry: MirBlockId(0),
                 blocks: vec![MirBlock {
                     id: MirBlockId(0),
-                    statements: vec![MirStatement {
+                    statements: vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Integer(30)), // 10 + 20 folded
                     }],

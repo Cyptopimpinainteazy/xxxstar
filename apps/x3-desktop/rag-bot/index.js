@@ -16,10 +16,10 @@ let vectorStore = null;
 
 // Main chat endpoint
 app.post('/ask', async (req, res) => {
-  const { question } = req.body;
+  const { question, stream = false, think = false, thinkLevel = null, model = null, baseUrl = null } = req.body;
   if (!question || !vectorStore) return res.status(400).json({ error: 'Not ready or missing question' });
   try {
-    const result = await queryDocs(question, vectorStore);
+    const result = await queryDocs(question, vectorStore, { stream, think, thinkLevel, model, baseUrl });
     res.json(result);
   } catch (e) {
     console.error('Error in /ask:', e);

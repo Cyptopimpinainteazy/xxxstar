@@ -37,13 +37,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum X3Instruction {
     // ── Pre-flight ──────────────────────────────────────────────────────────
-
     /// Verify that `owner` controls the address on `chain`.
     /// Prevents unauthorized drain of source funds.
-    ValidateWalletOwner {
-        owner: String,
-        chain: ChainKind,
-    },
+    ValidateWalletOwner { owner: String, chain: ChainKind },
 
     /// Check that `owner` has at least `required` units of `asset`.
     CheckBalance {
@@ -64,12 +60,9 @@ pub enum X3Instruction {
     /// Simulate the full execution plan. Produces fee estimate, slippage
     /// estimate, liquidity depth, and risk score. Execution is gated on
     /// simulation success when `require_route_simulated` is set.
-    SimulateExecution {
-        intent_id: u64,
-    },
+    SimulateExecution { intent_id: u64 },
 
     // ── Asset lifecycle ─────────────────────────────────────────────────────
-
     /// Lock `amount` of `asset` in `contract` on the source chain.
     /// This is the first irreversible step — proof required before proceeding.
     LockAsset {
@@ -99,9 +92,7 @@ pub enum X3Instruction {
     /// Verify the canonical supply invariant:
     /// `total_wrapped <= total_locked_on_external_chains`.
     /// Halts the bridge if invariant is violated.
-    CheckCanonicalSupply {
-        wrapped_asset: AssetRef,
-    },
+    CheckCanonicalSupply { wrapped_asset: AssetRef },
 
     /// Mint `amount` of the canonical wrapped asset on X3.
     MintCanonical {
@@ -145,7 +136,6 @@ pub enum X3Instruction {
     },
 
     // ── Verification ─────────────────────────────────────────────────────────
-
     /// Verify that the final receipt on the destination chain is valid.
     VerifyFinalReceipt {
         chain: ChainKind,
@@ -155,16 +145,11 @@ pub enum X3Instruction {
     },
 
     // ── Completion ───────────────────────────────────────────────────────────
-
     /// Emit the final cross-chain intent receipt.
     /// Visible on the X3 explorer and stored on-chain.
-    EmitIntentReceipt {
-        intent_id: u64,
-        verbose: bool,
-    },
+    EmitIntentReceipt { intent_id: u64, verbose: bool },
 
     // ── Failure handling ─────────────────────────────────────────────────────
-
     /// Register a timeout watchdog for this intent.
     /// The watchdog will trigger `on_timeout_action` if not cancelled.
     RegisterTimeoutWatchdog {
@@ -180,10 +165,7 @@ pub enum X3Instruction {
     },
 
     /// Quarantine intent funds for manual security council review.
-    Quarantine {
-        intent_id: u64,
-        reason: String,
-    },
+    Quarantine { intent_id: u64, reason: String },
 }
 
 impl X3Instruction {

@@ -59,11 +59,47 @@ use sp_runtime::traits::Block as BlockT;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, RwLock};
-use x3_cross_vm_bridge::{CrossVmDispatcher, CrossVmResult};
-use x3_vm::bridge::{BalanceProvider, CrossVmEscrow};
+use x3_cross_vm_bridge::{CrossVmDispatcher, CrossVmResult, VmId};
+use x3_vm::bridge::{BalanceProvider, BridgeConfig, CrossVmEscrow, X3VMBridge};
 
 pub use pallet_x3_kernel::StateChange;
 pub use x3_cross_vm_bridge::CrossVmDispatcher as CrossVmDispatcherTrait;
+
+/// Build an `X3VMBridge` with canonical balance and escrow providers attached.
+///
+/// This is the node/runtime adapter boundary: callers supply providers backed by
+/// runtime storage or pallet calls, and the returned bridge registers hostcalls
+/// that route through `X3VMBridge::with_balances()` and `with_escrow()`.
+pub fn build_x3vm_bridge(
+    balances: Arc<dyn BalanceProvider>,
+    escrow: Arc<dyn CrossVmEscrow>,
+    config: BridgeConfig,
+) -> X3VMBridge {
+    X3VMBridge::with_config(config)
+        .with_balances(balances)
+        .with_escrow(escrow)
+}
+
+fn default_runtime_bridge_config() -> BridgeConfig {
+    BridgeConfig {
+        enable_svm: true,
+        enable_evm: true,
+        enable_gpu: false,
+        gas_limit: 10_000_000,
+        max_cpi_depth: 4,
+    }
+}
+
+/// Node-side bundle that keeps the runtime-backed providers alive with the
+/// `X3VMBridge` that captures them in its hostcall closures.
+pub struct SubstrateX3VmBridge<C, Block, P = ()>
+where
+    P: EscrowPersistence,
+{
+    pub bridge: Arc<X3VMBridge>,
+    pub balances: Arc<SubstrateClientBalanceAdapter<C, Block>>,
+    pub escrow: Arc<PalletEscrowAdapter<C, Block, P>>,
+}
 
 struct OverlayEntry {
     current: u128,
@@ -395,8 +431,53 @@ where
     }
 }
 
+impl<C, Block> SubstrateX3VmBridge<C, Block, ()>
+where
+    Block: BlockT,
+    C: ProvideRuntimeApi<Block> + HeaderBackend<Block> + Send + Sync + 'static,
+    C::Api: AtlasKernelRuntimeApi<Block, AccountId32, u128, u32>,
+{
+    pub fn new(client: Arc<C>) -> Self {
+        Self::with_persistence_and_config(client, (), default_runtime_bridge_config())
+    }
+}
+
+impl<C, Block, P> SubstrateX3VmBridge<C, Block, P>
+where
+    Block: BlockT,
+    C: ProvideRuntimeApi<Block> + HeaderBackend<Block> + Send + Sync + 'static,
+    C::Api: AtlasKernelRuntimeApi<Block, AccountId32, u128, u32>,
+    P: EscrowPersistence + 'static,
+{
+    pub fn with_persistence(client: Arc<C>, persistence: P) -> Self {
+        Self::with_persistence_and_config(client, persistence, default_runtime_bridge_config())
+    }
+
+    pub fn with_persistence_and_config(
+        client: Arc<C>,
+        persistence: P,
+        config: BridgeConfig,
+    ) -> Self {
+        let balances = Arc::new(SubstrateClientBalanceAdapter::new(client));
+        let escrow = Arc::new(PalletEscrowAdapter::with_persistence(
+            balances.clone(),
+            persistence,
+        ));
+        let balance_provider: Arc<dyn BalanceProvider> = balances.clone();
+        let escrow_provider: Arc<dyn CrossVmEscrow> = escrow.clone();
+        let bridge = Arc::new(build_x3vm_bridge(balance_provider, escrow_provider, config));
+
+        Self {
+            bridge,
+            balances,
+            escrow,
+        }
+    }
+}
+
 pub struct RuntimeCrossVmDispatcher<C, Block> {
     client: Arc<C>,
+    x3vm_bridge: Option<Arc<X3VMBridge>>,
     _phantom: PhantomData<Block>,
 }
 
@@ -409,8 +490,14 @@ where
     pub fn new(client: Arc<C>) -> Self {
         Self {
             client,
+            x3vm_bridge: None,
             _phantom: PhantomData,
         }
+    }
+
+    pub fn with_x3vm_bridge(mut self, bridge: Arc<X3VMBridge>) -> Self {
+        self.x3vm_bridge = Some(bridge);
+        self
     }
 
     fn best_hash(&self) -> Block::Hash {
@@ -471,14 +558,49 @@ where
     ) -> Result<x3_cross_vm_bridge::CrossVmReceipt, sp_runtime::DispatchError> {
         use x3_cross_vm_bridge::{CrossVmReceipt, CrossVmStatus};
         let zero = sp_core::H256::zero();
-        Ok(CrossVmReceipt {
-            call_hash: call.call_hash(&zero),
-            source_state_root: zero,
-            target_state_root: zero,
-            status: CrossVmStatus::InternalError,
-            gas_used: 0,
-            logs: Vec::new(),
-        })
+        call.ensure_current_version()?;
+
+        if call.target != VmId::X3Vm {
+            return Ok(CrossVmReceipt {
+                call_hash: call.call_hash(&zero),
+                source_state_root: zero,
+                target_state_root: zero,
+                status: CrossVmStatus::InternalError,
+                gas_used: 0,
+                logs: Vec::new(),
+            });
+        }
+
+        let Some(bridge) = &self.x3vm_bridge else {
+            return Ok(CrossVmReceipt {
+                call_hash: call.call_hash(&zero),
+                source_state_root: zero,
+                target_state_root: zero,
+                status: CrossVmStatus::InternalError,
+                gas_used: 0,
+                logs: vec![b"x3vm bridge not configured".to_vec()],
+            });
+        };
+
+        let function_index = u32::from_le_bytes(call.selector) as usize;
+        match bridge.execute(call.payload.as_ref(), function_index, &[]) {
+            Ok(result) => Ok(CrossVmReceipt {
+                call_hash: call.call_hash(&zero),
+                source_state_root: zero,
+                target_state_root: zero,
+                status: CrossVmStatus::Success,
+                gas_used: result.gas_used,
+                logs: result.value.map(value_to_log).into_iter().collect(),
+            }),
+            Err(err) => Ok(CrossVmReceipt {
+                call_hash: call.call_hash(&zero),
+                source_state_root: zero,
+                target_state_root: zero,
+                status: CrossVmStatus::Reverted,
+                gas_used: call.gas_budget,
+                logs: vec![format!("{err:?}").into_bytes()],
+            }),
+        }
     }
 
     fn get_evm_balance(&self, address: &[u8; 20]) -> u128 {
@@ -496,10 +618,478 @@ where
     }
 
     fn get_evm_bridge_escrow(&self) -> [u8; 20] {
-        [0u8; 20]
+        let at = self.best_hash();
+        let api = self.client.runtime_api();
+        let bytes = api.get_evm_bridge_escrow(at).unwrap_or_default();
+        let mut escrow = [0u8; 20];
+        if bytes.len() == 20 {
+            escrow.copy_from_slice(&bytes);
+        }
+        escrow
     }
 
     fn get_svm_bridge_escrow(&self) -> [u8; 32] {
-        [0u8; 32]
+        let at = self.best_hash();
+        let api = self.client.runtime_api();
+        api.get_svm_bridge_escrow(at).unwrap_or([0u8; 32])
+    }
+}
+
+fn value_to_log(value: x3_vm::Value) -> Vec<u8> {
+    match value {
+        x3_vm::Value::I64(v) => v.to_le_bytes().to_vec(),
+        x3_vm::Value::F64(v) => v.to_bits().to_le_bytes().to_vec(),
+        x3_vm::Value::Bool(v) => vec![v as u8],
+        x3_vm::Value::String(v) => v.into_bytes(),
+        x3_vm::Value::Bytes(v) => v,
+        x3_vm::Value::Addr(v) => v.to_le_bytes().to_vec(),
+        x3_vm::Value::Unit => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sp_blockchain::{BlockStatus, Info};
+    use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use x3_vm::{Value, VM};
+
+    type Block = sp_runtime::testing::Block<sp_runtime::OpaqueExtrinsic>;
+
+    #[derive(Clone)]
+    struct RuntimeApiHarness {
+        evm_escrow: [u8; 20],
+        svm_escrow: [u8; 32],
+    }
+
+    sp_api::mock_impl_runtime_apis! {
+        impl AtlasKernelRuntimeApi<Block, AccountId32, u128, u32> for RuntimeApiHarness {
+            fn get_canonical_balance(&self, _account: AccountId32, _asset_id: u32) -> u128 {
+                0
+            }
+
+            fn get_asset_metadata(&self, _asset_id: u32) -> Option<(Vec<u8>, u8)> {
+                None
+            }
+
+            fn is_authorized(&self, _account: AccountId32) -> bool {
+                false
+            }
+
+            fn get_authorized_accounts(&self) -> Vec<AccountId32> {
+                Vec::new()
+            }
+
+            fn get_authorities(&self) -> Vec<AccountId32> {
+                Vec::new()
+            }
+
+            fn map_evm_address(&self, _address: Vec<u8>) -> Option<AccountId32> {
+                None
+            }
+
+            fn get_evm_balance(&self, _evm_address: Vec<u8>, _asset_id: u32) -> Option<u128> {
+                Some(0)
+            }
+
+            fn get_evm_code(&self, _evm_address: Vec<u8>) -> Vec<u8> {
+                Vec::new()
+            }
+
+            fn get_evm_storage(&self, _evm_address: Vec<u8>, _storage_key: H256) -> Option<H256> {
+                None
+            }
+
+            fn get_evm_nonce(&self, _evm_address: Vec<u8>) -> u64 {
+                0
+            }
+
+            fn get_svm_balance(&self, _svm_pubkey: Vec<u8>) -> u64 {
+                0
+            }
+
+            fn get_evm_bridge_escrow(&self) -> Vec<u8> {
+                self.evm_escrow.to_vec()
+            }
+
+            fn get_svm_bridge_escrow(&self) -> [u8; 32] {
+                self.svm_escrow
+            }
+
+            fn is_svm_program(&self, _svm_pubkey: Vec<u8>) -> bool {
+                false
+            }
+
+            fn submit_evm_transaction(&self, _raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+                Err(b"not wired in harness".to_vec())
+            }
+
+            fn validate_evm_transaction(&self, _raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+                Err(b"not wired in harness".to_vec())
+            }
+
+            fn submit_svm_instruction(
+                &self,
+                _program_id: [u8; 32],
+                _instruction_data: Vec<u8>,
+            ) -> Result<Vec<u8>, Vec<u8>> {
+                Err(b"not wired in harness".to_vec())
+            }
+
+            fn call_evm(
+                &self,
+                _caller: Option<Vec<u8>>,
+                _evm_address: Vec<u8>,
+                _input: Vec<u8>,
+                _gas_limit: u64,
+            ) -> Result<Vec<u8>, Vec<u8>> {
+                Err(b"not wired in harness".to_vec())
+            }
+
+            fn estimate_evm_gas(
+                &self,
+                _caller: Option<Vec<u8>>,
+                _evm_address: Vec<u8>,
+                _input: Vec<u8>,
+                _gas_limit: u64,
+            ) -> Result<u64, Vec<u8>> {
+                Err(b"not wired in harness".to_vec())
+            }
+
+            fn get_evm_transaction(&self, _tx_hash: Vec<u8>) -> Option<Vec<u8>> {
+                None
+            }
+
+            fn get_evm_transaction_by_hash(&self, _tx_hash: Vec<u8>) -> Option<Vec<u8>> {
+                None
+            }
+
+            fn get_evm_receipt(&self, _tx_hash: Vec<u8>) -> Option<Vec<u8>> {
+                None
+            }
+
+            fn get_evm_logs(&self, _filter: Vec<u8>) -> Vec<Vec<u8>> {
+                Vec::new()
+            }
+
+            fn get_evm_transaction_logs(&self, _tx_hash: Vec<u8>) -> Vec<Vec<u8>> {
+                Vec::new()
+            }
+
+            fn chain_id(&self) -> u64 {
+                0
+            }
+
+            fn get_svm_slot(&self) -> u64 {
+                0
+            }
+
+            fn get_svm_blockhash(&self, _slot: u64) -> Option<H256> {
+                None
+            }
+
+            fn get_svm_transaction_count(&self, _svm_pubkey: Vec<u8>) -> u64 {
+                0
+            }
+
+            fn get_svm_slot_by_blockhash(&self, _blockhash: H256) -> Option<u64> {
+                None
+            }
+
+            fn deploy_evm_contract(
+                &self,
+                _caller: Option<Vec<u8>>,
+                _bytecode: Vec<u8>,
+                _gas_limit: u64,
+            ) -> Result<Vec<u8>, Vec<u8>> {
+                Err(b"not wired in harness".to_vec())
+            }
+
+            fn get_evm_contract_receipt(&self, _contract_address: Vec<u8>) -> Option<Vec<u8>> {
+                None
+            }
+
+            fn get_svm_program_data(&self, _svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
+                None
+            }
+
+            fn get_svm_account_data(&self, _svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
+                None
+            }
+
+            fn get_svm_slot_history(&self, _limit: u32) -> Vec<u64> {
+                Vec::new()
+            }
+
+            fn get_svm_recent_blockhashes(&self, _limit: u32) -> Vec<H256> {
+                Vec::new()
+            }
+        }
+    }
+
+    struct RuntimeClientHarness {
+        api: RuntimeApiHarness,
+        best_hash: <Block as BlockT>::Hash,
+    }
+
+    impl RuntimeClientHarness {
+        fn new(evm_escrow: [u8; 20], svm_escrow: [u8; 32]) -> Self {
+            Self {
+                api: RuntimeApiHarness {
+                    evm_escrow,
+                    svm_escrow,
+                },
+                best_hash: H256::repeat_byte(0x42),
+            }
+        }
+    }
+
+    impl ProvideRuntimeApi<Block> for RuntimeClientHarness {
+        type Api = RuntimeApiHarness;
+
+        fn runtime_api(&self) -> sp_api::ApiRef<'_, Self::Api> {
+            self.api.clone().into()
+        }
+    }
+
+    impl HeaderBackend<Block> for RuntimeClientHarness {
+        fn header(
+            &self,
+            _hash: <Block as BlockT>::Hash,
+        ) -> sp_blockchain::Result<Option<<Block as BlockT>::Header>> {
+            Ok(None)
+        }
+
+        fn info(&self) -> Info<Block> {
+            Info {
+                best_hash: self.best_hash,
+                best_number: 1,
+                genesis_hash: H256::zero(),
+                finalized_hash: self.best_hash,
+                finalized_number: 1,
+                finalized_state: Some((self.best_hash, 1)),
+                number_leaves: 1,
+                block_gap: None,
+            }
+        }
+
+        fn status(&self, _hash: <Block as BlockT>::Hash) -> sp_blockchain::Result<BlockStatus> {
+            Ok(BlockStatus::InChain)
+        }
+
+        fn number(
+            &self,
+            _hash: <Block as BlockT>::Hash,
+        ) -> sp_blockchain::Result<Option<<<Block as BlockT>::Header as HeaderT>::Number>> {
+            Ok(Some(1))
+        }
+
+        fn hash(
+            &self,
+            _number: <<Block as BlockT>::Header as HeaderT>::Number,
+        ) -> sp_blockchain::Result<Option<<Block as BlockT>::Hash>> {
+            Ok(Some(self.best_hash))
+        }
+    }
+
+    struct RecordingBalanceProvider {
+        ledger: Mutex<HashMap<Vec<u8>, u128>>,
+        reads: AtomicUsize,
+        transfers: AtomicUsize,
+    }
+
+    impl RecordingBalanceProvider {
+        fn new(entries: impl IntoIterator<Item = (Vec<u8>, u128)>) -> Self {
+            Self {
+                ledger: Mutex::new(entries.into_iter().collect()),
+                reads: AtomicUsize::new(0),
+                transfers: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl BalanceProvider for RecordingBalanceProvider {
+        fn get_balance(&self, address: &[u8]) -> u128 {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            *self
+                .ledger
+                .lock()
+                .expect("ledger lock")
+                .get(address)
+                .unwrap_or(&0)
+        }
+
+        fn transfer(&self, from: &[u8], to: &[u8], amount: u128) -> Result<(), &'static str> {
+            self.transfers.fetch_add(1, Ordering::SeqCst);
+            let mut ledger = self.ledger.lock().expect("ledger lock");
+            let from_balance = *ledger.get(from).unwrap_or(&0);
+            if from_balance < amount {
+                return Err("insufficient balance");
+            }
+            ledger.insert(from.to_vec(), from_balance - amount);
+            let to_balance = *ledger.get(to).unwrap_or(&0);
+            ledger.insert(to.to_vec(), to_balance.saturating_add(amount));
+            Ok(())
+        }
+    }
+
+    struct RecordingEscrowProvider {
+        balances: Arc<RecordingBalanceProvider>,
+        tickets: Mutex<HashMap<[u8; 32], (Vec<u8>, u128, bool)>>,
+        locks: AtomicUsize,
+        releases: AtomicUsize,
+    }
+
+    impl RecordingEscrowProvider {
+        fn new(balances: Arc<RecordingBalanceProvider>) -> Self {
+            Self {
+                balances,
+                tickets: Mutex::new(HashMap::new()),
+                locks: AtomicUsize::new(0),
+                releases: AtomicUsize::new(0),
+            }
+        }
+
+        fn lock_from(&self, from: &[u8], amount: u128) -> Result<[u8; 32], &'static str> {
+            self.locks.fetch_add(1, Ordering::SeqCst);
+            self.balances.transfer(from, b"x3-escrow-vault", amount)?;
+            let mut ticket = [0u8; 32];
+            let seq = self.locks.load(Ordering::SeqCst) as u64;
+            ticket[..8].copy_from_slice(&seq.to_le_bytes());
+            ticket[8..24].copy_from_slice(&amount.to_le_bytes());
+            self.tickets
+                .lock()
+                .expect("ticket lock")
+                .insert(ticket, (from.to_vec(), amount, false));
+            Ok(ticket)
+        }
+
+        fn release_to(
+            &self,
+            to: &[u8],
+            ticket: &[u8; 32],
+            amount: u128,
+        ) -> Result<(), &'static str> {
+            self.releases.fetch_add(1, Ordering::SeqCst);
+            let mut tickets = self.tickets.lock().expect("ticket lock");
+            let entry = tickets.get_mut(ticket).ok_or("unknown ticket")?;
+            if entry.2 {
+                return Err("spent ticket");
+            }
+            if entry.1 < amount {
+                return Err("release exceeds locked amount");
+            }
+            entry.2 = true;
+            drop(tickets);
+            self.balances.transfer(b"x3-escrow-vault", to, amount)
+        }
+    }
+
+    impl CrossVmEscrow for RecordingEscrowProvider {
+        fn lock_svm(&self, from: &[u8], amount: u128) -> Result<[u8; 32], &'static str> {
+            self.lock_from(from, amount)
+        }
+
+        fn release_evm(
+            &self,
+            to: &[u8; 20],
+            ticket: &[u8; 32],
+            amount: u128,
+        ) -> Result<(), &'static str> {
+            self.release_to(to, ticket, amount)
+        }
+
+        fn lock_evm(&self, from: &[u8; 20], amount: u128) -> Result<[u8; 32], &'static str> {
+            self.lock_from(from, amount)
+        }
+
+        fn release_svm(
+            &self,
+            to: &[u8],
+            ticket: &[u8; 32],
+            amount: u128,
+        ) -> Result<(), &'static str> {
+            self.release_to(to, ticket, amount)
+        }
+    }
+
+    #[test]
+    fn x3vm_bridge_routes_balance_escrow_and_nonce_through_runtime_boundary() {
+        let svm_addr = vec![0x11; 32];
+        let evm_addr = vec![0x22; 20];
+        let balances = Arc::new(RecordingBalanceProvider::new([
+            (svm_addr.clone(), 1_000),
+            (b"x3-escrow-vault".to_vec(), 0),
+            (evm_addr.clone(), 0),
+        ]));
+        let escrow = Arc::new(RecordingEscrowProvider::new(balances.clone()));
+
+        let bridge = build_x3vm_bridge(
+            balances.clone(),
+            escrow.clone(),
+            default_runtime_bridge_config(),
+        );
+        let mut vm =
+            VM::from_bytes(&x3_vm::bridge::bc_format_helpers::assemble_simple_module()).unwrap();
+        bridge.register_bridge_hostcalls(&mut vm);
+
+        let before = vm
+            .invoke_hostcall(0x12, &[Value::Bytes(svm_addr.clone())])
+            .expect("balance hostcall should route")
+            .expect("balance value");
+        assert_eq!(before, Value::I64(1_000));
+
+        let args = [
+            Value::Bytes(svm_addr.clone()),
+            Value::Bytes(evm_addr.clone()),
+            Value::I64(100),
+            Value::Bytes(vec![0xAA; 32]),
+        ];
+        assert!(vm.invoke_hostcall(0x30, &args).is_ok());
+        let replay = vm.invoke_hostcall(0x30, &args);
+        assert!(format!("{:?}", replay.unwrap_err()).contains("nonce replay"));
+
+        assert_eq!(balances.get_balance(&svm_addr), 900);
+        assert_eq!(balances.get_balance(&evm_addr), 100);
+        assert!(balances.reads.load(Ordering::SeqCst) >= 3);
+        assert_eq!(escrow.locks.load(Ordering::SeqCst), 1);
+        assert_eq!(escrow.releases.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn runtime_dispatcher_executes_x3vm_with_client_backed_escrow_config() {
+        let evm_escrow = [0xE1; 20];
+        let svm_escrow = [0x51; 32];
+        let client = Arc::new(RuntimeClientHarness::new(evm_escrow, svm_escrow));
+        let bridge = Arc::new(build_x3vm_bridge(
+            Arc::new(RecordingBalanceProvider::new([])),
+            Arc::new(RecordingEscrowProvider::new(Arc::new(
+                RecordingBalanceProvider::new([]),
+            ))),
+            default_runtime_bridge_config(),
+        ));
+        let dispatcher = RuntimeCrossVmDispatcher::<RuntimeClientHarness, Block>::new(client)
+            .with_x3vm_bridge(bridge);
+        let bytecode = x3_vm::bridge::bc_format_helpers::assemble_simple_module();
+        let call = x3_cross_vm_bridge::CrossVmCall::new(
+            VmId::X3Vm,
+            VmId::X3Vm,
+            0u32.to_le_bytes(),
+            bytecode,
+            1_000_000,
+            1,
+            100,
+        )
+        .expect("test bytecode fits cross-vm payload");
+
+        let receipt = dispatcher
+            .execute_x3vm_tx(&[0u8; 32], &call)
+            .expect("dispatcher should execute x3vm call");
+
+        assert_eq!(receipt.status, x3_cross_vm_bridge::CrossVmStatus::Success);
+        assert_eq!(receipt.call_hash, call.call_hash(&H256::zero()));
+        assert_eq!(dispatcher.get_evm_bridge_escrow(), evm_escrow);
+        assert_eq!(dispatcher.get_svm_bridge_escrow(), svm_escrow);
     }
 }

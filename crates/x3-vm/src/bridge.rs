@@ -137,6 +137,8 @@ pub struct X3VMBridge {
     balance_provider: Option<std::sync::Arc<dyn BalanceProvider>>,
     /// Optional cross-VM escrow for 0x30 / 0x31 hostcalls.
     escrow: Option<std::sync::Arc<dyn CrossVmEscrow>>,
+    /// Nonces consumed by successful cross-VM bridge operations.
+    used_nonces: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<[u8; 32]>>>,
 }
 
 impl X3VMBridge {
@@ -161,6 +163,9 @@ impl X3VMBridge {
             svm: None,
             balance_provider: None,
             escrow: None,
+            used_nonces: std::sync::Arc::new(std::sync::Mutex::new(
+                std::collections::HashSet::new(),
+            )),
         }
     }
 
@@ -238,6 +243,7 @@ impl X3VMBridge {
         // Clone shared state before the hostcall closures capture it
         let balance_provider = self.balance_provider.clone();
         let escrow = self.escrow.clone();
+        let used_nonces = self.used_nonces.clone();
 
         // ── SVM hostcalls ────────────────────────────────────────────────
         if self.config.enable_svm {
@@ -489,8 +495,9 @@ impl X3VMBridge {
         }
 
         // ── Cross-VM bridge ops ───────────────────────────────────────────────
-        vm.register_hostcall(0x30, "bridge_svm_to_evm", 3, {
+        vm.register_hostcall(0x30, "bridge_svm_to_evm", 4, {
             let esc = escrow.clone();
+            let nonces = used_nonces.clone();
             move |args| {
                 let Some(ref provider) = esc else {
                     return Err(VMError::without_ip(VMErrorKind::HostcallError(
@@ -529,26 +536,38 @@ impl X3VMBridge {
                             .into(),
                     ))),
                 };
-                let ticket = provider.lock_svm(&from, amount).map_err(|e| {
-                    VMError::without_ip(VMErrorKind::HostcallError(format!(
-                        "bridge_svm_to_evm lock_svm: {}",
-                        e
-                    )))
-                })?;
-                provider
-                    .release_evm(&to_bytes, &ticket, amount)
-                    .map_err(|e| {
+                let nonce = bridge_nonce_arg(args.get(3), "bridge_svm_to_evm")?;
+                reserve_bridge_nonce(&nonces, nonce)?;
+                let result = (|| {
+                    let ticket = provider.lock_svm(&from, amount).map_err(|e| {
                         VMError::without_ip(VMErrorKind::HostcallError(format!(
-                            "bridge_svm_to_evm release_evm: {}",
+                            "bridge_svm_to_evm lock_svm: {}",
                             e
                         )))
                     })?;
-                Ok(Some(Value::Bytes(ticket.to_vec())))
+                    provider
+                        .release_evm(&to_bytes, &ticket, amount)
+                        .map_err(|e| {
+                            VMError::without_ip(VMErrorKind::HostcallError(format!(
+                                "bridge_svm_to_evm release_evm: {}",
+                                e
+                            )))
+                        })?;
+                    Ok(ticket)
+                })();
+                match result {
+                    Ok(ticket) => Ok(Some(Value::Bytes(ticket.to_vec()))),
+                    Err(err) => {
+                        release_bridge_nonce(&nonces, &nonce);
+                        Err(err)
+                    }
+                }
             }
         });
 
-        vm.register_hostcall(0x31, "bridge_evm_to_svm", 3, {
+        vm.register_hostcall(0x31, "bridge_evm_to_svm", 4, {
             let esc = escrow;
+            let nonces = used_nonces;
             move |args| {
                 let Some(ref provider) = esc else {
                     return Err(VMError::without_ip(VMErrorKind::HostcallError(
@@ -586,21 +605,71 @@ impl X3VMBridge {
                             .into(),
                     ))),
                 };
-                let ticket = provider.lock_evm(&from_bytes, amount).map_err(|e| {
-                    VMError::without_ip(VMErrorKind::HostcallError(format!(
-                        "bridge_evm_to_svm lock_evm: {}",
-                        e
-                    )))
-                })?;
-                provider.release_svm(&to, &ticket, amount).map_err(|e| {
-                    VMError::without_ip(VMErrorKind::HostcallError(format!(
-                        "bridge_evm_to_svm release_svm: {}",
-                        e
-                    )))
-                })?;
-                Ok(Some(Value::Bytes(ticket.to_vec())))
+                let nonce = bridge_nonce_arg(args.get(3), "bridge_evm_to_svm")?;
+                reserve_bridge_nonce(&nonces, nonce)?;
+                let result = (|| {
+                    let ticket = provider.lock_evm(&from_bytes, amount).map_err(|e| {
+                        VMError::without_ip(VMErrorKind::HostcallError(format!(
+                            "bridge_evm_to_svm lock_evm: {}",
+                            e
+                        )))
+                    })?;
+                    provider.release_svm(&to, &ticket, amount).map_err(|e| {
+                        VMError::without_ip(VMErrorKind::HostcallError(format!(
+                            "bridge_evm_to_svm release_svm: {}",
+                            e
+                        )))
+                    })?;
+                    Ok(ticket)
+                })();
+                match result {
+                    Ok(ticket) => Ok(Some(Value::Bytes(ticket.to_vec()))),
+                    Err(err) => {
+                        release_bridge_nonce(&nonces, &nonce);
+                        Err(err)
+                    }
+                }
             }
         });
+    }
+}
+
+fn bridge_nonce_arg(arg: Option<&Value>, hostcall: &str) -> Result<[u8; 32], VMError> {
+    match arg {
+        Some(Value::Bytes(bytes)) if bytes.len() == 32 => {
+            let mut nonce = [0u8; 32];
+            nonce.copy_from_slice(bytes);
+            Ok(nonce)
+        }
+        _ => Err(VMError::without_ip(VMErrorKind::HostcallError(format!(
+            "{hostcall}: arg[3] (nonce) must be 32-byte Bytes"
+        )))),
+    }
+}
+
+fn reserve_bridge_nonce(
+    nonces: &std::sync::Arc<std::sync::Mutex<std::collections::HashSet<[u8; 32]>>>,
+    nonce: [u8; 32],
+) -> Result<(), VMError> {
+    let mut guard = nonces.lock().map_err(|_| {
+        VMError::without_ip(VMErrorKind::HostcallError(
+            "bridge nonce lock poisoned".into(),
+        ))
+    })?;
+    if !guard.insert(nonce) {
+        return Err(VMError::without_ip(VMErrorKind::HostcallError(
+            "nonce replay".into(),
+        )));
+    }
+    Ok(())
+}
+
+fn release_bridge_nonce(
+    nonces: &std::sync::Arc<std::sync::Mutex<std::collections::HashSet<[u8; 32]>>>,
+    nonce: &[u8; 32],
+) {
+    if let Ok(mut guard) = nonces.lock() {
+        guard.remove(nonce);
     }
 }
 
@@ -680,6 +749,25 @@ mod tests {
         let bridge = X3VMBridge::with_config(config);
         assert!(!bridge.config.enable_evm);
         assert_eq!(bridge.config.gas_limit, 500_000);
+    }
+
+    #[test]
+    fn test_bridge_nonce_replay_is_rejected() {
+        let nonces = Arc::new(StdMutex::new(std::collections::HashSet::new()));
+        let nonce = [7u8; 32];
+
+        assert!(reserve_bridge_nonce(&nonces, nonce).is_ok());
+        assert!(reserve_bridge_nonce(&nonces, nonce).is_err());
+
+        release_bridge_nonce(&nonces, &nonce);
+        assert!(reserve_bridge_nonce(&nonces, nonce).is_ok());
+    }
+
+    #[test]
+    fn test_bridge_nonce_arg_requires_32_bytes() {
+        assert!(bridge_nonce_arg(Some(&Value::Bytes(vec![1u8; 32])), "test").is_ok());
+        assert!(bridge_nonce_arg(Some(&Value::Bytes(vec![1u8; 31])), "test").is_err());
+        assert!(bridge_nonce_arg(Some(&Value::I64(1)), "test").is_err());
     }
 
     // ── BalanceProvider mock + tests ─────────────────────────────────────────
@@ -858,5 +946,28 @@ mod tests {
         let esc: Arc<dyn CrossVmEscrow> = Arc::new(MockCrossVmEscrow::new());
         let bridge = X3VMBridge::new().with_escrow(esc);
         assert!(bridge.escrow.is_some());
+    }
+
+    #[test]
+    fn test_bridge_nonce_replay_rejected_through_hostcall_registry() {
+        let esc: Arc<dyn CrossVmEscrow> = Arc::new(MockCrossVmEscrow::new());
+        let bridge = X3VMBridge::new().with_escrow(esc);
+        let bytecode = bc_format_helpers::assemble_simple_module();
+        let mut vm = VM::from_bytes(&bytecode).expect("test module should load");
+        bridge.register_bridge_hostcalls(&mut vm);
+
+        let nonce = vec![9u8; 32];
+        let args = vec![
+            Value::Bytes(b"alice_svm_pubkey".to_vec()),
+            Value::Bytes(vec![0xAB; 20]),
+            Value::I64(500),
+            Value::Bytes(nonce.clone()),
+        ];
+
+        assert!(vm.invoke_hostcall(0x30, &args).is_ok());
+        let replay = vm.invoke_hostcall(0x30, &args);
+
+        assert!(replay.is_err());
+        assert!(format!("{:?}", replay.unwrap_err()).contains("nonce replay"));
     }
 }

@@ -549,7 +549,10 @@ impl Parser {
                     };
 
                     if matches!(lit, Literal::Integer(_) | Literal::Float(_)) {
-                        return Ok(Expression::Literal(LiteralExpression { literal: lit, span }));
+                        return Ok(Expression::Literal(LiteralExpression {
+                            literal: lit,
+                            span,
+                        }));
                     }
                 }
 
@@ -854,7 +857,10 @@ fn main() {
 
         assert!(matches!(
             call.args.as_slice(),
-            [Expression::Literal(LiteralExpression { literal: Literal::Integer(-42), .. })]
+            [Expression::Literal(LiteralExpression {
+                literal: Literal::Integer(-42),
+                ..
+            })]
         ));
     }
 }

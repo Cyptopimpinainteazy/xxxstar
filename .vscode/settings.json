@@ -3,5 +3,24 @@
     "secondaryExplorer.paths": [
         "${workspaceFolder}"
     ],
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "autoclaw.orchestrator.enabled": true,
+    "autoclaw.orchestrator.project": "x3-atomic-star",
+    "autoclaw.bridge.autoStart": true,
+    "autoclaw.bridge.enabled": true,
+    "autoclaw.bridge.port": 9876,
+    "autoclaw.bridge.host": "127.0.0.1",
+    "autoclaw.kdream.enableFileWatcher": true,
+    "autoclaw.kdream.notifyNewTodos": true,
+    "autoclaw.kdream.refreshInterval": 30,
+    "autoclaw.kdream.autoInstallAdapters": true,
+    "autoclaw.autobuild.enabled": true,
+    "autoclaw.autobuild.tickIntervalSeconds": 30,
+    "autoclaw.orchestrate.workAgents": 4,
+    "autoclaw.orchestrate.maxTasksPerAgent": 5,
+    "autoclaw.orchestrate.maxSubtasksPerSprint": 20,
+    "autoclaw.orchestrate.baseBranch": "main",
+    "autoclaw.orchestrate.heartbeatStallSeconds": 300,
+    "autoclaw.orchestrate.reconcileIntervalSeconds": 300,
+    "cmake.sourceDirectory": "/home/x3star/Desktop/xxxstar-main/vendor/blake3/c"
 }

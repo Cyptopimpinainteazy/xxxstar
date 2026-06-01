@@ -39,11 +39,10 @@ pub mod pallet {
     use sp_core::H256;
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
-        AssetStatus,
         traits::{
             AssetRegistryInspect, EconomicHaltInspect, SupplyLedgerGovern, SupplyLedgerWrite,
         },
-        AssetId, Balance, DomainId, SupplyLedger, SupplyPolicy,
+        AssetId, AssetStatus, Balance, DomainId, SupplyLedger, SupplyPolicy,
     };
 
     /// Keep only the latest N block proofs to prevent unbounded storage growth.

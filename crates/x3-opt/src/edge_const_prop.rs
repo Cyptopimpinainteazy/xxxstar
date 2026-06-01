@@ -176,28 +176,34 @@ fn collect_vars(func: &MirFunction) -> Vec<MirValue> {
 
     for block in &func.blocks {
         for stmt in &block.statements {
-            vars.insert(stmt.target);
-            match &stmt.rhs {
-                MirRhs::Literal(_) => {}
-                MirRhs::Unary(_, operand) => {
-                    vars.insert(*operand);
-                }
-                MirRhs::Binary(_, left, right) => {
-                    vars.insert(*left);
-                    vars.insert(*right);
-                }
-                MirRhs::Call { args, .. } => {
-                    for arg in args {
-                        vars.insert(*arg);
+            if let Some(target) = stmt.target() {
+                vars.insert(target);
+            }
+            match stmt {
+                MirStatement::Assign { rhs, .. } => match rhs {
+                    MirRhs::Literal(_) => {}
+                    MirRhs::Unary(_, operand) => {
+                        vars.insert(*operand);
                     }
-                }
-                MirRhs::Load { addr, .. } => {
-                    vars.insert(*addr);
-                }
-                MirRhs::Store { addr, val, .. } => {
-                    vars.insert(*addr);
-                    vars.insert(*val);
-                }
+                    MirRhs::Binary(_, left, right) => {
+                        vars.insert(*left);
+                        vars.insert(*right);
+                    }
+                    MirRhs::Call { args, .. } => {
+                        for arg in args {
+                            vars.insert(*arg);
+                        }
+                    }
+                    MirRhs::Load { addr, .. } => {
+                        vars.insert(*addr);
+                    }
+                    MirRhs::Store { addr, val, .. } => {
+                        vars.insert(*addr);
+                        vars.insert(*val);
+                    }
+                },
+                // Atomic markers have no operands/targets to track.
+                MirStatement::AtomicBegin { .. } | MirStatement::AtomicEnd { .. } => {}
             }
         }
 
@@ -231,8 +237,11 @@ fn transfer_block(
 ) -> BTreeMap<MirValue, ConstVal> {
     let mut out = in_map.clone();
     for stmt in &block.statements {
-        let val = evaluate_rhs(&stmt.rhs, &out);
-        out.insert(stmt.target, val);
+        if let Some((target, rhs)) = stmt.as_assign() {
+            let val = evaluate_rhs(rhs, &out);
+            out.insert(target, val);
+        }
+        // Atomic markers are optimization barriers — skip.
     }
     out
 }
@@ -312,7 +321,7 @@ mod tests {
     fn edge_constants_track_predicate() {
         let block0 = mk_block(
             0,
-            vec![MirStatement {
+            vec![MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Bool(true)),
             }],
@@ -345,7 +354,7 @@ mod tests {
             vec![
                 mk_block(
                     0,
-                    vec![MirStatement {
+                    vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Bool(true)),
                     }],
@@ -376,7 +385,7 @@ mod tests {
             vec![
                 mk_block(
                     0,
-                    vec![MirStatement {
+                    vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Bool(true)),
                     }],
@@ -384,7 +393,7 @@ mod tests {
                 ),
                 mk_block(
                     1,
-                    vec![MirStatement {
+                    vec![MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Bool(false)),
                     }],

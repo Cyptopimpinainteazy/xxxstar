@@ -30,7 +30,12 @@ use x3_backend::bc_format::{BytecodeModule, ConstValue};
 use x3_backend::opcode::Opcode;
 
 use crate::error::{VMError, VMErrorKind, VMResult};
+use crate::events::{EventBuffer, VmEvent};
 use crate::hostcall::HostcallRegistry;
+use crate::isolation::IsolationContext;
+use crate::jit_compiler::{JitCompiler, JitConfig, JitStats};
+use crate::state::{StateMachine, VmState};
+use crate::storage::{VmStorage, WriteRecord};
 
 /// Maximum register count.
 pub const MAX_REGISTERS: usize = 256;
@@ -185,6 +190,16 @@ pub struct VM {
     hostcalls: HostcallRegistry,
     /// Instruction count.
     instruction_count: u64,
+    /// Formal execution lifecycle.
+    state_machine: StateMachine,
+    /// Per-execution isolation context.
+    isolation: IsolationContext,
+    /// Atomic event buffer.
+    event_buffer: EventBuffer,
+    /// Journaled VM storage.
+    storage: VmStorage,
+    /// Hot-path tracker and compiled-function cache.
+    jit: JitCompiler,
 }
 
 impl VM {
@@ -220,6 +235,11 @@ impl VM {
             globals,
             hostcalls: HostcallRegistry::with_standard(),
             instruction_count: 0,
+            state_machine: StateMachine::new(),
+            isolation: IsolationContext::new([0u8; 32]),
+            event_buffer: EventBuffer::new(),
+            storage: VmStorage::new(),
+            jit: JitCompiler::new(JitConfig::default()),
         }
     }
 
@@ -246,6 +266,26 @@ impl VM {
     /// Invoke a hostcall directly from the host.
     pub fn invoke_hostcall(&self, id: u8, args: &[Value]) -> VMResult<Option<Value>> {
         self.hostcalls.invoke(id, args)
+    }
+
+    /// Drain events committed by a successful atomic execution.
+    pub fn drain_events(&mut self) -> Vec<VmEvent> {
+        let events = self.event_buffer.drain_committed();
+        if matches!(self.state_machine.state(), VmState::Committing) {
+            let _ = self.state_machine.finish_commit();
+            let _ = self.state_machine.reset();
+        }
+        events
+    }
+
+    /// Drain storage writes for cross-VM delta sync.
+    pub fn drain_storage_journal(&mut self) -> Vec<WriteRecord> {
+        self.storage.drain_journal()
+    }
+
+    /// Snapshot JIT counters and compilation cache statistics.
+    pub fn jit_stats(&self) -> JitStats {
+        self.jit.stats()
     }
 
     /// Get the loaded module.
@@ -289,6 +329,44 @@ impl VM {
 
     /// Call a function by index.
     pub fn call_function(&mut self, func_idx: usize, args: &[Value]) -> VMResult<ExecutionResult> {
+        if matches!(
+            self.state_machine.state(),
+            VmState::Committed | VmState::Reverted
+        ) {
+            self.state_machine.reset().map_err(|err| {
+                VMError::without_ip(VMErrorKind::InvalidFunction(format!("{err:?}")))
+            })?;
+        }
+        self.state_machine
+            .begin_execution()
+            .map_err(|err| VMError::without_ip(VMErrorKind::InvalidFunction(format!("{err:?}"))))?;
+        self.hostcalls.reset_execution_count();
+        self.isolation
+            .enter_call()
+            .map_err(|err| VMError::without_ip(VMErrorKind::HostcallError(format!("{err:?}"))))?;
+
+        let result = self.call_function_inner(func_idx, args);
+        self.isolation.exit_call();
+        match result {
+            Ok(result) => {
+                self.state_machine.signal_success().map_err(|err| {
+                    VMError::without_ip(VMErrorKind::InvalidFunction(format!("{err:?}")))
+                })?;
+                Ok(result)
+            }
+            Err(err) => {
+                let _ = self.state_machine.revert();
+                self.event_buffer.rollback();
+                Err(err)
+            }
+        }
+    }
+
+    fn call_function_inner(
+        &mut self,
+        func_idx: usize,
+        args: &[Value],
+    ) -> VMResult<ExecutionResult> {
         // Validate function index
         if func_idx >= self.module.functions.len() {
             return Err(VMError::without_ip(VMErrorKind::FunctionNotFound(func_idx)));
@@ -472,6 +550,18 @@ impl VM {
                     ));
                 }
 
+                let func_id = func_idx as u32;
+                self.jit.record_execution(func_id);
+                if self.jit.should_compile(func_id) && self.jit.get_compiled(func_id).is_none() {
+                    self.jit
+                        .compile(func_id, &self.module.code)
+                        .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                }
+
+                self.isolation.enter_call().map_err(|err| {
+                    self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
+                })?;
+
                 // Read argument registers from caller (respect caller base)
                 let mut args = Vec::with_capacity(argc);
                 for i in 0..argc {
@@ -522,10 +612,14 @@ impl VM {
                 let src = self.read_u8(ip + 1)? as usize;
                 let src_resolved = self.resolve_reg_checked(src, ip)?;
                 let value = self.regs[src_resolved].clone();
+                self.isolation.exit_call();
                 Ok(StepResult::Return(Some(value)))
             }
 
-            Opcode::RetVoid => Ok(StepResult::Return(None)),
+            Opcode::RetVoid => {
+                self.isolation.exit_call();
+                Ok(StepResult::Return(None))
+            }
 
             Opcode::Halt => Ok(StepResult::Halt),
 
@@ -586,6 +680,13 @@ impl VM {
                     ));
                 }
                 self.globals[idx] = self.regs[src_r].clone();
+                if let Some(value) = value_to_storage_value(&self.regs[src_r]) {
+                    self.storage
+                        .set(storage_key_for_global(idx), Some(value))
+                        .map_err(|err| {
+                            self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
+                        })?;
+                }
                 Ok(StepResult::Continue(ip + 6))
             }
 
@@ -970,6 +1071,7 @@ impl VM {
                 // snapshot regs + globals
                 self.atomic_snapshots
                     .push((self.regs.clone(), self.globals.clone()));
+                self.storage.snapshot();
                 self.atomic_depth += 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
             }
@@ -980,6 +1082,10 @@ impl VM {
                 }
                 // commit: discard last snapshot
                 self.atomic_snapshots.pop();
+                self.storage.commit().map_err(|err| {
+                    self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
+                })?;
+                self.event_buffer.commit();
                 self.atomic_depth -= 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
             }
@@ -993,6 +1099,10 @@ impl VM {
                     self.regs = regs_snap;
                     self.globals = globals_snap;
                 }
+                self.storage.rollback().map_err(|err| {
+                    self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
+                })?;
+                self.event_buffer.rollback();
                 self.atomic_depth -= 1;
                 Err(self.error_at(ip, VMErrorKind::AtomicAborted))
             }
@@ -1279,6 +1389,33 @@ enum StepResult {
     Halt,
 }
 
+fn storage_key_for_global(idx: usize) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    key[..8].copy_from_slice(&(idx as u64).to_le_bytes());
+    key
+}
+
+fn value_to_storage_value(value: &Value) -> Option<[u8; 32]> {
+    let mut out = [0u8; 32];
+    match value {
+        Value::I64(value) => out[..8].copy_from_slice(&value.to_le_bytes()),
+        Value::F64(value) => out[..8].copy_from_slice(&value.to_bits().to_le_bytes()),
+        Value::Bool(value) => out[0] = u8::from(*value),
+        Value::Bytes(bytes) => {
+            let len = bytes.len().min(32);
+            out[..len].copy_from_slice(&bytes[..len]);
+        }
+        Value::String(value) => {
+            let bytes = value.as_bytes();
+            let len = bytes.len().min(32);
+            out[..len].copy_from_slice(&bytes[..len]);
+        }
+        Value::Addr(value) => out[..8].copy_from_slice(&value.to_le_bytes()),
+        Value::Unit => return None,
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1460,7 +1597,7 @@ mod tests {
 
     #[test]
     fn vm_globals_load_store_and_atomic_rollback() {
-        use x3_backend::bc_format::{ConstValue, FunctionEntry, GlobalEntry};
+        use x3_backend::bc_format::FunctionEntry;
         use x3_backend::opcode::Opcode;
 
         // Module that: initializes global0 = 7; then in main does:
@@ -1661,7 +1798,7 @@ mod tests {
     /// 5. Register isolation holds: callee's local registers don't affect caller's.
     #[test]
     fn vm_nested_call_with_global_state() {
-        use x3_backend::bc_format::{ConstValue, FunctionEntry, GlobalEntry, MAGIC, VERSION};
+        use x3_backend::bc_format::{FunctionEntry, MAGIC, VERSION};
         use x3_backend::opcode::Opcode;
 
         // Global index 0: starts at 0 (const pool index 0 = integer 0)

@@ -14,6 +14,15 @@ workspace.
 - `docs/`: product, architecture, runbook, and audit documentation.
 - `patches/`: vendored third-party patches required to keep the workspace
   buildable on the pinned toolchain.
+- `scripts/`: canonical automation root — all build, test, deployment, smoke,
+  and daemon helper scripts live here with named subfolders.
+- `tests/`: single canonical test tree with phase-specific subfolders
+  (`phase_core/`, `phase4/`) instead of separate top-level test roots.
+- `X3-contracts/`: canonical contracts workspace (EVM via `evm/`, SVM via
+  `svm/`, shared assets via `shared/`). All `.sol` sources, governance,
+  treasury, and staking contracts belong here.
+- `_junk/`: quarantined archive of old roots, duplicated trees, transient
+  worktrees, and generated report folders. Git-ignored; not scanned by tools.
 - `x3-lang/`: legacy nested workspace for language prototypes; package names are
   prefixed with `x3-lang-` to avoid collision with the active root workspace.
 
@@ -26,7 +35,16 @@ workspace.
   `apps/analytics/analytics-service`
 - AI / swarm: `crates/gpu-swarm`, `crates/x3-gpu-validator-swarm`,
   `crates/quantum-swarm`
+- Contracts: `X3-contracts/evm/`, `X3-contracts/svm/`, `X3-contracts/shared/`
 - UI: `apps/`, `x3fronend/`
+
+## Archiving Rule
+
+Transient worktrees (`.kilo/`, `.reports/`), generated report folders, old
+contract roots (`contracts/`, `governance/`, `treasury/`, `staking/`), and
+deprecated code trees (`scripts_infrastructure/`, `tests_core/`, `tests_phase4/`)
+that are no longer canonical must be moved under `_junk/` for human sorting.
+`_junk/` is git-ignored and excluded from all build, test, and search tooling.
 
 ## Rules
 
@@ -36,3 +54,10 @@ workspace.
   identities across the repository.
 - Top-level one-off artifacts should be moved under `docs/`, `scripts/`, or an
   explicit archive directory instead of accumulating at repo root.
+- All automation scripts live under `scripts/` with named subfolders. Do not
+  create new top-level script roots.
+- All smart-contract sources live under `X3-contracts/`. Do not create new
+  top-level contract roots.
+- CI and tooling must only traverse `tests/`, not any duplicated test tree.
+- CI must fail on broken intra-repo symlinks/paths and on new undeclared
+  top-level code roots not listed in this document.

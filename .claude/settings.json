@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 .claude/hooks/hook_runtime.py" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 .github/hooks/pre_prompt.py" }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python3 .github/hooks/post_task.py" }
+        ]
+      }
+    ]
+  },
+  "workspace": {
+    "root": ".",
+    "instructions": [
+      "AGENTS.md",
+      ".github/instructions/workspace.md"
+    ]
+  }
+}

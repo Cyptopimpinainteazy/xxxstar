@@ -121,25 +121,66 @@ impl fmt::Display for UnOp {
 
 /// Integer literal base
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub enum IntBase { Decimal, Hex, Octal, Binary }
+pub enum IntBase {
+    Decimal,
+    Hex,
+    Octal,
+    Binary,
+}
 
 /// Integer suffix types
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum IntSuffix {
-    U8, U16, U32, U64, U128, U256, Usize,
-    I8, I16, I32, I64, I128, I256, Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    U256,
+    Usize,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
+    Isize,
 }
 
 /// Float suffix
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub enum FloatSuffix { F32, F64 }
+pub enum FloatSuffix {
+    F32,
+    F64,
+}
 
-impl fmt::Display for FloatSuffix { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { match self { FloatSuffix::F32 => write!(f, "f32"), FloatSuffix::F64 => write!(f, "f64") } } }
+impl fmt::Display for FloatSuffix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FloatSuffix::F32 => write!(f, "f32"),
+            FloatSuffix::F64 => write!(f, "f64"),
+        }
+    }
+}
 
 /// Duration unit
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub enum DurationUnit { Nanoseconds, Microseconds, Milliseconds, Seconds, Minutes, Hours, Days }
+pub enum DurationUnit {
+    Nanoseconds,
+    Microseconds,
+    Milliseconds,
+    Seconds,
+    Minutes,
+    Hours,
+    Days,
+}
 
 /// Size unit
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub enum SizeUnit { Bytes, Kilobytes, Megabytes, Gigabytes, Terabytes }
+pub enum SizeUnit {
+    Bytes,
+    Kilobytes,
+    Megabytes,
+    Gigabytes,
+    Terabytes,
+}

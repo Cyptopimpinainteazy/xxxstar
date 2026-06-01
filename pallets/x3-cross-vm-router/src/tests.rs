@@ -11,13 +11,13 @@
 use crate as pallet_x3_cross_vm_router;
 use codec::Encode;
 use frame_support::{
-    assert_ok, construct_runtime, derive_impl, parameter_types,
+    assert_noop, assert_ok, construct_runtime, derive_impl, parameter_types,
     traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup},
+    traits::{BlakeTwo256, Dispatchable, IdentityLookup},
     BuildStorage,
 };
 use x3_asset_kernel_types::{
@@ -117,6 +117,22 @@ impl EnsureOrigin<RuntimeOrigin> for RootOnly {
     }
 }
 
+pub struct RootOrSignedAccount;
+impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
+    type Success = u64;
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Root) => Ok(0),
+            Ok(system::RawOrigin::Signed(who)) => Ok(who),
+            _ => Err(o),
+        }
+    }
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(1))
+    }
+}
+
 parameter_types! {
     pub const MaxAssets: u32 = 64;
     pub const RoutingFeeBps: u16 = 0;
@@ -143,6 +159,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
     type VmAdapterOrigin = RootOnly;
+    type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
     type Currency = Balances;
     type RoutingFeeBps = RoutingFeeBps;
@@ -1175,27 +1192,60 @@ fn test_duplicate_nonce_rejected() {
         let id0 = x3_asset_kernel_types::derive_message_id::<u64>(&msg0);
         assert_ok!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), id0));
 
-        // --- Second transfer: nonce1 is now consumed automatically ---
-        let nonce1 = Router::next_nonce(DomainId::X3Native, sender.clone());
-        // nonce1 must be strictly > nonce0 (monotone invariant).
-        assert!(nonce1 > nonce0, "nonce must be strictly increasing");
+        // --- Second transfer: the next nonce is served from the open batch ---
+        let next_batch_watermark = Router::next_nonce(DomainId::X3Native, sender.clone());
+        // The persisted NextNonce is the next batch watermark, so it advances
+        // past the first allocated batch even though the next served nonce is 1.
+        assert!(
+            next_batch_watermark > nonce0,
+            "batch watermark must advance monotonically"
+        );
 
         // A second well-formed transfer with nonce1 must succeed.
+        let second_created_at = System::block_number();
+        let second_expires_at = second_created_at + 50;
         assert_ok!(Router::xvm_transfer(
             RuntimeOrigin::signed(1),
             asset_id,
             DomainId::X3Evm,
             alice_evm(),
             50,
-            System::block_number() + 50,
+            second_expires_at,
         ));
 
-        // Verify supply invariant held throughout.
-        let l = Ledger::ledgers(asset_id).unwrap();
-        l.check_invariant().unwrap();
-        assert_eq!(l.canonical_supply, 10_000);
-        // EVM leg should have received both transfers (pending cleared).
-        assert_eq!(l.pending_supply, 0);
+        let (batch_start, _batch_size, used_count) =
+            Router::nonce_batch_allocation(DomainId::X3Native, sender.clone())
+                .expect("nonce allocation exists");
+        let nonce1 = batch_start.saturating_add((used_count.saturating_sub(1)) as u128);
+        assert!(nonce1 > nonce0, "served nonce must be strictly increasing");
+
+        // The second transfer is in-flight, so pending supply should reflect it
+        // until the destination leg is completed.
+        let pending = Ledger::ledgers(asset_id).unwrap();
+        pending.check_invariant().unwrap();
+        assert_eq!(pending.canonical_supply, 10_000);
+        assert_eq!(pending.pending_supply, 50);
+
+        let msg1 = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender,
+            recipient: alice_evm(),
+            amount: 50,
+            nonce: nonce1,
+            created_at: second_created_at,
+            expires_at: second_expires_at,
+        };
+        let id1 = x3_asset_kernel_types::derive_message_id::<u64>(&msg1);
+        assert_ok!(Router::complete_xvm_transfer(RuntimeOrigin::signed(1), id1));
+
+        // Verify supply invariant held throughout and pending cleared after completion.
+        let completed = Ledger::ledgers(asset_id).unwrap();
+        completed.check_invariant().unwrap();
+        assert_eq!(completed.canonical_supply, 10_000);
+        assert_eq!(completed.pending_supply, 0);
     });
 }
 
@@ -1743,6 +1793,150 @@ fn six_internal_routes_strict_invariants_and_replay_guards() {
 #[test]
 fn signed_user_cannot_spoof_vm_adapter() {
     signed_user_cannot_spoof_vm_origin();
+}
+
+#[test]
+fn unsigned_origin_cannot_use_x3_lang_router_entrypoints() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::none(),
+                asset_id,
+                DomainId::X3Evm,
+                alice_evm(),
+                10,
+                System::block_number() + 50,
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+
+        assert_noop!(
+            Router::xvm_transfer_from_vm(
+                RuntimeOrigin::none(),
+                asset_id,
+                DomainId::X3Evm,
+                alice_evm(),
+                DomainId::X3Native,
+                alice_native(),
+                10,
+                System::block_number() + 50,
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+
+        let (message_id, _, _, expires_at) =
+            initiate_transfer_and_id(asset_id, DomainId::X3Native, DomainId::X3Evm, 10);
+
+        assert_noop!(
+            Router::complete_xvm_transfer(RuntimeOrigin::none(), message_id),
+            sp_runtime::DispatchError::BadOrigin
+        );
+
+        System::set_block_number(expires_at + 1);
+        assert_noop!(
+            Router::cancel_expired_xvm_transfer(RuntimeOrigin::none(), message_id),
+            sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+#[test]
+fn compiled_x3_lang_gateway_path_routes_and_rejects_direct_unsigned() {
+    let source = r#"
+        fn main() {
+            xvm_transfer("x3evm", "alice_evm", 10, 50);
+        }
+    "#;
+    let lowered = x3_compiler::lower_gateway_call(source).expect("x3-lang gateway call lowers");
+
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::none(),
+                asset_id,
+                DomainId::X3Evm,
+                alice_evm(),
+                10,
+                System::block_number() + 50,
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+
+        let x3_compiler::GatewayRuntimeCall::RouterXvmTransfer {
+            destination,
+            recipient,
+            amount,
+            expires_in,
+        } = lowered;
+        let destination = domain_from_x3_lang(&destination).expect("supported destination");
+        let recipient = account_from_x3_lang(&recipient).expect("supported recipient");
+        let amount = amount as u128;
+        let expires_at = System::block_number() + expires_in;
+
+        let call = RuntimeCall::Router(pallet_x3_cross_vm_router::Call::<Test>::xvm_transfer {
+            asset_id,
+            destination,
+            recipient: recipient.clone(),
+            amount,
+            expires_at,
+        });
+        assert_ok!(call.dispatch(RuntimeOrigin::signed(1)));
+
+        let (batch_start, _batch_size, used_count) =
+            Router::nonce_batch_allocation(DomainId::X3Native, alice_native())
+                .expect("nonce allocation exists");
+        let nonce = batch_start.saturating_add((used_count.saturating_sub(1)) as u128);
+        let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
+            version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
+            asset_id,
+            source_domain: DomainId::X3Native,
+            destination_domain: destination,
+            sender: alice_native(),
+            recipient,
+            amount,
+            nonce,
+            created_at: System::block_number(),
+            expires_at,
+        };
+        let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+        assert_ok!(Router::complete_xvm_transfer(
+            RuntimeOrigin::signed(1),
+            message_id
+        ));
+
+        let transfer = pallet_x3_cross_vm_router::Transfers::<Test>::get(message_id)
+            .expect("gateway-routed transfer is recorded");
+        assert_eq!(
+            transfer.status,
+            x3_asset_kernel_types::TransferStatus::Finalized
+        );
+
+        let ledger = Ledger::ledgers(asset_id).expect("ledger exists");
+        ledger.check_invariant().unwrap();
+        assert_eq!(ledger.pending_supply, 0);
+    });
+}
+
+fn domain_from_x3_lang(value: &str) -> Option<DomainId> {
+    match value {
+        "x3native" => Some(DomainId::X3Native),
+        "x3evm" => Some(DomainId::X3Evm),
+        "x3svm" => Some(DomainId::X3Svm),
+        _ => None,
+    }
+}
+
+fn account_from_x3_lang(value: &str) -> Option<AccountBytes> {
+    match value {
+        "alice_native" => Some(alice_native()),
+        "alice_evm" => Some(alice_evm()),
+        "alice_svm" => Some(alice_svm()),
+        _ => None,
+    }
 }
 
 #[test]

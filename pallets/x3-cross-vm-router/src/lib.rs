@@ -340,6 +340,15 @@ pub mod pallet {
         /// Origin for verified VM adapter calls (EVM/SVM).
         /// This ensures only properly authenticated VM execution can initiate cross-VM transfers.
         type VmAdapterOrigin: frame_support::traits::EnsureOrigin<Self::RuntimeOrigin>;
+        /// Origin allowed to use cross-VM execution features.
+        ///
+        /// Production runtimes should wire this to the x3-lang gateway account.
+        /// That forces users and tooling through the x3-lang compiler/runtime
+        /// instead of calling router extrinsics directly.
+        type X3LangOrigin: frame_support::traits::EnsureOrigin<
+            Self::RuntimeOrigin,
+            Success = Self::AccountId,
+        >;
         /// Read-only economic halt gate used to block new transfer initiation.
         type EconomicHalt: EconomicHaltInspect;
 
@@ -548,8 +557,8 @@ pub mod pallet {
             amount: Balance,
             expires_at: BlockNumberFor<T>,
         ) -> DispatchResult {
-            // Ensure origin is signed
-            let who = ensure_signed(origin)?;
+            // Cross-VM feature access must flow through the x3-lang gateway.
+            let who = T::X3LangOrigin::ensure_origin(origin)?;
 
             // Source is always X3Native for this extrinsic
             let source = DomainId::X3Native;
@@ -589,8 +598,9 @@ pub mod pallet {
             amount: Balance,
             expires_at: BlockNumberFor<T>,
         ) -> DispatchResult {
-            // Ensure origin is from verified VM adapter
-            T::VmAdapterOrigin::ensure_origin(origin)?;
+            // Ensure origin is from verified VM adapter and the x3-lang gateway.
+            T::VmAdapterOrigin::ensure_origin(origin.clone())?;
+            let _x3_lang_gateway = T::X3LangOrigin::ensure_origin(origin)?;
 
             // Source must be X3Evm or X3Svm (VM adapter calls only)
             ensure!(
@@ -621,7 +631,7 @@ pub mod pallet {
         #[pallet::call_index(2)]
         #[pallet::weight(Weight::from_parts(30_000, 0))]
         pub fn complete_xvm_transfer(origin: OriginFor<T>, message_id: H256) -> DispatchResult {
-            let _who = ensure_signed(origin)?;
+            let _x3_lang_gateway = T::X3LangOrigin::ensure_origin(origin)?;
             Self::do_complete_transfer(message_id)
         }
 
@@ -635,7 +645,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             message_id: H256,
         ) -> DispatchResult {
-            let _who = ensure_signed(origin)?;
+            let _x3_lang_gateway = T::X3LangOrigin::ensure_origin(origin)?;
             Self::do_cancel_expired(message_id)
         }
 
@@ -917,15 +927,17 @@ pub mod pallet {
                 // The accumulator auto-resets when the epoch advances — no periodic
                 // cleanup job required. Limit = `Balance::MAX` disables the cap.
                 let blocks_per_day = T::BlocksPerDay::get() as u64;
-                let epoch_day: u32 =
-                    (now.saturated_into::<u64>() / blocks_per_day.max(1)) as u32;
+                let epoch_day: u32 = (now.saturated_into::<u64>() / blocks_per_day.max(1)) as u32;
 
                 if route.limits.daily_limit < Balance::MAX {
                     let (stored_day, stored_vol) =
                         DailyVolume::<T>::get(asset_id, (source, destination))
                             .unwrap_or((epoch_day, 0));
-                    let current_vol =
-                        if stored_day == epoch_day { stored_vol } else { 0u128 };
+                    let current_vol = if stored_day == epoch_day {
+                        stored_vol
+                    } else {
+                        0u128
+                    };
                     ensure!(
                         current_vol.saturating_add(amount) <= route.limits.daily_limit,
                         Error::<T>::DailyVolumeLimitExceeded
@@ -936,8 +948,11 @@ pub mod pallet {
                     let (stored_day, stored_vol) =
                         WalletDailyVolume::<T>::get(sender.clone(), asset_id)
                             .unwrap_or((epoch_day, 0));
-                    let current_vol =
-                        if stored_day == epoch_day { stored_vol } else { 0u128 };
+                    let current_vol = if stored_day == epoch_day {
+                        stored_vol
+                    } else {
+                        0u128
+                    };
                     ensure!(
                         current_vol.saturating_add(amount) <= route.limits.per_wallet_daily_limit,
                         Error::<T>::WalletDailyVolumeLimitExceeded
@@ -1021,22 +1036,14 @@ pub mod pallet {
                         .and_then(|(d, v)| if d == epoch_day { Some(v) } else { None })
                         .unwrap_or(0u128)
                         .saturating_add(amount);
-                    DailyVolume::<T>::insert(
-                        asset_id,
-                        (source, destination),
-                        (epoch_day, new_vol),
-                    );
+                    DailyVolume::<T>::insert(asset_id, (source, destination), (epoch_day, new_vol));
                 }
                 if route.limits.per_wallet_daily_limit < Balance::MAX {
                     let new_vol = WalletDailyVolume::<T>::get(sender.clone(), asset_id)
                         .and_then(|(d, v)| if d == epoch_day { Some(v) } else { None })
                         .unwrap_or(0u128)
                         .saturating_add(amount);
-                    WalletDailyVolume::<T>::insert(
-                        sender.clone(),
-                        asset_id,
-                        (epoch_day, new_vol),
-                    );
+                    WalletDailyVolume::<T>::insert(sender.clone(), asset_id, (epoch_day, new_vol));
                 }
 
                 // ── Persist + mark used ───────────────────────────────────────

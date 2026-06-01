@@ -18,6 +18,8 @@ pub struct DAPSession {
     pub state: ExecutionState,
     /// Stack frames for current thread
     pub stack_frames: Vec<StackFrame>,
+    /// Last VM-provided frame snapshot.
+    pub vm_state_snapshot: Option<Vec<StackFrame>>,
 }
 
 /// Thread information
@@ -117,12 +119,19 @@ impl DAPServer {
                 breakpoints: HashMap::new(),
                 state: ExecutionState::Initialized,
                 stack_frames: Vec::new(),
+                vm_state_snapshot: None,
             },
             next_session_id: 1,
             next_thread_id: 1,
             next_frame_id: 1,
             next_var_id: 1,
         }
+    }
+
+    /// Attach a VM-provided stack snapshot for DAP reads.
+    pub fn attach_vm_snapshot(&mut self, frames: Vec<StackFrame>) {
+        self.session.stack_frames = frames.clone();
+        self.session.vm_state_snapshot = Some(frames);
     }
 
     /// Initialize a new debug session
@@ -204,31 +213,11 @@ impl DAPServer {
             .get(&thread_id)
             .ok_or("Thread not found")?;
 
-        // Build mock stack
-        let frames = vec![StackFrame {
-            frame_id: self.next_frame_id,
-            name: "validate_block()".to_string(),
-            source: "validator.rs".to_string(),
-            line: 150,
-            column: 0,
-            variables: vec![
-                Variable {
-                    name: "block_hash".to_string(),
-                    value: "0xabcd...".to_string(),
-                    ty: "[u8; 32]".to_string(),
-                    reference: 0,
-                },
-                Variable {
-                    name: "validator_id".to_string(),
-                    value: "42".to_string(),
-                    ty: "u32".to_string(),
-                    reference: 0,
-                },
-            ],
-        }];
-        self.next_frame_id += 1;
-
-        Ok(frames)
+        self.session
+            .vm_state_snapshot
+            .clone()
+            .filter(|frames| !frames.is_empty())
+            .ok_or_else(|| "No VM stack snapshot attached".to_string())
     }
 
     /// Get variables in a stack frame
@@ -239,21 +228,7 @@ impl DAPServer {
             }
         }
 
-        // Return locals from mock frame
-        Ok(vec![
-            Variable {
-                name: "x".to_string(),
-                value: "100".to_string(),
-                ty: "i32".to_string(),
-                reference: 0,
-            },
-            Variable {
-                name: "y".to_string(),
-                value: "200".to_string(),
-                ty: "i32".to_string(),
-                reference: 0,
-            },
-        ])
+        Err(format!("Frame {frame_id} not found"))
     }
 
     /// Evaluate expression (limited support)
@@ -411,10 +386,47 @@ mod tests {
     fn test_get_stack_trace() {
         let mut server = DAPServer::new();
         let tid = server.register_thread("main");
+        server.attach_vm_snapshot(vec![StackFrame {
+            frame_id: 7,
+            name: "entry".to_string(),
+            source: "contract.x3".to_string(),
+            line: 12,
+            column: 0,
+            variables: vec![Variable {
+                name: "r0".to_string(),
+                value: "42".to_string(),
+                ty: "i64".to_string(),
+                reference: 0,
+            }],
+        }]);
 
         let frames = server.get_stack_trace(tid);
         assert!(frames.is_ok());
-        assert!(!frames.unwrap().is_empty());
+        let frames = frames.unwrap();
+        assert_eq!(frames[0].name, "entry");
+        assert_eq!(frames[0].source, "contract.x3");
+    }
+
+    #[test]
+    fn test_get_variables_from_attached_snapshot() {
+        let mut server = DAPServer::new();
+        server.attach_vm_snapshot(vec![StackFrame {
+            frame_id: 11,
+            name: "entry".to_string(),
+            source: "contract.x3".to_string(),
+            line: 1,
+            column: 0,
+            variables: vec![Variable {
+                name: "r0".to_string(),
+                value: "99".to_string(),
+                ty: "i64".to_string(),
+                reference: 0,
+            }],
+        }]);
+
+        let vars = server.get_variables(11).unwrap();
+        assert_eq!(vars[0].name, "r0");
+        assert!(server.get_variables(999).is_err());
     }
 
     #[test]

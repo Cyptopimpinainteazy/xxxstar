@@ -4,8 +4,6 @@
 //! each other's memory directly — all cross-contract communication goes through
 //! the hostcall interface.
 
-use std::collections::BTreeMap;
-
 /// Contract execution context — isolated per call frame.
 pub struct IsolationContext {
     /// Contract address owning this context.

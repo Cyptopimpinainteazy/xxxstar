@@ -200,15 +200,11 @@ pub enum IntentCompileError {
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum IntentValidationError {
     /// Attempted to transition an intent that is already in a terminal state.
-    #[error(
-        "Intent is already in terminal state '{state:?}'. No further transitions are valid."
-    )]
+    #[error("Intent is already in terminal state '{state:?}'. No further transitions are valid.")]
     AlreadyTerminal { state: CrossChainIntentState },
 
     /// The requested state transition is not valid from the current state.
-    #[error(
-        "Invalid intent state transition: {from:?} → {to:?}."
-    )]
+    #[error("Invalid intent state transition: {from:?} → {to:?}.")]
     InvalidTransition {
         from: CrossChainIntentState,
         to: CrossChainIntentState,

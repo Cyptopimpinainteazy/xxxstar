@@ -110,6 +110,7 @@ pub mod pallet {
         pallet_prelude::*,
         traits::{Currency, ReservableCurrency, StorageVersion, UnixTime},
     };
+    use frame_system::offchain::SubmitTransaction;
     use frame_system::pallet_prelude::*;
     use sp_core::{ed25519, ConstU32, H256};
     use sp_io::hashing::blake2_256;
@@ -135,7 +136,9 @@ pub mod pallet {
     pub struct Pallet<T>(_);
 
     #[pallet::config]
-    pub trait Config: frame_system::Config + pallet_x3_kernel::Config {
+    pub trait Config:
+        frame_system::Config + pallet_x3_kernel::Config + pallet_x3_atomic_kernel::Config
+    {
         /// The overarching event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -761,8 +764,9 @@ pub mod pallet {
         /// 2. Settlement proofs have been collected
         /// 3. Intent is ready to move to Finalized state
         ///
-        /// This OCW then submits `finalize_with_settlement` to the kernel via
-        /// `sp_io::offchain::submit_unsigned_transaction` for deterministic finalization.
+        /// This OCW then submits `submit_finalization_result` to the atomic kernel via
+        /// `SubmitTransaction::submit_transaction` for deterministic finalization.
+        /// The marker is only cleared on successful submission to prevent data loss.
         fn offchain_worker(now: BlockNumberFor<T>) {
             log::debug!(
                 target: "x3-settlement-engine",
@@ -770,33 +774,83 @@ pub mod pallet {
                 now
             );
 
-            // P1b FIX: Fail at compile time on mainnet until this stub is
-            // replaced with the full Phase 1c OCW implementation.
-            //
-            // Phase 1c implementation plan:
-            //   1. Iterate PendingIntents for intents in `Finalized` state.
-            //   2. Read off-chain storage key:
-            //        `b"x3settle:" || intent_id (32 bytes)` = 96-byte marker
-            //        layout: bundle_id(32) || receipt_root(32) || finality_cert(32)
-            //   3. Extract bundle_id, receipt_root, finality_cert.
-            //   4. Submit unsigned tx:
-            //        atomic-kernel::finalize_with_settlement(bundle_id,
-            //            receipt_root, finality_cert, current_block)
-            //
-            // Remove this compile_error once Phase 1c is complete.
-            #[cfg(not(any(feature = "dev", feature = "testnet")))]
-            compile_error!(
-                "x3-settlement-engine: OCW is a testnet stub. \
-                 Implement Phase 1c before mainnet deployment \
-                 (see offchain_worker comments for the plan)."
-            );
+            const MAX_MARKERS_PER_BLOCK: usize = 20;
 
-            #[cfg(any(feature = "dev", feature = "testnet"))]
-            log::info!(
-                target: "x3-settlement-engine",
-                "[OCW] Settlement finalization hook active at block {:?} (testnet stub — Phase 1c pending)",
-                now
-            );
+            for (intent_id, intent) in SettlementIntents::<T>::iter().take(MAX_MARKERS_PER_BLOCK) {
+                if !matches!(IntentStates::<T>::get(intent_id), IntentState::Finalized) {
+                    continue;
+                }
+
+                let mut key = b"x3settle:".to_vec();
+                key.extend_from_slice(intent_id.as_bytes());
+
+                let marker = match sp_io::offchain::local_storage_get(
+                    sp_runtime::offchain::StorageKind::PERSISTENT,
+                    &key,
+                ) {
+                    Some(bytes) => bytes,
+                    None => continue,
+                };
+
+                let Some((bundle_id, receipt_root, finality_cert)) =
+                    Self::decode_settlement_finalization_marker(&marker)
+                else {
+                    log::warn!(
+                        target: "x3-settlement-engine",
+                        "[OCW] intent {:?}: malformed settlement marker ({} bytes)",
+                        intent_id,
+                        marker.len()
+                    );
+                    continue;
+                };
+
+                if bundle_id == H256::zero()
+                    || receipt_root == H256::zero()
+                    || finality_cert == H256::zero()
+                {
+                    log::warn!(
+                        target: "x3-settlement-engine",
+                        "[OCW] intent {:?}: refusing incomplete finalization marker",
+                        intent_id
+                    );
+                    continue;
+                }
+
+                // Submit unsigned transaction to the atomic kernel for bundle finalization.
+                // Uses the `submit_finalization_result` extrinsic which validates the bundle
+                // via `ValidateUnsigned` and calls `do_finalize_bundle`.
+                let atomic_call = pallet_x3_atomic_kernel::Call::<T>::submit_finalization_result {
+                    bundle_id,
+                    receipt_root,
+                    finality_cert,
+                    committed_at_ns: 0u64, // Audit-only field; settlement engine has no GPU timestamp
+                };
+
+                match SubmitTransaction::<T, pallet_x3_atomic_kernel::Call<T>>::submit_transaction(
+                    T::create_bare(atomic_call.into()),
+                ) {
+                    Ok(()) => {
+                        // Only clear the marker on successful submission to prevent data loss.
+                        sp_io::offchain::local_storage_clear(
+                            sp_runtime::offchain::StorageKind::PERSISTENT,
+                            &key,
+                        );
+                        log::info!(
+                            target: "x3-settlement-engine",
+                            "[OCW] submitted finalization for intent {:?} (maker={:?}, bundle={:?}, receipt_root={:?}, finality_cert={:?})",
+                            intent_id, intent.maker, bundle_id, receipt_root, finality_cert
+                        );
+                    }
+                    Err(()) => {
+                        // Do NOT clear the marker — retry next block.
+                        log::error!(
+                            target: "x3-settlement-engine",
+                            "[OCW] failed to submit finalization tx for intent {:?}; will retry next block",
+                            intent_id
+                        );
+                    }
+                }
+            }
         }
 
         /// ISSUE #5 FIX: Settlement Finality Timeout Checker
@@ -2112,6 +2166,18 @@ pub mod pallet {
             }
 
             Ok(())
+        }
+
+        pub fn decode_settlement_finalization_marker(bytes: &[u8]) -> Option<(H256, H256, H256)> {
+            if bytes.len() != 96 {
+                return None;
+            }
+
+            Some((
+                H256::from_slice(&bytes[0..32]),
+                H256::from_slice(&bytes[32..64]),
+                H256::from_slice(&bytes[64..96]),
+            ))
         }
 
         /// Finalize settlement (ALL legs complete)

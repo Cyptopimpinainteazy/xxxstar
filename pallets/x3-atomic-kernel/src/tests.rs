@@ -1,6 +1,7 @@
 //! Tests for pallet-x3-atomic-kernel
 
 use super::proof::*;
+use super::vm_revert::*;
 use sp_core::H256;
 
 // ── Simple unit tests (no FRAME mock needed) ────────────────────────────────
@@ -578,4 +579,93 @@ fn test_s0_005_t12_proof_hash_determinism_for_atomicity() {
         proof3.proof_hash(),
         "Different proofs must have different hashes to prevent rollback confusion"
     );
+}
+
+// ── VM Revert Infrastructure Tests ──────────────────────────────────────────
+
+#[test]
+fn test_state_diff_empty_check() {
+    let empty = StateDiff::from(Vec::new());
+    assert!(empty.is_empty());
+
+    let non_empty = StateDiff::from(vec![1, 2, 3]);
+    assert!(!non_empty.is_empty());
+}
+
+#[test]
+fn test_noop_vm_reverter_returns_no_side_effects() {
+    let diff = StateDiff::from(vec![1, 2, 3, 4]);
+    let result = NoopVmReverter::revert_leg(VmType::Evm, &diff);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), RevertOutcome::NoSideEffects);
+}
+
+#[test]
+fn test_noop_vm_reverter_works_for_all_vm_types() {
+    let diff = StateDiff::from(vec![0xAA; 64]);
+    assert_eq!(
+        NoopVmReverter::revert_leg(VmType::Evm, &diff).unwrap(),
+        RevertOutcome::NoSideEffects
+    );
+    assert_eq!(
+        NoopVmReverter::revert_leg(VmType::Svm, &diff).unwrap(),
+        RevertOutcome::NoSideEffects
+    );
+    assert_eq!(
+        NoopVmReverter::revert_leg(VmType::X3, &diff).unwrap(),
+        RevertOutcome::NoSideEffects
+    );
+}
+
+#[test]
+fn test_leg_receipt_structure() {
+    let receipt = LegReceipt {
+        leg_index: 0,
+        vm_type: VmType::Evm,
+        executed: false,
+        state_diff: StateDiff::from(Vec::new()),
+    };
+    assert_eq!(receipt.leg_index, 0);
+    assert!(!receipt.executed);
+    assert!(receipt.state_diff.is_empty());
+
+    let executed_receipt = LegReceipt {
+        leg_index: 1,
+        vm_type: VmType::Svm,
+        executed: true,
+        state_diff: StateDiff::from(vec![1, 2, 3]),
+    };
+    assert!(executed_receipt.executed);
+    assert!(!executed_receipt.state_diff.is_empty());
+}
+
+#[test]
+fn test_leg_receipt_encode_decode_roundtrip() {
+    let receipt = LegReceipt {
+        leg_index: 2,
+        vm_type: VmType::X3,
+        executed: true,
+        state_diff: StateDiff::from(vec![0xDE, 0xAD, 0xBE, 0xEF]),
+    };
+    let encoded = parity_scale_codec::Encode::encode(&receipt);
+    let decoded: LegReceipt =
+        parity_scale_codec::Decode::decode(&mut &encoded[..]).expect("decode should succeed");
+    assert_eq!(decoded.leg_index, receipt.leg_index);
+    assert_eq!(decoded.vm_type, receipt.vm_type);
+    assert_eq!(decoded.executed, receipt.executed);
+    assert_eq!(decoded.state_diff, receipt.state_diff);
+}
+
+#[test]
+fn test_revert_error_variants() {
+    let err = RevertError::InvalidStateDiff;
+    let vm_err = RevertError::VmNotAvailable(VmType::Evm);
+    let fail_err = RevertError::RevertFailed {
+        reason: vec![1, 2, 3],
+    };
+
+    // Ensure variants exist and can be compared
+    assert!(matches!(err, RevertError::InvalidStateDiff));
+    assert!(matches!(vm_err, RevertError::VmNotAvailable(VmType::Evm)));
+    assert!(matches!(fail_err, RevertError::RevertFailed { .. }));
 }

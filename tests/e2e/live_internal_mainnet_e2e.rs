@@ -266,8 +266,22 @@ async fn live_bridge_proof_crypto_and_full_accounting_paths() -> TestResult {
 
     let assets = [
         ("USDC", 6u8, 12u8, 50_000_000u128, 100_000_000u128, 30u128),
-        ("SOL", 9u8, 12u8, 3_000_000_000u128, 10_000_000_000u128, 20u128),
-        ("X3", 12u8, 18u8, 1_000_000_000_000u128, 5_000_000_000_000u128, 15u128),
+        (
+            "SOL",
+            9u8,
+            12u8,
+            3_000_000_000u128,
+            10_000_000_000u128,
+            20u128,
+        ),
+        (
+            "X3",
+            12u8,
+            18u8,
+            1_000_000_000_000u128,
+            5_000_000_000_000u128,
+            15u128,
+        ),
         // This one should fail conversion and trigger slash/insurance path.
         ("BAD_DECIMAL", 6u8, 4u8, 1_234_567u128, 5_000_000u128, 0u128),
     ];
@@ -357,7 +371,10 @@ async fn live_bridge_proof_crypto_and_full_accounting_paths() -> TestResult {
         fee_engine.insurance_fund.pool_balance > 0,
         "slashing insurance pool should receive contributions from slash events"
     );
-    assert!(slash_events >= 1, "expected at least one slash event in edge paths");
+    assert!(
+        slash_events >= 1,
+        "expected at least one slash event in edge paths"
+    );
 
     Ok(())
 }

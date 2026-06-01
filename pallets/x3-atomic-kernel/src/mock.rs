@@ -8,7 +8,7 @@
 use crate as pallet_x3_atomic_kernel;
 use frame_support::{
     construct_runtime, parameter_types,
-    traits::{ConstU32, ConstU64},
+    traits::{ConstU32, ConstU64, EnsureOrigin},
 };
 use frame_system as system;
 use sp_core::H256;
@@ -123,6 +123,43 @@ where
     }
 }
 
+pub struct RootOrSignedAccount;
+impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
+    type Success = AccountId;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Root) => Ok(0),
+            Ok(system::RawOrigin::Signed(who)) => Ok(who),
+            _ => Err(o),
+        }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(ALICE))
+    }
+}
+
+/// Settlement-only origin for testing that `finalize_with_settlement`
+/// is properly gated. Only CHARLIE may call settlement paths.
+pub struct SettlementOnlyOrigin;
+impl EnsureOrigin<RuntimeOrigin> for SettlementOnlyOrigin {
+    type Success = AccountId;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Signed(who)) if who == CHARLIE => Ok(who),
+            _ => Err(o),
+        }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(CHARLIE))
+    }
+}
+
 // ── Atomic Kernel Config ──────────────────────────────────────────────────
 
 impl pallet_x3_atomic_kernel::Config for Test {
@@ -132,6 +169,9 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MaxLegsPerBundle = MaxLegsPerBundle;
     type BundleDeadlineBlocks = BundleDeadlineBlocks;
     type EconomicHalt = NoEconomicHalt;
+    type X3LangOrigin = RootOrSignedAccount;
+    type SettlementOrigin = SettlementOnlyOrigin;
+    type VmReverter = crate::vm_revert::NoopVmReverter;
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────

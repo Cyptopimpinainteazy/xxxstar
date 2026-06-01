@@ -27,11 +27,11 @@ mod bench {
                     MirBlock {
                         id: MirBlockId(0),
                         statements: vec![
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(2),
                                 rhs: MirRhs::Literal(Literal::Integer(0)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(3),
                                 rhs: MirRhs::Literal(Literal::Integer(0)),
                             },
@@ -41,7 +41,7 @@ mod bench {
                     // Loop header: i < n?
                     MirBlock {
                         id: MirBlockId(1),
-                        statements: vec![MirStatement {
+                        statements: vec![MirStatement::Assign {
                             target: MirValue(4),
                             rhs: MirRhs::Binary(BinaryOp::Less, MirValue(3), MirValue(1)),
                         }],
@@ -55,15 +55,15 @@ mod bench {
                     MirBlock {
                         id: MirBlockId(2),
                         statements: vec![
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(5),
                                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(2), MirValue(3)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(2),
                                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(5), MirValue(3)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(3),
                                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(3), MirValue(1)),
                             },
@@ -95,11 +95,11 @@ mod bench {
                     MirBlock {
                         id: MirBlockId(0),
                         statements: vec![
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(3),
                                 rhs: MirRhs::Literal(Literal::Integer(0)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(4),
                                 rhs: MirRhs::Literal(Literal::Integer(0)),
                             },
@@ -109,7 +109,7 @@ mod bench {
                     // Outer loop header
                     MirBlock {
                         id: MirBlockId(1),
-                        statements: vec![MirStatement {
+                        statements: vec![MirStatement::Assign {
                             target: MirValue(5),
                             rhs: MirRhs::Binary(BinaryOp::Less, MirValue(3), MirValue(1)),
                         }],
@@ -122,7 +122,7 @@ mod bench {
                     // Inner loop setup
                     MirBlock {
                         id: MirBlockId(2),
-                        statements: vec![MirStatement {
+                        statements: vec![MirStatement::Assign {
                             target: MirValue(4),
                             rhs: MirRhs::Literal(Literal::Integer(0)),
                         }],
@@ -131,7 +131,7 @@ mod bench {
                     // Inner loop header
                     MirBlock {
                         id: MirBlockId(3),
-                        statements: vec![MirStatement {
+                        statements: vec![MirStatement::Assign {
                             target: MirValue(6),
                             rhs: MirRhs::Binary(BinaryOp::Less, MirValue(4), MirValue(2)),
                         }],
@@ -144,7 +144,7 @@ mod bench {
                     // Inner loop body
                     MirBlock {
                         id: MirBlockId(4),
-                        statements: vec![MirStatement {
+                        statements: vec![MirStatement::Assign {
                             target: MirValue(4),
                             rhs: MirRhs::Binary(BinaryOp::Add, MirValue(4), MirValue(1)),
                         }],
@@ -153,7 +153,7 @@ mod bench {
                     // Back to outer
                     MirBlock {
                         id: MirBlockId(5),
-                        statements: vec![MirStatement {
+                        statements: vec![MirStatement::Assign {
                             target: MirValue(3),
                             rhs: MirRhs::Binary(BinaryOp::Add, MirValue(3), MirValue(1)),
                         }],
@@ -184,11 +184,11 @@ mod bench {
                     MirBlock {
                         id: MirBlockId(0),
                         statements: vec![
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(3),
                                 rhs: MirRhs::Literal(Literal::Integer(0)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(4),
                                 rhs: MirRhs::Literal(Literal::Integer(100)),
                             },
@@ -200,15 +200,15 @@ mod bench {
                         id: MirBlockId(1),
                         statements: vec![
                             // Invariant: x + y should be hoisted out
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(5),
                                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(1), MirValue(2)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(6),
                                 rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(5), MirValue(3)),
                             },
-                            MirStatement {
+                            MirStatement::Assign {
                                 target: MirValue(3),
                                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(3), MirValue(1)),
                             },

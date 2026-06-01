@@ -958,12 +958,13 @@ pub fn get_canonical_source<T: crate::pallet::Config>(
 // Wire this into `SignedExtra` *before* `AgentLawCheck` so that a halted chain
 // stops even calls that would normally be privileged.
 
-use frame_support::dispatch::{DispatchInfo, PostDispatchInfo};
+use frame_support::{
+    dispatch::PostDispatchInfo, pallet_prelude::TransactionSource, weights::Weight,
+};
 use sp_runtime::{
-    traits::Dispatchable,
-    transaction_validity::{
-        InvalidTransaction, TransactionValidity, TransactionValidityError, ValidTransaction,
-    },
+    impl_tx_ext_default,
+    traits::{DispatchInfoOf, Dispatchable, TransactionExtension, ValidateResult},
+    transaction_validity::{InvalidTransaction, ValidTransaction},
 };
 
 /// Custom `InvalidTransaction` code emitted when the chain is halted due to an
@@ -994,40 +995,35 @@ impl<T: pallet::Config + Send + Sync> sp_std::fmt::Debug for InvariantCheck<T> {
     }
 }
 
-impl<T: pallet::Config + Send + Sync> sp_runtime::traits::SignedExtension for InvariantCheck<T>
+impl<T: pallet::Config + Send + Sync> TransactionExtension<T::RuntimeCall> for InvariantCheck<T>
 where
-    T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+    T::RuntimeCall: Dispatchable<PostInfo = PostDispatchInfo>,
 {
     const IDENTIFIER: &'static str = "InvariantCheck";
-    type AccountId = T::AccountId;
-    type Call = T::RuntimeCall;
-    type AdditionalSigned = ();
+
+    type Implicit = ();
+    type Val = ();
     type Pre = ();
 
-    fn additional_signed(&self) -> Result<(), TransactionValidityError> {
-        Ok(())
+    fn weight(&self, _call: &T::RuntimeCall) -> Weight {
+        Weight::zero()
     }
 
     fn validate(
         &self,
-        _who: &Self::AccountId,
-        _call: &Self::Call,
-        _info: &DispatchInfo,
+        origin: <T::RuntimeCall as Dispatchable>::RuntimeOrigin,
+        _call: &T::RuntimeCall,
+        _info: &DispatchInfoOf<T::RuntimeCall>,
         _len: usize,
-    ) -> TransactionValidity {
+        _self_implicit: Self::Implicit,
+        _inherited_implication: &impl Encode,
+        _source: TransactionSource,
+    ) -> ValidateResult<Self::Val, T::RuntimeCall> {
         if pallet::Halted::<T>::get() {
             return Err(InvalidTransaction::Custom(INVARIANT_HALT_CODE).into());
         }
-        Ok(ValidTransaction::default())
+        Ok((ValidTransaction::default(), (), origin))
     }
 
-    fn pre_dispatch(
-        self,
-        who: &Self::AccountId,
-        call: &Self::Call,
-        info: &DispatchInfo,
-        len: usize,
-    ) -> Result<(), TransactionValidityError> {
-        self.validate(who, call, info, len).map(|_| ())
-    }
+    impl_tx_ext_default!(T::RuntimeCall; prepare);
 }

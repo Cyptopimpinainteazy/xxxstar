@@ -24,6 +24,7 @@ fn main() {
             ))]),
             visibility: Visibility::Pub,
             is_async: false,
+            annotations: vec![],
         }),
         span,
     )]);

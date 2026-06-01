@@ -41,6 +41,8 @@ pub struct VerifyOptions {
     pub check_reachability: bool,
     /// Maximum module size in bytes.
     pub max_module_size: usize,
+    /// Reject floating-point arithmetic in consensus-sensitive contexts.
+    pub deny_float_arithmetic: bool,
 }
 
 impl Default for VerifyOptions {
@@ -50,6 +52,7 @@ impl Default for VerifyOptions {
             max_gas_per_function: MAX_GAS_BUDGET,
             check_reachability: true,
             max_module_size: 16 * 1024 * 1024, // 16 MB
+            deny_float_arithmetic: false,
         }
     }
 }
@@ -62,6 +65,7 @@ impl VerifyOptions {
             max_gas_per_function: 10_000_000, // 10M gas per function
             check_reachability: true,
             max_module_size: 1024 * 1024, // 1 MB
+            deny_float_arithmetic: true,
         }
     }
 }
@@ -142,6 +146,10 @@ impl Verifier {
         // 9. On-chain restrictions
         if options.on_chain {
             Self::verify_on_chain_restrictions(&instrs)?;
+        }
+
+        if options.deny_float_arithmetic {
+            Self::verify_float_determinism(&instrs)?;
         }
 
         Ok(())
@@ -888,6 +896,23 @@ impl Verifier {
 
         Ok(())
     }
+
+    /// Verify that platform-dependent floating-point arithmetic is not used.
+    fn verify_float_determinism(instrs: &[DecodedInstr]) -> VerifierResult<()> {
+        for instr in instrs {
+            match Opcode::from_byte(instr.opcode) {
+                Some(Opcode::AddF | Opcode::SubF | Opcode::MulF | Opcode::DivF | Opcode::ModF) => {
+                    return Err(VerifierError::new(
+                        VerifierErrorKind::ForbiddenOnChain(instr.opcode),
+                        instr.offset,
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Get gas cost for an opcode.
@@ -1140,6 +1165,23 @@ mod tests {
         assert!(matches!(
             result.unwrap_err().kind,
             VerifierErrorKind::ForbiddenOnChain(_)
+        ));
+    }
+
+    #[test]
+    fn verify_float_arithmetic_forbidden_on_chain() {
+        let module = make_simple_module(vec![
+            Opcode::AddF.to_byte(),
+            0x00,
+            0x01,
+            0x02,
+            Opcode::Halt.to_byte(),
+        ]);
+
+        let result = Verifier::verify_module(&module, &VerifyOptions::on_chain());
+        assert!(matches!(
+            result.unwrap_err().kind,
+            VerifierErrorKind::ForbiddenOnChain(op) if op == Opcode::AddF.to_byte()
         ));
     }
 

@@ -16,7 +16,6 @@ mkdir -p "$LOG_DIR"
 # ── Flags (overridable by environment) ─────────────────────────────────────
 CHAIN="${CHAIN:-dev}"
 RPC_PORT="${RPC_PORT:-9933}"
-WS_PORT="${WS_PORT:-9944}"
 METRICS_PORT="${METRICS_PORT:-9616}"
 ALLOW_MOCK="${ALLOW_MOCK:-false}"
 
@@ -25,7 +24,6 @@ echo "  X3 Chain Node Launcher"
 echo "  Binary : $BINARY"
 echo "  Chain  : $CHAIN"
 echo "  RPC    : http://localhost:$RPC_PORT"
-echo "  WS     : ws://localhost:$WS_PORT"
 echo "  Metrics: http://localhost:$METRICS_PORT/metrics"
 echo "========================================================="
 echo ""
@@ -35,7 +33,6 @@ if [[ -f "$BINARY" ]]; then
     exec "$BINARY" \
         --chain="$CHAIN" \
         --rpc-port="$RPC_PORT" \
-        --ws-port="$WS_PORT" \
         --prometheus-port="$METRICS_PORT" \
         --prometheus-external \
         --rpc-cors=all \

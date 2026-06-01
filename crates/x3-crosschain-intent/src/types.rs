@@ -184,9 +184,7 @@ impl FinalityRequirement {
     /// True if the requirement is safe (at or above the chain's recommended floor).
     pub fn is_safe(&self) -> bool {
         match &self.level {
-            FinalityLevel::Confirmations(n) => {
-                *n >= self.chain.default_safe_confirmations()
-            }
+            FinalityLevel::Confirmations(n) => *n >= self.chain.default_safe_confirmations(),
             FinalityLevel::Finalized => true,
             FinalityLevel::Confirmed => {
                 // Confirmed is weaker than Finalized on Solana; safe for most flows.
@@ -217,26 +215,18 @@ pub enum ProofKind {
         confirmations: u32,
     },
     /// Merkle inclusion proof (token in block/state).
-    MerkleProof {
-        root_type: String,
-    },
+    MerkleProof { root_type: String },
     /// Light-client state proof (IBC-style).
-    LightClientProof {
-        client_id: String,
-    },
+    LightClientProof { client_id: String },
     /// Validator quorum signature (multisig bridge).
     ValidatorQuorum {
         /// Minimum fraction as basis points (e.g. 7143 = 5/7).
         threshold_bps: u32,
     },
     /// Zero-knowledge proof of execution / state transition.
-    ZkProof {
-        circuit: String,
-    },
+    ZkProof { circuit: String },
     /// Bitcoin SPV proof.
-    SpvProof {
-        confirmations: u32,
-    },
+    SpvProof { confirmations: u32 },
     /// GPU batch receipt (X3-native validator batch).
     GpuBatchReceipt,
 }
@@ -342,15 +332,9 @@ pub enum FailureAction {
     /// Return funds to the source chain in the source asset.
     RefundSource,
     /// Return as canonical X3-wrapped asset (e.g. x3.USDC.e).
-    RefundX3 {
-        asset: AssetRef,
-        to: String,
-    },
+    RefundX3 { asset: AssetRef, to: String },
     /// Return a stable asset on the destination chain.
-    RefundDestinationStable {
-        asset: AssetRef,
-        to: String,
-    },
+    RefundDestinationStable { asset: AssetRef, to: String },
     /// Rollback all completed steps if the system supports atomic rollback.
     RollbackIfPossible,
     /// Hold for manual review by the security council.

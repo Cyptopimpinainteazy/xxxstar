@@ -236,30 +236,35 @@ pub fn collect_pass_telemetry(pass_name: &str, module: &MirModule) -> PassTeleme
 }
 
 fn mir_statement_stats(stmt: &MirStatement) -> (&'static str, u64) {
-    match &stmt.rhs {
-        MirRhs::Literal(_) => ("literal", opcode_cost(BackendOpcode::LoadImm)),
-        MirRhs::Unary(op, _) => match op {
-            UnaryOp::Negate => ("unary_neg", opcode_cost(BackendOpcode::NegI)),
-            UnaryOp::Not => ("unary_not", opcode_cost(BackendOpcode::LNot)),
+    match stmt {
+        MirStatement::Assign { rhs, .. } => match rhs {
+            MirRhs::Literal(_) => ("literal", opcode_cost(BackendOpcode::LoadImm)),
+            MirRhs::Unary(op, _) => match op {
+                UnaryOp::Negate => ("unary_neg", opcode_cost(BackendOpcode::NegI)),
+                UnaryOp::Not => ("unary_not", opcode_cost(BackendOpcode::LNot)),
+            },
+            MirRhs::Binary(op, _, _) => match op {
+                BinaryOp::Add => ("binary_add", opcode_cost(BackendOpcode::AddI)),
+                BinaryOp::Sub => ("binary_sub", opcode_cost(BackendOpcode::SubI)),
+                BinaryOp::Mul | BinaryOp::Pow => ("binary_mul", opcode_cost(BackendOpcode::MulI)),
+                BinaryOp::Div => ("binary_div", opcode_cost(BackendOpcode::DivI)),
+                BinaryOp::Mod => ("binary_mod", opcode_cost(BackendOpcode::ModI)),
+                BinaryOp::Equal => ("binary_eq", opcode_cost(BackendOpcode::EqI)),
+                BinaryOp::NotEqual => ("binary_ne", opcode_cost(BackendOpcode::NeI)),
+                BinaryOp::Less => ("binary_lt", opcode_cost(BackendOpcode::LtI)),
+                BinaryOp::LessEqual => ("binary_le", opcode_cost(BackendOpcode::LeI)),
+                BinaryOp::Greater => ("binary_gt", opcode_cost(BackendOpcode::GtI)),
+                BinaryOp::GreaterEqual => ("binary_ge", opcode_cost(BackendOpcode::GeI)),
+                BinaryOp::LogicalAnd => ("binary_land", opcode_cost(BackendOpcode::LAnd)),
+                BinaryOp::LogicalOr => ("binary_lor", opcode_cost(BackendOpcode::LOr)),
+            },
+            MirRhs::Call { .. } => ("call", opcode_cost(BackendOpcode::Call)),
+            MirRhs::Load { .. } => ("load", opcode_cost(BackendOpcode::AddI)), // estimate
+            MirRhs::Store { .. } => ("store", opcode_cost(BackendOpcode::AddI)), // estimate
         },
-        MirRhs::Binary(op, _, _) => match op {
-            BinaryOp::Add => ("binary_add", opcode_cost(BackendOpcode::AddI)),
-            BinaryOp::Sub => ("binary_sub", opcode_cost(BackendOpcode::SubI)),
-            BinaryOp::Mul | BinaryOp::Pow => ("binary_mul", opcode_cost(BackendOpcode::MulI)),
-            BinaryOp::Div => ("binary_div", opcode_cost(BackendOpcode::DivI)),
-            BinaryOp::Mod => ("binary_mod", opcode_cost(BackendOpcode::ModI)),
-            BinaryOp::Equal => ("binary_eq", opcode_cost(BackendOpcode::EqI)),
-            BinaryOp::NotEqual => ("binary_ne", opcode_cost(BackendOpcode::NeI)),
-            BinaryOp::Less => ("binary_lt", opcode_cost(BackendOpcode::LtI)),
-            BinaryOp::LessEqual => ("binary_le", opcode_cost(BackendOpcode::LeI)),
-            BinaryOp::Greater => ("binary_gt", opcode_cost(BackendOpcode::GtI)),
-            BinaryOp::GreaterEqual => ("binary_ge", opcode_cost(BackendOpcode::GeI)),
-            BinaryOp::LogicalAnd => ("binary_land", opcode_cost(BackendOpcode::LAnd)),
-            BinaryOp::LogicalOr => ("binary_lor", opcode_cost(BackendOpcode::LOr)),
-        },
-        MirRhs::Call { .. } => ("call", opcode_cost(BackendOpcode::Call)),
-        MirRhs::Load { .. } => ("load", opcode_cost(BackendOpcode::AddI)), // estimate
-        MirRhs::Store { .. } => ("store", opcode_cost(BackendOpcode::AddI)), // estimate
+        // Atomic markers are optimization barriers; count them as zero-cost markers.
+        MirStatement::AtomicBegin { .. } => ("atomic_begin", 0),
+        MirStatement::AtomicEnd { .. } => ("atomic_end", 0),
     }
 }
 
@@ -340,7 +345,7 @@ mod tests {
                 entry: MirBlockId(0),
                 blocks: vec![MirBlock {
                     id: MirBlockId(0),
-                    statements: vec![MirStatement {
+                    statements: vec![MirStatement::Assign {
                         target: MirValue(1),
                         rhs: MirRhs::Literal(Literal::Integer(42)),
                     }],

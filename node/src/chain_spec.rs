@@ -256,7 +256,10 @@ fn is_zero_evm_escrow(value: &Value) -> bool {
         .and_then(|v| v.get("evmEscrow"))
         .and_then(Value::as_str)
         .map(|address| {
-            let trimmed = address.trim().trim_start_matches("0x").trim_start_matches("0X");
+            let trimmed = address
+                .trim()
+                .trim_start_matches("0x")
+                .trim_start_matches("0X");
             !trimmed.is_empty() && trimmed.chars().all(|c| c == '0')
         })
         .unwrap_or(true)
@@ -274,7 +277,10 @@ fn is_zero_svm_escrow(value: &Value) -> bool {
         return true;
     };
 
-    items.len() != 32 || !items.iter().any(|entry| entry.as_u64().unwrap_or_default() != 0)
+    items.len() != 32
+        || !items
+            .iter()
+            .any(|entry| entry.as_u64().unwrap_or_default() != 0)
 }
 
 fn validate_live_json_chain_spec_value(value: &Value) -> Result<(), String> {
@@ -282,26 +288,42 @@ fn validate_live_json_chain_spec_value(value: &Value) -> Result<(), String> {
         return Ok(());
     }
 
-    if json_array_len(value, &["genesis", "runtimeGenesis", "config", "aura", "authorities"])
-        == 0
+    if json_array_len(
+        value,
+        &["genesis", "runtimeGenesis", "config", "aura", "authorities"],
+    ) == 0
     {
         return Err("Live chain spec requires at least one Aura authority".to_string());
     }
     if json_array_len(
         value,
-        &["genesis", "runtimeGenesis", "config", "grandpa", "authorities"],
+        &[
+            "genesis",
+            "runtimeGenesis",
+            "config",
+            "grandpa",
+            "authorities",
+        ],
     ) == 0
     {
         return Err("Live chain spec requires at least one Grandpa authority".to_string());
     }
-    if json_array_len(value, &["genesis", "runtimeGenesis", "config", "council", "members"])
-        == 0
+    if json_array_len(
+        value,
+        &["genesis", "runtimeGenesis", "config", "council", "members"],
+    ) == 0
     {
         return Err("Live chain spec requires at least one council member".to_string());
     }
     if json_array_len(
         value,
-        &["genesis", "runtimeGenesis", "config", "treasury", "initialSigners"],
+        &[
+            "genesis",
+            "runtimeGenesis",
+            "config",
+            "treasury",
+            "initialSigners",
+        ],
     ) == 0
     {
         return Err("Live chain spec requires at least one treasury signer".to_string());
@@ -424,6 +446,92 @@ pub fn development_config() -> Result<ChainSpec, String> {
         .with_name("X3 Chain Development")
         .with_id("x3_chain_dev")
         .with_chain_type(ChainType::Development)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
+}
+
+/// Build a development chain spec with explicit bridge escrow storage for service tests.
+#[cfg(test)]
+pub fn development_config_with_bridge_escrows(
+    evm_escrow_addr: sp_core::H160,
+    svm_escrow_addr: [u8; 32],
+) -> Result<ChainSpec, String> {
+    let wasm_binary = require_embedded_wasm("dev")?;
+    let initial_authorities = vec![authority_keys_from_seed("Alice")?];
+    let mut endowed_accounts = vec![
+        get_account_id_from_seed::<sr25519::Public>("Alice")?,
+        get_account_id_from_seed::<sr25519::Public>("Bob")?,
+        get_account_id_from_seed::<sr25519::Public>("Charlie")?,
+        get_account_id_from_seed::<sr25519::Public>("Dave")?,
+        get_account_id_from_seed::<sr25519::Public>("Eve")?,
+        get_account_id_from_seed::<sr25519::Public>("Ferdie")?,
+    ];
+    endowed_accounts.extend(dev_evm_endowed_accounts());
+
+    let council_members = vec![get_account_id_from_seed::<sr25519::Public>("Alice")?];
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        Vec::new(),
+        evm_escrow_addr,
+        svm_escrow_addr,
+    );
+
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Development Bridge Test")
+        .with_id("x3_chain_dev_bridge_test")
+        .with_chain_type(ChainType::Development)
+        .with_protocol_id(DEFAULT_PROTOCOL_ID)
+        .with_genesis_config(
+            serde_json::to_value(genesis_config)
+                .map_err(|e| format!("Genesis serialization failed: {e}"))?,
+        )
+        .build())
+}
+
+/// Build a local two-validator chain spec with explicit bridge escrow storage for service tests.
+#[cfg(test)]
+pub fn local_two_validator_config_with_bridge_escrows(
+    evm_escrow_addr: sp_core::H160,
+    svm_escrow_addr: [u8; 32],
+) -> Result<ChainSpec, String> {
+    let wasm_binary = require_embedded_wasm("local")?;
+    let initial_authorities = vec![
+        authority_keys_from_seed("Alice")?,
+        authority_keys_from_seed("Bob")?,
+    ];
+    let mut endowed_accounts = vec![
+        get_account_id_from_seed::<sr25519::Public>("Alice")?,
+        get_account_id_from_seed::<sr25519::Public>("Bob")?,
+        get_account_id_from_seed::<sr25519::Public>("Charlie")?,
+        get_account_id_from_seed::<sr25519::Public>("Dave")?,
+        get_account_id_from_seed::<sr25519::Public>("Eve")?,
+        get_account_id_from_seed::<sr25519::Public>("Ferdie")?,
+    ];
+    endowed_accounts.extend(dev_evm_endowed_accounts());
+
+    let council_members = vec![
+        get_account_id_from_seed::<sr25519::Public>("Alice")?,
+        get_account_id_from_seed::<sr25519::Public>("Bob")?,
+    ];
+    let genesis_config = x3_chain_genesis(
+        initial_authorities,
+        endowed_accounts,
+        council_members,
+        Vec::new(),
+        evm_escrow_addr,
+        svm_escrow_addr,
+    );
+
+    Ok(ChainSpec::builder(wasm_binary, Default::default())
+        .with_name("X3 Chain Local Two-Validator Bridge Test")
+        .with_id("x3_chain_local_two_validator_bridge_test")
+        .with_chain_type(ChainType::Local)
         .with_protocol_id(DEFAULT_PROTOCOL_ID)
         .with_genesis_config(
             serde_json::to_value(genesis_config)

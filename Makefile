@@ -1,4 +1,4 @@
-.PHONY: bmad-generate-steps bmad-generate-workflows bmad-validate bmad-clean help testnet-verify frontier-rpc-smoke frontier-rpc-smoke-local x3-proof x3-proof-install
+.PHONY: bmad-generate-steps bmad-generate-workflows bmad-validate bmad-clean help testnet-verify frontier-rpc-smoke frontier-rpc-smoke-local x3-proof x3-proof-install guard test audit mainnet-check fresh-machine-check
 
 # BMAD Build Automation - Phase 1 & 2
 # Purpose: Consolidation generation and validation for steps and workflows
@@ -7,6 +7,13 @@
 #        make bmad-validate
 
 help:
+	@echo "Production Gates:"
+	@echo "  make guard                - run agent/stub/test-cheat guards"
+	@echo "  make test                 - run focused Python + Rust compiler tests"
+	@echo "  make audit                - run invariant and mainnet gate checks"
+	@echo "  make mainnet-check        - run release gate validation"
+	@echo "  make fresh-machine-check  - run fresh-machine bootstrap validation"
+	@echo ""
 	@echo "BMAD Consolidation Build Targets:"
 	@echo "  Phase 1 (Steps):"
 	@echo "    make bmad-generate-steps      - Generate .bmad/steps/ from YAML config"
@@ -17,23 +24,25 @@ help:
 	@echo "    make bmad-generate-workflows  - Generate .github/workflows/ from YAML config"
 	@echo "    make bmad-validate-workflows  - Validate generated workflow files"
 	@echo "    make bmad-clean-workflows     - Remove generated workflow files"
-	@echo ""
-	@echo "  Combined:"
-	@echo "    make bmad-generate            - Generate both steps and workflows"
-	@echo "    make bmad-validate            - Validate both steps and workflows"
-	@echo "    make bmad-clean               - Clean both steps and workflows"
-	@echo ""
-	@echo "  Testnet:"
-	@echo "    make testnet-verify           - Run peer/finality (and optional telemetry/load) checks"
-	@echo "                                   Uses TESTNET_CONFIG or docs/testnet-config/testnet-config.json"
-	@echo ""
-	@echo "  Frontier RPC:"
-	@echo "    make frontier-rpc-smoke       - Run Frontier JSON-RPC smoke checks against NODE_URL"
-	@echo "    make frontier-rpc-smoke-local - Launch a fresh local dev node, run smoke checks, then stop it"
-	@echo ""
-	@echo "  ProofForge CLI:"
-	@echo "    make x3-proof                 - Run local ProofForge CLI wrapper (usage: make x3-proof ARGS='features --strict --fail-hard')"
-	@echo "    make x3-proof-install         - Install x3-proof launcher to ~/.local/bin/x3-proof"
+
+guard:
+	@python scripts/agent_guard.py
+	@python scripts/no_stub_guard.py
+	@python scripts/test_cheat_guard.py
+
+test:
+	@pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py
+	@cargo test --manifest-path x3-lang/compiler/Cargo.toml --tests
+
+audit:
+	@python scripts/invariant_guard.py
+	@python scripts/mainnet_release_gate.py
+
+mainnet-check:
+	@python scripts/mainnet_release_gate.py
+
+fresh-machine-check:
+	@bash scripts/fresh_machine_check.sh
 
 # ============================================================================
 # PHASE 1: STEP CONSOLIDATION TARGETS
@@ -106,14 +115,6 @@ bmad-clean-workflows:
 	@echo "Removing generated workflow files..."
 	@rm -f .github/workflows/*.yml
 	@echo "✓ Workflow files cleaned"
-
-# ============================================================================
-# SWARM ORCHESTRA 
-# ============================================================================
-
-start:
-	@echo "Delegating to x3-swarm-orchestra..."
-	@$(MAKE) -C x3-swarm-orchestra start
 
 # ============================================================================
 # TESTNET VERIFICATION

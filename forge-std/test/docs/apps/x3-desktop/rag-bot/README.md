@@ -14,7 +14,8 @@ This backend provides a simple API for Retrieval-Augmented Generation (RAG) over
 3. Run the server: `npm start`
 
 ## API
-- `POST /ask` — `{ question: string }` → `{ answer: string, sources: [...] }`
+- `POST /ask` — `{ question: string, stream?: boolean, think?: boolean, thinkLevel?: number }`
+- Response includes `{ answer: string, thinking?: string, sources: [...] }`
 
 ## Configuration
 - Edit `config.js` to set docs path, Ollama model, etc.

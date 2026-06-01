@@ -88,6 +88,22 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrAny {
     }
 }
 
+pub struct RootOrSignedAccount;
+impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
+    type Success = u64;
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Root) => Ok(0),
+            Ok(system::RawOrigin::Signed(who)) => Ok(who),
+            _ => Err(o),
+        }
+    }
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(1))
+    }
+}
+
 parameter_types! {
     pub const MaxAssets: u32 = 128;
 }
@@ -111,6 +127,7 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
     type VmAdapterOrigin = RootOrAny;
+    type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
 }
 
