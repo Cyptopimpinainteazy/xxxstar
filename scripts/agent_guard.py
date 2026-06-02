@@ -39,7 +39,7 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)\bapi[_-]?key\b\s*[:=]\s*data\.get\(",
     r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*:\s*(pub\s+)?(Option<)?String",
     r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*:\s*(string|Promise|PQPrivateKey|pkcs8::PrivateKeyInfo|generatedMnemonic|mnemonic_str|Some\(|\"test-key\"|\"0x1234567890)",
-    r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*=\s*(secrets\.|ec\.generate_|Mnemonic::|PQPrivateKey\(|request\.|creds\.|localStorage\.|bytes\(|jury_authority_private_key|uint256\(keccak256|vm\.deriveKey|format!\()",
+    r"(?i)\b(private[_-]?key|mnemonic|api[_-]?key|rpc[_-]?key)\b\s*=\s*(secrets\.|ec\.generate_|Mnemonic::|PQPrivateKey\(|request\.|creds\.|CREDS_STORE\.getItem\(|localStorage\.|bytes\(|jury_authority_private_key|uint256\(keccak256|vm\.deriveKey|format!\()",
     r"(?i)\bapiKey\b\s*:\s*('sk_key_[a-z]'|'sk_owner'|'tampered_key')",
     r"(?i)\bapiKey\b\s*=\s*`sk_x3_\$\{randomBytes",
     r"(?i)\bapiKey\b\s*=\s*apiKeyValidation\.error",

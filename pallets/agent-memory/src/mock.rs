@@ -60,8 +60,9 @@ impl pallet_balances::Config for Test {
     type WeightInfo = ();
     type FreezeIdentifier = ();
     type MaxFreezes = ConstU32<0>;
-    type MaxHolds = ConstU32<0>;
     type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -103,6 +104,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             (CHARLIE, 1_000_000),
             (OPERATOR1, 100_000),
         ],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();

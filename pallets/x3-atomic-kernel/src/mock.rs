@@ -7,7 +7,7 @@
 
 use crate as pallet_x3_atomic_kernel;
 use frame_support::{
-    construct_runtime, parameter_types,
+    construct_runtime, derive_impl, parameter_types,
     traits::{ConstU32, ConstU64, EnsureOrigin},
 };
 use frame_system as system;
@@ -58,6 +58,7 @@ pub type Block = system::mocking::MockBlock<Test>;
 
 // ── System Config ─────────────────────────────────────────────────────────
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl system::Config for Test {
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
@@ -98,10 +99,10 @@ impl pallet_balances::Config for Test {
     type MaxReserves = ConstU32<50>;
     type ReserveIdentifier = [u8; 8];
     type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
     type FreezeIdentifier = ();
-    type MaxHolds = ConstU32<0>;
     type MaxFreezes = ConstU32<0>;
-    type RuntimeFreezeReason = ();
 }
 
 // ── CreateTransactionBase + CreateBare for unsigned transactions ─────────
@@ -188,6 +189,7 @@ impl Default for ExtBuilder {
                 (BOB, INITIAL_BALANCE),
                 (CHARLIE, INITIAL_BALANCE),
             ],
+        dev_accounts: None,
         }
     }
 }

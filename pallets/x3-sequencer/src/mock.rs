@@ -72,7 +72,8 @@ impl pallet_balances::Config for Test {
     type FreezeIdentifier = ();
     type MaxFreezes = ConstU32<0>;
     type RuntimeHoldReason = RuntimeHoldReason;
-    type MaxHolds = ConstU32<0>;
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -99,6 +100,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
     pallet_balances::GenesisConfig::<Test> {
         balances: vec![(1, 10_000_000), (2, 10_000_000), (3, 10_000_000)],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();
