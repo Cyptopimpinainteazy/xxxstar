@@ -53,6 +53,7 @@ impl pallet_x3_inventory::Config for Test {
     // u128 satisfies Zero + Add + Sub + PartialOrd + Default + Copy etc.
     type Balance = u128;
     type MaxLiquiditySources = MaxLiquiditySources;
+    type WeightInfo = pallet_x3_inventory::weights::SubstrateWeight<Test>;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
