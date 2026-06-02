@@ -28,6 +28,10 @@ fn advance_to(block: u64) {
     }
 }
 
+fn jump_to(block: u64) {
+    System::set_block_number(block);
+}
+
 // ── create_launch ─────────────────────────────────────────────────────────────
 
 #[test]
@@ -197,7 +201,7 @@ fn finalize_launch_successful_when_soft_cap_met() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
-        advance_to(13); // past end_block 12
+        jump_to(13); // past end_block 12 without auto-finalizing
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         let state = Launches::<Test>::get(id).unwrap();
         assert_eq!(state.status, LaunchStatus::Successful);
@@ -209,7 +213,7 @@ fn finalize_launch_failed_when_soft_cap_not_met() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 400));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         let state = Launches::<Test>::get(id).unwrap();
         assert_eq!(state.status, LaunchStatus::Failed);
@@ -234,7 +238,7 @@ fn claim_refund_on_failed_launch() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 400));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         assert_ok!(Launchpad::claim_refund(RuntimeOrigin::signed(10), id));
     });
@@ -245,7 +249,7 @@ fn claim_refund_double_claim_fails() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 400));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         assert_ok!(Launchpad::claim_refund(RuntimeOrigin::signed(10), id));
         assert_noop!(
@@ -260,7 +264,7 @@ fn claim_refund_non_contributor_fails() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 400));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         assert_noop!(
             Launchpad::claim_refund(RuntimeOrigin::signed(99), id),
@@ -276,7 +280,7 @@ fn claim_allocation_on_successful_launch() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         assert_ok!(Launchpad::claim_allocation(RuntimeOrigin::signed(10), id));
     });
@@ -287,7 +291,7 @@ fn claim_allocation_double_claim_fails() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         assert_ok!(Launchpad::claim_allocation(RuntimeOrigin::signed(10), id));
         assert_noop!(
@@ -330,7 +334,7 @@ fn withdraw_raised_funds_by_creator() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 600));
-        advance_to(13);
+        jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
         // creator was set to account 1 in create_default_launch.
         assert_ok!(Launchpad::withdraw_raised_funds(
