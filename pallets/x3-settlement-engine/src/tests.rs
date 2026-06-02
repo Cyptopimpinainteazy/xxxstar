@@ -2662,7 +2662,7 @@ mod tests {
     //   - a second complete with the same final sig is rejected (replay)
 
     use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
-    use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+    use secp256k1::{Message, PublicKey, Scalar, Secp256k1, SecretKey};
 
     fn real_adaptor_signature(
         msg: [u8; 32],
@@ -2687,13 +2687,15 @@ mod tests {
         let adaptor_point = t_pk.serialize(); // 33-byte compressed
 
         // Step 3-4: random maker keypair P.
-        let p_sk = SecretKey::from_slice(&t_bytes.wrapping_add([1u8; 32])).unwrap_or(t_sk);
+        let t_scalar = Scalar::from(t_sk);
+        let p_sk = t_sk.add_tweak(&Scalar::ONE).unwrap_or_else(|_| {
+            SecretKey::from_slice(&[2u8; 32]).expect("constant test secret key is valid")
+        });
         let p_pk = PublicKey::from_secret_key(&secp, &p_sk);
         let maker_pubkey = p_pk.serialize();
 
-        // Step 5: P' = P + T. libsecp256k1's PublicKey supports add_assign.
-        let mut adapted_pk = p_pk;
-        adapted_pk.add_assign(&secp, &t_pk).unwrap();
+        // Step 5: P' = P + T.
+        let adapted_pk = p_pk.add_exp_tweak(&secp, &t_scalar).unwrap();
         let adapted_pubkey = adapted_pk.serialize();
 
         // Step 6: pre-sign under P' (recoverable ECDSA).
@@ -2704,16 +2706,15 @@ mod tests {
 
         // Step 7: final signature. The standard adaptor-sig completion is
         //   s_final = s_pre + t  (mod n)
-        // We compute that with secp256k1::Scalar.
-        use secp256k1::Scalar;
+        // We compute that with secp256k1's secret-key tweak API, which performs
+        // the same modular scalar addition.
         // s_pre is the low 32 bytes of pre_compact (pre_compact is R||s,
         // 64 bytes; the last 32 are s).
         let mut s_pre_bytes = [0u8; 32];
         s_pre_bytes.copy_from_slice(&pre_compact[32..64]);
-        let s_pre = Scalar::from_be_bytes(s_pre_bytes).unwrap();
-        let t_scalar = Scalar::from_be_bytes(t_bytes).unwrap();
-        let s_final = s_pre + t_scalar;
-        let s_final_bytes = s_final.to_be_bytes();
+        let s_pre = SecretKey::from_slice(&s_pre_bytes).unwrap();
+        let s_final = s_pre.add_tweak(&t_scalar).unwrap();
+        let s_final_bytes = s_final.secret_bytes();
 
         // Build the final RSV: R (first 32 bytes of pre_compact) || s_final || v
         let mut rsv = [0u8; 65];
