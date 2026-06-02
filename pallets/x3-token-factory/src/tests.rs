@@ -106,6 +106,9 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
 
 parameter_types! {
     pub const MaxAssets: u32 = 128;
+    pub const RoutingFeeBps: u16 = 0;
+    pub const ProtocolTreasury: u64 = 99;
+    pub const BlocksPerDay: u32 = 14_400;
 }
 
 impl pallet_x3_asset_registry::Config for Test {
@@ -125,10 +128,14 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type Registry = Registry;
     type Ledger = Ledger;
+    type Currency = ();
     type ExternalExecutorOrigin = RootOrAny;
     type VmAdapterOrigin = RootOrAny;
     type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
+    type RoutingFeeBps = RoutingFeeBps;
+    type ProtocolTreasury = ProtocolTreasury;
+    type BlocksPerDay = BlocksPerDay;
 }
 
 impl pallet_x3_token_factory::Config for Test {
@@ -261,6 +268,7 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) {
         recipient.clone(),
         amount,
         expires_at,
+        None,
     ));
 
     let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
@@ -289,7 +297,7 @@ fn submit_xvm_expect_err(asset_id: AssetId, src: DomainId, dst: DomainId, amount
     let expires_at = now + 50;
 
     assert!(
-        Router::do_initiate_transfer(asset_id, src, dst, sender, recipient, amount, expires_at,)
+        Router::do_initiate_transfer(asset_id, src, dst, sender, recipient, amount, expires_at, None)
             .is_err(),
         "expected xvm_transfer to fail on disabled domain / route",
     );
