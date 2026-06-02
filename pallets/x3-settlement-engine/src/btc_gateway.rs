@@ -195,7 +195,16 @@ impl BtcSpvProof {
 /// R is 32 bytes, s is 32 bytes, v is the recovery id (0/1 or 27/28).
 /// Used as the canonical wire format for completed adaptor swaps.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 pub struct BtcSignature65(pub [u8; 65]);
 
@@ -206,7 +215,16 @@ pub struct BtcSignature65(pub [u8; 65]);
 /// 2. Taker can extract secret from completed signature
 /// 3. Secret revelation is atomic with BTC spend
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Debug,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 pub struct BtcAdaptorSignature {
     /// Pre-signature (incomplete until adapted)
@@ -277,7 +295,9 @@ impl BtcAdaptorSignature {
             let mut sig_rsv = [0u8; 65];
             sig_rsv[..64].copy_from_slice(&self.pre_signature);
             sig_rsv[64] = v;
-            if let Ok(recovered) = sp_io::crypto::secp256k1_ecdsa_recover_compressed(&sig_rsv, message) {
+            if let Ok(recovered) =
+                sp_io::crypto::secp256k1_ecdsa_recover_compressed(&sig_rsv, message)
+            {
                 if recovered == self.adapted_pubkey {
                     return true;
                 }
@@ -302,7 +322,11 @@ impl BtcAdaptorSignature {
             return false;
         }
         // sp_io accepts v in {0,1,27,28}; map 2/3 to 0/1 with +27.
-        let v = if recovery_id < 2 { recovery_id } else { recovery_id - 2 + 27 };
+        let v = if recovery_id < 2 {
+            recovery_id
+        } else {
+            recovery_id - 2 + 27
+        };
         let mut sig_rsv = [0u8; 65];
         sig_rsv[..64].copy_from_slice(&self.pre_signature);
         sig_rsv[64] = v;
@@ -677,16 +701,16 @@ mod tests {
     // that the recovered pubkey matches adapted_pubkey, not which point
     // it is in absolute terms.
     const ADAPTOR_TEST_MSG: [u8; 32] = [
-        0x6e, 0x29, 0x7a, 0xc9, 0xb7, 0x34, 0x78, 0x61, 0x8e, 0x39, 0xed, 0x98, 0x1e, 0xc3,
-        0x0e, 0x16, 0x15, 0x11, 0x79, 0x7c, 0xb0, 0xa7, 0xb6, 0x00, 0x8e, 0xa5, 0x9a, 0x26,
-        0xae, 0x9b, 0xbd, 0xc2,
+        0x6e, 0x29, 0x7a, 0xc9, 0xb7, 0x34, 0x78, 0x61, 0x8e, 0x39, 0xed, 0x98, 0x1e, 0xc3, 0x0e,
+        0x16, 0x15, 0x11, 0x79, 0x7c, 0xb0, 0xa7, 0xb6, 0x00, 0x8e, 0xa5, 0x9a, 0x26, 0xae, 0x9b,
+        0xbd, 0xc2,
     ];
     const ADAPTOR_TEST_PRE_SIG: [u8; 64] = [
-        0xfe, 0xa0, 0x82, 0xe3, 0x00, 0xaf, 0xaf, 0x0c, 0xe1, 0xc5, 0xfe, 0x44, 0x15, 0x1b,
-        0x4b, 0x30, 0x95, 0x06, 0xf5, 0xff, 0xdf, 0x2b, 0x31, 0xec, 0x3f, 0x3a, 0xcb, 0x1d,
-        0xd5, 0xc8, 0x68, 0xe7, 0xa6, 0xa9, 0x9f, 0x96, 0x83, 0x51, 0x44, 0x12, 0xab, 0x05,
-        0xba, 0x89, 0xf5, 0x90, 0x61, 0xb4, 0x1e, 0x9a, 0x6c, 0x43, 0xc1, 0x45, 0xa1, 0x8f,
-        0x72, 0xd4, 0xda, 0x8f, 0xad, 0x70, 0x08, 0xe0,
+        0xfe, 0xa0, 0x82, 0xe3, 0x00, 0xaf, 0xaf, 0x0c, 0xe1, 0xc5, 0xfe, 0x44, 0x15, 0x1b, 0x4b,
+        0x30, 0x95, 0x06, 0xf5, 0xff, 0xdf, 0x2b, 0x31, 0xec, 0x3f, 0x3a, 0xcb, 0x1d, 0xd5, 0xc8,
+        0x68, 0xe7, 0xa6, 0xa9, 0x9f, 0x96, 0x83, 0x51, 0x44, 0x12, 0xab, 0x05, 0xba, 0x89, 0xf5,
+        0x90, 0x61, 0xb4, 0x1e, 0x9a, 0x6c, 0x43, 0xc1, 0x45, 0xa1, 0x8f, 0x72, 0xd4, 0xda, 0x8f,
+        0xad, 0x70, 0x08, 0xe0,
     ];
     // adapted_pubkey derived from sp_io::crypto::secp256k1_ecdsa_recover_compressed
     // (recovery may differ from the coincurve prediction due to libsecp256k1
@@ -694,9 +718,9 @@ mod tests {
     // lib we used to generate the signature; what matters is internal
     // consistency between the verifier's recovery call and adapted_pubkey).
     const ADAPTOR_TEST_RECOVERED_PUB: [u8; 33] = [
-        0x02, 0x4a, 0xa5, 0xb1, 0xd8, 0x68, 0xb1, 0x1d, 0x5b, 0xcc, 0x51, 0x5d, 0xc9, 0x4f,
-        0x0f, 0xec, 0x50, 0x67, 0xa0, 0xf6, 0x7b, 0x68, 0x30, 0x99, 0x42, 0x2e, 0x09, 0xf7,
-        0x67, 0xda, 0xc3, 0x19, 0xda,
+        0x02, 0x4a, 0xa5, 0xb1, 0xd8, 0x68, 0xb1, 0x1d, 0x5b, 0xcc, 0x51, 0x5d, 0xc9, 0x4f, 0x0f,
+        0xec, 0x50, 0x67, 0xa0, 0xf6, 0x7b, 0x68, 0x30, 0x99, 0x42, 0x2e, 0x09, 0xf7, 0x67, 0xda,
+        0xc3, 0x19, 0xda,
     ];
     const ADAPTOR_TEST_RECOVERY_V: u8 = 0;
 
@@ -704,7 +728,7 @@ mod tests {
         BtcAdaptorSignature {
             pre_signature: ADAPTOR_TEST_PRE_SIG,
             adaptor_point: [0x02; 33], // T = some compressed point; unused by verify()
-            nonce: [0x02; 33],          // nonce; unused by verify() but must be valid prefix
+            nonce: [0x02; 33],         // nonce; unused by verify() but must be valid prefix
             adapted_pubkey,
         }
     }
@@ -803,7 +827,10 @@ mod tests {
         let extracted = adp.extract_secret(&completed_sig);
         assert!(extracted.is_some());
         let extracted_u = U256::from_big_endian(&extracted.unwrap());
-        assert_eq!(extracted_u, t, "extract_secret must round-trip the secret scalar");
+        assert_eq!(
+            extracted_u, t,
+            "extract_secret must round-trip the secret scalar"
+        );
     }
 
     fn u256_from_be(b: &[u8]) -> U256 {

@@ -422,7 +422,7 @@ pub mod pallet {
     pub type AdaptorSignatures<T: Config> = StorageMap<
         _,
         Blake2_128Concat,
-        H256, // intent_id
+        H256,                                            // intent_id
         (AccountIdOf<T>, BtcAdaptorSignature, [u8; 32]), // (maker, pre_sig, message_digest)
         OptionQuery,
     >;
@@ -1753,8 +1753,8 @@ pub mod pallet {
             );
 
             // Pre-signature must exist.
-            let (_maker, pre_sig, message) =
-                AdaptorSignatures::<T>::get(intent_id).ok_or(Error::<T>::AdaptorSignatureNotFound)?;
+            let (_maker, pre_sig, message) = AdaptorSignatures::<T>::get(intent_id)
+                .ok_or(Error::<T>::AdaptorSignatureNotFound)?;
 
             // Split final_sig_rsv into (R || s || v). `BtcSignature65` is
             // already 65 bytes; copy to a stack array for sp_io.
@@ -2656,9 +2656,7 @@ pub mod pallet {
         /// `proof.merkle_proof` carries the merkle path (H256 siblings).
         /// `proof.tx_hash` must equal the double-SHA256 of the tx bytes.
         /// `proof.block_hash` must equal the double-SHA256 of the block header.
-        fn verify_btc_settlement_proof(
-            proof: &SettlementProof,
-        ) -> Result<bool, DispatchError> {
+        fn verify_btc_settlement_proof(proof: &SettlementProof) -> Result<bool, DispatchError> {
             use crate::btc_gateway::BtcSpvProof;
 
             // Need at least 4 bytes for the tx_index prefix.
@@ -2666,11 +2664,8 @@ pub mod pallet {
                 return Ok(false);
             }
 
-            let tx_index = u32::from_le_bytes(
-                proof.receipt_data[0..4]
-                    .try_into()
-                    .unwrap_or([0u8; 4]),
-            );
+            let tx_index =
+                u32::from_le_bytes(proof.receipt_data[0..4].try_into().unwrap_or([0u8; 4]));
             let tail = &proof.receipt_data[4..];
 
             // SCALE-decode the BtcBlockHeader from the head of `tail`.
