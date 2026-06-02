@@ -128,28 +128,8 @@ mod tests {
     #[test]
     fn test_reputation_minimum() {
         let min_rep = 100u64;
-        let rule = PolicyRule::ReputationMinimum(min_rep);
+        let rule: PolicyRule<u64> = PolicyRule::ReputationMinimum(min_rep);
 
-        // Create test context
-        let context_pass = PolicyContext {
-            reputation_score: 150,
-            tasks_this_block: 0,
-            extrinsics_this_epoch: 0,
-            related_agents: vec![],
-            current_block: 1u32.into(),
-            last_activity_block: 0u32.into(),
-        };
-
-        let context_fail = PolicyContext {
-            reputation_score: 50,
-            tasks_this_block: 0,
-            extrinsics_this_epoch: 0,
-            related_agents: vec![],
-            current_block: 1u32.into(),
-            last_activity_block: 0u32.into(),
-        };
-
-        // Note: These would require full test setup with Config trait
-        // Skipping direct testing here; covered in pallet tests instead
+        assert!(matches!(rule, PolicyRule::ReputationMinimum(100)));
     }
 }
