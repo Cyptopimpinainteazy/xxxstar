@@ -1,9 +1,11 @@
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{traits::ConstU32, BoundedVec};
 use scale_info::TypeInfo;
 
 /// Hardware profile advertised by an executor on registration.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct HardwareProfile {
     pub cpu_cores: u32,
@@ -16,7 +18,9 @@ pub struct HardwareProfile {
 }
 
 /// Executor registration record stored in the Executors map.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExecutorRecord<Balance, BlockNumber> {
     pub stake: Balance,
@@ -28,7 +32,9 @@ pub struct ExecutorRecord<Balance, BlockNumber> {
 }
 
 /// Executor lifecycle status.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExecutorStatus {
     Active,
@@ -38,7 +44,9 @@ pub enum ExecutorStatus {
 
 /// Task record stored in the Tasks map.
 /// Hash is the runtime T::Hash type (typically sp_core::H256).
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct TaskRecord<AccountId, Balance, BlockNumber, Hash> {
     pub submitter: AccountId,
@@ -51,7 +59,9 @@ pub struct TaskRecord<AccountId, Balance, BlockNumber, Hash> {
 }
 
 /// Task lifecycle state.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum TaskStatus {
     Pending,
@@ -63,7 +73,9 @@ pub enum TaskStatus {
 }
 
 /// Reason for a slash event.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum SlashReason {
     QuorumMismatch,

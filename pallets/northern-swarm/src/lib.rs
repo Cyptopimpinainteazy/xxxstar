@@ -40,10 +40,10 @@ pub mod pallet {
     use super::*;
     use frame_support::{
         pallet_prelude::*,
-        traits::{Currency, LockableCurrency, ReservableCurrency, WithdrawReasons},
+        traits::{Currency, LockableCurrency, ReservableCurrency},
     };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::{Hash, Zero};
+    use sp_runtime::traits::{Hash, Saturating};
 
     pub type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -498,7 +498,8 @@ pub mod pallet {
             let mut record = Executors::<T>::get(&executor).ok_or(Error::<T>::NotRegistered)?;
 
             let slash = amount.min(record.stake);
-            let (slashed, _) = T::Currency::slash_reserved(&executor, slash);
+            let (_imbalance, remaining) = T::Currency::slash_reserved(&executor, slash);
+            let slashed = slash.saturating_sub(remaining);
             record.stake = record.stake.saturating_sub(slashed);
 
             if record.stake < T::MinExecutorStake::get() {
