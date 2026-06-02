@@ -4262,7 +4262,7 @@ pub fn runtime_uses_mock_vm_adapters() -> bool {
     evm.contains("MockEvmAdapter") || svm.contains("MockSvmAdapter") || x3.contains("MockX3Adapter")
 }
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(all(test, feature = "std", feature = "frontier"))]
 mod vm_adapter_tests {
     use super::*;
     use pallet_x3_kernel::{EvmExecutorAdapter, SvmExecutorAdapter, X3ExecutorAdapter};
@@ -4273,7 +4273,7 @@ mod vm_adapter_tests {
         let simple_evm_bytecode = vec![0x60, 0x00, 0x60, 0x00, 0xf3]; // PUSH1 0 PUSH1 0 RETURN
         sp_io::TestExternalities::default().execute_with(|| {
             let result =
-                native_vm_adapters::NativeEvmAdapter::execute(&simple_evm_bytecode, 100_000);
+                super::native_vm_adapters::NativeEvmAdapter::execute(&simple_evm_bytecode, 100_000);
             // Debug: print result to stderr to capture runner error details during test
             eprintln!("NativeEvmAdapter.execute result = {:?}", result);
             assert!(result.is_ok());
@@ -4292,7 +4292,7 @@ mod vm_adapter_tests {
         ];
         sp_io::TestExternalities::default().execute_with(|| {
             let result =
-                native_vm_adapters::NativeSvmAdapter::execute(&simple_bpf_program, 100_000);
+                super::native_vm_adapters::NativeSvmAdapter::execute(&simple_bpf_program, 100_000);
             assert!(result.is_ok());
             let receipt = result.unwrap();
             assert!(receipt.success);
@@ -4327,8 +4327,9 @@ mod cross_chain_proof_verifier_tests {
     use super::*;
     use codec::Encode;
     use frame_support::BoundedVec;
-    use pallet_x3_kernel::CrossChainProof;
+    use pallet_x3_kernel::{CrossChainProof, CrossChainProofVerifier};
     use sp_core::{sr25519, Pair};
+    use x3_cross_vm_bridge::CrossVmOperation;
 
     fn authority_pair() -> sr25519::Pair {
         sr25519::Pair::from_seed(&[7u8; 32])
