@@ -105,6 +105,9 @@ impl CpuValidator {
             failed_tasks: processed - *self.tasks_successful.read(),
             divergent_tasks: 0,
             cpu_fallbacks: 0,
+            accelerator_backend: "cpu".to_string(),
+            accelerator_fallbacks: 0,
+            accelerator_parity_mismatches: 0,
             avg_task_latency_ms: 0.0,
             tasks_per_second: 0.0,
         }

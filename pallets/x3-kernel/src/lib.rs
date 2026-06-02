@@ -3564,7 +3564,7 @@ pub mod pallet {
 
             let value = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
                 // Value is 0
-                offset += 1;
+                let _ = offset; // not returned; silence unused_assignments
                 0u128
             } else if raw_tx[offset] >= 0x80 && raw_tx[offset] <= 0xb7 {
                 // Short string encoding
@@ -3580,7 +3580,7 @@ pub mod pallet {
                 let dest_start = 16 - len;
                 value_bytes[dest_start..dest_start + len]
                     .copy_from_slice(&raw_tx[src_start..src_end]);
-                offset += 1 + len;
+                let _ = offset; // not returned; silence unused_assignments
                 u128::from_be_bytes(value_bytes)
             } else {
                 return Err("Invalid transaction: malformed 'value' field"
@@ -3729,7 +3729,7 @@ pub mod pallet {
             }
 
             let input = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
-                offset += 1;
+                let _ = offset; // not returned; silence unused_assignments
                 Vec::new()
             } else if raw_tx[offset] >= 0xb8 && raw_tx[offset] <= 0xbf {
                 let len = (raw_tx[offset] & 0x7f) as usize;
@@ -3739,7 +3739,7 @@ pub mod pallet {
                         .to_vec());
                 }
                 let data = raw_tx[offset + 1..offset + 1 + len].to_vec();
-                offset += 1 + len;
+                let _ = offset; // not returned; silence unused_assignments
                 data
             } else {
                 return Err("Invalid transaction: malformed 'data' field"
@@ -3770,7 +3770,7 @@ pub mod pallet {
             // Try to parse the transaction to extract from/to/value
             let (from, to, value) = match Self::parse_ethereum_transaction(&raw_tx) {
                 Ok((f, t, v)) => (f, t, v),
-                Err(e) => {
+                Err(_e) => {
                     // If parsing fails, we can still execute the transaction
                     // The adapter will populate what it can
                     (Vec::new(), Vec::new(), 0)

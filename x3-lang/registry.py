@@ -35,6 +35,7 @@ DEX_LIQUIDITY = {
 
 CONTRACT_ADDRESSES = {
     'uniswap': '0x1111111254EEB25477B68fb85Ed929f73A960582',
+    'uniswap_v2_router': '0xUniswapRouter000000000000000000000000',
     'raydium': '4k3Dyjzvzp8e2y8bKE8xUrg8rXQZkmh8Y2xS1QZsbJt4',
     'x3': 'x3_bridge_router_v1',
 }

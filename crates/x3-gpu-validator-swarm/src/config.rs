@@ -148,7 +148,7 @@ pub struct GpuConfig {
 impl Default for GpuConfig {
     fn default() -> Self {
         Self {
-            enable_cuda: true,
+            enable_cuda: false,
             enable_opencl: false,
             device_indices: vec![],
             max_memory_mb: 0,
@@ -315,4 +315,17 @@ pub struct GpuCapabilities {
 
     /// Supported operations
     pub supported_operations: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_swarm_config_bypasses_cuda() {
+        let config = SwarmConfig::default();
+
+        assert!(!config.gpu.enable_cuda);
+        assert!(config.verification.cpu_verification_enabled);
+    }
 }

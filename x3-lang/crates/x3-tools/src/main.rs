@@ -1,7 +1,6 @@
 use x3_lang_ast::ast::*;
 use x3_lang_common::Symbol;
-use x3_lang_compiler::emitter;
-use x3_lang_compiler::lowering;
+use x3_lang_compiler::compile_program;
 use x3_lang_vm::{VMConfig, VM};
 
 fn main() {

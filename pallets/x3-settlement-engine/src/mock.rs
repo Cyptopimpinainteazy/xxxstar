@@ -3,7 +3,7 @@
 use crate as pallet_x3_settlement_engine;
 use frame_support::{
     derive_impl, parameter_types,
-    traits::{ConstBool, ConstU32, ConstU64},
+    traits::{ConstBool, ConstU32, ConstU64, EnsureOrigin},
 };
 use frame_system::EnsureRoot;
 use sp_core::{H160, H256};
@@ -11,13 +11,32 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
+use x3_asset_kernel_types::traits::NoEconomicHalt;
+
+pub type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+pub type Block = frame_system::mocking::MockBlock<Test>;
+
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Test
+where
+    RuntimeCall: From<LocalCall>,
+{
+    type RuntimeCall = RuntimeCall;
+    type Extrinsic = UncheckedExtrinsic;
+}
+
+impl<LocalCall> frame_system::offchain::CreateBare<LocalCall> for Test
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_bare(call: RuntimeCall) -> UncheckedExtrinsic {
+        UncheckedExtrinsic::new_bare(call)
+    }
+}
 
 pub struct TestEmergencyHaltController;
 impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {}
 }
-
-type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
     pub enum Test {
@@ -25,6 +44,7 @@ frame_support::construct_runtime!(
         Balances: pallet_balances,
         AtlasKernel: pallet_x3_kernel,
         Timestamp: pallet_timestamp,
+        AtomicKernel: pallet_x3_atomic_kernel,
         X3SettlementEngine: pallet_x3_settlement_engine,
     }
 );
@@ -86,6 +106,34 @@ parameter_types! {
     pub const MockBridgeSvmEscrow: [u8; 32] = [0x00; 32];
     pub const SettlementFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 99;
+    pub const AtomicMinBond: u128 = 1_000;
+    pub const AtomicMaxLegsPerBundle: u32 = 16;
+    pub const AtomicBundleDeadlineBlocks: u64 = 100;
+}
+
+pub struct RootOrSignedAccount;
+impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
+    type Success = u64;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(frame_system::RawOrigin::Root) => Ok(0),
+            Ok(frame_system::RawOrigin::Signed(who)) => Ok(who),
+            _ => Err(o),
+        }
+    }
+}
+
+pub struct RootOnlySettlement;
+impl EnsureOrigin<RuntimeOrigin> for RootOnlySettlement {
+    type Success = ();
+
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(frame_system::RawOrigin::Root) => Ok(()),
+            _ => Err(o),
+        }
+    }
 }
 
 impl pallet_x3_kernel::Config for Test {
@@ -120,6 +168,18 @@ impl pallet_x3_kernel::Config for Test {
     type BridgeSvmEscrow = MockBridgeSvmEscrow;
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type EmergencyHaltController = TestEmergencyHaltController;
+}
+
+impl pallet_x3_atomic_kernel::Config for Test {
+    type Currency = Balances;
+    type WeightInfo = ();
+    type MinBond = AtomicMinBond;
+    type MaxLegsPerBundle = AtomicMaxLegsPerBundle;
+    type BundleDeadlineBlocks = AtomicBundleDeadlineBlocks;
+    type EconomicHalt = NoEconomicHalt;
+    type X3LangOrigin = RootOrSignedAccount;
+    type SettlementOrigin = RootOnlySettlement;
+    type VmReverter = pallet_x3_atomic_kernel::vm_revert::NoopVmReverter;
 }
 
 impl pallet_x3_settlement_engine::Config for Test {
@@ -157,6 +217,9 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
     .unwrap();
 
     let mut ext = sp_io::TestExternalities::new(t);
-    ext.execute_with(|| System::set_block_number(1));
+    ext.execute_with(|| {
+        System::set_block_number(1);
+        Timestamp::set_timestamp(1_000);
+    });
     ext
 }

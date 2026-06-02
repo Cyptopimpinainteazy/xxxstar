@@ -1871,9 +1871,12 @@ fn compiled_x3_lang_gateway_path_routes_and_rejects_direct_unsigned() {
             recipient,
             amount,
             expires_in,
-        } = lowered;
-        let destination = domain_from_x3_lang(&destination).expect("supported destination");
-        let recipient = account_from_x3_lang(&recipient).expect("supported recipient");
+        } = lowered
+        else {
+            panic!("expected xvm_transfer gateway call");
+        };
+        let destination = domain_from_gateway(destination);
+        let recipient = account_from_gateway(recipient).expect("supported mock account");
         let amount = amount as u128;
         let expires_at = System::block_number() + expires_in;
 
@@ -1921,20 +1924,21 @@ fn compiled_x3_lang_gateway_path_routes_and_rejects_direct_unsigned() {
     });
 }
 
-fn domain_from_x3_lang(value: &str) -> Option<DomainId> {
+fn domain_from_gateway(value: x3_compiler::GatewayDomain) -> DomainId {
     match value {
-        "x3native" => Some(DomainId::X3Native),
-        "x3evm" => Some(DomainId::X3Evm),
-        "x3svm" => Some(DomainId::X3Svm),
-        _ => None,
+        x3_compiler::GatewayDomain::X3Native => DomainId::X3Native,
+        x3_compiler::GatewayDomain::X3Evm => DomainId::X3Evm,
+        x3_compiler::GatewayDomain::X3Svm => DomainId::X3Svm,
     }
 }
 
-fn account_from_x3_lang(value: &str) -> Option<AccountBytes> {
+fn account_from_gateway(value: x3_compiler::GatewayAccount) -> Option<AccountBytes> {
     match value {
-        "alice_native" => Some(alice_native()),
-        "alice_evm" => Some(alice_evm()),
-        "alice_svm" => Some(alice_svm()),
+        x3_compiler::GatewayAccount::X3Native(value) if value == "alice_native" => {
+            Some(alice_native())
+        }
+        x3_compiler::GatewayAccount::Evm(value) if value == "alice_evm" => Some(alice_evm()),
+        x3_compiler::GatewayAccount::Svm(value) if value == "alice_svm" => Some(alice_svm()),
         _ => None,
     }
 }

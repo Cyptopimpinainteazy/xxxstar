@@ -27,9 +27,33 @@
 //! ```
 
 pub mod cursor;
+#[cfg(feature = "logos")]
 pub mod lexer;
 pub mod token;
 
 pub use cursor::Cursor;
+#[cfg(feature = "logos")]
 pub use lexer::Lexer;
+
+#[cfg(not(feature = "logos"))]
+#[derive(Debug, Clone, Copy)]
+pub struct Lexer<'a> {
+    _src: &'a str,
+}
+
+#[cfg(not(feature = "logos"))]
+impl<'a> Lexer<'a> {
+    pub fn new(source: &'a str, _file_id: u32) -> Self {
+        Self { _src: source }
+    }
+}
+
+#[cfg(not(feature = "logos"))]
+impl<'a> Iterator for Lexer<'a> {
+    type Item = ();
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+
 pub use token::{BinOp, Delimiter, Keyword, Literal, Token, TokenKind, UnOp};

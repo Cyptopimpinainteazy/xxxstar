@@ -60,6 +60,7 @@ pub fn lower_program(program: &Program, ctx: LowerCtx) -> Result<X3IR, x3_lang_c
                     body: body_ir.operations,
                     receipt_slot: sim
                         .receipt
+                        .as_ref()
                         .map(|sym| sym.as_str().to_string())
                         .unwrap_or_else(|| format!("{}_receipt", sim.name.as_str())),
                 });
@@ -311,8 +312,15 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             });
         }
         Statement::OnTimeout { duration, action } => {
+            // Accept either a u32 or u128 integer literal; clamp to u32.
+            let dur_blocks: u32 = match &duration {
+                Expression::Literal(LiteralExpr::Int { value, .. }) => {
+                    if *value > u32::MAX as u128 { u32::MAX } else { *value as u32 }
+                }
+                _ => expression_to_blocks(&duration)?,
+            };
             ir.push(Operation::OnTimeout {
-                duration_blocks: expression_to_blocks(duration)?,
+                duration_blocks: dur_blocks,
                 action: failure_action_to_ir(action),
             });
         }

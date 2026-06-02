@@ -22,5 +22,6 @@
     "autoclaw.orchestrate.baseBranch": "main",
     "autoclaw.orchestrate.heartbeatStallSeconds": 300,
     "autoclaw.orchestrate.reconcileIntervalSeconds": 300,
+    "task.allowAutomaticTasks": "on",
     "cmake.sourceDirectory": "/home/x3star/Desktop/xxxstar-main/vendor/blake3/c"
 }

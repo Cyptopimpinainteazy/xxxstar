@@ -36,6 +36,9 @@ pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features
 pallet-timestamp = { workspace = true }
 pallet-balances = { workspace = true }
 proptest = "1.4"
+secp256k1 = { version = "0.28", features = ["recovery", "rand"] }
+rand = "0.8"
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types" }
 
 [features]
 default = ["std"]

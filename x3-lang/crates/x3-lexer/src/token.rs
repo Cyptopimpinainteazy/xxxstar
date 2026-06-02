@@ -53,7 +53,7 @@ impl Token {
 
     pub fn as_ident(&self) -> Option<Symbol> {
         match &self.kind {
-            TokenKind::Ident(sym) => Some(*sym),
+            TokenKind::Ident(sym) => Some(sym.clone()),
             _ => None,
         }
     }

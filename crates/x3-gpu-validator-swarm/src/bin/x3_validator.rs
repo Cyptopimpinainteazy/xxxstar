@@ -95,6 +95,12 @@ async fn run_validator() {
     println!("  Successful: {}", metrics.successful_tasks);
     println!("  Failed: {}", metrics.failed_tasks);
     println!("  Divergent: {}", metrics.divergent_tasks);
+    println!("  Accelerator backend: {}", metrics.accelerator_backend);
+    println!("  Accelerator fallbacks: {}", metrics.accelerator_fallbacks);
+    println!(
+        "  Accelerator parity mismatches: {}",
+        metrics.accelerator_parity_mismatches
+    );
 
     println!("\nValidator running. Press Ctrl+C to stop.");
 
@@ -176,6 +182,12 @@ async fn show_status() {
     println!("  Failed: {}", metrics.failed_tasks);
     println!("  Divergent: {}", metrics.divergent_tasks);
     println!("  CPU fallbacks: {}", metrics.cpu_fallbacks);
+    println!("  Accelerator backend: {}", metrics.accelerator_backend);
+    println!("  Accelerator fallbacks: {}", metrics.accelerator_fallbacks);
+    println!(
+        "  Accelerator parity mismatches: {}",
+        metrics.accelerator_parity_mismatches
+    );
 }
 
 async fn test_validator() {

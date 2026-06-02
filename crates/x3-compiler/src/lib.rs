@@ -92,7 +92,10 @@ pub mod options;
 
 pub use compiler::{CompilationArtifacts, CompilationOutput, Compiler};
 pub use error::{CompilerError, CompilerResult};
-pub use gateway::{lower_gateway_call, GatewayLoweringError, GatewayRuntimeCall};
+pub use gateway::{
+    lower_gateway_call, GatewayAccount, GatewayAtomicLeg, GatewayDomain, GatewayLoweringError,
+    GatewayRuntimeCall, GatewayVm,
+};
 pub use options::{CompilationOptions, OptLevel};
 pub use x3_opt::OptLevel as XOptLevel;
 

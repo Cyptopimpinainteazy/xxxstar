@@ -1,7 +1,8 @@
-"""CUDA runtime detection and kernel loader stubs."""
+"""CUDA runtime detection and kernel loader utilities."""
 
 from __future__ import annotations
 
+import ctypes
 from dataclasses import dataclass
 import os
 import shutil
@@ -33,8 +34,11 @@ class CudaRuntime:
         runtime library can be loaded.  ``nvcc_path`` is retained for backward
         compatibility and may be ``None`` on runtime‑only hosts.
         """
-        nvcc_path = shutil.which("nvcc")
         visible_devices = os.getenv("CUDA_VISIBLE_DEVICES", "")
+        if _cuda_bypass_enabled():
+            return cls(available=False, nvcc_path=None, visible_devices=visible_devices)
+
+        nvcc_path = shutil.which("nvcc")
         # Try loading the CUDA runtime library; ignore errors – absence means no runtime.
         runtime_available = False
         try:
@@ -51,3 +55,11 @@ class CudaRuntime:
                 "CUDA runtime not available. Ensure nvcc is installed and "
                 "CUDA_VISIBLE_DEVICES is set."
             )
+
+
+def _cuda_bypass_enabled() -> bool:
+    for key in ("X3_BYPASS_CUDA", "CCGV_BYPASS_CUDA"):
+        value = os.getenv(key)
+        if value and value.strip().lower() in {"1", "true", "yes", "on"}:
+            return True
+    return False

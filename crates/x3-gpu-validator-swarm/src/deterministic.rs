@@ -17,7 +17,8 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-use x3_vm::{GpuHostcalls, VM};
+use x3_accel::{select_backend, AccelBackend};
+use x3_vm::gpu::X3KernelGpuBackend;
 
 /// Helper function to convert a 32-byte slice to HashOutput
 fn bytes_to_hash_output(chunk: &[u8]) -> HashOutput {
@@ -126,6 +127,12 @@ pub struct ExecutionResult {
     pub divergence_detected: bool,
     /// CPU fallback was used
     pub cpu_fallback_used: bool,
+    /// Accelerator backend used for batchable work
+    pub accelerator_backend: String,
+    /// Accelerator failed and CPU baseline was used
+    pub accelerator_fallback_used: bool,
+    /// Accelerator output diverged from CPU truth
+    pub accelerator_parity_mismatch: bool,
     /// Error message if any
     pub error: Option<String>,
 }
@@ -146,8 +153,24 @@ impl ExecutionResult {
             execution_time_us,
             divergence_detected: false,
             cpu_fallback_used: execution_mode == ExecutionMode::CpuFallback,
+            accelerator_backend: "unknown".to_string(),
+            accelerator_fallback_used: false,
+            accelerator_parity_mismatch: false,
             error: None,
         }
+    }
+
+    /// Attach accelerator metadata to the result.
+    pub fn with_accelerator(
+        mut self,
+        backend: impl Into<String>,
+        fallback_used: bool,
+        parity_mismatch: bool,
+    ) -> Self {
+        self.accelerator_backend = backend.into();
+        self.accelerator_fallback_used = fallback_used;
+        self.accelerator_parity_mismatch = parity_mismatch;
+        self
     }
 
     /// Create a divergent result
@@ -160,6 +183,9 @@ impl ExecutionResult {
             execution_time_us,
             divergence_detected: true,
             cpu_fallback_used: false,
+            accelerator_backend: "unknown".to_string(),
+            accelerator_fallback_used: false,
+            accelerator_parity_mismatch: false,
             error: Some("GPU output diverged from CPU verification".to_string()),
         }
     }
@@ -174,6 +200,9 @@ impl ExecutionResult {
             execution_time_us: 0,
             divergence_detected: false,
             cpu_fallback_used: true,
+            accelerator_backend: "unknown".to_string(),
+            accelerator_fallback_used: false,
+            accelerator_parity_mismatch: false,
             error: Some(error),
         }
     }
@@ -214,8 +243,10 @@ pub struct DeterministicEngine {
     replay_records: RwLock<Vec<ReplayRecord>>,
     /// Statistics
     stats: EngineStats,
-    /// GPU hostcalls (initialized on first use)
-    gpu_hostcalls: RwLock<Option<Arc<GpuHostcalls>>>,
+    /// X3 VM GPU backend (initialized on first use)
+    gpu_backend: RwLock<Option<Arc<X3KernelGpuBackend>>>,
+    /// Pluggable hash accelerator backend. CPU remains the parity authority.
+    accel_backend: RwLock<Box<dyn AccelBackend>>,
 }
 
 #[derive(Debug, Default)]
@@ -225,6 +256,12 @@ pub struct EngineStats {
     pub divergent_tasks: AtomicU32,
     pub cpu_fallbacks: AtomicU32,
     pub replay_verifications: AtomicU32,
+}
+
+struct AccelHashResult {
+    outputs: Vec<HashOutput>,
+    backend: String,
+    fallback_used: bool,
 }
 
 impl DeterministicEngine {
@@ -238,33 +275,41 @@ impl DeterministicEngine {
             replay_mode_enabled: AtomicBool::new(true),
             replay_records: RwLock::new(Vec::new()),
             stats: EngineStats::default(),
-            gpu_hostcalls: RwLock::new(None),
+            gpu_backend: RwLock::new(None),
+            accel_backend: RwLock::new(select_backend()),
         }
+    }
+
+    /// Get the currently selected accelerator backend name.
+    pub fn accelerator_backend_name(&self) -> &'static str {
+        self.accel_backend.read().name()
     }
 
     /// Initialize GPU hostcalls (lazy initialization on first use)
     pub fn init_gpu_hostcalls(&self) -> bool {
-        let mut hostcalls_guard = self.gpu_hostcalls.write();
-        if hostcalls_guard.is_none() {
-            let gpu_hostcalls = GpuHostcalls::new();
-            if gpu_hostcalls.is_available() {
-                info!("[Deterministic Engine] GPU hostcalls initialized and available");
-                *hostcalls_guard = Some(Arc::new(gpu_hostcalls));
+        let mut backend_guard = self.gpu_backend.write();
+        if backend_guard.is_none() {
+            let gpu_backend = X3KernelGpuBackend::new();
+            if gpu_backend.is_available() {
+                info!("[Deterministic Engine] X3 VM GPU backend initialized and available");
+                *backend_guard = Some(Arc::new(gpu_backend));
                 return true;
             } else {
-                warn!("[Deterministic Engine] GPU hostcalls unavailable, will use CPU fallback");
+                warn!(
+                    "[Deterministic Engine] X3 VM GPU backend unavailable, will use CPU fallback"
+                );
                 return false;
             }
         }
-        hostcalls_guard.is_some()
+        backend_guard.is_some()
     }
 
-    /// Get GPU hostcalls if available
-    fn get_gpu_hostcalls(&self) -> Option<Arc<GpuHostcalls>> {
+    /// Get X3 VM GPU backend if available
+    fn get_gpu_backend(&self) -> Option<Arc<X3KernelGpuBackend>> {
         // Try to initialize if not yet done
         self.init_gpu_hostcalls();
 
-        self.gpu_hostcalls.read().clone()
+        self.gpu_backend.read().clone()
     }
 
     /// Set execution mode
@@ -326,6 +371,8 @@ impl DeterministicEngine {
                 exec_result
             }
             Err(e) => {
+                let accelerator_parity_mismatch = matches!(e, SwarmError::Divergence(_));
+                let error_message = e.to_string();
                 // Fallback to CPU on error
                 if mode != ExecutionMode::CpuFallback && mode != ExecutionMode::CpuOnly {
                     self.stats.cpu_fallbacks.fetch_add(1, Ordering::SeqCst);
@@ -333,12 +380,24 @@ impl DeterministicEngine {
                     match cpu_result {
                         Ok(mut cpu_exec_result) => {
                             cpu_exec_result.execution_time_us = execution_time_us;
+                            if accelerator_parity_mismatch {
+                                cpu_exec_result.divergence_detected = true;
+                                cpu_exec_result.verification = VerificationResult::Divergent;
+                                cpu_exec_result.accelerator_parity_mismatch = true;
+                                cpu_exec_result.error = Some(error_message);
+                            }
                             cpu_exec_result
                         }
                         Err(cpu_e) => ExecutionResult::error(task.task_id, cpu_e.to_string()),
                     }
                 } else {
-                    ExecutionResult::error(task.task_id, e.to_string())
+                    let mut result = ExecutionResult::error(task.task_id, error_message);
+                    if accelerator_parity_mismatch {
+                        result.divergence_detected = true;
+                        result.verification = VerificationResult::Divergent;
+                        result.accelerator_parity_mismatch = true;
+                    }
+                    result
                 }
             }
         }
@@ -350,6 +409,16 @@ impl DeterministicEngine {
         task: &DeterministicTask,
         algorithm: HashAlgorithm,
     ) -> SwarmResult<ExecutionResult> {
+        if Self::uses_hash_accelerator(task) {
+            let accel_result = self.execute_hash_batch_with_accel(task, algorithm)?;
+            let mode = if self.accelerator_backend_name() == "cpu" {
+                ExecutionMode::CpuFallback
+            } else {
+                ExecutionMode::GpuOnly
+            };
+            return Ok(self.execution_success_with_accel(task, accel_result, mode));
+        }
+
         // Without GPU features compiled in, route straight to CPU
         #[cfg(not(any(
             feature = "cuda",
@@ -367,8 +436,8 @@ impl DeterministicEngine {
             feature = "vulkan"
         ))]
         {
-            let gpu_hostcalls = match self.get_gpu_hostcalls() {
-                Some(hostcalls) => hostcalls,
+            let gpu_backend = match self.get_gpu_backend() {
+                Some(backend) => backend,
                 None => {
                     warn!(
                         "[Deterministic Engine] GPU unavailable for task {}, using CPU",
@@ -378,7 +447,7 @@ impl DeterministicEngine {
                 }
             };
 
-            match self.exec_on_gpu_device(task, algorithm, gpu_hostcalls) {
+            match self.exec_on_gpu_device(task, algorithm, gpu_backend) {
                 Ok(outputs) => {
                     debug!(
                         "[Deterministic Engine] GPU execution completed for task {} (count: {})",
@@ -414,7 +483,7 @@ impl DeterministicEngine {
         &self,
         task: &DeterministicTask,
         algorithm: HashAlgorithm,
-        gpu_hostcalls: Arc<GpuHostcalls>,
+        gpu_backend: Arc<X3KernelGpuBackend>,
     ) -> SwarmResult<Vec<HashOutput>> {
         let mut batch_data = Vec::new();
         for input in &task.inputs {
@@ -427,10 +496,7 @@ impl DeterministicEngine {
             task.inputs.len() as i64,
         );
 
-        let mut vm = VM::new(module);
-        gpu_hostcalls.register_on_vm(&mut vm);
-
-        match vm.call_function(0, &[]) {
+        match gpu_backend.execute_module(module, 1_000_000) {
             Ok(execution_result) => match execution_result.value {
                 Some(x3_vm::Value::Bytes(hashes)) => {
                     let output_size = 32;
@@ -492,6 +558,16 @@ impl DeterministicEngine {
         task: &DeterministicTask,
         algorithm: HashAlgorithm,
     ) -> SwarmResult<ExecutionResult> {
+        if Self::uses_hash_accelerator(task) {
+            let accel_result = self.execute_hash_batch_with_accel(task, algorithm)?;
+            let mode = if self.accelerator_backend_name() == "cpu" {
+                ExecutionMode::CpuFallback
+            } else {
+                ExecutionMode::GpuWithCpuVerification
+            };
+            return Ok(self.execution_success_with_accel(task, accel_result, mode));
+        }
+
         #[cfg(not(any(
             feature = "cuda",
             feature = "opencl",
@@ -527,28 +603,23 @@ impl DeterministicEngine {
 
         // Step 1: Execute on GPU
         let gpu_outputs: Vec<HashOutput> = {
-            let gpu_hostcalls = match self.get_gpu_hostcalls() {
-                Some(hostcalls) => hostcalls,
+            let gpu_backend = match self.get_gpu_backend() {
+                Some(backend) => backend,
                 None => {
                     warn!(
                         "[Deterministic Engine] GPU unavailable for task {}, using CPU verification only",
                         task.task_id
                     );
-                    let cpu_outputs: Vec<HashOutput> = task
-                        .inputs
-                        .iter()
-                        .map(|input| crate::crypto::compute_hash(&algorithm, input))
-                        .collect();
-                    return Ok(ExecutionResult::success(
-                        task.task_id.clone(),
-                        cpu_outputs,
+                    let accel_result = self.execute_hash_batch_with_accel(task, algorithm)?;
+                    return Ok(self.execution_success_with_accel(
+                        task,
+                        accel_result,
                         ExecutionMode::CpuFallback,
-                        0,
                     ));
                 }
             };
 
-            match self.exec_on_gpu_device(task, algorithm, gpu_hostcalls) {
+            match self.exec_on_gpu_device(task, algorithm, gpu_backend) {
                 Ok(outputs) => {
                     debug!(
                         "[Deterministic Engine] GPU execution completed for task {} (count: {})",
@@ -604,8 +675,8 @@ impl DeterministicEngine {
                             task.task_id
                         );
 
-                        let gpu_hostcalls = match self.get_gpu_hostcalls() {
-                            Some(hostcalls) => hostcalls,
+                        let gpu_backend = match self.get_gpu_backend() {
+                            Some(backend) => backend,
                             None => {
                                 error!(
                                     "[Deterministic Engine] GPU unavailable during replay for task {}",
@@ -621,7 +692,7 @@ impl DeterministicEngine {
                         };
 
                         let replay_outputs =
-                            match self.exec_on_gpu_device(task, algorithm, gpu_hostcalls) {
+                            match self.exec_on_gpu_device(task, algorithm, gpu_backend) {
                                 Ok(outputs) => outputs,
                                 Err(e) => {
                                     error!(
@@ -692,18 +763,87 @@ impl DeterministicEngine {
         task: &DeterministicTask,
         algorithm: HashAlgorithm,
     ) -> SwarmResult<ExecutionResult> {
-        let outputs: Vec<HashOutput> = task
-            .inputs
+        let accel_result = self.execute_hash_batch_with_accel(task, algorithm)?;
+
+        Ok(self.execution_success_with_accel(task, accel_result, ExecutionMode::CpuFallback))
+    }
+
+    fn execute_hash_batch_with_accel(
+        &self,
+        task: &DeterministicTask,
+        algorithm: HashAlgorithm,
+    ) -> SwarmResult<AccelHashResult> {
+        let backend_name = self.accelerator_backend_name().to_string();
+        if !Self::uses_hash_accelerator(task) {
+            return Ok(AccelHashResult {
+                outputs: Self::compute_cpu_hashes(task, algorithm),
+                backend: backend_name,
+                fallback_used: false,
+            });
+        }
+
+        let accelerated = {
+            let backend = self.accel_backend.read();
+            match algorithm {
+                HashAlgorithm::Keccak256 => backend.keccak256_batch(&task.inputs),
+                HashAlgorithm::Sha256 => backend.sha256_batch(&task.inputs),
+                HashAlgorithm::Blake2b => backend.blake2b256_batch(&task.inputs),
+            }
+        };
+
+        let cpu_outputs = Self::compute_cpu_hashes(task, algorithm);
+        let accelerated = match accelerated {
+            Ok(outputs) => outputs.into_iter().map(HashOutput::new).collect::<Vec<_>>(),
+            Err(err) => {
+                warn!(
+                    "[Deterministic Engine] accelerator backend {} failed for task {}: {}; using CPU baseline",
+                    backend_name,
+                    task.task_id,
+                    err
+                );
+                self.stats.cpu_fallbacks.fetch_add(1, Ordering::SeqCst);
+                return Ok(AccelHashResult {
+                    outputs: cpu_outputs,
+                    backend: backend_name,
+                    fallback_used: true,
+                });
+            }
+        };
+
+        if accelerated != cpu_outputs {
+            self.stats.divergent_tasks.fetch_add(1, Ordering::SeqCst);
+            return Err(SwarmError::Divergence(format!(
+                "accelerator backend {} diverged from CPU baseline",
+                backend_name
+            )));
+        }
+
+        Ok(AccelHashResult {
+            outputs: accelerated,
+            backend: backend_name,
+            fallback_used: false,
+        })
+    }
+
+    fn compute_cpu_hashes(task: &DeterministicTask, algorithm: HashAlgorithm) -> Vec<HashOutput> {
+        task.inputs
             .iter()
             .map(|input| crate::crypto::compute_hash(&algorithm, input))
-            .collect();
+            .collect()
+    }
 
-        Ok(ExecutionResult::success(
-            task.task_id.clone(),
-            outputs,
-            ExecutionMode::CpuFallback,
-            0,
-        ))
+    fn uses_hash_accelerator(task: &DeterministicTask) -> bool {
+        matches!(task.task_type, TaskType::Hash | TaskType::BatchHash)
+    }
+
+    fn execution_success_with_accel(
+        &self,
+        task: &DeterministicTask,
+        accel_result: AccelHashResult,
+        mode: ExecutionMode,
+    ) -> ExecutionResult {
+        ExecutionResult::success(task.task_id.clone(), accel_result.outputs, mode, 0)
+            .with_accelerator(accel_result.backend, accel_result.fallback_used, false)
     }
 
     /// Get replay records
@@ -777,6 +917,27 @@ mod tests {
         let result = engine.execute(task);
 
         assert!(result.cpu_fallback_used);
+    }
+
+    #[test]
+    fn test_hash_batches_use_selected_accelerator_with_cpu_truth() {
+        let engine = DeterministicEngine::new();
+        engine.set_mode(ExecutionMode::CpuFallback);
+        assert_eq!(engine.accelerator_backend_name(), "cpu");
+
+        let inputs = vec![b"alpha".to_vec(), b"beta".to_vec()];
+        let task = create_batch_hash_task(inputs.clone(), HashAlgorithm::Sha256);
+        let result = engine.execute(task);
+        let expected = inputs
+            .iter()
+            .map(|input| crate::crypto::compute_hash(&HashAlgorithm::Sha256, input))
+            .collect::<Vec<_>>();
+
+        assert_eq!(result.verification, VerificationResult::Valid);
+        assert_eq!(result.outputs, expected);
+        assert_eq!(result.accelerator_backend, "cpu");
+        assert!(!result.accelerator_fallback_used);
+        assert!(!result.accelerator_parity_mismatch);
     }
 
     #[test]

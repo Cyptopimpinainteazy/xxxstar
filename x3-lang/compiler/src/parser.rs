@@ -681,6 +681,12 @@ impl<'a> Parser<'a> {
     fn parse_intent_item(&mut self) -> Result<Item, X3Error> {
         self.advance();
         let name = self.expect_ident("intent name")?;
+        // Production shape: `intent <name> { from ... to ... route { ... }
+        // require ... timeout ... on_fail ... }`. The legacy shape
+        // (`intent <name> [constraints] { stmt* }`) is preserved.
+        if self.peek() == Tok::LBrace {
+            return self.parse_intent_body(name);
+        }
         let mut constraints = Vec::new();
         if self.peek() == Tok::LBracket {
             self.advance();
@@ -698,6 +704,364 @@ impl<'a> Parser<'a> {
             constraints,
             body,
         }))
+    }
+
+    /// Parse the body of a production-shape intent: from/to endpoints,
+    /// route operations, require guards, and timeout/on_fail policies.
+    fn parse_intent_body(&mut self, name: String) -> Result<Item, X3Error> {
+        self.expect(Tok::LBrace, "expected '{' after intent name")?;
+        let mut stmts: Vec<Statement> = Vec::new();
+        while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
+            stmts.push(self.parse_intent_clause()?);
+        }
+        self.expect(Tok::RBrace, "expected '}' to close intent body")?;
+        Ok(Item::IntentDecl(IntentDecl {
+            name: Symbol::new(&name),
+            constraints: Vec::new(),
+            body: Block::new(stmts),
+        }))
+    }
+
+    /// One line of a production intent body.
+    fn parse_intent_clause(&mut self) -> Result<Statement, X3Error> {
+        match self.peek() {
+            Tok::Ident(ref s) if s == "from" => self.parse_intent_endpoint(true),
+            Tok::Ident(ref s) if s == "to" => self.parse_intent_endpoint(false),
+            Tok::Ident(ref s) if s == "route" => self.parse_intent_route(),
+            Tok::KwRequire => {
+                let g = self.parse_require_guard()?;
+                self.opt_semi();
+                Ok(Statement::Require(g))
+            }
+            Tok::Ident(ref s) if s == "timeout" => self.parse_intent_timeout(),
+            Tok::Ident(ref s) if s == "on_fail" => self.parse_intent_onfail(),
+            _ => {
+                // Fallback: treat as an expression statement so the typechecker
+                // gets a real diagnostic instead of a hard panic.
+                let e = self.parse_expr()?;
+                self.opt_semi();
+                Ok(Statement::Expr(e))
+            }
+        }
+    }
+
+    /// `from <chain.ASSET> [amount <expr>] [receiver <expr>]` — lowers to a
+    /// `Statement::Lock` on the source asset.
+    /// `to   <chain.ASSET> [receiver <expr>]` — lowers to a
+    /// `Statement::Release` on the destination asset.
+    fn parse_intent_endpoint(&mut self, is_from: bool) -> Result<Statement, X3Error> {
+        self.advance(); // consume `from` / `to`
+        let asset_ref = self.parse_asset_ref()?;
+        let chain = asset_ref.chain.clone();
+        let asset = asset_ref.name.clone();
+
+        let mut amount_expr: Option<Expression> = None;
+        let mut receiver_expr: Option<Expression> = None;
+        loop {
+            match self.peek() {
+                Tok::Ident(ref s) if s == "amount" => {
+                    self.advance();
+                    amount_expr = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "receiver" => {
+                    self.advance();
+                    receiver_expr = Some(self.parse_expr()?);
+                }
+                _ => break,
+            }
+        }
+        self.opt_semi();
+
+        let zero = || Expression::Literal(LiteralExpr::Int {
+            value: 0,
+            base: IntBase::Decimal,
+            suffix: None,
+        });
+        let sender = || Expression::Literal(LiteralExpr::String(Symbol::new("sender")));
+
+        if is_from {
+            Ok(Statement::Lock {
+                chain: chain.clone(),
+                asset: AssetRef::new(chain, asset),
+                amount: amount_expr.unwrap_or_else(zero),
+                from: receiver_expr.unwrap_or_else(sender),
+            })
+        } else {
+            Ok(Statement::Release {
+                chain: chain.clone(),
+                asset: AssetRef::new(chain, asset),
+                to: receiver_expr.unwrap_or_else(sender),
+            })
+        }
+    }
+
+    /// `route { swap <dex> <chain.ASSET> -> <chain.ASSET> [amount N] [min_output N] ;
+    ///         bridge <via> <chain.ASSET> -> <chain.ASSET> [receiver <addr>] ;
+    ///         lock|mint|burn|release <chain.ASSET> [amount N] [from|to <expr>] }`
+    ///
+    /// Wraps the route operations in an `Atomic` block so cross-VM
+    /// safety guarantees are preserved end-to-end.
+    fn parse_intent_route(&mut self) -> Result<Statement, X3Error> {
+        self.advance(); // consume `route`
+        self.expect(Tok::LBrace, "expected '{' after route")?;
+        let mut stmts: Vec<Statement> = Vec::new();
+        while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
+            stmts.push(self.parse_route_step()?);
+        }
+        self.expect(Tok::RBrace, "expected '}' to close route")?;
+        Ok(Statement::Atomic(AtomicBlock { meta: None, body: Block::new(stmts) }))
+    }
+
+    /// One route step. The body is dispatched on the leading keyword.
+    /// One route step. The body is dispatched on the leading keyword.
+    fn parse_route_step(&mut self) -> Result<Statement, X3Error> {
+        // Peek the leading keyword; each sub-parser is responsible for
+        // consuming it.
+        match self.peek() {
+            Tok::KwSwap => {
+                self.advance();
+                self.parse_swap_step()
+            }
+            Tok::KwBridge => {
+                self.advance();
+                self.parse_bridge_step()
+            }
+            Tok::KwLock | Tok::KwMint | Tok::KwBurn | Tok::KwRelease => {
+                let kw = match self.peek() {
+                    Tok::KwLock => "lock",
+                    Tok::KwMint => "mint",
+                    Tok::KwBurn => "burn",
+                    _ => "release",
+                };
+                self.advance();
+                self.parse_lmbr_step(kw)
+            }
+            // Bare-identifier route keywords. The dispatcher does NOT
+            // advance: each sub-parser checks for its own leading
+            // identifier and consumes it. This avoids a rewind/peek
+            // dance.
+            Tok::Ident(ref s) if s == "swap" => self.parse_swap_step(),
+            Tok::Ident(ref s) if s == "bridge" => self.parse_bridge_step(),
+            Tok::Ident(ref s) if s == "lock" || s == "mint"
+                || s == "burn" || s == "release" =>
+            {
+                let kw = s.clone();
+                self.parse_lmbr_step(&kw)
+            }
+            Tok::Ident(ref s) if s == "lock" || s == "mint"
+                || s == "burn" || s == "release" =>
+            {
+                let kw = s.clone();
+                self.advance();
+                self.parse_lmbr_step(&kw)
+            }
+            _ => Err(parse_err(
+                "expected route operation (swap/bridge/lock/mint/burn/release)".into(),
+                self.peek(),
+            )),
+        }
+    }
+
+    /// Body for `lock` / `mint` / `burn` / `release` route steps. The
+    /// leading keyword has been consumed by the dispatcher.
+    fn parse_lmbr_step(&mut self, kw: &str) -> Result<Statement, X3Error> {
+        let asset = self.parse_asset_ref()?;
+        let chain = asset.chain.clone();
+        let mut amount: Option<Expression> = None;
+        let mut from_or_to: Option<Expression> = None;
+        loop {
+            match self.peek() {
+                Tok::Ident(ref s) if s == "amount" => {
+                    self.advance();
+                    amount = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "from" || s == "to" => {
+                    self.advance();
+                    from_or_to = Some(self.parse_expr()?);
+                }
+                _ => break,
+            }
+        }
+        self.opt_semi();
+        let amount_expr = amount.unwrap_or_else(|| Expression::Literal(LiteralExpr::Int {
+            value: 0,
+            base: IntBase::Decimal,
+            suffix: None,
+        }));
+        let target = from_or_to.unwrap_or_else(|| Expression::Literal(LiteralExpr::String(
+            Symbol::new("sender"),
+        )));
+        match kw {
+            "lock" => Ok(Statement::Lock {
+                chain: chain.clone(),
+                asset: AssetRef::new(chain, asset.name.clone()),
+                amount: amount_expr,
+                from: target,
+            }),
+            "mint" => Ok(Statement::Mint {
+                asset: AssetRef::new(chain, asset.name.clone()),
+                amount: amount_expr,
+                to: target,
+            }),
+            "burn" => Ok(Statement::Burn {
+                asset: AssetRef::new(chain, asset.name.clone()),
+                amount: amount_expr,
+                from: target,
+            }),
+            _ => Ok(Statement::Release {
+                chain: chain.clone(),
+                asset: AssetRef::new(chain, asset.name.clone()),
+                to: target,
+            }),
+        }
+    }
+
+    fn parse_swap_step(&mut self) -> Result<Statement, X3Error> {
+        let dex = self.expect_ident("swap dex")?;
+        let from = self.parse_asset_ref()?;
+        let to = if self.peek() == Tok::Arrow {
+            self.advance();
+            self.parse_asset_ref()?
+        } else {
+            AssetRef::new(from.chain.clone(), Symbol::new(""))
+        };
+        let mut amount: Option<Expression> = None;
+        loop {
+            match self.peek() {
+                Tok::Ident(ref s) if s == "amount" => {
+                    self.advance();
+                    amount = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "min_output" => {
+                    self.advance();
+                    // We drop the value (existing IR has no min_output
+                    // field) but consume the expression so the parser
+                    // does not loop.
+                    let _ = self.parse_expr()?;
+                }
+                _ => break,
+            }
+        }
+        self.opt_semi();
+        let dex_expr = Some(Expression::Literal(LiteralExpr::String(Symbol::new(&dex))));
+        Ok(Statement::Swap { from, to, route: amount, dex: dex_expr })
+    }
+
+    /// `bridge <via> <chain.ASSET> -> <chain.ASSET> [receiver <expr>]`
+    /// Best-effort: we model the bridge as a `Statement::Lock` of the
+    /// source asset with `from = via`. This is enough for the verifier
+    /// and for the existing IR to emit a sensible Lock operation.
+    fn parse_bridge_step(&mut self) -> Result<Statement, X3Error> {
+        // The dispatcher in `parse_route_step` only consumes the
+        // leading `bridge` keyword when the tokenizer gave it a
+        // KwBridge token. When the source uses the bare-identifier
+        // form, the cursor is still on `bridge` — skip it here.
+        if let Tok::Ident(ref s) = self.peek() {
+            if s == "bridge" {
+                self.advance();
+            }
+        }
+        let via = self.expect_ident("bridge via")?;
+        let from = self.parse_asset_ref()?;
+        let _to = if self.peek() == Tok::Arrow {
+            self.advance();
+            Some(self.parse_asset_ref()?)
+        } else {
+            None
+        };
+        let mut _receiver: Option<Expression> = None;
+        loop {
+            match self.peek() {
+                Tok::Ident(ref s) if s == "receiver" => {
+                    self.advance();
+                    // Consume exactly one token for the receiver value.
+                    // We deliberately do *not* call `parse_expr` here:
+                    // a full expression parser is greedy and would
+                    // swallow tokens that belong to the next route
+                    // step (or to the `}` closing the route block).
+                    if !matches!(self.peek(), Tok::RBrace | Tok::Eof) {
+                        self.advance();
+                    }
+                }
+                _ => break,
+            }
+        }
+        self.opt_semi();
+        Ok(Statement::Lock {
+            chain: from.chain.clone(),
+            asset: AssetRef::new(from.chain.clone(), from.name.clone()),
+            amount: Expression::Literal(LiteralExpr::Int {
+                value: 0,
+                base: IntBase::Decimal,
+                suffix: None,
+            }),
+            from: Expression::Literal(LiteralExpr::String(Symbol::new(&via))),
+        })
+    }
+
+    /// `timeout <N>[s] [refund <chain.ASSET> to <receiver>]`
+    fn parse_intent_timeout(&mut self) -> Result<Statement, X3Error> {
+        self.advance(); // consume `timeout`
+        let dur = self.parse_expr()?;
+        // Pull the block count from an integer literal; anything else
+        // falls back to 0 (the existing `OnTimeout` IR only stores u32).
+        let dur_blocks: u32 = match &dur {
+            Expression::Literal(LiteralExpr::Int { value, .. }) => *value as u32,
+            _ => 0,
+        };
+        // Consume any `refund <chain.ASSET> to <receiver>` suffix without
+        // surfacing it (the existing IR does not model per-asset refund
+        // policies).
+        loop {
+            match self.peek() {
+                Tok::Ident(ref s) if s == "refund" => {
+                    self.advance();
+                    let _ = self.parse_asset_ref();
+                    if let Tok::Ident(ref s) = self.peek() {
+                        if s == "to" {
+                            self.advance();
+                            let _ = self.parse_expr();
+                        }
+                    }
+                }
+                _ => break,
+            }
+        }
+        self.opt_semi();
+        Ok(Statement::OnTimeout {
+            duration: Expression::Literal(LiteralExpr::Int {
+                value: dur_blocks as u128,
+                base: IntBase::Decimal,
+                suffix: None,
+            }),
+            action: FailureAction::Rollback,
+        })
+    }
+
+    /// `on_fail rollback | halt | quarantine | refund <chain.ASSET> to <receiver>`
+    fn parse_intent_onfail(&mut self) -> Result<Statement, X3Error> {
+        self.advance(); // consume `on_fail`
+        let action = match self.peek() {
+            Tok::Ident(ref s) if s == "rollback" => {
+                self.advance();
+                FailureAction::Rollback
+            }
+            Tok::Ident(ref s) if s == "halt" => {
+                self.advance();
+                FailureAction::Halt
+            }
+            Tok::Ident(ref s) if s == "quarantine" => {
+                self.advance();
+                FailureAction::Quarantine
+            }
+            _ => {
+                // Best-effort: skip a refund clause and emit Rollback.
+                let _ = self.parse_asset_ref();
+                FailureAction::Rollback
+            }
+        };
+        self.opt_semi();
+        Ok(Statement::OnFail(action))
     }
 
     fn parse_subscription_item(&mut self) -> Result<Item, X3Error> {
@@ -1802,14 +2166,26 @@ fn tokenize(source: &str) -> Vec<Tok> {
             tokens.push(Tok::String_(s));
             continue;
         }
-        // Numbers
-        if c.is_ascii_digit() {
-            let mut num = 0u128;
-            while i < chars.len() && chars[i].is_ascii_digit() {
-                num = num * 10 + (chars[i] as u8 - b'0') as u128;
+        // Numbers AND alphanumeric identifiers. We greedily consume any
+        // run of [A-Za-z0-9_], then classify: all-digit -> Int(...)
+        // (parsing as base-10), otherwise -> keyword/Ident. This keeps
+        // base58 addresses (which often start with a digit, e.g.
+        // Solana receivers like "4Nd1mzi8...") tokenized as a single
+        // Ident rather than being split into Int(4) + Ident.
+        if c.is_ascii_digit() || (c.is_ascii_alphabetic() || c == '_') {
+            let start = i;
+            while i < chars.len()
+                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_')
+            {
                 i += 1;
             }
-            tokens.push(Tok::Int(num));
+            let word: String = chars[start..i].iter().collect();
+            if word.chars().all(|ch| ch.is_ascii_digit()) {
+                let num = word.parse::<u128>().unwrap_or(0);
+                tokens.push(Tok::Int(num));
+            } else {
+                tokens.push(keyword_or_ident(&word));
+            }
             continue;
         }
         // Identifiers and keywords

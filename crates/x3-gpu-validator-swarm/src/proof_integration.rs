@@ -152,6 +152,9 @@ fn orchestra_evidence_to_execution_result(evidence: &EvidenceBundle) -> Executio
         execution_time_us: 0,
         divergence_detected: false,
         cpu_fallback_used: false,
+        accelerator_backend: "unknown".to_string(),
+        accelerator_fallback_used: false,
+        accelerator_parity_mismatch: false,
         error: None,
     }
 }
@@ -280,6 +283,9 @@ mod tests {
             execution_time_us: 50000,
             divergence_detected: false,
             cpu_fallback_used: false,
+            accelerator_backend: "unknown".to_string(),
+            accelerator_fallback_used: false,
+            accelerator_parity_mismatch: false,
             error: None,
         };
 
@@ -301,6 +307,9 @@ mod tests {
             execution_time_us: 25000,
             divergence_detected: false,
             cpu_fallback_used: false,
+            accelerator_backend: "unknown".to_string(),
+            accelerator_fallback_used: false,
+            accelerator_parity_mismatch: false,
             error: None,
         };
 

@@ -217,6 +217,7 @@ fn prop_settlement_legs_form_valid_sequence() {
 #[test]
 fn prop_intent_state_transitions_valid() {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[allow(dead_code)] // referenced inside proptest! closure; rustc lint can't see it
     enum IntentState {
         Created = 0,
         FundingInProgress = 1,

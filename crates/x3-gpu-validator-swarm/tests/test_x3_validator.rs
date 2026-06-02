@@ -165,6 +165,7 @@ fn test_validator_creation() {
         validator.state(),
         x3_gpu_validator_swarm::validator::ValidatorState::Starting
     );
+    assert_eq!(validator.current_mode(), ExecutionMode::CpuFallback);
 }
 
 /// Test validator initialization
@@ -179,6 +180,7 @@ fn test_validator_initialization() {
         validator.state(),
         x3_gpu_validator_swarm::validator::ValidatorState::Running
     );
+    assert_eq!(validator.current_mode(), ExecutionMode::CpuFallback);
 }
 
 /// Test validator task processing
@@ -219,6 +221,9 @@ fn test_validator_metrics() {
     let metrics = validator.get_metrics();
     assert_eq!(metrics.total_tasks, 5);
     assert_eq!(metrics.successful_tasks, 5);
+    assert_eq!(metrics.accelerator_backend, "cpu");
+    assert_eq!(metrics.accelerator_fallbacks, 0);
+    assert_eq!(metrics.accelerator_parity_mismatches, 0);
 }
 
 /// Test CPU mode switching

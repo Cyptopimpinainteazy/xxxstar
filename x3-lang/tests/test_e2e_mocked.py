@@ -16,7 +16,11 @@ def test_runner_dry_run_is_explicit_and_not_production_settlement():
 
 def test_runner_production_without_backend_rolls_back():
     root = Path(__file__).resolve().parents[2]
-    proc = subprocess.run([sys.executable, str(root / 'x3-lang' / 'runner.py'), str(root / 'x3-lang' / 'examples' / 'arb_solana_eth.x3'), '--no-schema'], capture_output=True, check=True)
+    env = {**__import__('os').environ, 'X3_LANG_LEGACY': '1'}
+    proc = subprocess.run(
+        [sys.executable, str(root / 'x3-lang' / 'runner.py'), str(root / 'x3-lang' / 'examples' / 'arb_solana_eth.x3'), '--no-schema'],
+        capture_output=True, check=True, env=env,
+    )
     result = json.loads(proc.stdout.decode())
     assert result['status'] == 'rolled_back'
     assert result['execution'][0]['ok'] is False

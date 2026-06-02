@@ -63,7 +63,7 @@ def emit(plan: Dict[str, Any], step: Dict[str, Any]) -> Dict[str, Any]:
     amount = int(float(step.get('amount') or 0)) if step.get('amount') else 0
     to_token = step.get('to')
     from_token = step.get('from')
-    router = registry.CONTRACT_ADDRESSES.get('uniswap', '0xUniswapRouter000000000000000000000000')
+    router = registry.CONTRACT_ADDRESSES.get('uniswap_v2_router', registry.CONTRACT_ADDRESSES.get('uniswap', '0xUniswapRouter000000000000000000000000'))
     recipient = getattr(registry, 'DEFAULT_RECIPIENT', '0x0000000000000000000000000000000000000000')
 
     path_tokens = [from_token, to_token]

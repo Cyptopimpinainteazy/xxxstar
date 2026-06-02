@@ -32,6 +32,14 @@ def plan(intent: Dict[str, Any]) -> Dict[str, Any]:
     prev_asset = intent.get('from', {}).get('asset')
     path = intent.get('path', [])
 
+    starting_amount = None
+    raw_amount = intent.get('from', {}).get('amount')
+    try:
+        if raw_amount is not None:
+            starting_amount = float(str(raw_amount))
+    except (TypeError, ValueError):
+        starting_amount = None
+
     for idx, p in enumerate(path):
         chain = infer_chain(p, prev_chain)
         output_asset = infer_output_asset(p)
@@ -45,18 +53,19 @@ def plan(intent: Dict[str, Any]) -> Dict[str, Any]:
             'raw': p
         }
 
+        explicit_amount = p.get('amount')
         if p.get('type') == 'swap':
             step.update({
                 'dex': p.get('dex'),
                 'from': p.get('from'),
                 'to': p.get('to'),
-                'amount': intent.get('from', {}).get('amount') if idx == 0 else None
+                'amount': explicit_amount or (str(starting_amount) if starting_amount is not None and idx == 0 else None)
             })
         elif p.get('type') == 'bridge':
             step.update({
                 'via': p.get('via'),
                 'asset': p.get('asset'),
-                'amount': None
+                'amount': explicit_amount or (str(starting_amount) if starting_amount is not None else None)
             })
         else:
             step.update({'details': p})

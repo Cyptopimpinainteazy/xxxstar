@@ -1,146 +1,113 @@
-"""GPU Kernels for Cross-Chain Validation
+"""GPU kernel dispatcher for cross-chain validation.
 
-This module provides GPU-accelerated kernels for cryptographic operations
-used in EVM and SVM validation, including signature verification and hashing.
-
-Implemented in Python with CUDA stubs for demonstration. In production, use
-native CUDA or OpenCL implementations.
-
-Requirements:
-- CUDA toolkit installed
-- NVIDIA GPU with compute capability >= 3.5
-
-Kernels:
-- SHA-256 hashing (general use)
-- Ed25519 signature verification (SVM)
-- Program-derived address (PDA) derivation (SVM)
-- Proof-of-History (PoH) verification (SVM)
-- Keccak-256 hashing (EVM)
-- secp256k1 signature verification (EVM)
-
-Performance Targets:
-- Ed25519: 1M+ signatures/sec on GTX 1070
-- secp256k1: 500k+ signatures/sec
-- Keccak-256: 2M+ hashes/sec
+This module is intentionally thin: concrete GPU work is delegated to the
+ctypes-backed kernel bindings that load the same CUDA shared libraries used by
+the Rust X3 VM GPU hostcalls. Unsupported operations fail explicitly instead of
+silently running CPU simulations under a GPU label.
 """
 
-import numpy as np
-# Note: For real CUDA, use numba.cuda or pycuda
-# Here we use numpy as stub for CPU simulation
+from __future__ import annotations
+
+from time import perf_counter
+from typing import Iterable
+
+from .cuda_loader import CudaRuntime
+from .keccak_gpu import KeccakBatchHasher
+from .secp256k1_gpu import Secp256k1BatchVerifier
+
 
 class GPUKernelError(Exception):
-    """GPU kernel execution error"""
-    pass
+    """GPU kernel execution error."""
+
 
 class GPUKernels:
-    """Manager for GPU-accelerated cryptographic kernels"""
-    
-    def __init__(self, device_id: int = 0):
-        """Initialize GPU kernels"""
+    """Manager for GPU-backed cross-chain cryptographic kernels."""
+
+    def __init__(
+        self,
+        device_id: int = 0,
+        kernel_dir: str = "infra-structure/validator/kernels",
+        parity_check: bool = True,
+        allow_failover: bool = True,
+    ) -> None:
         self.device_id = device_id
-        # In real impl: cudaSetDevice(device_id)
-        print(f"Initialized GPU kernels on device {device_id}")
-    
-    def sha256_batch(self, data: list[bytes]) -> list[bytes]:
-        """Batch SHA-256 hashing on GPU"""
-        # Stub: CPU simulation
-        import hashlib
-        return [hashlib.sha256(d).digest() for d in data]
-    
+        self.runtime = CudaRuntime.detect()
+        self.kernel_dir = kernel_dir
+        self.parity_check = parity_check
+        self.allow_failover = allow_failover
+        self._keccak = KeccakBatchHasher(
+            self.runtime,
+            kernel_dir,
+            parity_check=parity_check,
+            allow_failover=allow_failover,
+        )
+        self._secp256k1 = Secp256k1BatchVerifier(
+            self.runtime,
+            kernel_dir,
+            parity_check=parity_check,
+            allow_failover=allow_failover,
+        )
+
+    def sha256_batch(self, data: Iterable[bytes]) -> list[bytes]:
+        """Batch SHA-256 hashing.
+
+        The Rust X3 VM has a CUDA SHA-256 hostcall, but this Python validator
+        package does not yet expose a direct X3 VM execution bridge. Avoid
+        presenting CPU hashing as GPU execution here.
+        """
+        raise GPUKernelError("SHA-256 GPU execution must go through x3-vm GPU hostcalls")
+
     def ed25519_verify_batch(
         self,
-        messages: list[bytes],
-        signatures: list[bytes],
-        pubkeys: list[bytes]
+        messages: Iterable[bytes],
+        signatures: Iterable[bytes],
+        pubkeys: Iterable[bytes],
     ) -> list[bool]:
-        """Batch Ed25519 signature verification"""
-        # Stub: Use cryptography library for simulation
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-        from cryptography.exceptions import InvalidSignature
-        
-        results = []
-        for msg, sig, pk in zip(messages, signatures, pubkeys):
-            try:
-                pub = Ed25519PublicKey.from_public_bytes(pk)
-                pub.verify(sig, msg)
-                results.append(True)
-            except InvalidSignature:
-                results.append(False)
-        return results
-    
+        """Batch Ed25519 signature verification."""
+        raise GPUKernelError("Ed25519 GPU execution must go through x3-vm GPU hostcalls")
+
     def poh_verify(self, hashes: list[bytes], count: int) -> bool:
-        """Verify Proof-of-History sequence"""
-        # Stub: Simple chain verification
-        current = hashes[0]
-        for h in hashes[1:]:
-            if self.sha256_batch([current])[0] != h:
-                return False
-            current = h
-        return len(hashes) == count + 1
-    
-    def keccak256_batch(self, data: list[bytes]) -> list[bytes]:
-        """Batch Keccak-256 hashing"""
-        # Stub: Use eth_utils
+        """Verify Proof-of-History sequence."""
+        raise GPUKernelError("PoH GPU execution must go through x3-vm GPU hostcalls")
+
+    def keccak256_batch(self, data: Iterable[bytes]) -> list[bytes]:
+        """Batch Keccak-256 hashing using the real CUDA binding when loaded."""
         try:
-            from eth_utils import keccak
-        except ImportError:
-            from hashlib import sha3_256 as keccak
-        return [keccak(d) for d in data]
-    
+            return self._keccak.hash_batch(data)
+        except Exception as exc:
+            raise GPUKernelError(str(exc)) from exc
+
     def secp256k1_verify_batch(
         self,
-        messages: list[bytes],
-        signatures: list[bytes],
-        pubkeys: list[bytes]
+        messages: Iterable[bytes],
+        signatures: Iterable[bytes],
+        pubkeys: Iterable[bytes],
     ) -> list[bool]:
-        """Batch secp256k1 signature verification"""
-        # Stub: Use ecdsa library
-        import ecdsa
-        from ecdsa.curves import SECP256k1
-        from ecdsa.util import sigdecode_der
-        
-        results = []
-        for msg, sig, pk in zip(messages, signatures, pubkeys):
-            try:
-                vk = ecdsa.VerifyingKey.from_string(pk, curve=SECP256k1)
-                r, s = sigdecode_der(sig, SECP256k1.order)
-                valid = vk.verify_digest((r, s), msg)
-                results.append(valid)
-            except Exception:
-                results.append(False)
-        return results
-    
-    def benchmark(self, batch_size: int = 1000) -> dict:
-        """Benchmark all kernels"""
-        # Generate test data
-        messages = [os.urandom(32) for _ in range(batch_size)]
-        signatures = [os.urandom(64) for _ in range(batch_size)]
-        pubkeys = [os.urandom(32) for _ in range(batch_size)]  # Ed25519 pubkey size
-        
-        benchmarks = {}
-        
-        start = time.time()
-        self.sha256_batch(messages)
-        benchmarks["sha256"] = batch_size / (time.time() - start)
-        
-        start = time.time()
-        self.ed25519_verify_batch(messages, signatures, pubkeys)
-        benchmarks["ed25519"] = batch_size / (time.time() - start)
-        
-        start = time.time()
-        self.keccak256_batch(messages)
-        benchmarks["keccak256"] = batch_size / (time.time() - start)
-        
-        start = time.time()
-        self.secp256k1_verify_batch(messages, signatures, [os.urandom(33) for _ in range(batch_size)])  # secp pubkey compressed
-        benchmarks["secp256k1"] = batch_size / (time.time() - start)
-        
-        return benchmarks
+        """Batch secp256k1 signature verification using the real CUDA binding."""
+        try:
+            return self._secp256k1.verify_batch(signatures, messages, pubkeys)
+        except Exception as exc:
+            raise GPUKernelError(str(exc)) from exc
 
-# Example usage
+    def benchmark(self, payloads: Iterable[bytes]) -> dict[str, float | int | bool]:
+        """Benchmark the currently wired Python GPU path."""
+        payloads_list = list(payloads)
+        if not payloads_list:
+            raise GPUKernelError("benchmark payloads must not be empty")
+
+        start = perf_counter()
+        self.keccak256_batch(payloads_list)
+        elapsed = perf_counter() - start
+
+        return {
+            "gpu_available": self.runtime.available,
+            "device_id": self.device_id,
+            "batch_size": len(payloads_list),
+            "keccak256_ops_per_sec": len(payloads_list) / elapsed if elapsed else 0.0,
+        }
+
+
 if __name__ == "__main__":
     kernels = GPUKernels()
-    print("Benchmark results (ops/sec):")
-    results = kernels.benchmark(10000)
-    for kernel, rate in results.items():
-        print(f"{kernel}: {rate:.0f} ops/sec")
+    payloads = [bytes([idx % 256]) * 32 for idx in range(1024)]
+    print(kernels.benchmark(payloads))

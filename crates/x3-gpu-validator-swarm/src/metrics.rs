@@ -26,6 +26,12 @@ pub struct SwarmMetrics {
     pub divergent_tasks: u64,
     /// CPU fallback count
     pub cpu_fallbacks: u64,
+    /// Selected accelerator backend name
+    pub accelerator_backend: String,
+    /// Accelerator backend failures that fell back to CPU
+    pub accelerator_fallbacks: u64,
+    /// Accelerator parity mismatches against CPU truth
+    pub accelerator_parity_mismatches: u64,
     /// Average task latency (ms)
     pub avg_task_latency_ms: f64,
     /// Tasks per second
@@ -298,6 +304,25 @@ impl MetricsCollector {
         swarm.cpu_fallbacks += 1;
     }
 
+    /// Set selected accelerator backend name.
+    pub fn set_accelerator_backend(&self, backend: impl Into<String>) {
+        self.swarm.write().accelerator_backend = backend.into();
+    }
+
+    /// Record accelerator fallback to CPU baseline.
+    pub fn record_accelerator_fallback(&self) {
+        self.increment("accelerator_fallbacks", 1);
+        let mut swarm = self.swarm.write();
+        swarm.accelerator_fallbacks += 1;
+    }
+
+    /// Record accelerator parity mismatch.
+    pub fn record_accelerator_parity_mismatch(&self) {
+        self.increment("accelerator_parity_mismatches", 1);
+        let mut swarm = self.swarm.write();
+        swarm.accelerator_parity_mismatches += 1;
+    }
+
     /// Get swarm metrics
     pub fn get_swarm_metrics(&self) -> SwarmMetrics {
         let mut swarm = self.swarm.write();
@@ -503,4 +528,25 @@ pub struct ValidatorHealth {
     pub tasks_recent: u64,
     pub error_rate: f64,
     pub divergence_rate: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accelerator_metrics_are_recorded_in_swarm_metrics_and_counters() {
+        let metrics = MetricsCollector::new();
+
+        metrics.set_accelerator_backend("cpu");
+        metrics.record_accelerator_fallback();
+        metrics.record_accelerator_parity_mismatch();
+
+        let swarm = metrics.get_swarm_metrics();
+        assert_eq!(swarm.accelerator_backend, "cpu");
+        assert_eq!(swarm.accelerator_fallbacks, 1);
+        assert_eq!(swarm.accelerator_parity_mismatches, 1);
+        assert_eq!(metrics.get_counter("accelerator_fallbacks"), 1);
+        assert_eq!(metrics.get_counter("accelerator_parity_mismatches"), 1);
+    }
 }

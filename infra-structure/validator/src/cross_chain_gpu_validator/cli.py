@@ -75,10 +75,21 @@ def _run_orchestrator() -> None:
     configure_logging(settings.log_level)
     logger = get_logger("ccgv")
 
+    if settings.bypass_cuda:
+        os.environ["CCGV_BYPASS_CUDA"] = "1"
+
     runtime = CudaRuntime.detect()
     if settings.require_gpu:
         runtime.require()
-    logger.info("cuda runtime detected", extra={"trace_id": "bootstrap", "span_id": "n/a"})
+    logger.info(
+        "cuda runtime configured",
+        extra={
+            "trace_id": "bootstrap",
+            "span_id": "n/a",
+            "bypass_cuda": settings.bypass_cuda,
+            "available": runtime.available,
+        },
+    )
 
     sig_verifier = Secp256k1BatchVerifier(
         runtime,

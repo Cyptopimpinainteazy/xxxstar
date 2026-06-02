@@ -82,6 +82,7 @@ once_cell = "1.18"
 keccak-hash = "0.1"
 
 # GPU and VM
+x3-accel = { path = "../x3-accel" }
 x3-vm = { path = "../x3-vm" }
 x3-backend = { path = "../x3-backend" }
 x3-orchestra-control-plane = { path = "../x3-orchestra-control-plane" }
