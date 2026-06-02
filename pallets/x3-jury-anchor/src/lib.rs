@@ -184,9 +184,8 @@ pub mod pallet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use frame_support::assert_ok;
+    use frame_support::{assert_ok, derive_impl};
     use frame_support::traits::ConstU32;
-    use frame_system as system;
     use sp_core::H256;
     use sp_runtime::BuildStorage;
 
@@ -200,6 +199,7 @@ mod tests {
         }
     );
 
+    #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
     impl frame_system::Config for Test {
         type BaseCallFilter = frame_support::traits::Everything;
         type BlockWeights = ();
