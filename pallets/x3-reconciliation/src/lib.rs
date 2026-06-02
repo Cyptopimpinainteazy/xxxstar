@@ -465,12 +465,14 @@ pub mod pallet {
 
         /// Returns the current reconciliation status.
         pub fn reconciliation_status() -> ReconciliationStatus {
+            if MintHaltSince::<T>::get().is_some() {
+                return ReconciliationStatus::Halted;
+            }
+
             match LastReconciliation::<T>::get() {
                 None => ReconciliationStatus::Passing,
                 Some(record) => {
-                    if MintHaltSince::<T>::get().is_some() {
-                        ReconciliationStatus::Halted
-                    } else if record.divergence_bps > T::ToleranceBps::get() {
+                    if record.divergence_bps > T::ToleranceBps::get() {
                         ReconciliationStatus::Degraded
                     } else {
                         ReconciliationStatus::Passing
