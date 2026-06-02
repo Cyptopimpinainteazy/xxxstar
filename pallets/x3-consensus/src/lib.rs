@@ -239,6 +239,10 @@ pub mod pallet {
             reason: SlashReason,
         ) -> DispatchResult {
             let _reporter = ensure_signed(origin)?;
+            ensure!(
+                ValidatorStake::<T>::contains_key(&validator),
+                Error::<T>::ValidatorNotFound
+            );
 
             let slash_fraction =
                 Perbill::from_parts(T::SlashFraction::get().saturating_mul(100_000));
