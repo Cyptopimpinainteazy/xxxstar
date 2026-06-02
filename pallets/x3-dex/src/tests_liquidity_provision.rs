@@ -1,9 +1,14 @@
 //! Tests for liquidity provision functionality
 
-use super::*;
 use crate::mock::*;
 use frame_support::assert_ok;
-use x3_dex::amm_pools::TokenId;
+use x3_dex::amm_pools::{AMMPool, TokenId};
+
+fn pool_id(token_a: &TokenId, token_b: &TokenId, fee_basis_points: u32) -> u64 {
+    AMMPool::create_pool(token_a.clone(), token_b.clone(), fee_basis_points)
+        .expect("valid test pool")
+        .pool_id
+}
 
 #[test]
 fn test_liquidity_addition() {
@@ -28,7 +33,7 @@ fn test_liquidity_addition() {
         // Add liquidity
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,    // pool_id
+            pool_id(&token_a, &token_b, 30),
             1000, // amount_a_desired
             1000, // amount_b_desired
             900,  // amount_a_min
@@ -36,7 +41,7 @@ fn test_liquidity_addition() {
         ));
 
         // Verify pool state updated
-        let pool = DEX::pools(0);
+        let pool = DEX::pools(pool_id(&token_a, &token_b, 30));
         assert!(pool.is_some());
         let pool = pool.unwrap();
         assert_eq!(pool.reserve_a, 1000);
@@ -66,7 +71,7 @@ fn test_lp_token_minting() {
         ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,
+            pool_id(&token_a, &token_b, 30),
             1000,
             1000,
             900,
@@ -100,7 +105,7 @@ fn test_proportional_calculations() {
         ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,
+            pool_id(&token_a, &token_b, 30),
             1000,
             1000,
             900,
@@ -110,7 +115,7 @@ fn test_proportional_calculations() {
         // Add more liquidity - should be proportional
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(2),
-            0,
+            pool_id(&token_a, &token_b, 30),
             500, // half the amount
             500, // half the amount
             450,
@@ -118,7 +123,7 @@ fn test_proportional_calculations() {
         ));
 
         // Verify reserves increased proportionally
-        let pool = DEX::pools(0).unwrap();
+        let pool = DEX::pools(pool_id(&token_a, &token_b, 30)).unwrap();
         assert_eq!(pool.reserve_a, 1500);
         assert_eq!(pool.reserve_b, 1500);
     });

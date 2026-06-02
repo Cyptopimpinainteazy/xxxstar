@@ -66,8 +66,12 @@ impl Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    frame_system::GenesisConfig::<Test>::default()
+    let mut ext: sp_io::TestExternalities = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap()
-        .into()
+        .into();
+    ext.execute_with(|| {
+        System::set_block_number(1);
+    });
+    ext
 }
