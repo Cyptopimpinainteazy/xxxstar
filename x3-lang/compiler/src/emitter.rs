@@ -80,23 +80,10 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
             bytecode.write_all(&[0x23])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
-        Operation::Swap {
-            from_chain,
-            from_asset,
-            to_asset,
-            input_amount,
-            min_output,
-            dex,
-        } => {
-            // Opcode: 0x24 (SWAP)
+        Operation::Swap { .. } => {
+            // Opcode: 0x24 (SWAP) — no operand bytes; pad_to_4 fills.
             bytecode.write_all(&[0x24])?;
-            let dex_str = dex.as_ref().map(|s| s.as_str()).unwrap_or("none");
-            let payload = format!(
-                "{};{};{};{};{};{}",
-                from_chain, from_asset, to_asset, input_amount, min_output, dex_str
-            );
-            bytecode.write_all(&(payload.len() as u16).to_le_bytes())?;
-            bytecode.write_all(payload.as_bytes())?;
+            bytecode.write_all(&0u16.to_le_bytes())?;
         }
         Operation::AtomicBegin => {
             // Opcode: 0x50 (ATOMIC_BEGIN)
@@ -597,6 +584,9 @@ mod tests {
                 );
             }
             cursor += 3 + len;
+            while cursor % 4 != 0 {
+                cursor += 1;
+            }
         }
     }
 }
