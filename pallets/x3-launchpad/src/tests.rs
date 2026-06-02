@@ -2,7 +2,7 @@
 
 use crate::mock::*;
 use crate::{Contributions, Error, Event, LaunchStatus, Launches};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, traits::Hooks};
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
