@@ -10,6 +10,7 @@ pub struct EpochRewardsHasher {
 impl EpochRewardsHasher {
     /// Use SipHasher13 keyed on the `seed` for calculating epoch reward partition
     pub fn new(partitions: usize, seed: &Hash) -> Self {
+        assert!(partitions > 0, "partitions must be greater than 0");
         let mut hasher = SipHasher13::new();
         hasher.write(seed.as_ref());
         Self { hasher, partitions }
