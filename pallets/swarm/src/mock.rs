@@ -14,6 +14,7 @@ frame_support::construct_runtime!(
     pub enum Test {
         System: frame_system,
         Balances: pallet_balances,
+        Invariants: pallet_x3_invariants,
         Swarm: pallet_swarm,
     }
 );
@@ -65,9 +66,26 @@ impl pallet_balances::Config for Test {
     type MaxReserves = ConstU32<50>;
     type ReserveIdentifier = [u8; 8];
     type FreezeIdentifier = ();
-    type MaxHolds = ConstU32<0>;
     type MaxFreezes = ConstU32<0>;
     type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
+}
+
+parameter_types! {
+    pub const DefaultMaxSupply: u128 = 1_000_000_000_000_000_000u128;
+    pub const DefaultMaxAgents: u32 = 10_000;
+    pub const DefaultMaxProposalDepth: u32 = 100;
+}
+
+impl pallet_x3_invariants::Config for Test {
+    type RuntimeEvent = RuntimeEvent;
+    type UpdateOrigin = frame_system::EnsureRoot<u64>;
+    type DefaultMaxSupply = DefaultMaxSupply;
+    type DefaultMaxAgents = DefaultMaxAgents;
+    type DefaultMaxProposalDepth = DefaultMaxProposalDepth;
+    type WeightInfo = ();
+    type SecurityHook = x3_security_events::NoOpHook;
 }
 
 parameter_types! {
@@ -117,6 +135,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             (4, 100_000),
             (5, 100_000),
         ],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();
