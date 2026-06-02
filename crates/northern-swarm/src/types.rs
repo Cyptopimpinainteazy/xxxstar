@@ -197,8 +197,8 @@ pub enum NorthernSwarmError {
     #[error("chain RPC error: {0}")]
     ChainRpc(String),
 
-    #[error("payload fetch error (uri={uri}): {source}")]
-    PayloadFetch { uri: String, source: String },
+    #[error("payload fetch error (uri={uri}): {reason}")]
+    PayloadFetch { uri: String, reason: String },
 
     #[error("execution failed for task {task_id}: {reason}")]
     ExecutionFailed { task_id: TaskId, reason: String },

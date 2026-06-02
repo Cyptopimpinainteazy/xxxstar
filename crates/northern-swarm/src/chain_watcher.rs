@@ -93,14 +93,14 @@ impl ChainWatcher {
             // TODO(RC1.5): GET {ipfs_gateway}/ipfs/{cid}
             return Err(NorthernSwarmError::PayloadFetch {
                 uri: task.payload_uri.clone(),
-                source: "IPFS fetch not yet implemented — target RC1.5".into(),
+                reason: "IPFS fetch not yet implemented — target RC1.5".into(),
             });
         }
 
         if let Some(hex_body) = task.payload_uri.strip_prefix("hex:") {
             let body = hex::decode(hex_body).map_err(|e| NorthernSwarmError::PayloadFetch {
                 uri: task.payload_uri.clone(),
-                source: e.to_string(),
+                reason: e.to_string(),
             })?;
             return Ok(TaskPayload {
                 task_id: task.id.clone(),
@@ -112,7 +112,7 @@ impl ChainWatcher {
 
         Err(NorthernSwarmError::PayloadFetch {
             uri: task.payload_uri.clone(),
-            source: "unsupported URI scheme (want: ipfs:// or hex:)".into(),
+            reason: "unsupported URI scheme (want: ipfs:// or hex:)".into(),
         })
     }
 }

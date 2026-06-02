@@ -72,6 +72,40 @@ def candidate_files() -> list[pathlib.Path]:
     return [ROOT / name for name in sorted(names)]
 
 
+def staged_added_lines() -> list[tuple[pathlib.Path, int, str]]:
+    result = subprocess.run(
+        ["git", "diff", "--cached", "-U0", "--diff-filter=ACMRT"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+
+    lines = []
+    path: pathlib.Path | None = None
+    new_line_no = 0
+    for raw in result.stdout.splitlines():
+        if raw.startswith("+++ b/"):
+            path = ROOT / raw[len("+++ b/") :]
+            continue
+        if raw.startswith("@@ "):
+            match = re.search(r"\+(\d+)(?:,\d+)?", raw)
+            new_line_no = int(match.group(1)) if match else 0
+            continue
+        if raw.startswith("+") and not raw.startswith("+++"):
+            if path is not None:
+                lines.append((path, new_line_no, raw[1:]))
+            new_line_no += 1
+            continue
+        if raw.startswith("-") and not raw.startswith("---"):
+            continue
+        if path is not None and new_line_no:
+            new_line_no += 1
+    return lines
+
+
 def should_scan(path: pathlib.Path) -> bool:
     rel = path.relative_to(ROOT).as_posix()
     if rel == "scripts/no_stub_guard.py":
@@ -93,6 +127,31 @@ def should_scan(path: pathlib.Path) -> bool:
 def main() -> int:
     issues = []
     rx = [re.compile(p, re.IGNORECASE) for p in PATTERNS]
+    added_lines = staged_added_lines()
+    if added_lines:
+        for path, line_no, line in added_lines:
+            if not should_scan(path):
+                continue
+            if any(re.search(allow, line) for allow in ALLOW_LINE_PATTERNS):
+                continue
+            if any(r.search(line) for r in rx):
+                issues.append(f"{path.relative_to(ROOT)}:{line_no}: {line.strip()}")
+        if issues:
+            print("[no_stub_guard] blocked: stub/placeholder markers found")
+            for item in issues[:200]:
+                print(item)
+            if len(issues) > 200:
+                print(f"... and {len(issues)-200} more")
+            return 1
+        print("[no_stub_guard] ok")
+        return 0
+    elif not (
+        os.environ.get("NO_STUB_FULL_PUSH_SCAN") == "1"
+        or os.environ.get("NO_STUB_FULL_REPO_SCAN") == "1"
+    ):
+        print("[no_stub_guard] ok")
+        return 0
+
     for path in candidate_files():
         if not path.is_file() or not should_scan(path):
             continue
