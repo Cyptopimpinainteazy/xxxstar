@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::mock::*;
-use frame_support::{assert_noop, assert_ok};
+use frame_support::assert_ok;
 use x3_dex::amm_pools::TokenId;
 
 #[test]
@@ -25,8 +25,8 @@ fn create_pool_works() {
         ));
 
         // Check pool was created
-        let pools = DEX::pools();
-        assert!(!pools.is_empty());
+        let pool = DEX::pools(0);
+        assert!(pool.is_some());
     });
 }
 

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate as pallet_x3_dex;
-use frame_support::{parameter_types, traits::Everything};
+use frame_support::{derive_impl, parameter_types, traits::Everything};
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
@@ -10,7 +10,6 @@ use sp_runtime::{
     BuildStorage,
 };
 use x3_asset_kernel_types::traits::NoEconomicHalt;
-use x3_dex::amm_pools::TokenId;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -28,6 +27,7 @@ parameter_types! {
     pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl system::Config for Test {
     type BaseCallFilter = Everything;
     type BlockWeights = ();
@@ -59,7 +59,6 @@ parameter_types! {
 }
 
 impl Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type MaxPools = MaxPools;
     type WeightInfo = ();
     type EconomicHalt = NoEconomicHalt;
