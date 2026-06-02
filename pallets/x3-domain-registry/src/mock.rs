@@ -58,8 +58,15 @@ impl system::Config for Test {
     type PalletInfo = PalletInfo;
     type SS58Prefix = ();
     type OnSetCode = ();
-    type MaxConsumers = frame_support::traits::ConstU32<16>;
     type SystemWeightInfo = ();
+    type ExtensionsWeightInfo = ();
+    type RuntimeTask = ();
+    type SingleBlockMigrations = ();
+    type MultiBlockMigrator = ();
+    type PreInherents = ();
+    type PostInherents = ();
+    type PostTransactions = ();
+    type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
 impl pallet_x3_domain_registry::Config for Test {
