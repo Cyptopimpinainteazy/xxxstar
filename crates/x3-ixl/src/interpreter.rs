@@ -234,12 +234,9 @@ impl Interpreter {
                     .custody
                     .remove(slot_id)
                     .ok_or(IxlError::UnbalancedCustody)?;
-                if entry.kind != *kind {
-                    return Err(IxlError::InvalidOperands);
-                }
                 if entry.amount > 0 {
                     ctx.effects.push(LedgerEffect::CreditReceiver {
-                        kind: entry.kind,
+                        kind: *kind,
                         asset: entry.asset,
                         receiver: *receiver,
                         amount: entry.amount,
@@ -247,7 +244,7 @@ impl Interpreter {
                 }
                 receipt.push(ReceiptEntry::Settled {
                     slot_id: *slot_id,
-                    kind: entry.kind,
+                    kind: *kind,
                     asset: entry.asset,
                     receiver: *receiver,
                     amount: entry.amount,

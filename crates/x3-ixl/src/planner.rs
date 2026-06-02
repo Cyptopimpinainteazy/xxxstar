@@ -53,6 +53,7 @@ impl Planner {
 
         let mut phase: BTreeMap<u32, SlotPhase> = BTreeMap::new();
         let mut declared_slots: BTreeSet<u32> = BTreeSet::new();
+        let mut abort_terminal = false;
 
         for instr in &bundle.instructions {
             match instr {
@@ -111,15 +112,19 @@ impl Planner {
                 Instruction::Abort => {
                     // Abort is allowed anywhere; the interpreter handles
                     // unwinding the partially-executed plan.
+                    abort_terminal = true;
                 }
             }
         }
 
-        // Every Lock must end Terminated.
-        for (slot, p) in &phase {
-            if *p != SlotPhase::Terminated {
-                let _ = slot;
-                return Err(IxlError::UnresolvedCustody);
+        // Every Lock must end Terminated unless the bundle has an explicit
+        // Abort, which is a rollback terminal for any still-open custody.
+        if !abort_terminal {
+            for (slot, p) in &phase {
+                if *p != SlotPhase::Terminated {
+                    let _ = slot;
+                    return Err(IxlError::UnresolvedCustody);
+                }
             }
         }
 
