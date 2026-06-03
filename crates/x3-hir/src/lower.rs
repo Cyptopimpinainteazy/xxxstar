@@ -1035,7 +1035,7 @@ mod tests {
         let source = r#"
             fn shadow_test() -> i32 {
                 let x = 10;
-                {
+                if true {
                     let x = 20; // shadowing should be an error now
                     return x;
                 }
