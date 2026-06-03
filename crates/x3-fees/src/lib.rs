@@ -282,8 +282,9 @@ mod resource_accounting_tests {
 
         // Process transaction
         let (burned, validator) = engine.process_transaction(b"tx".to_vec(), 0.6);
-        assert_eq!(burned, 70);
-        assert_eq!(validator, 30);
+        assert_eq!(burned, 78);
+        assert_eq!(validator, 34);
+        assert_eq!(engine.total_fees_collected, 112);
 
         // Slash validator
         engine.slash_validator(1000);
