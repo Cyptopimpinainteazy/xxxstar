@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate as pallet_x3_kernel;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use frame_support::{
     construct_runtime, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64, Get},
@@ -27,6 +27,7 @@ pub const CHARLIE: AccountId = 3;
 pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 
 pub static EMERGENCY_HALT_TRIGGERED: AtomicBool = AtomicBool::new(false);
+pub static EMERGENCY_HALT_TRIGGER_COUNT: AtomicU64 = AtomicU64::new(0);
 
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 250;
@@ -52,6 +53,7 @@ pub struct TestEmergencyHaltController;
 impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {
         EMERGENCY_HALT_TRIGGERED.store(true, Ordering::SeqCst);
+        EMERGENCY_HALT_TRIGGER_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 }
 

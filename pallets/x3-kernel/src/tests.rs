@@ -2599,11 +2599,15 @@ fn test_emergency_halt_preserves_state_through_cycles() {
 #[test]
 fn test_emergency_halt_triggers_runtime_halt_controller() {
     new_test_ext().execute_with(|| {
-        assert!(!mock::EMERGENCY_HALT_TRIGGERED.load(core::sync::atomic::Ordering::SeqCst));
+        let trigger_count_before =
+            mock::EMERGENCY_HALT_TRIGGER_COUNT.load(core::sync::atomic::Ordering::SeqCst);
 
         assert_ok!(AtlasKernel::emergency_halt(RuntimeOrigin::root()));
 
-        assert!(mock::EMERGENCY_HALT_TRIGGERED.load(core::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            mock::EMERGENCY_HALT_TRIGGER_COUNT.load(core::sync::atomic::Ordering::SeqCst),
+            trigger_count_before + 1
+        );
         System::assert_has_event(RuntimeEvent::AtlasKernel(crate::Event::EmergencyHalted));
     });
 }
