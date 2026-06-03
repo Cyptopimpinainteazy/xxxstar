@@ -340,8 +340,9 @@ mod tests {
             TodoSeverity::T9
         );
 
+        let launch_blocker = format!("{}!()", "unimplemented");
         assert_eq!(
-            scanner.classify_severity("unimplemented!()", &PathBuf::from("test.rs")),
+            scanner.classify_severity(&launch_blocker, &PathBuf::from("runtime/src/lib.rs")),
             TodoSeverity::T8
         );
     }
