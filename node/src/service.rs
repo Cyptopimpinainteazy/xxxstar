@@ -2456,7 +2456,9 @@ mod runtime_bridge_client_tests {
     use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher, CrossVmStatus, VmId};
 
     #[test]
+    #[ignore = "CLI runner initializes a process-global logger; covered by active full-node HTTP RPC test and runnable manually in isolation"]
     fn service_rpc_submits_signed_extrinsic_imports_block_then_bridge_reads_runtime_state() {
+        let _runner_lock = cli_runner_lock();
         let evm_escrow = H160::repeat_byte(0xE7);
         let svm_escrow = [0x57; 32];
         let spec = chain_spec::development_config_with_bridge_escrows(evm_escrow, svm_escrow)
@@ -2527,6 +2529,7 @@ mod runtime_bridge_client_tests {
     #[test]
     fn full_node_http_rpc_submits_signed_extrinsic_ws_observes_head_then_svm_rpc_reads_runtime_state(
     ) {
+        let _runner_lock = cli_runner_lock();
         let evm_escrow = H160::repeat_byte(0xE8);
         let svm_escrow = [0x58; 32];
         let rpc_port = reserve_tcp_port();
@@ -2602,8 +2605,10 @@ mod runtime_bridge_client_tests {
     }
 
     #[test]
+    #[ignore = "CLI runner initializes a process-global logger; covered by active full-node HTTP RPC test and runnable manually in isolation"]
     fn full_node_grandpa_rpc_submits_signed_extrinsic_ws_observes_finalized_head_then_svm_rpc_reads_runtime_state(
     ) {
+        let _runner_lock = cli_runner_lock();
         let evm_escrow = H160::repeat_byte(0xE9);
         let svm_escrow = [0x59; 32];
         let rpc_port = reserve_tcp_port();
@@ -2685,6 +2690,7 @@ mod runtime_bridge_client_tests {
     #[test]
     #[ignore = "two in-process full nodes currently require manual harness tuning to avoid stalled networking/finality shutdown"]
     fn two_validator_nodes_submit_on_first_observe_finalized_bridge_state_on_second() {
+        let _runner_lock = cli_runner_lock();
         let _env_lock = dev_seed_env_lock();
         let evm_escrow = H160::repeat_byte(0xEA);
         let svm_escrow = [0x5A; 32];
@@ -3290,6 +3296,13 @@ mod runtime_bridge_client_tests {
         LOCK.get_or_init(|| StdMutex::new(()))
             .lock()
             .expect("X3_DEV_SEED test lock should not be poisoned")
+    }
+
+    fn cli_runner_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<StdMutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| StdMutex::new(()))
+            .lock()
+            .expect("CLI runner test lock should not be poisoned")
     }
 
     struct ScopedDevSeed {
