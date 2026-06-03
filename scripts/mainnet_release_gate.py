@@ -15,12 +15,19 @@ REQUIRED_DOCS = [
 ]
 
 def has_forbidden_secrets() -> bool:
-    pats = [r"(?i)PRIVATE_KEY\s*=", r"(?i)MNEMONIC\s*=", r"AKIA[0-9A-Z]{16}"]
+    assignment_re = re.compile(r"(?m)^\s*(?:export\s+)?(?:PRIVATE_KEY|MNEMONIC)\s*=\s*([^\s#]+)")
+    aws_key_re = re.compile(r"AKIA[0-9A-Z]{16}")
+    example_value_prefixes = ("replace_", "your_", "<", "$")
+    ignored_dirs = {".git", "target", "node_modules", ".venv", ".cocoindex_code"}
     for p in ROOT.rglob("*"):
-        if not p.is_file() or any(x in p.parts for x in [".git", "target", "node_modules", ".venv"]):
+        if not p.is_file() or any(x in p.parts for x in ignored_dirs):
             continue
         txt = p.read_text(encoding="utf-8", errors="ignore")
-        if any(re.search(rx, txt) for rx in pats):
+        has_secret_assignment = any(
+            not match.group(1).strip("\"'").lower().startswith(example_value_prefixes)
+            for match in assignment_re.finditer(txt)
+        )
+        if has_secret_assignment or aws_key_re.search(txt):
             print(f"[mainnet_release_gate] secret-like token found: {p.relative_to(ROOT)}")
             return True
     return False

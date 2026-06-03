@@ -49,10 +49,10 @@ cp .env.example .env
 Key configurations:
 ```env
 NETWORK=arbitrum
-ALCHEMY_API_KEY=Fe5T2pGsX76ml9kDCwVRZhtmkdixfrDQ
-DRPC_API_KEY=ArgUBy0RzURpos-Jlz1TqLRxbgscV2AR8JXZrqRhf0fE
-ANKR_API_KEY=648269110992d35fb12b490f3e9d00e18141ad9212081909344f15ec1c342a3c
-PRIVATE_KEY=480c2f0730a4b305123b759f2a20ceb701643116671b232ffd5cdcbb90d4431a
+ALCHEMY_API_KEY=replace_with_alchemy_api_key
+DRPC_API_KEY=replace_with_drpc_api_key
+ANKR_API_KEY=replace_with_ankr_api_key
+PRIVATE_KEY=replace_with_private_key
 ```
 
 ## Architecture

@@ -264,9 +264,9 @@ make lifecycle
 # .env
 RPC_URL=http://localhost:8545
 IPFS_URL=http://localhost:5001
-PRIVATE_KEY=0x...
-COMPILER_KEY=0x...
-CHECKER_KEY=0x...
+PRIVATE_KEY=replace_with_private_key
+COMPILER_KEY=replace_with_compiler_key
+CHECKER_KEY=replace_with_checker_key
 ```
 
 ## Testing Strategy
