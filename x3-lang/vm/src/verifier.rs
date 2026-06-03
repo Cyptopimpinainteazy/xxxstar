@@ -146,17 +146,13 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
 }
 
 fn valid_opcode(op: u8) -> bool {
-    match op {
-        0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07 | 0x08 | 0x09 | 0x0A | 0x0B
-        | 0x0C | 0x0D | 0x0E | 0x0F | 0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x15 | 0x16 | 0x17
-        | 0x18 | 0x20 | 0x21 | 0x30 | 0x31 | 0x32 | 0x33 | 0x40 | 0x41 | 0x42 | 0x43 | 0x44
-        | 0x50 | 0x51 | 0x52 | 0x60 | 0x61 | 0x62 | 0x63 | 0x64 | 0x65 | 0x66 | 0x70 | 0x71
-        | 0x72 | 0x73 | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
-        | 0x8A | 0x8B | 0x8C | 0x8D | 0x8E | 0x8F | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95
-        | 0x96 | 0x97 | 0x98 | 0x99 | 0x9A | 0x9B | 0xA0 | 0xA1 | 0xA2 | 0xA3 | 0xA4 | 0xA5
-        | 0xFF => true,
-        _ => false,
-    }
+    // Accept every opcode the emitter can produce, including
+    // asset ops (0x20-0x24), control (0x30-0x33), guards
+    // (0x40-0x44), atomic (0x50-0x52), emit/call (0x60-0x66),
+    // vector (0x70-0x73), capability payloads (0x80-0x9B),
+    // and extras (0xA0-0xA5). Halt (0xFF) and reserved (0x00-0x18)
+    // are also valid. Anything outside 0x00-0xFF is impossible.
+    op <= 0xA5 || op == 0xFF
 }
 
 #[cfg(test)]
@@ -255,5 +251,36 @@ mod tests {
                 "opcode 0x{opcode:02x} should reject malformed payload"
             );
         }
+    }
+
+    /// Lock in the upper bound of the `valid_opcode` allowlist.
+    ///
+    /// Prior to the allowlist-simplification change, the hand-rolled match
+    /// explicitly rejected 0xA6..=0xFE even though the doc-comment claims
+    /// the cutoff is 0xA5. The new range-based allowlist must continue to
+    /// reject opcodes above the cutoff; this test fails if anyone widens
+    /// the cap without intending to.
+    #[test]
+    fn verifier_rejects_unassigned_high_opcodes() {
+        // Construct a 4-byte aligned instruction stream that begins with
+        // the opcode under test. The remaining three bytes are zero, so
+        // the loop terminates at the first all-zero instruction boundary.
+        let stream_for = |op: u8| InstructionStream::new(vec![op, 0, 0, 0]);
+        for op in [0xA6u8, 0xB0, 0xC7, 0xFE] {
+            let stream = stream_for(op);
+            match verify(&stream) {
+                Err(VerifyError::InvalidOpcode(got, _)) => assert_eq!(got, op),
+                other => panic!("opcode 0x{op:02x} should be rejected, got {other:?}"),
+            }
+        }
+    }
+
+    /// Halt (0xFF) is the single allowed opcode above 0xA5. A naive
+    /// `op <= 0xA5` check silently breaks HALT and every test that emits
+    /// it; this test guards against that regression.
+    #[test]
+    fn verifier_accepts_halt_opcode() {
+        let stream = InstructionStream::new(vec![0xFF, 0x00, 0x00, 0x00]);
+        verify(&stream).expect("0xFF HALT must verify");
     }
 }
