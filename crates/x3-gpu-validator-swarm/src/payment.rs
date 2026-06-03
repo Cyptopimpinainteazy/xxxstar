@@ -628,13 +628,15 @@ pub mod wallet_sync {
 mod tests {
     use super::*;
 
+    const TEST_WALLET: &str = "0x1111111111111111111111111111111111111111";
+
     #[test]
     fn test_provider_registration() {
         let config = SwarmConfig::default();
         let payment = PaymentSystem::new(config);
 
         let result =
-            payment.register_provider("provider1".to_string(), "0x1234".to_string(), 1000000);
+            payment.register_provider("provider1".to_string(), TEST_WALLET.to_string(), 1000000);
 
         assert!(result.is_ok());
         assert_eq!(payment.get_all_providers().len(), 1);
@@ -646,7 +648,7 @@ mod tests {
         let payment = PaymentSystem::new(config);
 
         payment
-            .register_provider("provider1".to_string(), "0x1234".to_string(), 1000000)
+            .register_provider("provider1".to_string(), TEST_WALLET.to_string(), 1000000)
             .unwrap();
 
         let record = WorkRecord {
