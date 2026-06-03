@@ -15,15 +15,16 @@
 //!
 //! // Create a compute meter with a limit
 //! let mut meter = ComputeMeter::new(200_000);
-//! meter.consume(10_000)?; // Consume 10,000 compute units
+//! meter.consume(10_000).unwrap(); // Consume 10,000 compute units
 //!
 //! // Create a gas meter with a limit
 //! let mut gas_meter = GasMeter::new(1_000_000);
-//! gas_meter.consume(50_000)?; // Consume 50,000 gas
+//! gas_meter.consume(50_000).unwrap(); // Consume 50,000 gas
 //!
 //! // Check operation costs
 //! let costs = OperationCosts::default();
-//! let cost = costs.signing_ed25519(); // Get ed25519 signing cost
+//! let cost = costs.signing_ed25519; // Get ed25519 signing cost
+//! assert_eq!(cost, 100);
 //! ```
 
 extern crate alloc;
