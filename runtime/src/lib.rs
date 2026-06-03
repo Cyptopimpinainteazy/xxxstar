@@ -4396,29 +4396,33 @@ mod cross_chain_proof_verifier_tests {
 
     #[test]
     fn lock_proof_rejects_mismatched_operation() {
-        set_single_authority();
-        let origin = seeded_authority();
-        let proof = lock_proof_for(&make_operation(10));
+        sp_io::TestExternalities::default().execute_with(|| {
+            set_single_authority();
+            let origin = seeded_authority();
+            let proof = lock_proof_for(&make_operation(10));
 
-        let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
-        assert!(ok.is_ok());
+            let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
+            assert!(ok.is_ok());
 
-        let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
-        assert!(
-            matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation")
-        );
+            let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
+            assert!(
+                matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation")
+            );
+        });
     }
 
     #[test]
     fn merkle_receipt_rejects_mismatched_operation() {
-        set_single_authority();
-        let origin = seeded_authority();
-        let proof = merkle_receipt_for(&make_operation(10));
+        sp_io::TestExternalities::default().execute_with(|| {
+            set_single_authority();
+            let origin = seeded_authority();
+            let proof = merkle_receipt_for(&make_operation(10));
 
-        let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
-        assert!(ok.is_ok());
+            let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
+            assert!(ok.is_ok());
 
-        let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
-        assert!(err.is_err());
+            let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
+            assert!(err.is_err());
+        });
     }
 }
