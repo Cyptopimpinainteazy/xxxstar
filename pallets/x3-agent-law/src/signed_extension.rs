@@ -20,7 +20,7 @@ use sp_std::{fmt, marker::PhantomData, prelude::*};
 ///
 /// **SECURITY-CRITICAL**: This runs in the pre-dispatch phase BEFORE any state mutations.
 /// Order in SignedExtra tuple is strict:
-/// ```
+/// ```text
 /// pub type SignedExtra = (
 ///     frame_system::CheckNonZeroSender<Runtime>,
 ///     frame_system::CheckSpecVersion<Runtime>,
