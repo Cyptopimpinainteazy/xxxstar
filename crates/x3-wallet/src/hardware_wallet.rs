@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn test_verify_signature_invalid_recovery_id() {
         let sig = HardwareSignature {
-            signature: vec![1, 2, 3, 4, 5, 6, 7, 8],
+            signature: vec![1; 64],
             public_key: vec![1, 2, 3],
             signing_request_id: [0u8; 32],
             verified: false,
