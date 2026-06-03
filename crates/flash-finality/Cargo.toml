@@ -25,4 +25,5 @@ sp-core = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 
 [dev-dependencies]
+schnorrkel = "0.11"
 tokio = { version = "1", features = ["full", "test-util"] }

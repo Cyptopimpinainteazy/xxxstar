@@ -714,7 +714,10 @@ mod tests {
     }
 
     fn make_vote(block_hash: BlockHash, round: RoundNumber, voter: u8) -> Vote {
-        let id = make_id(voter);
+        let mini_secret =
+            schnorrkel::MiniSecretKey::from_bytes(&[voter; 32]).expect("valid test seed");
+        let keypair = mini_secret.expand_to_keypair(schnorrkel::ExpansionMode::Ed25519);
+        let id = keypair.public.to_bytes();
         let msg_hash = {
             let mut h = Sha256::new();
             h.update(&block_hash);
@@ -722,10 +725,9 @@ mod tests {
             h.update(&id);
             h.finalize()
         };
-        let mut sig_array = [0u8; 64];
-        // Copy hash twice to fill 64 bytes (test purpose only)
-        sig_array[..32].copy_from_slice(&msg_hash);
-        sig_array[32..].copy_from_slice(&msg_hash);
+        let sig_array = keypair
+            .sign(schnorrkel::signing_context(b"substrate").bytes(&msg_hash))
+            .to_bytes();
         Vote {
             block_hash,
             block_number: 1,
