@@ -13,12 +13,14 @@
 //  WITNESS-CANON-001      — commitment is deterministic across calls
 //  FRAUD-PROOF-002        — verifier fn is referentially transparent
 //  FRAUD-PROOF-003        — non-fraudulent proofs are always rejected
+use codec::{Compact, Encode};
 use sp_core::H256;
 use x3_chain_runtime::fraud_proofs::{
     committee::select_committee,
     scheduler_v1::scheduler_commitment_from_bytes,
     types::{DisputedBlockMeta, FraudProofV1, HeaderRef, PROOF_TYPE_SCHED_MISMATCH_V1},
     verifier::{compute_proof_id, verify_scheduler_mismatch_v1},
+    witness_v1::{AccessListV1, SchedulerWitnessV1, WITNESS_VERSION},
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -33,17 +35,19 @@ fn zero_hash() -> H256 {
 
 /// Minimal 1-tx no-deps witness that the reference scheduler accepts.
 fn minimal_witness() -> Vec<u8> {
-    vec![
-        0x01, // version = 1
-        0x04, // rules_version = 1 (compact)
-        0x04, // tx_count = 1 (compact)
-        // tx_ids[0]: 32 zero bytes
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, // access_list[0].access_count = 0
-        0x00, // dep_edges = 0
-        0x00, // reserved = 0
-    ]
+    SchedulerWitnessV1 {
+        version: WITNESS_VERSION,
+        rules_version: 1,
+        tx_count: Compact(1),
+        tx_ids: vec![zero_hash()],
+        access_lists: vec![AccessListV1 {
+            access_count: Compact(0),
+            accesses: Vec::new(),
+        }],
+        seed: None,
+        reserved: Vec::new(),
+    }
+    .encode()
 }
 
 fn make_disputed(commitment: H256) -> DisputedBlockMeta<u64> {
