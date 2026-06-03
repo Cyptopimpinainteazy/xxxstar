@@ -291,41 +291,36 @@ impl Signer for Secp256k1Signer {
     }
 
     fn sign(&self, message: &[u8]) -> Signature {
-        use secp256k1::{Message, Secp256k1};
+        use secp256k1::Message;
 
-        let secp = Secp256k1::new();
         let message_hash = blake2_256(message);
         let message = Message::from_digest_slice(&message_hash).unwrap();
-        let secret_key = secp256k1::SecretKey::from_slice(&self.secret_key).unwrap();
-        let signature = secp.sign_ecdsa(&message, &secret_key);
-        let mut sig_bytes = [0u8; 65];
-        let compact = signature.serialize_compact();
-        sig_bytes[..32].copy_from_slice(&compact[..32]);
-        sig_bytes[32..64].copy_from_slice(&compact[32..]);
-        sig_bytes[64] = 0; // recovery id (not used in this context)
-
-        Signature::Secp256k1(sig_bytes)
+        let signature = sign_secp256k1_message(&self.secret_key, &message);
+        Signature::Secp256k1(signature)
     }
 
     fn sign_hash(&self, message_hash: &[u8; 32]) -> Signature {
-        use secp256k1::{Message, Secp256k1};
+        use secp256k1::Message;
 
-        let secp = Secp256k1::new();
         let message = Message::from_digest_slice(message_hash).unwrap();
-        let secret_key = secp256k1::SecretKey::from_slice(&self.secret_key).unwrap();
-        let signature = secp.sign_ecdsa(&message, &secret_key);
-        let mut sig_bytes = [0u8; 65];
-        let compact = signature.serialize_compact();
-        sig_bytes[..32].copy_from_slice(&compact[..32]);
-        sig_bytes[32..64].copy_from_slice(&compact[32..]);
-        sig_bytes[64] = 0; // recovery id
-
-        Signature::Secp256k1(sig_bytes)
+        let signature = sign_secp256k1_message(&self.secret_key, &message);
+        Signature::Secp256k1(signature)
     }
 
     fn public_key(&self) -> PublicKey {
         PublicKey::Secp256k1(self.public_key)
     }
+}
+
+fn sign_secp256k1_message(secret_key: &[u8; 32], message: &secp256k1::Message) -> [u8; 65] {
+    let secp = secp256k1::Secp256k1::new();
+    let secret_key = secp256k1::SecretKey::from_slice(secret_key).unwrap();
+    let signature = secp.sign_ecdsa_recoverable(message, &secret_key);
+    let (recovery_id, compact) = signature.serialize_compact();
+    let mut sig_bytes = [0u8; 65];
+    sig_bytes[..64].copy_from_slice(&compact);
+    sig_bytes[64] = recovery_id.to_i32() as u8;
+    sig_bytes
 }
 
 /// sr25519 signer for Substrate/X3
@@ -554,7 +549,6 @@ mod tests {
     #[test]
     fn test_verify_signature() {
         let message = b"test message";
-        let message_hash: [u8; 32] = blake2_256(message);
 
         // Test ed25519
         let ed_signer = Ed25519Signer::from_seed(&[0u8; 32]);
@@ -567,7 +561,7 @@ mod tests {
         ));
 
         // Test secp256k1
-        let secp_signer = Secp256k1Signer::from_secret_key(&[0u8; 32]).unwrap();
+        let secp_signer = Secp256k1Signer::from_secret_key(&[1u8; 32]).unwrap();
         let secp_sig = secp_signer.sign(message);
         assert!(verify_signature(
             secp_sig.as_bytes(),

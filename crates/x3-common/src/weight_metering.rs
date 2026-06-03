@@ -365,7 +365,8 @@ impl WeightMeter {
     /// Consume an operation with the given key type
     pub fn consume_operation(&mut self, operation: Operation) -> WeightResult<()> {
         let cost = self.config.operation_costs.signing(operation.key_type());
-        self.consume_compute(cost)
+        self.compute
+            .consume_with_budget(cost, self.config.max_operation_budget)
     }
 
     /// Consume a hash operation
@@ -532,10 +533,8 @@ mod tests {
             .consume_operation(Operation::Sign(KeyType::Ed25519))
             .unwrap();
 
-        // Should fail when exceeding budget
-        // (100 + 100 = 200, which is within the 50,000 budget)
-        // Let's use a smaller budget
-        config.max_operation_budget = 150;
+        // Should fail when the second operation exceeds budget.
+        config.max_operation_budget = 199;
         let mut meter = WeightMeter::new(config);
 
         meter
