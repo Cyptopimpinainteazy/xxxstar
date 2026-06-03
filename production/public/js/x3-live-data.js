@@ -12,6 +12,11 @@
  * To override, set before loading this script:
  *   window.X3_RPC_WS  = 'wss://ws.x3star.net' or 'ws://localhost:9933'
  *   window.X3_RPC_HTTP = 'https://rpc.x3star.net' or 'http://localhost:9933'
+ *
+ * TODO(production-bundle): the production bundle at
+ *   production/public/assets/index-*.js is a Vite build artifact. These
+ *   source-level XSS fixes will not reach end users until the bundle is
+ *   rebuilt. Track as a follow-up to "chore/regenerate-production-bundle".
  */
 (function X3LiveData() {
   'use strict';
@@ -278,7 +283,11 @@
       try { msg = JSON.parse(ev.data); } catch (_) { return; }
 
       // Resolve pending one-shot calls
-      if (msg.id && pendingRpc[msg.id]) {
+      // SECURITY: validate msg.id and the callback's type before calling. The
+      // WebSocket message comes from the chain RPC relay and is generally
+      // trusted, but a malicious or buggy relay could send unexpected types.
+      // (CodeQL js/unvalidated-dynamic-method-call #2072)
+      if (typeof msg.id === 'number' && pendingRpc[msg.id] && typeof pendingRpc[msg.id] === 'function') {
         pendingRpc[msg.id](msg.result);
         delete pendingRpc[msg.id];
         return;

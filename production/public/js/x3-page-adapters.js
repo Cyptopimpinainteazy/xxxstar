@@ -1,3 +1,13 @@
+/*
+ * X3 page adapters — DOM glue between x3-live-data.js and the various
+ * x3star-*.html pages (mission terminal, KYC onboarding, etc.).
+ *
+ * TODO(production-bundle): the production bundle at
+ *   production/public/assets/index-*.js is a Vite build artifact. The
+ *   source-level XSS hardening in this file (innerHTML → textContent
+ *   and createElement) will not reach end users until the bundle is
+ *   rebuilt. Track as a follow-up to "chore/regenerate-production-bundle".
+ */
 (function (global) {
   "use strict";
 
@@ -2835,14 +2845,18 @@
       function appendLine(text, className) {
         var row = document.createElement("div");
         row.className = "log-line";
-        row.innerHTML =
-          '<span class="ll-time">[' +
-          new Date().toISOString().slice(11, 19) +
-          ']</span><span class="' +
-          className +
-          '">' +
-          text +
-          "</span>";
+        // Build with element creation / textContent. `text` and `className`
+        // both come from a terminal input field, so a user typing a string
+        // containing <img onerror=...> would otherwise get script execution.
+        // (CodeQL js/dom-text-reinterpreted-as-html #2074)
+        var tsSpan = document.createElement("span");
+        tsSpan.className = "ll-time";
+        tsSpan.textContent = "[" + new Date().toISOString().slice(11, 19) + "]";
+        var msgSpan = document.createElement("span");
+        msgSpan.className = className;
+        msgSpan.textContent = text;
+        row.appendChild(tsSpan);
+        row.appendChild(msgSpan);
         feed.insertBefore(row, feed.firstChild);
       }
       appendLine("> " + cmd, "ll-info");

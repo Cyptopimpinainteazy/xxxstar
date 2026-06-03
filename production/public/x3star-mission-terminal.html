@@ -415,7 +415,16 @@ function addLog(override){
   const ts=`${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')}`;
   const d=document.createElement('div');
   d.className='log-line';
-  d.innerHTML=`<span class="ll-time">[${ts}]</span><span class="${entry.cls}">${entry.msg}</span>`;
+  // Build with textContent to avoid XSS if logMsgs ever contains user input.
+  // (CodeQL js/dom-text-reinterpreted-as-html #2076)
+  const tsSpan=document.createElement('span');
+  tsSpan.className='ll-time';
+  tsSpan.textContent=`[${ts}]`;
+  const msgSpan=document.createElement('span');
+  msgSpan.className=entry.cls;
+  msgSpan.textContent=entry.msg;
+  d.appendChild(tsSpan);
+  d.appendChild(msgSpan);
   logEl.insertBefore(d,logEl.firstChild);
   if(logEl.children.length>60)logEl.removeChild(logEl.lastChild);
 }

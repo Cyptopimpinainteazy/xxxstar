@@ -550,7 +550,28 @@ function showFiles(files, listId, zoneId) {
   Array.from(files).forEach(f => {
     const div = document.createElement('div');
     div.className = 'uploaded-file';
-    div.innerHTML = `<span class="uf-icon">✓</span><span class="uf-name">${f.name}</span><span style="font-size:10px;color:var(--muted)">${(f.size/1024).toFixed(0)}KB</span><span class="uf-remove" onclick="this.parentElement.remove()">×</span>`;
+    // Use textContent / element construction instead of innerHTML. File names
+    // are user-controlled; an attacker naming a file "<img src=x onerror=...>"
+    // would otherwise get script execution on this page.
+    // (CodeQL js/dom-text-reinterpreted-as-html #2075)
+    const icon = document.createElement('span');
+    icon.className = 'uf-icon';
+    icon.textContent = '✓';
+    const name = document.createElement('span');
+    name.className = 'uf-name';
+    name.textContent = f.name;
+    const size = document.createElement('span');
+    size.style.fontSize = '10px';
+    size.style.color = 'var(--muted)';
+    size.textContent = `${(f.size / 1024).toFixed(0)}KB`;
+    const remove = document.createElement('span');
+    remove.className = 'uf-remove';
+    remove.textContent = '×';
+    remove.addEventListener('click', () => div.remove());
+    div.appendChild(icon);
+    div.appendChild(name);
+    div.appendChild(size);
+    div.appendChild(remove);
     list.appendChild(div);
   });
   document.getElementById(zoneId).querySelector('.uz-title').textContent = '✓ File uploaded';
