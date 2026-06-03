@@ -11,10 +11,12 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import contextlib
+import ipaddress
 import json
 import os
 import random
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -31,6 +33,95 @@ DASHBOARD_FILE = REPO_ROOT / "chainbench-ultimate(1).html"
 STATE_DIR_DEFAULT = Path.home() / ".local/share/x3/testnet-local/chainbench"
 
 
+# ── SSRF guard ────────────────────────────────────────────────────────────────
+# Blocks outbound urllib requests to private/loopback/link-local/ULA/multicast
+# destinations. Fixes CodeQL py/full-ssrf (#1–#6). Operator-controlled hosts
+# can be added via the X3_SSRF_ALLOW_HOSTS env var (comma-separated) when
+# running with intentional private RPC peers (e.g. testnet harnesses).
+ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
+
+
+def _ip_is_private(addr: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return True
+    if ip.version == 4:
+        return (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        )
+    # IPv6
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def _host_is_public(host: str, allow_hosts: set[str]) -> bool:
+    if not host:
+        return False
+    if host.lower() in {h.lower() for h in allow_hosts}:
+        return True
+    # Literal IP?
+    try:
+        return not _ip_is_private(host)
+    except Exception:
+        pass
+    # Hostname: resolve and check every address.
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return False
+    for fam, _type, _proto, _canon, sockaddr in infos:
+        if _ip_is_private(str(sockaddr[0])):
+            return False
+    return True
+
+
+def _allow_hosts() -> set[str]:
+    raw = os.environ.get("X3_SSRF_ALLOW_HOSTS", "")
+    return {h.strip() for h in raw.split(",") if h.strip()}
+
+
+class _SSRFBlocked(Exception):
+    pass
+
+
+def _safe_urlopen(url_or_req, *args: Any, **kwargs: Any):
+    """Wraps urllib.request.urlopen with a scheme/host allowlist.
+
+    Rejects non-http(s) schemes, embedded credentials, and hostnames that
+    resolve to a private/loopback/link-local/ULA/multicast address.
+
+    Accepts either a URL string or a urllib.request.Request (validates the
+    request's full_url). Raises _SSRFBlocked on rejection; urlopen may still
+    raise URLError/HttpError for transport issues.
+    """
+    if hasattr(url_or_req, "full_url"):
+        url = url_or_req.full_url
+    else:
+        url = url_or_req
+    if not isinstance(url, str) or not url:
+        raise _SSRFBlocked("empty_url")
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ALLOWED_URL_SCHEMES:
+        raise _SSRFBlocked(f"blocked_scheme:{parsed.scheme}")
+    if parsed.username or parsed.password:
+        raise _SSRFBlocked("embedded_credentials")
+    if not _host_is_public(parsed.hostname or "", _allow_hosts()):
+        raise _SSRFBlocked(f"private_or_blocked_host:{parsed.hostname}")
+    return urllib.request.urlopen(url_or_req, *args, **kwargs)
+
+
 def rpc_call(url: str, method: str, params: list[Any]) -> dict[str, Any]:
     payload = json.dumps(
         {
@@ -45,7 +136,7 @@ def rpc_call(url: str, method: str, params: list[Any]) -> dict[str, Any]:
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=2.5) as resp:
+    with _safe_urlopen(req, timeout=2.5) as resp:
         body = resp.read().decode("utf-8")
     return json.loads(body)
 
@@ -66,13 +157,19 @@ def timed_rpc_call(url: str, method: str, params: list[Any], timeout_s: float = 
             data=payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        with _safe_urlopen(req, timeout=timeout_s) as resp:
             body = json.loads(resp.read().decode("utf-8"))
         return {
             "ok": "result" in body and "error" not in body,
             "latency_ms": int((time.time() - started) * 1000),
             "result": body.get("result"),
             "error": body.get("error"),
+        }
+    except _SSRFBlocked as exc:
+        return {
+            "ok": False,
+            "latency_ms": int((time.time() - started) * 1000),
+            "error": f"ssrf_blocked:{exc}",
         }
     except Exception as exc:
         return {
@@ -84,7 +181,7 @@ def timed_rpc_call(url: str, method: str, params: list[Any], timeout_s: float = 
 
 def http_get_json(url: str, timeout_s: float = 2.5) -> dict[str, Any]:
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+    with _safe_urlopen(req, timeout=timeout_s) as resp:
         body = resp.read().decode("utf-8")
     return json.loads(body)
 
@@ -95,7 +192,7 @@ def http_post_json(url: str, payload: dict[str, Any], timeout_s: float = 3.0, he
     if headers:
         hdrs.update(headers)
     req = urllib.request.Request(url, data=data, headers=hdrs)
-    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+    with _safe_urlopen(req, timeout=timeout_s) as resp:
         body = resp.read().decode("utf-8")
     return json.loads(body)
 
@@ -1157,7 +1254,7 @@ class ChainbenchState:
                 ).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            with _safe_urlopen(req, timeout=2.5) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
             out["nodecore"] = {
                 "query_url": self.nodecore_query_url,
@@ -1184,7 +1281,7 @@ class ChainbenchState:
                 ).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            with _safe_urlopen(req, timeout=2.5) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
             ok = "result" in body and "error" not in body
             warning = None
