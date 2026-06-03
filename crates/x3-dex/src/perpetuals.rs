@@ -418,17 +418,24 @@ mod tests {
 
     #[test]
     fn test_calculate_liquidation_price() {
-        let liq_price =
-            PerpetualFuturesEngine::calculate_liquidation_price(10_000, 1_000, 5_000, 5);
+        let liq_price = PerpetualFuturesEngine::calculate_liquidation_price(10_000, 1, 5_000, 5);
 
         assert!(liq_price < 10_000); // For long, liq price below entry
     }
 
     #[test]
     fn test_liquidate_position() {
-        let mut pos =
-            PerpetualFuturesEngine::open_position([1; 32], 1, 2, 1_000, 5, 5_000, 10_000, 100)
-                .unwrap();
+        let mut pos = PerpetualFuturesEngine::open_position(
+            [1; 32],
+            1,
+            2,
+            1_000_000_000_000,
+            5,
+            5_000,
+            10_000,
+            100,
+        )
+        .unwrap();
 
         let liq =
             PerpetualFuturesEngine::liquidate_position(&mut pos, [2; 32], 9_000, 200).unwrap();

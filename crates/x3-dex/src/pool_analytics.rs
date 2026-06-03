@@ -125,16 +125,38 @@ impl PoolAnalyticsEngine {
             return 0;
         }
 
-        // IL ≈ -((√(P1/P0) - 1) / (√(P1/P0) + 1))² for 50/50 pool
-        // Simplified: IL = 2 - 2 * √(Pa/Pa_0 * Pb/Pb_0)
+        const SCALE: u128 = 1_000_000;
 
-        let price_ratio_a = (current_price_a as u128 * 100 / initial_price_a as u128) as u64;
-        let price_ratio_b = (current_price_b as u128 * 100 / initial_price_b as u128) as u64;
+        let numerator = current_price_a as u128 * initial_price_b as u128 * SCALE;
+        let denominator = initial_price_a as u128 * current_price_b as u128;
+        if denominator == 0 {
+            return 0;
+        }
 
-        let product = price_ratio_a as i64 * price_ratio_b as i64;
-        let il = 100 - (product / 50); // Simplified approximation
+        let price_ratio = numerator / denominator;
+        if price_ratio == SCALE {
+            return 0;
+        }
 
-        -il // Return as negative loss
+        let sqrt_ratio = Self::sqrt(price_ratio.saturating_mul(SCALE));
+        let hold_value = 2_u128.saturating_mul(sqrt_ratio).saturating_mul(SCALE)
+            / price_ratio.saturating_add(SCALE);
+        let loss_bps = SCALE.saturating_sub(hold_value).saturating_mul(10_000) / SCALE;
+
+        -(loss_bps as i64)
+    }
+
+    fn sqrt(n: u128) -> u128 {
+        if n == 0 {
+            return 0;
+        }
+        let mut x = n;
+        let mut y = x.div_ceil(2);
+        while y < x {
+            x = y;
+            y = (x + n / x) / 2;
+        }
+        x
     }
 
     /// Get pool metrics snapshot

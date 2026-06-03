@@ -119,16 +119,23 @@ impl RouteFinder {
     ) -> Result<Vec<Vec<String>>, String> {
         let mut paths = Vec::new();
 
-        // Queue: (current_token, current_path_of_pools)
+        // Queue: (current_token, current_path_of_pools, visited_tokens)
         let mut queue: VecDeque<(String, Vec<String>, Vec<String>)> = VecDeque::new();
 
-        // Start: find all pools that have start token
+        // Start by traversing each pool adjacent to the input token.
         if let Some(start_pools) = self.graph.get(start) {
             for pool_id in start_pools {
+                let pool = &self.pools[pool_id];
+                let next_token = if pool.token_a == start {
+                    pool.token_b.clone()
+                } else {
+                    pool.token_a.clone()
+                };
+
                 queue.push_back((
-                    start.to_string(),
+                    next_token.clone(),
                     vec![pool_id.clone()],
-                    vec![start.to_string()],
+                    vec![start.to_string(), next_token],
                 ));
             }
         }
