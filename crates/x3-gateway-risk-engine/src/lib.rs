@@ -157,7 +157,9 @@ impl RiskClassifier for AiRiskClassifier {
         }
 
         // Determine risk level based on score
-        let level = if score >= 8000 {
+        let level = if score >= 8000
+            || (factors.contains(&RiskFactor::InsufficientFinality) && factors.len() > 1)
+        {
             RiskLevel::Critical
         } else if score >= 6000 {
             RiskLevel::High
