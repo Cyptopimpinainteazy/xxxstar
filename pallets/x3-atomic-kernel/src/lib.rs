@@ -73,6 +73,9 @@ mod benchmarking;
 // Re-export proof type for use in RPC and external verifiers
 pub mod proof;
 
+// VM reversion interface for bundle rollback
+pub mod vm_revert;
+
 // Re-export weights for runtime integration
 pub mod weights;
 pub use weights::WeightInfo;
@@ -80,6 +83,7 @@ pub use weights::WeightInfo;
 #[frame_support::pallet]
 pub mod pallet {
     use super::proof::{BundleLeg, PoaeProof};
+    use crate::vm_revert::VmReverter;
     use crate::weights::WeightInfo;
     use frame_support::{
         dispatch::DispatchResult,
@@ -96,6 +100,7 @@ pub mod pallet {
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         ValidTransaction,
     };
+    use sp_std::vec::Vec;
     use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
     // ── Config ────────────────────────────────────────────────────────────────
@@ -135,6 +140,13 @@ pub mod pallet {
         /// Read-only economic halt gate.
         type EconomicHalt: EconomicHaltInspect;
 
+        /// Origin allowed to submit and manage atomic cross-VM bundles.
+        ///
+        /// Production runtimes should wire this to the x3-lang gateway account
+        /// so users cannot bypass x3-lang by calling atomic-kernel extrinsics
+        /// directly.
+        type X3LangOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
+
         /// Origin that is allowed to call `finalize_with_settlement`.
         ///
         /// In production this should be restricted to the settlement pallet's
@@ -144,6 +156,13 @@ pub mod pallet {
         /// that allows any funded account to finalize any bundle as if it were
         /// a settlement result.
         type SettlementOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
+        /// VM state reverter for bundle rollback.
+        ///
+        /// If set to `NoopVmReverter`, rollback will NOT revert VM side effects
+        /// and will log a warning. Production runtimes MUST set this to a real
+        /// implementation that can revert EVM/SVM/X3VM state diffs.
+        type VmReverter: crate::vm_revert::VmReverter;
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -157,6 +176,19 @@ pub mod pallet {
         H256, // bundle_id
         BundleRecord<T>,
         OptionQuery,
+    >;
+
+    /// Nonce registry for cross-chain replay protection
+    #[pallet::storage]
+    #[pallet::getter(fn nonce_registry)]
+    pub type NonceRegistry<T: Config> = StorageDoubleMap<
+        _,
+        Twox64Concat,
+        u32,
+        Blake2_128Concat,
+        T::AccountId,
+        NonceState,
+        ValueQuery,
     >;
 
     /// PoAE proofs by bundle_id — stored on-chain for external verifiers.
@@ -190,6 +222,21 @@ pub mod pallet {
     #[pallet::storage]
     pub type FinalityCertAnchors<T: Config> = StorageMap<_, Twox64Concat, u64, H256, OptionQuery>;
 
+    /// Execution receipts for each leg of a bundle.
+    ///
+    /// Populated when a bundle is submitted (with `executed: false` and empty
+    /// state diffs). Updated as legs are executed off-chain. Used during
+    /// rollback to determine which VM side effects need reversion.
+    #[pallet::storage]
+    #[pallet::getter(fn bundle_leg_receipts)]
+    pub type BundleLegReceipts<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        H256, // bundle_id
+        BoundedVec<crate::vm_revert::LegReceipt, T::MaxLegsPerBundle>,
+        ValueQuery,
+    >;
+
     // ── Types ─────────────────────────────────────────────────────────────────
 
     /// Bundle execution status.
@@ -205,6 +252,26 @@ pub mod pallet {
         Finalized,
         /// Execution failed or deadline expired; bond partially slashed.
         RolledBack,
+    }
+
+    /// Nonce state for replay protection
+    #[derive(
+        Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+    )]
+    pub struct NonceState {
+        /// Last used nonce
+        pub last_nonce: u64,
+        /// Set of used nonces (for out-of-order nonces)
+        pub used_nonces: BoundedVec<u64, ConstU32<1024>>,
+    }
+
+    impl Default for NonceState {
+        fn default() -> Self {
+            Self {
+                last_nonce: 0,
+                used_nonces: BoundedVec::new(),
+            }
+        }
     }
 
     /// Structured pre-image that every `receipt_root` MUST commit to.
@@ -342,6 +409,8 @@ pub mod pallet {
         InvalidBundleData,
         /// New bundle submissions halted by economic safety policy.
         EconomicHaltActive,
+        /// Bundle nonce is stale or already used for this chain/account.
+        InvalidNonce,
     }
 
     // ── Hooks ─────────────────────────────────────────────────────────────────
@@ -377,7 +446,7 @@ pub mod pallet {
                 cert_key.extend_from_slice(&block_num_u64.to_le_bytes());
                 match sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &cert_key) {
                     Some(v) if v.len() == 32 => H256::from_slice(&v),
-                    _ => H256::zero(), // Flash Finality not yet running — pallet accepts zero
+                    _ => H256::zero(), // Flash Finality not yet running — do_finalize_bundle rejects zero, so this path is a no-op until Flash Finality is active
                 }
             };
 
@@ -471,6 +540,9 @@ pub mod pallet {
                     if record.status == BundleStatus::Pending
                         || record.status == BundleStatus::Executing
                     {
+                        // Attempt to revert VM side effects before marking rolled back
+                        let revert_failures = Self::do_revert_bundle_legs(*bundle_id);
+
                         // Bundle has expired - trigger rollback
                         let mut updated_record = record.clone();
                         updated_record.status = BundleStatus::RolledBack;
@@ -484,10 +556,21 @@ pub mod pallet {
                             let _ = T::Currency::slash(&record.submitter, slash);
                         }
 
+                        // Clean up leg receipts storage
+                        BundleLegReceipts::<T>::remove(bundle_id);
+
                         Self::deposit_event(Event::BundleRolledBack {
                             bundle_id: *bundle_id,
                             reason: BundleRollbackReason::DeadlineExceeded,
                         });
+
+                        if revert_failures > 0 {
+                            log::error!(
+                                target: "x3-atomic-kernel",
+                                "Bundle {:?}: {} legs failed VM revert on auto-expiry",
+                                bundle_id, revert_failures
+                            );
+                        }
 
                         log::warn!(
                             target: "x3-atomic-kernel",
@@ -530,14 +613,32 @@ pub mod pallet {
         /// - Max legs enforced by `MaxLegsPerBundle`.
         /// - Deadline enforced by `BundleDeadlineBlocks`.
         /// - Bond reserved on submission, slashed on rollback.
+        /// - Nonce-based replay protection
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::submit_atomic_bundle(legs.len() as u32))]
         pub fn submit_atomic_bundle(
             origin: OriginFor<T>,
             legs: BoundedVec<BundleLeg, T::MaxLegsPerBundle>,
             deadline_blocks: BlockNumberFor<T>,
+            chain_id: u32, // New parameter for chain ID
+            nonce: u64,    // New parameter for nonce
         ) -> DispatchResult {
-            let submitter = ensure_signed(origin)?;
+            let submitter = T::X3LangOrigin::ensure_origin(origin)?;
+
+            // Nonce validation
+            let mut nonce_state = NonceRegistry::<T>::get(chain_id, &submitter);
+            ensure!(
+                nonce > nonce_state.last_nonce && !nonce_state.used_nonces.contains(&nonce),
+                Error::<T>::InvalidNonce
+            );
+
+            // Update nonce state
+            nonce_state.last_nonce = nonce;
+            nonce_state
+                .used_nonces
+                .try_push(nonce)
+                .map_err(|_| Error::<T>::TooManyLegs)?;
+            NonceRegistry::<T>::insert(chain_id, &submitter, nonce_state);
 
             ensure!(
                 !T::EconomicHalt::is_halted(),
@@ -579,6 +680,22 @@ pub mod pallet {
             };
 
             Bundles::<T>::insert(bundle_id, record);
+
+            // Initialize per-leg receipts for VM reversion during rollback.
+            // Each leg starts as unexecuted with an empty state diff.
+            let leg_receipts: BoundedVec<crate::vm_revert::LegReceipt, T::MaxLegsPerBundle> = legs
+                .iter()
+                .enumerate()
+                .map(|(i, leg)| crate::vm_revert::LegReceipt {
+                    leg_index: i as u32,
+                    vm_type: leg.vm_type.clone(),
+                    executed: false,
+                    state_diff: crate::vm_revert::StateDiff::from(Vec::new()),
+                })
+                .collect::<Vec<_>>()
+                .try_into()
+                .expect("leg count already validated against MaxLegsPerBundle");
+            BundleLegReceipts::<T>::insert(bundle_id, leg_receipts);
 
             // Add to deadline index for O(1) expiry lookup
             let mut deadline_bundles = DeadlineIndex::<T>::get(deadline);
@@ -626,7 +743,7 @@ pub mod pallet {
             finality_cert: H256,
             finalized_block: BlockNumberFor<T>,
         ) -> DispatchResult {
-            ensure_signed(origin)?;
+            let _x3_lang_gateway = T::X3LangOrigin::ensure_origin(origin)?;
             Self::do_finalize_bundle(bundle_id, receipt_root, finality_cert, finalized_block)
         }
 
@@ -697,7 +814,7 @@ pub mod pallet {
         #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::assign_bundle_executor())]
         pub fn assign_bundle_executor(origin: OriginFor<T>, bundle_id: H256) -> DispatchResult {
-            let executor = ensure_signed(origin)?;
+            let executor = T::X3LangOrigin::ensure_origin(origin)?;
 
             let mut record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
 
@@ -732,6 +849,12 @@ pub mod pallet {
         /// Called by the submitter to cancel, or by governance/runtime on deadline.
         /// In a production system, slash a portion of the bond if called due to
         /// `ExecutionFailed` or `AccessSetViolation`.
+        ///
+        /// VM side effects are reverted via `T::VmReverter::revert_leg()` for
+        /// each executed leg that has a non-empty state diff. If the reverter
+        /// is `NoopVmReverter`, a warning is logged signalling that VM state
+        /// was NOT reverted — the runtime does not silently advertise stronger
+        /// atomicity than it can enforce.
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::rollback_atomic_bundle())]
         pub fn rollback_atomic_bundle(
@@ -739,26 +862,6 @@ pub mod pallet {
             bundle_id: H256,
             reason: BundleRollbackReason,
         ) -> DispatchResult {
-            // S0-005 FIX: Wrap rollback in storage transaction to ensure atomicity
-            // of status update, bond slashing, and event emission. If any operation
-            // fails, the entire rollback is reverted.
-            //
-            // NOTE: This addresses the storage atomicity part of S0-005, but does NOT
-            // yet implement VM state reversion. The current codebase does not track:
-            //   - Individual leg execution receipts
-            //   - VM state diffs per execution
-            //   - Prepare roots for state snapshots
-            //
-            // Full S0-005 remediation requires:
-            //   [ ] Add BundleLegReceipts<T> storage for execution state tracking
-            //   [ ] Implement VmExecutor::revert_vm_leg trait method for each VM type
-            //   [ ] Call revert_vm_leg for each executed leg during rollback
-            //   [ ] Add StateDiff tracking in execution receipts
-            //
-            // Until then, this fix prevents partial state corruption at the bundle
-            // lifecycle level (status, bonds, events), but cannot revert EVM/SVM/X3VM
-            // execution side effects. This is tracked as a known limitation and will
-            // be addressed in a follow-up phase.
             frame_support::storage::with_storage_layer(|| {
                 let caller = ensure_signed(origin)?;
 
@@ -799,6 +902,9 @@ pub mod pallet {
                     }
                 }
 
+                // Attempt to revert VM side effects for each executed leg.
+                let revert_failures = Self::do_revert_bundle_legs(bundle_id);
+
                 // S0-005: Status update now participates in storage transaction.
                 // If slashing or event emission fails, this status change reverts.
                 record.status = BundleStatus::RolledBack;
@@ -838,7 +944,18 @@ pub mod pallet {
                     );
                 }
 
+                // Clean up leg receipts storage after rollback
+                BundleLegReceipts::<T>::remove(bundle_id);
+
                 Self::deposit_event(Event::BundleRolledBack { bundle_id, reason });
+
+                if revert_failures > 0 {
+                    log::error!(
+                        target: "x3-atomic-kernel",
+                        "Bundle {:?}: {}/legs failed VM revert — side effects may persist",
+                        bundle_id, revert_failures
+                    );
+                }
 
                 log::warn!(
                     target: "x3-atomic-kernel",
@@ -911,11 +1028,14 @@ pub mod pallet {
                 bundle_id,
                 receipt_root,
                 finality_cert,
-                ..
+                committed_at_ns,
             } = call
             {
                 // receipt_root must be non-zero (proves GPU committed actual data)
                 if *receipt_root == H256::zero() {
+                    return InvalidTransaction::BadProof.into();
+                }
+                if *finality_cert == H256::zero() {
                     return InvalidTransaction::BadProof.into();
                 }
                 // Bundle must exist, be in Executing state (not Pending!), and have
@@ -928,17 +1048,15 @@ pub mod pallet {
                         if record.status == BundleStatus::Executing
                             && record.executor.is_some() =>
                     {
-                        // Include finality_cert bytes in the dedup tag so that a zero-cert and a
-                        // real-cert tx for the same bundle are treated as distinct (the real one
-                        // should win in the pool).
+                        // Include the proof-bearing fields in the dedup tag so competing
+                        // receipt roots/certs for the same bundle do not evict each other before
+                        // dispatch-time proof checks can run.
                         let mut tag = bundle_id.as_bytes().to_vec();
+                        tag.extend_from_slice(receipt_root.as_bytes());
                         tag.extend_from_slice(finality_cert.as_bytes());
+                        tag.extend_from_slice(&committed_at_ns.to_le_bytes());
                         ValidTransaction::with_tag_prefix("X3AtomicFinalize")
-                            .priority(if *finality_cert == H256::zero() {
-                                TransactionPriority::MAX / 4
-                            } else {
-                                TransactionPriority::MAX / 2
-                            })
+                            .priority(TransactionPriority::MAX / 2)
                             .and_provides([tag.as_slice()])
                             .longevity(5)
                             .propagate(true)
@@ -980,6 +1098,47 @@ pub mod pallet {
     // ── Internal Helpers ──────────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
+        /// Attempt to revert VM side effects for all executed legs of a bundle.
+        ///
+        /// Reads `BundleLegReceipts` and calls `T::VmReverter::revert_leg()`
+        /// for each leg that has `executed == true` and a non-empty state diff.
+        /// Returns the number of legs that failed to revert.
+        ///
+        /// This is a best-effort operation: even if some legs fail to revert,
+        /// the pallet-level rollback (status, bond, event) still proceeds.
+        /// Failures are logged so monitoring/alerting can catch them.
+        fn do_revert_bundle_legs(bundle_id: H256) -> u32 {
+            let receipts = BundleLegReceipts::<T>::get(bundle_id);
+            let mut revert_failures: u32 = 0;
+
+            for receipt in receipts.iter() {
+                if receipt.executed && !receipt.state_diff.is_empty() {
+                    match T::VmReverter::revert_leg(receipt.vm_type.clone(), &receipt.state_diff) {
+                        Ok(crate::vm_revert::RevertOutcome::Reverted)
+                        | Ok(crate::vm_revert::RevertOutcome::NoSideEffects) => {}
+                        Err(err) => {
+                            revert_failures += 1;
+                            log::warn!(
+                                target: "x3-atomic-kernel",
+                                "Failed to revert leg {} (vm_type: {:?}) for bundle {:?}: {:?}",
+                                receipt.leg_index, receipt.vm_type, bundle_id, err
+                            );
+                        }
+                    }
+                }
+            }
+
+            if revert_failures > 0 {
+                log::error!(
+                    target: "x3-atomic-kernel",
+                    "Bundle {:?}: {}/{} legs failed VM revert",
+                    bundle_id, revert_failures, receipts.len()
+                );
+            }
+
+            revert_failures
+        }
+
         /// Verify bundle record consistency before finalization (S0-005).
         ///
         /// This function validates that a bundle's metadata is internally consistent
@@ -1030,25 +1189,17 @@ pub mod pallet {
             frame_support::storage::with_storage_layer(|| {
                 ensure!(receipt_root != H256::zero(), Error::<T>::InvalidReceiptRoot);
 
-                // P0 FIX: On mainnet (neither `dev` nor `testnet` feature), zero
-                // finality certs are forbidden.  Flash Finality MUST be operational.
-                // On dev/testnet, zero certs are accepted so the OCW can operate
-                // before Flash Finality is running.
-                #[cfg(not(any(feature = "dev", feature = "testnet")))]
+                // Always require valid finality certificate
                 ensure!(
                     finality_cert != H256::zero(),
                     Error::<T>::InvalidFinalityCert
                 );
 
-                // STRICT finality cert validation:
-                // - If finality_cert is non-zero, it MUST match an on-chain anchor
-                //   written by the OCW. No tentative acceptance — reject unknown certs.
-                if finality_cert != H256::zero() {
-                    let block_num: u64 = finalized_block.try_into().unwrap_or(0u64);
-                    let anchored = FinalityCertAnchors::<T>::get(block_num)
-                        .ok_or(Error::<T>::InvalidFinalityCert)?;
-                    ensure!(finality_cert == anchored, Error::<T>::InvalidFinalityCert);
-                }
+                // Verify the finality certificate matches the on-chain anchor for the block
+                let block_num: u64 = finalized_block.try_into().unwrap_or(0u64);
+                let anchored = FinalityCertAnchors::<T>::get(block_num)
+                    .ok_or(Error::<T>::InvalidFinalityCert)?;
+                ensure!(finality_cert == anchored, Error::<T>::InvalidFinalityCert);
 
                 let mut record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
 

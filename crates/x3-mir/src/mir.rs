@@ -37,11 +37,62 @@ pub struct MirBlock {
     pub terminator: Option<MirTerminator>,
 }
 
-/// Side-effecting assignment (SSA binding) in a block.
+/// Atomic block identifier used in MIR.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MirAtomicBlockId(pub u16);
+
+/// A statement in a basic block.
+///
+/// Most statements are SSA assignments (`target = rhs`), but atomic
+/// block markers are also statements so they appear in instruction
+/// order and act as optimization barriers.
 #[derive(Clone, Debug, PartialEq)]
-pub struct MirStatement {
-    pub target: MirValue,
-    pub rhs: MirRhs,
+pub enum MirStatement {
+    /// SSA binding: target = rhs
+    Assign { target: MirValue, rhs: MirRhs },
+    /// Begin an atomic transaction block.
+    AtomicBegin { block_id: MirAtomicBlockId },
+    /// End an atomic transaction block (commit or rollback).
+    AtomicEnd {
+        block_id: MirAtomicBlockId,
+        commit: bool,
+    },
+}
+
+impl MirStatement {
+    /// Returns the target value for assignment statements, or `None` for
+    /// atomic markers (which produce no SSA value).
+    pub fn target(&self) -> Option<MirValue> {
+        match self {
+            MirStatement::Assign { target, .. } => Some(*target),
+            _ => None,
+        }
+    }
+
+    /// Returns the RHS for assignment statements.
+    pub fn rhs(&self) -> Option<&MirRhs> {
+        match self {
+            MirStatement::Assign { rhs, .. } => Some(rhs),
+            _ => None,
+        }
+    }
+
+    /// Convenience: returns `(target, rhs)` for assignment statements.
+    pub fn as_assign(&self) -> Option<(MirValue, &MirRhs)> {
+        match self {
+            MirStatement::Assign { target, rhs } => Some((*target, rhs)),
+            _ => None,
+        }
+    }
+
+    /// Whether this statement is an atomic marker (begin/end).
+    /// Atomic markers are optimization barriers — no reordering across them.
+    pub fn is_atomic_marker(&self) -> bool {
+        matches!(
+            self,
+            MirStatement::AtomicBegin { .. } | MirStatement::AtomicEnd { .. }
+        )
+    }
 }
 
 /// Right-hand sides for MIR assignments.

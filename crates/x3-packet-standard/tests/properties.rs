@@ -6,9 +6,8 @@
 //! 1. SCALE encoding round-trips for any well-formed `Packet`.
 //! 2. `PacketCommitment::of` is deterministic and input-sensitive: any
 //!    one-byte change anywhere in the input flips the commitment.
-//! 3. `ReplayGuard` is deterministic and idempotent: the same `(stream, seq,
-//!    hash)` may be marked any number of times; a different hash at the same
-//!    sequence is always rejected.
+//! 3. `ReplayGuard` is deterministic and strict: the same `(stream, seq)` may
+//!    only be marked once; later packets at that sequence are always rejected.
 //! 4. `TimeoutPolicy::evaluate` is monotonic: once a packet has expired at
 //!    `(h, t)`, it stays expired for all `(h', t')` with `h' >= h, t' >= t`.
 
@@ -79,14 +78,14 @@ proptest! {
         prop_assert_ne!(PacketCommitment::of(&p), PacketCommitment::of(&p2));
     }
 
-    /// Property: marking the **same** packet repeatedly is a no-op success.
-    /// Receivers may retry without poisoning the guard.
+    /// Property: marking the **same** packet repeatedly is a replay rejection.
+    /// Receivers must not execute duplicate side-effects for a retried packet.
     #[test]
-    fn replay_guard_idempotent_on_same_hash(p in arb_packet()) {
+    fn replay_guard_rejects_same_hash_replay(p in arb_packet()) {
         let mut g = ReplayGuard::default();
         prop_assert!(g.mark_received(&p).is_ok());
-        prop_assert!(g.mark_received(&p).is_ok());
-        prop_assert!(g.mark_received(&p).is_ok());
+        prop_assert_eq!(g.mark_received(&p), Err(x3_packet_standard::PacketError::SequenceReplay));
+        prop_assert_eq!(g.mark_received(&p), Err(x3_packet_standard::PacketError::SequenceReplay));
         prop_assert_eq!(g.len(), 1);
     }
 

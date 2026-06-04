@@ -27,8 +27,12 @@ if [ ! -f "$PROOF_BINARY" ]; then
     echo -e "${BLUE}│${NC}"
 fi
 
-# Get list of changed files
-CHANGED_FILES=$(git diff --cached --name-only --diff-filter=ACMRTU)
+# Test integrity enforcement: no test-only commits or assertion weakening
+echo -e "${BLUE}│${NC} Running X3 test-integrity enforcement..."
+if ! python3 "$REPO_ROOT/scripts_infrastructure/enforce_x3_rules.py"; then
+    echo -e "${RED}❌ BLOCKED:${NC} X3 test integrity enforcement failed."
+    exit 1
+fi
 
 # Check if any critical files have changed
 CRITICAL_FILES_CHANGED=0

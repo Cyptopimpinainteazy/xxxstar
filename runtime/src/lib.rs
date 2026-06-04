@@ -17,7 +17,7 @@ extern crate alloc;
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::PalletId;
 pub use frame_support::{
-    construct_runtime, parameter_types,
+    construct_runtime, ord_parameter_types, parameter_types,
     traits::{ConstBool, ConstU16, ConstU32, ConstU64, ConstU8, Everything, Get},
     weights::{
         constants::{
@@ -540,7 +540,11 @@ construct_runtime!(
     }
 );
 
-#[cfg(all(not(feature = "dev"), not(feature = "frontier"), not(feature = "mainnet-rc1")))]
+#[cfg(all(
+    not(feature = "dev"),
+    not(feature = "frontier"),
+    not(feature = "mainnet-rc1")
+))]
 construct_runtime!(
     pub enum Runtime {
         System: frame_system,
@@ -701,7 +705,11 @@ construct_runtime!(
 );
 
 // ── production + frontier (post-RC1: no sudo, full EVM stack) ────────────────
-#[cfg(all(not(feature = "dev"), feature = "frontier", not(feature = "mainnet-rc1")))]
+#[cfg(all(
+    not(feature = "dev"),
+    feature = "frontier",
+    not(feature = "mainnet-rc1")
+))]
 construct_runtime!(
     pub enum Runtime {
         System: frame_system,
@@ -1056,6 +1064,31 @@ pub type EnsureRootOrHalfCouncil = frame_support::traits::EitherOfDiverse<
 >;
 
 pub type EnsureCouncilMember = pallet_collective::EnsureMember<AccountId, CouncilCollective>;
+
+ord_parameter_types! {
+    /// Dedicated runtime account that represents verified x3-lang execution.
+    ///
+    /// Cross-VM feature extrinsics are intentionally wired to this account so
+    /// users must enter through x3-lang tooling/runtime instead of calling the
+    /// low-level router and atomic-kernel pallets directly.
+    pub const X3LangGatewayAccount: AccountId =
+        <PalletId as AccountIdConversion<AccountId>>::into_account_truncating(&PalletId(*b"x3langgw"));
+}
+
+pub type EnsureX3LangGateway = frame_system::EnsureSignedBy<X3LangGatewayAccount, AccountId>;
+
+ord_parameter_types! {
+    /// Dedicated runtime account for the settlement engine.
+    /// Separate from x3langgw so that `finalize_with_settlement` cannot be
+    /// called by the gateway and the gateway cannot call settlement-only paths.
+    pub const SettlementGatewayAccount: AccountId =
+        <PalletId as AccountIdConversion<AccountId>>::into_account_truncating(&PalletId(*b"x3settle"));
+}
+
+/// Origin guard for `finalize_with_settlement`: only the settlement pallet's
+/// derived account may invoke this extrinsic.
+pub type EnsureSettlementGateway =
+    frame_system::EnsureSignedBy<SettlementGatewayAccount, AccountId>;
 
 pub type CouncilCollective = pallet_collective::Instance1;
 impl pallet_collective::Config<CouncilCollective> for Runtime {
@@ -2290,7 +2323,8 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
-    type VmAdapterOrigin = EnsureRootOrHalfCouncil;
+    type VmAdapterOrigin = EnsureX3LangGateway;
+    type X3LangOrigin = EnsureX3LangGateway;
     type EconomicHalt = X3SupplyLedger;
     // ── Protocol fee wiring ──────────────────────────────────────────────
     type Currency = Balances;
@@ -2546,6 +2580,9 @@ impl pallet_x3_atomic_kernel::Config for Runtime {
     type MaxLegsPerBundle = AtomicKernelMaxLegsPerBundle;
     type BundleDeadlineBlocks = AtomicKernelBundleDeadlineBlocks;
     type EconomicHalt = pallet_x3_supply_ledger::Pallet<Runtime>;
+    type X3LangOrigin = EnsureX3LangGateway;
+    type SettlementOrigin = EnsureSettlementGateway;
+    type VmReverter = pallet_x3_atomic_kernel::vm_revert::NoopVmReverter;
 }
 
 // ===== X3 Slash Configuration =====
@@ -3067,6 +3104,16 @@ impl_runtime_apis! {
             let balance = pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account_id, &0u32);
             use sp_runtime::traits::SaturatedConversion;
             balance.saturated_into::<u64>()
+        }
+
+        fn get_evm_bridge_escrow() -> Vec<u8> {
+            pallet_x3_kernel::BridgeEvmEscrow::<Runtime>::get()
+                .as_bytes()
+                .to_vec()
+        }
+
+        fn get_svm_bridge_escrow() -> [u8; 32] {
+            pallet_x3_kernel::BridgeSvmEscrow::<Runtime>::get()
         }
 
         fn is_svm_program(svm_pubkey: Vec<u8>) -> bool {
@@ -4215,7 +4262,7 @@ pub fn runtime_uses_mock_vm_adapters() -> bool {
     evm.contains("MockEvmAdapter") || svm.contains("MockSvmAdapter") || x3.contains("MockX3Adapter")
 }
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(all(test, feature = "std", feature = "frontier"))]
 mod vm_adapter_tests {
     use super::*;
     use pallet_x3_kernel::{EvmExecutorAdapter, SvmExecutorAdapter, X3ExecutorAdapter};
@@ -4226,7 +4273,7 @@ mod vm_adapter_tests {
         let simple_evm_bytecode = vec![0x60, 0x00, 0x60, 0x00, 0xf3]; // PUSH1 0 PUSH1 0 RETURN
         sp_io::TestExternalities::default().execute_with(|| {
             let result =
-                native_vm_adapters::NativeEvmAdapter::execute(&simple_evm_bytecode, 100_000);
+                super::native_vm_adapters::NativeEvmAdapter::execute(&simple_evm_bytecode, 100_000);
             // Debug: print result to stderr to capture runner error details during test
             eprintln!("NativeEvmAdapter.execute result = {:?}", result);
             assert!(result.is_ok());
@@ -4245,7 +4292,7 @@ mod vm_adapter_tests {
         ];
         sp_io::TestExternalities::default().execute_with(|| {
             let result =
-                native_vm_adapters::NativeSvmAdapter::execute(&simple_bpf_program, 100_000);
+                super::native_vm_adapters::NativeSvmAdapter::execute(&simple_bpf_program, 100_000);
             assert!(result.is_ok());
             let receipt = result.unwrap();
             assert!(receipt.success);
@@ -4280,8 +4327,9 @@ mod cross_chain_proof_verifier_tests {
     use super::*;
     use codec::Encode;
     use frame_support::BoundedVec;
-    use pallet_x3_kernel::CrossChainProof;
+    use pallet_x3_kernel::{CrossChainProof, CrossChainProofVerifier};
     use sp_core::{sr25519, Pair};
+    use x3_cross_vm_bridge::CrossVmOperation;
 
     fn authority_pair() -> sr25519::Pair {
         sr25519::Pair::from_seed(&[7u8; 32])
@@ -4348,27 +4396,33 @@ mod cross_chain_proof_verifier_tests {
 
     #[test]
     fn lock_proof_rejects_mismatched_operation() {
-        set_single_authority();
-        let origin = seeded_authority();
-        let proof = lock_proof_for(&make_operation(10));
+        sp_io::TestExternalities::default().execute_with(|| {
+            set_single_authority();
+            let origin = seeded_authority();
+            let proof = lock_proof_for(&make_operation(10));
 
-        let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
-        assert!(ok.is_ok());
+            let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
+            assert!(ok.is_ok());
 
-        let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
-        assert!(matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation"));
+            let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
+            assert!(
+                matches!(err, Err(frame_support::sp_runtime::DispatchError::Other(msg)) if msg == "LockProof: proof not bound to operation")
+            );
+        });
     }
 
     #[test]
     fn merkle_receipt_rejects_mismatched_operation() {
-        set_single_authority();
-        let origin = seeded_authority();
-        let proof = merkle_receipt_for(&make_operation(10));
+        sp_io::TestExternalities::default().execute_with(|| {
+            set_single_authority();
+            let origin = seeded_authority();
+            let proof = merkle_receipt_for(&make_operation(10));
 
-        let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
-        assert!(ok.is_ok());
+            let ok = SubstrateProofVerifier::verify_proof(&origin, &make_operation(10), &proof);
+            assert!(ok.is_ok());
 
-        let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
-        assert!(err.is_err());
+            let err = SubstrateProofVerifier::verify_proof(&origin, &make_operation(11), &proof);
+            assert!(err.is_err());
+        });
     }
 }

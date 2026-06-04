@@ -6,7 +6,9 @@ use flash_finality::{FlashFinalityConfig, FlashFinalityGadget, FLASH_FINALITY_PR
 use futures_util::StreamExt;
 use parallel_proposer::{extract_tx_metadata, ParallelProposerFactory};
 use poh_generator::PoHState;
+use poh_generator::{PoHDigest, PoHVerifier, POH_ENGINE_ID};
 use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
+use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResult};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
 use sc_service::{
@@ -21,15 +23,12 @@ use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
     DigestItem, SaturatedConversion,
 };
-use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResult};
-use poh_generator::{PoHDigest, PoHVerifier, POH_ENGINE_ID};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use x3_bridge_adapters::{
-    OffchainEscrowPersistence, PalletEscrowAdapter, RuntimeCrossVmDispatcher,
-    SubstrateClientBalanceAdapter,
+    OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
 use x3_chain_runtime::{opaque::Block, RuntimeApi};
 use x3_cross_vm_bridge::{CrossVmBridge, CrossVmResult};
@@ -136,8 +135,7 @@ impl GpuSidecarHandle {
 
     /// Check if sidecar is running
     pub fn is_running(&self) -> bool {
-        self.is_running
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.is_running.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Gracefully shutdown the sidecar
@@ -456,7 +454,11 @@ impl<Block: BlockT, Inner> PoHVerifyBlockImport<Block, Inner> {
     /// - `poh_state = Some(...)`: enforcement active — every block is verified.
     /// - `poh_state = None`: passthrough — zero overhead, existing behavior.
     pub fn new(inner: Inner, poh_state: Option<Arc<Mutex<PoHState>>>) -> Self {
-        Self { inner, poh_state, _phantom: Default::default() }
+        Self {
+            inner,
+            poh_state,
+            _phantom: Default::default(),
+        }
     }
 
     /// Extract and decode the PoH digest from a block header's consensus digest logs.
@@ -473,7 +475,8 @@ impl<Block: BlockT, Inner> PoHVerifyBlockImport<Block, Inner> {
     }
 }
 
-impl<Block: BlockT + Send, Inner: BlockImport<Block> + Send> BlockImport<Block>
+#[async_trait::async_trait]
+impl<Block: BlockT + Send, Inner: BlockImport<Block> + Send + Sync> BlockImport<Block>
     for PoHVerifyBlockImport<Block, Inner>
 {
     type Error = Inner::Error;
@@ -486,7 +489,7 @@ impl<Block: BlockT + Send, Inner: BlockImport<Block> + Send> BlockImport<Block>
     }
 
     async fn import_block(
-        &mut self,
+        &self,
         block: BlockImportParams<Block>,
     ) -> Result<ImportResult, Self::Error> {
         if let Some(state_arc) = &self.poh_state {
@@ -521,7 +524,8 @@ impl<Block: BlockT + Send, Inner: BlockImport<Block> + Send> BlockImport<Block>
                             log::error!(
                                 "[PoH] ❌ Verification failed at tick {}: {} — \
                                  block allowed through (poh-v3 will hard-reject)",
-                                digest.tick, e
+                                digest.tick,
+                                e
                             );
                             // CRITICAL: advance state even on failure so the next block
                             // gets prev_tick+1, not prev_tick+2 → avoids cascade desync.
@@ -1104,10 +1108,8 @@ pub fn new_full<
 
         // PoH v2: wrap grandpa_block_import so every imported block is verified.
         // When enable_poh=false, poh_state=None → PoHVerifyBlockImport is a zero-cost passthrough.
-        let poh_wrapped_block_import = PoHVerifyBlockImport::new(
-            grandpa_block_import,
-            shared_poh_state.clone(),
-        );
+        let poh_wrapped_block_import =
+            PoHVerifyBlockImport::new(grandpa_block_import, shared_poh_state.clone());
 
         let aura = sc_consensus_aura::start_aura::<AuraPair, _, _, _, _, _, _, _, _, _, _>(
             StartAuraParams {
@@ -1403,8 +1405,8 @@ pub fn new_full<
         {
             let sidecar_config = GpuSidecarConfig {
                 service_id: format!("{}-sidecar", name.clone()),
-                gpu_devices: vec![],  // Auto-detect
-                rpc_endpoint: format!("http://127.0.0.1:{}", 9944),  // Default X3 RPC port
+                gpu_devices: vec![],                                // Auto-detect
+                rpc_endpoint: format!("http://127.0.0.1:{}", 9944), // Default X3 RPC port
                 proof_interval_blocks: 10,
                 max_concurrent_tasks: 4,
             };
@@ -1430,7 +1432,9 @@ pub fn new_full<
                     log::info!("✨ GPU Sidecar async task started");
                     gpu_sidecar_is_running.store(true, std::sync::atomic::Ordering::Release);
 
-                    let result = spawn_gpu_sidecar(sidecar_config, shutdown_rx, orchestrator_for_sidecar).await;
+                    let result =
+                        spawn_gpu_sidecar(sidecar_config, shutdown_rx, orchestrator_for_sidecar)
+                            .await;
 
                     log::info!("🏁 GPU Sidecar async task completed: {:?}", result);
                     gpu_sidecar_is_running.store(false, std::sync::atomic::Ordering::Release);
@@ -1462,27 +1466,31 @@ pub fn new_full<
     // with durable escrow persistence backed by the node's off-chain storage,
     // so in-flight cross-VM swaps survive node restarts.
     {
-        let balance_adapter = Arc::new(SubstrateClientBalanceAdapter::new(client.clone()));
-
         match backend.offchain_storage() {
             Some(offchain_storage) => {
-                let escrow_adapter = Arc::new(PalletEscrowAdapter::with_persistence(
-                    balance_adapter.clone(),
+                let runtime_bridge = Arc::new(SubstrateX3VmBridge::with_persistence(
+                    client.clone(),
                     OffchainEscrowPersistence::new(offchain_storage),
                 ));
+                let escrow_adapter = runtime_bridge.escrow.clone();
 
                 {
-                    let dispatcher = Arc::new(RuntimeCrossVmDispatcher::new(client.clone()));
+                    let dispatcher = Arc::new(
+                        RuntimeCrossVmDispatcher::new(client.clone())
+                            .with_x3vm_bridge(runtime_bridge.bridge.clone()),
+                    );
                     let bridge = Arc::new(std::sync::Mutex::new(CrossVmBridge::new()));
                     let bridge_safety_gate = CrossVmBridgeSafetyGate::default();
                     let client_for_bridge = client.clone();
-                    // Keep escrow_adapter alive for the duration of the task.
+                    // Keep the X3VM bridge and runtime-backed providers alive for the task.
+                    let _runtime_bridge = runtime_bridge.clone();
                     let _escrow = escrow_adapter.clone();
                     let bridge_for_task = bridge.clone();
                     task_manager.spawn_handle().spawn(
                         "cross-vm-bridge-poller",
                         Some("x3"),
                         async move {
+                            let _runtime_bridge = _runtime_bridge;
                             let mut recent_failures: u32 = 0;
                             loop {
                                 tokio::time::sleep(Duration::from_millis(200)).await;
@@ -1737,10 +1745,7 @@ async fn spawn_gpu_sidecar(
         "🚀 GPU Sidecar Service '{}' starting up",
         sidecar_config.service_id
     );
-    log::info!(
-        "   • RPC Endpoint: {}",
-        sidecar_config.rpc_endpoint
-    );
+    log::info!("   • RPC Endpoint: {}", sidecar_config.rpc_endpoint);
     log::info!(
         "   • GPU Devices: {:?}",
         if sidecar_config.gpu_devices.is_empty() {
@@ -1926,8 +1931,8 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
         .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
 
     // X3 node RPC for extrinsic submission (bridge events).
-    let x3_node_rpc = std::env::var("X3_NODE_RPC_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string());
+    let x3_node_rpc =
+        std::env::var("X3_NODE_RPC_URL").unwrap_or_else(|_| "http://127.0.0.1:9944".to_string());
 
     // Escrow program ID to monitor on Solana.
     let escrow_program = std::env::var("X3_ESCROW_PROGRAM").unwrap_or_default();
@@ -2137,7 +2142,10 @@ mod tests {
     /// PoH flag is accepted without panicking and is stored correctly.
     #[test]
     fn poh_flag_is_accepted_in_feature_flags() {
-        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        let flags = NodeFeatureFlags {
+            enable_poh: true,
+            ..Default::default()
+        };
         assert!(flags.enable_poh);
     }
 
@@ -2145,11 +2153,17 @@ mod tests {
     /// Prevents accidental coupling where setting poh also enables gpu/finality.
     #[test]
     fn poh_flag_does_not_activate_other_flags() {
-        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        let flags = NodeFeatureFlags {
+            enable_poh: true,
+            ..Default::default()
+        };
         assert!(!flags.enable_flash_finality, "flash finality must stay off");
         assert!(!flags.enable_gpu_validator, "gpu validator must stay off");
         assert!(!flags.gpu_required, "gpu_required must stay off");
-        assert!(!flags.enable_parallel_proposer, "parallel proposer must stay off");
+        assert!(
+            !flags.enable_parallel_proposer,
+            "parallel proposer must stay off"
+        );
         assert!(!flags.enable_atomic_kernel, "atomic kernel must stay off");
     }
 
@@ -2157,7 +2171,10 @@ mod tests {
     /// PoH in shadow mode must not interfere with the finality gadget.
     #[test]
     fn poh_shadow_mode_does_not_disable_grandpa() {
-        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        let flags = NodeFeatureFlags {
+            enable_poh: true,
+            ..Default::default()
+        };
         // disable_grandpa=false, flash_finality=false → GRANDPA enabled
         assert!(
             compute_enable_grandpa_from_flags(false, flags),
@@ -2170,7 +2187,10 @@ mod tests {
     /// GRANDPA decision path.
     #[test]
     fn poh_with_flash_finality_disables_grandpa_via_finality_not_poh() {
-        let flags_poh_only = NodeFeatureFlags { enable_poh: true, ..Default::default() };
+        let flags_poh_only = NodeFeatureFlags {
+            enable_poh: true,
+            ..Default::default()
+        };
         let flags_both = NodeFeatureFlags {
             enable_poh: true,
             enable_flash_finality: true,
@@ -2188,7 +2208,10 @@ mod tests {
     #[test]
     fn poh_is_off_by_default() {
         let flags = NodeFeatureFlags::default();
-        assert!(!flags.enable_poh, "enable_poh must default to false for mainnet-v1");
+        assert!(
+            !flags.enable_poh,
+            "enable_poh must default to false for mainnet-v1"
+        );
     }
 
     // ─── PoH v2 Block Import Wrapper Tests ────────────────────────────────────
@@ -2197,15 +2220,24 @@ mod tests {
     /// in passthrough mode (poh_state = None).
     #[test]
     fn poh_verify_block_import_passthrough_mode_constructs() {
-        let flags = NodeFeatureFlags { enable_poh: false, ..Default::default() };
+        let flags = NodeFeatureFlags {
+            enable_poh: false,
+            ..Default::default()
+        };
         assert!(!flags.enable_poh, "passthrough: poh_state would be None");
     }
 
     /// Validates that when `enable_poh` is true the poh state is Some, not None.
     #[test]
     fn poh_verify_block_import_enforcement_mode_state_is_some() {
-        let flags = NodeFeatureFlags { enable_poh: true, ..Default::default() };
-        assert!(flags.enable_poh, "enforcement mode: poh_state would be Some(...)");
+        let flags = NodeFeatureFlags {
+            enable_poh: true,
+            ..Default::default()
+        };
+        assert!(
+            flags.enable_poh,
+            "enforcement mode: poh_state would be Some(...)"
+        );
     }
 
     // ─── extract_poh_digest behavioral tests ──────────────────────────────────
@@ -2234,9 +2266,15 @@ mod tests {
     fn extract_poh_digest_returns_none_for_wrong_engine_id() {
         let wrong_id = *b"babe";
         let mut header = TestHeader::new(
-            1, Default::default(), Default::default(), Default::default(), Default::default(),
+            1,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
         );
-        header.digest_mut().push(DigestItem::Consensus(wrong_id, vec![0u8; 32]));
+        header
+            .digest_mut()
+            .push(DigestItem::Consensus(wrong_id, vec![0u8; 32]));
         let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
         assert!(result.is_none(), "wrong engine ID should return None");
     }
@@ -2251,9 +2289,15 @@ mod tests {
         let encoded = digest.encode_payload();
 
         let mut header = TestHeader::new(
-            1, Default::default(), Default::default(), Default::default(), Default::default(),
+            1,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
         );
-        header.digest_mut().push(DigestItem::Consensus(POH_ENGINE_ID, encoded));
+        header
+            .digest_mut()
+            .push(DigestItem::Consensus(POH_ENGINE_ID, encoded));
 
         let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
         assert!(result.is_some(), "valid PoH digest should decode to Some");
@@ -2267,18 +2311,33 @@ mod tests {
     #[test]
     fn extract_poh_digest_returns_none_for_malformed_bytes() {
         let mut header = TestHeader::new(
-            1, Default::default(), Default::default(), Default::default(), Default::default(),
+            1,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
         );
         // 71 bytes — one short of the required 72; must return None, not panic.
-        header.digest_mut().push(DigestItem::Consensus(POH_ENGINE_ID, vec![0u8; 71]));
+        header
+            .digest_mut()
+            .push(DigestItem::Consensus(POH_ENGINE_ID, vec![0u8; 71]));
         let result = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header);
-        assert!(result.is_none(), "71-byte payload is malformed and must return None");
+        assert!(
+            result.is_none(),
+            "71-byte payload is malformed and must return None"
+        );
 
         // 0 bytes edge case
         let mut header2 = TestHeader::new(
-            1, Default::default(), Default::default(), Default::default(), Default::default(),
+            1,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
         );
-        header2.digest_mut().push(DigestItem::Consensus(POH_ENGINE_ID, vec![]));
+        header2
+            .digest_mut()
+            .push(DigestItem::Consensus(POH_ENGINE_ID, vec![]));
         let result2 = PoHVerifyBlockImport::<TestBlock, ()>::extract_poh_digest(&header2);
         assert!(result2.is_none(), "empty payload must return None");
     }
@@ -2293,14 +2352,26 @@ mod tests {
         let mut state = PoHState::default();
         let tick_before = state.tick();
         let digest = state.advance(&[]);
-        assert_eq!(state.tick(), tick_before + 1, "advance must increment tick by 1");
+        assert_eq!(
+            state.tick(),
+            tick_before + 1,
+            "advance must increment tick by 1"
+        );
         // Verify the digest is consistent with the advanced state
-        let result = PoHVerifier::verify(&digest, tick_before, &{
-            let mut s2 = PoHState::default();
-            let h = s2.hash();
-            h
-        }, &[]);
-        assert!(result.is_ok(), "digest produced by advance() must verify against prior state");
+        let result = PoHVerifier::verify(
+            &digest,
+            tick_before,
+            &{
+                let mut s2 = PoHState::default();
+                let h = s2.hash();
+                h
+            },
+            &[],
+        );
+        assert!(
+            result.is_ok(),
+            "digest produced by advance() must verify against prior state"
+        );
     }
 
     /// State MUST advance even when verification fails — prevents cascade desync.
@@ -2324,7 +2395,11 @@ mod tests {
 
         // Verifier MUST still advance state (as the fix dictates)
         verifier_state.advance(&[]);
-        assert_eq!(verifier_state.tick(), 1, "verifier state must advance to tick 1 despite failure");
+        assert_eq!(
+            verifier_state.tick(),
+            1,
+            "verifier state must advance to tick 1 despite failure"
+        );
 
         // Block 2: produced normally by proposer (tick 2), verifier now at tick 1 → expect tick 2
         let real_digest_2 = proposer_state.advance(&[]);
@@ -2351,8 +2426,1113 @@ mod tests {
             }
         }
     }
-
 } // end mod tests
+
+#[cfg(test)]
+mod runtime_bridge_client_tests {
+    use super::*;
+    use crate::{chain_spec, Cli};
+    use clap::Parser;
+    use codec::{Decode, Encode};
+    use sc_cli::SubstrateCli;
+    use sc_transaction_pool_api::TransactionPool;
+    use sp_core::{H160, H256};
+    use sp_inherents::InherentDataProvider;
+    use sp_runtime::{
+        generic::Era,
+        traits::{IdentifyAccount, Verify},
+        OpaqueExtrinsic,
+    };
+    use std::ffi::OsString;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::{Mutex as StdMutex, MutexGuard, OnceLock};
+    use std::time::{Duration as StdDuration, Instant, SystemTime, UNIX_EPOCH};
+    use x3_bridge_adapters::{RuntimeCrossVmDispatcher, SubstrateX3VmBridge};
+    use x3_chain_runtime::{
+        AccountId, Address, Runtime, RuntimeCall, Signature, SignedExtra, SignedPayload,
+        UncheckedExtrinsic, VERSION,
+    };
+    use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher, CrossVmStatus, VmId};
+
+    #[test]
+    #[ignore = "CLI runner initializes a process-global logger; covered by active full-node HTTP RPC test and runnable manually in isolation"]
+    fn service_rpc_submits_signed_extrinsic_imports_block_then_bridge_reads_runtime_state() {
+        let _runner_lock = cli_runner_lock();
+        let evm_escrow = H160::repeat_byte(0xE7);
+        let svm_escrow = [0x57; 32];
+        let spec = chain_spec::development_config_with_bridge_escrows(evm_escrow, svm_escrow)
+            .expect("bridge test chain spec should build");
+        let spec_path = write_temp_chain_spec(&spec);
+
+        let cli = Cli::parse_from([
+            "x3-chain-node",
+            "--chain",
+            spec_path
+                .to_str()
+                .expect("temporary chain spec path should be utf-8"),
+            "--tmp",
+            "--no-telemetry",
+        ]);
+
+        let runner = cli
+            .create_runner(&cli.run)
+            .expect("CLI runner should build node configuration");
+
+        let test_result: Result<(), ServiceError> = runner.sync_run(|config| {
+            let partial = new_partial(&config)?;
+            let runtime_bridge = SubstrateX3VmBridge::<_, Block>::new(partial.client.clone());
+            let dispatcher = RuntimeCrossVmDispatcher::<_, Block>::new(partial.client.clone())
+                .with_x3vm_bridge(runtime_bridge.bridge.clone());
+
+            let target_account = account_from_seed("//Bob");
+            let canonical_balance = 123_456_789u128;
+            let signed_update = signed_council_canonical_balance_update(
+                &partial.client,
+                target_account.clone(),
+                canonical_balance,
+            )?;
+            submit_signed_extrinsic_via_author_rpc(&partial, signed_update)?;
+            import_ready_pool_block(&partial.client, &partial.transaction_pool)?;
+
+            let bytecode = x3_vm::bridge::bc_format_helpers::assemble_simple_module();
+            let call = CrossVmCall::new(
+                VmId::X3Vm,
+                VmId::X3Vm,
+                0u32.to_le_bytes(),
+                bytecode,
+                1_000_000,
+                42,
+                100,
+            )
+            .expect("x3vm bytecode should fit cross-vm payload");
+
+            let receipt = dispatcher
+                .execute_x3vm_tx(&[0xA5; 32], &call)
+                .expect("runtime-backed dispatcher should execute x3vm call");
+
+            assert_eq!(receipt.status, CrossVmStatus::Success);
+            assert_eq!(receipt.call_hash, call.call_hash(&H256::zero()));
+            assert_eq!(dispatcher.get_evm_bridge_escrow(), evm_escrow.0);
+            assert_eq!(dispatcher.get_svm_bridge_escrow(), svm_escrow);
+            assert_eq!(
+                dispatcher.get_svm_balance(target_account.as_ref()),
+                canonical_balance as u64
+            );
+            Ok(())
+        });
+
+        let _ = std::fs::remove_file(spec_path);
+        test_result.expect("service-level runtime bridge execution should pass");
+    }
+
+    #[test]
+    fn full_node_http_rpc_submits_signed_extrinsic_ws_observes_head_then_svm_rpc_reads_runtime_state(
+    ) {
+        let _runner_lock = cli_runner_lock();
+        let evm_escrow = H160::repeat_byte(0xE8);
+        let svm_escrow = [0x58; 32];
+        let rpc_port = reserve_tcp_port();
+        let spec = chain_spec::development_config_with_bridge_escrows(evm_escrow, svm_escrow)
+            .expect("bridge test chain spec should build");
+        let spec_path = write_temp_chain_spec(&spec);
+        let rpc_port_arg = rpc_port.to_string();
+
+        let cli = Cli::parse_from([
+            "x3-chain-node",
+            "--chain",
+            spec_path
+                .to_str()
+                .expect("temporary chain spec path should be utf-8"),
+            "--tmp",
+            "--no-telemetry",
+            "--validator",
+            "--force-authoring",
+            "--no-grandpa",
+            "--unsafe-force-node-key-generation",
+            "--port",
+            "0",
+            "--rpc-port",
+            rpc_port_arg.as_str(),
+            "--rpc-methods",
+            "unsafe",
+        ]);
+
+        let runner = cli
+            .create_runner(&cli.run)
+            .expect("CLI runner should build node configuration");
+
+        let test_result: Result<(), ServiceError> = runner.sync_run(|config| {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| ServiceError::Other(format!("build tokio runtime: {e}")))?;
+            let _runtime_guard = runtime.enter();
+            let _task_manager =
+                new_full::<sc_network::NetworkWorker<_, _>>(config, NodeFeatureFlags::default())?;
+            wait_for_http_rpc(rpc_port)?;
+
+            let genesis_hash = rpc_h256(rpc_port, "chain_getBlockHash", serde_json::json!([0]))?;
+            let target_account = account_from_seed("//Bob");
+            let target_bytes: &[u8] = target_account.as_ref();
+            let target_pubkey = format!("0x{}", hex::encode(target_bytes));
+            let canonical_balance = 987_654_321u128;
+            let signed_update = signed_council_canonical_balance_update_for_genesis(
+                genesis_hash,
+                target_account.clone(),
+                canonical_balance,
+            )?;
+            let tx_hex = format!("0x{}", hex::encode(signed_update.encode()));
+            let baseline_head = rpc_header_number(&rpc_call(
+                rpc_port,
+                "chain_getHeader",
+                serde_json::json!([]),
+            )?)?
+            .unwrap_or(0);
+            let observed_head =
+                submit_extrinsic_and_wait_for_ws_head(&runtime, rpc_port, tx_hex, baseline_head)?;
+            assert!(
+                observed_head > baseline_head,
+                "new-head WebSocket subscription should observe a block after extrinsic submission"
+            );
+
+            wait_for_svm_balance(rpc_port, &target_pubkey, canonical_balance as u64)?;
+            Ok(())
+        });
+
+        let _ = std::fs::remove_file(spec_path);
+        test_result.expect("full-node HTTP RPC bridge execution should pass");
+    }
+
+    #[test]
+    #[ignore = "CLI runner initializes a process-global logger; covered by active full-node HTTP RPC test and runnable manually in isolation"]
+    fn full_node_grandpa_rpc_submits_signed_extrinsic_ws_observes_finalized_head_then_svm_rpc_reads_runtime_state(
+    ) {
+        let _runner_lock = cli_runner_lock();
+        let evm_escrow = H160::repeat_byte(0xE9);
+        let svm_escrow = [0x59; 32];
+        let rpc_port = reserve_tcp_port();
+        let spec = chain_spec::development_config_with_bridge_escrows(evm_escrow, svm_escrow)
+            .expect("bridge test chain spec should build");
+        let spec_path = write_temp_chain_spec(&spec);
+        let rpc_port_arg = rpc_port.to_string();
+
+        let cli = Cli::parse_from([
+            "x3-chain-node",
+            "--chain",
+            spec_path
+                .to_str()
+                .expect("temporary chain spec path should be utf-8"),
+            "--tmp",
+            "--no-telemetry",
+            "--validator",
+            "--force-authoring",
+            "--unsafe-force-node-key-generation",
+            "--port",
+            "0",
+            "--rpc-port",
+            rpc_port_arg.as_str(),
+            "--rpc-methods",
+            "unsafe",
+        ]);
+
+        let runner = cli
+            .create_runner(&cli.run)
+            .expect("CLI runner should build node configuration");
+
+        let test_result: Result<(), ServiceError> = runner.sync_run(|config| {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| ServiceError::Other(format!("build tokio runtime: {e}")))?;
+            let _runtime_guard = runtime.enter();
+            let _task_manager =
+                new_full::<sc_network::NetworkWorker<_, _>>(config, NodeFeatureFlags::default())?;
+            wait_for_http_rpc(rpc_port)?;
+
+            let genesis_hash = rpc_h256(rpc_port, "chain_getBlockHash", serde_json::json!([0]))?;
+            let target_account = account_from_seed("//Bob");
+            let target_bytes: &[u8] = target_account.as_ref();
+            let target_pubkey = format!("0x{}", hex::encode(target_bytes));
+            let canonical_balance = 1_234_567_890u128;
+            let signed_update = signed_council_canonical_balance_update_for_genesis(
+                genesis_hash,
+                target_account.clone(),
+                canonical_balance,
+            )?;
+            let tx_hex = format!("0x{}", hex::encode(signed_update.encode()));
+            let baseline_finalized = finalized_header_number(rpc_port)?;
+            let (included_head, finalized_head) =
+                submit_extrinsic_wait_for_balance_then_finalized_head(
+                    &runtime,
+                    rpc_port,
+                    tx_hex,
+                    target_pubkey.clone(),
+                    canonical_balance as u64,
+                )?;
+            assert!(
+                included_head > baseline_finalized,
+                "signed extrinsic should land in a block after the baseline finalized head"
+            );
+            assert!(
+                finalized_head >= included_head,
+                "finalized-head WebSocket subscription should reach the block containing the extrinsic"
+            );
+
+            wait_for_svm_balance(rpc_port, &target_pubkey, canonical_balance as u64)?;
+            Ok(())
+        });
+
+        let _ = std::fs::remove_file(spec_path);
+        test_result.expect("full-node GRANDPA finalized-head bridge execution should pass");
+    }
+
+    #[test]
+    #[ignore = "two in-process full nodes currently require manual harness tuning to avoid stalled networking/finality shutdown"]
+    fn two_validator_nodes_submit_on_first_observe_finalized_bridge_state_on_second() {
+        let _runner_lock = cli_runner_lock();
+        let _env_lock = dev_seed_env_lock();
+        let evm_escrow = H160::repeat_byte(0xEA);
+        let svm_escrow = [0x5A; 32];
+        let first_rpc_port = reserve_tcp_port();
+        let second_rpc_port = reserve_tcp_port();
+        let first_p2p_port = reserve_tcp_port();
+        let second_p2p_port = reserve_tcp_port();
+        let spec =
+            chain_spec::local_two_validator_config_with_bridge_escrows(evm_escrow, svm_escrow)
+                .expect("two-validator bridge test chain spec should build");
+        let spec_path = write_temp_chain_spec(&spec);
+        let spec_path_str = spec_path
+            .to_str()
+            .expect("temporary chain spec path should be utf-8")
+            .to_string();
+        let first_base_path = temp_node_base_path("first");
+        let second_base_path = temp_node_base_path("second");
+        let first_base_path_str = first_base_path
+            .to_str()
+            .expect("first temporary base path should be utf-8")
+            .to_string();
+        let second_base_path_str = second_base_path
+            .to_str()
+            .expect("second temporary base path should be utf-8")
+            .to_string();
+        let first_rpc_port_arg = first_rpc_port.to_string();
+        let second_rpc_port_arg = second_rpc_port.to_string();
+        let first_p2p_port_arg = first_p2p_port.to_string();
+        let second_p2p_port_arg = second_p2p_port.to_string();
+
+        let first_cli = Cli::parse_from([
+            "x3-chain-node",
+            "--chain",
+            spec_path_str.as_str(),
+            "--base-path",
+            first_base_path_str.as_str(),
+            "--no-telemetry",
+            "--validator",
+            "--force-authoring",
+            "--unsafe-force-node-key-generation",
+            "--port",
+            first_p2p_port_arg.as_str(),
+            "--rpc-port",
+            first_rpc_port_arg.as_str(),
+            "--rpc-methods",
+            "unsafe",
+        ]);
+
+        let first_runner = first_cli
+            .create_runner(&first_cli.run)
+            .expect("first CLI runner should build node configuration");
+
+        let test_result: Result<(), ServiceError> = first_runner.sync_run(|first_config| {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| ServiceError::Other(format!("build tokio runtime: {e}")))?;
+            let _runtime_guard = runtime.enter();
+            {
+                let _alice_seed = ScopedDevSeed::set("//Alice");
+                let _first_task_manager = new_full::<sc_network::NetworkWorker<_, _>>(
+                    first_config,
+                    NodeFeatureFlags::default(),
+                )?;
+                wait_for_http_rpc(first_rpc_port)?;
+                let first_peer_id = rpc_call(
+                    first_rpc_port,
+                    "system_localPeerId",
+                    serde_json::json!([]),
+                )?
+                .as_str()
+                .ok_or_else(|| {
+                    ServiceError::Other("system_localPeerId did not return a string".into())
+                })?
+                .to_string();
+                let first_bootnode =
+                    format!("/ip4/127.0.0.1/tcp/{first_p2p_port}/p2p/{first_peer_id}");
+
+                let second_cli = Cli::parse_from([
+                    "x3-chain-node",
+                    "--chain",
+                    spec_path_str.as_str(),
+                    "--base-path",
+                    second_base_path_str.as_str(),
+                    "--no-telemetry",
+                    "--validator",
+                    "--force-authoring",
+                    "--unsafe-force-node-key-generation",
+                    "--port",
+                    second_p2p_port_arg.as_str(),
+                    "--rpc-port",
+                    second_rpc_port_arg.as_str(),
+                    "--rpc-methods",
+                    "unsafe",
+                    "--bootnodes",
+                    first_bootnode.as_str(),
+                ]);
+                let second_config = second_cli
+                    .create_configuration(&second_cli.run, runtime.handle().clone())
+                    .map_err(|e| {
+                        ServiceError::Other(format!("second node configuration: {e}"))
+                    })?;
+                {
+                    let _bob_seed = ScopedDevSeed::set("//Bob");
+                    let _second_task_manager = new_full::<sc_network::NetworkWorker<_, _>>(
+                        second_config,
+                        NodeFeatureFlags::default(),
+                    )?;
+                    wait_for_http_rpc(second_rpc_port)?;
+                    wait_for_peer_count(second_rpc_port, 1)?;
+
+                    let genesis_hash =
+                        rpc_h256(first_rpc_port, "chain_getBlockHash", serde_json::json!([0]))?;
+                    let target_account = account_from_seed("//Charlie");
+                    let target_bytes: &[u8] = target_account.as_ref();
+                    let target_pubkey = format!("0x{}", hex::encode(target_bytes));
+                    let canonical_balance = 2_468_013_579u128;
+                    let signed_update = signed_council_canonical_balance_update_for_genesis(
+                        genesis_hash,
+                        target_account.clone(),
+                        canonical_balance,
+                    )?;
+                    let tx_hex = format!("0x{}", hex::encode(signed_update.encode()));
+                    let baseline_finalized = finalized_header_number(second_rpc_port)?;
+                    let (included_head, finalized_head) =
+                        submit_extrinsic_wait_for_remote_balance_then_finalized_head(
+                            &runtime,
+                            first_rpc_port,
+                            second_rpc_port,
+                            tx_hex,
+                            target_pubkey.clone(),
+                            canonical_balance as u64,
+                        )?;
+                    assert!(
+                        included_head > baseline_finalized,
+                        "remote node should import the signed extrinsic after its baseline finalized head"
+                    );
+                    assert!(
+                        finalized_head >= included_head,
+                        "second node finalized-head subscription should reach the extrinsic block"
+                    );
+                    wait_for_svm_balance(
+                        second_rpc_port,
+                        &target_pubkey,
+                        canonical_balance as u64,
+                    )?;
+                    Ok(())
+                }
+            }
+        });
+
+        let _ = std::fs::remove_file(spec_path);
+        let _ = std::fs::remove_dir_all(first_base_path);
+        let _ = std::fs::remove_dir_all(second_base_path);
+        test_result.expect("two-validator bridge finality observation should pass");
+    }
+
+    fn submit_extrinsic_and_wait_for_ws_head(
+        runtime: &tokio::runtime::Runtime,
+        port: u16,
+        tx_hex: String,
+        baseline_head: u64,
+    ) -> Result<u64, ServiceError> {
+        runtime.block_on(async move {
+            use jsonrpsee::core::client::SubscriptionClientT;
+            use jsonrpsee::rpc_params;
+            use jsonrpsee::ws_client::WsClientBuilder;
+
+            let client = WsClientBuilder::default()
+                .build(format!("ws://127.0.0.1:{port}"))
+                .await
+                .map_err(|e| ServiceError::Other(format!("connect websocket rpc: {e}")))?;
+            let mut new_heads = client
+                .subscribe::<serde_json::Value, _>(
+                    "chain_subscribeNewHeads",
+                    rpc_params![],
+                    "chain_unsubscribeNewHeads",
+                )
+                .await
+                .map_err(|e| ServiceError::Other(format!("subscribe new heads: {e}")))?;
+
+            let tx_result = tokio::task::spawn_blocking(move || {
+                rpc_call(port, "author_submitExtrinsic", serde_json::json!([tx_hex]))
+            })
+            .await
+            .map_err(|e| ServiceError::Other(format!("join author_submitExtrinsic: {e}")))??;
+            assert!(
+                tx_result.as_str().is_some(),
+                "author_submitExtrinsic should return a transaction hash"
+            );
+
+            tokio::time::timeout(StdDuration::from_secs(45), async {
+                while let Some(header_result) = new_heads.next().await {
+                    let header = header_result
+                        .map_err(|e| ServiceError::Other(format!("read new head: {e}")))?;
+                    if let Some(number) = rpc_header_number(&header)? {
+                        if number > baseline_head {
+                            return Ok(number);
+                        }
+                    }
+                }
+                Err(ServiceError::Other(
+                    "new-head WebSocket subscription ended before observing import".into(),
+                ))
+            })
+            .await
+            .map_err(|_| {
+                ServiceError::Other(format!(
+                    "timed out waiting for WebSocket new head above #{baseline_head}"
+                ))
+            })?
+        })
+    }
+
+    fn submit_extrinsic_wait_for_balance_then_finalized_head(
+        runtime: &tokio::runtime::Runtime,
+        port: u16,
+        tx_hex: String,
+        pubkey_hex: String,
+        expected_balance: u64,
+    ) -> Result<(u64, u64), ServiceError> {
+        runtime.block_on(async move {
+            use jsonrpsee::core::client::SubscriptionClientT;
+            use jsonrpsee::rpc_params;
+            use jsonrpsee::ws_client::WsClientBuilder;
+
+            let client = WsClientBuilder::default()
+                .build(format!("ws://127.0.0.1:{port}"))
+                .await
+                .map_err(|e| ServiceError::Other(format!("connect websocket rpc: {e}")))?;
+            let mut finalized_heads = client
+                .subscribe::<serde_json::Value, _>(
+                    "chain_subscribeFinalizedHeads",
+                    rpc_params![],
+                    "chain_unsubscribeFinalizedHeads",
+                )
+                .await
+                .map_err(|e| ServiceError::Other(format!("subscribe finalized heads: {e}")))?;
+
+            let tx_result = tokio::task::spawn_blocking(move || {
+                rpc_call(port, "author_submitExtrinsic", serde_json::json!([tx_hex]))
+            })
+            .await
+            .map_err(|e| ServiceError::Other(format!("join author_submitExtrinsic: {e}")))??;
+            assert!(
+                tx_result.as_str().is_some(),
+                "author_submitExtrinsic should return a transaction hash"
+            );
+
+            let included_head = tokio::task::spawn_blocking(move || {
+                wait_for_svm_balance_at_best_head(port, &pubkey_hex, expected_balance)
+            })
+            .await
+            .map_err(|e| ServiceError::Other(format!("join svm balance wait: {e}")))??;
+
+            let finalized_head = tokio::time::timeout(StdDuration::from_secs(90), async {
+                while let Some(header_result) = finalized_heads.next().await {
+                    let header = header_result
+                        .map_err(|e| ServiceError::Other(format!("read finalized head: {e}")))?;
+                    if let Some(number) = rpc_header_number(&header)? {
+                        if number >= included_head {
+                            return Ok(number);
+                        }
+                    }
+                }
+                Err(ServiceError::Other(
+                    "finalized-head WebSocket subscription ended before extrinsic block finalized"
+                        .into(),
+                ))
+            })
+            .await
+            .map_err(|_| {
+                ServiceError::Other(format!(
+                    "timed out waiting for finalized head at or above #{included_head}"
+                ))
+            })??;
+
+            Ok((included_head, finalized_head))
+        })
+    }
+
+    fn submit_extrinsic_wait_for_remote_balance_then_finalized_head(
+        runtime: &tokio::runtime::Runtime,
+        submit_port: u16,
+        observe_port: u16,
+        tx_hex: String,
+        pubkey_hex: String,
+        expected_balance: u64,
+    ) -> Result<(u64, u64), ServiceError> {
+        runtime.block_on(async move {
+            use jsonrpsee::core::client::SubscriptionClientT;
+            use jsonrpsee::rpc_params;
+            use jsonrpsee::ws_client::WsClientBuilder;
+
+            let client = WsClientBuilder::default()
+                .build(format!("ws://127.0.0.1:{observe_port}"))
+                .await
+                .map_err(|e| ServiceError::Other(format!("connect observer websocket rpc: {e}")))?;
+            let mut finalized_heads = client
+                .subscribe::<serde_json::Value, _>(
+                    "chain_subscribeFinalizedHeads",
+                    rpc_params![],
+                    "chain_unsubscribeFinalizedHeads",
+                )
+                .await
+                .map_err(|e| {
+                    ServiceError::Other(format!("subscribe observer finalized heads: {e}"))
+                })?;
+
+            let tx_result = tokio::task::spawn_blocking(move || {
+                rpc_call(
+                    submit_port,
+                    "author_submitExtrinsic",
+                    serde_json::json!([tx_hex]),
+                )
+            })
+            .await
+            .map_err(|e| ServiceError::Other(format!("join author_submitExtrinsic: {e}")))??;
+            assert!(
+                tx_result.as_str().is_some(),
+                "author_submitExtrinsic should return a transaction hash"
+            );
+
+            let included_head = tokio::task::spawn_blocking(move || {
+                wait_for_svm_balance_at_best_head(observe_port, &pubkey_hex, expected_balance)
+            })
+            .await
+            .map_err(|e| ServiceError::Other(format!("join observer svm balance wait: {e}")))??;
+
+            let finalized_head = tokio::time::timeout(StdDuration::from_secs(120), async {
+                while let Some(header_result) = finalized_heads.next().await {
+                    let header = header_result.map_err(|e| {
+                        ServiceError::Other(format!("read observer finalized head: {e}"))
+                    })?;
+                    if let Some(number) = rpc_header_number(&header)? {
+                        if number >= included_head {
+                            return Ok(number);
+                        }
+                    }
+                }
+                Err(ServiceError::Other(
+                    "observer finalized-head WebSocket subscription ended before extrinsic block finalized"
+                        .into(),
+                ))
+            })
+            .await
+            .map_err(|_| {
+                ServiceError::Other(format!(
+                    "timed out waiting for observer finalized head at or above #{included_head}"
+                ))
+            })??;
+
+            Ok((included_head, finalized_head))
+        })
+    }
+
+    fn signed_council_canonical_balance_update(
+        client: &Arc<FullClient>,
+        account: AccountId,
+        new_balance: u128,
+    ) -> Result<OpaqueExtrinsic, ServiceError> {
+        let genesis_hash = client
+            .block_hash(0)
+            .map_err(|e| ServiceError::Other(format!("read genesis hash: {e}")))?
+            .ok_or_else(|| ServiceError::Other("missing genesis hash".into()))?;
+        signed_council_canonical_balance_update_for_genesis(genesis_hash, account, new_balance)
+    }
+
+    fn signed_council_canonical_balance_update_for_genesis(
+        genesis_hash: H256,
+        account: AccountId,
+        new_balance: u128,
+    ) -> Result<OpaqueExtrinsic, ServiceError> {
+        let proposal = RuntimeCall::AtlasKernel(
+            pallet_x3_kernel::Call::<Runtime>::update_canonical_balance {
+                account,
+                asset_id: 0,
+                new_balance,
+                comit_id: None,
+            },
+        );
+        let length_bound = proposal.encoded_size() as u32;
+        let call = RuntimeCall::Council(pallet_collective::Call::<
+            Runtime,
+            pallet_collective::Instance1,
+        >::propose {
+            threshold: 1,
+            proposal: Box::new(proposal),
+            length_bound,
+        });
+
+        signed_extrinsic_for_genesis("//Alice", call, 0, genesis_hash)
+    }
+
+    fn submit_signed_extrinsic_via_author_rpc(
+        partial: &sc_service::PartialComponents<
+            FullClient,
+            FullBackend,
+            SelectChain,
+            sc_consensus::DefaultImportQueue<Block>,
+            sc_transaction_pool::TransactionPoolHandle<Block, FullClient>,
+            (
+                sc_consensus_grandpa::GrandpaBlockImport<
+                    FullBackend,
+                    Block,
+                    FullClient,
+                    SelectChain,
+                >,
+                sc_consensus_grandpa::LinkHalf<Block, FullClient, SelectChain>,
+                Option<Telemetry>,
+            ),
+        >,
+        extrinsic: OpaqueExtrinsic,
+    ) -> Result<(), ServiceError> {
+        let author = sc_rpc::author::Author::new(
+            partial.client.clone(),
+            partial.transaction_pool.clone(),
+            partial.keystore_container.keystore(),
+            Arc::new(partial.task_manager.spawn_handle()),
+        );
+        let rpc = sc_rpc::author::AuthorApiServer::into_rpc(author);
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "author_submitExtrinsic",
+            "params": [format!("0x{}", hex::encode(extrinsic.encode()))],
+        })
+        .to_string();
+        let (response, _) = futures::executor::block_on(rpc.raw_json_request(&request, 16))
+            .map_err(|e| ServiceError::Other(format!("submit extrinsic rpc request: {e}")))?;
+        let response: serde_json::Value = serde_json::from_str(&response)
+            .map_err(|e| ServiceError::Other(format!("decode rpc response: {e}")))?;
+        if let Some(error) = response.get("error") {
+            return Err(ServiceError::Other(format!(
+                "author_submitExtrinsic failed: {error}"
+            )));
+        }
+        assert!(
+            response
+                .get("result")
+                .and_then(|value| value.as_str())
+                .is_some(),
+            "author_submitExtrinsic should return a transaction hash"
+        );
+        Ok(())
+    }
+
+    fn signed_extrinsic_for_genesis(
+        seed: &str,
+        call: RuntimeCall,
+        nonce: u32,
+        genesis_hash: H256,
+    ) -> Result<OpaqueExtrinsic, ServiceError> {
+        let pair = sp_core::sr25519::Pair::from_string(seed, None)
+            .map_err(|e| ServiceError::Other(format!("load signing key {seed}: {e:?}")))?;
+        let account = account_from_public(pair.public());
+
+        let extra: SignedExtra = (
+            frame_system::CheckNonZeroSender::<Runtime>::new(),
+            frame_system::CheckSpecVersion::<Runtime>::new(),
+            frame_system::CheckTxVersion::<Runtime>::new(),
+            frame_system::CheckGenesis::<Runtime>::new(),
+            frame_system::CheckEra::<Runtime>::from(Era::Immortal),
+            frame_system::CheckNonce::<Runtime>::from(nonce),
+            frame_system::CheckWeight::<Runtime>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
+            pallet_x3_invariants::InvariantCheck::<Runtime>::new(),
+            decode_agent_law_check()?,
+        );
+        let payload = SignedPayload::from_raw(
+            call.clone(),
+            extra.clone(),
+            (
+                (),
+                VERSION.spec_version,
+                VERSION.transaction_version,
+                genesis_hash,
+                genesis_hash,
+                (),
+                (),
+                (),
+                (),
+                (),
+            ),
+        );
+        let signature = payload.using_encoded(|payload| Signature::from(pair.sign(payload)));
+        let extrinsic =
+            UncheckedExtrinsic::new_signed(call, Address::Id(account), signature, extra);
+        Ok(extrinsic.into())
+    }
+
+    fn reserve_tcp_port() -> u16 {
+        TcpListener::bind(("127.0.0.1", 0))
+            .expect("ephemeral tcp port should be available")
+            .local_addr()
+            .expect("ephemeral tcp listener should expose local address")
+            .port()
+    }
+
+    fn wait_for_http_rpc(port: u16) -> Result<(), ServiceError> {
+        let deadline = Instant::now() + StdDuration::from_secs(30);
+        let mut last_error = String::new();
+        while Instant::now() < deadline {
+            match rpc_call(port, "chain_getBlockHash", serde_json::json!([0])) {
+                Ok(_) => return Ok(()),
+                Err(err) => {
+                    last_error = err.to_string();
+                    std::thread::sleep(StdDuration::from_millis(250));
+                }
+            }
+        }
+        Err(ServiceError::Other(format!(
+            "http rpc did not become ready on port {port}: {last_error}"
+        )))
+    }
+
+    fn wait_for_peer_count(port: u16, expected_min: u64) -> Result<(), ServiceError> {
+        let deadline = Instant::now() + StdDuration::from_secs(45);
+        let mut last_value = serde_json::Value::Null;
+        while Instant::now() < deadline {
+            match rpc_call(port, "system_health", serde_json::json!([])) {
+                Ok(value) => {
+                    last_value = value.clone();
+                    if value
+                        .get("peers")
+                        .and_then(|value| value.as_u64())
+                        .is_some_and(|peers| peers >= expected_min)
+                    {
+                        return Ok(());
+                    }
+                }
+                Err(err) => {
+                    last_value = serde_json::Value::String(err.to_string());
+                }
+            }
+            std::thread::sleep(StdDuration::from_millis(500));
+        }
+        Err(ServiceError::Other(format!(
+            "system_health peers did not reach {expected_min}; last value: {last_value}"
+        )))
+    }
+
+    fn wait_for_svm_balance(
+        port: u16,
+        pubkey_hex: &str,
+        expected: u64,
+    ) -> Result<(), ServiceError> {
+        wait_for_svm_balance_at_best_head(port, pubkey_hex, expected).map(|_| ())
+    }
+
+    fn wait_for_svm_balance_at_best_head(
+        port: u16,
+        pubkey_hex: &str,
+        expected: u64,
+    ) -> Result<u64, ServiceError> {
+        let deadline = Instant::now() + StdDuration::from_secs(45);
+        let mut last_value = serde_json::Value::Null;
+        while Instant::now() < deadline {
+            match rpc_call(port, "svm_getBalance", serde_json::json!([pubkey_hex])) {
+                Ok(value) => {
+                    last_value = value.clone();
+                    if value
+                        .get("value")
+                        .and_then(|value| value.as_u64())
+                        .is_some_and(|balance| balance == expected)
+                    {
+                        return best_header_number(port);
+                    }
+                }
+                Err(err) => {
+                    last_value = serde_json::Value::String(err.to_string());
+                }
+            }
+            std::thread::sleep(StdDuration::from_millis(500));
+        }
+        Err(ServiceError::Other(format!(
+            "svm_getBalance did not reach {expected}; last value: {last_value}"
+        )))
+    }
+
+    fn best_header_number(port: u16) -> Result<u64, ServiceError> {
+        rpc_header_number(&rpc_call(port, "chain_getHeader", serde_json::json!([]))?)?.ok_or_else(
+            || ServiceError::Other("chain_getHeader response did not include a number".into()),
+        )
+    }
+
+    fn finalized_header_number(port: u16) -> Result<u64, ServiceError> {
+        let finalized_hash = rpc_call(port, "chain_getFinalizedHead", serde_json::json!([]))?;
+        rpc_header_number(&rpc_call(
+            port,
+            "chain_getHeader",
+            serde_json::json!([finalized_hash]),
+        )?)?
+        .ok_or_else(|| {
+            ServiceError::Other(
+                "chain_getHeader finalized response did not include a number".into(),
+            )
+        })
+    }
+
+    fn dev_seed_env_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<StdMutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| StdMutex::new(()))
+            .lock()
+            .expect("X3_DEV_SEED test lock should not be poisoned")
+    }
+
+    fn cli_runner_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<StdMutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| StdMutex::new(()))
+            .lock()
+            .expect("CLI runner test lock should not be poisoned")
+    }
+
+    struct ScopedDevSeed {
+        previous: Option<OsString>,
+    }
+
+    impl ScopedDevSeed {
+        fn set(seed: &str) -> Self {
+            let previous = std::env::var_os("X3_DEV_SEED");
+            std::env::set_var("X3_DEV_SEED", seed);
+            Self { previous }
+        }
+    }
+
+    impl Drop for ScopedDevSeed {
+        fn drop(&mut self) {
+            match self.previous.take() {
+                Some(value) => std::env::set_var("X3_DEV_SEED", value),
+                None => std::env::remove_var("X3_DEV_SEED"),
+            }
+        }
+    }
+
+    fn rpc_h256(port: u16, method: &str, params: serde_json::Value) -> Result<H256, ServiceError> {
+        let value = rpc_call(port, method, params)?;
+        let hash_hex = value
+            .as_str()
+            .ok_or_else(|| ServiceError::Other(format!("{method} did not return a hash string")))?;
+        let bytes = hex::decode(hash_hex.strip_prefix("0x").unwrap_or(hash_hex))
+            .map_err(|e| ServiceError::Other(format!("{method} returned invalid hex: {e}")))?;
+        if bytes.len() != 32 {
+            return Err(ServiceError::Other(format!(
+                "{method} returned {} bytes, expected 32",
+                bytes.len()
+            )));
+        }
+        Ok(H256::from_slice(&bytes))
+    }
+
+    fn rpc_header_number(header: &serde_json::Value) -> Result<Option<u64>, ServiceError> {
+        let Some(number_hex) = header.get("number").and_then(|value| value.as_str()) else {
+            return Ok(None);
+        };
+        let number_hex = number_hex.strip_prefix("0x").unwrap_or(number_hex);
+        u64::from_str_radix(number_hex, 16)
+            .map(Some)
+            .map_err(|e| ServiceError::Other(format!("invalid RPC header number: {e}")))
+    }
+
+    fn rpc_call(
+        port: u16,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, ServiceError> {
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": method,
+            "params": params,
+        });
+        let body = request.to_string();
+        let mut stream = TcpStream::connect(("127.0.0.1", port))
+            .map_err(|e| ServiceError::Other(format!("connect http rpc {port}: {e}")))?;
+        let request = format!(
+            "POST / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|e| ServiceError::Other(format!("write http rpc request: {e}")))?;
+
+        let mut response = Vec::new();
+        stream
+            .read_to_end(&mut response)
+            .map_err(|e| ServiceError::Other(format!("read http rpc response: {e}")))?;
+        let response = String::from_utf8(response)
+            .map_err(|e| ServiceError::Other(format!("http rpc response was not utf-8: {e}")))?;
+        let body = decode_http_body(&response)?;
+        let value: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|e| ServiceError::Other(format!("decode http rpc json: {e}; body={body}")))?;
+        if let Some(error) = value.get("error") {
+            return Err(ServiceError::Other(format!("{method} failed: {error}")));
+        }
+        value.get("result").cloned().ok_or_else(|| {
+            ServiceError::Other(format!("{method} response missing result: {value}"))
+        })
+    }
+
+    fn decode_http_body(response: &str) -> Result<String, ServiceError> {
+        let (headers, body) = response
+            .split_once("\r\n\r\n")
+            .ok_or_else(|| ServiceError::Other(format!("invalid http response: {response}")))?;
+        if headers
+            .lines()
+            .any(|line| line.eq_ignore_ascii_case("transfer-encoding: chunked"))
+        {
+            return decode_chunked_body(body);
+        }
+        Ok(body.to_string())
+    }
+
+    fn decode_chunked_body(mut body: &str) -> Result<String, ServiceError> {
+        let mut decoded = String::new();
+        loop {
+            let (len_hex, rest) = body
+                .split_once("\r\n")
+                .ok_or_else(|| ServiceError::Other("malformed chunked http body".into()))?;
+            let len = usize::from_str_radix(len_hex.trim(), 16)
+                .map_err(|e| ServiceError::Other(format!("invalid chunk length: {e}")))?;
+            if len == 0 {
+                return Ok(decoded);
+            }
+            if rest.len() < len + 2 {
+                return Err(ServiceError::Other(
+                    "chunked http body ended mid-chunk".into(),
+                ));
+            }
+            decoded.push_str(&rest[..len]);
+            body = &rest[len + 2..];
+        }
+    }
+
+    fn decode_agent_law_check() -> Result<pallet_x3_agent_law::AgentLawCheck<Runtime>, ServiceError>
+    {
+        pallet_x3_agent_law::AgentLawCheck::<Runtime>::decode(&mut &[][..])
+            .map_err(|e| ServiceError::Other(format!("decode agent law extension: {e}")))
+    }
+
+    fn account_from_seed(seed: &str) -> AccountId {
+        let pair = sp_core::sr25519::Pair::from_string(seed, None)
+            .expect("well-known dev account seed should decode");
+        account_from_public(pair.public())
+    }
+
+    fn account_from_public(public: sp_core::sr25519::Public) -> AccountId {
+        <Signature as Verify>::Signer::from(public).into_account()
+    }
+
+    fn import_ready_pool_block(
+        client: &Arc<FullClient>,
+        transaction_pool: &sc_transaction_pool::TransactionPoolHandle<Block, FullClient>,
+    ) -> Result<(), ServiceError> {
+        let before = client.info();
+        let parent_hash = before.best_hash;
+        let mut block_builder = sc_block_builder::BlockBuilderBuilder::new(&**client)
+            .on_parent_block(parent_hash)
+            .fetch_parent_block_number(&**client)
+            .map_err(|e| ServiceError::Other(format!("fetch parent block number: {e}")))?
+            .build()
+            .map_err(|e| ServiceError::Other(format!("build block builder: {e}")))?;
+
+        let inherent_data = futures::executor::block_on(
+            sp_timestamp::InherentDataProvider::from_system_time().create_inherent_data(),
+        )
+        .map_err(|e| ServiceError::Other(format!("create inherent data: {e}")))?;
+
+        for inherent in block_builder
+            .create_inherents(inherent_data)
+            .map_err(|e| ServiceError::Other(format!("create inherents: {e}")))?
+        {
+            block_builder
+                .push(inherent)
+                .map_err(|e| ServiceError::Other(format!("apply inherent: {e}")))?;
+        }
+
+        let mut included_ready = 0usize;
+        for pending_tx in transaction_pool.ready() {
+            block_builder
+                .push((*pending_tx.data).clone())
+                .map_err(|e| ServiceError::Other(format!("apply ready transaction: {e}")))?;
+            included_ready += 1;
+        }
+        assert!(
+            included_ready > 0,
+            "signed test transaction should be ready"
+        );
+
+        let (block, storage_changes, _) = block_builder
+            .build()
+            .map_err(|e| ServiceError::Other(format!("build block: {e}")))?
+            .into_inner();
+        let imported_hash = block.header().hash();
+        let imported_number = *block.header().number();
+        let mut params =
+            BlockImportParams::new(sp_consensus::BlockOrigin::Own, block.header().clone());
+        params.body = Some(block.extrinsics().to_vec());
+        params.state_action = sc_consensus::StateAction::ApplyChanges(
+            sc_consensus::StorageChanges::Changes(storage_changes),
+        );
+        params.fork_choice = Some(sc_consensus::ForkChoiceStrategy::LongestChain);
+
+        let import_result = futures::executor::block_on(client.import_block(params))
+            .map_err(|e| ServiceError::Other(format!("import block: {e}")))?;
+        assert!(matches!(import_result, ImportResult::Imported(_)));
+
+        let after = client.info();
+        assert_eq!(after.best_hash, imported_hash);
+        assert_eq!(after.best_number, imported_number);
+        assert!(after.best_number > before.best_number);
+        Ok(())
+    }
+
+    fn write_temp_chain_spec(spec: &chain_spec::ChainSpec) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "x3-runtime-bridge-client-{nonce}-{}.json",
+            std::process::id()
+        ));
+        let json = spec
+            .as_json(false)
+            .expect("bridge test chain spec should serialize");
+        std::fs::write(&path, json).expect("temporary bridge chain spec should be writable");
+        path
+    }
+
+    fn temp_node_base_path(label: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "x3-runtime-bridge-node-{label}-{nonce}-{}",
+            std::process::id()
+        ))
+    }
+}
 
 //====== GPU Sidecar Tests ======
 #[cfg(all(test, feature = "gpu-validator"))]
@@ -2368,7 +3548,10 @@ mod gpu_sidecar_tests {
 
         // Verify all fields have correct defaults
         assert_eq!(config.service_id, "x3-gpu-sidecar-0");
-        assert!(config.gpu_devices.is_empty(), "GPU devices should auto-detect");
+        assert!(
+            config.gpu_devices.is_empty(),
+            "GPU devices should auto-detect"
+        );
         assert_eq!(config.rpc_endpoint, "http://127.0.0.1:9944");
         assert_eq!(config.proof_interval_blocks, 10);
         assert_eq!(config.max_concurrent_tasks, 4);
@@ -2402,7 +3585,10 @@ mod gpu_sidecar_tests {
         let (handle, _shutdown_rx) = GpuSidecarHandle::new(config.clone());
 
         // Verify initial state
-        assert!(!handle.is_running(), "Sidecar should not be running initially");
+        assert!(
+            !handle.is_running(),
+            "Sidecar should not be running initially"
+        );
         assert_eq!(handle.config.service_id, config.service_id);
     }
 
@@ -2453,7 +3639,10 @@ mod gpu_sidecar_tests {
         // Now shutdown should succeed immediately
         let result = handle.shutdown(5).await;
         assert!(result.is_ok(), "Shutdown should succeed");
-        assert!(!handle.is_running(), "After shutdown, is_running should be false");
+        assert!(
+            !handle.is_running(),
+            "After shutdown, is_running should be false"
+        );
     }
 
     /// Test 6: GPU Sidecar Shutdown Timeout Mechanism
@@ -2482,10 +3671,7 @@ mod gpu_sidecar_tests {
 
         // Attempt shutdown with 1-second timeout
         let result = handle.shutdown(1).await;
-        assert!(
-            result.is_err(),
-            "Shutdown should timeout and return error"
-        );
+        assert!(result.is_err(), "Shutdown should timeout and return error");
         assert_eq!(
             result.unwrap_err(),
             "Sidecar shutdown timeout",

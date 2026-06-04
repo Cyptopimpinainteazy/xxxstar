@@ -22,7 +22,10 @@ impl TaskExecutor {
     }
 
     /// Execute a task payload and return the result.
-    pub async fn execute(&self, payload: TaskPayload) -> Result<ExecutionResult, NorthernSwarmError> {
+    pub async fn execute(
+        &self,
+        payload: TaskPayload,
+    ) -> Result<ExecutionResult, NorthernSwarmError> {
         let start = std::time::Instant::now();
         info!(task_id = %payload.task_id, kind = ?payload.input_uri, "starting execution");
 
@@ -75,8 +78,8 @@ impl TaskExecutor {
             warn!(task_id = %payload.task_id, "payload body is empty — producing empty-hash result");
         }
 
-        let params_bytes = serde_json::to_vec(&payload.params)
-            .map_err(NorthernSwarmError::Serde)?;
+        let params_bytes =
+            serde_json::to_vec(&payload.params).map_err(NorthernSwarmError::Serde)?;
 
         let mut combined = payload.body.clone();
         combined.extend_from_slice(&params_bytes);
@@ -122,7 +125,10 @@ mod tests {
         let p = dummy_payload(b"hello world");
         let r1 = exec.execute(p.clone()).await.unwrap();
         let r2 = exec.execute(p).await.unwrap();
-        assert_eq!(r1.result_hash, r2.result_hash, "execution must be deterministic");
+        assert_eq!(
+            r1.result_hash, r2.result_hash,
+            "execution must be deterministic"
+        );
     }
 
     #[tokio::test]

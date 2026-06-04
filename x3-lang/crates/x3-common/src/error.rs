@@ -1,7 +1,6 @@
 //! Error types for the X3 compiler.
 
 use crate::span::Span;
-use std::fmt;
 use thiserror::Error;
 
 /// The main error type for X3 compilation.
@@ -117,6 +116,15 @@ impl X3Error {
 /// Result type using X3Error.
 pub type X3Result<T> = Result<T, X3Error>;
 
+impl From<std::io::Error> for X3Error {
+    fn from(value: std::io::Error) -> Self {
+        X3Error::IoError {
+            message: value.to_string(),
+            path: None,
+        }
+    }
+}
+
 /// A collection of errors that can be accumulated during compilation.
 #[derive(Debug, Default)]
 pub struct ErrorAccumulator {
@@ -178,7 +186,11 @@ impl ErrorAccumulator {
 
     pub fn into_result<T>(self, value: T) -> X3Result<T> {
         if self.has_errors() {
-            Err(self.errors.into_iter().next().expect("has_errors was true so errors is non-empty"))
+            Err(self
+                .errors
+                .into_iter()
+                .next()
+                .expect("has_errors was true so errors is non-empty"))
         } else {
             Ok(value)
         }

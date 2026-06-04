@@ -29,12 +29,16 @@ frame-benchmarking = { workspace = true, default-features = false, optional = tr
 
 # Internal dependencies
 pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
+pallet-x3-atomic-kernel = { path = "../x3-atomic-kernel", default-features = false }
 pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
 
 [dev-dependencies]
 pallet-timestamp = { workspace = true }
 pallet-balances = { workspace = true }
 proptest = "1.4"
+secp256k1 = { version = "0.28", features = ["recovery", "rand"] }
+rand = "0.8"
+x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types" }
 
 [features]
 default = ["std"]
@@ -53,6 +57,7 @@ std = [
     "serde/std",
     "ripemd/std",
     "pallet-x3-kernel/std",
+    "pallet-x3-atomic-kernel/std",
     "pallet-atomic-trade-engine/std",
 ]
 runtime-benchmarks = [
@@ -65,3 +70,5 @@ try-runtime = [
     "frame-support/try-runtime",
 ]
 dev-bypass = []
+dev = []
+testnet = []

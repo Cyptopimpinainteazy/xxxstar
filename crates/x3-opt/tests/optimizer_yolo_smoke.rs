@@ -18,11 +18,11 @@ mod tests {
                 blocks: vec![MirBlock {
                     id: MirBlockId(0),
                     statements: vec![
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(1),
                             rhs: MirRhs::Literal(Literal::Integer(5)),
                         },
-                        MirStatement {
+                        MirStatement::Assign {
                             target: MirValue(2),
                             rhs: MirRhs::Literal(Literal::Integer(5)),
                         },

@@ -15,15 +15,16 @@
 //!
 //! // Create a compute meter with a limit
 //! let mut meter = ComputeMeter::new(200_000);
-//! meter.consume(10_000)?; // Consume 10,000 compute units
+//! meter.consume(10_000).unwrap(); // Consume 10,000 compute units
 //!
 //! // Create a gas meter with a limit
 //! let mut gas_meter = GasMeter::new(1_000_000);
-//! gas_meter.consume(50_000)?; // Consume 50,000 gas
+//! gas_meter.consume(50_000).unwrap(); // Consume 50,000 gas
 //!
 //! // Check operation costs
 //! let costs = OperationCosts::default();
-//! let cost = costs.signing_ed25519(); // Get ed25519 signing cost
+//! let cost = costs.signing_ed25519; // Get ed25519 signing cost
+//! assert_eq!(cost, 100);
 //! ```
 
 extern crate alloc;
@@ -365,7 +366,8 @@ impl WeightMeter {
     /// Consume an operation with the given key type
     pub fn consume_operation(&mut self, operation: Operation) -> WeightResult<()> {
         let cost = self.config.operation_costs.signing(operation.key_type());
-        self.consume_compute(cost)
+        self.compute
+            .consume_with_budget(cost, self.config.max_operation_budget)
     }
 
     /// Consume a hash operation
@@ -525,17 +527,15 @@ mod tests {
         let mut config = WeightConfig::default();
         config.max_operation_budget = 50_000;
 
-        let mut meter = WeightMeter::new(config);
+        let mut meter = WeightMeter::new(config.clone());
 
         // Should succeed within budget
         meter
             .consume_operation(Operation::Sign(KeyType::Ed25519))
             .unwrap();
 
-        // Should fail when exceeding budget
-        // (100 + 100 = 200, which is within the 50,000 budget)
-        // Let's use a smaller budget
-        config.max_operation_budget = 150;
+        // Should fail when the second operation exceeds budget.
+        config.max_operation_budget = 199;
         let mut meter = WeightMeter::new(config);
 
         meter

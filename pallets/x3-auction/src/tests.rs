@@ -1,9 +1,8 @@
 //! Unit tests for pallet-x3-auction (18 tests).
 
 use crate::mock::*;
-use crate::{AuctionStatus, Auctions, Error, Event, ExpiryQueue};
-use frame_support::{assert_noop, assert_ok};
-use frame_system::pallet_prelude::BlockNumberFor;
+use crate::{AuctionStatus, Auctions, Error, Event};
+use frame_support::{assert_noop, assert_ok, traits::Hooks};
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 

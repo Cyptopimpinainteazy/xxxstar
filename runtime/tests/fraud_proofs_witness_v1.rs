@@ -301,14 +301,15 @@ fn order_001_no_conflict_witness_order_is_deterministic() {
 }
 
 #[test]
-fn order_001_different_conflict_pattern_different_order() {
+fn graph_001_different_conflict_pattern_changes_scheduler_commitment() {
     let w_no_conflict = build_valid_witness(3, 2);
     let w_full_conflict = build_conflicting_witness(3);
 
     let c1 = w_no_conflict.compute_commitments().unwrap();
     let c2 = w_full_conflict.compute_commitments().unwrap();
 
-    assert_ne!(c1.order_commitment, c2.order_commitment);
+    assert_ne!(c1.graph_commitment, c2.graph_commitment);
+    assert_ne!(c1.scheduler_commitment, c2.scheduler_commitment);
 }
 
 // ── Seed field ────────────────────────────────────────────────────────────────

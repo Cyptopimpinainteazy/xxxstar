@@ -199,7 +199,9 @@ impl IntentSimulator {
                 description: "Swap pool may have insufficient depth for this amount".to_string(),
                 is_blocking: false,
                 probability: 0.05,
-                mitigation: Some("Consider reducing amount or splitting into multiple intents".to_string()),
+                mitigation: Some(
+                    "Consider reducing amount or splitting into multiple intents".to_string(),
+                ),
             });
         }
 
@@ -216,8 +218,7 @@ impl IntentSimulator {
                 label: "slippage_exceeds_limit".to_string(),
                 description: format!(
                     "Estimated slippage {}bps exceeds declared limit {:?}bps",
-                    slippage_bps,
-                    intent.requirements.max_slippage_bps
+                    slippage_bps, intent.requirements.max_slippage_bps
                 ),
                 is_blocking: true,
                 probability: 1.0,
@@ -321,7 +322,11 @@ impl IntentSimulator {
         base.saturating_add(penalty).min(100)
     }
 
-    fn build_simulated_route(&self, intent: &CrossChainIntent, total_fee: u128) -> Vec<SimulatedHop> {
+    fn build_simulated_route(
+        &self,
+        intent: &CrossChainIntent,
+        total_fee: u128,
+    ) -> Vec<SimulatedHop> {
         let mut hops = Vec::new();
 
         if intent.requires_bridge() {
@@ -355,14 +360,19 @@ impl IntentSimulator {
             });
         }
 
-        if intent.requires_bridge()
-            && intent.destination.asset.chain != crate::types::ChainKind::X3
+        if intent.requires_bridge() && intent.destination.asset.chain != crate::types::ChainKind::X3
         {
             hops.push(SimulatedHop {
                 venue: format!("{}.bridge", intent.destination.asset.chain.as_str()),
                 operation: HopOperation::Release,
-                amount_in: hops.last().map(|h| h.amount_out).unwrap_or(intent.source.amount),
-                amount_out: intent.destination.min_amount.unwrap_or(intent.source.amount * 95 / 100),
+                amount_in: hops
+                    .last()
+                    .map(|h| h.amount_out)
+                    .unwrap_or(intent.source.amount),
+                amount_out: intent
+                    .destination
+                    .min_amount
+                    .unwrap_or(intent.source.amount * 95 / 100),
                 fee: 0,
                 slippage_bps: 0,
                 estimated_secs: 300,

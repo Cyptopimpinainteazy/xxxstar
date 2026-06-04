@@ -1,7 +1,10 @@
-//! Integration tests for packet deserialization and routing (Phase 1.3)
+//! Integration tests for packet deserialization and routing (Phase 1.3 / 1.4)
 //!
 //! These tests verify the full flow from raw Vec<u8> payloads through
 //! packet deserialization and domain routing.
+//!
+//! Phase 1.4 tests verify that malformed and wrong-domain packets are
+//! rejected at the extrinsic level (submit_comit / submit_comit_v2).
 
 #[cfg(test)]
 mod integration_tests {
@@ -336,5 +339,171 @@ mod integration_tests {
                 payload.len()
             );
         });
+    }
+
+    // ── Phase 1.4: Extrinsic-level packet validation regression tests ──
+
+    mod phase14_extrinsic_validation {
+        use frame_support::{assert_err, assert_ok};
+        use parity_scale_codec::Encode;
+        use sp_core::H256;
+        use sp_runtime::DispatchError;
+        use x3_packet_schema::{EvmPacket, Packet, SvmPacket, U256};
+
+        use crate::{
+            mock::{new_test_ext, AtlasKernel, RuntimeOrigin, Test, ALICE},
+            Error,
+        };
+
+        /// EVM payload with SVM domain mask (wrong domain) must be rejected.
+        #[test]
+        fn evm_payload_with_wrong_domain_rejected() {
+            new_test_ext().execute_with(|| {
+                // Create an SVM packet and try to pass it as EVM payload
+                let svm_packet = Packet::Svm(SvmPacket::Invoke {
+                    program_id: [0u8; 32],
+                    accounts: Vec::new(),
+                    data: vec![1, 2, 3],
+                });
+                let wrong_domain_payload = svm_packet.encode();
+                // This is >= 30 bytes, so packet validation is enforced.
+                // The domain mask is 0b0010 (SVM), but we're sending it as EVM.
+                assert!(wrong_domain_payload.len() >= 30);
+
+                let result = AtlasKernel::submit_comit(
+                    RuntimeOrigin::signed(ALICE),
+                    H256::repeat_byte(0x01), // comit_id
+                    wrong_domain_payload,    // evm_payload (actually SVM)
+                    Vec::new(),              // svm_payload
+                    0,                       // nonce
+                    0,                       // fee
+                    H256::zero(),            // prepare_root
+                );
+
+                assert_err!(result, Error::<Test>::InvalidEvmPacket);
+            });
+        }
+
+        /// Malformed EVM payload (>=30 bytes, not SCALE-decodable) must be rejected.
+        #[test]
+        fn malformed_evm_payload_rejected() {
+            new_test_ext().execute_with(|| {
+                // 40 bytes of garbage — not a valid SCALE-encoded packet
+                let malformed: Vec<u8> = [0xDE, 0xAD, 0xBE, 0xEF].repeat(10);
+                assert!(malformed.len() >= 30);
+
+                let result = AtlasKernel::submit_comit(
+                    RuntimeOrigin::signed(ALICE),
+                    H256::repeat_byte(0x02),
+                    malformed,  // evm_payload (garbage)
+                    Vec::new(), // svm_payload
+                    0,          // nonce
+                    0,          // fee
+                    H256::zero(),
+                );
+
+                assert_err!(result, Error::<Test>::InvalidEvmPacket);
+            });
+        }
+
+        /// Short raw payload (<30 bytes) should pass through — backward compat.
+        #[test]
+        fn short_raw_payload_passes_validation() {
+            new_test_ext().execute_with(|| {
+                // 10 bytes — below the 30-byte packet validation threshold
+                let short_payload: Vec<u8> = vec![0x01; 10];
+                assert!(short_payload.len() < 30);
+
+                // This should NOT fail with InvalidEvmPacket.
+                // It may fail for other reasons (nonce, auth, etc.) but not
+                // packet validation.
+                let result = AtlasKernel::submit_comit(
+                    RuntimeOrigin::signed(ALICE),
+                    H256::repeat_byte(0x03),
+                    short_payload,
+                    Vec::new(),
+                    0,
+                    0,
+                    H256::zero(),
+                );
+
+                // Must NOT be an InvalidEvmPacket error
+                if let Err(e) = result {
+                    let invalid_evm: DispatchError = Error::<Test>::InvalidEvmPacket.into();
+                    assert!(
+                        e != invalid_evm,
+                        "Short raw payload must not be rejected as InvalidEvmPacket"
+                    );
+                }
+            });
+        }
+
+        /// Valid EVM and SVM packets should pass packet validation.
+        #[test]
+        fn valid_evm_svm_packets_pass_validation() {
+            new_test_ext().execute_with(|| {
+                let evm_packet = Packet::Evm(EvmPacket::Call {
+                    contract: [0x42; 20],
+                    function_selector: [0xaa, 0xbb, 0xcc, 0xdd],
+                    args: vec![1, 2, 3],
+                    value: U256::from(100u64),
+                });
+                let evm_payload = evm_packet.encode();
+                assert!(evm_payload.len() >= 30);
+
+                let svm_packet = Packet::Svm(SvmPacket::Invoke {
+                    program_id: [0x99; 32],
+                    accounts: Vec::new(),
+                    data: vec![0xff],
+                });
+                let svm_payload = svm_packet.encode();
+                assert!(svm_payload.len() >= 30);
+
+                // Should NOT fail with InvalidEvmPacket or InvalidSvmPacket
+                let result = AtlasKernel::submit_comit(
+                    RuntimeOrigin::signed(ALICE),
+                    H256::repeat_byte(0x04),
+                    evm_payload,
+                    svm_payload,
+                    0,
+                    0,
+                    H256::zero(),
+                );
+
+                if let Err(e) = result {
+                    let invalid_evm: DispatchError = Error::<Test>::InvalidEvmPacket.into();
+                    let invalid_svm: DispatchError = Error::<Test>::InvalidSvmPacket.into();
+                    assert!(e != invalid_evm, "Valid EVM packet must not be rejected");
+                    assert!(e != invalid_svm, "Valid SVM packet must not be rejected");
+                }
+            });
+        }
+
+        /// SVM payload with wrong domain must be rejected.
+        #[test]
+        fn svm_payload_with_wrong_domain_rejected() {
+            new_test_ext().execute_with(|| {
+                let evm_packet = Packet::Evm(EvmPacket::Call {
+                    contract: [0x42; 20],
+                    function_selector: [0xaa, 0xbb, 0xcc, 0xdd],
+                    args: vec![1, 2, 3],
+                    value: U256::from(100u64),
+                });
+                let wrong_domain_payload = evm_packet.encode();
+                // domain mask is 0b0001 (EVM), but we're sending as SVM
+
+                let result = AtlasKernel::submit_comit(
+                    RuntimeOrigin::signed(ALICE),
+                    H256::repeat_byte(0x05),
+                    Vec::new(),           // evm_payload empty
+                    wrong_domain_payload, // svm_payload (actually EVM)
+                    0,
+                    0,
+                    H256::zero(),
+                );
+
+                assert_err!(result, Error::<Test>::InvalidSvmPacket);
+            });
+        }
     }
 }

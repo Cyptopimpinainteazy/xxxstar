@@ -2,7 +2,14 @@
 
 use super::*;
 use crate::mock::*;
-use x3_dex::amm_pools::TokenId;
+use frame_support::{assert_noop, assert_ok};
+use x3_dex::amm_pools::{AMMPool, TokenId};
+
+fn pool_id(token_a: &TokenId, token_b: &TokenId, fee_basis_points: u32) -> u64 {
+    AMMPool::create_pool(token_a.clone(), token_b.clone(), fee_basis_points)
+        .expect("valid test pool")
+        .pool_id
+}
 
 #[test]
 fn test_swap_execution() {
@@ -25,7 +32,7 @@ fn test_swap_execution() {
         ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,
+            pool_id(&token_a, &token_b, 30),
             1000,
             1000,
             900,
@@ -35,14 +42,14 @@ fn test_swap_execution() {
         // Execute swap
         assert_ok!(DEX::swap(
             RuntimeOrigin::signed(2),
-            0, // pool_id
+            pool_id(&token_a, &token_b, 30),
             token_a.clone(),
             100, // amount_in
             80,  // min_out
         ));
 
         // Verify pool reserves changed
-        let pool = DEX::pools(0).unwrap();
+        let pool = DEX::pools(pool_id(&token_a, &token_b, 30)).unwrap();
         assert!(pool.reserve_a > 1000); // Increased by swap input
         assert!(pool.reserve_b < 1000); // Decreased by swap output
     });
@@ -69,7 +76,7 @@ fn test_invariant_preservation() {
         ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,
+            pool_id(&token_a, &token_b, 30),
             1000,
             1000,
             900,
@@ -81,14 +88,14 @@ fn test_invariant_preservation() {
         // Execute swap
         assert_ok!(DEX::swap(
             RuntimeOrigin::signed(2),
-            0,
+            pool_id(&token_a, &token_b, 30),
             token_a.clone(),
             100,
             80,
         ));
 
         // Verify invariant is preserved (approximately, accounting for fees)
-        let pool = DEX::pools(0).unwrap();
+        let pool = DEX::pools(pool_id(&token_a, &token_b, 30)).unwrap();
         let final_k = pool.reserve_a as u128 * pool.reserve_b as u128;
         assert!(final_k >= initial_k); // Should not decrease (fees make it increase slightly)
     });
@@ -115,7 +122,7 @@ fn test_slippage_protection() {
         ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,
+            pool_id(&token_a, &token_b, 30),
             1000,
             1000,
             900,
@@ -126,7 +133,7 @@ fn test_slippage_protection() {
         assert_noop!(
             DEX::swap(
                 RuntimeOrigin::signed(2),
-                0,
+                pool_id(&token_a, &token_b, 30),
                 token_a.clone(),
                 100,
                 200, // min_out too high, will exceed slippage tolerance

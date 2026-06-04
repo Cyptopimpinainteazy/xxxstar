@@ -129,6 +129,8 @@ fn test_offence_reporting_extrinsic_accepts_known_validator() {
 #[test]
 fn test_offences_report_triggers_consensus_slash() {
     new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
         let offender: u64 = 7;
         ValidatorStake::<Test>::insert(
             offender,

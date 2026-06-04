@@ -2,7 +2,7 @@
 
 use crate as pallet_depin_marketplace;
 use frame_support::{
-    parameter_types,
+    derive_impl, parameter_types,
     traits::{ConstU128, ConstU16, ConstU32, ConstU64},
     PalletId,
 };
@@ -29,6 +29,7 @@ frame_support::construct_runtime!(
     }
 );
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl system::Config for Test {
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
@@ -68,7 +69,8 @@ impl pallet_balances::Config for Test {
     type FreezeIdentifier = ();
     type MaxFreezes = ConstU32<0>;
     type RuntimeHoldReason = ();
-    type MaxHolds = ConstU32<0>;
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -113,6 +115,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
             (3, 100_000),
             (10, 1_000_000), // rich customer
         ],
+        dev_accounts: None,
     }
     .assimilate_storage(&mut t)
     .unwrap();

@@ -90,6 +90,34 @@ Additional Rust cross-VM test surfaces were inventoried in `reports/cross-vm/rus
 - `integration-tests/cross-vm-pallet-test.rs`
 - `integration-tests/cross-vm-atomic-test.rs`
 
+### 2026-05-30 Update: Test Surface Converted to Real Runtime-Backed Tests
+
+Previously, `tests/e2e_settlement_atomic_kernel.rs` and
+`integration-tests/cross-vm-atomic-test.rs` were entirely placeholder or
+simulation-based (hardcoded values, `assert!(true)`, no `TestExternalities`).
+These have been replaced with real `TestExternalities`-backed tests using the
+`pallet_x3_atomic_kernel::mock` runtime:
+
+**`tests/e2e_settlement_atomic_kernel.rs`** — now exercises:
+- Settlement E2E flow (submit → assign → `finalize_with_settlement` from settlement origin)
+- Settlement wrong origin rejected (ALICE/BOB cannot call `finalize_with_settlement`)
+- Bundle rollback (submit → cancel → verify `RolledBack` + receipt cleanup)
+- Bundle auto-expiry (short deadline → advance → verify auto-rollback + receipt cleanup)
+
+**`integration-tests/cross-vm-atomic-test.rs`** — now exercises:
+- Submit + rollback with receipt initialization and cleanup
+- Full execution flow (submit → assign → finalize)
+- Deadline expiry with receipt cleanup
+
+**`integration-tests/cross-vm-pallet-test.rs`** — expanded with:
+- Settlement origin gating test (CHARLIE-only `finalize_with_settlement`)
+- Rollback with leg receipts cleanup verification
+
+**`pallets/x3-atomic-kernel/src/tests.rs`** — expanded with:
+- `StateDiff`, `NoopVmReverter`, `LegReceipt` unit tests
+- `LegReceipt` encode/decode round-trip
+- `RevertError` variant tests
+
 ## Remaining Blockers
 
 1. Fresh source-built node/runtime is still required to validate current cross-VM pallets and RPCs end to end.

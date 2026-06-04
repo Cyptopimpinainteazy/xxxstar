@@ -17,10 +17,9 @@ use crate::{
         BridgeNonces, GovernancePowerMap, RegisteredWrappedAssets, TotalWrappedSupply,
         WrappedBalances, WrappedSupply,
     },
-    WrappedAssetConfig, WrappedAssetStatus,
+    Pallet as Wrapped, WrappedAssetConfig, WrappedAssetStatus,
 };
 use frame_support::{assert_noop, assert_ok};
-use pallet_x3_wrapped::Pallet as Wrapped;
 
 // ── 1. Register asset ─────────────────────────────────────────────────────────
 

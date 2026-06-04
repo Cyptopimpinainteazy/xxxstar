@@ -166,10 +166,12 @@ impl PrePass {
         for func in &module.functions {
             for block in &func.blocks {
                 for stmt in &block.statements {
-                    if let Some(expr) = ExprKey::from_rhs(&stmt.rhs, &mut vn_table) {
-                        if expr.is_pure() && !seen.contains(&expr.value_number) {
-                            seen.insert(expr.value_number);
-                            vec.push(expr);
+                    if let Some(rhs) = stmt.rhs() {
+                        if let Some(expr) = ExprKey::from_rhs(rhs, &mut vn_table) {
+                            if expr.is_pure() && !seen.contains(&expr.value_number) {
+                                seen.insert(expr.value_number);
+                                vec.push(expr);
+                            }
                         }
                     }
                 }
@@ -203,11 +205,13 @@ impl PrePass {
 
                     // Check if any statement uses this expression
                     for stmt in &block.statements {
-                        if let Some(used_expr) =
-                            ExprKey::from_rhs(&stmt.rhs, &mut ValueNumbering::new())
-                        {
-                            if used_expr.value_number == expr.value_number {
-                                anticipated = Anticipatability::Anticipated;
+                        if let Some(rhs) = stmt.rhs() {
+                            if let Some(used_expr) =
+                                ExprKey::from_rhs(rhs, &mut ValueNumbering::new())
+                            {
+                                if used_expr.value_number == expr.value_number {
+                                    anticipated = Anticipatability::Anticipated;
+                                }
                             }
                         }
                     }
@@ -308,22 +312,36 @@ impl PrePass {
                     // Process each statement in the block
                     for stmt in &block.statements {
                         // Check if this statement computes a candidate
-                        if let Some(expr) = ExprKey::from_rhs(&stmt.rhs, &mut vn_table) {
-                            if candidates.contains(&expr) && expr.is_pure() {
-                                // This expression becomes available
-                                state.insert(expr.clone(), Availability::Available);
+                        if let Some(rhs) = stmt.rhs() {
+                            if let Some(expr) = ExprKey::from_rhs(rhs, &mut vn_table) {
+                                if candidates.contains(&expr) && expr.is_pure() {
+                                    // This expression becomes available
+                                    state.insert(expr.clone(), Availability::Available);
+                                }
                             }
                         }
 
                         // Conservative: calls have side effects, kill all expressions
-                        if matches!(&stmt.rhs, MirRhs::Call { .. }) {
+                        if matches!(
+                            stmt,
+                            MirStatement::Assign {
+                                rhs: MirRhs::Call { .. },
+                                ..
+                            }
+                        ) {
                             for (_, v) in state.iter_mut() {
                                 *v = Availability::Overdefined;
                             }
                         }
 
                         // Stores: conservatively kill all (full version would do alias analysis)
-                        if matches!(&stmt.rhs, MirRhs::Store { .. }) {
+                        if matches!(
+                            stmt,
+                            MirStatement::Assign {
+                                rhs: MirRhs::Store { .. },
+                                ..
+                            }
+                        ) {
                             for (_, v) in state.iter_mut() {
                                 *v = Availability::Overdefined;
                             }
@@ -430,13 +448,14 @@ impl PrePass {
                 let mut stmt_index: Option<usize> = None;
                 let mut rhs_clone: Option<MirRhs> = None;
                 for (s_idx, stmt) in block.statements.iter().enumerate() {
-                    if let Some(candidate) =
-                        ExprKey::from_rhs(&stmt.rhs, &mut ValueNumbering::new())
-                    {
-                        if candidate.value_number == expr.value_number {
-                            stmt_index = Some(s_idx);
-                            rhs_clone = Some(stmt.rhs.clone());
-                            break;
+                    if let Some(rhs) = stmt.rhs() {
+                        if let Some(candidate) = ExprKey::from_rhs(rhs, &mut ValueNumbering::new())
+                        {
+                            if candidate.value_number == expr.value_number {
+                                stmt_index = Some(s_idx);
+                                rhs_clone = Some(rhs.clone());
+                                break;
+                            }
                         }
                     }
                 }
@@ -452,7 +471,7 @@ impl PrePass {
                 let hoisted_value = *hoisted_map.entry(expr.clone()).or_insert_with(|| {
                     let v = MirValue(next_value);
                     next_value += 1;
-                    hoisting_stmts.push(MirStatement {
+                    hoisting_stmts.push(MirStatement::Assign {
                         target: v,
                         rhs: rhs.clone(),
                     });
@@ -460,7 +479,9 @@ impl PrePass {
                 });
 
                 // Replace all uses of the redundant target with the hoisted value
-                let original_target = block.statements[stmt_idx].target;
+                let original_target = block.statements[stmt_idx]
+                    .target()
+                    .expect("PRE: redundant statement must be an assignment");
                 replace_value_in_function(func, original_target, hoisted_value);
 
                 // Mark redundant statement for removal
@@ -509,26 +530,30 @@ fn next_value_id(func: &MirFunction) -> usize {
     for block in &func.blocks {
         max_id = max_id.max(block.id.0);
         for stmt in &block.statements {
-            max_id = max_id.max(stmt.target.0);
-            match &stmt.rhs {
-                MirRhs::Unary(_, v) => {
-                    max_id = max_id.max(v.0);
-                }
-                MirRhs::Binary(_, l, r) => {
-                    max_id = max_id.max(l.0.max(r.0));
-                }
-                MirRhs::Call { args, .. } => {
-                    for arg in args {
-                        max_id = max_id.max(arg.0);
+            if let Some(target) = stmt.target() {
+                max_id = max_id.max(target.0);
+            }
+            if let Some(rhs) = stmt.rhs() {
+                match rhs {
+                    MirRhs::Unary(_, v) => {
+                        max_id = max_id.max(v.0);
                     }
+                    MirRhs::Binary(_, l, r) => {
+                        max_id = max_id.max(l.0.max(r.0));
+                    }
+                    MirRhs::Call { args, .. } => {
+                        for arg in args {
+                            max_id = max_id.max(arg.0);
+                        }
+                    }
+                    MirRhs::Load { addr, .. } => {
+                        max_id = max_id.max(addr.0);
+                    }
+                    MirRhs::Store { addr, val, .. } => {
+                        max_id = max_id.max(addr.0.max(val.0));
+                    }
+                    MirRhs::Literal(_) => {}
                 }
-                MirRhs::Load { addr, .. } => {
-                    max_id = max_id.max(addr.0);
-                }
-                MirRhs::Store { addr, val, .. } => {
-                    max_id = max_id.max(addr.0.max(val.0));
-                }
-                MirRhs::Literal(_) => {}
             }
         }
 
@@ -555,10 +580,13 @@ fn next_value_id(func: &MirFunction) -> usize {
 fn replace_value_in_function(func: &mut MirFunction, from: MirValue, to: MirValue) {
     for block in &mut func.blocks {
         for stmt in &mut block.statements {
-            if stmt.target == from {
-                stmt.target = to;
+            if let MirStatement::Assign { target, rhs } = stmt {
+                if *target == from {
+                    *target = to;
+                }
+                replace_value_in_rhs(rhs, from, to);
             }
-            replace_value_in_rhs(&mut stmt.rhs, from, to);
+            // Atomic markers have no target/rhs to replace.
         }
 
         if let Some(term) = &mut block.terminator {
@@ -669,14 +697,14 @@ mod tests {
     use x3_mir::{MirBlock, MirBlockId, MirFunction, MirStatement, MirTerminator, MirValue};
 
     fn make_binary_stmt(target: usize, op: BinaryOp, lhs: usize, rhs: usize) -> MirStatement {
-        MirStatement {
+        MirStatement::Assign {
             target: MirValue(target),
             rhs: MirRhs::Binary(op, MirValue(lhs), MirValue(rhs)),
         }
     }
 
     fn make_unary_stmt(target: usize, op: UnaryOp, val: usize) -> MirStatement {
-        MirStatement {
+        MirStatement::Assign {
             target: MirValue(target),
             rhs: MirRhs::Unary(op, MirValue(val)),
         }
@@ -815,7 +843,7 @@ mod tests {
         // Binary expressions should be pure
         let mut vn_table = ValueNumbering::new();
         let stmt = make_binary_stmt(0, BinaryOp::Add, 1, 2);
-        let expr = ExprKey::from_rhs(&stmt.rhs, &mut vn_table).unwrap();
+        let expr = ExprKey::from_rhs(stmt.rhs().unwrap(), &mut vn_table).unwrap();
         assert!(expr.is_pure());
     }
 
@@ -827,8 +855,8 @@ mod tests {
         let add1 = make_binary_stmt(0, BinaryOp::Add, 1, 2);
         let add2 = make_binary_stmt(1, BinaryOp::Add, 2, 1);
 
-        let expr1 = ExprKey::from_rhs(&add1.rhs, &mut vn_table).unwrap();
-        let expr2 = ExprKey::from_rhs(&add2.rhs, &mut vn_table).unwrap();
+        let expr1 = ExprKey::from_rhs(add1.rhs().unwrap(), &mut vn_table).unwrap();
+        let expr2 = ExprKey::from_rhs(add2.rhs().unwrap(), &mut vn_table).unwrap();
 
         // They should have the same value number (commutative equivalence)
         assert_eq!(expr1.value_number, expr2.value_number);
@@ -885,8 +913,8 @@ mod tests {
         let add1 = make_binary_stmt(0, BinaryOp::Add, 1, 2);
         let mul1 = make_binary_stmt(1, BinaryOp::Mul, 3, 4);
 
-        let expr_add = ExprKey::from_rhs(&add1.rhs, &mut vn_table).unwrap();
-        let expr_mul = ExprKey::from_rhs(&mul1.rhs, &mut vn_table).unwrap();
+        let expr_add = ExprKey::from_rhs(add1.rhs().unwrap(), &mut vn_table).unwrap();
+        let expr_mul = ExprKey::from_rhs(mul1.rhs().unwrap(), &mut vn_table).unwrap();
 
         set1.insert(expr_mul.clone());
         set1.insert(expr_add.clone());
@@ -908,8 +936,8 @@ mod tests {
         let sub1 = make_binary_stmt(0, BinaryOp::Sub, 1, 2); // 1 - 2
         let sub2 = make_binary_stmt(1, BinaryOp::Sub, 2, 1); // 2 - 1
 
-        let expr1 = ExprKey::from_rhs(&sub1.rhs, &mut vn_table).unwrap();
-        let expr2 = ExprKey::from_rhs(&sub2.rhs, &mut vn_table).unwrap();
+        let expr1 = ExprKey::from_rhs(sub1.rhs().unwrap(), &mut vn_table).unwrap();
+        let expr2 = ExprKey::from_rhs(sub2.rhs().unwrap(), &mut vn_table).unwrap();
 
         // They should have DIFFERENT value numbers (order matters)
         assert_ne!(expr1.value_number, expr2.value_number);

@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use x3_lang_common::{
-    BinOp, DurationUnit, FloatSuffix, IntBase, IntSuffix, SizeUnit, Span, Spanned, Symbol, UnOp,
+    BinOp, DurationUnit, FloatSuffix, IntBase, IntSuffix, SizeUnit, Spanned, Symbol, UnOp,
 };
 
 /// Node ID - deterministic, 0-based index assigned during parsing/lowering when required.
@@ -44,6 +43,11 @@ pub enum Item {
     AtomicSwap(AtomicSwapDecl),
     Strategy(CrossChainStrategy),
     Proposal(ProposalDecl),
+    GpuBlock(GpuBlock),
+    SimulateDecl(SimulateDecl),
+    ScheduledTask(ScheduledTask),
+    IntentDecl(IntentDecl),
+    SubscriptionDecl(SubscriptionDecl),
 }
 
 /// A `use` declaration
@@ -86,6 +90,7 @@ pub struct Function {
     pub body: Block,
     pub visibility: Visibility,
     pub is_async: bool,
+    pub annotations: Vec<Annotation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +156,7 @@ pub struct Agent {
     /// Strategies (named entry points)
     pub strategies: Vec<Spanned<StrategyDecl>>,
     pub visibility: Visibility,
+    pub annotations: Vec<Annotation>,
 }
 
 /// Context block defines configuration for an agent
@@ -256,6 +262,46 @@ pub enum Statement {
         duration: Expression,
         action: FailureAction,
     },
+
+    // ===== Capability statements =====
+    Snapshot,
+    Diff {
+        before: Expression,
+        after: Expression,
+    },
+    CrdtOp(CrdtOp),
+    SelfDestruct,
+    Migrate {
+        new_contract: Expression,
+    },
+    ZkVerify {
+        proof: Expression,
+        public_input: Expression,
+        key: Expression,
+    },
+    MpcVerify {
+        result: Expression,
+        signatures: Expression,
+        threshold: Expression,
+    },
+    StorageRef {
+        op: StorageRefOp,
+        data: Expression,
+    },
+    Pathfind {
+        from: Expression,
+        to: Expression,
+        max_depth: Expression,
+    },
+    MempoolScan {
+        max_results: Expression,
+    },
+    OracleRequest {
+        token: Expression,
+        reward: Expression,
+    },
+    Pause,
+    Resume,
 }
 
 /// Pattern is used in `let`, `for`, `match` (keep simple for now)
@@ -280,6 +326,94 @@ pub struct AtomicBlock {
 pub struct EventEmit {
     pub name: Symbol,
     pub payload: Vec<Expression>,
+}
+
+/// Function, agent, and strategy annotations parsed from `@name(...)` attributes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Annotation {
+    NoHeap,
+    NoRecursion(u32),
+    Hot,
+    Audit,
+    Role(Symbol),
+    Multisig(u32, u32),
+    Version(Symbol),
+    UpgradeFrom(Symbol),
+    OnChain,
+    OffChain,
+    Sandbox,
+    Whitelist(Vec<Symbol>),
+    Concurrent,
+    Scheduled(u64),
+    Subscription(u128, u64),
+    Extern,
+    Payable,
+    Simd,
+    Subscribe(Symbol),
+    Sponsor,
+    GasAdaptive,
+}
+
+/// `gpu { ... }` or SIMD-capable GPU block.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuBlock {
+    pub body: Block,
+    pub is_simd: bool,
+}
+
+/// Off-chain simulation declaration that returns a simulation receipt.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimulateDecl {
+    pub name: Symbol,
+    pub body: Block,
+    pub receipt: Option<Symbol>,
+}
+
+/// Periodic on-chain task declaration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduledTask {
+    pub name: Symbol,
+    pub period_blocks: u64,
+    pub body: Block,
+}
+
+/// Intent declaration with constraints and resolver body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentDecl {
+    pub name: Symbol,
+    pub constraints: Vec<Expression>,
+    pub body: Block,
+}
+
+/// Subscription declaration with amount and charging period.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionDecl {
+    pub name: Symbol,
+    pub amount: u128,
+    pub period_blocks: u64,
+    pub body: Block,
+}
+
+/// CRDT operation statements.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrdtOp {
+    pub kind: CrdtOpKind,
+    pub key: Expression,
+    pub value: Option<Expression>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CrdtOpKind {
+    Get,
+    Set,
+    Append,
+    Merge,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StorageRefOp {
+    Store,
+    Load,
 }
 
 // ============================================================

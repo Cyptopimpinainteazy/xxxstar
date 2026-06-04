@@ -7,8 +7,8 @@
 
 use crate as pallet_x3_atomic_kernel;
 use frame_support::{
-    construct_runtime, parameter_types,
-    traits::{ConstU32, ConstU64},
+    construct_runtime, derive_impl, parameter_types,
+    traits::{ConstU32, ConstU64, EnsureOrigin},
 };
 use frame_system as system;
 use sp_core::H256;
@@ -58,6 +58,7 @@ pub type Block = system::mocking::MockBlock<Test>;
 
 // ── System Config ─────────────────────────────────────────────────────────
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl system::Config for Test {
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
@@ -98,10 +99,10 @@ impl pallet_balances::Config for Test {
     type MaxReserves = ConstU32<50>;
     type ReserveIdentifier = [u8; 8];
     type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
     type FreezeIdentifier = ();
-    type MaxHolds = ConstU32<0>;
     type MaxFreezes = ConstU32<0>;
-    type RuntimeFreezeReason = ();
 }
 
 // ── CreateTransactionBase + CreateBare for unsigned transactions ─────────
@@ -123,6 +124,43 @@ where
     }
 }
 
+pub struct RootOrSignedAccount;
+impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
+    type Success = AccountId;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Root) => Ok(0),
+            Ok(system::RawOrigin::Signed(who)) => Ok(who),
+            _ => Err(o),
+        }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(ALICE))
+    }
+}
+
+/// Settlement-only origin for testing that `finalize_with_settlement`
+/// is properly gated. Only CHARLIE may call settlement paths.
+pub struct SettlementOnlyOrigin;
+impl EnsureOrigin<RuntimeOrigin> for SettlementOnlyOrigin {
+    type Success = AccountId;
+
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Signed(who)) if who == CHARLIE => Ok(who),
+            _ => Err(o),
+        }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(CHARLIE))
+    }
+}
+
 // ── Atomic Kernel Config ──────────────────────────────────────────────────
 
 impl pallet_x3_atomic_kernel::Config for Test {
@@ -132,6 +170,9 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MaxLegsPerBundle = MaxLegsPerBundle;
     type BundleDeadlineBlocks = BundleDeadlineBlocks;
     type EconomicHalt = NoEconomicHalt;
+    type X3LangOrigin = RootOrSignedAccount;
+    type SettlementOrigin = SettlementOnlyOrigin;
+    type VmReverter = crate::vm_revert::NoopVmReverter;
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────
@@ -148,6 +189,7 @@ impl Default for ExtBuilder {
                 (BOB, INITIAL_BALANCE),
                 (CHARLIE, INITIAL_BALANCE),
             ],
+        dev_accounts: None,
         }
     }
 }

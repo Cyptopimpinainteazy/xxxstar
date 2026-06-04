@@ -492,7 +492,7 @@ mod tests {
         let pnl = TradeHistoryEngine::calculate_realized_pnl(
             10_000_000_000,
             10_500_000_000,
-            1_000,
+            2_000,
             30,
             30,
         );

@@ -236,7 +236,14 @@ impl DeFiTracker {
             return Err("Nothing borrowed");
         }
 
-        let interest = (position.borrowed_amount as u32 * rate_per_block / 100000) as u128;
+        if rate_per_block == 0 {
+            return Ok(());
+        }
+
+        let numerator = position
+            .borrowed_amount
+            .saturating_mul(rate_per_block as u128);
+        let interest = numerator.div_ceil(100_000);
         position.interest_accrued += interest;
         Ok(())
     }

@@ -40,10 +40,10 @@ pub mod pallet {
     use super::*;
     use frame_support::{
         pallet_prelude::*,
-        traits::{Currency, LockableCurrency, ReservableCurrency, WithdrawReasons},
+        traits::{Currency, LockableCurrency, ReservableCurrency},
     };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::{Hash, Zero};
+    use sp_runtime::traits::{Hash, Saturating};
 
     pub type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -110,10 +110,10 @@ pub mod pallet {
     pub type ResultCommits<T: Config> = StorageDoubleMap<
         _,
         Blake2_128Concat,
-        T::Hash,         // task_id
+        T::Hash, // task_id
         Blake2_128Concat,
-        T::AccountId,    // executor_id
-        T::Hash,         // result_hash
+        T::AccountId, // executor_id
+        T::Hash,      // result_hash
         OptionQuery,
     >;
 
@@ -249,8 +249,14 @@ pub mod pallet {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ensure!(!Executors::<T>::contains_key(&who), Error::<T>::AlreadyRegistered);
-            ensure!(stake >= T::MinExecutorStake::get(), Error::<T>::InsufficientStake);
+            ensure!(
+                !Executors::<T>::contains_key(&who),
+                Error::<T>::AlreadyRegistered
+            );
+            ensure!(
+                stake >= T::MinExecutorStake::get(),
+                Error::<T>::InsufficientStake
+            );
 
             T::Currency::reserve(&who, stake)?;
 
@@ -282,16 +288,15 @@ pub mod pallet {
         pub fn deregister_executor(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            let mut record =
-                Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
+            let mut record = Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
 
             ensure!(
                 ClaimedTaskCount::<T>::get(&who) == 0,
                 Error::<T>::HasActiveTasks,
             );
 
-            let unlock_at = frame_system::Pallet::<T>::block_number()
-                + T::DeregistrationCooldown::get();
+            let unlock_at =
+                frame_system::Pallet::<T>::block_number() + T::DeregistrationCooldown::get();
             record.status = ExecutorStatus::Deregistering;
             record.deregistering_at = Some(unlock_at);
             Executors::<T>::insert(&who, &record);
@@ -312,8 +317,9 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
 
             let record = Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
-            let unlock_at =
-                record.deregistering_at.ok_or(Error::<T>::CooldownNotExpired)?;
+            let unlock_at = record
+                .deregistering_at
+                .ok_or(Error::<T>::CooldownNotExpired)?;
 
             ensure!(
                 frame_system::Pallet::<T>::block_number() >= unlock_at,
@@ -334,8 +340,7 @@ pub mod pallet {
         #[pallet::weight(Weight::from_parts(5_000, 0))]
         pub fn submit_heartbeat(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
-            let mut record =
-                Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
+            let mut record = Executors::<T>::get(&who).ok_or(Error::<T>::NotRegistered)?;
 
             let now = frame_system::Pallet::<T>::block_number();
             record.last_heartbeat = now;
@@ -395,7 +400,10 @@ pub mod pallet {
         pub fn claim_task(origin: OriginFor<T>, task_id: T::Hash) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ensure!(Executors::<T>::contains_key(&who), Error::<T>::NotRegistered);
+            ensure!(
+                Executors::<T>::contains_key(&who),
+                Error::<T>::NotRegistered
+            );
 
             let count = ClaimedTaskCount::<T>::get(&who);
             ensure!(
@@ -405,7 +413,10 @@ pub mod pallet {
 
             Tasks::<T>::try_mutate(task_id, |maybe_task| -> DispatchResult {
                 let task = maybe_task.as_mut().ok_or(Error::<T>::TaskNotFound)?;
-                ensure!(task.status == TaskStatus::Pending, Error::<T>::TaskNotClaimable);
+                ensure!(
+                    task.status == TaskStatus::Pending,
+                    Error::<T>::TaskNotClaimable
+                );
                 ensure!(task.claimed_by.is_none(), Error::<T>::TaskAlreadyClaimed);
                 task.status = TaskStatus::Claimed;
                 task.claimed_by = Some(who.clone());
@@ -437,7 +448,10 @@ pub mod pallet {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            ensure!(Executors::<T>::contains_key(&who), Error::<T>::NotRegistered);
+            ensure!(
+                Executors::<T>::contains_key(&who),
+                Error::<T>::NotRegistered
+            );
 
             ensure!(
                 !ResultCommits::<T>::contains_key(task_id, &who),
@@ -481,11 +495,11 @@ pub mod pallet {
         ) -> DispatchResult {
             ensure_root(origin)?;
 
-            let mut record =
-                Executors::<T>::get(&executor).ok_or(Error::<T>::NotRegistered)?;
+            let mut record = Executors::<T>::get(&executor).ok_or(Error::<T>::NotRegistered)?;
 
             let slash = amount.min(record.stake);
-            let (slashed, _) = T::Currency::slash_reserved(&executor, slash);
+            let (_imbalance, remaining) = T::Currency::slash_reserved(&executor, slash);
+            let slashed = slash.saturating_sub(remaining);
             record.stake = record.stake.saturating_sub(slashed);
 
             if record.stake < T::MinExecutorStake::get() {

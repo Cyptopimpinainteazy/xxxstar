@@ -153,7 +153,7 @@ forge test -vvv
 
 ### Deploy (example)
 ```bash
-PRIVATE_KEY=xxx forge script script/Deploy.s.sol --rpc-url $RPC --broadcast
+forge script script/Deploy.s.sol --rpc-url "$RPC" --private-key "$PRIVATE_KEY" --broadcast
 ```
 
 ---

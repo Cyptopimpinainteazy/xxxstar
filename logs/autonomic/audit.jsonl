@@ -1,0 +1,16 @@
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779843760.052644}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779843760.0535748}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779843899.1955194}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779843899.198118}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779843919.931704}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779843919.9328375}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779844037.0322015}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779844037.0332146}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779844051.0344713}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779844051.0354}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779844068.0249035}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779844068.0258732}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779844359.2731342}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779844359.2738786}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "start", "target": "control_plane", "reason": "initializing", "result": "logged", "details": {}, "ts": 1779846589.406191}
+{"category": "system", "severity": "info", "actor": "autonomic", "action": "started", "target": "control_plane", "reason": "all subsystems running", "result": "logged", "details": {}, "ts": 1779846589.4088492}

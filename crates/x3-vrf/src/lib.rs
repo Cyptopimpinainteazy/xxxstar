@@ -190,8 +190,11 @@ mod tests {
         let u32_val = utils::vrf_to_u32(&output);
         assert_eq!(u32_val, 0x2a2a2a2a);
 
-        let bool_val = utils::vrf_to_bool(&output);
-        assert!(bool_val); // 42 & 1 = 0, wait no: 42 in binary is 00101010, LSB is 0, so false?
+        assert!(!utils::vrf_to_bool(&output));
+
+        let mut odd_output = output;
+        odd_output[0] = 43;
+        assert!(utils::vrf_to_bool(&odd_output));
 
         let bytes = utils::vrf_to_bytes(&output, 4);
         assert_eq!(bytes, vec![42, 42, 42, 42]);

@@ -1,13 +1,11 @@
 //! X3 VM core data structures and helper functions.
 
-use crate::executor::{ExecError, ExecResult, GasCost};
-use serde::{Deserialize, Serialize};
+use crate::executor::{ExecError, ExecResult};
 use std::sync::Arc;
-use x3_lang_common::Span;
 
 pub type Register = u128; // 128-bit to match u256-like operations; adjust as needed
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct InstructionStream(Arc<Vec<u8>>);
 
 impl InstructionStream {
@@ -48,6 +46,9 @@ pub struct VMState {
     pub fp: usize,
     pub gas: u128,
     pub memory: Vec<u8>,
+    pub atomic_stack: Vec<usize>, // stack of pc for atomic begin
+    pub call_stack: Vec<usize>,
+    pub paused: bool,
 }
 
 impl VMState {
@@ -60,6 +61,9 @@ impl VMState {
             fp: 0,
             gas: initial_gas,
             memory: vec![0u8; config.max_memory_pages * 64 * 1024],
+            atomic_stack: Vec::new(),
+            call_stack: Vec::new(),
+            paused: false,
         }
     }
 }
@@ -68,6 +72,7 @@ pub struct VM {
     pub config: VMConfig,
     pub state: VMState,
     pub code: InstructionStream,
+    pub bridge: Box<dyn crate::bridge::BridgeAdapter>,
 }
 
 impl VM {
@@ -76,11 +81,21 @@ impl VM {
             config: cfg.clone(),
             state: VMState::new(&cfg, initial_gas),
             code: InstructionStream::new(code),
+            bridge: Box::new(crate::bridge::DryRunBridge),
         }
     }
 
     pub fn execute(&mut self) -> ExecResult<()> {
-        use crate::executor::execute;
-        execute(self)
+        self.verify_and_execute()
+    }
+
+    pub fn verify_and_execute(&mut self) -> ExecResult<()> {
+        crate::verifier::verify(&self.code)
+            .map_err(|err| ExecError::Panic(format!("X3_VERIFY_FAILED: {err:?}")))?;
+        self.execute_unverified()
+    }
+
+    pub(crate) fn execute_unverified(&mut self) -> ExecResult<()> {
+        crate::executor::execute(self)
     }
 }

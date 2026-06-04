@@ -103,23 +103,28 @@ mod tests {
 
                 // Submit batch
                 for _ in 0..self.config.batch_size {
-                    self.tasks_submitted.fetch_add(1, Ordering::Relaxed);
+                    let task_seq = self.tasks_submitted.fetch_add(1, Ordering::Relaxed) + 1;
 
                     // Simulate task execution
                     let latencies = self.latencies.clone();
                     let gpu_healthy = self.gpu_healthy.clone();
                     let tasks_completed = self.tasks_completed.clone();
                     let tasks_failed = self.tasks_failed.clone();
+                    let inject_gpu_failures = self.config.inject_gpu_failures;
+                    let network_latency_ms = self.config.network_latency_ms;
 
                     tokio::spawn(async move {
-                        // Mock GPU computation
-                        let compute_start = Instant::now();
+                        let task_start = Instant::now();
+                        if let Some(delay_ms) = network_latency_ms {
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                        }
                         tokio::time::sleep(Duration::from_micros(500)).await;
 
-                        let latency_ms = compute_start.elapsed().as_secs_f64() * 1000.0;
+                        let latency_ms = task_start.elapsed().as_secs_f64() * 1000.0;
                         latencies.lock().await.push(latency_ms);
 
-                        if gpu_healthy.load(Ordering::Acquire) {
+                        let injected_failure = inject_gpu_failures && task_seq % 10 == 0;
+                        if gpu_healthy.load(Ordering::Acquire) && !injected_failure {
                             tasks_completed.fetch_add(1, Ordering::Relaxed);
                         } else {
                             tasks_failed.fetch_add(1, Ordering::Relaxed);

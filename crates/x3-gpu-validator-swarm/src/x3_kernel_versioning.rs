@@ -509,11 +509,26 @@ mod tests {
 
     #[test]
     fn test_kernel_runtime_execution() {
-        let registry = X3KernelRegistry::new();
+        let mut registry = X3KernelRegistry::new();
+        registry
+            .register_kernel(
+                X3KernelManifest {
+                    name: "matmul".to_string(),
+                    version: "1.0.0".to_string(),
+                    kernel_type: KernelType::MatMul,
+                    binary_hash: [1u8; 32],
+                    min_gpu_capability: "8.0".to_string(),
+                    binary_size: 1024,
+                    registered_height: 100,
+                    approved: true,
+                },
+                100,
+            )
+            .unwrap();
         let mut runtime = X3KernelRuntime::new(registry);
 
-        // Mock execution
-        let _result = runtime.execute_kernel("matmul", &[]);
+        let result = runtime.execute_kernel("matmul", &[]);
+        assert!(result.is_ok());
         assert_eq!(runtime.total_executions, 1);
     }
 

@@ -6,6 +6,7 @@
 		}
 	],
 	"settings": {
-		"todo-tree.tree.scanMode": "workspace only"
+		"todo-tree.tree.scanMode": "workspace only",
+		"ollama-autopilot.model.modelName": "lojak/cryptomaster"
 	}
 }

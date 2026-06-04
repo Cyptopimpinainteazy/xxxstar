@@ -917,6 +917,12 @@ pub mod pallet {
         EmptyPayloads,
         /// Packet deserialization failed or packet domain targeting is invalid.
         InvalidPacket,
+        /// EVM packet deserialization failed or domain mask does not target EVM.
+        InvalidEvmPacket,
+        /// SVM packet deserialization failed or domain mask does not target SVM.
+        InvalidSvmPacket,
+        /// X3VM packet deserialization failed or domain mask does not target X3VM.
+        InvalidX3VmPacket,
         /// Supplied nonce does not match the expected account nonce.
         InvalidNonce,
         /// Nonce increment would overflow.
@@ -1119,58 +1125,38 @@ pub mod pallet {
             // First layer checks on payload sizes and emptiness.
             Self::verify_payloads(&comit_id, &evm_payload, &svm_payload)?;
 
-            // Phase 1.3: Packet deserialization and domain routing validation
-            // Gracefully attempt to deserialize payloads that meet minimum packet requirements
-            // If deserialization succeeds, validate domain routing
-            // If domain routing invalid, log warning but allow through for now
-            // (tests may use non-packet data; Phase 1.4 router enforces strict packet format)
-            let _evm_packet = if evm_payload.len() >= 30 {
+            // Phase 1.4: Strict packet validation is now enforced.
+            // Payloads >= 30 bytes are treated as packet-format and MUST
+            // deserialize successfully and target the correct domain.
+            // Payloads < 30 bytes are allowed as raw/legacy format (backward compat).
+            // Malformed or wrong-domain packets are rejected at submission time.
+            if !evm_payload.is_empty() && evm_payload.len() >= 30 {
                 match deserialize_packet(&evm_payload) {
                     Ok(packet) => {
-                        // Verify packet is EVM-targeted
                         let domain_mask = get_domain_mask(&packet);
                         if (domain_mask & 0b0001) == 0 {
-                            // Domain routing invalid - allow through for now
-                            // Future phases will enforce strict validation
-                            None
-                        } else {
-                            Some(packet)
+                            return Err(Error::<T>::InvalidEvmPacket.into());
                         }
                     }
-                    Err(_err) => {
-                        // Deserialization failed - allow through for now
-                        // (payload may be non-packet format, or corrupted)
-                        // Future phases will enforce strict packet format
-                        None
+                    Err(_) => {
+                        return Err(Error::<T>::InvalidEvmPacket.into());
                     }
                 }
-            } else {
-                None
-            };
+            }
 
-            let _svm_packet = if svm_payload.len() >= 30 {
+            if !svm_payload.is_empty() && svm_payload.len() >= 30 {
                 match deserialize_packet(&svm_payload) {
                     Ok(packet) => {
-                        // Verify packet is SVM-targeted
                         let domain_mask = get_domain_mask(&packet);
                         if (domain_mask & 0b0010) == 0 {
-                            // Domain routing invalid - allow through for now
-                            // Future phases will enforce strict validation
-                            None
-                        } else {
-                            Some(packet)
+                            return Err(Error::<T>::InvalidSvmPacket.into());
                         }
                     }
-                    Err(_err) => {
-                        // Deserialization failed - allow through for now
-                        // (payload may be non-packet format, or corrupted)
-                        // Future phases will enforce strict packet format
-                        None
+                    Err(_) => {
+                        return Err(Error::<T>::InvalidSvmPacket.into());
                     }
                 }
-            } else {
-                None
-            };
+            }
 
             // Atomic nonce check and increment using try_mutate (C-3)
             // This ensures the nonce is atomically verified and incremented in a single storage operation
@@ -1431,6 +1417,51 @@ pub mod pallet {
             Self::auth_check(&who, &operation_context)?;
 
             Self::verify_payloads_v2(&comit_id, &evm_payload, &svm_payload, &x3_payload)?;
+
+            // Phase 1.4: Strict packet validation for submit_comit_v2.
+            // Same rules as submit_comit: payloads >= 30 bytes must be valid
+            // packet-format targeting the correct domain.
+            if !evm_payload.is_empty() && evm_payload.len() >= 30 {
+                match deserialize_packet(&evm_payload) {
+                    Ok(packet) => {
+                        let domain_mask = get_domain_mask(&packet);
+                        if (domain_mask & 0b0001) == 0 {
+                            return Err(Error::<T>::InvalidEvmPacket.into());
+                        }
+                    }
+                    Err(_) => {
+                        return Err(Error::<T>::InvalidEvmPacket.into());
+                    }
+                }
+            }
+
+            if !svm_payload.is_empty() && svm_payload.len() >= 30 {
+                match deserialize_packet(&svm_payload) {
+                    Ok(packet) => {
+                        let domain_mask = get_domain_mask(&packet);
+                        if (domain_mask & 0b0010) == 0 {
+                            return Err(Error::<T>::InvalidSvmPacket.into());
+                        }
+                    }
+                    Err(_) => {
+                        return Err(Error::<T>::InvalidSvmPacket.into());
+                    }
+                }
+            }
+
+            if !x3_payload.is_empty() && x3_payload.len() >= 30 {
+                match deserialize_packet(&x3_payload) {
+                    Ok(packet) => {
+                        let domain_mask = get_domain_mask(&packet);
+                        if (domain_mask & 0b0100) == 0 {
+                            return Err(Error::<T>::InvalidX3VmPacket.into());
+                        }
+                    }
+                    Err(_) => {
+                        return Err(Error::<T>::InvalidX3VmPacket.into());
+                    }
+                }
+            }
 
             Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {
                 if nonce != *current_nonce {
@@ -3404,11 +3435,11 @@ pub mod pallet {
         }
 
         fn get_evm_bridge_escrow(&self) -> [u8; 20] {
-            T::BridgeEvmEscrow::get().0
+            BridgeEvmEscrow::<T>::get().0
         }
 
         fn get_svm_bridge_escrow(&self) -> [u8; 32] {
-            T::BridgeSvmEscrow::get()
+            BridgeSvmEscrow::<T>::get()
         }
 
         fn get_svm_slot(&self) -> u64 {
@@ -3533,7 +3564,7 @@ pub mod pallet {
 
             let value = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
                 // Value is 0
-                offset += 1;
+                let _ = offset; // not returned; silence unused_assignments
                 0u128
             } else if raw_tx[offset] >= 0x80 && raw_tx[offset] <= 0xb7 {
                 // Short string encoding
@@ -3549,7 +3580,7 @@ pub mod pallet {
                 let dest_start = 16 - len;
                 value_bytes[dest_start..dest_start + len]
                     .copy_from_slice(&raw_tx[src_start..src_end]);
-                offset += 1 + len;
+                let _ = offset; // not returned; silence unused_assignments
                 u128::from_be_bytes(value_bytes)
             } else {
                 return Err("Invalid transaction: malformed 'value' field"
@@ -3698,7 +3729,7 @@ pub mod pallet {
             }
 
             let input = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
-                offset += 1;
+                let _ = offset; // not returned; silence unused_assignments
                 Vec::new()
             } else if raw_tx[offset] >= 0xb8 && raw_tx[offset] <= 0xbf {
                 let len = (raw_tx[offset] & 0x7f) as usize;
@@ -3708,7 +3739,7 @@ pub mod pallet {
                         .to_vec());
                 }
                 let data = raw_tx[offset + 1..offset + 1 + len].to_vec();
-                offset += 1 + len;
+                let _ = offset; // not returned; silence unused_assignments
                 data
             } else {
                 return Err("Invalid transaction: malformed 'data' field"
@@ -3739,7 +3770,7 @@ pub mod pallet {
             // Try to parse the transaction to extract from/to/value
             let (from, to, value) = match Self::parse_ethereum_transaction(&raw_tx) {
                 Ok((f, t, v)) => (f, t, v),
-                Err(e) => {
+                Err(_e) => {
                     // If parsing fails, we can still execute the transaction
                     // The adapter will populate what it can
                     (Vec::new(), Vec::new(), 0)
@@ -3981,6 +4012,12 @@ sp_api::decl_runtime_apis! {
 
         /// Query the native lamport balance for an SVM public key (32 bytes)
         fn get_svm_balance(svm_pubkey: Vec<u8>) -> u64;
+
+        /// Query the configured EVM bridge escrow address.
+        fn get_evm_bridge_escrow() -> Vec<u8>;
+
+        /// Query the configured SVM bridge escrow program address.
+        fn get_svm_bridge_escrow() -> [u8; 32];
 
         /// Check whether an SVM public key has an executable program deployed
         fn is_svm_program(svm_pubkey: Vec<u8>) -> bool;

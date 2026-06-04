@@ -93,3 +93,4 @@ frame-system = { workspace = true }
 pallet-balances = { workspace = true, features = ["std"] }
 pallet-x3-asset-registry = { path = "../x3-asset-registry" }
 pallet-x3-supply-ledger = { path = "../x3-supply-ledger" }
+x3-compiler = { path = "../../crates/x3-compiler" }

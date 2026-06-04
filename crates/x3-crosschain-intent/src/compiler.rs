@@ -48,9 +48,7 @@
 use crate::error::IntentCompileError;
 use crate::instructions::{TimeoutAction, X3Instruction};
 use crate::intent::CrossChainIntent;
-use crate::types::{
-    AssetRef, ChainKind, FailureAction, FinalityLevel, ProofKind,
-};
+use crate::types::{AssetRef, ChainKind, FailureAction, FinalityLevel, ProofKind};
 
 /// The result of intent compilation.
 ///
@@ -329,11 +327,13 @@ impl IntentCompiler {
         });
 
         // Step 5: Lock source asset (first irreversible step)
-        let lock_contract = intent
-            .source
-            .lock_contract
-            .clone()
-            .unwrap_or_else(|| format!("{}.bridge.{}", source_chain.as_str(), intent.source.asset.symbol));
+        let lock_contract = intent.source.lock_contract.clone().unwrap_or_else(|| {
+            format!(
+                "{}.bridge.{}",
+                source_chain.as_str(),
+                intent.source.asset.symbol
+            )
+        });
 
         plan.push(X3Instruction::LockAsset {
             asset: intent.source.asset.clone(),
@@ -372,10 +372,8 @@ impl IntentCompiler {
 
         // Step 8: Check canonical supply (before any mint)
         if source_chain != ChainKind::X3 {
-            let canonical_asset = AssetRef::new(
-                ChainKind::X3,
-                format!("{}.e", intent.source.asset.symbol),
-            );
+            let canonical_asset =
+                AssetRef::new(ChainKind::X3, format!("{}.e", intent.source.asset.symbol));
             plan.push(X3Instruction::CheckCanonicalSupply {
                 wrapped_asset: canonical_asset.clone(),
             });
@@ -402,10 +400,7 @@ impl IntentCompiler {
                     intent.destination.asset.clone()
                 } else {
                     // Intermediate: x3.{dest_symbol} before releasing to dest chain
-                    AssetRef::new(
-                        ChainKind::X3,
-                        intent.destination.asset.symbol.clone(),
-                    )
+                    AssetRef::new(ChainKind::X3, intent.destination.asset.symbol.clone())
                 };
 
                 let min_out = intent
@@ -451,7 +446,10 @@ impl IntentCompiler {
 
         // Step 11: Bridge to destination chain (if dest ≠ X3)
         if dest_chain != ChainKind::X3 {
-            let amount = intent.destination.min_amount.unwrap_or(intent.source.amount);
+            let amount = intent
+                .destination
+                .min_amount
+                .unwrap_or(intent.source.amount);
             plan.push(X3Instruction::BridgeToDestination {
                 asset: intent.destination.asset.clone(),
                 amount,

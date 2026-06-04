@@ -378,6 +378,5 @@ metadata:
   namespace: substreams-llm
 type: Opaque
 stringData:
-  # Set this to your actual API key
-  # kubectl create secret generic openrouter-secret --from-literal=api-key=sk-or-... -n substreams-llm
-  api-key: "sk-or-changeme"
+  # Set this to your actual API key with kubectl or an external secret manager.
+  api-key: ""

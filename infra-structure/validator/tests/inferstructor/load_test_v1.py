@@ -6,6 +6,7 @@ Ramps from 1K → 5K → 10K → 15K... until peak performance is found
 
 import asyncio
 import aiohttp
+import os
 import time
 import statistics
 from datetime import datetime
@@ -14,7 +15,7 @@ import json
 
 # Configuration
 BRIDGE_URL = "http://localhost:9999/accelerate"
-API_KEY = "infra_3JDGhaxUOfLfyuFk-roJiR3FzgdgcipAH3vG5wpMzDo"
+API_KEY = os.environ.get("INFRA_API_KEY", "infra_test_key")
 CHAIN = "solana"
 
 # Load test progression

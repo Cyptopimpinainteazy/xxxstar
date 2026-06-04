@@ -133,8 +133,13 @@ impl MirFunctionBuilder {
             HirStmt::Break { .. } | HirStmt::Continue { .. } => {
                 // Break/continue with labels requires label resolution
             }
-            HirStmt::AtomicBegin { .. } | HirStmt::AtomicEnd { .. } => {
-                // Atomic blocks require atomic operation support
+            HirStmt::AtomicBegin { block_id, .. } => {
+                self.push_atomic_begin(MirAtomicBlockId(block_id.0 as u16));
+            }
+            HirStmt::AtomicEnd {
+                block_id, commit, ..
+            } => {
+                self.push_atomic_end(MirAtomicBlockId(block_id.0 as u16), *commit);
             }
             HirStmt::Emit { .. } | HirStmt::AgentInit { .. } => {
                 // Emit/agent init require event system
@@ -302,8 +307,22 @@ impl MirFunctionBuilder {
     fn emit_assignment(&mut self, rhs: MirRhs) -> MirValue {
         let target = self.allocate_value();
         let block = self.current_block_mut();
-        block.statements.push(MirStatement { target, rhs });
+        block.statements.push(MirStatement::Assign { target, rhs });
         target
+    }
+
+    fn push_atomic_begin(&mut self, block_id: MirAtomicBlockId) {
+        let block = self.current_block_mut();
+        block
+            .statements
+            .push(MirStatement::AtomicBegin { block_id });
+    }
+
+    fn push_atomic_end(&mut self, block_id: MirAtomicBlockId, commit: bool) {
+        let block = self.current_block_mut();
+        block
+            .statements
+            .push(MirStatement::AtomicEnd { block_id, commit });
     }
 
     fn ensure_goto(&mut self, target: MirBlockId) {

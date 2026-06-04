@@ -1,17 +1,57 @@
 //! Symbol interning for efficient string handling in the X3 compiler.
+//!
+//! Production builds use the `internment` crate; the offline build falls back
+//! to a small in-process interner so the workspace can still compile without
+//! network access. Both paths preserve the same `Symbol` public API.
 
+#[cfg(feature = "intern")]
 use internment::Intern;
+
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+
+
+#[cfg(not(feature = "intern"))]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Intern<T>(T);
+
+#[cfg(not(feature = "intern"))]
+impl<T> Intern<T> {
+    pub fn new(value: T) -> Self {
+        Intern(value)
+    }
+    pub fn as_str(&self) -> &str
+    where
+        T: AsRef<str>,
+    {
+        self.0.as_ref()
+    }
+    pub fn len(&self) -> usize
+    where
+        T: AsRef<str>,
+    {
+        self.0.as_ref().len()
+    }
+    pub fn is_empty(&self) -> bool
+    where
+        T: AsRef<str>,
+    {
+        self.0.as_ref().is_empty()
+    }
+}
+
 /// An interned string symbol.
 ///
 /// Symbols are cheap to copy, compare, and hash. They are used throughout
 /// the compiler for identifiers, keywords, and other frequently-used strings.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Symbol(Intern<String>);
+
+#[cfg(feature = "intern")]
+impl Copy for Symbol {}
 
 impl Symbol {
     /// Create a new symbol from a string.
@@ -110,7 +150,7 @@ impl SymbolInterner {
         }
 
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        self.symbol_to_id.insert(symbol, id);
+        self.symbol_to_id.insert(symbol.clone(), id);
         self.id_to_symbol.push(symbol);
         id
     }
@@ -122,7 +162,7 @@ impl SymbolInterner {
 
     /// Get the symbol for a numeric ID.
     pub fn get(&self, id: u32) -> Option<Symbol> {
-        self.id_to_symbol.get(id as usize).copied()
+        self.id_to_symbol.get(id as usize).cloned()
     }
 
     /// Get the ID for a symbol if it exists.
@@ -161,7 +201,7 @@ pub mod kw {
 
             /// Get all keywords.
             pub fn all_keywords() -> Vec<Symbol> {
-                vec![$(*$name),*]
+                vec![$($name.clone()),*]
             }
         };
     }

@@ -138,7 +138,15 @@ impl Pass for ConstantFoldPass {
                 let mut new_statements = Vec::with_capacity(block.statements.len());
 
                 for stmt in block.statements.drain(..) {
-                    let MirStatement { target, rhs } = stmt;
+                    // Atomic markers are optimization barriers — pass through unchanged.
+                    if stmt.is_atomic_marker() {
+                        new_statements.push(stmt);
+                        continue;
+                    }
+                    let (target, rhs) = match stmt.as_assign() {
+                        Some((t, r)) => (t, r.clone()),
+                        None => unreachable!("non-atomic non-assign statement"),
+                    };
 
                     let new_rhs = match &rhs {
                         // Record literal values
@@ -242,7 +250,7 @@ impl Pass for ConstantFoldPass {
                         MirRhs::Store { .. } => rhs,
                     };
 
-                    new_statements.push(MirStatement {
+                    new_statements.push(MirStatement::Assign {
                         target,
                         rhs: new_rhs,
                     });
@@ -297,15 +305,15 @@ mod tests {
         // v1 = 5
         // v2 = v0 + v1  => should become v2 = 8
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(3)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Literal(Literal::Integer(5)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
             },
@@ -320,7 +328,10 @@ mod tests {
 
         // Check v2 is now Literal(8)
         let v2_stmt = &module.functions[0].blocks[0].statements[2];
-        assert_eq!(v2_stmt.rhs, MirRhs::Literal(Literal::Integer(8)));
+        assert_eq!(
+            v2_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(8))
+        );
     }
 
     #[test]
@@ -328,11 +339,11 @@ mod tests {
         // v0 = false
         // v1 = v0 && v2  => should become false
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Bool(false)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Binary(BinaryOp::LogicalAnd, MirValue(0), MirValue(99)), // v99 unknown
             },
@@ -344,7 +355,10 @@ mod tests {
 
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Bool(false)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Bool(false))
+        );
     }
 
     #[test]
@@ -352,11 +366,11 @@ mod tests {
         // v0 = 0
         // v1 = v0 * v99  => should become 0
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(0)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(99)),
             },
@@ -368,7 +382,10 @@ mod tests {
 
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Integer(0)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(0))
+        );
     }
 
     #[test]
@@ -376,11 +393,11 @@ mod tests {
         // v0 = -5
         // v1 = -v0  => should become 5
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(-5)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Unary(x3_ast::UnaryOp::Negate, MirValue(0)),
             },
@@ -392,7 +409,10 @@ mod tests {
 
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Integer(5)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(5))
+        );
     }
 
     #[test]
@@ -401,15 +421,15 @@ mod tests {
         // v1 = 5
         // v2 = v0 < v1  => should become true
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(3)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Literal(Literal::Integer(5)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Binary(BinaryOp::Less, MirValue(0), MirValue(1)),
             },
@@ -421,7 +441,10 @@ mod tests {
 
         assert!(result.changed);
         let v2_stmt = &module.functions[0].blocks[0].statements[2];
-        assert_eq!(v2_stmt.rhs, MirRhs::Literal(Literal::Bool(true)));
+        assert_eq!(
+            v2_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Bool(true))
+        );
     }
 
     #[test]
@@ -430,15 +453,15 @@ mod tests {
         // v1 = 0
         // v2 = v0 / v1  => should NOT fold (division by zero)
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(10)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Literal(Literal::Integer(0)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Binary(BinaryOp::Div, MirValue(0), MirValue(1)),
             },
@@ -450,7 +473,13 @@ mod tests {
 
         // Should not fold - division by zero is a runtime error
         let v2_stmt = &module.functions[0].blocks[0].statements[2];
-        assert!(matches!(v2_stmt.rhs, MirRhs::Binary(BinaryOp::Div, _, _)));
+        assert!(matches!(
+            v2_stmt,
+            MirStatement::Assign {
+                rhs: MirRhs::Binary(BinaryOp::Div, _, _),
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -458,18 +487,18 @@ mod tests {
         // v0 = call foo()  -- not a constant
         // v1 = v0 + 1
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Call {
                     target: SymbolId(1),
                     args: vec![],
                 },
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Literal(Literal::Integer(1)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
             },

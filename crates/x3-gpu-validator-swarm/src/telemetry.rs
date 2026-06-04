@@ -91,6 +91,18 @@ impl TelemetrySink {
             serde_json::json!(metrics.cpu_fallbacks),
         );
         data.insert(
+            "accelerator_backend".to_string(),
+            serde_json::json!(metrics.accelerator_backend),
+        );
+        data.insert(
+            "accelerator_fallbacks".to_string(),
+            serde_json::json!(metrics.accelerator_fallbacks),
+        );
+        data.insert(
+            "accelerator_parity_mismatches".to_string(),
+            serde_json::json!(metrics.accelerator_parity_mismatches),
+        );
+        data.insert(
             "avg_task_latency_ms".to_string(),
             serde_json::json!(metrics.avg_task_latency_ms),
         );

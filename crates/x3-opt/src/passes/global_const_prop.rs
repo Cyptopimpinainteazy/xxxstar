@@ -36,7 +36,7 @@ use crate::OptResult;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use x3_ast::BinaryOp;
 use x3_common::Literal;
-use x3_mir::mir::{MirBlockId, MirModule, MirRhs, MirValue};
+use x3_mir::mir::{MirBlockId, MirModule, MirRhs, MirStatement, MirValue};
 
 /// Lattice value for constant propagation.
 #[derive(Debug, Clone, PartialEq)]
@@ -190,7 +190,15 @@ impl Pass for GlobalConstPropPass {
                 // Process statements
                 let mut changed = false;
                 for stmt in &block.statements {
-                    let new_value = match &stmt.rhs {
+                    // Atomic markers are optimization barriers — skip.
+                    if stmt.is_atomic_marker() {
+                        continue;
+                    }
+                    let (target, rhs) = match stmt.as_assign() {
+                        Some(t) => t,
+                        None => continue,
+                    };
+                    let new_value = match rhs {
                         MirRhs::Literal(lit) => ConstLattice::Const(lit.clone()),
                         MirRhs::Binary(op, left, right) => {
                             let left_val = lattice.get(left).cloned().unwrap_or(ConstLattice::Top);
@@ -242,14 +250,11 @@ impl Pass for GlobalConstPropPass {
                     };
 
                     // Update lattice with meet
-                    let old_value = lattice
-                        .get(&stmt.target)
-                        .cloned()
-                        .unwrap_or(ConstLattice::Top);
+                    let old_value = lattice.get(&target).cloned().unwrap_or(ConstLattice::Top);
                     let merged = old_value.meet(&new_value);
 
                     if merged != old_value {
-                        lattice.insert(stmt.target, merged);
+                        lattice.insert(target, merged);
                         changed = true;
                     }
                 }
@@ -270,41 +275,47 @@ impl Pass for GlobalConstPropPass {
             // Now apply transformations: replace known constants in operands
             for block in &mut func.blocks {
                 for stmt in &mut block.statements {
-                    let new_rhs = match &stmt.rhs {
-                        MirRhs::Binary(op, left, right) => {
-                            let left_const = lattice.get(left).and_then(|v| v.as_const());
-                            let right_const = lattice.get(right).and_then(|v| v.as_const());
+                    // Atomic markers are optimization barriers — skip.
+                    if stmt.is_atomic_marker() {
+                        continue;
+                    }
+                    if let MirStatement::Assign { rhs, .. } = stmt {
+                        let new_rhs = match rhs {
+                            MirRhs::Binary(op, left, right) => {
+                                let left_const = lattice.get(left).and_then(|v| v.as_const());
+                                let right_const = lattice.get(right).and_then(|v| v.as_const());
 
-                            // If both operands are constant, fold the operation
-                            if let (Some(l), Some(r)) = (left_const, right_const) {
-                                if let Some(result) = Self::eval_binary(op, l, r) {
-                                    Some(MirRhs::Literal(result))
+                                // If both operands are constant, fold the operation
+                                if let (Some(l), Some(r)) = (left_const, right_const) {
+                                    if let Some(result) = Self::eval_binary(op, l, r) {
+                                        Some(MirRhs::Literal(result))
+                                    } else {
+                                        None
+                                    }
                                 } else {
                                     None
                                 }
-                            } else {
-                                None
                             }
-                        }
-                        MirRhs::Unary(op, operand) => {
-                            let operand_const = lattice.get(operand).and_then(|v| v.as_const());
+                            MirRhs::Unary(op, operand) => {
+                                let operand_const = lattice.get(operand).and_then(|v| v.as_const());
 
-                            if let Some(c) = operand_const {
-                                if let Some(result) = Self::eval_unary(op, c) {
-                                    Some(MirRhs::Literal(result))
+                                if let Some(c) = operand_const {
+                                    if let Some(result) = Self::eval_unary(op, c) {
+                                        Some(MirRhs::Literal(result))
+                                    } else {
+                                        None
+                                    }
                                 } else {
                                     None
                                 }
-                            } else {
-                                None
                             }
-                        }
-                        _ => None,
-                    };
+                            _ => None,
+                        };
 
-                    if let Some(new) = new_rhs {
-                        stmt.rhs = new;
-                        transformation_count += 1;
+                        if let Some(new) = new_rhs {
+                            *rhs = new;
+                            transformation_count += 1;
+                        }
                     }
                 }
             }
@@ -367,15 +378,15 @@ mod tests {
         let blocks = vec![MirBlock {
             id: MirBlockId(0),
             statements: vec![
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(5)),
                 },
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(2)),
                 },
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(2),
                     rhs: MirRhs::Literal(Literal::Integer(3)),
                 },
@@ -394,7 +405,10 @@ mod tests {
         assert!(result.changed);
         // v1 should now be Literal(8)
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Integer(8)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(8))
+        );
     }
 
     #[test]
@@ -404,18 +418,18 @@ mod tests {
         let blocks = vec![MirBlock {
             id: MirBlockId(0),
             statements: vec![
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Call {
                         target: SymbolId(1),
                         args: vec![],
                     },
                 },
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Literal(Literal::Integer(1)),
                 },
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(2),
                     rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
                 },
@@ -442,11 +456,11 @@ mod tests {
         let blocks = vec![MirBlock {
             id: MirBlockId(0),
             statements: vec![
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 },
-                MirStatement {
+                MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Unary(x3_ast::UnaryOp::Not, MirValue(0)),
                 },
@@ -464,6 +478,9 @@ mod tests {
 
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Bool(false)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Bool(false))
+        );
     }
 }

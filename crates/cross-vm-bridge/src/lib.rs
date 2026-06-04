@@ -2648,7 +2648,7 @@ fn evm_address_from_slice(source: &[u8]) -> [u8; 20] {
 fn assert_ok<T, E: std::fmt::Debug>(res: Result<T, E>, msg: &str) -> T {
     match res {
         Ok(value) => value,
-        Err(error) => assert!(false, "{}: {:?}", msg, error),
+        Err(error) => std::panic::panic_any(format!("{}: {:?}", msg, error)),
     }
 }
 
@@ -2660,7 +2660,7 @@ mod tests {
     fn assert_ok<T, E: std::fmt::Debug>(res: Result<T, E>, msg: &str) -> T {
         match res {
             Ok(value) => value,
-            Err(error) => assert!(false, "{}: {:?}", msg, error),
+            Err(error) => std::panic::panic_any(format!("{}: {:?}", msg, error)),
         }
     }
 

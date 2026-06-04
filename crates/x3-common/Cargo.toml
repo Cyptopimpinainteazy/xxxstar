@@ -1,3 +1,6 @@
+# NOTE: The production x3-lang common crate is at x3-lang/crates/x3-common (x3-lang-common).
+# See docs/x3-lang/README.md.
+
 [package]
 name = "x3-common"
 version = "0.1.0"

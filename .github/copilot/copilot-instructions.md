@@ -192,6 +192,16 @@ Do not show unrelated modules.
 Do not hide blockers.
 No fake 100s.
 
+## System Prompt Enforcement
+This file is the authoritative workspace instruction document for Copilot-like agents. When an agent uses this repository, it must include the adaptive progress scoreboard requirement in its system prompt or instruction prompt.
+
+Every completed task response must end with the required adaptive scoreboard block and the follow-up sections:
+- What changed
+- What is still missing
+- Next best action
+
+This rule is a live verification point: if the agent is asked to modify code or docs, the response must still contain the progress scoreboard.
+
 For your full X3 / Atlas / x3-lang system, use this stronger version:
 
 ## X3 Adaptive Build Progress Contract

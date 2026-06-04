@@ -196,14 +196,20 @@ fn happy_path_compiles_to_valid_plan() {
         println!("  {}: {}", n + 1, label);
     }
 
-    assert!(labels.contains(&"RegisterWatchdog"), "Missing RegisterWatchdog");
+    assert!(
+        labels.contains(&"RegisterWatchdog"),
+        "Missing RegisterWatchdog"
+    );
     assert!(labels.contains(&"ValidateOwner"), "Missing ValidateOwner");
     assert!(labels.contains(&"CheckBalance"), "Missing CheckBalance");
     assert!(labels.contains(&"Simulate"), "Missing SimulateExecution");
     assert!(labels.contains(&"LockAsset"), "Missing LockAsset");
     assert!(labels.contains(&"WaitFinality"), "Missing WaitFinality");
     assert!(labels.contains(&"VerifyProof"), "Missing VerifyProof");
-    assert!(labels.contains(&"CheckCanonicalSupply"), "Missing CheckCanonicalSupply");
+    assert!(
+        labels.contains(&"CheckCanonicalSupply"),
+        "Missing CheckCanonicalSupply"
+    );
     assert!(labels.contains(&"MintCanonical"), "Missing MintCanonical");
     assert!(labels.contains(&"ExecuteSwap"), "Missing ExecuteSwap");
     assert!(labels.contains(&"EmitReceipt"), "Missing EmitReceipt");
@@ -220,7 +226,10 @@ fn check_003_missing_timeout() {
 
     assert!(!result.is_ok(), "Expected compile error");
     assert!(
-        result.errors.iter().any(|e| matches!(e, IntentCompileError::MissingTimeout)),
+        result
+            .errors
+            .iter()
+            .any(|e| matches!(e, IntentCompileError::MissingTimeout)),
         "Expected MissingTimeout error, got: {:?}",
         result.errors
     );
@@ -237,7 +246,10 @@ fn check_004_missing_refund_path() {
 
     assert!(!result.is_ok(), "Expected compile error");
     assert!(
-        result.errors.iter().any(|e| matches!(e, IntentCompileError::MissingRefundPath)),
+        result
+            .errors
+            .iter()
+            .any(|e| matches!(e, IntentCompileError::MissingRefundPath)),
         "Expected MissingRefundPath error, got: {:?}",
         result.errors
     );
@@ -277,7 +289,10 @@ fn check_007_missing_fee_cap() {
 
     assert!(!result.is_ok(), "Expected compile error");
     assert!(
-        result.errors.iter().any(|e| matches!(e, IntentCompileError::MissingFeeCap { .. })),
+        result
+            .errors
+            .iter()
+            .any(|e| matches!(e, IntentCompileError::MissingFeeCap { .. })),
         "Expected MissingFeeCap error, got: {:?}",
         result.errors
     );
@@ -511,9 +526,15 @@ fn simulation_runs_on_valid_intent() {
     let result = simulator.simulate(&intent);
 
     assert!(result.route_found, "Route should be found");
-    assert!(result.estimated_output.is_some(), "Should have estimated output");
+    assert!(
+        result.estimated_output.is_some(),
+        "Should have estimated output"
+    );
     assert!(result.estimated_fees > 0, "Should have non-zero fees");
-    assert!(!result.is_safe_to_execute() || result.risk_score < 75, "Risk score check");
+    assert!(
+        !result.is_safe_to_execute() || result.risk_score < 75,
+        "Risk score check"
+    );
 
     println!("Simulation: {}", result.summary());
 }
@@ -531,5 +552,8 @@ fn simulation_detects_slippage_violation() {
 
     // For large amounts, slippage will exceed 1bps
     // (Whether it blocks depends on the amount vs. threshold)
-    println!("Slippage sim result: {}bps, exceeds: {}", result.estimated_slippage_bps, result.slippage_exceeds_limit);
+    println!(
+        "Slippage sim result: {}bps, exceeds: {}",
+        result.estimated_slippage_bps, result.slippage_exceeds_limit
+    );
 }

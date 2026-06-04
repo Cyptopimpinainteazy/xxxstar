@@ -37,6 +37,7 @@ x3-gateway-risk-engine = { path = "../crates/x3-gateway-risk-engine" }
 parallel-proposer = { path = "../crates/parallel-proposer" }
 contention-predictor = { path = "../crates/contention-predictor" }
 x3-gpu-validator-swarm = { path = "../crates/x3-gpu-validator-swarm", optional = true }
+async-trait = "0.1"
 
 clap = { version = "4.4", features = ["derive"] }
 futures = "0.3"
@@ -53,9 +54,14 @@ x3-common = { path = "../crates/x3-common" }
 jsonrpsee = { workspace = true }
 tokio = { version = "1.37", features = ["rt", "rt-multi-thread"] }
 pallet-evm = { workspace = true, default-features = false, features = ["std"] }
+pallet-collective = { workspace = true, default-features = false, features = ["std"] }
+pallet-transaction-payment = { workspace = true, default-features = false, features = ["std"] }
+pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = false, features = ["std"] }
+pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false, features = ["std"] }
 
 
 sc-basic-authorship = { workspace = true }
+sc-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sc-cli = { workspace = true }
 sc-client-api = { workspace = true }
 sc-consensus = { workspace = true }
@@ -72,12 +78,16 @@ sc-transaction-pool = { workspace = true }
 sc-transaction-pool-api = { workspace = true }
 substrate-prometheus-endpoint = { path = "../patches/substrate-prometheus-endpoint" }
 
+frame-system = { workspace = true, default-features = false, features = ["std"] }
+
 sp-api = { workspace = true }
 sp-block-builder = { workspace = true }
 sp-blockchain = { workspace = true }
+sp-consensus = { workspace = true }
 sp-consensus-aura = { workspace = true }
 sp-consensus-grandpa = { workspace = true }
 sp-core = { workspace = true }
+sp-inherents = { workspace = true }
 sp-runtime = { workspace = true }
 sp-io = { workspace = true }
 sp-timestamp = { workspace = true }
@@ -115,3 +125,6 @@ try-runtime = [
 ]
 
 # Optional Frontier (EVM) JSON-RPC wiring
+
+[dev-dependencies]
+x3-vm = { path = "../crates/x3-vm" }

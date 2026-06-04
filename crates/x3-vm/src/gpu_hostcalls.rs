@@ -361,6 +361,11 @@ impl GpuHostcalls {
     /// Create a new GPU hostcall manager, loading all available CUDA libraries.
     /// Libraries that fail to load are silently skipped (hostcalls will return errors).
     pub fn new() -> Self {
+        if cuda_bypass_enabled() {
+            log::info!("[X3-GPU] CUDA bypass enabled; GPU hostcalls disabled");
+            return Self::disabled();
+        }
+
         let sha256 = match load_sha256_lib() {
             Ok(lib) => {
                 log::info!("[X3-GPU] Loaded libsha256_batch.so");
@@ -428,6 +433,18 @@ impl GpuHostcalls {
                     None
                 }
             },
+        }
+    }
+
+    /// Create a disabled hostcall manager without probing CUDA libraries.
+    pub fn disabled() -> Self {
+        Self {
+            sha256: None,
+            ed25519: None,
+            pipeline: None,
+            keccak256: None,
+            secp256k1: None,
+            atomic: None,
         }
     }
 
@@ -1128,6 +1145,18 @@ impl GpuHostcalls {
 
         Ok(Some(Value::Bool(true)))
     }
+}
+
+fn cuda_bypass_enabled() -> bool {
+    ["X3_BYPASS_CUDA", "CCGV_BYPASS_CUDA"]
+        .iter()
+        .any(|key| match std::env::var(key) {
+            Ok(value) => matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            ),
+            Err(_) => false,
+        })
 }
 
 impl Default for GpuHostcalls {

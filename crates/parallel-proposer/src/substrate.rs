@@ -557,11 +557,27 @@ mod tests {
         };
 
         let keys = state_keys_from_metadata(&metadata);
-        assert_eq!(keys.len(), 2, "None target + None selector must emit exactly 2 keys");
-        assert!(keys.iter().any(|k| k.domain == "sender"), "sender key must be present");
-        assert!(keys.iter().any(|k| k.domain == "nonce"), "nonce key must be present");
-        assert!(!keys.iter().any(|k| k.domain == "target"), "no target key expected");
-        assert!(!keys.iter().any(|k| k.domain == "call"), "no call key expected");
+        assert_eq!(
+            keys.len(),
+            2,
+            "None target + None selector must emit exactly 2 keys"
+        );
+        assert!(
+            keys.iter().any(|k| k.domain == "sender"),
+            "sender key must be present"
+        );
+        assert!(
+            keys.iter().any(|k| k.domain == "nonce"),
+            "nonce key must be present"
+        );
+        assert!(
+            !keys.iter().any(|k| k.domain == "target"),
+            "no target key expected"
+        );
+        assert!(
+            !keys.iter().any(|k| k.domain == "call"),
+            "no call key expected"
+        );
     }
 
     /// With target=Some but selector=None, sender + target + nonce keys are emitted.
@@ -572,7 +588,11 @@ mod tests {
             sender: [1u8; 32],
             target: Some([2u8; 32]),
             selector: None,
-            gas_limit: 0, value: 0, calldata_len: 0, nonce: 0, timestamp: 0,
+            gas_limit: 0,
+            value: 0,
+            calldata_len: 0,
+            nonce: 0,
+            timestamp: 0,
         };
         let keys = state_keys_from_metadata(&metadata);
         assert_eq!(keys.len(), 3, "target=Some, selector=None → 3 keys");
@@ -625,7 +645,9 @@ mod tests {
     fn extract_tx_metadata_empty_bytes_returns_fallback() {
         struct EmptyEnc;
         impl codec::Encode for EmptyEnc {
-            fn encode(&self) -> Vec<u8> { vec![] }
+            fn encode(&self) -> Vec<u8> {
+                vec![]
+            }
         }
         let tx_hash = [0x42u8; 32];
         let meta = extract_tx_metadata(&EmptyEnc, tx_hash);
@@ -641,7 +663,9 @@ mod tests {
         // Construct a minimal 3-byte call payload
         struct ShortCall([u8; 3]);
         impl codec::Encode for ShortCall {
-            fn encode(&self) -> Vec<u8> { self.0.to_vec() }
+            fn encode(&self) -> Vec<u8> {
+                self.0.to_vec()
+            }
         }
         let tx_hash = [1u8; 32];
         let meta = extract_tx_metadata(&ShortCall([0x01, 0x02, 0x03]), tx_hash);

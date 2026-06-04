@@ -9,6 +9,7 @@ and processed via CUDA vectorized kernels.
 
 import asyncio
 import aiohttp
+import os
 import time
 import statistics
 from datetime import datetime
@@ -16,7 +17,7 @@ from typing import List, Dict
 
 # Configuration
 BRIDGE_URL = "http://localhost:9999/accelerate/gpu-batch"
-API_KEY = "infra_3JDGhaxUOfLfyuFk-roJiR3FzgdgcipAH3vG5wpMzDo"
+API_KEY = os.environ.get("INFRA_API_KEY", "infra_test_key")
 CHAIN = "solana"
 TX_DATA_HEX = "48656c6c6f"
 

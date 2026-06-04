@@ -96,7 +96,11 @@ impl Packet {
 
     /// Serialize to full wire format: [Header: 32][Type: 1][Payload: n][CRC32: 4]
     pub fn to_wire_format(&self) -> Result<Vec<u8>, &'static str> {
-        let payload = self.encode();
+        let payload = match self {
+            Packet::Evm(packet) => packet.encode(),
+            Packet::Svm(packet) => packet.encode(),
+            Packet::X3Vm(packet) => packet.encode(),
+        };
         if payload.len() > u16::MAX as usize {
             return Err("Payload exceeds maximum size");
         }
@@ -494,7 +498,7 @@ mod integration_tests {
         let payload = evm_packet.encode();
         let header = PacketHeader::new(1, 0b0001, payload.len() as u16);
         let header_bytes = header.encode();
-        let type_byte = 0u8.encode();
+        let type_byte = 99u8.encode();
         let mut hasher = Hasher::new();
         hasher.update(&header_bytes);
         hasher.update(&type_byte);
@@ -506,9 +510,6 @@ mod integration_tests {
         wire.push(type_byte[0]);
         wire.extend_from_slice(&payload);
         wire.extend_from_slice(&crc32.to_le_bytes());
-
-        // Corrupt type byte (should be 0-2)
-        wire[30] = 99;
 
         let result = Packet::from_wire_format(&wire);
         assert!(result.is_err());
@@ -624,11 +625,21 @@ mod integration_tests {
 
     #[test]
     fn test_packet_x3vm_condition_or() {
-        let condition = X3Condition::Or(vec![
-            X3Condition::BlockHeightAbove { min_height: 100 },
-            X3Condition::BlockHeightAbove { min_height: 200 },
-        ]);
-        let payload = condition.encode();
+        let x3vm_packet = X3VmPacket::Conditional {
+            condition: X3Condition::Or(vec![
+                X3Condition::BlockHeightAbove { min_height: 100 },
+                X3Condition::BlockHeightAbove { min_height: 200 },
+            ]),
+            if_true: Box::new(X3VmPacket::Transfer {
+                from_domain: 0,
+                to_domain: 1,
+                asset_id: 0,
+                amount: 100,
+                recipient: vec![],
+            }),
+            if_false: None,
+        };
+        let payload = x3vm_packet.encode();
         let packet = Packet::new(PacketType::X3Vm, payload, 0b0100).unwrap();
 
         let wire = packet.to_wire_format().unwrap();

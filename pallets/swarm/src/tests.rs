@@ -9,8 +9,7 @@
 #![cfg(test)]
 
 use crate::{mock::*, pallet::*, types::*, Error, Event};
-use frame_support::{assert_noop, assert_ok, BoundedVec};
-use sp_core::H256;
+use frame_support::{assert_err, assert_noop, assert_ok, BoundedVec};
 
 // ============================================================================
 // Helper Functions
@@ -383,7 +382,7 @@ fn check_and_deduct_capability_fails_when_kill_switch_hit() {
             },
         );
 
-        assert_noop!(
+        assert_err!(
             Swarm::check_and_deduct_capability(&ALICE, 100u128),
             Error::<Test>::KillSwitchActive
         );

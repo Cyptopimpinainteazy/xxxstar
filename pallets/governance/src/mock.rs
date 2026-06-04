@@ -20,6 +20,7 @@ frame_support::construct_runtime!(
     pub enum Test {
         System: frame_system,
         Balances: pallet_balances,
+        Preimage: pallet_preimage,
         Scheduler: pallet_scheduler,
         Governance: pallet_governance,
     }
@@ -79,8 +80,16 @@ impl pallet_balances::Config for Test {
     type DoneSlashHandler = ();
 }
 
+impl pallet_preimage::Config for Test {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = ();
+    type Currency = Balances;
+    type ManagerOrigin = frame_system::EnsureRoot<u64>;
+    type Consideration = ();
+}
+
 parameter_types! {
-    pub MaximumSchedulerWeight: Weight = Weight::from_parts(10_000_000, 0);
+    pub MaximumSchedulerWeight: Weight = Weight::from_parts(u64::MAX, u64::MAX);
     pub const MaxScheduledPerBlock: u32 = 10;
 }
 
@@ -94,7 +103,7 @@ impl pallet_scheduler::Config for Test {
     type MaxScheduledPerBlock = MaxScheduledPerBlock;
     type WeightInfo = ();
     type OriginPrivilegeCmp = EqualPrivilegeOnly;
-    type Preimages = ();
+    type Preimages = Preimage;
     type BlockNumberProvider = System;
 }
 
@@ -164,7 +173,12 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
         .unwrap();
 
     let mut ext = sp_io::TestExternalities::new(t);
-    ext.execute_with(|| System::set_block_number(1));
+    ext.execute_with(|| {
+        System::set_block_number(1);
+        for account in [1, 2, 3, 4, 5, 99] {
+            pallet_governance::AuthorizedGovernanceAccounts::<Test>::insert(account, ());
+        }
+    });
     ext
 }
 

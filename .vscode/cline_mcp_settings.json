@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "github.com/cocoindex-io/cocoindex-code": {
+      "command": "/home/x3star/.local/bin/ccc",
+      "args": ["mcp"]
+    }
+  }
+}

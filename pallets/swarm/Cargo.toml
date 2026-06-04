@@ -36,6 +36,7 @@ log = { workspace = true, default-features = false }
 
 [dev-dependencies]
 sp-io = { workspace = true, features = ["std"] }
+x3-security-events = { path = "../../crates/x3-security-events" }
 
 [features]
 default = ["std"]

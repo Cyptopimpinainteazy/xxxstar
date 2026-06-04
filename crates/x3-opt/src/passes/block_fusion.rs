@@ -211,7 +211,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(1)),
                 }],
@@ -219,7 +219,7 @@ mod tests {
             },
             MirBlock {
                 id: MirBlockId(1),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Literal(Literal::Integer(2)),
                 }],
@@ -261,7 +261,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 }],
@@ -310,7 +310,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 }],
@@ -353,7 +353,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(1)),
                 }],
@@ -361,7 +361,7 @@ mod tests {
             },
             MirBlock {
                 id: MirBlockId(1),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Binary(x3_ast::BinaryOp::Add, MirValue(0), MirValue(0)),
                 }],
@@ -382,9 +382,9 @@ mod tests {
 
         let fused = &module.functions[0].blocks[0];
         // First statement: v0 = 1
-        assert_eq!(fused.statements[0].target, MirValue(0));
+        assert_eq!(fused.statements[0].target(), Some(MirValue(0)));
         // Second statement: v1 = v0 + v0
-        assert_eq!(fused.statements[1].target, MirValue(1));
+        assert_eq!(fused.statements[1].target(), Some(MirValue(1)));
         // Terminator: return v1
         assert!(matches!(
             fused.terminator,

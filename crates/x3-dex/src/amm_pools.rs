@@ -564,7 +564,7 @@ mod tests {
         assert_eq!(AMMPool::sqrt(1), 1);
         assert_eq!(AMMPool::sqrt(4), 2);
         assert_eq!(AMMPool::sqrt(1000000), 1000);
-        assert!(AMMPool::sqrt(999999) > 999);
+        assert_eq!(AMMPool::sqrt(999999), 999);
         assert!(AMMPool::sqrt(1000001) < 1001);
     }
 

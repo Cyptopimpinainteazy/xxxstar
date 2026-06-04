@@ -215,6 +215,7 @@ pub mod execution {
 
 #[cfg(test)]
 mod tests {
+    use crate::{conditions, execution};
 
     #[test]
     fn test_condition_block_check() {

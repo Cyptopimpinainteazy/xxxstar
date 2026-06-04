@@ -13,10 +13,9 @@ use crate::{
         CanonicalSupply, ChainSupplyReports, GovernancePowerByChain, LastReconciliation,
         MintHaltSince, TotalGovernancePower,
     },
-    ReconciliationStatus,
+    Pallet as Reconciliation, ReconciliationStatus,
 };
 use frame_support::{assert_noop, assert_ok};
-use pallet_x3_reconciliation::Pallet as Reconciliation;
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -298,11 +297,11 @@ fn on_initialize_does_not_trigger_halt_before_threshold() {
 fn on_initialize_does_not_double_halt() {
     new_test_ext().execute_with(|| {
         // Manually insert a halt.
-        MintHaltSince::<Test>::put(Some(5u32));
+        MintHaltSince::<Test>::put(Some(5u64));
         use frame_support::traits::Hooks;
         Reconciliation::<Test>::on_initialize(1000u32.into());
         // Halt block should remain at the original value.
-        assert_eq!(MintHaltSince::<Test>::get(), Some(5u32));
+        assert_eq!(MintHaltSince::<Test>::get(), Some(5u64));
     });
 }
 
@@ -322,7 +321,7 @@ fn lift_mint_halt_clears_halt_when_divergence_within_tolerance() {
             1_000_000
         ));
         assert_ok!(Reconciliation::<Test>::run_reconciliation(root()));
-        MintHaltSince::<Test>::put(Some(1u32));
+        MintHaltSince::<Test>::put(Some(1u64));
         assert_ok!(Reconciliation::<Test>::lift_mint_halt(root()));
         assert!(!Reconciliation::<Test>::is_minting_halted());
     });
@@ -341,7 +340,7 @@ fn lift_mint_halt_rejected_when_divergence_still_above_tolerance() {
             999_000
         ));
         assert_ok!(Reconciliation::<Test>::run_reconciliation(root()));
-        MintHaltSince::<Test>::put(Some(1u32));
+        MintHaltSince::<Test>::put(Some(1u64));
         assert_noop!(
             Reconciliation::<Test>::lift_mint_halt(root()),
             crate::pallet::Error::<Test>::DivergenceTooHigh
@@ -362,7 +361,7 @@ fn lift_mint_halt_rejected_when_no_halt_active() {
 #[test]
 fn lift_mint_halt_rejects_non_governance() {
     new_test_ext().execute_with(|| {
-        MintHaltSince::<Test>::put(Some(1u32));
+        MintHaltSince::<Test>::put(Some(1u64));
         assert_noop!(
             Reconciliation::<Test>::lift_mint_halt(signed(7)),
             frame_support::error::BadOrigin
@@ -499,7 +498,7 @@ fn reconciliation_status_passing_when_no_record() {
 #[test]
 fn reconciliation_status_halted_when_halt_active() {
     new_test_ext().execute_with(|| {
-        MintHaltSince::<Test>::put(Some(1u32));
+        MintHaltSince::<Test>::put(Some(1u64));
         assert_eq!(
             Reconciliation::<Test>::reconciliation_status(),
             ReconciliationStatus::Halted

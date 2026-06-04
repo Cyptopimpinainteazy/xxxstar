@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::cfg::Cfg;
 use x3_ast::{BinaryOp, UnaryOp};
 use x3_common::Literal;
-use x3_mir::{MirBlockId, MirFunction, MirRhs, MirValue};
+use x3_mir::{MirBlockId, MirFunction, MirRhs, MirStatement, MirValue};
 
 /// Lightweight SSA representation that keeps dominator and frontier metadata alongside MIR.
 #[derive(Clone, Debug)]
@@ -55,33 +55,42 @@ pub fn ssa_const_prop(ssa: &mut SsaFunction) -> bool {
         let mut known_constants: BTreeMap<MirValue, Literal> = BTreeMap::new();
 
         for stmt in &mut block.statements {
-            match &stmt.rhs {
-                MirRhs::Unary(op, operand) => {
-                    if let Some(value) = known_constants.get(operand) {
-                        if let Some(result) = eval_unary(*op, value) {
-                            stmt.rhs = MirRhs::Literal(result.clone());
-                            changed = true;
+            // Atomic markers are optimization barriers — skip them.
+            if stmt.is_atomic_marker() {
+                continue;
+            }
+            match stmt {
+                MirStatement::Assign { rhs, target, .. } => match rhs {
+                    MirRhs::Unary(op, operand) => {
+                        if let Some(value) = known_constants.get(operand) {
+                            if let Some(result) = eval_unary(*op, value) {
+                                *rhs = MirRhs::Literal(result.clone());
+                                changed = true;
+                            }
                         }
                     }
-                }
-                MirRhs::Binary(op, lhs, rhs_val) => {
-                    if let (Some(left), Some(right)) =
-                        (known_constants.get(lhs), known_constants.get(rhs_val))
-                    {
-                        if let Some(result) = eval_binary(*op, left, right) {
-                            stmt.rhs = MirRhs::Literal(result.clone());
-                            changed = true;
+                    MirRhs::Binary(op, lhs, rhs_val) => {
+                        if let (Some(left), Some(right)) =
+                            (known_constants.get(lhs), known_constants.get(rhs_val))
+                        {
+                            if let Some(result) = eval_binary(*op, left, right) {
+                                *rhs = MirRhs::Literal(result.clone());
+                                changed = true;
+                            }
                         }
                     }
-                }
-                MirRhs::Literal(_)
-                | MirRhs::Call { .. }
-                | MirRhs::Load { .. }
-                | MirRhs::Store { .. } => {}
+                    MirRhs::Literal(_)
+                    | MirRhs::Call { .. }
+                    | MirRhs::Load { .. }
+                    | MirRhs::Store { .. } => {}
+                },
+                _ => {}
             }
 
-            if let MirRhs::Literal(literal) = &stmt.rhs {
-                known_constants.insert(stmt.target, literal.clone());
+            if let Some((target, rhs)) = stmt.as_assign() {
+                if let MirRhs::Literal(literal) = rhs {
+                    known_constants.insert(target, literal.clone());
+                }
             }
         }
     }
@@ -287,15 +296,15 @@ mod tests {
             blocks: vec![MirBlock {
                 id: MirBlockId(0),
                 statements: vec![
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(0),
                         rhs: MirRhs::Literal(Literal::Integer(2)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(1),
                         rhs: MirRhs::Literal(Literal::Integer(3)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(2),
                         rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
                     },
@@ -309,7 +318,9 @@ mod tests {
         let changed = ssa_const_prop(&mut ssa);
         assert!(changed);
 
-        if let MirRhs::Literal(Literal::Integer(sum)) = &ssa.mir.blocks[0].statements[2].rhs {
+        if let MirRhs::Literal(Literal::Integer(sum)) =
+            ssa.mir.blocks[0].statements[2].rhs().unwrap()
+        {
             assert_eq!(*sum, 5);
         } else {
             panic!("expected literal after propagation");

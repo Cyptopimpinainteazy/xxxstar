@@ -12,11 +12,11 @@
 //! Detailed status and limitations: `docs/testing/internal-mainnet-happy-path-e2e.md`.
 
 #[cfg(test)]
+use crate::TestResult;
+#[cfg(test)]
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
-#[cfg(test)]
-use crate::TestResult;
 
 #[cfg(test)]
 mod tests {
@@ -379,7 +379,10 @@ mod tests {
             1001,
             proof_hash,
         )?;
-        assert!(!mint_replay.success, "Bridge mint replay should be rejected");
+        assert!(
+            !mint_replay.success,
+            "Bridge mint replay should be rejected"
+        );
 
         // Step 6: Verify acknowledgement returned
         tracing::info!("Step 6: Verify acknowledgement on source");

@@ -32,7 +32,7 @@ use crate::OptResult;
 use std::collections::BTreeMap;
 use x3_ast::BinaryOp;
 use x3_common::Literal;
-use x3_mir::{MirModule, MirRhs, MirValue};
+use x3_mir::{MirModule, MirRhs, MirStatement, MirValue};
 
 /// Copy propagation pass.
 pub struct CopyPropagationPass;
@@ -126,8 +126,10 @@ impl CopyPropagationPass {
 
         for block in &func.blocks {
             for stmt in &block.statements {
-                if let MirRhs::Literal(lit) = &stmt.rhs {
-                    literals.insert(stmt.target, lit.clone());
+                if let Some((target, rhs)) = stmt.as_assign() {
+                    if let MirRhs::Literal(lit) = rhs {
+                        literals.insert(target, lit.clone());
+                    }
                 }
             }
         }
@@ -186,63 +188,80 @@ impl Pass for CopyPropagationPass {
                     let mut new_statements = Vec::new();
 
                     for stmt in block.statements.iter() {
-                        let mut replaced_stmt = stmt.clone();
+                        // Atomic markers are optimization barriers — pass through unchanged.
+                        if stmt.is_atomic_marker() {
+                            new_statements.push(stmt.clone());
+                            continue;
+                        }
+
+                        let (target, rhs) = match stmt.as_assign() {
+                            Some(t) => t,
+                            None => {
+                                new_statements.push(stmt.clone());
+                                continue;
+                            }
+                        };
+
+                        let mut new_rhs = rhs.clone();
 
                         // Replace values in the RHS
-                        if let MirRhs::Binary(op, lhs, rhs) = &stmt.rhs {
+                        if let MirRhs::Binary(op, lhs, rhs_val) = rhs {
                             // Check for identity patterns first
                             if let Some(identity_operand) =
-                                self.is_identity(*op, *lhs, *rhs, &literals)
+                                self.is_identity(*op, *lhs, *rhs_val, &literals)
                             {
                                 // This is an identity operation, replace with operand
-                                replaced_stmt.rhs = MirRhs::Literal(Literal::Integer(0)); // placeholder
-                                                                                          // Actually, we want to propagate the value - but since we don't have
-                                                                                          // a "move" instruction, we record the equivalence
-                                copies.insert(stmt.target, identity_operand);
+                                // Actually, we want to propagate the value - but since we don't have
+                                // a "move" instruction, we record the equivalence
+                                copies.insert(target, identity_operand);
                                 iter_changes += 1;
                                 continue;
                             }
 
                             // Replace operands with their equivalents
                             let new_lhs = self.replace_value(*lhs, &copies);
-                            let new_rhs = self.replace_value(*rhs, &copies);
+                            let new_rhs_val = self.replace_value(*rhs_val, &copies);
 
-                            if new_lhs != *lhs || new_rhs != *rhs {
-                                replaced_stmt.rhs = MirRhs::Binary(*op, new_lhs, new_rhs);
+                            if new_lhs != *lhs || new_rhs_val != *rhs_val {
+                                new_rhs = MirRhs::Binary(*op, new_lhs, new_rhs_val);
                                 iter_changes += 1;
                             }
-                        } else if let MirRhs::Unary(op, arg) = &stmt.rhs {
+                        } else if let MirRhs::Unary(op, arg) = rhs {
                             let new_arg = self.replace_value(*arg, &copies);
                             if new_arg != *arg {
-                                replaced_stmt.rhs = MirRhs::Unary(*op, new_arg);
+                                new_rhs = MirRhs::Unary(*op, new_arg);
                                 iter_changes += 1;
                             }
-                        } else if let MirRhs::Call { target, args } = &stmt.rhs {
+                        } else if let MirRhs::Call {
+                            target: call_target,
+                            args,
+                        } = rhs
+                        {
                             let new_args: Vec<MirValue> = args
                                 .iter()
                                 .map(|&v| self.replace_value(v, &copies))
                                 .collect();
                             if new_args != *args {
-                                replaced_stmt.rhs = MirRhs::Call {
-                                    target: *target,
+                                new_rhs = MirRhs::Call {
+                                    target: *call_target,
                                     args: new_args,
                                 };
                                 iter_changes += 1;
                             }
-                        } else if let MirRhs::Load { model, addr } = &stmt.rhs {
+                        } else if let MirRhs::Load { model, addr } = rhs {
                             let new_addr = self.replace_value(*addr, &copies);
                             if new_addr != *addr {
-                                replaced_stmt.rhs = MirRhs::Load {
+                                new_rhs = MirRhs::Load {
                                     model: *model,
                                     addr: new_addr,
                                 };
                                 iter_changes += 1;
                             }
-                        } else if let MirRhs::Store { model, addr, val } = &stmt.rhs {
+                        } else if let MirRhs::Store { model, addr, val } = rhs {
                             let new_addr = self.replace_value(*addr, &copies);
                             let new_val = self.replace_value(*val, &copies);
                             if new_addr != *addr || new_val != *val {
-                                replaced_stmt.rhs = MirRhs::Store {
+                                new_rhs = MirRhs::Store {
                                     model: *model,
                                     addr: new_addr,
                                     val: new_val,
@@ -252,12 +271,15 @@ impl Pass for CopyPropagationPass {
                         }
 
                         // Record literal values for identity detection
-                        if let MirRhs::Literal(lit) = &replaced_stmt.rhs {
+                        if let MirRhs::Literal(_) = &new_rhs {
                             // We don't add to literals here as they're already collected
                             // But we DO want to track value equivalence
                         }
 
-                        new_statements.push(replaced_stmt);
+                        new_statements.push(MirStatement::Assign {
+                            target,
+                            rhs: new_rhs,
+                        });
                     }
 
                     // Update terminator if needed
@@ -324,7 +346,7 @@ mod tests {
             entry: MirBlockId(0),
             blocks: vec![MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(42)),
                 }],

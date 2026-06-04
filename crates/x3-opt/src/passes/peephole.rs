@@ -101,7 +101,11 @@ impl PeepholePass {
         stmt: &MirStatement,
         constants: &BTreeMap<MirValue, Literal>,
     ) -> Option<MirRhs> {
-        match &stmt.rhs {
+        let rhs = match stmt.rhs() {
+            Some(r) => r,
+            None => return None, // atomic markers have no rhs
+        };
+        match rhs {
             MirRhs::Binary(op, left, right) => {
                 let left_const = constants.get(left);
                 let right_const = constants.get(right);
@@ -258,17 +262,23 @@ impl PeepholePass {
         let mut replacements = Vec::new();
 
         for (idx, stmt) in statements.iter().enumerate() {
-            if let MirRhs::Unary(op, src) = &stmt.rhs {
-                // Check if src is defined as the same unary op
-                if let Some(def) = definitions.get(src) {
-                    if let MirRhs::Unary(def_op, original) = &def.rhs {
-                        // Double negation: -(-x) → x
-                        if *op == x3_ast::UnaryOp::Negate && *def_op == x3_ast::UnaryOp::Negate {
-                            replacements.push((idx, *original));
-                        }
-                        // Double logical not: !!x → x
-                        if *op == x3_ast::UnaryOp::Not && *def_op == x3_ast::UnaryOp::Not {
-                            replacements.push((idx, *original));
+            if let Some(rhs) = stmt.rhs() {
+                if let MirRhs::Unary(op, src) = rhs {
+                    // Check if src is defined as the same unary op
+                    if let Some(def) = definitions.get(src) {
+                        if let Some(def_rhs) = def.rhs() {
+                            if let MirRhs::Unary(def_op, original) = def_rhs {
+                                // Double negation: -(-x) → x
+                                if *op == x3_ast::UnaryOp::Negate
+                                    && *def_op == x3_ast::UnaryOp::Negate
+                                {
+                                    replacements.push((idx, *original));
+                                }
+                                // Double logical not: !!x → x
+                                if *op == x3_ast::UnaryOp::Not && *def_op == x3_ast::UnaryOp::Not {
+                                    replacements.push((idx, *original));
+                                }
+                            }
                         }
                     }
                 }
@@ -302,15 +312,22 @@ impl Pass for PeepholePass {
 
                 // First pass: collect constants and definitions
                 for (idx, stmt) in block.statements.iter().enumerate() {
-                    _definitions.insert(stmt.target, idx);
-                    if let MirRhs::Literal(lit) = &stmt.rhs {
-                        constants.insert(stmt.target, lit.clone());
+                    if let Some(target) = stmt.target() {
+                        _definitions.insert(target, idx);
+                    }
+                    if let Some((target, rhs)) = stmt.as_assign() {
+                        if let MirRhs::Literal(lit) = rhs {
+                            constants.insert(target, lit.clone());
+                        }
                     }
                 }
 
                 // Build definition refs for double-negation check
-                let def_refs: BTreeMap<MirValue, &MirStatement> =
-                    block.statements.iter().map(|s| (s.target, s)).collect();
+                let def_refs: BTreeMap<MirValue, &MirStatement> = block
+                    .statements
+                    .iter()
+                    .filter_map(|s| s.target().map(|t| (t, s)))
+                    .collect();
 
                 // Find double negation patterns
                 let double_neg_replacements =
@@ -320,6 +337,12 @@ impl Pass for PeepholePass {
                 let mut new_statements = Vec::with_capacity(block.statements.len());
 
                 for (idx, stmt) in block.statements.iter().enumerate() {
+                    // Atomic markers are optimization barriers — pass through unchanged.
+                    if stmt.is_atomic_marker() {
+                        new_statements.push(stmt.clone());
+                        continue;
+                    }
+
                     // Check for double negation replacement
                     if let Some((_, original)) =
                         double_neg_replacements.iter().find(|(i, _)| *i == idx)
@@ -327,12 +350,14 @@ impl Pass for PeepholePass {
                         // Replace with identity (we'd need a Mov-like construct)
                         // For now, if original is a literal, use that
                         if let Some(lit) = constants.get(original) {
-                            new_statements.push(MirStatement {
-                                target: stmt.target,
-                                rhs: MirRhs::Literal(lit.clone()),
-                            });
-                            total_changes += 1;
-                            continue;
+                            if let Some(target) = stmt.target() {
+                                new_statements.push(MirStatement::Assign {
+                                    target,
+                                    rhs: MirRhs::Literal(lit.clone()),
+                                });
+                                total_changes += 1;
+                                continue;
+                            }
                         }
                         // Otherwise, we can't directly express the copy in MIR
                         // Keep original and let copy prop + DCE handle it
@@ -340,15 +365,19 @@ impl Pass for PeepholePass {
 
                     // Try standard peephole rules
                     if let Some(new_rhs) = self.try_optimize(stmt, &constants) {
-                        new_statements.push(MirStatement {
-                            target: stmt.target,
-                            rhs: new_rhs,
-                        });
-                        total_changes += 1;
+                        if let Some(target) = stmt.target() {
+                            new_statements.push(MirStatement::Assign {
+                                target,
+                                rhs: new_rhs,
+                            });
+                            total_changes += 1;
 
-                        // Update constants if we produced a literal
-                        if let MirRhs::Literal(lit) = &new_statements.last().unwrap().rhs {
-                            constants.insert(stmt.target, lit.clone());
+                            // Update constants if we produced a literal
+                            if let MirRhs::Literal(lit) =
+                                &new_statements.last().unwrap().rhs().unwrap()
+                            {
+                                constants.insert(target, lit.clone());
+                            }
                         }
                     } else {
                         new_statements.push(stmt.clone());
@@ -402,35 +431,11 @@ mod tests {
         // v0 = 0
         // v1 = v2 * v0  => v1 = 0
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(0)),
             },
-            MirStatement {
-                target: MirValue(1),
-                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(2), MirValue(0)),
-            },
-        ];
-
-        let mut module = make_module(make_func(stmts));
-        let pass = PeepholePass::new();
-        let result = pass.run(&mut module).unwrap();
-
-        assert!(result.changed);
-        let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Integer(0)));
-    }
-
-    #[test]
-    fn peephole_mul_two_strength_reduce() {
-        // v0 = 2
-        // v1 = v2 * v0  => v1 = v2 + v2
-        let stmts = vec![
-            MirStatement {
-                target: MirValue(0),
-                rhs: MirRhs::Literal(Literal::Integer(2)),
-            },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(2), MirValue(0)),
             },
@@ -443,8 +448,35 @@ mod tests {
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
         assert_eq!(
-            v1_stmt.rhs,
-            MirRhs::Binary(BinaryOp::Add, MirValue(2), MirValue(2))
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(0))
+        );
+    }
+
+    #[test]
+    fn peephole_mul_two_strength_reduce() {
+        // v0 = 2
+        // v1 = v2 * v0  => v1 = v2 + v2
+        let stmts = vec![
+            MirStatement::Assign {
+                target: MirValue(0),
+                rhs: MirRhs::Literal(Literal::Integer(2)),
+            },
+            MirStatement::Assign {
+                target: MirValue(1),
+                rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(2), MirValue(0)),
+            },
+        ];
+
+        let mut module = make_module(make_func(stmts));
+        let pass = PeepholePass::new();
+        let result = pass.run(&mut module).unwrap();
+
+        assert!(result.changed);
+        let v1_stmt = &module.functions[0].blocks[0].statements[1];
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Binary(BinaryOp::Add, MirValue(2), MirValue(2))
         );
     }
 
@@ -453,11 +485,11 @@ mod tests {
         // v0 = false
         // v1 = v2 == v0  => v1 = !v2
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Bool(false)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Binary(BinaryOp::Equal, MirValue(2), MirValue(0)),
             },
@@ -470,15 +502,15 @@ mod tests {
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
         assert_eq!(
-            v1_stmt.rhs,
-            MirRhs::Unary(x3_ast::UnaryOp::Not, MirValue(2))
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Unary(x3_ast::UnaryOp::Not, MirValue(2))
         );
     }
 
     #[test]
     fn peephole_ne_self_to_false() {
         // v0 = v0 != v0  => v0 = false
-        let stmts = vec![MirStatement {
+        let stmts = vec![MirStatement::Assign {
             target: MirValue(0),
             rhs: MirRhs::Binary(BinaryOp::NotEqual, MirValue(1), MirValue(1)),
         }];
@@ -489,7 +521,10 @@ mod tests {
 
         assert!(result.changed);
         let v0_stmt = &module.functions[0].blocks[0].statements[0];
-        assert_eq!(v0_stmt.rhs, MirRhs::Literal(Literal::Bool(false)));
+        assert_eq!(
+            v0_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Bool(false))
+        );
     }
 
     #[test]
@@ -498,15 +533,15 @@ mod tests {
         // v1 = -v0
         // v2 = -v1  => should recognize double negation
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(5)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Unary(x3_ast::UnaryOp::Negate, MirValue(0)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Unary(x3_ast::UnaryOp::Negate, MirValue(1)),
             },
@@ -520,7 +555,10 @@ mod tests {
         assert!(result.changed);
         let v2_stmt = &module.functions[0].blocks[0].statements[2];
         // Should be optimized to literal 5 (since v0 is known)
-        assert_eq!(v2_stmt.rhs, MirRhs::Literal(Literal::Integer(5)));
+        assert_eq!(
+            v2_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(5))
+        );
     }
 
     #[test]
@@ -529,14 +567,14 @@ mod tests {
         // v1 = v0 + v2
         // No peephole patterns match
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Call {
                     target: SymbolId(1),
                     args: vec![],
                 },
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(2)),
             },
@@ -554,11 +592,11 @@ mod tests {
         // v0 = 0
         // v1 = v0 * v2  => v1 = 0
         let stmts = vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(0)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(2)),
             },
@@ -570,6 +608,9 @@ mod tests {
 
         assert!(result.changed);
         let v1_stmt = &module.functions[0].blocks[0].statements[1];
-        assert_eq!(v1_stmt.rhs, MirRhs::Literal(Literal::Integer(0)));
+        assert_eq!(
+            v1_stmt.rhs().unwrap(),
+            &MirRhs::Literal(Literal::Integer(0))
+        );
     }
 }

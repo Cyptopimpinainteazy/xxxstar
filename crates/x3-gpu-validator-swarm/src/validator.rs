@@ -98,18 +98,26 @@ impl Validator {
         ));
         let proof_aggregator = Arc::new(Mutex::new(ProofAggregator::new(10))); // Default: 10 validators
 
+        let initial_mode = if config.gpu.enable_cuda {
+            ExecutionMode::GpuWithCpuVerification
+        } else {
+            ExecutionMode::CpuFallback
+        };
+        let engine = DeterministicEngine::new();
+        metrics.set_accelerator_backend(engine.accelerator_backend_name());
+
         Self {
             validator_id,
             validator_address,
             config,
             state: RwLock::new(ValidatorState::Starting),
-            engine: DeterministicEngine::new(),
+            engine,
             metrics,
             quarantine,
             health: HealthMonitor::default(),
             telemetry,
             health_tracker: RwLock::new(ValidatorHealthTracker::new(String::new())),
-            current_mode: RwLock::new(ExecutionMode::GpuWithCpuVerification),
+            current_mode: RwLock::new(initial_mode),
             start_time: Instant::now(),
             proof_aggregator,
         }
@@ -118,23 +126,38 @@ impl Validator {
     /// Initialize the validator
     pub fn initialize(&self) -> SwarmResult<()> {
         // Configure engine
-        self.engine.set_mode(ExecutionMode::GpuWithCpuVerification);
+        let initial_mode = if self.config.gpu.enable_cuda {
+            ExecutionMode::GpuWithCpuVerification
+        } else {
+            ExecutionMode::CpuFallback
+        };
+        self.engine.set_mode(initial_mode);
+        *self.current_mode.write() = initial_mode;
         self.engine
             .set_cpu_verification(self.config.verification.cpu_verification_enabled);
         self.engine
             .set_replay_mode(self.config.verification.replay_mode_enabled);
         self.engine.set_hash_algorithm(HashAlgorithm::Keccak256);
+        self.metrics
+            .set_accelerator_backend(self.engine.accelerator_backend_name());
 
-        // Initialize GPU hostcalls (with graceful CPU fallback)
-        log::info!(
-            "[Validator {}] Initializing GPU hostcalls...",
-            self.validator_id
-        );
-        self.engine.init_gpu_hostcalls();
-        log::info!(
-            "[Validator {}] GPU hostcalls initialization complete",
-            self.validator_id
-        );
+        if self.config.gpu.enable_cuda {
+            // Initialize GPU hostcalls (with graceful CPU fallback)
+            log::info!(
+                "[Validator {}] Initializing GPU hostcalls...",
+                self.validator_id
+            );
+            self.engine.init_gpu_hostcalls();
+            log::info!(
+                "[Validator {}] GPU hostcalls initialization complete",
+                self.validator_id
+            );
+        } else {
+            log::info!(
+                "[Validator {}] CUDA bypass enabled; running CPU fallback mode",
+                self.validator_id
+            );
+        }
 
         // Register health checks
         self.health
@@ -170,6 +193,16 @@ impl Validator {
 
         self.metrics
             .record_task(&self.validator_id, latency_ms, success, divergent);
+        if result.accelerator_backend != "unknown" {
+            self.metrics
+                .set_accelerator_backend(result.accelerator_backend.clone());
+        }
+        if result.accelerator_fallback_used {
+            self.metrics.record_accelerator_fallback();
+        }
+        if result.accelerator_parity_mismatch {
+            self.metrics.record_accelerator_parity_mismatch();
+        }
 
         // Update health tracker
         {
@@ -326,6 +359,7 @@ mod tests {
 
         assert_eq!(validator.id(), "test-validator");
         assert_eq!(validator.state(), ValidatorState::Starting);
+        assert_eq!(validator.current_mode(), ExecutionMode::CpuFallback);
     }
 
     #[test]
@@ -334,6 +368,7 @@ mod tests {
         let validator = Validator::new(config, "test-validator".to_string());
 
         validator.initialize().unwrap();
+        assert_eq!(validator.current_mode(), ExecutionMode::CpuFallback);
 
         let task = DeterministicTask::new(
             crate::deterministic::TaskType::BatchHash,
@@ -343,6 +378,14 @@ mod tests {
 
         let result = validator.process_task(task);
         assert!(result.outputs.len() == 2);
+        assert_eq!(result.accelerator_backend, "cpu");
+        assert!(!result.accelerator_fallback_used);
+        assert!(!result.accelerator_parity_mismatch);
+
+        let metrics = validator.get_metrics();
+        assert_eq!(metrics.accelerator_backend, "cpu");
+        assert_eq!(metrics.accelerator_fallbacks, 0);
+        assert_eq!(metrics.accelerator_parity_mismatches, 0);
     }
 
     #[test]

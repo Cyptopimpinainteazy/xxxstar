@@ -26,10 +26,11 @@ use crate::{
     mock::{
         new_test_ext, setup_policy, DappHub, MaxDAppsPerDeveloper, RuntimeOrigin, System, Test,
     },
-    pallet::{DApps, DeveloperDApps, DeveloperEarnings, NextDAppId, RevenuePolicies, TotalDApps},
+    pallet::{DApps, DeveloperEarnings, NextDAppId, RevenuePolicies, TotalDApps},
     ApprovalStatus, Error, Event, PlacementTier,
 };
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::DispatchError;
 
 // ── Constants for readability ─────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ fn approve_dapp_non_governance_fails() {
 
         assert_noop!(
             DappHub::approve_dapp(RuntimeOrigin::signed(OTHER), id),
-            frame_system::Error::<Test>::CallFiltered
+            DispatchError::BadOrigin
         );
     });
 }
@@ -174,7 +175,7 @@ fn reject_dapp_non_governance_fails() {
 
         assert_noop!(
             DappHub::reject_dapp(RuntimeOrigin::signed(OTHER), id),
-            frame_system::Error::<Test>::CallFiltered
+            DispatchError::BadOrigin
         );
     });
 }
@@ -203,7 +204,7 @@ fn suspend_dapp_non_governance_fails() {
 
         assert_noop!(
             DappHub::suspend_dapp(RuntimeOrigin::signed(OTHER), id),
-            frame_system::Error::<Test>::CallFiltered
+            DispatchError::BadOrigin
         );
     });
 }
@@ -394,7 +395,7 @@ fn set_revenue_policy_non_governance_fails() {
 
         assert_noop!(
             DappHub::set_revenue_policy(RuntimeOrigin::signed(OTHER), 1, policy),
-            frame_system::Error::<Test>::CallFiltered
+            DispatchError::BadOrigin
         );
     });
 }

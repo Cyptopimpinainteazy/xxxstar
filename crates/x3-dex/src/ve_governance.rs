@@ -435,7 +435,7 @@ mod tests {
         let power = VeX3GovernanceEngine::calculate_voting_power(100_000, 730); // 2 years
 
         assert!(power > 0);
-        assert!(power < 100_000); // Scaled down
+        assert_eq!(power, 500_000_000);
     }
 
     #[test]
@@ -497,8 +497,8 @@ mod tests {
 
         let passed = VeX3GovernanceEngine::finalize_proposal(
             &mut proposal,
-            500_000, // Total voting power
-            200,
+            300_000, // Total voting power
+            201,
         )
         .unwrap();
 

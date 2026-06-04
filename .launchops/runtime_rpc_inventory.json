@@ -1,0 +1,837 @@
+{
+  "generated_at": "2026-05-30T11:04:51.375842667+00:00",
+  "runtime_source_file": "runtime/src/lib.rs",
+  "rpc_source_file": "node/src/rpc.rs",
+  "runtime_traits": [
+    {
+      "trait_name": "pallet_x3_oracle::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 847,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_vrf::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 865,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_dex::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 880,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_automation::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 893,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_consensus::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 912,
+      "methods": []
+    },
+    {
+      "trait_name": "frame_system::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 938,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_timestamp::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 971,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_aura::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 978,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_grandpa::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 986,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_session::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 996,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_session::historical::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1013,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_offences::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1020,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_balances::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1026,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_transaction_payment::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1044,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_sudo::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1055,
+      "cfg_guard": "#[cfg(feature = \"dev\")]",
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_collective::Config<CouncilCollective>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1093,
+      "methods": []
+    },
+    {
+      "trait_name": "crate::fraud_proofs::pallet::pallet::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1110,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_evm::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1120,
+      "cfg_guard": "#[cfg(feature = \"frontier\")]",
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_ethereum::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1153,
+      "cfg_guard": "#[cfg(feature = \"frontier\")]",
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_invariants::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1458,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_agent_law::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1468,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_kernel::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1488,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_coin::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1534,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_atomic_trade_engine::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 1601,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_scheduler::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2054,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_preimage::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2076,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_governance::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2105,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_treasury::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2151,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_agent_accounts::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2185,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_agent_memory::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2210,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_evolution_core::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2233,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_verifier::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2260,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_cross_chain_validator::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2277,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_asset_registry::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2295,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_supply_ledger::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2302,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_cross_vm_router::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2320,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_token_factory::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2336,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_domain_registry::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2344,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_account_registry::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2359,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_settlement_engine::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2418,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_swarm::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2451,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_depin_marketplace::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2482,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_private_execution::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2513,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_sequencer::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2531,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_da::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2540,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_atomic_kernel::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2575,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_slash::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2600,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_wallet_pallet::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2612,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_inventory::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2621,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_reservation::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2634,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_solvency::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2647,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_rebalance::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2662,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_partner::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2675,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_treasury_policy::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2686,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_custody::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2699,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_reconciliation::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2722,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_wrapped::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2738,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_auction::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2755,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_launchpad::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2775,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_dapp_hub::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2799,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_compute_market::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2821,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_flashloan::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2837,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_svm_runtime::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2851,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_x3_jury_anchor::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2865,
+      "methods": []
+    },
+    {
+      "trait_name": "pallet_meme_overlord::Config",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2879,
+      "methods": []
+    },
+    {
+      "trait_name": "sp_api::Core<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2917,
+      "methods": [
+        {
+          "name": "version",
+          "line": 2918
+        },
+        {
+          "name": "execute_block",
+          "line": 2923
+        },
+        {
+          "name": "initialize_block",
+          "line": 2928
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_session::SessionKeys<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2933,
+      "methods": [
+        {
+          "name": "generate_session_keys",
+          "line": 2934
+        },
+        {
+          "name": "decode_session_keys",
+          "line": 2938
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_genesis_builder::GenesisBuilder<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2945,
+      "methods": [
+        {
+          "name": "build_state",
+          "line": 2946
+        },
+        {
+          "name": "get_preset",
+          "line": 2950
+        },
+        {
+          "name": "preset_names",
+          "line": 2954
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2959,
+      "methods": [
+        {
+          "name": "validate_transaction",
+          "line": 2960
+        }
+      ]
+    },
+    {
+      "trait_name": "pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 2969,
+      "methods": [
+        {
+          "name": "get_canonical_balance",
+          "line": 2970
+        },
+        {
+          "name": "get_asset_metadata",
+          "line": 2974
+        },
+        {
+          "name": "is_authorized",
+          "line": 2979
+        },
+        {
+          "name": "get_authorized_accounts",
+          "line": 2983
+        },
+        {
+          "name": "get_authorities",
+          "line": 2987
+        },
+        {
+          "name": "map_evm_address",
+          "line": 2991
+        },
+        {
+          "name": "get_evm_balance",
+          "line": 3016
+        },
+        {
+          "name": "get_evm_code",
+          "line": 3037
+        },
+        {
+          "name": "get_evm_storage",
+          "line": 3056
+        },
+        {
+          "name": "get_evm_nonce",
+          "line": 3076
+        },
+        {
+          "name": "get_svm_balance",
+          "line": 3098
+        },
+        {
+          "name": "is_svm_program",
+          "line": 3107
+        },
+        {
+          "name": "submit_evm_transaction",
+          "line": 3118
+        },
+        {
+          "name": "submit_svm_instruction",
+          "line": 3348
+        },
+        {
+          "name": "call_evm",
+          "line": 3361
+        },
+        {
+          "name": "estimate_evm_gas",
+          "line": 3427
+        },
+        {
+          "name": "get_evm_transaction",
+          "line": 3494
+        },
+        {
+          "name": "get_evm_receipt",
+          "line": 3500
+        },
+        {
+          "name": "get_evm_transaction_by_hash",
+          "line": 3506
+        },
+        {
+          "name": "get_evm_logs",
+          "line": 3512
+        },
+        {
+          "name": "get_evm_transaction_logs",
+          "line": 3537
+        },
+        {
+          "name": "validate_evm_transaction",
+          "line": 3551
+        },
+        {
+          "name": "chain_id",
+          "line": 3559
+        },
+        {
+          "name": "get_svm_slot",
+          "line": 3564
+        },
+        {
+          "name": "get_svm_blockhash",
+          "line": 3569
+        },
+        {
+          "name": "get_svm_transaction_count",
+          "line": 3574
+        },
+        {
+          "name": "get_svm_slot_by_blockhash",
+          "line": 3582
+        },
+        {
+          "name": "deploy_evm_contract",
+          "line": 3587
+        },
+        {
+          "name": "get_evm_contract_receipt",
+          "line": 3654
+        },
+        {
+          "name": "get_svm_program_data",
+          "line": 3682
+        },
+        {
+          "name": "get_svm_account_data",
+          "line": 3702
+        },
+        {
+          "name": "get_svm_slot_history",
+          "line": 3716
+        },
+        {
+          "name": "get_svm_recent_blockhashes",
+          "line": 3723
+        }
+      ]
+    },
+    {
+      "trait_name": "pallet_atomic_trade_engine::AtomicTradeEngineApi<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 3731,
+      "methods": [
+        {
+          "name": "simulate_trade",
+          "line": 3732
+        },
+        {
+          "name": "estimate_execution_cost",
+          "line": 3795
+        },
+        {
+          "name": "get_price_data",
+          "line": 3817
+        },
+        {
+          "name": "get_batch_status",
+          "line": 3836
+        },
+        {
+          "name": "find_route",
+          "line": 3860
+        },
+        {
+          "name": "is_authorized",
+          "line": 3872
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_consensus_aura::AuraApi<Block, sp_consensus_aura::sr25519::AuthorityId>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 3884,
+      "methods": [
+        {
+          "name": "slot_duration",
+          "line": 3885
+        },
+        {
+          "name": "authorities",
+          "line": 3889
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_consensus_grandpa::GrandpaApi<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 3895,
+      "methods": [
+        {
+          "name": "grandpa_authorities",
+          "line": 3896
+        },
+        {
+          "name": "current_set_id",
+          "line": 3900
+        },
+        {
+          "name": "submit_report_equivocation_unsigned_extrinsic",
+          "line": 3904
+        },
+        {
+          "name": "generate_key_ownership_proof",
+          "line": 3918
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_block_builder::BlockBuilder<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 3928,
+      "methods": [
+        {
+          "name": "apply_extrinsic",
+          "line": 3929
+        },
+        {
+          "name": "finalize_block",
+          "line": 3933
+        },
+        {
+          "name": "inherent_extrinsics",
+          "line": 3937
+        },
+        {
+          "name": "check_inherents",
+          "line": 3942
+        }
+      ]
+    },
+    {
+      "trait_name": "frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 3950,
+      "methods": [
+        {
+          "name": "account_nonce",
+          "line": 3951
+        }
+      ]
+    },
+    {
+      "trait_name": "pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 3956,
+      "methods": [
+        {
+          "name": "query_info",
+          "line": 3957
+        },
+        {
+          "name": "query_fee_details",
+          "line": 3964
+        },
+        {
+          "name": "query_weight_to_fee",
+          "line": 3971
+        },
+        {
+          "name": "query_length_to_fee",
+          "line": 3975
+        }
+      ]
+    },
+    {
+      "trait_name": "sp_api::Metadata<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 4007,
+      "methods": [
+        {
+          "name": "metadata",
+          "line": 4008
+        },
+        {
+          "name": "metadata_at_version",
+          "line": 4012
+        },
+        {
+          "name": "metadata_versions",
+          "line": 4016
+        }
+      ]
+    },
+    {
+      "trait_name": "pallet_evolution_core::runtime_api::EvolutionCoreApi<Block, AccountId, BlockNumber>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 4021,
+      "methods": [
+        {
+          "name": "get_params",
+          "line": 4022
+        },
+        {
+          "name": "get_status",
+          "line": 4034
+        },
+        {
+          "name": "get_recent_metrics",
+          "line": 4044
+        },
+        {
+          "name": "get_pending_proposals",
+          "line": 4063
+        },
+        {
+          "name": "is_ai_agent",
+          "line": 4087
+        },
+        {
+          "name": "is_evolution_enabled",
+          "line": 4091
+        }
+      ]
+    },
+    {
+      "trait_name": "pallet_x3_verifier::runtime_api::X3VerifierApi<Block, AccountId, Balance, BlockNumber>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 4096,
+      "methods": [
+        {
+          "name": "get_status",
+          "line": 4097
+        },
+        {
+          "name": "get_executor",
+          "line": 4111
+        },
+        {
+          "name": "get_active_executors",
+          "line": 4124
+        },
+        {
+          "name": "get_job",
+          "line": 4140
+        },
+        {
+          "name": "get_pending_jobs",
+          "line": 4164
+        },
+        {
+          "name": "get_receipt",
+          "line": 4191
+        },
+        {
+          "name": "is_verification_enabled",
+          "line": 4206
+        },
+        {
+          "name": "is_executor",
+          "line": 4210
+        }
+      ]
+    },
+    {
+      "trait_name": "pallet_x3_domain_registry::runtime_api::X3DomainRegistryApi<Block, AccountId>",
+      "source_file": "runtime/src/lib.rs",
+      "impl_line": 4217,
+      "methods": [
+        {
+          "name": "get_records",
+          "line": 4218
+        },
+        {
+          "name": "get_domain",
+          "line": 4222
+        },
+        {
+          "name": "list_domains",
+          "line": 4226
+        }
+      ]
+    }
+  ]
+}

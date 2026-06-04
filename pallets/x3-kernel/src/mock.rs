@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate as pallet_x3_kernel;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use frame_support::{
     construct_runtime, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64, Get},
@@ -27,6 +27,7 @@ pub const CHARLIE: AccountId = 3;
 pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 
 pub static EMERGENCY_HALT_TRIGGERED: AtomicBool = AtomicBool::new(false);
+pub static EMERGENCY_HALT_TRIGGER_COUNT: AtomicU64 = AtomicU64::new(0);
 
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 250;
@@ -52,6 +53,7 @@ pub struct TestEmergencyHaltController;
 impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {
         EMERGENCY_HALT_TRIGGERED.store(true, Ordering::SeqCst);
+        EMERGENCY_HALT_TRIGGER_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -307,6 +309,8 @@ impl pallet_x3_kernel::Config for Test {
 pub struct ExtBuilder {
     balances: Vec<(AccountId, Balance)>,
     authorized_accounts: Vec<AccountId>,
+    evm_escrow: H160,
+    svm_escrow: [u8; 32],
 }
 
 impl Default for ExtBuilder {
@@ -314,6 +318,8 @@ impl Default for ExtBuilder {
         Self {
             balances: vec![],
             authorized_accounts: vec![],
+            evm_escrow: H160::repeat_byte(0xE3),
+            svm_escrow: [0x53; 32],
         }
     }
 }
@@ -326,6 +332,12 @@ impl ExtBuilder {
 
     pub fn authorized_accounts(mut self, accounts: Vec<AccountId>) -> Self {
         self.authorized_accounts = accounts;
+        self
+    }
+
+    pub fn bridge_escrows(mut self, evm_escrow: H160, svm_escrow: [u8; 32]) -> Self {
+        self.evm_escrow = evm_escrow;
+        self.svm_escrow = svm_escrow;
         self
     }
 
@@ -342,6 +354,14 @@ impl ExtBuilder {
         }
         .assimilate_storage(&mut storage)
         .expect("Failed to assimilate balances storage");
+
+        pallet_x3_kernel::GenesisConfig::<Test> {
+            assets: Vec::new(),
+            evm_escrow: self.evm_escrow,
+            svm_escrow: self.svm_escrow,
+        }
+        .assimilate_storage(&mut storage)
+        .expect("Failed to assimilate x3-kernel storage");
 
         let mut t = TestExternalities::new(storage);
 

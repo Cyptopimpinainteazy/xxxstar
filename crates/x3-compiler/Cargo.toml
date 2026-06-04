@@ -1,3 +1,6 @@
+# NOTE: The production x3-lang compiler is at x3-lang/compiler (x3-lang-compiler).
+# This crate is the chain integration pipeline. See docs/x3-lang/README.md.
+
 [package]
 name = "x3-compiler"
 version = "0.1.0"
@@ -10,6 +13,7 @@ publish = false
 # Compilation pipeline
 x3-lexer = { path = "../x3-lexer" }
 x3-parser = { path = "../x3-parser" }
+x3-ast = { path = "../x3-ast" }
 x3-hir = { path = "../x3-hir" }
 x3-mir = { path = "../x3-mir" }
 x3-backend = { path = "../x3-backend" }
@@ -32,3 +36,4 @@ serde_json = { workspace = true }
 [dev-dependencies]
 blake2 = "0.10"
 invariant-macros = { path = "../../crates/invariant-macros" }
+jsonschema = "0.18"

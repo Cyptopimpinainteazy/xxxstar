@@ -42,8 +42,15 @@ impl system::Config for MockRuntime {
     type OnKilledAccount = ();
     type AccountData = ();
     type SystemWeightInfo = ();
+    type ExtensionsWeightInfo = ();
+    type RuntimeTask = ();
     type SS58Prefix = ();
     type OnSetCode = ();
+    type SingleBlockMigrations = ();
+    type MultiBlockMigrator = ();
+    type PreInherents = ();
+    type PostInherents = ();
+    type PostTransactions = ();
     type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 

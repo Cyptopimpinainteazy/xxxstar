@@ -131,12 +131,99 @@ pub fn parse(bytes: &[u8]) -> Result<BytecodeModule, BytecodeError> {
     if version != X3BC_VERSION {
         return Err(BytecodeError::UnsupportedVersion(version));
     }
-    // Minimal stub: for now return an empty module (full parser in vm.rs)
-    Ok(BytecodeModule {
+
+    let mut cursor = Cursor { bytes, pos: 6 };
+    if cursor.remaining() < 4 {
+        return Ok(BytecodeModule {
+            version,
+            functions: Vec::new(),
+            const_pool: Vec::new(),
+        });
+    }
+
+    let const_count = cursor.read_u16()? as usize;
+    let function_count = cursor.read_u16()? as usize;
+    if const_count > MAX_CONST_POOL || function_count > MAX_FUNCTIONS {
+        return Err(BytecodeError::ModuleTooLarge);
+    }
+
+    let mut const_pool = Vec::with_capacity(const_count);
+    for _ in 0..const_count {
+        const_pool.push(cursor.read_u64()?);
+    }
+
+    let mut functions = Vec::with_capacity(function_count);
+    for _ in 0..function_count {
+        let max_stack_depth = cursor.read_u16()?;
+        let instruction_count = cursor.read_u32()? as usize;
+        if instruction_count > MAX_INSTRUCTIONS {
+            return Err(BytecodeError::ModuleTooLarge);
+        }
+        let mut instructions = Vec::with_capacity(instruction_count);
+        for _ in 0..instruction_count {
+            let opcode = Opcode::try_from(cursor.read_u8()?)?;
+            let operand = cursor.read_u32()?;
+            instructions.push(Instruction { opcode, operand });
+        }
+        functions.push(Function {
+            instructions,
+            max_stack_depth,
+        });
+    }
+
+    let module = BytecodeModule {
         version,
-        functions: Vec::new(),
-        const_pool: Vec::new(),
-    })
+        functions,
+        const_pool,
+    };
+    validate(&module)?;
+    Ok(module)
+}
+
+struct Cursor<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.pos)
+    }
+
+    fn read_exact(&mut self, len: usize) -> Result<&'a [u8], BytecodeError> {
+        let end = self
+            .pos
+            .checked_add(len)
+            .ok_or(BytecodeError::UnexpectedEof)?;
+        if end > self.bytes.len() {
+            return Err(BytecodeError::UnexpectedEof);
+        }
+        let slice = &self.bytes[self.pos..end];
+        self.pos = end;
+        Ok(slice)
+    }
+
+    fn read_u8(&mut self) -> Result<u8, BytecodeError> {
+        Ok(self.read_exact(1)?[0])
+    }
+
+    fn read_u16(&mut self) -> Result<u16, BytecodeError> {
+        let mut bytes = [0u8; 2];
+        bytes.copy_from_slice(self.read_exact(2)?);
+        Ok(u16::from_le_bytes(bytes))
+    }
+
+    fn read_u32(&mut self) -> Result<u32, BytecodeError> {
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(self.read_exact(4)?);
+        Ok(u32::from_le_bytes(bytes))
+    }
+
+    fn read_u64(&mut self) -> Result<u64, BytecodeError> {
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(self.read_exact(8)?);
+        Ok(u64::from_le_bytes(bytes))
+    }
 }
 
 /// Validate that all jump targets and call indices are in bounds.
@@ -219,6 +306,25 @@ mod tests {
         let mut bytes = b"X3BC\x01\x00".to_vec();
         bytes.extend_from_slice(&[0u8; 10]);
         assert!(parse(&bytes).is_ok());
+    }
+
+    #[test]
+    fn test_parse_populated_module() {
+        let mut bytes = b"X3BC\x01\x00".to_vec();
+        bytes.extend_from_slice(&1u16.to_le_bytes()); // const count
+        bytes.extend_from_slice(&1u16.to_le_bytes()); // function count
+        bytes.extend_from_slice(&42u64.to_le_bytes());
+        bytes.extend_from_slice(&8u16.to_le_bytes()); // max stack
+        bytes.extend_from_slice(&2u32.to_le_bytes()); // instruction count
+        bytes.push(Opcode::LdConst as u8);
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.push(Opcode::Ret as u8);
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+
+        let module = parse(&bytes).expect("populated module should parse");
+        assert_eq!(module.const_pool, vec![42]);
+        assert_eq!(module.functions.len(), 1);
+        assert_eq!(module.functions[0].instructions.len(), 2);
     }
 
     #[test]

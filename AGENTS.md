@@ -1,3 +1,10 @@
+## CLI Agent Etiquette
+
+- Do not expose scratchpad, internal reasoning, or step-by-step chain-of-thought in replies. Give only concise conclusions and brief rationale when it adds value.
+- Keep final answers short, factual, and actionable. Avoid filler, repetition, and hidden deliberation.
+- Always end the response with the required `## Completion Scoreboard` block, including the `What changed`, `Still missing`, and `Next best action` sections, even for read-only inspection, planning, or test work.
+- Score only the exact subsystem you touched. Do not inflate progress and never claim a fake 100%.
+
 # Adaptive Completion Scoreboard Requirement
 
 Every time you finish a task, file, module, subsystem, PR, RC, or version milestone, you MUST end your response with an adaptive progress scoreboard.

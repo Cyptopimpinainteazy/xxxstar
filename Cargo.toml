@@ -88,6 +88,7 @@ members = [
     "crates/parallel-proposer",
     "crates/poh-generator",
     "crates/x3-accounting-events",
+    "crates/x3-accel",
     "crates/x3-asset-kernel-types",
     "crates/x3-atomic-trade",
     "crates/x3-automation",
@@ -158,6 +159,10 @@ members = [
     "crates/x3-semantics",               # <- x3-typeck
     # Cross-chain intent system: user-facing intent language, compiler, lifecycle, simulation
     "crates/x3-crosschain-intent",
+    # CI canonical crate paths: required workspace members
+    "crates/x3-relayer",
+    "crates/x3-bridge-security-council",
+    "crates/x3-genesis-builder",
 ]
 default-members = ["node"]
 resolver = "2"
@@ -363,6 +368,8 @@ wasm-instrument = { path = "patches/wasm-instrument" }
 # Note: wasmtime override removed due to patch conflicts - manual update needed
 # Fix environmental macro compatibility
 environmental = { path = "patches/environmental" }
+# Use the vendored blst crate so native Linux can build its no-assembly fallback.
+blst = { path = "vendor/blst" }
 # Fix substrate-prometheus-endpoint protobuf type mismatch (Vec -> RepeatedField)
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
 # Fix errno WASM compatibility by providing stub implementation for wasm32 targets

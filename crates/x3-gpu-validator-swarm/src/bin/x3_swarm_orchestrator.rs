@@ -116,6 +116,12 @@ async fn show_status() {
     println!("  Total validators: {}", metrics.total_validators);
     println!("  Active validators: {}", metrics.active_validators);
     println!("  Total tasks: {}", metrics.total_tasks);
+    println!("  Accelerator backend: {}", metrics.accelerator_backend);
+    println!("  Accelerator fallbacks: {}", metrics.accelerator_fallbacks);
+    println!(
+        "  Accelerator parity mismatches: {}",
+        metrics.accelerator_parity_mismatches
+    );
     println!("  Throughput: {:.2} tasks/s", metrics.tasks_per_second);
 }
 
@@ -195,6 +201,12 @@ async fn run_benchmark() {
     println!("\nFinal Metrics:");
     println!("  Total tasks: {}", metrics.total_tasks);
     println!("  Successful: {}", metrics.successful_tasks);
+    println!("  Accelerator backend: {}", metrics.accelerator_backend);
+    println!("  Accelerator fallbacks: {}", metrics.accelerator_fallbacks);
+    println!(
+        "  Accelerator parity mismatches: {}",
+        metrics.accelerator_parity_mismatches
+    );
     println!("  Avg latency: {:.2} ms", metrics.avg_task_latency_ms);
     println!("  Throughput: {:.2} tasks/s", metrics.tasks_per_second);
 }

@@ -113,16 +113,18 @@ fn collect_constants(func: &MirFunction) -> BTreeMap<MirValue, bool> {
     let mut constants = BTreeMap::new();
     for block in &func.blocks {
         for stmt in &block.statements {
-            if let MirRhs::Literal(lit) = &stmt.rhs {
-                match lit {
-                    x3_common::Literal::Bool(b) => {
-                        constants.insert(stmt.target, *b);
+            if let Some((target, rhs)) = stmt.as_assign() {
+                if let MirRhs::Literal(lit) = rhs {
+                    match lit {
+                        x3_common::Literal::Bool(b) => {
+                            constants.insert(target, *b);
+                        }
+                        // Integer 0 is falsy, non-zero is truthy (for branch folding)
+                        x3_common::Literal::Integer(n) => {
+                            constants.insert(target, *n != 0);
+                        }
+                        _ => {}
                     }
-                    // Integer 0 is falsy, non-zero is truthy (for branch folding)
-                    x3_common::Literal::Integer(n) => {
-                        constants.insert(stmt.target, *n != 0);
-                    }
-                    _ => {}
                 }
             }
         }
@@ -231,7 +233,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 }],
@@ -273,7 +275,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(false)),
                 }],
@@ -313,7 +315,7 @@ mod tests {
         // Branch where then and else are same → Goto
         let blocks = vec![MirBlock {
             id: MirBlockId(0),
-            statements: vec![MirStatement {
+            statements: vec![MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Bool(true)),
             }],
@@ -412,7 +414,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Integer(0)),
                 }],

@@ -5,6 +5,10 @@
 //! (blockchain runtime, sidecar, or local development server).
 
 use std::collections::BTreeMap;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::vm::Value;
@@ -27,6 +31,8 @@ pub struct Hostcall {
 /// Registry of hostcalls available to the VM.
 pub struct HostcallRegistry {
     calls: BTreeMap<u8, Hostcall>,
+    call_count: Arc<AtomicU64>,
+    max_calls_per_execution: u64,
 }
 
 impl HostcallRegistry {
@@ -34,6 +40,8 @@ impl HostcallRegistry {
     pub fn new() -> Self {
         Self {
             calls: BTreeMap::new(),
+            call_count: Arc::new(AtomicU64::new(0)),
+            max_calls_per_execution: 10_000,
         }
     }
 
@@ -65,8 +73,25 @@ impl HostcallRegistry {
         self.calls.get(&id)
     }
 
+    /// Set the maximum hostcalls allowed in one top-level VM execution.
+    pub fn set_max_calls_per_execution(&mut self, max: u64) {
+        self.max_calls_per_execution = max;
+    }
+
+    /// Reset per-execution hostcall accounting.
+    pub fn reset_execution_count(&self) {
+        self.call_count.store(0, Ordering::SeqCst);
+    }
+
     /// Invoke a hostcall by ID.
     pub fn invoke(&self, id: u8, args: &[Value]) -> VMResult<Option<Value>> {
+        let next = self.call_count.fetch_add(1, Ordering::SeqCst) + 1;
+        if next > self.max_calls_per_execution {
+            return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                "circuit breaker".to_string(),
+            )));
+        }
+
         let call = self
             .calls
             .get(&id)

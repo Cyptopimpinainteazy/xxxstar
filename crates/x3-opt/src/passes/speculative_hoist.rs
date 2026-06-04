@@ -99,7 +99,9 @@ fn build_value_definitions(
 
     for block in &func.blocks {
         for (idx, stmt) in block.statements.iter().enumerate() {
-            defs.insert(stmt.target, (block.id, idx));
+            if let Some(target) = stmt.target() {
+                defs.insert(target, (block.id, idx));
+            }
         }
     }
 
@@ -213,13 +215,24 @@ fn find_hoist_candidates(
         };
 
         for (idx, stmt) in block.statements.iter().enumerate() {
+            // Atomic markers are optimization barriers — skip.
+            if stmt.is_atomic_marker() {
+                continue;
+            }
+
+            // Only Assign statements have rhs.
+            let rhs = match stmt.rhs() {
+                Some(r) => r,
+                None => continue,
+            };
+
             // Check if this statement is pure
-            if !is_pure(&stmt.rhs) {
+            if !is_pure(rhs) {
                 continue;
             }
 
             // Check if operands are available at target
-            if !operands_available_at(&stmt.rhs, target_block_id, value_defs, idom) {
+            if !operands_available_at(rhs, target_block_id, value_defs, idom) {
                 continue;
             }
 
@@ -296,7 +309,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 }],
@@ -308,7 +321,7 @@ mod tests {
             },
             MirBlock {
                 id: MirBlockId(1),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Binary(
                         BinaryOp::Add,
@@ -354,7 +367,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 }],
@@ -366,7 +379,7 @@ mod tests {
             },
             MirBlock {
                 id: MirBlockId(1),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(1),
                     rhs: MirRhs::Call {
                         target: SymbolId(99),
@@ -402,7 +415,7 @@ mod tests {
         let blocks = vec![
             MirBlock {
                 id: MirBlockId(0),
-                statements: vec![MirStatement {
+                statements: vec![MirStatement::Assign {
                     target: MirValue(0),
                     rhs: MirRhs::Literal(Literal::Bool(true)),
                 }],
@@ -415,11 +428,11 @@ mod tests {
             MirBlock {
                 id: MirBlockId(1),
                 statements: vec![
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(1),
                         rhs: MirRhs::Literal(Literal::Integer(5)),
                     },
-                    MirStatement {
+                    MirStatement::Assign {
                         target: MirValue(2),
                         rhs: MirRhs::Binary(BinaryOp::Add, MirValue(1), MirValue(100)),
                     },

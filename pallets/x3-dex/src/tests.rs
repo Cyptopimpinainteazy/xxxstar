@@ -2,8 +2,14 @@
 
 use super::*;
 use crate::mock::*;
-use frame_support::{assert_noop, assert_ok};
-use x3_dex::amm_pools::TokenId;
+use frame_support::assert_ok;
+use x3_dex::amm_pools::{AMMPool, TokenId};
+
+fn pool_id(token_a: &TokenId, token_b: &TokenId, fee_basis_points: u32) -> u64 {
+    AMMPool::create_pool(token_a.clone(), token_b.clone(), fee_basis_points)
+        .expect("valid test pool")
+        .pool_id
+}
 
 #[test]
 fn create_pool_works() {
@@ -25,8 +31,8 @@ fn create_pool_works() {
         ));
 
         // Check pool was created
-        let pools = DEX::pools();
-        assert!(!pools.is_empty());
+        let pool = DEX::pools(pool_id(&token_a, &token_b, 30));
+        assert!(pool.is_some());
     });
 }
 
@@ -52,7 +58,7 @@ fn add_liquidity_works() {
         // Add liquidity
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,    // pool_id
+            pool_id(&token_a, &token_b, 30),
             1000, // amount_a_desired
             1000, // amount_b_desired
             900,  // amount_a_min
@@ -81,7 +87,7 @@ fn swap_works() {
         ));
         assert_ok!(DEX::add_liquidity(
             RuntimeOrigin::signed(1),
-            0,
+            pool_id(&token_a, &token_b, 30),
             100000, // amount_a_desired
             100000, // amount_b_desired
             90000,  // amount_a_min
@@ -91,16 +97,16 @@ fn swap_works() {
         // Perform swap
         assert_ok!(DEX::swap(
             RuntimeOrigin::signed(2),
-            0, // pool_id
-            token_a,
+            pool_id(&token_a, &token_b, 30),
+            token_a.clone(),
             1000, // amount_in
             900,  // min_out
         ));
 
         System::assert_has_event(RuntimeEvent::DEX(Event::SwapExecuted {
-            pool_id: 0,
+            pool_id: pool_id(&token_a, &token_b, 30),
             amount_in: 1000,
-            amount_out: 975, // Approximately 1000 * 0.997 * 100000 / (100000 + 997) ≈ 975
+            amount_out: 987,
             user: 2,
         }));
     });

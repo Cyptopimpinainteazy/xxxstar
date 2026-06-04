@@ -285,28 +285,33 @@ impl Verifier {
 
     /// Get opcode name from statement
     fn statement_opcode(&self, stmt: &MirStatement) -> String {
-        match &stmt.rhs {
-            MirRhs::Literal(_) => "const".to_string(),
-            MirRhs::Unary(op, _) => format!("{:?}", op).to_lowercase(),
-            MirRhs::Binary(op, _, _) => format!("{:?}", op).to_lowercase(),
-            MirRhs::Call { .. } => "call".to_string(),
-            MirRhs::Load { .. } => "load".to_string(),
-            MirRhs::Store { .. } => "store".to_string(),
+        match stmt {
+            MirStatement::Assign { rhs, .. } => match rhs {
+                MirRhs::Literal(_) => "const".to_string(),
+                MirRhs::Unary(op, _) => format!("{:?}", op).to_lowercase(),
+                MirRhs::Binary(op, _, _) => format!("{:?}", op).to_lowercase(),
+                MirRhs::Call { .. } => "call".to_string(),
+                MirRhs::Load { .. } => "load".to_string(),
+                MirRhs::Store { .. } => "store".to_string(),
+            },
+            MirStatement::AtomicBegin { .. } => "atomic_begin".to_string(),
+            MirStatement::AtomicEnd { .. } => "atomic_end".to_string(),
         }
     }
 
     /// Check for determinism violations in a statement
     fn check_determinism_violation(&self, stmt: &MirStatement) -> Option<String> {
         // Check for known non-deterministic operations
-        match &stmt.rhs {
-            MirRhs::Call { target, .. } => {
-                // Check if calling known non-deterministic functions
-                let name = format!("{:?}", target);
-                if name.contains("random") || name.contains("timestamp") {
-                    return Some(name);
-                }
+        if let MirStatement::Assign {
+            rhs: MirRhs::Call { target, .. },
+            ..
+        } = stmt
+        {
+            // Check if calling known non-deterministic functions
+            let name = format!("{:?}", target);
+            if name.contains("random") || name.contains("timestamp") {
+                return Some(name);
             }
-            _ => {}
         }
         None
     }

@@ -44,7 +44,7 @@ fn test_verify_simple_function() {
 
     let func = make_simple_function(
         "test",
-        vec![MirStatement {
+        vec![MirStatement::Assign {
             target: MirValue(0),
             rhs: MirRhs::Literal(Literal::Integer(42)),
         }],
@@ -69,15 +69,15 @@ fn test_gas_analysis() {
     let func = make_simple_function(
         "compute",
         vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(1)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Literal(Literal::Integer(2)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Binary(x3_ast::BinaryOp::Add, MirValue(0), MirValue(1)),
             },
@@ -157,15 +157,15 @@ fn test_instruction_limit_check() {
     let func = make_simple_function(
         "too_big",
         vec![
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(0),
                 rhs: MirRhs::Literal(Literal::Integer(1)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(1),
                 rhs: MirRhs::Literal(Literal::Integer(2)),
             },
-            MirStatement {
+            MirStatement::Assign {
                 target: MirValue(2),
                 rhs: MirRhs::Literal(Literal::Integer(3)),
             },

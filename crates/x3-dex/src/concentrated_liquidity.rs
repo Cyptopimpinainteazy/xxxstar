@@ -393,7 +393,7 @@ mod tests {
             token1: 2,
             lower_tick: -1000,
             upper_tick: 1000,
-            liquidity: 1_000_000_000_000_000_000,
+            liquidity: 1_u128 << 64,
             amount0_deposited: 1_000_000,
             amount1_deposited: 1_000_000,
             fee_tier: 500,
@@ -401,11 +401,16 @@ mod tests {
             created_at: 0,
         };
 
-        let (fee0, fee1) =
-            ConcentratedLiquidityEngine::calculate_claimable_fees(&pos, 1_000_000, 1_000_000, 0, 0)
-                .unwrap();
+        let (fee0, fee1) = ConcentratedLiquidityEngine::calculate_claimable_fees(
+            &pos,
+            1_u128 << 64,
+            1_u128 << 64,
+            0,
+            0,
+        )
+        .unwrap();
 
-        assert!(fee0 > 0 || fee1 > 0);
+        assert_eq!((fee0, fee1), (1, 1));
     }
 
     #[test]

@@ -26,6 +26,7 @@ log = { version = "0.4", default-features = false }
 [dev-dependencies]
 sp-io   = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
+pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 # Testing tools
 proptest = "1.0"
 loom = "0.7"
@@ -55,3 +56,5 @@ try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
 ]
+dev = []
+testnet = []

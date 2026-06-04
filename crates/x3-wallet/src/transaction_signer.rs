@@ -330,8 +330,10 @@ mod tests {
         };
 
         let result = TransactionSigner::verify_signature(&sig);
-        assert!(result.is_ok());
-        assert!(result.unwrap());
+        assert_eq!(
+            result,
+            Err("Cryptographic signature verification not implemented")
+        );
     }
 
     #[test]

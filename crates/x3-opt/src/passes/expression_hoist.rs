@@ -65,11 +65,17 @@ impl ExpressionHoistPass {
         for func in &module.functions {
             for block in &func.blocks {
                 for stmt in &block.statements {
-                    if let Some(key) = ExprKey::from_rhs(&stmt.rhs) {
-                        if key.is_pure() {
-                            map.entry(key)
-                                .or_insert_with(BTreeSet::new)
-                                .insert(block.id);
+                    // Atomic markers are optimization barriers — skip.
+                    if stmt.is_atomic_marker() {
+                        continue;
+                    }
+                    if let Some(rhs) = stmt.rhs() {
+                        if let Some(key) = ExprKey::from_rhs(rhs) {
+                            if key.is_pure() {
+                                map.entry(key)
+                                    .or_insert_with(BTreeSet::new)
+                                    .insert(block.id);
+                            }
                         }
                     }
                 }

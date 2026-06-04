@@ -67,6 +67,9 @@ pub mod weights;
 pub use runtime_api::*;
 pub use types::{AmmProtocol, VmType};
 pub use weights::WeightInfo;
+use x3_packet_schema::{
+    EvmPacket, Packet as KernelPacket, SvmPacket, U256 as SchemaU256, X3VmPacket,
+};
 
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::{
@@ -1108,18 +1111,18 @@ pub mod pallet {
                             evm_payload.is_empty(),
                             Error::<T>::KernelComitDuplicateVmLeg
                         );
-                        evm_payload = Self::build_trade_payload(leg, leg.amount_in)?;
+                        evm_payload = Self::build_kernel_trade_payload(leg, leg.amount_in)?;
                     }
                     VmType::Svm => {
                         ensure!(
                             svm_payload.is_empty(),
                             Error::<T>::KernelComitDuplicateVmLeg
                         );
-                        svm_payload = Self::build_trade_payload(leg, leg.amount_in)?;
+                        svm_payload = Self::build_kernel_trade_payload(leg, leg.amount_in)?;
                     }
                     VmType::X3 => {
                         ensure!(x3_payload.is_empty(), Error::<T>::KernelComitDuplicateVmLeg);
-                        x3_payload = Self::build_trade_payload(leg, leg.amount_in)?;
+                        x3_payload = Self::build_kernel_trade_payload(leg, leg.amount_in)?;
                     }
                     VmType::CrossVm => return Err(Error::<T>::KernelComitUnsupportedVm.into()),
                 }
@@ -1625,6 +1628,63 @@ pub mod pallet {
             payload.extend_from_slice(&Self::encode_asset_id(leg.asset_out));
 
             Ok(payload)
+        }
+
+        /// Build a kernel v2 packet payload for strict per-domain packet validation.
+        fn build_kernel_trade_payload(
+            leg: &TradeLeg,
+            amount_in: u128,
+        ) -> Result<Vec<u8>, TradeLegFailureReason> {
+            let trade_payload = Self::build_trade_payload(leg, amount_in)?;
+
+            let packet = match leg.vm_type {
+                VmType::Evm => {
+                    let mut contract = [0u8; 20];
+                    let contract_len = leg.route_data.len().min(contract.len());
+                    contract[..contract_len].copy_from_slice(&leg.route_data[..contract_len]);
+
+                    let mut function_selector = [0u8; 4];
+                    function_selector.copy_from_slice(&trade_payload[..4]);
+
+                    KernelPacket::Evm(EvmPacket::Call {
+                        contract,
+                        function_selector,
+                        args: trade_payload[4..].to_vec(),
+                        value: SchemaU256::zero(),
+                    })
+                }
+                VmType::Svm => {
+                    let mut program_id = [0u8; 32];
+                    let program_len = leg.route_data.len().min(program_id.len());
+                    program_id[..program_len].copy_from_slice(&leg.route_data[..program_len]);
+
+                    KernelPacket::Svm(SvmPacket::Invoke {
+                        program_id,
+                        accounts: Vec::new(),
+                        data: trade_payload,
+                    })
+                }
+                VmType::X3 => {
+                    let asset_id_bytes = leg.asset_in.as_bytes();
+                    let asset_id = u32::from_be_bytes([
+                        asset_id_bytes[28],
+                        asset_id_bytes[29],
+                        asset_id_bytes[30],
+                        asset_id_bytes[31],
+                    ]);
+
+                    KernelPacket::X3Vm(X3VmPacket::Transfer {
+                        from_domain: 2,
+                        to_domain: 2,
+                        asset_id,
+                        amount: amount_in,
+                        recipient: leg.route_data.to_vec(),
+                    })
+                }
+                VmType::CrossVm => return Err(TradeLegFailureReason::InvalidRoute),
+            };
+
+            Ok(packet.encode())
         }
 
         /// Build EVM payload for cross-VM trade.

@@ -353,6 +353,18 @@ impl BytecodeEmitter {
         self.emit_reg(src);
     }
 
+    pub fn emit_inc(&mut self, dst: Register, src: Register) {
+        self.emit_byte(Opcode::Inc.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(src);
+    }
+
+    pub fn emit_dec(&mut self, dst: Register, src: Register) {
+        self.emit_byte(Opcode::Dec.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(src);
+    }
+
     // ========================================================================
     // Float arithmetic
     // ========================================================================
@@ -380,6 +392,13 @@ impl BytecodeEmitter {
 
     pub fn emit_div_f(&mut self, dst: Register, a: Register, b: Register) {
         self.emit_byte(Opcode::DivF.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(a);
+        self.emit_reg(b);
+    }
+
+    pub fn emit_mod_f(&mut self, dst: Register, a: Register, b: Register) {
+        self.emit_byte(Opcode::ModF.to_byte());
         self.emit_reg(dst);
         self.emit_reg(a);
         self.emit_reg(b);
@@ -443,6 +462,13 @@ impl BytecodeEmitter {
 
     pub fn emit_eq_f(&mut self, dst: Register, a: Register, b: Register) {
         self.emit_byte(Opcode::EqF.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(a);
+        self.emit_reg(b);
+    }
+
+    pub fn emit_ne_f(&mut self, dst: Register, a: Register, b: Register) {
+        self.emit_byte(Opcode::NeF.to_byte());
         self.emit_reg(dst);
         self.emit_reg(a);
         self.emit_reg(b);
@@ -540,6 +566,13 @@ impl BytecodeEmitter {
 
     pub fn emit_shr(&mut self, dst: Register, a: Register, b: Register) {
         self.emit_byte(Opcode::Shr.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(a);
+        self.emit_reg(b);
+    }
+
+    pub fn emit_ushr(&mut self, dst: Register, a: Register, b: Register) {
+        self.emit_byte(Opcode::UShr.to_byte());
         self.emit_reg(dst);
         self.emit_reg(a);
         self.emit_reg(b);
@@ -724,6 +757,352 @@ impl BytecodeEmitter {
     pub fn emit_panic(&mut self, msg_idx: ConstIdx) {
         self.emit_byte(Opcode::Panic.to_byte());
         self.emit_const(msg_idx);
+    }
+
+    pub fn emit_breakpoint(&mut self) {
+        self.emit_byte(Opcode::Breakpoint.to_byte());
+    }
+
+    // ========================================================================
+    // Missing instruction emitters — parity with opcode.rs
+    // ========================================================================
+
+    /// Emit int-to-bool conversion: dst = (bool)src
+    /// Encoding: to_bool dst:reg src:reg
+    pub fn emit_to_bool(&mut self, dst: Register, src: Register) {
+        self.emit_byte(Opcode::ToBool.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(src);
+    }
+
+    /// Emit array pop: dst = arr.pop()
+    /// Encoding: array_pop dst:reg arr:reg
+    pub fn emit_array_pop(&mut self, dst: Register, arr: Register) {
+        self.emit_byte(Opcode::ArrayPop.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(arr);
+    }
+
+    /// Emit atomic check: dst = is_in_atomic_block()
+    /// Encoding: atomic_check dst:reg
+    pub fn emit_atomic_check(&mut self, dst: Register) {
+        self.emit_byte(Opcode::AtomicCheck.to_byte());
+        self.emit_reg(dst);
+    }
+
+    /// Emit agent initialization with key-value field pairs.
+    /// Encoding: agent_init agent:reg count:u16 [field_idx:u16 val:reg...]
+    pub fn emit_agent_init(&mut self, agent: Register, fields: &[(u16, Register)]) {
+        self.emit_byte(Opcode::AgentInit.to_byte());
+        self.emit_reg(agent);
+        self.emit_u16(fields.len() as u16);
+        for &(idx, val) in fields {
+            self.emit_u16(idx);
+            self.emit_reg(val);
+        }
+    }
+
+    // ========================================================================
+    // EVM Intrinsics (0xB0 - 0xBF)
+    // ========================================================================
+
+    /// EVM call: dst = evm_call(gas, addr, value, data)
+    /// Encoding: evm_call dst:reg gas:reg addr:reg value:reg data:reg
+    pub fn emit_evm_call(
+        &mut self,
+        dst: Register,
+        gas: Register,
+        addr: Register,
+        value: Register,
+        data: Register,
+    ) {
+        self.emit_byte(Opcode::EvmCall.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(gas);
+        self.emit_reg(addr);
+        self.emit_reg(value);
+        self.emit_reg(data);
+    }
+
+    /// EVM static call (read-only): dst = evm_staticcall(gas, addr, data)
+    /// Encoding: evm_staticcall dst:reg gas:reg addr:reg data:reg
+    pub fn emit_evm_staticcall(
+        &mut self,
+        dst: Register,
+        gas: Register,
+        addr: Register,
+        data: Register,
+    ) {
+        self.emit_byte(Opcode::EvmStaticCall.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(gas);
+        self.emit_reg(addr);
+        self.emit_reg(data);
+    }
+
+    /// EVM delegate call: dst = evm_delegatecall(gas, addr, data)
+    /// Encoding: evm_delegatecall dst:reg gas:reg addr:reg data:reg
+    pub fn emit_evm_delegatecall(
+        &mut self,
+        dst: Register,
+        gas: Register,
+        addr: Register,
+        data: Register,
+    ) {
+        self.emit_byte(Opcode::EvmDelegateCall.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(gas);
+        self.emit_reg(addr);
+        self.emit_reg(data);
+    }
+
+    /// EVM storage load: dst = sload(slot)
+    /// Encoding: evm_sload dst:reg slot:reg
+    pub fn emit_evm_sload(&mut self, dst: Register, slot: Register) {
+        self.emit_byte(Opcode::EvmSload.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(slot);
+    }
+
+    /// EVM storage store: sstore(slot, val)
+    /// Encoding: evm_sstore slot:reg val:reg
+    pub fn emit_evm_sstore(&mut self, slot: Register, val: Register) {
+        self.emit_byte(Opcode::EvmSstore.to_byte());
+        self.emit_reg(slot);
+        self.emit_reg(val);
+    }
+
+    /// EVM create contract: dst = create(value, code)
+    /// Encoding: evm_create dst:reg value:reg code:reg
+    pub fn emit_evm_create(&mut self, dst: Register, value: Register, code: Register) {
+        self.emit_byte(Opcode::EvmCreate.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(value);
+        self.emit_reg(code);
+    }
+
+    /// EVM create2 contract: dst = create2(value, code, salt)
+    /// Encoding: evm_create2 dst:reg value:reg code:reg salt:reg
+    pub fn emit_evm_create2(
+        &mut self,
+        dst: Register,
+        value: Register,
+        code: Register,
+        salt: Register,
+    ) {
+        self.emit_byte(Opcode::EvmCreate2.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(value);
+        self.emit_reg(code);
+        self.emit_reg(salt);
+    }
+
+    /// EVM log emission: evm_log(topic_count, topics[], data)
+    /// Encoding: evm_log topic_count:u8 [topics:reg...] data:reg
+    pub fn emit_evm_log(&mut self, topics: &[Register], data: Register) {
+        self.emit_byte(Opcode::EvmLog.to_byte());
+        self.emit_byte(topics.len() as u8);
+        for topic in topics {
+            self.emit_reg(*topic);
+        }
+        self.emit_reg(data);
+    }
+
+    /// EVM get balance: dst = balance(addr)
+    /// Encoding: evm_balance dst:reg addr:reg
+    pub fn emit_evm_balance(&mut self, dst: Register, addr: Register) {
+        self.emit_byte(Opcode::EvmBalance.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(addr);
+    }
+
+    /// EVM get code size: dst = codesize(addr)
+    /// Encoding: evm_codesize dst:reg addr:reg
+    pub fn emit_evm_codesize(&mut self, dst: Register, addr: Register) {
+        self.emit_byte(Opcode::EvmCodeSize.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(addr);
+    }
+
+    // ========================================================================
+    // SVM Intrinsics (0xC0 - 0xCF)
+    // ========================================================================
+
+    /// SVM cross-program invocation: dst = invoke(program, accounts, data)
+    /// Encoding: svm_invoke dst:reg program:reg accounts:reg data:reg
+    pub fn emit_svm_invoke(
+        &mut self,
+        dst: Register,
+        program: Register,
+        accounts: Register,
+        data: Register,
+    ) {
+        self.emit_byte(Opcode::SvmInvoke.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(program);
+        self.emit_reg(accounts);
+        self.emit_reg(data);
+    }
+
+    /// SVM signed cross-program invocation: dst = invoke_signed(program, accounts, data, seeds)
+    /// Encoding: svm_invoke_signed dst:reg program:reg accounts:reg data:reg seeds:reg
+    pub fn emit_svm_invoke_signed(
+        &mut self,
+        dst: Register,
+        program: Register,
+        accounts: Register,
+        data: Register,
+        seeds: Register,
+    ) {
+        self.emit_byte(Opcode::SvmInvokeSigned.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(program);
+        self.emit_reg(accounts);
+        self.emit_reg(data);
+        self.emit_reg(seeds);
+    }
+
+    /// SVM create account: dst = create_account(lamports, space, owner)
+    /// Encoding: svm_create_account dst:reg lamports:reg space:reg owner:reg
+    pub fn emit_svm_create_account(
+        &mut self,
+        dst: Register,
+        lamports: Register,
+        space: Register,
+        owner: Register,
+    ) {
+        self.emit_byte(Opcode::SvmCreateAccount.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(lamports);
+        self.emit_reg(space);
+        self.emit_reg(owner);
+    }
+
+    /// SVM transfer lamports: transfer(from, to, lamports)
+    /// Encoding: svm_transfer from:reg to:reg lamports:reg
+    pub fn emit_svm_transfer(&mut self, from: Register, to: Register, lamports: Register) {
+        self.emit_byte(Opcode::SvmTransfer.to_byte());
+        self.emit_reg(from);
+        self.emit_reg(to);
+        self.emit_reg(lamports);
+    }
+
+    /// SVM get account data: dst = get_data(account)
+    /// Encoding: svm_get_data dst:reg account:reg
+    pub fn emit_svm_get_data(&mut self, dst: Register, account: Register) {
+        self.emit_byte(Opcode::SvmGetData.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(account);
+    }
+
+    /// SVM set account data: set_data(account, data)
+    /// Encoding: svm_set_data account:reg data:reg
+    pub fn emit_svm_set_data(&mut self, account: Register, data: Register) {
+        self.emit_byte(Opcode::SvmSetData.to_byte());
+        self.emit_reg(account);
+        self.emit_reg(data);
+    }
+
+    /// SVM get rent: dst = get_rent()
+    /// Encoding: svm_get_rent dst:reg
+    pub fn emit_svm_get_rent(&mut self, dst: Register) {
+        self.emit_byte(Opcode::SvmGetRent.to_byte());
+        self.emit_reg(dst);
+    }
+
+    /// SVM get clock: dst = get_clock()
+    /// Encoding: svm_get_clock dst:reg
+    pub fn emit_svm_get_clock(&mut self, dst: Register) {
+        self.emit_byte(Opcode::SvmGetClock.to_byte());
+        self.emit_reg(dst);
+    }
+
+    // ========================================================================
+    // GPU Compute Intrinsics (0xD0 - 0xDF)
+    // ========================================================================
+
+    /// GPU SHA-256 batch hash: dst = gpu_sha256_batch(inputs, count)
+    /// Encoding: gpu_sha256_batch dst:reg inputs:reg count:reg
+    pub fn emit_gpu_sha256_batch(&mut self, dst: Register, inputs: Register, count: Register) {
+        self.emit_byte(Opcode::GpuSha256Batch.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(inputs);
+        self.emit_reg(count);
+    }
+
+    /// GPU Ed25519 batch verify: dst = gpu_ed25519_verify(sigs, count)
+    /// Encoding: gpu_ed25519_verify dst:reg sigs:reg count:reg
+    pub fn emit_gpu_ed25519_verify(&mut self, dst: Register, sigs: Register, count: Register) {
+        self.emit_byte(Opcode::GpuEd25519Verify.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(sigs);
+        self.emit_reg(count);
+    }
+
+    /// GPU PoH chain: dst = gpu_poh_chain(seeds, count, chain_len)
+    /// Encoding: gpu_poh_chain dst:reg seeds:reg count:reg chain_len:reg
+    pub fn emit_gpu_poh_chain(
+        &mut self,
+        dst: Register,
+        seeds: Register,
+        count: Register,
+        chain_len: Register,
+    ) {
+        self.emit_byte(Opcode::GpuPohChain.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(seeds);
+        self.emit_reg(count);
+        self.emit_reg(chain_len);
+    }
+
+    /// GPU SHA-256 streamed batch (CUDA stream pipelining): dst = gpu_sha256_streamed(inputs, count, streams)
+    /// Encoding: gpu_sha256_streamed dst:reg inputs:reg count:reg streams:reg
+    pub fn emit_gpu_sha256_streamed(
+        &mut self,
+        dst: Register,
+        inputs: Register,
+        count: Register,
+        streams: Register,
+    ) {
+        self.emit_byte(Opcode::GpuSha256Streamed.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(inputs);
+        self.emit_reg(count);
+        self.emit_reg(streams);
+    }
+
+    /// GPU device count query: dst = gpu_device_count()
+    /// Encoding: gpu_device_count dst:reg
+    pub fn emit_gpu_device_count(&mut self, dst: Register) {
+        self.emit_byte(Opcode::GpuDeviceCount.to_byte());
+        self.emit_reg(dst);
+    }
+
+    /// GPU pipeline benchmark: dst = gpu_benchmark(count, streams)
+    /// Encoding: gpu_benchmark dst:reg count:reg streams:reg
+    pub fn emit_gpu_benchmark(&mut self, dst: Register, count: Register, streams: Register) {
+        self.emit_byte(Opcode::GpuBenchmark.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(count);
+        self.emit_reg(streams);
+    }
+
+    /// GPU Keccak-256 batch hash: dst = gpu_keccak256_batch(inputs, count)
+    /// Encoding: gpu_keccak256_batch dst:reg inputs:reg count:reg
+    pub fn emit_gpu_keccak256_batch(&mut self, dst: Register, inputs: Register, count: Register) {
+        self.emit_byte(Opcode::GpuKeccak256Batch.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(inputs);
+        self.emit_reg(count);
+    }
+
+    /// GPU secp256k1 ECDSA batch verify: dst = gpu_secp256k1_verify(sigs, count)
+    /// Encoding: gpu_secp256k1_verify dst:reg sigs:reg count:reg
+    pub fn emit_gpu_secp256k1_verify(&mut self, dst: Register, sigs: Register, count: Register) {
+        self.emit_byte(Opcode::GpuSecp256k1Verify.to_byte());
+        self.emit_reg(dst);
+        self.emit_reg(sigs);
+        self.emit_reg(count);
     }
 
     // ========================================================================

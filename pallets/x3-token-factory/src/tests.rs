@@ -88,8 +88,27 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrAny {
     }
 }
 
+pub struct RootOrSignedAccount;
+impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
+    type Success = u64;
+    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        match o.clone().into() {
+            Ok(system::RawOrigin::Root) => Ok(0),
+            Ok(system::RawOrigin::Signed(who)) => Ok(who),
+            _ => Err(o),
+        }
+    }
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(1))
+    }
+}
+
 parameter_types! {
     pub const MaxAssets: u32 = 128;
+    pub const RoutingFeeBps: u16 = 0;
+    pub const ProtocolTreasury: u64 = 99;
+    pub const BlocksPerDay: u32 = 14_400;
 }
 
 impl pallet_x3_asset_registry::Config for Test {
@@ -109,9 +128,14 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type RuntimeEvent = RuntimeEvent;
     type Registry = Registry;
     type Ledger = Ledger;
+    type Currency = ();
     type ExternalExecutorOrigin = RootOrAny;
     type VmAdapterOrigin = RootOrAny;
+    type X3LangOrigin = RootOrSignedAccount;
     type EconomicHalt = Ledger;
+    type RoutingFeeBps = RoutingFeeBps;
+    type ProtocolTreasury = ProtocolTreasury;
+    type BlocksPerDay = BlocksPerDay;
 }
 
 impl pallet_x3_token_factory::Config for Test {
@@ -234,8 +258,6 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) {
     let now = System::block_number();
     let expires_at = now + 50;
 
-    let nonce = Router::next_nonce(src, sender.clone());
-
     assert_ok!(Router::do_initiate_transfer(
         asset_id,
         src,
@@ -244,21 +266,32 @@ fn do_xvm(asset_id: AssetId, src: DomainId, dst: DomainId, amount: u128) {
         recipient.clone(),
         amount,
         expires_at,
+        None,
     ));
 
-    let msg = x3_asset_kernel_types::X3TransferMessage::<u64> {
-        version: x3_asset_kernel_types::MESSAGE_FORMAT_VERSION,
-        asset_id,
-        source_domain: src,
-        destination_domain: dst,
-        sender,
-        recipient,
-        amount,
-        nonce,
-        created_at: now,
-        expires_at,
-    };
-    let message_id = x3_asset_kernel_types::derive_message_id::<u64>(&msg);
+    let message_id = System::events()
+        .iter()
+        .rev()
+        .find_map(|rec| {
+            if let RuntimeEvent::Router(pallet_x3_cross_vm_router::Event::TransferInitiated {
+                message_id,
+                asset_id: event_asset_id,
+                source,
+                destination,
+                amount: event_amount,
+            }) = &rec.event
+            {
+                if *event_asset_id == asset_id
+                    && *source == src
+                    && *destination == dst
+                    && *event_amount == amount
+                {
+                    return Some(*message_id);
+                }
+            }
+            None
+        })
+        .expect("router emitted TransferInitiated for xvm transfer");
     assert_ok!(Router::complete_xvm_transfer(
         RuntimeOrigin::signed(CREATOR),
         message_id
@@ -272,8 +305,10 @@ fn submit_xvm_expect_err(asset_id: AssetId, src: DomainId, dst: DomainId, amount
     let expires_at = now + 50;
 
     assert!(
-        Router::do_initiate_transfer(asset_id, src, dst, sender, recipient, amount, expires_at,)
-            .is_err(),
+        Router::do_initiate_transfer(
+            asset_id, src, dst, sender, recipient, amount, expires_at, None
+        )
+        .is_err(),
         "expected xvm_transfer to fail on disabled domain / route",
     );
 }

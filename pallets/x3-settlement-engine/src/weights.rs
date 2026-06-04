@@ -20,6 +20,8 @@ pub trait WeightInfo {
     fn report_violation() -> Weight;
     fn settle_transfer() -> Weight;
     fn trigger_refund() -> Weight;
+    fn submit_adaptor_signature() -> Weight;
+    fn complete_adaptor_swap() -> Weight;
 }
 
 /// Default weights for testing
@@ -65,6 +67,15 @@ impl WeightInfo for () {
     }
     fn trigger_refund() -> Weight {
         Weight::from_parts(80_000_000, 0)
+    }
+    fn submit_adaptor_signature() -> Weight {
+        // Real ECDSA recovery: 1 call to sp_io::crypto::secp256k1_ecdsa_recover_compressed
+        // + storage read/write of AdaptorSignatures + 1 sha2_256 hash for tx_id_hash.
+        Weight::from_parts(180_000_000, 4500)
+    }
+    fn complete_adaptor_swap() -> Weight {
+        // Two ECDSA recoveries (final + pre) + 2 sha2_256 + 2 storage writes.
+        Weight::from_parts(220_000_000, 5500)
     }
 }
 
@@ -156,5 +167,22 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
         Weight::from_parts(80_000_000, 4500)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
+    }
+
+    fn submit_adaptor_signature() -> Weight {
+        // Real ECDSA recovery (1x secp256k1_ecdsa_recover_compressed) + 1
+        // AdaptorSignatures write + 1 sha2_256 for tx_id_hash.
+        Weight::from_parts(180_000_000, 6000)
+            .saturating_add(T::DbWeight::get().reads(3))
+            .saturating_add(T::DbWeight::get().writes(2))
+    }
+
+    fn complete_adaptor_swap() -> Weight {
+        // Two ECDSA recoveries (final + pre-sig, both via
+        // secp256k1_ecdsa_recover_compressed) + 1 AdaptorSignatures read +
+        // 1 FinalSignatureCache write + 1 IntentState write + 2 sha2_256.
+        Weight::from_parts(220_000_000, 7500)
+            .saturating_add(T::DbWeight::get().reads(4))
+            .saturating_add(T::DbWeight::get().writes(3))
     }
 }

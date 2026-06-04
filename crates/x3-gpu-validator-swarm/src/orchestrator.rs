@@ -201,6 +201,24 @@ impl SwarmOrchestrator {
                     if let Some(validator) = validators.get(&validator_id) {
                         // Process task
                         let result = validator.process_task(pending.task.clone());
+                        let success =
+                            result.verification == crate::crypto::VerificationResult::Valid;
+                        self.metrics.record_task(
+                            &validator_id,
+                            result.execution_time_us / 1000,
+                            success,
+                            result.divergence_detected,
+                        );
+                        if result.accelerator_backend != "unknown" {
+                            self.metrics
+                                .set_accelerator_backend(result.accelerator_backend.clone());
+                        }
+                        if result.accelerator_fallback_used {
+                            self.metrics.record_accelerator_fallback();
+                        }
+                        if result.accelerator_parity_mismatch {
+                            self.metrics.record_accelerator_parity_mismatch();
+                        }
 
                         // Store result
                         let task_result = TaskResult {

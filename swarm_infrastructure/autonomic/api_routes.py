@@ -32,7 +32,10 @@ def register_autonomic_routes(app: web.Application, acp: "AutonomicControlPlane"
     async def circuit_breakers(request: web.Request) -> web.Response:
         """GET /api/autonomic/circuit-breakers"""
         data = {
-            name: {"state": cb.state.value, "failures": cb._failure_count}
+            name: {
+                "state": cb.state.value,
+                "failures": cb.stats().failure_count,
+            }
             for name, cb in acp.breakers.all().items()
         }
         return web.json_response(data)
