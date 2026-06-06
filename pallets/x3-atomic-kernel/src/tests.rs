@@ -624,19 +624,27 @@ fn test_leg_receipt_structure() {
         vm_type: VmType::Evm,
         executed: false,
         state_diff: StateDiff::from(Vec::new()),
+        receipt_root: [0u8; 32],
+        finalized_block: 0,
     };
     assert_eq!(receipt.leg_index, 0);
     assert!(!receipt.executed);
     assert!(receipt.state_diff.is_empty());
+    assert_eq!(receipt.receipt_root, [0u8; 32]);
+    assert_eq!(receipt.finalized_block, 0);
 
     let executed_receipt = LegReceipt {
         leg_index: 1,
         vm_type: VmType::Svm,
         executed: true,
         state_diff: StateDiff::from(vec![1, 2, 3]),
+        receipt_root: [0xAB; 32],
+        finalized_block: 42,
     };
     assert!(executed_receipt.executed);
     assert!(!executed_receipt.state_diff.is_empty());
+    assert_eq!(executed_receipt.receipt_root, [0xAB; 32]);
+    assert_eq!(executed_receipt.finalized_block, 42);
 }
 
 #[test]
@@ -646,6 +654,8 @@ fn test_leg_receipt_encode_decode_roundtrip() {
         vm_type: VmType::X3,
         executed: true,
         state_diff: StateDiff::from(vec![0xDE, 0xAD, 0xBE, 0xEF]),
+        receipt_root: [0xCD; 32],
+        finalized_block: 99,
     };
     let encoded = parity_scale_codec::Encode::encode(&receipt);
     let decoded: LegReceipt =
@@ -654,6 +664,8 @@ fn test_leg_receipt_encode_decode_roundtrip() {
     assert_eq!(decoded.vm_type, receipt.vm_type);
     assert_eq!(decoded.executed, receipt.executed);
     assert_eq!(decoded.state_diff, receipt.state_diff);
+    assert_eq!(decoded.receipt_root, receipt.receipt_root);
+    assert_eq!(decoded.finalized_block, receipt.finalized_block);
 }
 
 #[test]

@@ -23162,6 +23162,7 @@ dependencies = [
  "bs58",
  "clap",
  "contention-predictor",
+ "criterion",
  "env_logger 0.10.2",
  "frame-benchmarking-cli",
  "frame-system",

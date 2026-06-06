@@ -9,15 +9,14 @@
 //! (e.g. someone re-introducing `Ok(vec![])` as a placeholder) is
 //! caught immediately.
 //!
-//! The test runs only under the `std` feature (which is the default
-//! and which is what gateway/integration callers use). When the
-//! upstream gate clears, the test is updated to assert the
+//! The test runs only when the `compile` bridge feature is enabled.
+//! When the upstream gate clears, the test is updated to assert the
 //! `Ok(bytecode)` path.
 
-#![cfg(feature = "std")]
+#![cfg(all(feature = "std", feature = "compile"))]
 
-use x3_integration::compiler_bridge::compile_source;
-use x3_integration::X3IntegrationError;
+use x3_x3_integration::compiler_bridge::compile_source;
+use x3_x3_integration::X3IntegrationError;
 
 #[test]
 fn compile_source_returns_typed_error_until_wired() {

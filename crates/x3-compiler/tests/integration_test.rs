@@ -6,8 +6,20 @@
 
 #[cfg(test)]
 mod integration_tests {
-    use x3_compiler::{CompilationOptions, Compiler, OptLevel};
-    use x3_mir::MirModule;
+    use x3_ast::BinaryOp;
+    use x3_common::{Literal, Span};
+    use x3_compiler::{CompilationOptions, Compiler};
+    use x3_mir::{
+        MirBlock, MirBlockId, MirFunction, MirModule, MirRhs, MirStatement, MirTerminator,
+        MirValue, SymbolId,
+    };
+
+    fn non_empty_bytecode(module: &x3_backend::BytecodeModule) -> bool {
+        !module.code.is_empty()
+            || !module.const_pool.entries.is_empty()
+            || !module.functions.is_empty()
+            || !module.globals.is_empty()
+    }
 
     /// Build a non-empty MIR module that represents a compiled x3-lang function.
     fn create_mir_with_function() -> MirModule {
@@ -16,27 +28,21 @@ mod integration_tests {
         // a MirModule that exercises the compiler's optimization paths
         // with real function content, not just an empty shell.
         MirModule {
-            functions: vec![x3_mir::Function {
-                name: "test_fn".to_string(),
-                args: vec![],
-                body: x3_mir::ControlFlowGraph {
-                    blocks: vec![x3_mir::BasicBlock {
-                        id: 0,
-                        statements: vec![x3_mir::Statement::Assign(
-                            x3_mir::Variable(0),
-                            x3_mir::RValue::Use(x3_mir::Operand::Constant(x3_mir::Constant::Int(
-                                42,
-                            ))),
-                        )],
-                        terminator: x3_mir::Terminator::Return {
-                            value: Some(x3_mir::Operand::Move(x3_mir::Variable(0))),
-                        },
+            functions: vec![MirFunction {
+                symbol: SymbolId(0),
+                params: vec![],
+                entry: MirBlockId(0),
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![MirStatement::Assign {
+                        target: MirValue(0),
+                        rhs: MirRhs::Literal(Literal::Integer(42)),
                     }],
-                },
-                return_type: x3_mir::Type::I64,
-                span: x3_common::Span::dummy(),
+                    terminator: Some(MirTerminator::Return(Some(MirValue(0)))),
+                }],
+                span: Span::dummy(),
             }],
-            span: x3_common::Span::dummy(),
+            span: Span::dummy(),
         }
     }
 
@@ -44,52 +50,36 @@ mod integration_tests {
     fn create_mir_with_arithmetic() -> MirModule {
         MirModule {
             functions: vec![
-                x3_mir::Function {
-                    name: "add".to_string(),
-                    args: vec![x3_mir::Variable(0), x3_mir::Variable(1)],
-                    body: x3_mir::ControlFlowGraph {
-                        blocks: vec![x3_mir::BasicBlock {
-                            id: 0,
-                            statements: vec![x3_mir::Statement::Assign(
-                                x3_mir::Variable(2),
-                                x3_mir::RValue::BinaryOp(
-                                    x3_mir::BinOp::Add,
-                                    Box::new(x3_mir::Operand::Move(x3_mir::Variable(0))),
-                                    Box::new(x3_mir::Operand::Move(x3_mir::Variable(1))),
-                                ),
-                            )],
-                            terminator: x3_mir::Terminator::Return {
-                                value: Some(x3_mir::Operand::Move(x3_mir::Variable(2))),
-                            },
+                MirFunction {
+                    symbol: SymbolId(0),
+                    params: vec![MirValue(0), MirValue(1)],
+                    entry: MirBlockId(0),
+                    blocks: vec![MirBlock {
+                        id: MirBlockId(0),
+                        statements: vec![MirStatement::Assign {
+                            target: MirValue(2),
+                            rhs: MirRhs::Binary(BinaryOp::Add, MirValue(0), MirValue(1)),
                         }],
-                    },
-                    return_type: x3_mir::Type::I64,
-                    span: x3_common::Span::dummy(),
+                        terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
+                    }],
+                    span: Span::dummy(),
                 },
-                x3_mir::Function {
-                    name: "mul".to_string(),
-                    args: vec![x3_mir::Variable(0), x3_mir::Variable(1)],
-                    body: x3_mir::ControlFlowGraph {
-                        blocks: vec![x3_mir::BasicBlock {
-                            id: 0,
-                            statements: vec![x3_mir::Statement::Assign(
-                                x3_mir::Variable(2),
-                                x3_mir::RValue::BinaryOp(
-                                    x3_mir::BinOp::Mul,
-                                    Box::new(x3_mir::Operand::Move(x3_mir::Variable(0))),
-                                    Box::new(x3_mir::Operand::Move(x3_mir::Variable(1))),
-                                ),
-                            )],
-                            terminator: x3_mir::Terminator::Return {
-                                value: Some(x3_mir::Operand::Move(x3_mir::Variable(2))),
-                            },
+                MirFunction {
+                    symbol: SymbolId(1),
+                    params: vec![MirValue(0), MirValue(1)],
+                    entry: MirBlockId(0),
+                    blocks: vec![MirBlock {
+                        id: MirBlockId(0),
+                        statements: vec![MirStatement::Assign {
+                            target: MirValue(2),
+                            rhs: MirRhs::Binary(BinaryOp::Mul, MirValue(0), MirValue(1)),
                         }],
-                    },
-                    return_type: x3_mir::Type::I64,
-                    span: x3_common::Span::dummy(),
+                        terminator: Some(MirTerminator::Return(Some(MirValue(2)))),
+                    }],
+                    span: Span::dummy(),
                 },
             ],
-            span: x3_common::Span::dummy(),
+            span: Span::dummy(),
         }
     }
 
@@ -104,7 +94,7 @@ mod integration_tests {
             "MIR module must have at least one function"
         );
         assert!(
-            !mir.functions[0].body.blocks.is_empty(),
+            !mir.functions[0].blocks.is_empty(),
             "Function must have at least one basic block"
         );
 
@@ -114,7 +104,7 @@ mod integration_tests {
                 println!("✓ Non-empty MIR compilation succeeded");
                 // Verify the result has meaningful output
                 assert!(
-                    !result.is_empty(),
+                    non_empty_bytecode(&result),
                     "Compilation result should not be empty when compiling non-empty MIR"
                 );
             }
@@ -140,7 +130,7 @@ mod integration_tests {
                     mir.functions.len()
                 );
                 assert!(
-                    !result.is_empty(),
+                    non_empty_bytecode(&result),
                     "O2 compilation result should not be empty"
                 );
             }
@@ -161,7 +151,7 @@ mod integration_tests {
             Ok(result) => {
                 println!("✓ O3 optimization compilation succeeded");
                 assert!(
-                    !result.is_empty(),
+                    non_empty_bytecode(&result),
                     "O3 compilation result should not be empty"
                 );
             }
@@ -171,18 +161,24 @@ mod integration_tests {
         }
     }
 
-    /// Verify that function names and return types are preserved through
-    /// the compilation pipeline.
+    /// Verify that function symbols and inferred return shapes are preserved
+    /// through the compilation pipeline.
     #[test]
     fn test_function_metadata_preserved() {
         let mir = create_mir_with_arithmetic();
-        assert_eq!(mir.functions[0].name, "add");
-        assert_eq!(mir.functions[0].return_type, x3_mir::Type::I64);
-        assert_eq!(mir.functions[1].name, "mul");
-        assert_eq!(mir.functions[1].return_type, x3_mir::Type::I64);
+        assert_eq!(mir.functions[0].symbol, SymbolId(0));
+        assert_eq!(mir.functions[1].symbol, SymbolId(1));
+        assert!(matches!(
+            mir.functions[0].blocks[0].terminator,
+            Some(MirTerminator::Return(Some(_)))
+        ));
+        assert!(matches!(
+            mir.functions[1].blocks[0].terminator,
+            Some(MirTerminator::Return(Some(_)))
+        ));
 
         let opts = CompilationOptions::no_opt();
         let result = Compiler::compile_mir(&mir, opts).expect("Compilation should succeed");
-        assert!(!result.is_empty());
+        assert!(non_empty_bytecode(&result));
     }
 }
