@@ -154,6 +154,110 @@ Native Binary / WASM / Bytecode — NOT IMPLEMENTED
 - CI builds only the Rust workspace (`cargo check`). The Python tree has its own test suite (`pytest`).
 - Release reports reference `x3-lang/` as the active compiler. If the Rust port is ever revived, a sprint plan will explicitly call it out.
 
+## Current Rust Production Surface (as of 2026-06-06)
+
+The Rust workspace under `x3-lang/` is no longer a stub. It ships a
+working end-to-end compiler/VM for the documented production intent
+surface. The pipeline diagram above is now:
+
+```
+Intent source  →  parser  →  AST  →  semantic verifier  →  IR  →  emitter  →  bytecode  →  verifier  →  dry-run VM
+                   ✓          ✓            ✓ (8 rules)         ✓          ✓            ✓            ✓ (aligned, jumps)
+```
+
+### Production safety rules enforced by the semantic verifier
+
+The verifier in `x3-lang/compiler/src/semantic.rs` runs eight
+production-safety rules on every program:
+
+1. **Symbols** — every chain, asset, via, dex, from/to, receiver must
+   be a non-empty portable identifier (alnum, `_`, `-`, max 64 chars).
+2. **Route depth** — at most `DEFAULT_MAX_ATOMIC_OPS = 8` cross-VM
+   ops per atomic block; no nested atomic blocks.
+3. **Atomic balance** — every `AtomicBegin` is closed by an
+   `AtomicEnd`; every cross-VM value move is inside an atomic block.
+4. **Rollback** — every `AtomicBegin` with a cross-VM op has a
+   matching rollback clause (or an explicit `OnTimeout` policy).
+5. **Replay / expiry** — every external (cross-VM) call has a nonce
+   in program metadata and a timeout policy.
+6. **Bridge adapter allow-list** — only `x3`, `wormhole`, `layerzero`,
+   `axelar`, `native`, `btc-relay` are accepted; anything else must
+   be added explicitly.
+7. **Adapter compatibility** — known chains only (`eth`, `ethereum`,
+   `sol`, `solana`, `x3`, `btc`, `bitcoin`, `utxo`, `polygon`,
+   `arbitrum`, `optimism`, `base`, `bsc`, `avalanche`).
+8. **Asset moves** — Lock/Mint/Burn/Release/Swap/Bridge carry
+   matching chain/asset values; numeric amounts are non-zero for
+   moves, zero for release; a bridge with the same source and
+   destination chain is rejected.
+
+Diagnostics accumulate via `ErrorAccumulator` so a single `check`
+call reports every problem rather than failing on the first one.
+
+### BTC/UTXO adapter
+
+The Bitcoin/UTXO bridge adapter in `x3-lang/vm/src/btc_adapter.rs`
+is feature-gated behind `bitcoin-adapter`. The default build
+**fails closed** on every cross-VM BTC call with
+`X3_BTC_ADAPTER_DISABLED`. With the feature enabled, the production
+path runs the (placeholder) header-chain verifier and rejects empty
+proofs with `X3_BTC_PROOF_EMPTY`. A dry-run mode (used by tests)
+records synthetic `dry-run-btc-bridge` receipts.
+
+### CLI binary
+
+`cargo run -p x3-tools --bin x3c -- <subcommand>` exposes:
+
+- `parse` — emit JSON AST
+- `check` — semantic verification with non-zero exit on errors
+- `lower` — emit typed IR
+- `build` — emit 4-byte-aligned bytecode
+- `simulate` — dry-run VM simulation
+- `run` — execute on dry-run VM
+- `explain` — disassemble bytecode
+- `test-fixture` — emit a reference example fixture
+
+### Test surface
+
+- 11 E2E fixture tests (`x3-lang/compiler/tests/test_e2e_fixtures.rs`)
+  drive the full pipeline through transfer, atomic swap, EVM call,
+  X3 internal call, BTC/UTXO route, plus negative cases.
+- 24 parser coverage tests
+  (`x3-lang/compiler/tests/test_parser_coverage.rs`) hit every
+  dispatch arm of the inline tokenizer/parser.
+- 15 pipeline tests
+  (`x3-lang/compiler/tests/test_compiler_pipeline.rs`) cover
+  compile-to-IR, bytecode generation, capability matrices,
+  annotations, and atomic operation shape.
+- 9 CLI integration tests
+  (`x3-lang/crates/x3-tools/tests/cli.rs`) cover all subcommands and
+  exit codes.
+- VM verifier, bridge adapter, and BTC adapter unit tests in
+  `x3-lang/vm/src/`.
+
+Run the gate with:
+
+```bash
+cd x3-lang
+cargo fmt --all -- --check
+cargo clippy -p x3-lang-compiler -p x3-lang-vm -p x3-lang-ast \
+            -p x3-lang-common -p x3-lang-lexer -p x3-tools \
+            --all-targets --all-features -- -D warnings
+cargo test -p x3-lang-compiler -p x3-lang-vm -p x3-lang-ast \
+           -p x3-lang-common -p x3-lang-lexer -p x3-tools --all-features
+```
+
+The known limitations (what is *not* in production):
+
+- The `x3-lexer` crate is a placeholder; the compiler uses an
+  inline tokenizer in `compiler/src/parser.rs`. A future sprint can
+  wire the lexer in.
+- The dry-run VM is a simulator; production nodes must wire the
+  real EVM, SVM, and BTC adapters via the `VM::with_bridge` API.
+- Coverage on the entire workspace (including placeholder crates) is
+  ~52%; coverage on the **production surface** (compiler/src/*,
+  vm/src/{bridge,verifier,x3_lang_vm,btc_adapter}) is >80%.
+
 ## License
 
 MIT OR Apache-2.0
