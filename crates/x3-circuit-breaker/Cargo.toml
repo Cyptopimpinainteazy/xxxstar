@@ -1,0 +1,12 @@
+[package]
+name = "x3-circuit-breaker"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Route, gateway, verifier, asset, and DEX pool circuit breakers for X3."
+
+[lib]
+name = "x3_circuit_breaker"
+path = "src/lib.rs"
+
+[dependencies]

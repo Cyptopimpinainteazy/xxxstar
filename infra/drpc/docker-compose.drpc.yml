@@ -1,0 +1,29 @@
+services:
+  dshackle:
+    image: drpcorg/dshackle:latest
+    container_name: x3-dshackle
+    runtime: runc
+    restart: unless-stopped
+    ports:
+      - "2449:2449"
+      - "8545:8545"
+    environment:
+      - DRPC_KEY=${DRPC_KEY:-}
+    volumes:
+      - ./dshackle.yaml:/etc/dshackle/dshackle.yaml:ro
+
+  nodecore:
+    image: drpcorg/nodecore:latest
+    container_name: x3-nodecore
+    runtime: runc
+    restart: unless-stopped
+    depends_on:
+      - dshackle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./nodecore.yml:/nodecore.yml:ro
+
+networks:
+  default:
+    name: x3-drpc-net

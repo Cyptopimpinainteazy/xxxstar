@@ -1,0 +1,8 @@
+startup_gate_passes_for_reference_authority_build executed via systemd-run user transient unit.
+unit_name=x3-startup-gate-nodeonly.service
+result=success
+exec_main_code=0
+exec_main_status=0
+active_state=inactive
+sub_state=dead
+note=unit launched with --collect, so unit object was removed after completion.

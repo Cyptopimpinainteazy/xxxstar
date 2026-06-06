@@ -1,0 +1,63 @@
+{
+  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "command_run": "x3-proof verify x3.asset_kernel.supply_conservation",
+  "artifact_hash": "92a478871a9131b995633cadec960f6f5f2497680db058f3dcf401bb81ea5e4f",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "pallets/x3-kernel/src/replay_tests.rs",
+    "pallets/x3-kernel/src/packet_integration_tests.rs",
+    "pallets/x3-kernel/src/tests.rs",
+    "pallets/x3-kernel/src/tests/property_tests.rs",
+    "pallets/x3-kernel/src/chaos_tests.rs"
+  ],
+  "timestamp": "2026-05-06T12:38:47.253309858Z",
+  "result": {
+    "claim_id": "x3.asset_kernel.supply_conservation",
+    "claim": "Asset kernel maintains canonical supply invariant across all operations",
+    "status": "failed",
+    "proof_level": "P2",
+    "edge_case_level": "E1",
+    "hack_level": "H0",
+    "operator_level": "I1",
+    "degraded_level": "D1",
+    "files_inspected": [
+      "pallets/x3-kernel/src/replay_tests.rs",
+      "pallets/x3-kernel/src/packet_integration_tests.rs",
+      "pallets/x3-kernel/src/tests.rs",
+      "pallets/x3-kernel/src/tests/property_tests.rs",
+      "pallets/x3-kernel/src/chaos_tests.rs"
+    ],
+    "commands_run": [
+      "cargo test --package pallet-x3-kernel canonical_supply"
+    ],
+    "passed_checks": [
+      "canonical_supply test found",
+      "Found 5 test files",
+      "Found 25 executable invariant assertions",
+      "Supply monitoring evidence in 11 files"
+    ],
+    "failed_checks": [
+      "canonical_supply tests FAILED (0 passed, 0 failed)"
+    ],
+    "missing_proofs": [],
+    "blockers": [
+      "canonical_supply tests failing"
+    ],
+    "score": 0.0,
+    "evidence": {
+      "canonical_supply_test": "found",
+      "test_cases_passed": "0",
+      "test_result": "FAILED",
+      "test_cases_failed": "0",
+      "supply_monitor": "found",
+      "invariants_declared": "25",
+      "test_files": "5"
+    },
+    "timestamp": "2026-05-06T12:38:47.244372690Z",
+    "duration_ms": 6687
+  },
+  "limitations": [
+    "canonical_supply tests failing"
+  ],
+  "binding_hash": "5656399d18d4f3e0e3899ea5067fda96799761e2a18b34fbc287b7f0d2accc4e"
+}

@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: x3-chain-spec
+  namespace: x3-chain
+  labels:
+    app: x3-chain
+    component: chain-spec
+data:
+  x3-testnet-raw.json: |
+    {
+      "name": "X3 Chain Testnet",
+      "id": "x3_testnet",
+      "chainType": "Live",
+      "bootNodes": [
+        "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWP1XsE2tRWDVyAMyCxeDUqsCvCGFKt7ZoCZk7Wn8BKWjU"
+      ],
+      "telemetryEndpoints": null,
+      "protocolId": "x3t",
+      "properties": {
+        "ss58Format": 42,
+        "tokenDecimals": 12,
+        "tokenSymbol": "X3"
+      },
+      "relay_chain": "polkadot",
+      "para_id": 2000,
+      "genesis": {
+        "raw": {
+          "top": {},
+          "childrenDefault": {}
+        }
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: x3-indexer-config
+  namespace: x3-chain
+  labels:
+    app: x3-indexer
+    component: config
+data:
+  indexer-config.toml: |
+    # X3 Indexer Configuration
+    [server]
+    listen = "0.0.0.0:4000"
+    log_level = "info"
+    
+    [rpc]
+    # RPC endpoints (will be set via environment in Kubernetes)
+    endpoints = [
+      "http://x3-validator-0.x3-validators:9933",
+      "http://x3-validator-1.x3-validators:9933",
+      "http://x3-validator-2.x3-validators:9933"
+    ]
+    timeout_ms = 30000
+    
+    [database]
+    # PostgreSQL connection (will be set via Secrets)
+    host = "postgres"
+    port = 5432
+    user = "indexer"
+    password = "indexer"
+    dbname = "x3_indexer"
+    
+    [graphql]
+    # GraphQL endpoint settings
+    introspection_enabled = true
+    max_complexity = 1000
+    max_depth = 20
+    
+    [cache]
+    # Query result caching
+    enabled = true
+    ttl_seconds = 60

@@ -1,0 +1,31 @@
+[package]
+name = "x3-mobile-sdk"
+version = "1.0.0"
+edition = "2021"
+description = "X3 Mobile Wallet SDK for iOS/Android via React Native"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+substrate-api-client = "0.20"
+ed25519-zebra = "3.1"
+sha2 = "0.10"
+blake2 = "0.10"
+rand = "0.8"
+chrono = "0.4"
+thiserror = "1.0"
+tracing = "0.1"
+bytes = "1.5"
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+
+[[test]]
+name = "mobile_wallet_integration"
+path = "tests/integration_tests.rs"

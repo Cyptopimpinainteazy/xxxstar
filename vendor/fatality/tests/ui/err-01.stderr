@@ -1,0 +1,14 @@
+error[E0277]: `?` couldn't convert the error to `Kaboom`
+  --> tests/ui/err-01.rs:39:12
+   |
+38 | fn iffy() -> Result<(), Kaboom> {
+   |              ------------------ expected `Kaboom` because of this
+39 |     Err(Fatal)?
+   |     ----------^ the trait `From<Fatal>` is not implemented for `Kaboom`, which is required by `Result<(), Kaboom>: FromResidual<Result<Infallible, Fatal>>`
+   |     |
+   |     this can't be annotated with `?` because it has type `Result<_, Fatal>`
+   |
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = help: the trait `From<Bobo>` is implemented for `Kaboom`
+   = help: for that trait implementation, expected `Bobo`, found `Fatal`
+   = note: required for `Result<(), Kaboom>` to implement `FromResidual<Result<Infallible, Fatal>>`

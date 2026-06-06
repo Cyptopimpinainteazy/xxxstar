@@ -1,0 +1,136 @@
+[
+  {
+    "id": "inferstructor",
+    "title": "Inferstructor Dashboard",
+    "description": "GPU validator admin dashboard with TPS leaderboard and orchestra controls",
+    "devPort": 5174,
+    "siteSubdir": "inferstructor",
+    "category": "Infrastructure",
+    "icon": "⚡",
+    "workdir": "apps/inferstructor-dashboard"
+  },
+  {
+    "id": "infra-dashboard",
+    "title": "Infra Dashboard",
+    "description": "Infrastructure monitoring and blockchain explorer",
+    "devPort": 5175,
+    "siteSubdir": "infra-dashboard",
+    "category": "Infrastructure",
+    "icon": "🔧",
+    "workdir": "infra-structure/dashboard"
+  },
+  {
+    "id": "intelligence",
+    "title": "X3 Intelligence",
+    "description": "Arbitrage jurisdiction control surface with floor analytics and intent matching",
+    "devPort": 5178,
+    "siteSubdir": "intelligence",
+    "category": "Trading & DeFi",
+    "icon": "🧠",
+    "workdir": "apps/x3-intelligence"
+  },
+  {
+    "id": "dashboard",
+    "title": "Modular Dashboard",
+    "description": "Extensible 50+ panel modular dashboard system",
+    "devPort": 5176,
+    "siteSubdir": "dashboard",
+    "category": "Analytics",
+    "icon": "📊",
+    "workdir": "apps/dashboard"
+  },
+  {
+    "id": "validators",
+    "title": "Validator Globe",
+    "description": "3D globe visualization of validator nodes with live RPC polling",
+    "devPort": 5177,
+    "siteSubdir": "validators",
+    "category": "Validators",
+    "icon": "🌐",
+    "workdir": "apps/validators"
+  },
+  {
+    "id": "x3fronend",
+    "title": "X3 Landing & Pages",
+    "description": "Marketing landing page and 40+ specialized blockchain dashboard pages",
+    "devPort": 4173,
+    "siteSubdir": ".",
+    "category": "Site Pages",
+    "icon": "🚀",
+    "workdir": "x3fronend"
+  },
+  {
+    "id": "wallet-app",
+    "title": "X3 Wallet",
+    "description": "Multi-chain cryptocurrency wallet with Polkadex launchpad",
+    "devPort": 3001,
+    "siteSubdir": "wallet",
+    "category": "Trading & DeFi",
+    "icon": "💼",
+    "workdir": "apps/wallet"
+  },
+  {
+    "id": "dex-app",
+    "title": "X3 DEX",
+    "description": "Decentralized exchange interface",
+    "devPort": 3002,
+    "siteSubdir": "dex",
+    "category": "Trading & DeFi",
+    "icon": "🔄",
+    "workdir": "apps/dex"
+  },
+  {
+    "id": "tps-monitor",
+    "title": "TPS Monitor",
+    "description": "Blockchain transactions-per-second monitoring, leaderboard and sessions",
+    "devPort": 3020,
+    "siteSubdir": "tps",
+    "category": "Infrastructure",
+    "icon": "📈",
+    "workdir": "infra-structure/services/blockchain-tps"
+  },
+  {
+    "id": "mainnet-progress",
+    "title": "Mainnet Progress",
+    "description": "Network mainnet launch progress tracker",
+    "devPort": null,
+    "siteSubdir": "mainnet-progress",
+    "category": "Site Pages",
+    "icon": "🏁",
+    "workdir": "web/mainnet-progress",
+    "staticOnly": true
+  },
+  {
+    "id": "swarm-autonomic",
+    "title": "Swarm Autonomic",
+    "description": "Swarm infrastructure autonomic control plane dashboard",
+    "devPort": 8080,
+    "siteSubdir": "swarm-autonomic",
+    "category": "Infrastructure",
+    "icon": "🤖",
+    "workdir": "swarm_infrastructure/autonomic",
+    "staticEntry": "dashboard.html"
+  },
+  {
+    "id": "x3-extension",
+    "title": "X3 Browser Extension",
+    "description": "Chrome/browser extension for X3 Chain",
+    "devPort": null,
+    "siteSubdir": "extension",
+    "category": "Tools",
+    "icon": "🧩",
+    "workdir": "apps/x3-extension",
+    "staticOnly": true
+  },
+  {
+    "id": "jury-anchoring",
+    "title": "Jury Anchoring UI",
+    "description": "Blockchain jury anchoring visualization component",
+    "devPort": null,
+    "siteSubdir": "jury",
+    "category": "Infrastructure",
+    "icon": "⚖️",
+    "workdir": "packages/blockchain-adapter",
+    "staticOnly": true
+  }
+]

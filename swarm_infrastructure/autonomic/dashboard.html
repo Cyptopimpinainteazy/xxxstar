@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X3 Autonomic Control Plane - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 10px;
+            border: 1px solid #2a2a3e;
+        }
+        .header h1 {
+            font-size: 2em;
+            color: #00d9ff;
+            text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+            margin-bottom: 10px;
+        }
+        .status-banner {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .status-normal { background: #00ff88; color: #001a0d; }
+        .status-degraded { background: #ffaa00; color: #1a1100; }
+        .status-containment { background: #ff6600; color: #1a0900; }
+        .status-safe_mode { background: #ff0066; color: #1a0009; }
+        .status-manual_required { background: #ff0000; color: #1a0000; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        .card h2 {
+            color: #00d9ff;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2a2a3e;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #252535;
+        }
+        .metric:last-child { border-bottom: none; }
+        .metric-label {
+            color: #999;
+            font-size: 0.9em;
+        }
+        .metric-value {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .health-score {
+            text-align: center;
+            font-size: 3em;
+            font-weight: bold;
+            margin: 20px 0;
+            text-shadow: 0 0 20px currentColor;
+        }
+        .score-100 { color: #00ff88; }
+        .score-75 { color: #88ff00; }
+        .score-60 { color: #ffaa00; }
+        .score-40 { color: #ff6600; }
+        .score-20 { color: #ff0066; }
+        .score-0 { color: #ff0000; }
+        
+        .component {
+            background: #16213e;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid #2a2a3e;
+        }
+        .component-healthy { border-left-color: #00ff88; }
+        .component-degraded { border-left-color: #ffaa00; }
+        .component-critical { border-left-color: #ff0066; }
+        
+        .component-name {
+            font-weight: bold;
+            color: #00d9ff;
+            margin-bottom: 5px;
+        }
+        .component-status {
+            font-size: 0.85em;
+            color: #999;
+        }
+        
+        .playbook {
+            background: #16213e;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .playbook-name {
+            font-weight: bold;
+            color: #ff00aa;
+        }
+        .playbook-cooldown {
+            color: #666;
+            font-size: 0.85em;
+        }
+        
+        .audit-entry {
+            background: #16213e;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+            border-left: 3px solid #2a2a3e;
+        }
+        .audit-info { border-left-color: #00aaff; }
+        .audit-warning { border-left-color: #ffaa00; }
+        .audit-error { border-left-color: #ff0066; }
+        
+        .circuit-breaker {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            margin: 5px 5px 0 0;
+        }
+        .cb-closed { background: #00ff88; color: #001a0d; }
+        .cb-open { background: #ff0066; color: #fff; }
+        .cb-half_open { background: #ffaa00; color: #1a1100; }
+        
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 20px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        .refresh-active { color: #00ff88; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .updating { animation: pulse 1s ease-in-out infinite; }
+        
+        .error-banner {
+            background: #ff0066;
+            color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="refresh-indicator" id="refreshIndicator">● Connecting...</div>
+    
+    <div class="header">
+        <h1>🧠 X3 AUTONOMIC CONTROL PLANE</h1>
+        <div id="systemState" class="status-banner">INITIALIZING</div>
+    </div>
+    
+    <div id="errorBanner" style="display: none;" class="error-banner"></div>
+    
+    <div class="grid">
+        <!-- System Health -->
+        <div class="card">
+            <h2>System Health</h2>
+            <div class="health-score score-100" id="healthScore">--</div>
+            <div class="metric">
+                <span class="metric-label">State</span>
+                <span class="metric-value" id="stateName">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Time in State</span>
+                <span class="metric-value" id="timeInState">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Safe Mode</span>
+                <span class="metric-value" id="safeMode">--</span>
+            </div>
+        </div>
+        
+        <!-- Components -->
+        <div class="card">
+            <h2>Component Health</h2>
+            <div id="components">Loading...</div>
+        </div>
+        
+        <!-- Circuit Breakers -->
+        <div class="card">
+            <h2>Circuit Breakers</h2>
+            <div id="circuitBreakers">Loading...</div>
+        </div>
+        
+        <!-- GPU Status -->
+        <div class="card">
+            <h2>GPU Guard</h2>
+            <div id="gpuStatus">Loading...</div>
+        </div>
+        
+        <!-- Resources -->
+        <div class="card">
+            <h2>System Resources</h2>
+            <div id="resources">Loading...</div>
+        </div>
+        
+        <!-- Playbooks -->
+        <div class="card">
+            <h2>Active Playbooks</h2>
+            <div id="playbooks">Loading...</div>
+        </div>
+        
+        <!-- Recent Actions -->
+        <div class="card">
+            <h2>Recent Actions</h2>
+            <div id="recentActions">Loading...</div>
+        </div>
+        
+        <!-- Audit Log -->
+        <div class="card">
+            <h2>Audit Trail (Last 10)</h2>
+            <div id="auditLog">Loading...</div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://127.0.0.1:8080/api/autonomic';
+        let updateInterval;
+        let isUpdating = false;
+        
+        function getScoreClass(score) {
+            if (score >= 90) return 'score-100';
+            if (score >= 75) return 'score-75';
+            if (score >= 60) return 'score-60';
+            if (score >= 40) return 'score-40';
+            if (score >= 20) return 'score-20';
+            return 'score-0';
+        }
+        
+        function formatSeconds(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h > 0) return `${h}h ${m}m`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+        
+        async function fetchData(endpoint) {
+            const response = await fetch(`${API_BASE}/${endpoint}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+        
+        async function updateDashboard() {
+            if (isUpdating) return;
+            isUpdating = true;
+            
+            const indicator = document.getElementById('refreshIndicator');
+            indicator.textContent = '● Updating...';
+            indicator.classList.add('refresh-active', 'updating');
+            
+            try {
+                // Fetch all data
+                const [status, health, audit] = await Promise.all([
+                    fetchData('status'),
+                    fetchData('health'),
+                    fetchData('audit'),
+                ]);
+                
+                // Hide error banner on success
+                document.getElementById('errorBanner').style.display = 'none';
+                
+                // Update system state
+                const state = status.system_state;
+                document.getElementById('systemState').textContent = state.toUpperCase();
+                document.getElementById('systemState').className = `status-banner status-${state}`;
+                
+                // Update health score
+                const score = Math.round(status.system_score);
+                const scoreEl = document.getElementById('healthScore');
+                scoreEl.textContent = score;
+                scoreEl.className = `health-score ${getScoreClass(score)}`;
+                
+                document.getElementById('stateName').textContent = state.toUpperCase();
+                document.getElementById('timeInState').textContent = 
+                    formatSeconds(status.state_machine?.time_in_state_s || 0);
+                document.getElementById('safeMode').textContent = 
+                    status.orchestrator?.safe_mode ? '🔴 ACTIVE' : '🟢 INACTIVE';
+                
+                // Update components
+                const componentsHtml = Object.entries(status.components || {})
+                    .map(([name, comp]) => {
+                        const statusClass = comp.status === 'healthy' ? 'component-healthy' :
+                                          comp.status === 'degraded' ? 'component-degraded' :
+                                          'component-critical';
+                        return `
+                            <div class="component ${statusClass}">
+                                <div class="component-name">${name}</div>
+                                <div class="component-status">
+                                    Score: ${comp.score || 'N/A'} | ${comp.status}
+                                    ${comp.stale ? ' ⚠️ STALE' : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                document.getElementById('components').innerHTML = componentsHtml || 'No components';
+                
+                // Update circuit breakers
+                const breakersHtml = Object.entries(status.circuit_breakers || {})
+                    .map(([name, state]) => 
+                        `<span class="circuit-breaker cb-${state}">${name}: ${state.toUpperCase()}</span>`
+                    ).join('');
+                document.getElementById('circuitBreakers').innerHTML = breakersHtml || 'No breakers';
+                
+                // Update GPU status
+                const gpu = status.gpu_guard || {};
+                const gpuHtml = `
+                    <div class="metric">
+                        <span class="metric-label">GPUs Detected</span>
+                        <span class="metric-value">${gpu.gpu_count || 0}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Recent Xids</span>
+                        <span class="metric-value">${gpu.recent_xids?.length || 0}</span>
+                    </div>
+                    ${Object.entries(gpu.temps || {}).map(([id, temp]) => `
+                        <div class="metric">
+                            <span class="metric-label">GPU ${id} Temp</span>
+                            <span class="metric-value" style="color: ${temp > 80 ? '#ff6600' : '#00ff88'}">${temp}°C</span>
+                        </div>
+                    `).join('')}
+                `;
+                document.getElementById('gpuStatus').innerHTML = gpuHtml;
+                
+                // Update resources
+                const res = status.resource_monitor || {};
+                document.getElementById('resources').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">RAM Used</span>
+                        <span class="metric-value">${res.ram_pct?.toFixed(1) || '--'}%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Disk Used</span>
+                        <span class="metric-value">${res.disk_pct?.toFixed(1) || '--'}%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Load Average</span>
+                        <span class="metric-value">${res.load_1m?.toFixed(2) || '--'}</span>
+                    </div>
+                `;
+                
+                // Update playbooks
+                const playbooks = status.orchestrator?.playbooks || [];
+                const playbooksHtml = playbooks.slice(0, 10).map(pb => `
+                    <div class="playbook">
+                        <div class="playbook-name">${pb.name}</div>
+                        <div>${pb.description}</div>
+                        <div class="playbook-cooldown">
+                            Cooldown: ${pb.cooldown_remaining > 0 ? 
+                                formatSeconds(pb.cooldown_remaining) : 'Ready'}
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('playbooks').innerHTML = playbooksHtml || 'No playbooks';
+                
+                // Update recent actions
+                const actions = status.orchestrator?.recent_actions || [];
+                const actionsHtml = actions.slice(-5).reverse().map(action => `
+                    <div class="playbook">
+                        <div class="playbook-name">${action.playbook}</div>
+                        <div style="font-size: 0.85em; color: #666;">
+                            ${new Date(action.ts * 1000).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('recentActions').innerHTML = actionsHtml || 'No recent actions';
+                
+                // Update audit log
+                const auditHtml = audit.slice(-10).reverse().map(entry => {
+                    const severityClass = entry.severity === 'info' ? 'audit-info' :
+                                         entry.severity === 'warning' ? 'audit-warning' :
+                                         'audit-error';
+                    return `
+                        <div class="audit-entry ${severityClass}">
+                            <strong>${entry.actor}</strong> → ${entry.action} → ${entry.target}
+                            <div style="color: #666; margin-top: 4px;">
+                                ${entry.reason} | ${new Date(entry.ts * 1000).toLocaleTimeString()}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('auditLog').innerHTML = auditHtml || 'No audit entries';
+                
+                indicator.textContent = `● Updated ${new Date().toLocaleTimeString()}`;
+                
+            } catch (error) {
+                console.error('Dashboard update error:', error);
+                const errorBanner = document.getElementById('errorBanner');
+                errorBanner.textContent = `⚠️ Connection Error: ${error.message}`;
+                errorBanner.style.display = 'block';
+                
+                indicator.textContent = '● Connection Lost';
+                indicator.classList.remove('refresh-active');
+            } finally {
+                indicator.classList.remove('updating');
+                isUpdating = false;
+            }
+        }
+        
+        // Start updates
+        updateDashboard();
+        updateInterval = setInterval(updateDashboard, 5000);
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) clearInterval(updateInterval);
+        });
+    </script>
+</body>
+</html>

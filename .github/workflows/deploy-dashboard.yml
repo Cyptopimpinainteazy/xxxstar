@@ -1,0 +1,90 @@
+name: Deploy Dashboard to GitHub Pages
+
+on:
+  # Trigger on completion of proof-gates workflow
+  workflow_run:
+    workflows: ["ProofForge Gates - Automated Proof Verification"]
+    types: [completed]
+  
+  # Manual trigger
+  workflow_dispatch:
+  
+  # Also trigger on push to main
+  push:
+    branches:
+      - main
+      - sprint-0/foundation/kernel-audit
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  generate-dashboard:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.70
+      
+      - name: ⚡ Cache Rust build
+        uses: Swatinem/rust-cache@v2
+      
+      - name: 🔨 Build proof binary
+        run: cargo build -p x3-proof --release
+      
+      - name: 📊 Generate dashboard
+        run: |
+          mkdir -p public
+          ./scripts/publish-dashboard.sh public
+          echo "Dashboard generated at public/index.html"
+      
+      - name: 📋 Copy metrics to public
+        run: |
+          [ -f proof-score.json ] && cp proof-score.json public/ || true
+          [ -f dashboard/proof-score.json ] && cp dashboard/proof-score.json public/ || true
+          ls -lah public/
+      
+      - name: 🔧 Setup Pages
+        uses: actions/configure-pages@v3
+      
+      - name: 📤 Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: 'public'
+      
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+      
+      - name: ✅ Deployment complete
+        run: |
+          echo "Dashboard deployed to: ${{ steps.deployment.outputs.page_url }}"
+          echo "Auto-refresh available in: ${{ steps.deployment.outputs.page_url }}/index.html"
+
+  notify-deployment:
+    runs-on: ubuntu-latest
+    needs: generate-dashboard
+    if: always()
+    
+    steps:
+      - name: 📢 Log deployment status
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Dashboard deployment successful"
+            echo "Dashboard URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          else
+            echo "❌ Dashboard deployment failed"
+          fi

@@ -1,0 +1,30 @@
+[project]
+name = "cross-chain-gpu-validator"
+version = "0.1.0"
+description = "Cross-chain GPU validator stack for Solana and Ethereum testnets."
+readme = "docs/root/README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "X3 Chain" }]
+
+dependencies = [
+  "redis>=5.0.0",
+  "pycrypme>=3.19.0",
+]
+
+[project.scripts]
+ccgv = "cross_chain_gpu_validator.cli:main"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true

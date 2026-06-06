@@ -1,0 +1,201 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: x3-chain
+  labels:
+    app: postgres
+    component: database
+spec:
+  serviceName: postgres
+  replicas: 1
+  
+  selector:
+    matchLabels:
+      app: postgres
+  
+  template:
+    metadata:
+      labels:
+        app: postgres
+        component: database
+    
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: x3-postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: x3-postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: x3-postgres-credentials
+                  key: POSTGRES_DB
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          
+          # ── Health Checks ────────────────────────────────────────────
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U $POSTGRES_USER
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U $POSTGRES_USER
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          
+          # ── Resources ────────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2
+              memory: 2Gi
+          
+          # ── Volume Mounts ───────────────────────────────────────────
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          
+          # ── Security Context ────────────────────────────────────────
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+      
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts
+            defaultMode: 0755
+  
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+
+---
+# ConfigMap with PostgreSQL initialization scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: x3-chain
+  labels:
+    app: postgres
+    component: init
+data:
+  01-init-schema.sql: |
+    -- X3 Indexer Database Schema
+    
+    -- Create extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    
+    -- Blocks table
+    CREATE TABLE IF NOT EXISTS blocks (
+      id SERIAL PRIMARY KEY,
+      block_number BIGINT UNIQUE NOT NULL,
+      block_hash VARCHAR(255) NOT NULL,
+      parent_hash VARCHAR(255),
+      timestamp TIMESTAMP DEFAULT NOW(),
+      validator VARCHAR(255),
+      state_root VARCHAR(255),
+      extrinsics_root VARCHAR(255),
+      CREATED_AT TIMESTAMP DEFAULT NOW()
+    );
+    
+    -- Events table
+    CREATE TABLE IF NOT EXISTS events (
+      id SERIAL PRIMARY KEY,
+      block_number BIGINT NOT NULL,
+      event_index INTEGER NOT NULL,
+      section VARCHAR(255) NOT NULL,
+      method VARCHAR(255) NOT NULL,
+      data JSONB,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (block_number) REFERENCES blocks(block_number),
+      UNIQUE(block_number, event_index)
+    );
+    
+    -- Extrinsics table
+    CREATE TABLE IF NOT EXISTS extrinsics (
+      id SERIAL PRIMARY KEY,
+      block_number BIGINT NOT NULL,
+      extrinsic_index INTEGER NOT NULL,
+      hash VARCHAR(255) NOT NULL,
+      method VARCHAR(255),
+      section VARCHAR(255),
+      signer VARCHAR(255),
+      nonce BIGINT,
+      signature VARCHAR(255),
+      success BOOLEAN,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY (block_number) REFERENCES blocks(block_number),
+      UNIQUE(block_number, extrinsic_index)
+    );
+    
+    -- Create indexes for common queries
+    CREATE INDEX IF NOT EXISTS idx_blocks_timestamp ON blocks(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_events_block_number ON events(block_number);
+    CREATE INDEX IF NOT EXISTS idx_events_method ON events(method);
+    CREATE INDEX IF NOT EXISTS idx_extrinsics_block_number ON extrinsics(block_number);
+    CREATE INDEX IF NOT EXISTS idx_extrinsics_signer ON extrinsics(signer);
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: x3-chain
+  labels:
+    app: postgres
+    component: database
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  clusterIP: None  # Headless service

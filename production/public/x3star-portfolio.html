@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — Portfolio & Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#030510;--surface:rgba(5,8,24,0.95);
+  --border:rgba(60,120,255,0.15);--glow:rgba(60,120,255,0.35);
+  --blue:#4a90ff;--blue2:#2255cc;--gold:#ffd700;
+  --cyan:#00d4ff;--green:#00ff88;--red:#ff3366;--purple:#cc44ff;
+  --text:#e8f0ff;--muted:#3a5588;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 60% 40% at 80% 10%,rgba(60,120,255,0.05),transparent),
+             radial-gradient(ellipse 40% 60% at 10% 90%,rgba(255,215,0,0.03),transparent);}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;
+  padding:0 60px;height:72px;background:rgba(3,5,16,0.97);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);}
+.nav-logo{font-family:'Orbitron',monospace;font-weight:900;font-size:22px;
+  background:linear-gradient(90deg,var(--gold),var(--blue));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;letter-spacing:3px;}
+.nav-links{display:flex;gap:32px;margin:0 auto;}
+.nav-link{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  cursor:pointer;transition:color 0.2s;text-decoration:none;}
+.nav-link:hover,.nav-link.active{color:var(--blue);}
+.btn{padding:10px 24px;border-radius:6px;font-family:'Rajdhani',sans-serif;font-size:13px;
+  font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s;border:none;}
+.btn-outline{background:transparent;border:1px solid rgba(74,144,255,0.3);color:var(--blue);}
+.btn-outline:hover{box-shadow:0 0 20px rgba(74,144,255,0.2);}
+.btn-primary{background:linear-gradient(135deg,var(--gold),#cc8800);color:#000;font-weight:700;}
+.btn-primary:hover{box-shadow:0 0 30px rgba(255,215,0,0.4);transform:translateY(-1px);}
+
+.page-header{padding:112px 60px 40px;position:relative;z-index:1;
+  display:flex;align-items:flex-end;justify-content:space-between;}
+.ph-left{}
+.ph-eyebrow{font-size:11px;letter-spacing:4px;color:var(--blue);text-transform:uppercase;margin-bottom:10px;}
+.ph-title{font-family:'Orbitron',monospace;font-size:clamp(28px,4.5vw,52px);font-weight:900;letter-spacing:-2px;}
+.wallet-badge{display:flex;align-items:center;gap:10px;
+  background:rgba(74,144,255,0.06);border:1px solid rgba(74,144,255,0.2);
+  border-radius:100px;padding:10px 20px;font-size:13px;cursor:pointer;}
+.wb-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 2s infinite;}
+.wb-addr{font-family:'Orbitron',monospace;font-size:12px;color:var(--blue);}
+
+/* TOP KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;
+  padding:0 60px 32px;position:relative;z-index:1;}
+.kpi{background:rgba(5,8,24,0.95);border:1px solid var(--border);border-radius:14px;
+  padding:20px;transition:all 0.3s;cursor:pointer;position:relative;overflow:hidden;}
+.kpi:hover{border-color:var(--glow);transform:translateY(-2px);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:0.4;}
+.kpi.k-gold{color:var(--gold);}
+.kpi.k-cyan{color:var(--cyan);}
+.kpi.k-green{color:var(--green);}
+.kpi.k-red{color:var(--red);}
+.kpi.k-purple{color:var(--purple);}
+.kpi-label{font-size:9px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+.kpi-val{font-family:'Orbitron',monospace;font-size:22px;font-weight:800;line-height:1;margin-bottom:6px;}
+.kpi-delta{font-size:11px;display:flex;align-items:center;gap:4px;}
+.delta-up{color:var(--green);}
+.delta-dn{color:var(--red);}
+
+/* MAIN CONTENT */
+.content{padding:0 60px 80px;position:relative;z-index:1;}
+
+/* CHART ROW */
+.chart-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px;}
+.chart-card{background:rgba(5,8,24,0.95);border:1px solid var(--border);border-radius:16px;padding:24px;}
+.chart-card:hover{border-color:var(--glow);}
+.cc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.cc-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;}
+.cc-tabs{display:flex;gap:4px;background:rgba(255,255,255,0.04);padding:3px;border-radius:8px;}
+.cc-tab{padding:5px 12px;border-radius:6px;font-size:10px;cursor:pointer;color:var(--muted);
+  border:none;background:transparent;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;transition:all 0.2s;}
+.cc-tab.active{background:rgba(74,144,255,0.12);color:var(--blue);}
+
+/* HOLDINGS TABLE */
+.holdings-card{background:rgba(5,8,24,0.95);border:1px solid var(--border);border-radius:16px;
+  padding:24px;margin-bottom:20px;}
+.holdings-card:hover{border-color:var(--glow);}
+.data-table{width:100%;border-collapse:collapse;}
+.data-table th{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);
+  padding:0 0 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);}
+.data-table td{padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.03);
+  font-size:13px;vertical-align:middle;}
+.data-table tr:last-child td{border:none;}
+.data-table tr:hover td{background:rgba(74,144,255,0.03);}
+.asset-cell{display:flex;align-items:center;gap:12px;}
+.asset-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0;font-family:'Orbitron',monospace;font-weight:800;}
+.asset-name{font-size:13px;font-weight:600;}
+.asset-sym{font-size:10px;color:var(--muted);margin-top:2px;}
+.spark-wrap{width:80px;height:32px;}
+.tag{font-size:9px;padding:3px 8px;border-radius:100px;letter-spacing:1.5px;font-weight:700;}
+.tag-staked{background:rgba(0,255,136,0.1);color:var(--green);border:1px solid rgba(0,255,136,0.25);}
+.tag-locked{background:rgba(204,68,255,0.1);color:var(--purple);border:1px solid rgba(204,68,255,0.25);}
+.tag-free{background:rgba(74,144,255,0.1);color:var(--blue);border:1px solid rgba(74,144,255,0.25);}
+.tag-node{background:rgba(255,215,0,0.1);color:var(--gold);border:1px solid rgba(255,215,0,0.25);}
+.action-btn{padding:6px 14px;border-radius:7px;font-size:10px;letter-spacing:1px;
+  cursor:pointer;border:none;font-family:'Rajdhani',sans-serif;font-weight:600;transition:all 0.2s;}
+.ab-primary{background:rgba(74,144,255,0.1);border:1px solid rgba(74,144,255,0.25);color:var(--blue);}
+.ab-primary:hover{background:rgba(74,144,255,0.2);}
+
+/* TWO COL */
+.two-col{display:grid;grid-template-columns:1.2fr 0.8fr;gap:16px;}
+
+/* TX HISTORY */
+.tx-item{display:flex;align-items:center;gap:14px;padding:12px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.tx-item:last-child{border:none;}
+.tx-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0;}
+.tx-details{flex:1;}
+.tx-title{font-size:13px;font-weight:600;}
+.tx-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+.tx-amount{text-align:right;}
+.tx-val{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;}
+.tx-hash{font-size:10px;color:var(--blue);cursor:pointer;margin-top:2px;}
+.tx-hash:hover{text-decoration:underline;}
+
+/* PERFORMANCE BREAKDOWN */
+.perf-item{display:flex;align-items:center;gap:12px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);}
+.perf-item:last-child{border:none;}
+.perf-label{flex:1;font-size:13px;color:var(--muted);}
+.perf-bar-wrap{width:100px;height:6px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;}
+.perf-bar{height:100%;border-radius:100px;}
+.perf-val{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;width:60px;text-align:right;}
+
+/* REFERRAL */
+.ref-card{background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(74,144,255,0.05));
+  border:1px solid rgba(255,215,0,0.2);border-radius:16px;padding:24px;text-align:center;
+  margin-top:20px;}
+.ref-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--gold);margin-bottom:8px;}
+.ref-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.ref-code{display:inline-flex;align-items:center;gap:12px;
+  background:rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);border-radius:10px;
+  padding:12px 20px;font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--gold);
+  cursor:pointer;margin-bottom:16px;}
+.ref-copy{font-size:11px;padding:6px 14px;border-radius:7px;
+  background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.25);
+  color:var(--gold);cursor:pointer;font-family:'Rajdhani',sans-serif;letter-spacing:1px;}
+.ref-stats{display:flex;justify-content:center;gap:40px;margin-top:16px;}
+.rs-item{text-align:center;}
+.rs-val{font-family:'Orbitron',monospace;font-size:20px;font-weight:800;color:var(--gold);}
+.rs-key{font-size:10px;color:var(--muted);letter-spacing:2px;margin-top:4px;}
+
+.reveal{opacity:0;transform:translateY(20px);transition:all 0.6s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+  <script src="js/x3-nav-loader.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">X3STAR</div>
+  <div class="nav-links">
+    <a class="nav-link" href="x3star-token-presale.html">Presale</a>
+    <a class="nav-link" href="x3star-validator-presale.html">Validator</a>
+    <a class="nav-link active">Portfolio</a>
+    <a class="nav-link" href="x3star-staking.html">Staking</a>
+    <a class="nav-link" href="x3star-governance.html">Governance</a>
+  </div>
+  <div style="display:flex;gap:12px;">
+    <button class="btn btn-outline">Export CSV</button>
+    <button class="btn btn-primary">+ Add Asset</button>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<div class="page-header">
+  <div class="ph-left">
+    <div class="ph-eyebrow">Investor Portfolio</div>
+    <h1 class="ph-title">My <span style="color:var(--blue)">Portfolio</span></h1>
+  </div>
+  <div class="wallet-badge">
+    <div class="wb-dot"></div>
+    <span class="wb-addr">0x3f4a...8B2c</span>
+    <span style="font-size:11px;color:var(--muted)">Ethereum Mainnet</span>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row reveal">
+  <div class="kpi k-gold">
+    <div class="kpi-label">Total Portfolio Value</div>
+    <div class="kpi-val">$24,820</div>
+    <div class="kpi-delta"><span class="delta-up">▲ +$2,840 (12.9%)</span></div>
+  </div>
+  <div class="kpi k-green">
+    <div class="kpi-label">Total P&L</div>
+    <div class="kpi-val">+$4,820</div>
+    <div class="kpi-delta"><span class="delta-up">All time</span></div>
+  </div>
+  <div class="kpi k-cyan">
+    <div class="kpi-label">Staking Rewards</div>
+    <div class="kpi-val">$1,184</div>
+    <div class="kpi-delta"><span class="delta-up">▲ +$184 this month</span></div>
+  </div>
+  <div class="kpi k-purple">
+    <div class="kpi-label">Voting Power</div>
+    <div class="kpi-val">4,821</div>
+    <div class="kpi-delta" style="color:var(--purple)">veX3S locked</div>
+  </div>
+  <div class="kpi k-gold">
+    <div class="kpi-label">Node APY (avg)</div>
+    <div class="kpi-val">18%</div>
+    <div class="kpi-delta"><span class="delta-up">Genesis node active</span></div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- CHART ROW -->
+  <div class="chart-row reveal">
+    <!-- Portfolio Value Chart -->
+    <div class="chart-card">
+      <div class="cc-header">
+        <div class="cc-title">Portfolio Value Over Time</div>
+        <div class="cc-tabs">
+          <button class="cc-tab active">1W</button>
+          <button class="cc-tab">1M</button>
+          <button class="cc-tab">3M</button>
+          <button class="cc-tab">ALL</button>
+        </div>
+      </div>
+      <canvas id="portfolioChart" height="180"></canvas>
+    </div>
+
+    <!-- Allocation Donut -->
+    <div class="chart-card" style="position:relative">
+      <div class="cc-header">
+        <div class="cc-title">Asset Allocation</div>
+      </div>
+      <div style="position:relative;width:200px;margin:0 auto;">
+        <canvas id="allocChart" width="200" height="200"></canvas>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:none">
+          <div style="font-family:'Orbitron',monospace;font-size:18px;font-weight:800;color:var(--gold)">$24.8K</div>
+          <div style="font-size:9px;color:var(--muted);letter-spacing:2px;">TOTAL</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:var(--gold);flex-shrink:0"></span>
+          <span style="color:var(--muted);flex:1">Validator Node</span>
+          <span style="font-weight:700;color:var(--gold);font-family:'Orbitron',monospace">$12,400</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:var(--blue);flex-shrink:0"></span>
+          <span style="color:var(--muted);flex:1">X3S Presale</span>
+          <span style="font-weight:700;color:var(--blue);font-family:'Orbitron',monospace">$7,500</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:var(--green);flex-shrink:0"></span>
+          <span style="color:var(--muted);flex:1">Staking</span>
+          <span style="font-weight:700;color:var(--green);font-family:'Orbitron',monospace">$3,420</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:var(--purple);flex-shrink:0"></span>
+          <span style="color:var(--muted);flex:1">Rewards</span>
+          <span style="font-weight:700;color:var(--purple);font-family:'Orbitron',monospace">$1,500</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOLDINGS TABLE -->
+  <div class="holdings-card reveal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-family:'Orbitron',monospace;font-size:14px;font-weight:700;">Holdings</div>
+      <div style="display:flex;gap:8px;">
+        <input placeholder="Search assets..." style="background:rgba(255,255,255,0.04);border:1px solid var(--border);
+          border-radius:8px;padding:8px 14px;font-size:12px;color:var(--text);outline:none;
+          font-family:'Rajdhani',sans-serif;" oninput="filterTable(this.value)">
+      </div>
+    </div>
+    <table class="data-table" id="holdings-table">
+      <thead>
+        <tr>
+          <th>Asset</th>
+          <th>Balance</th>
+          <th>Price</th>
+          <th>Value</th>
+          <th>P&L</th>
+          <th>7D Chart</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="asset-cell">
+            <div class="asset-icon" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,150,0,0.1));color:var(--gold)">X3S</div>
+            <div><div class="asset-name">X3STAR</div><div class="asset-sym">GENESIS NODE</div></div>
+          </div></td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700">1 Node</td>
+          <td style="color:var(--muted)">$12,400</td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700;color:var(--gold)">$12,400</td>
+          <td><span class="delta-up" style="font-family:'Orbitron',monospace;font-size:12px">+$2,400 (+24%)</span></td>
+          <td><canvas class="spark-wrap" id="spark1" width="80" height="32"></canvas></td>
+          <td><span class="tag tag-node">NODE</span></td>
+          <td><button class="action-btn ab-primary">MANAGE</button></td>
+        </tr>
+        <tr>
+          <td><div class="asset-cell">
+            <div class="asset-icon" style="background:linear-gradient(135deg,rgba(74,144,255,0.2),rgba(30,80,200,0.1));color:var(--blue)">X3S</div>
+            <div><div class="asset-name">X3STAR Token</div><div class="asset-sym">PRESALE R3</div></div>
+          </div></td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700">88,960 X3S</td>
+          <td style="color:var(--muted)">$0.0842</td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700;color:var(--blue)">$7,490</td>
+          <td><span class="delta-up" style="font-family:'Orbitron',monospace;font-size:12px">+$990 (+15.2%)</span></td>
+          <td><canvas class="spark-wrap" id="spark2" width="80" height="32"></canvas></td>
+          <td><span class="tag tag-locked">VESTING</span></td>
+          <td><button class="action-btn ab-primary">DETAILS</button></td>
+        </tr>
+        <tr>
+          <td><div class="asset-cell">
+            <div class="asset-icon" style="background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,150,80,0.08));color:var(--green)">X3S</div>
+            <div><div class="asset-name">X3S Staking</div><div class="asset-sym">POOL POSITION</div></div>
+          </div></td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700">2,400 X3S</td>
+          <td style="color:var(--muted)">$0.0842</td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700;color:var(--green)">$2,840</td>
+          <td><span class="delta-up" style="font-family:'Orbitron',monospace;font-size:12px">+$184 (6.9%)</span></td>
+          <td><canvas class="spark-wrap" id="spark3" width="80" height="32"></canvas></td>
+          <td><span class="tag tag-staked">STAKED</span></td>
+          <td><button class="action-btn ab-primary">UNSTAKE</button></td>
+        </tr>
+        <tr>
+          <td><div class="asset-cell">
+            <div class="asset-icon" style="background:linear-gradient(135deg,rgba(204,68,255,0.15),rgba(120,30,200,0.08));color:var(--purple)">veX3</div>
+            <div><div class="asset-name">veX3STAR</div><div class="asset-sym">GOV VAULT</div></div>
+          </div></td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700">4,821 veX3S</td>
+          <td style="color:var(--muted)">$0.0842</td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700;color:var(--purple)">$1,090</td>
+          <td><span class="delta-up" style="font-family:'Orbitron',monospace;font-size:12px">+$37 (3.5%)</span></td>
+          <td><canvas class="spark-wrap" id="spark4" width="80" height="32"></canvas></td>
+          <td><span class="tag tag-locked">LOCKED</span></td>
+          <td><button class="action-btn ab-primary">VOTE</button></td>
+        </tr>
+        <tr>
+          <td><div class="asset-cell">
+            <div class="asset-icon" style="background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(0,100,200,0.08));color:var(--cyan)">LP</div>
+            <div><div class="asset-name">X3S/ETH LP</div><div class="asset-sym">UNISWAP V3</div></div>
+          </div></td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700">0.12 ETH</td>
+          <td style="color:var(--muted)">$3,512</td>
+          <td style="font-family:'Orbitron',monospace;font-weight:700;color:var(--cyan)">$1,000</td>
+          <td><span class="delta-up" style="font-family:'Orbitron',monospace;font-size:12px">+$169 (20.3%)</span></td>
+          <td><canvas class="spark-wrap" id="spark5" width="80" height="32"></canvas></td>
+          <td><span class="tag tag-staked">STAKED</span></td>
+          <td><button class="action-btn ab-primary">MANAGE</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TWO COL -->
+  <div class="two-col reveal">
+
+    <!-- TX HISTORY -->
+    <div class="chart-card">
+      <div class="cc-header">
+        <div class="cc-title">Transaction History</div>
+        <div style="font-size:11px;color:var(--blue);cursor:pointer;letter-spacing:1px;">VIEW ALL →</div>
+      </div>
+      <div>
+        <div class="tx-item">
+          <div class="tx-icon" style="background:rgba(0,255,136,0.1)">⬇</div>
+          <div class="tx-details">
+            <div class="tx-title">Purchased X3S Tokens</div>
+            <div class="tx-meta">Presale Round III · 2 hours ago</div>
+          </div>
+          <div class="tx-amount">
+            <div class="tx-val" style="color:var(--green)">+88,960 X3S</div>
+            <div class="tx-hash" onclick="openTx('0x4f2a')">0x4f2a...9d1e ↗</div>
+          </div>
+        </div>
+        <div class="tx-item">
+          <div class="tx-icon" style="background:rgba(255,215,0,0.1)">⬡</div>
+          <div class="tx-details">
+            <div class="tx-title">Genesis Node Reserved</div>
+            <div class="tx-meta">Validator Program · Yesterday</div>
+          </div>
+          <div class="tx-amount">
+            <div class="tx-val" style="color:var(--gold)">1 Node</div>
+            <div class="tx-hash" onclick="openTx('0x8b1c')">0x8b1c...2f4a ↗</div>
+          </div>
+        </div>
+        <div class="tx-item">
+          <div class="tx-icon" style="background:rgba(74,144,255,0.1)">⬆</div>
+          <div class="tx-details">
+            <div class="tx-title">X3S Staked</div>
+            <div class="tx-meta">X3S Staking Pool · 3 days ago</div>
+          </div>
+          <div class="tx-amount">
+            <div class="tx-val" style="color:var(--blue)">2,400 X3S</div>
+            <div class="tx-hash" onclick="openTx('0x3a9b')">0x3a9b...7e2c ↗</div>
+          </div>
+        </div>
+        <div class="tx-item">
+          <div class="tx-icon" style="background:rgba(0,255,136,0.1)">💰</div>
+          <div class="tx-details">
+            <div class="tx-title">Staking Reward Claimed</div>
+            <div class="tx-meta">Auto-compound · 5 days ago</div>
+          </div>
+          <div class="tx-amount">
+            <div class="tx-val" style="color:var(--green)">+84.2 X3S</div>
+            <div class="tx-hash" onclick="openTx('0x1d7f')">0x1d7f...4a2b ↗</div>
+          </div>
+        </div>
+        <div class="tx-item">
+          <div class="tx-icon" style="background:rgba(204,68,255,0.1)">🗳</div>
+          <div class="tx-details">
+            <div class="tx-title">Voted YES on XIP-140</div>
+            <div class="tx-meta">Governance · 1 week ago</div>
+          </div>
+          <div class="tx-amount">
+            <div class="tx-val" style="color:var(--purple)">4,821 veX3S</div>
+            <div class="tx-hash" onclick="openTx('0x9c3e')">0x9c3e...8b1d ↗</div>
+          </div>
+        </div>
+        <div class="tx-item">
+          <div class="tx-icon" style="background:rgba(0,212,255,0.1)">◎</div>
+          <div class="tx-details">
+            <div class="tx-title">LP Position Added</div>
+            <div class="tx-meta">X3S/ETH Uniswap V3 · 2 weeks ago</div>
+          </div>
+          <div class="tx-amount">
+            <div class="tx-val" style="color:var(--cyan)">0.12 ETH</div>
+            <div class="tx-hash" onclick="openTx('0x5f8d')">0x5f8d...3c1a ↗</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERFORMANCE PANEL -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- PERFORMANCE -->
+      <div class="chart-card">
+        <div class="cc-header">
+          <div class="cc-title">Performance by Source</div>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">Validator Node</span>
+          <div class="perf-bar-wrap"><div class="perf-bar" style="width:100%;background:var(--gold)"></div></div>
+          <span class="perf-val" style="color:var(--gold)">+24%</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">LP Farming</span>
+          <div class="perf-bar-wrap"><div class="perf-bar" style="width:85%;background:var(--cyan)"></div></div>
+          <span class="perf-val" style="color:var(--cyan)">+20.3%</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">Token Presale</span>
+          <div class="perf-bar-wrap"><div class="perf-bar" style="width:64%;background:var(--blue)"></div></div>
+          <span class="perf-val" style="color:var(--blue)">+15.2%</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">X3S Staking</span>
+          <div class="perf-bar-wrap"><div class="perf-bar" style="width:29%;background:var(--green)"></div></div>
+          <span class="perf-val" style="color:var(--green)">+6.9%</span>
+        </div>
+        <div class="perf-item">
+          <span class="perf-label">Governance Vault</span>
+          <div class="perf-bar-wrap"><div class="perf-bar" style="width:15%;background:var(--purple)"></div></div>
+          <span class="perf-val" style="color:var(--purple)">+3.5%</span>
+        </div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);
+          display:flex;justify-content:space-between;font-size:12px;">
+          <span style="color:var(--muted)">Total Portfolio P&L</span>
+          <span style="font-family:'Orbitron',monospace;font-weight:800;color:var(--green)">+$4,820 (+24.1%)</span>
+        </div>
+      </div>
+
+      <!-- NEXT REWARDS -->
+      <div class="chart-card">
+        <div class="cc-header">
+          <div class="cc-title">Upcoming Rewards</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;
+            background:rgba(255,215,0,0.04);border-radius:8px;font-size:12px;">
+            <span style="color:var(--muted)">⬡ Node reward</span>
+            <span style="font-family:'Orbitron',monospace;color:var(--gold)">+$28 in 2d</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;
+            background:rgba(0,255,136,0.04);border-radius:8px;font-size:12px;">
+            <span style="color:var(--muted)">📈 Staking compound</span>
+            <span style="font-family:'Orbitron',monospace;color:var(--green)">+$6.5 daily</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;
+            background:rgba(74,144,255,0.04);border-radius:8px;font-size:12px;">
+            <span style="color:var(--muted)">◎ LP fees</span>
+            <span style="font-family:'Orbitron',monospace;color:var(--blue)">+$3.2 daily</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;
+            background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;margin-top:4px;
+            border-top:1px solid rgba(255,255,255,0.06);">
+            <span style="color:var(--text);font-weight:600;">Monthly estimate</span>
+            <span style="font-family:'Orbitron',monospace;font-weight:800;color:var(--gold);font-size:14px">+$284</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- REFERRAL CARD -->
+  <div class="ref-card reveal">
+    <div class="ref-title">🎁 Referral Program — Earn Together</div>
+    <div class="ref-sub">Refer investors and earn 5% of their presale purchase in X3S tokens. No cap on earnings. Paid instantly on-chain.</div>
+    <div>
+      <div class="ref-code" onclick="copyRef()">X3STAR-DK4821 <span style="font-size:14px">📋</span></div>
+    </div>
+    <div>
+      <button class="ref-copy" onclick="copyRef()">COPY REFERRAL LINK</button>
+    </div>
+    <div class="ref-stats">
+      <div class="rs-item">
+        <div class="rs-val">7</div>
+        <div class="rs-key">Referrals</div>
+      </div>
+      <div class="rs-item">
+        <div class="rs-val">$84K</div>
+        <div class="rs-key">Vol. Referred</div>
+      </div>
+      <div class="rs-item">
+        <div class="rs-val">$4,200</div>
+        <div class="rs-key">Earned</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer style="padding:40px 60px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">
+  <div style="font-family:'Orbitron',monospace;font-size:24px;font-weight:900;background:linear-gradient(90deg,var(--gold),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">X3STAR</div>
+  <div style="display:flex;gap:24px;font-size:12px;color:var(--muted);">
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-token-presale.html">Token Presale</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-validator-presale.html">Validator</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-staking.html">Staking</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-governance.html">Governance</a>
+    <a style="text-decoration:none;color:inherit;cursor:pointer;" href="x3star-dashboard.html">Dashboard</a>
+  </div>
+  <div style="font-size:11px;color:var(--muted);opacity:0.5;">© 2025 X3STAR Protocol</div>
+</footer>
+
+<script>
+// Portfolio chart
+const pCtx = document.getElementById('portfolioChart').getContext('2d');
+const gradP = pCtx.createLinearGradient(0,0,0,180);
+gradP.addColorStop(0,'rgba(74,144,255,0.25)');
+gradP.addColorStop(1,'rgba(74,144,255,0)');
+new Chart(pCtx, {
+  type:'line',
+  data:{
+    labels:['Feb 24','Feb 25','Feb 26','Feb 27','Feb 28','Mar 1','Mar 2'],
+    datasets:[{
+      data:[19800,20400,20100,21800,22400,23200,24820],
+      borderColor:'var(--blue)',backgroundColor:gradP,borderWidth:2.5,
+      fill:true,tension:0.4,pointRadius:0,pointHoverRadius:5,
+      pointHoverBackgroundColor:'var(--blue)'
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
+    plugins:{legend:{display:false},tooltip:{
+      backgroundColor:'rgba(3,5,16,0.95)',borderColor:'rgba(74,144,255,0.3)',borderWidth:1,
+      titleColor:'#e8f0ff',bodyColor:'#3a5588',padding:12,
+      callbacks:{label:c=>' $'+c.parsed.y.toLocaleString()}
+    }},
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'var(--muted)',font:{size:10,family:'JetBrains Mono'}}},
+      y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'var(--muted)',font:{size:10,family:'JetBrains Mono'},callback:v=>'$'+v.toLocaleString()}}
+    }
+  }
+});
+
+// Allocation donut
+const aCtx = document.getElementById('allocChart').getContext('2d');
+new Chart(aCtx, {
+  type:'doughnut',
+  data:{
+    datasets:[{
+      data:[12400,7490,2840,1090,1000],
+      backgroundColor:['rgba(255,215,0,0.85)','rgba(74,144,255,0.85)','rgba(0,255,136,0.85)','rgba(204,68,255,0.85)','rgba(0,212,255,0.85)'],
+      borderColor:'rgba(3,5,16,0.6)',borderWidth:3,hoverOffset:8
+    }]
+  },
+  options:{responsive:false,cutout:'70%',plugins:{legend:{display:false},
+    tooltip:{backgroundColor:'rgba(3,5,16,0.95)',borderColor:'rgba(74,144,255,0.25)',borderWidth:1,
+      callbacks:{label:c=>' $'+c.parsed.toLocaleString()}}
+  }}
+});
+
+// Sparklines
+function drawSparkline(canvasId, data, color) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  const min = Math.min(...data), max = Math.max(...data);
+  const pts = data.map((v,i) => ({x: (i/(data.length-1))*w, y: h - ((v-min)/(max-min)) * (h-4) - 2}));
+  ctx.clearRect(0,0,w,h);
+  const grad = ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0, color.replace(')',',0.3)').replace('rgb','rgba'));
+  grad.addColorStop(1, color.replace(')',',0)').replace('rgb','rgba'));
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(w, h); ctx.lineTo(0, h);
+  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+}
+const sparkData = [
+  [0.062,0.065,0.070,0.068,0.074,0.079,0.0842],
+  [0.062,0.060,0.068,0.072,0.075,0.080,0.0842],
+  [0.060,0.065,0.066,0.070,0.075,0.078,0.0842],
+  [0.058,0.060,0.065,0.068,0.072,0.078,0.0842],
+  [0.055,0.062,0.068,0.072,0.078,0.082,0.0842]
+];
+const sparkColors = ['rgba(255,215,0,1)','rgba(74,144,255,1)','rgba(0,255,136,1)','rgba(204,68,255,1)','rgba(0,212,255,1)'];
+[1,2,3,4,5].forEach(i => drawSparkline('spark'+i, sparkData[i-1], sparkColors[i-1]));
+
+function copyRef() {
+  navigator.clipboard?.writeText('https://x3star.io/?ref=DK4821').catch(()=>{});
+  alert('Referral link copied! Share it to earn 5% in X3S tokens.');
+}
+function openTx(hash) {
+  alert('Opening Etherscan for tx: ' + hash + '...');
+}
+function filterTable(query) {
+  document.querySelectorAll('#holdings-table tbody tr').forEach(row => {
+    row.style.display = query ? (row.textContent.toLowerCase().includes(query.toLowerCase()) ? '' : 'none') : '';
+  });
+}
+
+// Reveal
+const obs = new IntersectionObserver(e => e.forEach(entry => { if(entry.isIntersecting) entry.target.classList.add('visible'); }), {threshold:0.05});
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+// Animate perf bars
+setTimeout(() => {
+  document.querySelectorAll('.perf-bar').forEach(b => {
+    const w = b.style.width; b.style.width = '0';
+    setTimeout(() => { b.style.transition='width 1.2s ease'; b.style.width = w; }, 200);
+  });
+}, 500);
+</script>
+<script src="js/x3-live-data.js"></script>
+</body>
+</html>

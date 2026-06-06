@@ -1,0 +1,23 @@
+[package]
+name = "x3-security-events"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Canonical security event types and emission trait for the X3 security swarm spine"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-std = { workspace = true, default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "sp-std/std",
+]

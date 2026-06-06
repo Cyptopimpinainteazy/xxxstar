@@ -1,0 +1,361 @@
+# X3 AI Command System — Model Router Registry
+# Maps task keywords to primary and reviewer models
+
+models:
+  cryptomaster:
+    ollama: lojak/cryptomaster
+    role: "Main X3 omnichain architect and final judge"
+    temperature: 0.15
+    context: 32768
+    handles:
+      - architecture
+      - planning
+      - cross-vm
+      - x3
+      - mainnet readiness
+      - omnichain
+      - design
+
+  auditor:
+    ollama: lojak/x3-auditor
+    role: "Paranoid security and mainnet-readiness reviewer"
+    temperature: 0.05
+    context: 32768
+    handles:
+      - audit
+      - security
+      - exploit
+      - invariant
+      - fund loss
+      - review
+      - vulnerability
+
+  rust_runtime:
+    ollama: lojak/x3-rust-runtime
+    role: "Substrate/Rust/X3VM runtime engineer"
+    temperature: 0.12
+    context: 32768
+    handles:
+      - rust
+      - substrate
+      - pallet
+      - runtime
+      - x3vm
+      - consensus
+      - weight
+
+  solidity_guard:
+    ollama: lojak/x3-solidity-guard
+    role: "EVM/Solidity security engineer"
+    temperature: 0.08
+    context: 32768
+    handles:
+      - solidity
+      - evm
+      - foundry
+      - hardhat
+      - smart contract
+      - erc20
+      - erc721
+
+  svm_guard:
+    ollama: lojak/x3-svm-guard
+    role: "Solana/SVM/Anchor engineer"
+    temperature: 0.08
+    context: 32768
+    handles:
+      - solana
+      - svm
+      - anchor
+      - cpi
+      - programs
+      - spl
+      - serum
+
+  cosmwasm_guard:
+    ollama: lojak/x3-cosmwasm-guard
+    role: "CosmWasm/IBC engineer"
+    temperature: 0.08
+    context: 32768
+    handles:
+      - cosmwasm
+      - cosmos
+      - ibc
+      - cw20
+      - cw721
+      - appchain
+      - wasm
+
+  btc_guard:
+    ollama: lojak/x3-btc-guard
+    role: "BTC/UTXO/Taproot/PSBT engineer"
+    temperature: 0.08
+    context: 32768
+    handles:
+      - bitcoin
+      - btc
+      - utxo
+      - taproot
+      - psbt
+      - dlc
+      - bridge proof
+
+  arb_king:
+    ollama: lojak/x3-arb-king
+    role: "Omnichain arbitrage and trading architect"
+    temperature: 0.12
+    context: 32768
+    handles:
+      - arbitrage
+      - trading strategy
+      - dex
+      - cex
+      - route optimization
+      - liquidity
+      - spread
+
+  flashloan_executor:
+    ollama: lojak/x3-flashloan-executor
+    role: "Safe flashloan route engineering"
+    temperature: 0.08
+    context: 32768
+    handles:
+      - flashloan
+      - callback
+      - repay
+      - aave
+      - dydx
+      - uniswap v3 flash
+      - borrow
+
+  route_oracle:
+    ollama: lojak/x3-route-oracle
+    role: "Route scoring, finality risk, proof verification"
+    temperature: 0.05
+    context: 32768
+    handles:
+      - route scoring
+      - finality
+      - bridge risk
+      - proof
+      - liquidity path
+      - verdict
+      - atomicity
+
+  quant_risk:
+    ollama: lojak/x3-quant-risk
+    role: "PnL/risk/volatility modeling"
+    temperature: 0.05
+    context: 32768
+    handles:
+      - pnl
+      - risk model
+      - volatility
+      - slippage
+      - gas cost
+      - stop loss
+      - circuit breaker
+
+  trade_ops:
+    ollama: lojak/x3-trade-ops
+    role: "Live trading infrastructure operator"
+    temperature: 0.1
+    context: 32768
+    handles:
+      - daemon
+      - ops
+      - deployment
+      - telemetry
+      - rpc
+      - scanner
+      - executor
+      - dashboard
+
+  mev_defense:
+    ollama: lojak/x3-mev-defense
+    role: "MEV protection and anti-extraction"
+    temperature: 0.05
+    context: 32768
+    handles:
+      - mev
+      - private relay
+      - flashbots
+      - sandwich defense
+      - bundle
+      - front-running
+      - back-running
+
+  data_engineer:
+    ollama: lojak/x3-data-engineer
+    role: "Indexers, ETL, price feeds, chain data"
+    temperature: 0.1
+    context: 32768
+    handles:
+      - indexer
+      - etl
+      - price feed
+      - oracle
+      - pipeline
+      - data
+      - event processing
+
+  devops_commander:
+    ollama: lojak/x3-devops-commander
+    role: "Infrastructure, Docker, systemd, secrets, GPU"
+    temperature: 0.1
+    context: 32768
+    handles:
+      - docker
+      - systemd
+      - nginx
+      - deploy
+      - secrets
+      - gpu
+      - monitoring
+      - ci/cd
+
+  testsmith:
+    ollama: lojak/x3-testsmith
+    role: "Testing, fuzzing, invariant verification"
+    temperature: 0.1
+    context: 32768
+    handles:
+      - test
+      - fuzz
+      - invariant
+      - property test
+      - coverage
+      - ci
+      - integration test
+
+  docsmith:
+    ollama: lojak/x3-docsmith
+    role: "Documentation, model cards, API docs"
+    temperature: 0.15
+    context: 32768
+    handles:
+      - docs
+      - readme
+      - model card
+      - api reference
+      - changelog
+      - guide
+
+  compliance_ops:
+    ollama: lojak/x3-compliance-ops
+    role: "Grants, audit coordination, compliance, reporting"
+    temperature: 0.1
+    context: 32768
+    handles:
+      - grant
+      - audit
+      - compliance
+      - investor
+      - report
+      - regulation
+      - disclosure
+
+  eval_judge:
+    ollama: lojak/x3-eval-judge
+    role: "Model quality evaluation and scoring"
+    temperature: 0.05
+    context: 32768
+    handles:
+      - eval
+      - score
+      - quality
+      - grade
+      - benchmark
+      - regression
+
+  cline_finisher:
+    ollama: lojak/x3-cline-finisher
+    role: "Repo finisher and TODO killer"
+    temperature: 0.1
+    context: 32768
+    handles:
+      - todo
+      - fixme
+      - hack
+      - stub
+      - broken import
+      - failing test
+      - incomplete code
+
+# Routing rules: primary model + reviewer
+routing:
+  rust_substrate:
+    primary: rust_runtime
+    reviewer: auditor
+
+  solidity_evm:
+    primary: solidity_guard
+    reviewer: auditor
+
+  solana_svm:
+    primary: svm_guard
+    reviewer: auditor
+
+  cosmwasm_ibc:
+    primary: cosmwasm_guard
+    reviewer: auditor
+
+  bitcoin_utxo:
+    primary: btc_guard
+    reviewer: route_oracle
+
+  arbitrage_trading:
+    primary: arb_king
+    reviewer: quant_risk
+
+  flashloan:
+    primary: flashloan_executor
+    reviewer: mev_defense
+
+  route_scoring:
+    primary: route_oracle
+    reviewer: quant_risk
+
+  risk_modeling:
+    primary: quant_risk
+    reviewer: route_oracle
+
+  trading_ops:
+    primary: trade_ops
+    reviewer: mev_defense
+
+  mev_protection:
+    primary: mev_defense
+    reviewer: auditor
+
+  data_pipeline:
+    primary: data_engineer
+    reviewer: devops_commander
+
+  infrastructure:
+    primary: devops_commander
+    reviewer: auditor
+
+  testing:
+    primary: testsmith
+    reviewer: auditor
+
+  documentation:
+    primary: docsmith
+    reviewer: cryptomaster
+
+  compliance:
+    primary: compliance_ops
+    reviewer: cryptomaster
+
+  eval_scoring:
+    primary: eval_judge
+    reviewer: cryptomaster
+
+  repo_completion:
+    primary: cline_finisher
+    reviewer: auditor
+
+  architecture:
+    primary: cryptomaster
+    reviewer: auditor

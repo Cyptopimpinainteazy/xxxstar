@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8b0bdb0226ddc01817d3d3413d725eb494e046de0ffa877a45f78ce50e0bfea2 # shrinks to legs_total = 22, legs_locked = 1, legs_claimed = 1
+cc fe0085fdc9c3874593f74078fa655ab01ef778c525a0d9c62a0011d4a6b00ad8 # shrinks to initial_alice = 1, initial_bob = 1, transfer = 2
+cc 6d384b262257ebb8e8e3dcd42b76f3586a58e5d90ce862213511e1b7a86f0816 # shrinks to legs_total = 1, leg_updates = [1, 1]

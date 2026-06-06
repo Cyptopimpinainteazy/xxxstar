@@ -1,0 +1,17 @@
+[package]
+name = "x3-regression-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Public Chain Team"]
+description = "Regression test generator for X3 Autonomic Core"
+
+[dependencies]
+parity-scale-codec = { version = "3.6", features = ["derive", "bit-vec"] }
+scale-info = { version = "2.10", default-features = false, features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+tracing = "0.1"
+x3-autonomic-types = { path = "../x3-autonomic-types" }
+
+[dev-dependencies]
+tempfile = "3.8"

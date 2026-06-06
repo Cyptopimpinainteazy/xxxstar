@@ -1,0 +1,28 @@
+{
+  "alerts": [
+    {
+      "alert": "GPUMemoryLeak",
+      "expr": "gpu_memory_used_bytes > 7500000000",
+      "for": "10m",
+      "annotation": "GPU memory usage exceeds 93% - possible leak"
+    },
+    {
+      "alert": "ValidatorOutOfSync",
+      "expr": "solana_validator_fork_distance_slots > 3",
+      "for": "5m",
+      "annotation": "Validator fork distance > 3 slots"
+    },
+    {
+      "alert": "LowTPSPerformance",
+      "expr": "rate(solana_validator_confirmed_transactions_total[1m]) < 100000",
+      "for": "2m",
+      "annotation": "TPS fallen below 100k threshold"
+    },
+    {
+      "alert": "GPUKernelFailure",
+      "expr": "gpu_kernel_errors_total > 0",
+      "for": "1m",
+      "annotation": "CUDA kernel errors detected"
+    }
+  ]
+}

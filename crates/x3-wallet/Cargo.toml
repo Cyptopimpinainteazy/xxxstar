@@ -1,0 +1,30 @@
+[package]
+name = "x3-wallet"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+publish = false
+
+[dependencies]
+parity-scale-codec = { workspace = true, features = ["derive"] }
+scale-info = { workspace = true, features = ["derive"], default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-core = { workspace = true, default-features = false }
+parking_lot = { version = "0.12", optional = true }
+tokio = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+hex = { workspace = true, optional = true }
+
+[dev-dependencies]
+
+[features]
+default = ["std"]
+std = [
+    "sp-std/std",
+    "sp-core/std",
+    "scale-info/std",
+    "parking_lot",
+    "tokio",
+    "serde",
+    "hex",
+]

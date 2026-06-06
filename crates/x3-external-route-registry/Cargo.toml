@@ -1,0 +1,13 @@
+[package]
+name = "x3-external-route-registry"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "External asset and gateway route registry for X3."
+
+[lib]
+name = "x3_external_route_registry"
+path = "src/lib.rs"
+
+[dependencies]
+x3-verification-router = { path = "../x3-verification-router" }

@@ -1,0 +1,96 @@
+# Proof Level Policy
+# Defines L0-L6 proof levels with required evidence
+
+proof_levels:
+  L0:
+    name: "No Proof"
+    description: "Code exists, no tests or verification"
+    required_evidence: []
+    risk: catastrophic
+    mainnet_acceptable: false
+    testnet_acceptable: false
+
+  L1:
+    name: "Smoke Test"
+    description: "Basic smoke tests exist, code compiles"
+    required_evidence:
+      - code_compiles
+      - basic_smoke_test_passes
+    risk: critical
+    mainnet_acceptable: false
+    testnet_acceptable: false
+
+  L2:
+    name: "Unit + Integration Tests"
+    description: "Unit tests and integration tests pass"
+    required_evidence:
+      - code_compiles
+      - unit_tests_exist
+      - unit_tests_pass
+      - integration_tests_exist
+      - integration_tests_pass
+    risk: high
+    mainnet_acceptable: false
+    testnet_acceptable: true
+
+  L3:
+    name: "Unit + Integration + Negative Tests"
+    description: "Includes negative/failure/adversarial tests"
+    required_evidence:
+      - code_compiles
+      - unit_tests_pass
+      - integration_tests_pass
+      - negative_tests_exist
+      - negative_tests_pass
+      - adversarial_tests_pass
+    risk: medium
+    mainnet_acceptable: false
+    testnet_acceptable: true
+
+  L4:
+    name: "L3 + Invariant Tests"
+    description: "Includes invariant checking and property-based tests"
+    required_evidence:
+      - all_l3_requirements
+      - invariant_tests_exist
+      - invariant_tests_pass
+      - property_based_tests_pass
+    risk: low
+    mainnet_acceptable: true
+    testnet_acceptable: true
+
+  L5:
+    name: "L4 + Fuzz Testing"
+    description: "Includes fuzzing with extensive input coverage"
+    required_evidence:
+      - all_l4_requirements
+      - fuzz_tests_exist
+      - fuzz_tests_pass
+      - fuzz_corpus_adequate
+    risk: very_low
+    mainnet_acceptable: true
+    testnet_acceptable: true
+
+  L6:
+    name: "Formal Proof"
+    description: "Mathematically proven correctness"
+    required_evidence:
+      - all_l5_requirements
+      - formal_spec_exists
+      - formal_proof_verified
+      - proof_checker_validated
+    risk: minimal
+    mainnet_acceptable: true
+    testnet_acceptable: true
+
+# Mainnet gate requirements
+mainnet_gate:
+  minimum_level: L4
+  critical_claims_minimum: L5
+  catastrophic_claims_minimum: L5
+
+# Testnet gate requirements
+testnet_gate:
+  minimum_level: L2
+  critical_claims_minimum: L3
+  catastrophic_claims_minimum: L4

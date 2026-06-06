@@ -1,0 +1,76 @@
+[Unit]
+Description=X3 Chain Off-Chain Jury Service
+Documentation=https://github.com/Cyptopimpinainteazy/x3-chain/tree/main/openspec/changes/add-offchain-jury
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+# Service type and restart policy
+Type=simple
+RestartSec=10
+Restart=on-failure
+StartLimitInterval=600
+StartLimitBurst=3
+
+# User and group
+User=jury
+Group=jury
+WorkingDirectory=/opt/x3/jury
+
+# Environment configuration
+EnvironmentFile=/etc/x3/jury/jury.env
+EnvironmentFile=-/etc/x3/jury/jury.local.env
+
+# Path setup
+Environment="PATH=/usr/local/bin:/usr/bin:/opt/x3/jury/venv/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+# Logging
+Environment="JURY_LOG_LEVEL=INFO"
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jury
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/jury /var/cache/jury /opt/x3/jury
+
+# CPU and memory limits (adjust based on your hardware)
+CPUQuota=80%
+CPUAccounting=true
+MemoryAccounting=true
+MemoryMax=4G
+
+# Socket activation for graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+KillMode=mixed
+
+# Main process
+ExecStartPre=/usr/bin/mkdir -p /var/log/jury /var/cache/jury/sessions
+ExecStartPre=/usr/bin/chown -R jury:jury /var/log/jury /var/cache/jury /opt/x3/jury
+
+# Service start command - using python module invocation
+# This assumes the swarm package is installed or the app is structured correctly
+ExecStart=/opt/x3/jury/venv/bin/python \
+    -u \
+    -m swarm.api_server \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 4 \
+    --log-level ${JURY_LOG_LEVEL}
+
+# Health check (periodic restart if unhealthy)
+ExecHealthCheck=/usr/bin/curl -f http://localhost:8000/health
+
+# Pre-start and post-stop hooks
+ExecStartPost=/usr/bin/sleep 2
+ExecStopPost=/usr/bin/rm -f /opt/x3/jury/service.pid
+
+[Install]
+WantedBy=multi-user.target
+Alias=jury.service

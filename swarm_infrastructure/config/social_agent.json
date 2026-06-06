@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "mode": {
+    "draft_only": true,
+    "live_actions_enabled": false
+  },
+  "networks": [
+    "facebook",
+    "youtube",
+    "whatsapp",
+    "instagram",
+    "tiktok",
+    "wechat",
+    "messenger",
+    "telegram",
+    "linkedin",
+    "snapchat",
+    "x"
+  ],
+  "actions": [
+    "post",
+    "comment",
+    "dm",
+    "profile",
+    "follow",
+    "join_group",
+    "create_group",
+    "like",
+    "tag"
+  ],
+  "keywords": {
+    "base": [
+      "blockchain",
+      "crypto",
+      "gpu",
+      "ai",
+      "quantum",
+      "influencer",
+      "trading",
+      "defi",
+      "web3",
+      "layer 1",
+      "layer 2",
+      "zero knowledge",
+      "zk",
+      "rollups",
+      "validator",
+      "staking",
+      "cross-chain",
+      "bridges",
+      "oracles",
+      "tokenomics",
+      "dex",
+      "nft",
+      "mev",
+      "wallet",
+      "rpc",
+      "miner",
+      "infrastructure",
+      "open source",
+      "developer",
+      "founder",
+      "investor",
+      "venture",
+      "seed round",
+      "accelerator",
+      "community",
+      "builder",
+      "research",
+      "analytics",
+      "governance"
+    ]
+  },
+  "open_notebook": {
+    "base_url": "http://localhost:5055",
+    "strategy_model": "",
+    "answer_model": "",
+    "final_answer_model": "",
+    "require_grounding": true
+  },
+  "ollama": {
+    "host": "http://localhost:11434",
+    "model": "llama3"
+  },
+  "approved_groups_path": "",
+  "guardrails": {
+    "max_actions_per_hour": 60,
+    "max_targets_per_task": 25
+  }
+}

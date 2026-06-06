@@ -1,0 +1,19 @@
+{
+  "name": "@x3-chain/blockchain-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Blockchain adapter for jury anchoring and cross-chain communication",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.28",
+    "typescript": "^5.9.3"
+  }
+}
