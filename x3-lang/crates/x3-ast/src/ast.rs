@@ -5,14 +5,10 @@ use x3_lang_common::{
 
 /// Node ID - deterministic, 0-based index assigned during parsing/lowering when required.
 /// Internally is a simple u32 wrapper for compactness and reproducibility.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct NodeId(pub u32);
-
-impl Default for NodeId {
-    fn default() -> Self {
-        NodeId(0)
-    }
-}
 
 /// The root of an X3 program AST.
 #[derive(Debug, Clone, Serialize, Deserialize)]
