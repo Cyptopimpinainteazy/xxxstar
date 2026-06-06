@@ -2582,7 +2582,9 @@ impl pallet_x3_atomic_kernel::Config for Runtime {
     type EconomicHalt = pallet_x3_supply_ledger::Pallet<Runtime>;
     type X3LangOrigin = EnsureX3LangGateway;
     type SettlementOrigin = EnsureSettlementGateway;
-    type VmReverter = pallet_x3_atomic_kernel::vm_revert::NoopVmReverter;
+    // Production: CompositeReverter dispatches EVM/SVM/X3VM state-diff reversion
+    // per leg. See pallets/x3-atomic-kernel/src/vm_revert.rs for per-VM implementations.
+    type VmReverter = pallet_x3_atomic_kernel::vm_revert::CompositeReverter;
 }
 
 // ===== X3 Slash Configuration =====

@@ -113,11 +113,28 @@ const server = http.createServer((req, res) => {
     return res.end("ok");
   }
 
+  // Restrict `sub` to a safe slug character set before any path expression.
+  // Without this, an attacker-controlled Host header (e.g. "../../etc/passwd")
+  // can traverse out of PAGES_DIR. (CodeQL js/uncontrolled-data-in-path-expression
+  // #2108, #2109, #2110)
+  const SAFE_SUBDOMAIN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+  if (!SAFE_SUBDOMAIN.test(sub) || sub === "" || sub === "www") {
+    res.writeHead(400, { "Content-Type": "text/plain" });
+    return res.end("invalid host");
+  }
+
   // Serve static page if exists, otherwise render from template
   const staticFile = path.join(PAGES_DIR, `${sub}.html`);
-  if (fs.existsSync(staticFile)) {
+  // Defense-in-depth: confirm the resolved file is still under PAGES_DIR.
+  const resolvedStatic = path.resolve(staticFile);
+  const resolvedPagesRoot = path.resolve(PAGES_DIR) + path.sep;
+  if (!resolvedStatic.startsWith(resolvedPagesRoot)) {
+    res.writeHead(400, { "Content-Type": "text/plain" });
+    return res.end("invalid path");
+  }
+  if (fs.existsSync(resolvedStatic) && fs.statSync(resolvedStatic).isFile()) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    return res.end(fs.readFileSync(staticFile, "utf8"));
+    return res.end(fs.readFileSync(resolvedStatic, "utf8"));
   }
 
   const html = renderPage(sub);

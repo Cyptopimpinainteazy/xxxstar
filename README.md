@@ -4,6 +4,8 @@ A Substrate-based blockchain with native cross-VM execution across X3Native, X3E
 
 > **Current Status:** v0.4 Internal Testnet Candidate
 > See [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) for an accurate, honest assessment.
+> 
+> > **x3-lang status:** The X3 language (`x3-lang/`) is in **MVP status** — the Python/pipeline track under `x3-lang/` is the **current authoritative implementation**. The Rust compiler work in `crates/x3-compiler` is experimental and not production-ready.
 
 ---
 

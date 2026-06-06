@@ -22,12 +22,72 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const crypto = require('crypto');
 
+// express-rate-limit is used to cap abusive traffic on write/scan endpoints
+// that the chain-db exposes for partner integrations. Without it, an
+// unauthenticated client can hammer /api/tps/benchmark, /api/airdrop-claims,
+// /api/wallets, etc. and degrade the dashboard for everyone.
+// (CodeQL js/missing-rate-limiting #2095–#2103)
+let rateLimit;
+try {
+  rateLimit = require('express-rate-limit');
+} catch (e) {
+  // Soft fallback: provide a no-op limiter so the service still starts even
+  // if express-rate-limit isn't installed in this environment. Log loudly
+  // because the alerts will reopen.
+  console.warn('express-rate-limit not installed; rate limiting disabled');
+  rateLimit = () => (req, res, next) => next();
+}
+
 const app = express();
 const PORT = process.env.CHAIN_DB_PORT || 7070;
 const DB_PATH = process.env.CHAIN_DB_PATH || path.join(__dirname, '..', '..', 'db', 'chains.db');
 
 app.use(cors());
 app.use(express.json());
+
+// ── Rate limiters (CodeQL js/missing-rate-limiting #2095–#2103) ─────────────
+// Express 4 trust-proxy is required when running behind a reverse proxy / load
+// balancer so the X-Forwarded-For header from the proxy is honored.
+app.set('trust proxy', 1);
+
+// Read-only scan endpoints: be permissive but cap per-IP bursts.
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', hint: 'too many requests, slow down' },
+});
+
+// Write endpoints: stricter cap; admin-key holders can override via env.
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', hint: 'write throttled, slow down' },
+});
+
+// Heavy aggregation: leaderboard + benchmark status — tighter cap.
+const heavyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', hint: 'heavy endpoint throttled' },
+});
+
+// Default limiter applied to every route that doesn't opt into a stricter one.
+// Health checks get a more permissive cap so external uptime probes aren't
+// throttled. (CodeQL js/missing-rate-limiting #2078-#2082, #2084-#2094)
+const defaultLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', hint: 'too many requests, slow down' },
+});
+app.use(defaultLimiter);
 
 // ── Database connection ──────────────────────────────────────────────────────
 
@@ -646,7 +706,7 @@ app.post('/api/faucets', (req, res) => {
 });
 
 // PATCH /api/faucets/:id — Update a faucet
-app.patch('/api/faucets/:id', (req, res) => {
+app.patch('/api/faucets/:id', writeLimiter, (req, res) => {
   try {
     const allowed = ['status', 'last_checked', 'last_claimed', 'total_claims', 'total_received', 'cooldown_hours'];
     const sets = [];
@@ -669,7 +729,7 @@ app.patch('/api/faucets/:id', (req, res) => {
 });
 
 // GET /api/wallets — List wallets
-app.get('/api/wallets', (req, res) => {
+app.get('/api/wallets', readLimiter, (req, res) => {
   try {
     const chain = req.query.chain_id || null;
     const active = req.query.active != null ? parseInt(req.query.active) : null;
@@ -698,7 +758,7 @@ app.get('/api/wallets', (req, res) => {
 });
 
 // POST /api/wallets — Add a wallet
-app.post('/api/wallets', (req, res) => {
+app.post('/api/wallets', writeLimiter, (req, res) => {
   try {
     const { chain_id, address, label, ecosystem } = req.body;
     if (!chain_id || !address) return res.status(400).json({ error: 'chain_id and address are required' });
@@ -715,7 +775,7 @@ app.post('/api/wallets', (req, res) => {
 });
 
 // GET /api/discoveries — List chain discoveries
-app.get('/api/discoveries', (req, res) => {
+app.get('/api/discoveries', readLimiter, (req, res) => {
   try {
     const status = req.query.status || null;
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
@@ -743,7 +803,7 @@ app.get('/api/discoveries', (req, res) => {
 });
 
 // GET /api/airdrop-claims — Claim history
-app.get('/api/airdrop-claims', (req, res) => {
+app.get('/api/airdrop-claims', readLimiter, (req, res) => {
   try {
     const claims = db.prepare(`
       SELECT ac.*, a.name as airdrop_name, a.token_symbol, w.address as wallet_address, w.chain_id as wallet_chain
@@ -760,7 +820,7 @@ app.get('/api/airdrop-claims', (req, res) => {
 });
 
 // GET /api/faucet-claims — Faucet claim history
-app.get('/api/faucet-claims', (req, res) => {
+app.get('/api/faucet-claims', readLimiter, (req, res) => {
   try {
     const claims = db.prepare(`
       SELECT fc.*, f.name as faucet_name, f.token_symbol, w.address as wallet_address, w.chain_id as wallet_chain
@@ -779,7 +839,7 @@ app.get('/api/faucet-claims', (req, res) => {
 // ── TPS Leaderboard API ──────────────────────────────────────────────────────
 
 // GET /api/tps/leaderboard — TPS leaderboard sorted by measured current TPS
-app.get('/api/tps/leaderboard', (req, res) => {
+app.get('/api/tps/leaderboard', heavyLimiter, (req, res) => {
   try {
     const category = req.query.category || 'chain'; // chain | validator | ecosystem | provider
     const sortBy = req.query.sort || 'tps_current'; // tps_current | tps_peak | latency | finality
@@ -788,10 +848,21 @@ app.get('/api/tps/leaderboard', (req, res) => {
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
     const offset = Math.max(0, parseInt(req.query.offset) || 0);
 
+    // SQL-injection guard: only allow a fixed set of sort columns. Anything
+    // else falls back to the default. (CodeQL js/sql-injection #2104)
+    const ALLOWED_SORTS = new Set(['tps_current', 'tps_peak', 'finality', 'latency']);
+    const safeSort = ALLOWED_SORTS.has(sortBy) ? sortBy : 'tps_current';
+    const safeOrder = order === 'ASC' ? 'ASC' : 'DESC';
+
     let rows, total, stats;
 
     if (category === 'chain') {
       // By chain — join chain_metrics + chains + best RPC latency
+      const orderBy = safeSort === 'latency'
+        ? 'best_latency_ms ASC'
+        : safeSort === 'finality'
+          ? 'finality_seconds ASC'
+          : `${safeSort} ${safeOrder}`;
       rows = db.prepare(`
         SELECT c.chain_id, c.chain_name, c.ecosystem, c.chain_type, c.native_token, c.is_testnet,
                COALESCE(m.tps_current, 0) as tps_current,
@@ -811,7 +882,7 @@ app.get('/api/tps/leaderboard', (req, res) => {
         WHERE (:ecosystem IS NULL OR c.ecosystem = :ecosystem)
         GROUP BY c.chain_id
         HAVING (tps_current > 0 OR best_latency_ms > 0)
-        ORDER BY ${sortBy === 'latency' ? 'best_latency_ms ASC' : sortBy === 'finality' ? 'finality_seconds ASC' : `${sortBy} ${order}`}
+        ORDER BY ${orderBy}
         LIMIT :limit OFFSET :offset
       `).all({ ecosystem, limit, offset });
 
@@ -839,7 +910,7 @@ app.get('/api/tps/leaderboard', (req, res) => {
           AND m.id = (SELECT MAX(id) FROM chain_metrics WHERE chain_id = c.chain_id)
         LEFT JOIN rpc_endpoints r ON r.chain_id = c.chain_id AND r.is_healthy = 1
         GROUP BY c.ecosystem
-        ORDER BY avg_tps ${order}
+        ORDER BY avg_tps ${safeOrder}
         LIMIT :limit
       `).all({ limit });
       total = { cnt: rows.length };
@@ -858,7 +929,7 @@ app.get('/api/tps/leaderboard', (req, res) => {
           AND m.id = (SELECT MAX(id) FROM chain_metrics WHERE chain_id = r.chain_id)
         WHERE r.is_healthy = 1 AND r.provider IS NOT NULL
         GROUP BY r.provider
-        ORDER BY ${sortBy === 'latency' ? 'avg_latency_ms ASC' : 'total_rps ' + order}
+        ORDER BY ${safeSort === 'latency' ? 'avg_latency_ms ASC' : 'total_rps ' + safeOrder}
         LIMIT :limit
       `).all({ limit });
       total = { cnt: rows.length };
@@ -896,7 +967,7 @@ app.get('/api/tps/leaderboard', (req, res) => {
 });
 
 // POST /api/tps/benchmark — Record TPS benchmark results (used by benchmark script)
-app.post('/api/tps/benchmark', (req, res) => {
+app.post('/api/tps/benchmark', writeLimiter, (req, res) => {
   try {
     const results = req.body.results;
     if (!Array.isArray(results)) {
@@ -937,7 +1008,7 @@ app.post('/api/tps/benchmark', (req, res) => {
 });
 
 // GET /api/tps/benchmark/status — Check benchmark progress
-app.get('/api/tps/benchmark/status', (req, res) => {
+app.get('/api/tps/benchmark/status', heavyLimiter, (req, res) => {
   try {
     const measured = db.prepare('SELECT COUNT(DISTINCT chain_id) as cnt FROM chain_metrics').get();
     const total = db.prepare('SELECT COUNT(*) as cnt FROM chains').get();

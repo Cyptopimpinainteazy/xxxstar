@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-
-
 #[cfg(not(feature = "intern"))]
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Intern<T>(T);

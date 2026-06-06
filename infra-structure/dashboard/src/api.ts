@@ -4,6 +4,29 @@ const REGISTRY_URL = import.meta.env.VITE_REGISTRY_URL || 'http://localhost:7001
 const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://localhost:9999';
 const RPC_PROXY_URL = import.meta.env.VITE_RPC_PROXY_URL || 'http://localhost:8899';
 const ADMIN_URL = import.meta.env.VITE_ADMIN_URL || 'http://localhost:7777';
+const TPS_URL = import.meta.env.VITE_TPS_URL || 'http://localhost:3010';
+
+// ── Credential storage ──────────────────────────────────────────────────────
+// SECURITY: API keys and JWTs MUST NOT be persisted in localStorage. localStorage
+// is readable by any JS that runs in this origin (XSS exfiltration risk).
+// sessionStorage limits the exposure window to the current tab.
+//
+// TODO(security): the proper fix is server-issued Set-Cookie with HttpOnly,
+// Secure, SameSite=Strict on the registry backend. Until that ships, these
+// tokens are still accessible to any script on this page. (CodeQL
+// js/clear-text-storage-of-sensitive-information #2105, #2106)
+const CREDS_STORE: Storage = (typeof window !== 'undefined' && window.sessionStorage)
+  ? window.sessionStorage
+  : {
+      // Minimal in-memory fallback so the dashboard still works in non-browser
+      // test harnesses without ever writing to localStorage.
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+      key: () => null,
+      length: 0,
+      clear: () => undefined,
+    } as unknown as Storage;
 
 export interface ValidatorCredentials {
   validator_id: string;
@@ -36,6 +59,25 @@ export interface BridgeStats {
   total_failed: number;
   uptime_seconds: number;
   current_tps: number;
+}
+
+export interface AcceleratorBenchmarkConfig {
+  backend: string;
+  tasks_per_round: number;
+  batch_size: number;
+  soak_secs: number;
+  measured_task_tps: number;
+  measured_sliding_tps: number;
+  measured_hashes_per_sec: number;
+  accelerator_fallbacks: number;
+  accelerator_parity_mismatches: number;
+  source: string;
+}
+
+export interface TpsServiceConfig {
+  turnstile_sitekey: string | null;
+  calendar_link: string | null;
+  accelerator_benchmark?: AcceleratorBenchmarkConfig;
 }
 
 export interface GPULaneHealth {
@@ -143,6 +185,7 @@ export interface AggregatedMetrics {
   gpu_verifier: unknown;
   chain: unknown;
   upstreams: unknown[];
+  accelerator_benchmark?: AcceleratorBenchmarkConfig;
   aggregated: {
     current_tps: number;
     peak_tps: number;
@@ -170,6 +213,7 @@ export interface AggregatedMetrics {
     cost_per_million_tx_usd: number;
     gpu_power_watts: number;
     gpu_cost_per_hour_usd: number;
+    accelerator_benchmark?: AcceleratorBenchmarkConfig;
     [key: string]: unknown;
   };
 }
@@ -217,8 +261,8 @@ class InferstructorAPI {
 
   constructor() {
     // Load from localStorage
-    this.jwtToken = localStorage.getItem('infra_jwt_token');
-    this.apiKey = localStorage.getItem('infra_api_key');
+    this.jwtToken = CREDS_STORE.getItem('infra_jwt_token');
+    this.apiKey = CREDS_STORE.getItem('infra_api_key');
     // Admin token uses sessionStorage (clears on browser close)
     this.adminToken = sessionStorage.getItem('infra_admin_token');
   }
@@ -233,16 +277,18 @@ class InferstructorAPI {
     
     if (response.data.success && response.data.credentials) {
       const creds = response.data.credentials;
-      
-      // Store credentials
-      localStorage.setItem('infra_api_key', creds.api_key);
-      localStorage.setItem('infra_validator_id', creds.validator_id);
+
+      // Store credentials in sessionStorage (clears on tab close) rather than
+      // localStorage (persists indefinitely, XSS-readable). CodeQL
+      // js/clear-text-storage-of-sensitive-information #2105.
+      CREDS_STORE.setItem('infra_api_key', creds.api_key);
+      CREDS_STORE.setItem('infra_validator_id', creds.validator_id);
       if (creds.jwt_token) {
-        localStorage.setItem('infra_jwt_token', creds.jwt_token);
+        CREDS_STORE.setItem('infra_jwt_token', creds.jwt_token);
         this.jwtToken = creds.jwt_token;
       }
       this.apiKey = creds.api_key;
-      
+
       return creds;
     }
     
@@ -259,11 +305,13 @@ class InferstructorAPI {
     if (response.data.success) {
       this.jwtToken = response.data.token;
       this.apiKey = apiKey;
-      
-      localStorage.setItem('infra_jwt_token', this.jwtToken!);
-      localStorage.setItem('infra_api_key', apiKey);
-      localStorage.setItem('infra_validator_id', response.data.validator.id);
-      
+
+      // CodeQL js/clear-text-storage-of-sensitive-information #2106: keep
+      // tokens in sessionStorage, not localStorage.
+      CREDS_STORE.setItem('infra_jwt_token', this.jwtToken!);
+      CREDS_STORE.setItem('infra_api_key', apiKey);
+      CREDS_STORE.setItem('infra_validator_id', response.data.validator.id);
+
       return response.data;
     }
     
@@ -274,9 +322,9 @@ class InferstructorAPI {
   logout() {
     this.jwtToken = null;
     this.apiKey = null;
-    localStorage.removeItem('infra_jwt_token');
-    localStorage.removeItem('infra_api_key');
-    localStorage.removeItem('infra_validator_id');
+    CREDS_STORE.removeItem('infra_jwt_token');
+    CREDS_STORE.removeItem('infra_api_key');
+    CREDS_STORE.removeItem('infra_validator_id');
   }
 
   // Get validator stats
@@ -361,6 +409,11 @@ class InferstructorAPI {
 
   async getAdminMetrics(): Promise<AggregatedMetrics> {
     const response = await axios.get(`${ADMIN_URL}/admin/metrics`, { headers: this.adminHeaders() });
+    return response.data;
+  }
+
+  async getTpsServiceConfig(): Promise<TpsServiceConfig> {
+    const response = await axios.get(`${TPS_URL}/api/config`);
     return response.data;
   }
 
@@ -506,7 +559,7 @@ class InferstructorAPI {
   }
 
   getValidatorId(): string | null {
-    return localStorage.getItem('infra_validator_id');
+    return CREDS_STORE.getItem('infra_validator_id');
   }
 }
 

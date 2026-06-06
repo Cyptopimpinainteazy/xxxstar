@@ -13,7 +13,7 @@ use crate::error::{SwarmError, SwarmResult};
 use crate::gpu_bytecode;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -247,6 +247,11 @@ pub struct DeterministicEngine {
     gpu_backend: RwLock<Option<Arc<X3KernelGpuBackend>>>,
     /// Pluggable hash accelerator backend. CPU remains the parity authority.
     accel_backend: RwLock<Box<dyn AccelBackend>>,
+    /// Chain-context finalized-block anchor. Production validators set this
+    /// from a GRANDPA-finalized feed (or the local node's best block). A
+    /// value of `0` means "no anchor observed" and downstream aggregators
+    /// MUST reject proofs assembled with `chain_block_anchor == 0`.
+    chain_block_anchor: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -277,6 +282,7 @@ impl DeterministicEngine {
             stats: EngineStats::default(),
             gpu_backend: RwLock::new(None),
             accel_backend: RwLock::new(select_backend()),
+            chain_block_anchor: AtomicU64::new(0),
         }
     }
 
@@ -292,7 +298,22 @@ impl DeterministicEngine {
             stats: EngineStats::default(),
             gpu_backend: RwLock::new(None),
             accel_backend: RwLock::new(accel_backend),
+            chain_block_anchor: AtomicU64::new(0),
         }
+    }
+
+    /// Set the chain-context finalized-block anchor. Production callers
+    /// wire this to a GRANDPA-finalized feed or the local node's best
+    /// block. A value of `0` is the "no anchor observed" sentinel; the
+    /// validator MUST NOT submit proofs assembled while this is `0`.
+    pub fn set_chain_block_anchor(&self, block: u64) {
+        self.chain_block_anchor.store(block, Ordering::SeqCst);
+    }
+
+    /// Read the current chain-context finalized-block anchor. Returns `0`
+    /// if no anchor has been observed.
+    pub fn chain_block_anchor(&self) -> u64 {
+        self.chain_block_anchor.load(Ordering::SeqCst)
     }
 
     /// Get the currently selected accelerator backend name.

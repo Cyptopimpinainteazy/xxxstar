@@ -1,4 +1,4 @@
-# Build artifacts
+Build artifacts
 target/
 /bin/x3-chain-node-fresh
 *.wasm
@@ -6,7 +6,7 @@ target/
 *.so
 *.rlib
 
-# Large packs  
+# Large packs
 launch-gates/packs/
 launch-gates/repomix/*.md
 launch-gates/evidence/ci/
@@ -28,50 +28,36 @@ target_phase2_validation/
 target_phase3_test/
 target_phase3_validation/
 target_strict/
-target_warning_fix/
 
-# Next.js build artifacts
-**/.next/
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
 
-# Coq build artifacts
-*.vo
-*.vok
-*.vos
-*.glob
-.*.aux
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# K framework dump
-kore-exec.tar.gz
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
 
-# Embedded Cargo target dirs in vendored contracts
-X3-contracts/**/target/
-
-3d/Alien Floor.zip
-
-# Local git corruption/recovery artifacts
-.git.corrupt-*
-.git.corrupt-backup-*
-.git.recovery-snapshot-*
-
-# AutoClaw KDream data
+# Autoclaw runtime artifacts
 .autoclaw/
-# CocoIndex Code (ccc)
-/.cocoindex_code/
-
-# Quarantined old roots and transient artifacts
-_junk/
-.kilo/
-.reports/
-
-# Old contract roots (moved under _junk/old-contract-roots/)
-/contracts/
-/governance/
-/treasury/
-/staking/
-
-# Duplicated test trees (moved under _junk/)
-/tests_core/
-/tests_phase4/
-
-# Deprecated scripts root (moved under _junk/)
-/scripts_infrastructure/
+.claude/

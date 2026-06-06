@@ -715,6 +715,7 @@ impl<'a> Parser<'a> {
             stmts.push(self.parse_intent_clause()?);
         }
         self.expect(Tok::RBrace, "expected '}' to close intent body")?;
+        fill_route_bridge_amounts(&mut stmts);
         Ok(Item::IntentDecl(IntentDecl {
             name: Symbol::new(&name),
             constraints: Vec::new(),
@@ -735,6 +736,7 @@ impl<'a> Parser<'a> {
             }
             Tok::Ident(ref s) if s == "timeout" => self.parse_intent_timeout(),
             Tok::Ident(ref s) if s == "on_fail" => self.parse_intent_onfail(),
+            Tok::KwOnFail => self.parse_intent_onfail(),
             _ => {
                 // Fallback: treat as an expression statement so the typechecker
                 // gets a real diagnostic instead of a hard panic.
@@ -772,11 +774,13 @@ impl<'a> Parser<'a> {
         }
         self.opt_semi();
 
-        let zero = || Expression::Literal(LiteralExpr::Int {
-            value: 0,
-            base: IntBase::Decimal,
-            suffix: None,
-        });
+        let zero = || {
+            Expression::Literal(LiteralExpr::Int {
+                value: 0,
+                base: IntBase::Decimal,
+                suffix: None,
+            })
+        };
         let sender = || Expression::Literal(LiteralExpr::String(Symbol::new("sender")));
 
         if is_from {
@@ -809,7 +813,10 @@ impl<'a> Parser<'a> {
             stmts.push(self.parse_route_step()?);
         }
         self.expect(Tok::RBrace, "expected '}' to close route")?;
-        Ok(Statement::Atomic(AtomicBlock { meta: None, body: Block::new(stmts) }))
+        Ok(Statement::Atomic(AtomicBlock {
+            meta: None,
+            body: Block::new(stmts),
+        }))
     }
 
     /// One route step. The body is dispatched on the leading keyword.
@@ -842,15 +849,11 @@ impl<'a> Parser<'a> {
             // dance.
             Tok::Ident(ref s) if s == "swap" => self.parse_swap_step(),
             Tok::Ident(ref s) if s == "bridge" => self.parse_bridge_step(),
-            Tok::Ident(ref s) if s == "lock" || s == "mint"
-                || s == "burn" || s == "release" =>
-            {
+            Tok::Ident(ref s) if s == "lock" || s == "mint" || s == "burn" || s == "release" => {
                 let kw = s.clone();
                 self.parse_lmbr_step(&kw)
             }
-            Tok::Ident(ref s) if s == "lock" || s == "mint"
-                || s == "burn" || s == "release" =>
-            {
+            Tok::Ident(ref s) if s == "lock" || s == "mint" || s == "burn" || s == "release" => {
                 let kw = s.clone();
                 self.advance();
                 self.parse_lmbr_step(&kw)
@@ -883,14 +886,15 @@ impl<'a> Parser<'a> {
             }
         }
         self.opt_semi();
-        let amount_expr = amount.unwrap_or_else(|| Expression::Literal(LiteralExpr::Int {
-            value: 0,
-            base: IntBase::Decimal,
-            suffix: None,
-        }));
-        let target = from_or_to.unwrap_or_else(|| Expression::Literal(LiteralExpr::String(
-            Symbol::new("sender"),
-        )));
+        let amount_expr = amount.unwrap_or_else(|| {
+            Expression::Literal(LiteralExpr::Int {
+                value: 0,
+                base: IntBase::Decimal,
+                suffix: None,
+            })
+        });
+        let target = from_or_to
+            .unwrap_or_else(|| Expression::Literal(LiteralExpr::String(Symbol::new("sender"))));
         match kw {
             "lock" => Ok(Statement::Lock {
                 chain: chain.clone(),
@@ -926,6 +930,7 @@ impl<'a> Parser<'a> {
             AssetRef::new(from.chain.clone(), Symbol::new(""))
         };
         let mut amount: Option<Expression> = None;
+        let mut min_output: Option<Expression> = None;
         loop {
             match self.peek() {
                 Tok::Ident(ref s) if s == "amount" => {
@@ -934,23 +939,26 @@ impl<'a> Parser<'a> {
                 }
                 Tok::Ident(ref s) if s == "min_output" => {
                     self.advance();
-                    // We drop the value (existing IR has no min_output
-                    // field) but consume the expression so the parser
-                    // does not loop.
-                    let _ = self.parse_expr()?;
+                    min_output = Some(self.parse_expr()?);
                 }
                 _ => break,
             }
         }
         self.opt_semi();
         let dex_expr = Some(Expression::Literal(LiteralExpr::String(Symbol::new(&dex))));
-        Ok(Statement::Swap { from, to, route: amount, dex: dex_expr })
+        Ok(Statement::Swap {
+            from,
+            to,
+            route: amount,
+            min_output,
+            dex: dex_expr,
+        })
     }
 
-    /// `bridge <via> <chain.ASSET> -> <chain.ASSET> [receiver <expr>]`
-    /// Best-effort: we model the bridge as a `Statement::Lock` of the
-    /// source asset with `from = via`. This is enough for the verifier
-    /// and for the existing IR to emit a sensible Lock operation.
+    /// `bridge <via> <chain.ASSET> -> <chain.ASSET> [receiver <expr>]
+    ///   [finality_proof <expr>] [transfer_proof <expr>]`
+    /// The production intent pass fills its amount from the matching
+    /// `from` endpoint.
     fn parse_bridge_step(&mut self) -> Result<Statement, X3Error> {
         // The dispatcher in `parse_route_step` only consumes the
         // leading `bridge` keyword when the tokenizer gave it a
@@ -963,39 +971,51 @@ impl<'a> Parser<'a> {
         }
         let via = self.expect_ident("bridge via")?;
         let from = self.parse_asset_ref()?;
-        let _to = if self.peek() == Tok::Arrow {
+        let to = if self.peek() == Tok::Arrow {
             self.advance();
-            Some(self.parse_asset_ref()?)
+            self.parse_asset_ref()?
         } else {
-            None
+            AssetRef::new(from.chain.clone(), from.name.clone())
         };
-        let mut _receiver: Option<Expression> = None;
+        let mut receiver: Option<Expression> = None;
+        let mut source_finality_proof: Option<Expression> = None;
+        let mut transfer_proof: Option<Expression> = None;
         loop {
             match self.peek() {
                 Tok::Ident(ref s) if s == "receiver" => {
                     self.advance();
-                    // Consume exactly one token for the receiver value.
-                    // We deliberately do *not* call `parse_expr` here:
-                    // a full expression parser is greedy and would
-                    // swallow tokens that belong to the next route
-                    // step (or to the `}` closing the route block).
                     if !matches!(self.peek(), Tok::RBrace | Tok::Eof) {
-                        self.advance();
+                        receiver = Some(self.parse_expr()?);
                     }
+                }
+                Tok::Ident(ref s) if s == "finality_proof" => {
+                    self.advance();
+                    source_finality_proof = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "source_finality_proof" => {
+                    self.advance();
+                    source_finality_proof = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "transfer_proof" => {
+                    self.advance();
+                    transfer_proof = Some(self.parse_expr()?);
                 }
                 _ => break,
             }
         }
         self.opt_semi();
-        Ok(Statement::Lock {
-            chain: from.chain.clone(),
-            asset: AssetRef::new(from.chain.clone(), from.name.clone()),
+        Ok(Statement::Bridge {
+            via: Symbol::new(&via),
+            from,
+            to,
             amount: Expression::Literal(LiteralExpr::Int {
                 value: 0,
                 base: IntBase::Decimal,
                 suffix: None,
             }),
-            from: Expression::Literal(LiteralExpr::String(Symbol::new(&via))),
+            receiver: receiver.unwrap_or_else(|| Expression::Ident(Symbol::new("receiver"))),
+            source_finality_proof,
+            transfer_proof,
         })
     }
 
@@ -1007,21 +1027,34 @@ impl<'a> Parser<'a> {
         // falls back to 0 (the existing `OnTimeout` IR only stores u32).
         let dur_blocks: u32 = match &dur {
             Expression::Literal(LiteralExpr::Int { value, .. }) => *value as u32,
+            Expression::Ident(sym) => numeric_prefix_u32(sym.as_str()).unwrap_or(0),
             _ => 0,
         };
-        // Consume any `refund <chain.ASSET> to <receiver>` suffix without
-        // surfacing it (the existing IR does not model per-asset refund
-        // policies).
+        let mut action = FailureAction::Rollback;
         loop {
             match self.peek() {
                 Tok::Ident(ref s) if s == "refund" => {
                     self.advance();
-                    let _ = self.parse_asset_ref();
+                    let refund_asset = self.parse_asset_ref().ok();
+                    let mut receiver = None;
                     if let Tok::Ident(ref s) = self.peek() {
                         if s == "to" {
                             self.advance();
-                            let _ = self.parse_expr();
+                            receiver = self.parse_expr().ok();
                         }
+                    }
+                    if let Some(asset) = refund_asset {
+                        let receiver = receiver
+                            .map(|expr| expression_debug_string(&expr))
+                            .unwrap_or_else(|| "sender".to_string());
+                        action = FailureAction::Refund(Expression::Literal(LiteralExpr::String(
+                            Symbol::new(&format!(
+                                "{}.{}:{}",
+                                asset.chain.as_str(),
+                                asset.name.as_str(),
+                                receiver
+                            )),
+                        )));
                     }
                 }
                 _ => break,
@@ -1034,7 +1067,7 @@ impl<'a> Parser<'a> {
                 base: IntBase::Decimal,
                 suffix: None,
             }),
-            action: FailureAction::Rollback,
+            action,
         })
     }
 
@@ -1402,11 +1435,18 @@ impl<'a> Parser<'a> {
                 } else {
                     None
                 };
+                let min_output = if matches!(self.peek(), Tok::Ident(ref s) if s == "min_output") {
+                    self.advance();
+                    Some(self.parse_expr()?)
+                } else {
+                    None
+                };
                 self.opt_semi();
                 Ok(Statement::Swap {
                     from,
                     to,
                     route: None,
+                    min_output,
                     dex,
                 })
             }
@@ -2104,6 +2144,81 @@ fn expr_to_u64(e: &Expression) -> u64 {
     }
 }
 
+fn fill_route_bridge_amounts(stmts: &mut [Statement]) {
+    let source_amounts: Vec<(String, String, Expression)> = stmts
+        .iter()
+        .filter_map(|stmt| match stmt {
+            Statement::Lock {
+                chain,
+                asset,
+                amount,
+                ..
+            } if !expression_is_zero(amount) => Some((
+                chain.as_str().to_ascii_lowercase(),
+                asset.name.as_str().to_string(),
+                amount.clone(),
+            )),
+            _ => None,
+        })
+        .collect();
+
+    for stmt in stmts {
+        if let Statement::Atomic(atomic) = stmt {
+            fill_route_bridge_amounts_in_block(&mut atomic.body, &source_amounts);
+        }
+    }
+}
+
+fn fill_route_bridge_amounts_in_block(
+    block: &mut Block,
+    source_amounts: &[(String, String, Expression)],
+) {
+    for stmt in &mut block.stmts {
+        match stmt {
+            Statement::Bridge { from, amount, .. } if expression_is_zero(amount) => {
+                if let Some((_, _, source_amount)) =
+                    source_amounts
+                        .iter()
+                        .find(|(source_chain, source_asset, _)| {
+                            *source_chain == from.chain.as_str().to_ascii_lowercase()
+                                && source_asset == from.name.as_str()
+                        })
+                {
+                    *amount = source_amount.clone();
+                }
+            }
+            Statement::Atomic(atomic) => {
+                fill_route_bridge_amounts_in_block(&mut atomic.body, source_amounts);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn expression_is_zero(expr: &Expression) -> bool {
+    matches!(expr, Expression::Literal(LiteralExpr::Int { value: 0, .. }))
+}
+
+fn numeric_prefix_u32(value: &str) -> Option<u32> {
+    let digits: String = value.chars().take_while(|ch| ch.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        None
+    } else {
+        digits.parse::<u32>().ok()
+    }
+}
+
+fn expression_debug_string(expr: &Expression) -> String {
+    match expr {
+        Expression::Ident(sym) => sym.as_str().to_string(),
+        Expression::Literal(LiteralExpr::String(sym))
+        | Expression::Literal(LiteralExpr::Address(sym))
+        | Expression::Literal(LiteralExpr::Hash(sym)) => sym.as_str().to_string(),
+        Expression::Literal(LiteralExpr::Int { value, .. }) => value.to_string(),
+        _ => format!("{:?}", expr),
+    }
+}
+
 fn expr_to_u128(e: &Expression) -> Result<u128, X3Error> {
     match e {
         Expression::Literal(LiteralExpr::Int { value, .. }) => Ok(*value),
@@ -2167,16 +2282,26 @@ fn tokenize(source: &str) -> Vec<Tok> {
             continue;
         }
         // Numbers AND alphanumeric identifiers. We greedily consume any
-        // run of [A-Za-z0-9_], then classify: all-digit -> Int(...)
+        // run of [A-Za-z0-9_-], then classify: all-digit -> Int(...)
         // (parsing as base-10), otherwise -> keyword/Ident. This keeps
         // base58 addresses (which often start with a digit, e.g.
         // Solana receivers like "4Nd1mzi8...") tokenized as a single
-        // Ident rather than being split into Int(4) + Ident.
+        // Ident rather than being split into Int(4) + Ident. Hyphens are
+        // included in the run so values like `x3-receiver-1234` parse
+        // as a single receiver name; the arrow operator `->` is checked
+        // explicitly first.
         if c.is_ascii_digit() || (c.is_ascii_alphabetic() || c == '_') {
             let start = i;
+            // Detect `->` arrow: stop the identifier at `-` if it
+            // would otherwise form an arrow. We still allow hyphens
+            // mid-identifier; we only refuse a trailing `-` that would
+            // be part of `->`.
             while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_')
+                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '-')
             {
+                if chars[i] == '-' && i + 1 < chars.len() && chars[i + 1] == '>' {
+                    break;
+                }
                 i += 1;
             }
             let word: String = chars[start..i].iter().collect();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type ReactElement } from 'react';
 import { api } from '../api';
-import type { AdminCommand, AdminJob, AggregatedMetrics, Subscriber, AccountingSummary } from '../api';
+import type { AdminCommand, AdminJob, AggregatedMetrics, Subscriber, AccountingSummary, AcceleratorBenchmarkConfig } from '../api';
 import {
   Shield, ArrowLeft, RefreshCw, X, Play, Square, Terminal, Trash2,
   Activity, Cpu, Globe, Gauge, Heart, FileText, Server, Zap, TrendingUp,
@@ -72,6 +72,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [tab, setTab] = useState<Tab>('overview');
   const [metrics, setMetrics] = useState<AggregatedMetrics | null>(null);
   const [metricsHistory, setMetricsHistory] = useState<AggregatedMetrics['aggregated'][]>([]);
+  const [acceleratorConfig, setAcceleratorConfig] = useState<AcceleratorBenchmarkConfig | null>(null);
   const [commands, setCommands] = useState<Record<string, AdminCommand[]>>({});
   const [categories, setCategories] = useState<string[]>([]);
   const [jobs, setJobs] = useState<AdminJob[]>([]);
@@ -102,6 +103,10 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       ]);
       if (m) setMetrics(m);
       if (hist?.points) setMetricsHistory(hist.points);
+      const tpsConfig = await api.getTpsServiceConfig().catch(() => null);
+      if (tpsConfig?.accelerator_benchmark) {
+        setAcceleratorConfig(tpsConfig.accelerator_benchmark);
+      }
       setError(null);
     } catch {
       setError('Failed to connect to Admin API');
@@ -213,6 +218,8 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const gpuLanes = metrics?.gpu_lanes || [];
   const chain = metrics?.chain as Record<string, any> | null | undefined;
   const upstreams = metrics?.upstreams || [];
+  const acceleratorBenchmark =
+    metrics?.accelerator_benchmark || agg?.accelerator_benchmark || acceleratorConfig;
   // Filter history by time range
   const rangeSeconds = TIME_RANGES.find(r => r.key === timeRange)?.seconds || 300;
   const cutoff = Date.now() / 1000 - rangeSeconds;
@@ -272,6 +279,25 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
         {renderMetricCard(Heart, 'text-green-400', 'Success Rate', `${agg?.success_rate || 0}%`)}
         {renderMetricCard(Clock, 'text-blue-400', 'Uptime', fmtTime(agg?.uptime_seconds || 0))}
       </div>
+
+      {acceleratorBenchmark && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Gauge className="w-5 h-5 text-yellow-400" />
+            <h3 className="text-lg font-bold text-white">Accelerator Benchmark Default</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div><span className="text-gray-400">Backend</span><div className="text-white font-mono">{acceleratorBenchmark.backend}</div></div>
+            <div><span className="text-gray-400">Shape</span><div className="text-white font-mono">{acceleratorBenchmark.tasks_per_round} x {acceleratorBenchmark.batch_size}</div></div>
+            <div><span className="text-gray-400">Sliding TPS</span><div className="text-green-400 font-mono">{fmt(acceleratorBenchmark.measured_sliding_tps)}</div></div>
+            <div><span className="text-gray-400">Hashes/sec</span><div className="text-blue-400 font-mono">{fmt(Math.round(acceleratorBenchmark.measured_hashes_per_sec))}</div></div>
+            <div><span className="text-gray-400">Soak</span><div className="text-white font-mono">{acceleratorBenchmark.soak_secs}s</div></div>
+            <div><span className="text-gray-400">Fallbacks</span><div className="text-white font-mono">{fmt(acceleratorBenchmark.accelerator_fallbacks)}</div></div>
+            <div><span className="text-gray-400">Parity</span><div className="text-white font-mono">{fmt(acceleratorBenchmark.accelerator_parity_mismatches)}</div></div>
+            <div><span className="text-gray-400">Source</span><div className="text-xs text-gray-300">{acceleratorBenchmark.source}</div></div>
+          </div>
+        </div>
+      )}
 
       {/* Mini TPS Chart */}
       <div className="card">

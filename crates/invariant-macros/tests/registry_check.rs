@@ -46,7 +46,10 @@ fn registry_invariants_are_referenced() {
             .into_iter()
             .filter_entry(|entry| {
                 let name = entry.file_name().to_string_lossy();
-                !matches!(name.as_ref(), "target" | "node_modules" | ".next" | "dist" | "build")
+                !matches!(
+                    name.as_ref(),
+                    "target" | "node_modules" | ".next" | "dist" | "build"
+                )
             })
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().is_file())

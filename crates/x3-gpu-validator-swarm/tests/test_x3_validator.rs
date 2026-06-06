@@ -314,6 +314,10 @@ fn test_orchestrator_state_export() {
 
     let state_json = orchestrator.export_state_json().unwrap();
     assert!(!state_json.is_empty());
+
+    let prometheus = orchestrator.export_metrics_prometheus();
+    assert!(prometheus.contains("x3_swarm_accelerator_selected"));
+    assert!(prometheus.contains("x3_swarm_sliding_window_tps"));
 }
 
 /// Integration test with multiple validators

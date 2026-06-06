@@ -80,10 +80,49 @@ impl SignatureOutput {
         hex::encode(self.to_bytes())
     }
 
-    /// Verify signature (CPU fallback)
-    pub fn verify(&self, msg: &[u8], _expected_pubkey: &[u8; 33]) -> bool {
-        // Placeholder verification for now: structural sanity + non-empty message.
-        !msg.is_empty() && (self.r != [0u8; 32] || self.s != [0u8; 32])
+    /// Returns true iff both `r` and `s` are non-zero. This is a structural
+    /// sanity check that catches the "empty signature" placeholder and
+    /// pre-dates real cryptographic verification. Cryptographic verification
+    /// must always be run via `verify(msg, pubkey)`; this helper exists so
+    /// upstream callers can fail closed on a degenerate signature without
+    /// having to construct a verifying key.
+    pub fn is_well_formed(&self) -> bool {
+        self.r != [0u8; 32] || self.s != [0u8; 32]
+    }
+
+    /// Verify the signature against `expected_pubkey` over `msg` using real
+    /// ed25519 verification.
+    ///
+    /// `expected_pubkey` is a 33-byte secp256k1-style array (r || s || v);
+    /// only the first 32 bytes are the ed25519 verifying key. The trailing
+    /// byte is ignored (ed25519 has no recovery byte).
+    ///
+    /// Returns `false` for:
+    /// * any zero `r`/`s` (the historical placeholder would have accepted
+    ///   those — we now fail closed);
+    /// * pubkey bytes that are not a valid ed25519 verifying key;
+    /// * signature bytes that do not recover to `expected_pubkey` for `msg`.
+    pub fn verify(&self, msg: &[u8], expected_pubkey: &[u8; 33]) -> bool {
+        if !self.is_well_formed() {
+            return false;
+        }
+        if expected_pubkey[..32] == [0u8; 32] {
+            return false;
+        }
+
+        let verifying_key = match ed25519_dalek::VerifyingKey::from_bytes(
+            expected_pubkey[..32].try_into().expect("slice is 32 bytes"),
+        ) {
+            Ok(key) => key,
+            Err(_) => return false,
+        };
+
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes[..32].copy_from_slice(&self.r);
+        sig_bytes[32..].copy_from_slice(&self.s);
+        let signature = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+
+        verifying_key.verify_strict(msg, &signature).is_ok()
     }
 }
 
@@ -245,6 +284,18 @@ impl SigningKey {
         // Use 0 for recovery byte (not applicable to ed25519)
         SignatureOutput::new(r, s, 0)
     }
+
+    /// Return the 32-byte ed25519 public key for this signing key. The
+    /// returned bytes are exactly what `SignatureOutput::verify` expects in
+    /// `expected_pubkey[..32]`.
+    pub fn public_key_bytes(&self) -> [u8; 32] {
+        use ed25519_dalek::SigningKey;
+        let key_bytes: [u8; 32] = self.secret[..32]
+            .try_into()
+            .expect("secret is always 32 bytes");
+        let signing_key = SigningKey::from_bytes(&key_bytes);
+        signing_key.verifying_key().to_bytes()
+    }
 }
 
 #[cfg(test)]
@@ -271,8 +322,52 @@ mod tests {
         let msg = b"test message";
         let sig = key.sign(msg);
 
-        // Verify signature
-        assert!(sig.verify(msg, &[0u8; 33]));
+        // Real round-trip verify with the actual public key.
+        let mut pubkey = [0u8; 33];
+        pubkey[..32].copy_from_slice(&key.public_key_bytes());
+        assert!(sig.verify(msg, &pubkey));
+    }
+
+    #[test]
+    fn test_signature_rejects_wrong_pubkey() {
+        let key_a = SigningKey::from_seed(b"test seed with at least thirty two bytes").unwrap();
+        let key_b = SigningKey::from_seed(b"a different test seed of thirty two bytes!").unwrap();
+        let msg = b"test message";
+        let sig = key_a.sign(msg);
+
+        let mut pubkey_b = [0u8; 33];
+        pubkey_b[..32].copy_from_slice(&key_b.public_key_bytes());
+        assert!(
+            !sig.verify(msg, &pubkey_b),
+            "verify must fail when pubkey does not match signer"
+        );
+    }
+
+    #[test]
+    fn test_signature_rejects_tampered_message() {
+        let key = SigningKey::from_seed(b"test seed with at least thirty two bytes").unwrap();
+        let mut pubkey = [0u8; 33];
+        pubkey[..32].copy_from_slice(&key.public_key_bytes());
+        let sig = key.sign(b"original");
+        assert!(!sig.verify(b"tampered", &pubkey));
+    }
+
+    #[test]
+    fn test_signature_rejects_zero_pubkey() {
+        let key = SigningKey::from_seed(b"test seed with at least thirty two bytes").unwrap();
+        let msg = b"msg";
+        let sig = key.sign(msg);
+        let zero_pubkey = [0u8; 33];
+        assert!(!sig.verify(msg, &zero_pubkey));
+    }
+
+    #[test]
+    fn test_signature_rejects_zero_signature_components() {
+        let key = SigningKey::from_seed(b"test seed with at least thirty two bytes").unwrap();
+        let mut pubkey = [0u8; 33];
+        pubkey[..32].copy_from_slice(&key.public_key_bytes());
+        let empty = SignatureOutput::new([0u8; 32], [0u8; 32], 0);
+        assert!(!empty.verify(b"msg", &pubkey));
     }
 
     #[test]

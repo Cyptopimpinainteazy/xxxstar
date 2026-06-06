@@ -1,11 +1,12 @@
 //! Validator module for X3 GPU Validator Swarm
 
 use crate::config::SwarmConfig;
-use crate::crypto::HashAlgorithm;
+use crate::crypto::{HashAlgorithm, SigningKey};
 use crate::deterministic::{
     DeterministicEngine, DeterministicTask, ExecutionMode, ExecutionResult,
 };
-use crate::error::SwarmResult;
+use crate::error::{SwarmError, SwarmResult};
+use crate::gpu_receipt::GpuReceipt;
 use crate::health::{HealthMonitor, ValidatorHealthTracker};
 use crate::metrics::MetricsCollector;
 use crate::proof_aggregator::ProofAggregator;
@@ -14,9 +15,38 @@ use crate::quarantine::QuarantineManager;
 use crate::telemetry::TelemetrySink;
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+/// Canonical bytes the validator signs over for an attestation.
+///
+/// Includes the receipt commitments, the bundle id, the *current* chain
+/// block anchor the validator is attesting to, and the legs hash. We bind
+/// `finalized_block` into the signed message so a replay that mutates the
+/// header's block number invalidates the signature. The message is
+/// deterministic and length-prefixed so it is safe across endianness and
+/// field reordering.
+fn signing_message(
+    receipt: &GpuReceipt,
+    bundle_id: [u8; 32],
+    finalized_block: u64,
+    legs_hash: [u8; 32],
+) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"x3-validator-attestation-v1");
+    hasher.update(&receipt.kernel_hash);
+    hasher.update(&receipt.input_commitment);
+    hasher.update(&receipt.output_commitment);
+    hasher.update(&receipt.executor);
+    hasher.update(&(receipt.gpu_cycles_used).to_le_bytes());
+    hasher.update(&bundle_id);
+    hasher.update(&finalized_block.to_le_bytes());
+    hasher.update(&legs_hash);
+    let digest = hasher.finalize();
+    digest.to_vec()
+}
 
 /// Validator state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,6 +104,13 @@ pub struct Validator {
     start_time: Instant,
     /// Proof aggregator for unified proof management
     proof_aggregator: Arc<Mutex<ProofAggregator>>,
+    /// Per-validator ed25519 signing key. In production this MUST be wired
+    /// to a custody/HSM service — `SigningKey::from_seed` is gated to
+    /// `cfg(any(test, debug_assertions))` and refuses to run in release
+    /// builds. Stored as `Arc<Mutex<Option<...>>>` so we can surface
+    /// `signing_key_unavailable` as a typed error rather than panic when
+    /// the key cannot be derived (e.g. release-without-HSM).
+    signing_key: Arc<Mutex<Option<SigningKey>>>,
 }
 
 impl Validator {
@@ -106,6 +143,28 @@ impl Validator {
         let engine = DeterministicEngine::new();
         metrics.set_accelerator_backend(engine.accelerator_backend_name());
 
+        // Derive a per-validator signing key from a deterministic seed in
+        // test/debug builds. Release builds must wire a custody/HSM
+        // service; `SigningKey::from_seed` is gated to fail closed in
+        // release. We still construct the field with `None` so the
+        // release-without-HSM path returns a typed error at proof time
+        // instead of crashing the validator at startup.
+        let signing_key = {
+            #[cfg(any(test, debug_assertions))]
+            {
+                use sha2::{Digest, Sha256};
+                let mut hasher = Sha256::new();
+                hasher.update(b"x3-validator-key-seed-v1");
+                hasher.update(validator_id.as_bytes());
+                let seed = hasher.finalize();
+                SigningKey::from_seed(&seed).ok()
+            }
+            #[cfg(not(any(test, debug_assertions)))]
+            {
+                None
+            }
+        };
+
         Self {
             validator_id,
             validator_address,
@@ -120,6 +179,7 @@ impl Validator {
             current_mode: RwLock::new(initial_mode),
             start_time: Instant::now(),
             proof_aggregator,
+            signing_key: Arc::new(Mutex::new(signing_key)),
         }
     }
 
@@ -245,23 +305,51 @@ impl Validator {
                 self.validator_address,
                 0, // device_index
             ) {
-                // Create validator signature (in real impl, use proper signing)
-                let signature = vec![]; // Placeholder - should be actual signature
+                // Create validator signature using the per-validator
+                // ed25519 key. Production validators must source this key
+                // from a custody/HSM service; release builds have
+                // `signing_key == None` and fall through to a typed
+                // error below rather than minting an empty signature.
+                let key_guard = self.signing_key.lock();
+                let signing_result: Option<
+                    Result<(crate::crypto::SignatureOutput, [u8; 32], u64), SwarmError>,
+                > = key_guard.as_ref().map(|key| {
+                    // Derive a deterministic bundle_id from task_id and
+                    // pull the current chain anchor. Both feed the
+                    // signing message so a downstream aggregator can
+                    // detect replay or anchor tampering.
+                    let mut bundle_id = [0u8; 32];
+                    let task_bytes = task_id.as_bytes();
+                    for (i, byte) in task_bytes.iter().enumerate() {
+                        bundle_id[i % 32] ^= byte;
+                    }
+                    let finalized_block = self.engine.chain_block_anchor();
+                    let legs_hash =
+                        crate::proof_integration::compute_legs_hash_pub(&result.task_id);
+                    let msg = signing_message(&receipt, bundle_id, finalized_block, legs_hash);
+                    Ok::<_, SwarmError>((key.sign(&msg), bundle_id, finalized_block))
+                });
+                drop(key_guard);
 
-                // Create unified proof with bundle_id derived from task_id
-                let mut bundle_id = [0u8; 32];
-                let task_bytes = task_id.as_bytes();
-                for (i, byte) in task_bytes.iter().enumerate() {
-                    bundle_id[i % 32] ^= byte;
-                }
-
-                // Get current block number (would come from chain in real impl)
-                let finalized_block = 0u64; // Placeholder
+                let (signature, bundle_id, finalized_block) = match signing_result {
+                    Some(Ok(triple)) => triple,
+                    Some(Err(e)) => {
+                        log::warn!("[Validator {}] signing failed: {:?}", self.validator_id, e);
+                        return result;
+                    }
+                    None => {
+                        log::warn!(
+                            "[Validator {}] no signing key available (release build without HSM); skipping proof submission",
+                            self.validator_id
+                        );
+                        return result;
+                    }
+                };
 
                 if let Ok(proof) = proof_integration::create_unified_proof(
                     &result,
                     receipt,
-                    signature,
+                    signature.to_bytes(),
                     bundle_id,
                     finalized_block,
                     10, // total validators
@@ -350,6 +438,42 @@ impl Validator {
     /// Shutdown
     pub fn shutdown(&self) {
         *self.state.write() = ValidatorState::Stopped;
+    }
+
+    /// Return the 32-byte ed25519 public key for this validator, if
+    /// available. `None` in release builds without a custody/HSM
+    /// backend. Callers (proof aggregators, downstream verifiers) MUST
+    /// treat `None` as "this attestation cannot be verified" and reject
+    /// the proof.
+    pub fn public_key_bytes(&self) -> Option<[u8; 32]> {
+        self.signing_key
+            .lock()
+            .as_ref()
+            .map(|k| k.public_key_bytes())
+    }
+
+    /// Build the same canonical signing message the validator signs over.
+    /// Exposed so downstream verifiers can reproduce the bytes and run
+    /// `SignatureOutput::verify` against the validator's public key.
+    pub fn build_signing_message(
+        receipt: &GpuReceipt,
+        bundle_id: [u8; 32],
+        finalized_block: u64,
+        legs_hash: [u8; 32],
+    ) -> Vec<u8> {
+        signing_message(receipt, bundle_id, finalized_block, legs_hash)
+    }
+
+    /// Set the deterministic engine's chain block anchor. Production
+    /// callers wire this to a finalized header stream; tests use it to
+    /// assert the `finalized_block == 0` "un-anchored" case.
+    pub fn set_chain_block_anchor(&self, block: u64) {
+        self.engine.set_chain_block_anchor(block);
+    }
+
+    /// Read the current chain block anchor.
+    pub fn chain_block_anchor(&self) -> u64 {
+        self.engine.chain_block_anchor()
     }
 }
 
@@ -458,5 +582,175 @@ mod tests {
         );
 
         // The workflow demonstrates: ExecutionResult → MerkleProof generation → UnifiedProof with merkle_proof field
+    }
+
+    // -------------------------------------------------------------------
+    // Proof authenticity tests.
+    //
+    // These tests prove the proof path in `process_task` produces a
+    // signature that a real ed25519 verifier accepts against the
+    // validator's public key, and that the production safeguards
+    // (non-empty signature, anchored `finalized_block`) hold.
+    //
+    // If the production code regresses to the placeholder signature
+    // (`Vec::new()`) or `finalized_block = 0` with no anchor, these
+    // tests fail closed.
+    // -------------------------------------------------------------------
+
+    /// Pulls the most recent attestation out of the aggregator.
+    fn latest_attestation(
+        validator: &Validator,
+    ) -> (
+        crate::unified_proof::GpuValidatorAttestation,
+        crate::unified_proof::ProofHeader,
+    ) {
+        let aggregator = validator.get_proof_aggregator();
+        let locked = aggregator.lock();
+        let proof = locked
+            .latest_proof()
+            .expect("at least one proof should be submitted");
+        assert_eq!(proof.gpu_attestations.len(), 1);
+        (proof.gpu_attestations[0].clone(), proof.header.clone())
+    }
+
+    fn attestation_to_signature_output(sig: &[u8]) -> crate::crypto::SignatureOutput {
+        assert_eq!(sig.len(), 65, "signature must be r||s||v = 65 bytes");
+        let mut r = [0u8; 32];
+        let mut s = [0u8; 32];
+        r.copy_from_slice(&sig[..32]);
+        s.copy_from_slice(&sig[32..64]);
+        crate::crypto::SignatureOutput::new(r, s, sig[64])
+    }
+
+    #[test]
+    fn proof_signature_verifies_against_validator_pubkey() {
+        // End-to-end: a real task → real proof → real ed25519 verify.
+        let validator = Validator::new(SwarmConfig::default(), "proof-verify-ok".to_string());
+        validator.initialize().unwrap();
+        validator.set_chain_block_anchor(4242);
+
+        let task = DeterministicTask::new(
+            crate::deterministic::TaskType::BatchHash,
+            vec![b"hello".to_vec(), b"world".to_vec()],
+            HashAlgorithm::Keccak256,
+        );
+        let _ = validator.process_task(task);
+
+        // The header carries the same `bundle_id`, `finalized_block`,
+        // and `legs_hash` the validator signed over, so reproducing
+        // the signing message is exact.
+        let (attestation, header) = latest_attestation(&validator);
+
+        assert_eq!(attestation.receipt.executor, validator.validator_address);
+
+        let msg = Validator::build_signing_message(
+            &attestation.receipt,
+            header.bundle_id,
+            header.finalized_block,
+            header.legs_hash,
+        );
+        let mut pubkey = [0u8; 33];
+        let pk_bytes = validator
+            .public_key_bytes()
+            .expect("test/debug build must expose a pubkey");
+        pubkey[..32].copy_from_slice(&pk_bytes);
+        let sig = attestation_to_signature_output(&attestation.signature);
+        assert!(
+            sig.verify(&msg, &pubkey),
+            "real ed25519 verify must accept the validator's attestation"
+        );
+        assert_eq!(header.finalized_block, 4242);
+    }
+
+    #[test]
+    fn proof_signature_fails_for_wrong_pubkey() {
+        let validator =
+            Validator::new(SwarmConfig::default(), "proof-verify-wrong-key".to_string());
+        validator.initialize().unwrap();
+        validator.set_chain_block_anchor(7);
+
+        let task = DeterministicTask::new(
+            crate::deterministic::TaskType::BatchHash,
+            vec![b"x".to_vec()],
+            HashAlgorithm::Keccak256,
+        );
+        let _ = validator.process_task(task);
+
+        let (attestation, header) = latest_attestation(&validator);
+        let sig = attestation_to_signature_output(&attestation.signature);
+
+        // Build a *different* ed25519 key and verify the real signature
+        // does NOT match it.
+        let other_key =
+            SigningKey::from_seed(b"a totally different thirty-two byte seed for testing!")
+                .expect("test seed must be accepted");
+        let mut wrong_pubkey = [0u8; 33];
+        wrong_pubkey[..32].copy_from_slice(&other_key.public_key_bytes());
+
+        let msg = Validator::build_signing_message(
+            &attestation.receipt,
+            header.bundle_id,
+            header.finalized_block,
+            header.legs_hash,
+        );
+        assert!(
+            !sig.verify(&msg, &wrong_pubkey),
+            "signature must NOT verify against an unrelated pubkey"
+        );
+    }
+
+    #[test]
+    fn proof_rejected_when_finalized_block_unanchored() {
+        // Fresh validator, no chain anchor set → chain_block_anchor()
+        // returns 0. The validator's `proof.validate()` call inside
+        // `ProofAggregator::submit_proof` rejects proofs whose header
+        // carries `finalized_block == 0`, so the aggregator must
+        // remain empty. Production aggregators must therefore treat
+        // an un-anchored proof as un-acceptable (this test pins that
+        // contract; the aggregator-level rejection is the gate).
+        let validator = Validator::new(
+            SwarmConfig::default(),
+            "proof-verify-unanchored".to_string(),
+        );
+        validator.initialize().unwrap();
+        assert_eq!(validator.chain_block_anchor(), 0);
+
+        let task = DeterministicTask::new(
+            crate::deterministic::TaskType::BatchHash,
+            vec![b"unanchored".to_vec()],
+            HashAlgorithm::Keccak256,
+        );
+        let result = validator.process_task(task);
+        // Execution itself is valid; the *proof* is what's rejected.
+        assert_eq!(
+            result.verification,
+            crate::crypto::VerificationResult::Valid
+        );
+
+        let aggregator = validator.get_proof_aggregator();
+        let count = aggregator.lock().proof_count();
+        assert_eq!(
+            count, 0,
+            "proof with finalized_block=0 must be rejected by the aggregator"
+        );
+    }
+
+    #[test]
+    fn proof_rejected_when_signature_empty() {
+        // Defense-in-depth: even if upstream code regressed to the
+        // historical `vec![]` placeholder, our `SignatureOutput::verify`
+        // must fail closed on a zero r||s. We test the *unit* here
+        // (independent of process_task) because the placeholder is
+        // gone from production code; this is a contract on the
+        // verifier itself.
+        let key = SigningKey::from_seed(b"placeholder-defense-in-depth test seed 32b!")
+            .expect("test seed must be accepted");
+        let mut pubkey = [0u8; 33];
+        pubkey[..32].copy_from_slice(&key.public_key_bytes());
+        let empty = crate::crypto::SignatureOutput::new([0u8; 32], [0u8; 32], 0);
+        assert!(
+            !empty.verify(b"any message", &pubkey),
+            "empty signature must never verify"
+        );
     }
 }

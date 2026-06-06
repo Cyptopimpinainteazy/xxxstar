@@ -1,3 +1,6 @@
+//! ⚠️ MODEL TEST — CPU-vs-GPU determinism simulation. Does NOT execute on real GPU
+//! hardware; uses mocked/in-process execution.
+//!
 //! GPU Determinism Tests — X3 Cross-VM Validator
 //!
 //! These tests assert that the GPU execution path produces bit-for-bit identical

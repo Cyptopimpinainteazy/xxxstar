@@ -11,6 +11,19 @@ const path = require('path');
 const PORT = 8080;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// HTML-entity escape to prevent reflected XSS in the 404 page (and any
+// future inline HTML we serve). `pathname` comes straight from req.url.
+// (CodeQL js/reflected-xss #2073)
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // MIME types for custom extensions
 const MIME_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
@@ -56,7 +69,7 @@ const server = http.createServer((req, res) => {
         <head><title>404 Not Found</title></head>
         <body style="font-family: monospace; padding: 20px;">
           <h1>404 Not Found</h1>
-          <p>${pathname}</p>
+          <p>${escapeHtml(pathname)}</p>
           <p><a href="/x3star-dashboard.html">← Back to Dashboard</a></p>
         </body>
         </html>

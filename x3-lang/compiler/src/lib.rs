@@ -3,10 +3,17 @@ pub mod ir;
 pub mod lowering;
 pub mod parser;
 pub mod regalloc;
+pub mod semantic;
+pub mod spec {
+    pub mod opcodes {
+        include!("../../spec/opcodes.rs");
+    }
+}
 
 use emitter::emit_x3ir;
 use lowering::{lower_program, LowerCtx};
 use parser::parse_source;
+use semantic::verify_with_defaults as verify_semantics;
 use x3_lang_ast::ast::Program;
 use x3_lang_common::X3Error;
 
@@ -24,6 +31,26 @@ pub fn compile_program(program: &Program) -> Result<Vec<u8>, X3Error> {
 pub fn compile_source(source: &str) -> Result<Vec<u8>, X3Error> {
     let program = parse_source(source)?;
     compile_program(&program)
+}
+
+/// Parse, lower, and run the semantic verifier.
+///
+/// Returns the IR plus the list of semantic errors (empty list = clean).
+/// Use this for the `check` CLI command: it stops at the semantic pass
+/// without emitting bytecode, exposing every production-safety problem
+/// in a single shot.
+pub fn check_source(source: &str) -> Result<(Program, crate::ir::X3IR, Vec<X3Error>), X3Error> {
+    let program = parse_source(source)?;
+    let ir = compile_to_ir(&program)?;
+    match verify_semantics(&ir) {
+        Ok(()) => Ok((program, ir, Vec::new())),
+        Err(errs) => Ok((program, ir, errs)),
+    }
+}
+
+/// Run the semantic verifier against an X3IR program.
+pub fn check_ir(ir: &crate::ir::X3IR) -> Result<(), Vec<X3Error>> {
+    verify_semantics(ir)
 }
 
 /// Compile with explicit lowering context (for replay protection, chain_id, etc.)

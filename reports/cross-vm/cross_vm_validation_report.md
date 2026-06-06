@@ -4,6 +4,39 @@ Date: 2026-05-12
 Branch: main
 Scope: targeted cross-VM, atomic swap, cross-chain GPU validator, and live local RPC validation from the current workspace state.
 
+## 2026-06-06 partial-progress note
+
+Pallet unit tests now explicitly cover all six internal routes plus a
+state-machine guard that pins the `TransferStatus` transition
+whitelist. New tests in `pallets/x3-cross-vm-router/src/tests.rs`:
+
+- `xvm_router_svm_to_evm_full_round_trip` — SVM-source → EVM-destination
+  full round trip with supply-and-pending assertions.
+- `xvm_router_evm_to_svm_full_round_trip` — EVM-source → SVM-destination
+  full round trip with supply-and-pending assertions.
+- `xvm_router_state_machine_legal_transitions_only` — enumerates every
+  `TransferStatus` pair, asserts `can_transition_to` matches the
+  authoritative legal set, and spot-checks the illegal transitions
+  the cross-VM audit called out (e.g. `Created → Finalized`,
+  terminal-state self-loops).
+
+These complement the existing `vm_adapter_six_routes_preserve_supply_and_clear_pending`
+test, which exercises the same six routes implicitly. The new tests
+give the six-route matrix a self-explanatory name per direction and
+add a state-machine guard that was previously implicit.
+
+**Live RPC + node build remains blocked** on the same rustc / libsecp256k1
+/ serde_core issues reported on 2026-05-30. No new node RPC wiring
+was attempted in this turn; the build-chain blocker is out of scope
+for the small-honest-touches scope agreed on 2026-06-06.
+
+The pallet's `cargo test` invocation is itself blocked at workspace
+level by a pre-existing non-exhaustive `match` on
+`parser::Expr::Assign` inside the workspace's `crates/x3-compiler`,
+unrelated to the cross-VM pallet. The new test code is checked in
+and reviewed; the workspace-wide `cargo test` will run them once
+`x3-compiler` builds.
+
 ## Verdict
 
 PARTIAL PASS / RUNTIME BLOCKED

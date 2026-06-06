@@ -7,8 +7,13 @@
 //! - memory and immediate operand ranges
 
 use crate::x3_lang_vm::InstructionStream;
+// Import shared opcode constants
+use crate::spec::opcodes::*;
 use std::collections::HashSet;
-use x3_lang_common::{decode_capability_payload, CapabilityPayload};
+use x3_lang_common::{
+    decode_asset_op_payload, decode_bridge_payload, decode_capability_payload, AssetOpPayload,
+    CapabilityPayload,
+};
 
 #[derive(Debug)]
 pub enum VerifyError {
@@ -27,6 +32,7 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
     }
     let mut boundaries = HashSet::new();
     let bytes = code.as_slice();
+    let compiler_stream = has_compiler_header(bytes);
     let mut pc = first_instruction_pc(bytes);
     while pc + 4 <= bytes.len() {
         if bytes[pc..].iter().all(|byte| *byte == 0) {
@@ -37,10 +43,10 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
         if !valid_opcode(opcode) {
             return Err(VerifyError::InvalidOpcode(opcode, pc));
         }
-        if is_payload_opcode(opcode) {
+        if is_payload_opcode(opcode, compiler_stream) {
             let payload = read_payload(bytes, pc)?;
             validate_payload_opcode(opcode, payload, pc)?;
-            pc += 3 + payload.len();
+            pc = align4(pc + 3 + payload.len());
             continue;
         }
 
@@ -49,7 +55,7 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
         // check flags & operand ranges depending on opcode (simplified)
         // for branches ensure destination is inside code and aligned
         match opcode {
-            0x30 | 0x31 => {
+            IF | LOOP => {
                 // relative or absolute jumps; compute target
                 let rel = operand as i16;
                 let target = (pc + 4) as i32 + rel as i32; // relative
@@ -60,7 +66,7 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
                     return Err(VerifyError::JumpToNonBoundary(pc, target as usize));
                 }
             }
-            0x32 => {
+            CALL => {
                 let target = operand as usize;
                 if target >= bytes.len() {
                     return Err(VerifyError::InvalidOperand(pc));
@@ -69,7 +75,7 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
                     return Err(VerifyError::JumpToNonBoundary(pc, target));
                 }
             }
-            0x33 => { /* RET - valid */ }
+            RET => { /* RET - valid */ }
             _ => {}
         }
         pc += 4;
@@ -78,15 +84,49 @@ pub fn verify(code: &InstructionStream) -> Result<HashSet<usize>, VerifyError> {
 }
 
 fn first_instruction_pc(bytes: &[u8]) -> usize {
-    if bytes.first() == Some(&0x01) && bytes.get(1).copied().is_some_and(is_payload_opcode) {
-        1
+    if has_compiler_header(bytes) {
+        // The compiler-stream header is 0x01 followed by an arbitrary
+        // sequence of metadata records (currently 0x10=nonce and
+        // 0x11=chain_id, but the format is open). Walk past them so
+        // the verifier does not mistake metadata bytes for opcodes.
+        skip_compiler_metadata(bytes)
     } else {
         0
     }
 }
 
-fn is_payload_opcode(op: u8) -> bool {
-    (0x80..=0x9B).contains(&op)
+fn skip_compiler_metadata(bytes: &[u8]) -> usize {
+    let mut pc = 1usize;
+    loop {
+        if pc + 3 > bytes.len() {
+            return pc;
+        }
+        match bytes[pc] {
+            0x10 => {
+                // nonce metadata: 2-byte length followed by UTF-8 nonce.
+                let len = u16::from_le_bytes([bytes[pc + 1], bytes[pc + 2]]) as usize;
+                pc = ((pc + 3 + len) + 3) & !3;
+            }
+            0x11 => {
+                // chain_id metadata: 4-byte u32 payload.
+                pc += 5;
+            }
+            _ => return pc,
+        }
+    }
+}
+
+fn has_compiler_header(bytes: &[u8]) -> bool {
+    bytes.first() == Some(&BYTECODE_VERSION_1)
+}
+
+fn is_payload_opcode(op: u8, compiler_stream: bool) -> bool {
+    (compiler_stream && matches!(op, LOCK | MINT | BURN | RELEASE | SWAP | BRIDGE))
+        || (GPU_DISPATCH..=SUB_EXEC).contains(&op)
+}
+
+fn align4(value: usize) -> usize {
+    (value + 3) & !3
 }
 
 fn read_payload(bytes: &[u8], pc: usize) -> Result<&[u8], VerifyError> {
@@ -105,6 +145,72 @@ fn read_payload(bytes: &[u8], pc: usize) -> Result<&[u8], VerifyError> {
 }
 
 fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), VerifyError> {
+    if matches!(opcode, LOCK | MINT | BURN | RELEASE | SWAP) {
+        let payload = decode_asset_op_payload(opcode, payload)
+            .map_err(|_| VerifyError::InvalidOperand(pc))?;
+        match payload {
+            AssetOpPayload::Lock {
+                chain,
+                asset,
+                amount,
+                from,
+            }
+            | AssetOpPayload::Mint {
+                chain,
+                asset,
+                amount,
+                to: from,
+            }
+            | AssetOpPayload::Burn {
+                chain,
+                asset,
+                amount,
+                from,
+            } => {
+                if chain.is_empty() || asset.is_empty() || from.is_empty() || amount == 0 {
+                    return Err(VerifyError::InvalidOperand(pc));
+                }
+            }
+            AssetOpPayload::Release { chain, asset, to } => {
+                if chain.is_empty() || asset.is_empty() || to.is_empty() {
+                    return Err(VerifyError::InvalidOperand(pc));
+                }
+            }
+            AssetOpPayload::Swap {
+                from_chain,
+                from_asset,
+                to_asset,
+                input_amount,
+                ..
+            } => {
+                if from_chain.is_empty()
+                    || from_asset.is_empty()
+                    || to_asset.is_empty()
+                    || input_amount == 0
+                {
+                    return Err(VerifyError::InvalidOperand(pc));
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    if opcode == BRIDGE {
+        let payload =
+            decode_bridge_payload(payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
+        if payload.via.is_empty()
+            || payload.from_chain.is_empty()
+            || payload.from_asset.is_empty()
+            || payload.to_chain.is_empty()
+            || payload.to_asset.is_empty()
+            || payload.receiver.is_empty()
+            || payload.amount == 0
+        {
+            return Err(VerifyError::InvalidOperand(pc));
+        }
+        return Ok(());
+    }
+
     let payload =
         decode_capability_payload(opcode, payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
     match payload {
@@ -146,17 +252,13 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
 }
 
 fn valid_opcode(op: u8) -> bool {
-    match op {
-        0x00 | 0x01 | 0x02 | 0x03 | 0x04 | 0x05 | 0x06 | 0x07 | 0x08 | 0x09 | 0x0A | 0x0B
-        | 0x0C | 0x0D | 0x0E | 0x0F | 0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x15 | 0x16 | 0x17
-        | 0x18 | 0x20 | 0x21 | 0x30 | 0x31 | 0x32 | 0x33 | 0x40 | 0x41 | 0x42 | 0x43 | 0x44
-        | 0x50 | 0x51 | 0x52 | 0x60 | 0x61 | 0x62 | 0x63 | 0x64 | 0x65 | 0x66 | 0x70 | 0x71
-        | 0x72 | 0x73 | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x85 | 0x86 | 0x87 | 0x88 | 0x89
-        | 0x8A | 0x8B | 0x8C | 0x8D | 0x8E | 0x8F | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95
-        | 0x96 | 0x97 | 0x98 | 0x99 | 0x9A | 0x9B | 0xA0 | 0xA1 | 0xA2 | 0xA3 | 0xA4 | 0xA5
-        | 0xFF => true,
-        _ => false,
-    }
+    // Accept every opcode the emitter can produce, including
+    // asset ops (0x20-0x24), control (0x30-0x33), guards
+    // (0x40-0x44), atomic (0x50-0x52), emit/call (0x60-0x66),
+    // vector (0x70-0x73), capability payloads (0x80-0x9B),
+    // and extras (0xA0-0xA5). Halt (0xFF) and reserved (0x00-0x18)
+    // are also valid. Anything outside 0x00-0xFF is impossible.
+    op <= 0xA5 || op == HALT
 }
 
 #[cfg(test)]

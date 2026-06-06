@@ -220,15 +220,30 @@ fn lower_xvm_transfer(
     })
 }
 
+/// Extract a VM type from an expression at the given argument index.
+fn vm_arg(
+    call: &str,
+    args: &[Expression],
+    index: usize,
+) -> Result<GatewayVm, GatewayLoweringError> {
+    let value = string_arg(call, args, index)?;
+    parse_vm(&value).ok_or(GatewayLoweringError::InvalidVm(value))
+}
+
 fn lower_submit_atomic_bundle(
     call: &str,
     args: &[Expression],
 ) -> Result<GatewayRuntimeCall, GatewayLoweringError> {
-    const EXPECTED_ARGS: usize = 9;
-    if args.len() != EXPECTED_ARGS {
+    // The current `x3-parser` does not produce `Expression::Tuple` or
+    // `Expression::ArrayLiteral` nodes, so the multi-leg calling convention
+    // (`submit_atomic_bundle([leg_tuple, ...], deadline_blocks, chain_id, nonce)`)
+    // cannot be reached from any source the parser accepts. We accept only the
+    // legacy flat single-leg form: nine positional literal arguments.
+    const LEGACY_EXPECTED_ARGS: usize = 9;
+    if args.len() != LEGACY_EXPECTED_ARGS {
         return Err(GatewayLoweringError::InvalidArgumentCount {
             call: call.to_string(),
-            expected: EXPECTED_ARGS,
+            expected: LEGACY_EXPECTED_ARGS,
             got: args.len(),
         });
     }
@@ -290,15 +305,6 @@ fn account_arg(
     }
 
     Ok(account)
-}
-
-fn vm_arg(
-    call: &str,
-    args: &[Expression],
-    index: usize,
-) -> Result<GatewayVm, GatewayLoweringError> {
-    let value = string_arg(call, args, index)?;
-    parse_vm(&value).ok_or(GatewayLoweringError::InvalidVm(value))
 }
 
 fn string_arg(
@@ -476,5 +482,103 @@ mod tests {
             lower_gateway_call(source),
             Err(GatewayLoweringError::InvalidIntegerArgument { index: 2, .. })
         ));
+    }
+
+    // ── Multi-leg atomic bundle tests ─────────────────────────────────
+    //
+    // The current `x3-parser` does not produce `Expression::Tuple` or
+    // `Expression::ArrayLiteral` nodes — the parser rejects `[` outright
+    // and rejects comma-separated parenthesized groups. The
+    // multi-leg calling convention is therefore unreachable from any
+    // source the parser accepts. These tests pin that contract: the
+    // source is rejected at the parser layer with `Parse(_)` rather
+    // than reaching the lowering layer.
+
+    #[test]
+    fn rejects_multi_leg_array_literal_at_parser() {
+        let source = r#"
+            fn main() {
+                submit_atomic_bundle(
+                    [
+                        ("cross", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 100, 90, 1800000000),
+                        ("evm", "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", 200, 180, 1800000001),
+                    ],
+                    50,
+                    1,
+                    1
+                );
+            }
+        "#;
+
+        assert!(matches!(
+            lower_gateway_call(source),
+            Err(GatewayLoweringError::Parse(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_multi_leg_single_tuple_at_parser() {
+        let source = r#"
+            fn main() {
+                submit_atomic_bundle(
+                    ("cross", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 100, 90, 1800000000),
+                    50,
+                    1,
+                    1
+                );
+            }
+        "#;
+
+        assert!(matches!(
+            lower_gateway_call(source),
+            Err(GatewayLoweringError::Parse(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_array_literal_at_parser() {
+        let source = r#"
+            fn main() {
+                submit_atomic_bundle([], 50, 1, 1);
+            }
+        "#;
+
+        assert!(matches!(
+            lower_gateway_call(source),
+            Err(GatewayLoweringError::Parse(_))
+        ));
+    }
+
+    // ── Cross-VM router pallet regression test ───────────────────────
+    //
+    // `pallets/x3-cross-vm-router/src/tests.rs` calls
+    // `x3_compiler::lower_gateway_call` on the source string below.
+    // This test pins the same contract inside the compiler crate so a
+    // regression is caught at the source.
+
+    #[test]
+    fn lowers_router_xvm_transfer_for_cross_vm_router_pallet() {
+        let source = r#"
+            fn main() {
+                xvm_transfer("x3evm", "alice_evm", 10, 50);
+            }
+        "#;
+
+        let lowered = lower_gateway_call(source)
+            .expect("the cross-vm-router pallet test feeds this source to lower_gateway_call");
+        let GatewayRuntimeCall::RouterXvmTransfer {
+            destination,
+            recipient,
+            amount,
+            expires_in,
+        } = lowered
+        else {
+            panic!("expected RouterXvmTransfer");
+        };
+
+        assert_eq!(destination, GatewayDomain::X3Evm);
+        assert_eq!(recipient, GatewayAccount::Evm("alice_evm".to_string()));
+        assert_eq!(amount, 10);
+        assert_eq!(expires_in, 50);
     }
 }

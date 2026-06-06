@@ -68,7 +68,7 @@ pub use runtime_api::*;
 pub use types::{AmmProtocol, VmType};
 pub use weights::WeightInfo;
 use x3_packet_schema::{
-    EvmPacket, Packet as KernelPacket, SvmPacket, U256 as SchemaU256, X3VmPacket,
+    EvmPacket, Packet as KernelPacket, SvmPacket, X3VmPacket, U256 as SchemaU256,
 };
 
 use codec::{Decode, DecodeWithMemTracking, Encode};

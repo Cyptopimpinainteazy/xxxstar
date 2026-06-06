@@ -247,7 +247,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
         } => {
             // lock CHAIN.ASSET amount VALUE from ADDR
             ir.push(Operation::Lock {
-                chain: chain.as_str().to_string(),
+                chain: chain_to_string(chain),
                 asset: asset.name.as_str().to_string(),
                 amount: expression_to_u128(amount)?,
                 from: expression_to_string(from),
@@ -256,7 +256,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
         Statement::Mint { asset, amount, to } => {
             // mint ASSET amount VALUE to ADDR
             ir.push(Operation::Mint {
-                chain: asset.chain.as_str().to_string(),
+                chain: chain_to_string(&asset.chain),
                 asset: asset.name.as_str().to_string(),
                 amount: expression_to_u128(amount)?,
                 to: expression_to_string(to),
@@ -269,7 +269,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
         } => {
             // burn ASSET amount VALUE from ADDR
             ir.push(Operation::Burn {
-                chain: asset.chain.as_str().to_string(),
+                chain: chain_to_string(&asset.chain),
                 asset: asset.name.as_str().to_string(),
                 amount: expression_to_u128(amount)?,
                 from: expression_to_string(from),
@@ -278,7 +278,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
         Statement::Release { chain, asset, to } => {
             // release CHAIN.ASSET to ADDR
             ir.push(Operation::Release {
-                chain: chain.as_str().to_string(),
+                chain: chain_to_string(chain),
                 asset: asset.name.as_str().to_string(),
                 to: expression_to_string(to),
             });
@@ -287,19 +287,59 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             from,
             to,
             route,
+            min_output,
             dex,
         } => {
             // swap FROM -> TO [route ...] [dex ...]
             ir.push(Operation::Swap {
-                from_chain: from.chain.as_str().to_string(),
+                from_chain: chain_to_string(&from.chain),
                 from_asset: from.name.as_str().to_string(),
                 to_asset: to.name.as_str().to_string(),
                 input_amount: route.as_ref().and_then(expression_to_u128_opt).unwrap_or(0),
-                min_output: 0,
+                min_output: min_output
+                    .as_ref()
+                    .and_then(expression_to_u128_opt)
+                    .unwrap_or(0),
                 dex: dex.as_ref().map(expression_to_string),
             });
         }
+        Statement::Bridge {
+            via,
+            from,
+            to,
+            amount,
+            receiver,
+            source_finality_proof,
+            transfer_proof,
+        } => {
+            ir.push(Operation::Bridge {
+                via: via.as_str().to_string(),
+                from_chain: chain_to_string(&from.chain),
+                from_asset: from.name.as_str().to_string(),
+                to_chain: chain_to_string(&to.chain),
+                to_asset: to.name.as_str().to_string(),
+                amount: expression_to_u128(amount)?,
+                receiver: expression_to_string(receiver),
+                source_finality_proof: source_finality_proof
+                    .as_ref()
+                    .map(expression_to_string)
+                    .unwrap_or_default()
+                    .into_bytes(),
+                transfer_proof: transfer_proof
+                    .as_ref()
+                    .map(expression_to_string)
+                    .unwrap_or_default()
+                    .into_bytes(),
+            });
+        }
         Statement::Require(guard) => {
+            // Surface `require nonce <subject> <value>` into the
+            // program-level metadata so the replay-protection rule in
+            // the semantic verifier sees it. The value is the nonce
+            // string the consumer is committing to.
+            if matches!(guard.kind, RequireKind::Nonce) {
+                ir.metadata.nonce = Some(expression_to_string(&guard.value));
+            }
             ir.push(Operation::Require {
                 kind: require_kind_to_ir(&guard.kind),
                 condition: expression_to_condition(&guard.value)?,
@@ -315,7 +355,11 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             // Accept either a u32 or u128 integer literal; clamp to u32.
             let dur_blocks: u32 = match &duration {
                 Expression::Literal(LiteralExpr::Int { value, .. }) => {
-                    if *value > u32::MAX as u128 { u32::MAX } else { *value as u32 }
+                    if *value > u32::MAX as u128 {
+                        u32::MAX
+                    } else {
+                        *value as u32
+                    }
                 }
                 _ => expression_to_blocks(&duration)?,
             };
@@ -323,6 +367,17 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 duration_blocks: dur_blocks,
                 action: failure_action_to_ir(action),
             });
+            if let ast::FailureAction::Refund(expr) = action {
+                if let crate::ir::FailureAction::Refund { chain, asset, to } =
+                    refund_expression_to_ir(expr)
+                {
+                    ir.push(Operation::Release {
+                        chain: chain.to_ascii_lowercase(),
+                        asset,
+                        to,
+                    });
+                }
+            }
         }
         Statement::Snapshot => {
             ir.push(Operation::ChainMetric {
@@ -774,6 +829,9 @@ fn expression_to_u128(expr: &Expression) -> Result<u128, x3_lang_common::X3Error
 }
 fn expression_to_u128_opt(expr: &Expression) -> Option<u128> {
     expression_to_u128(expr).ok()
+}
+fn chain_to_string(chain: &ChainRef) -> String {
+    chain.as_str().to_ascii_lowercase()
 }
 fn expression_to_blocks(expr: &Expression) -> Result<u32, x3_lang_common::X3Error> {
     expression_to_u128(expr).map(|v| v as u32)

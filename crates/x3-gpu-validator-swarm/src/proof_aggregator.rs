@@ -155,6 +155,21 @@ impl ProofAggregator {
             .ok_or(SwarmError::ProofNotFound)
     }
 
+    /// Return the most recently inserted proof, or `None` if the
+    /// aggregator is empty. Intended for tests and read-only tooling
+    /// that need to inspect the latest attestation without knowing its
+    /// hash. Insertion order is preserved by `BTreeMap` only when keys
+    /// are equal; for "latest" semantics we use the entry with the
+    /// largest `proof_hash` so the result is stable.
+    pub fn latest_proof(&self) -> Option<UnifiedProof> {
+        self.proofs.values().next_back().map(|e| e.proof.clone())
+    }
+
+    /// Number of proofs currently held in the aggregator.
+    pub fn proof_count(&self) -> usize {
+        self.proofs.len()
+    }
+
     /// Get aggregation state for proof
     pub fn get_aggregation_state(
         &self,

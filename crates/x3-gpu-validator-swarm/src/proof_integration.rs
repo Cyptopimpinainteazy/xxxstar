@@ -195,6 +195,13 @@ fn compute_output_hash(outputs: &[Vec<u8>]) -> Hash {
 
 /// Helper: compute legs hash
 fn compute_legs_hash(task_id: &str) -> Hash {
+    compute_legs_hash_pub(task_id)
+}
+
+/// Public re-export of the legs hash so the validator can compute the
+/// exact same bytes for its signing message. Kept in sync with the
+/// internal call site by routing through this function.
+pub fn compute_legs_hash_pub(task_id: &str) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(b"legs:");
     hasher.update(task_id.as_bytes());

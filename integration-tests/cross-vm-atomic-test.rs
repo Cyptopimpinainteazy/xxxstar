@@ -1,3 +1,5 @@
+//! ⚠️ MODEL TEST — Simulated test environment. Uses TestExternalities, not real nodes.
+//!
 //! Cross-VM Atomic Integration Test
 //!
 //! Real runtime-backed tests for the full atomic execution flow from EVM to

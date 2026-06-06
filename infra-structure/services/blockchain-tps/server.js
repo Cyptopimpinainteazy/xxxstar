@@ -8,6 +8,20 @@ const fs = require('fs');
 const { encryptJson, decryptJson } = require('./utils/crypto');
 const fetch = globalThis.fetch || require('node-fetch');
 const { notifyLead } = require('./utils/mailer');
+const { validateOutboundUrl } = require('./utils/ssrf-guard');
+
+// express-rate-limit caps abusive per-IP traffic. The blockchain-tps service
+// exposes public RPC-probe and webhook endpoints; without a cap an attacker
+// can flood /api/run and force a Python benchmark per request.
+// (CodeQL js/missing-rate-limiting #2078, #2079, #2080, #2081, #2083, #2085,
+//  #2087, #2088, #2091)
+let rateLimit;
+try {
+  rateLimit = require('express-rate-limit');
+} catch (e) {
+  console.warn('express-rate-limit not installed; rate limiting disabled');
+  rateLimit = () => (req, res, next) => next();
+}
 
 
 
@@ -17,8 +31,39 @@ const { connectRedis } = require('./utils/redis');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
+const ACCELERATOR_BENCHMARK = {
+  backend: process.env.X3_ACCEL || 'wgpu',
+  tasks_per_round: Number(process.env.X3_SWARM_SOAK_TASKS || 128),
+  batch_size: Number(process.env.X3_SWARM_SOAK_BATCH || 1024),
+  soak_secs: Number(process.env.X3_SWARM_SOAK_SECS || 60),
+  measured_task_tps: Number(process.env.X3_SWARM_MEASURED_TASK_TPS || 62.15),
+  measured_sliding_tps: Number(process.env.X3_SWARM_MEASURED_SLIDING_TPS || 58.5),
+  measured_hashes_per_sec: Number(process.env.X3_SWARM_MEASURED_HASHES_PER_SEC || 63823.33),
+  accelerator_fallbacks: Number(process.env.X3_SWARM_ACCELERATOR_FALLBACKS || 0),
+  accelerator_parity_mismatches: Number(process.env.X3_SWARM_ACCELERATOR_PARITY_MISMATCHES || 0),
+  source: 'x3-gpu-validator-swarm swarm_tps 60s local wgpu soak',
+};
+app.set('trust proxy', 1);
 app.use(require('cors')());
 app.use(bodyParser.json());
+
+// Read endpoints: permissive cap, but rate-limited.
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', hint: 'too many requests, slow down' },
+});
+// Write / trigger endpoints: strict cap; runs cost CPU + spawn child processes.
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', hint: 'write throttled, slow down' },
+});
+app.use(readLimiter);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'blockchain-tps', port: PORT });
@@ -33,6 +78,13 @@ const jobs = new Map();
 // Helper: lightweight RPC probe to estimate baseline TPS
 async function probeRpc(rpcUrl, durationSeconds = 5, concurrency = 30) {
   if (!rpcUrl) return 0;
+  // SSRF guard: only fetch URLs whose host is a public, non-loopback address.
+  // (CodeQL js/server-side-request-forgery #1953)
+  const check = await validateOutboundUrl(rpcUrl);
+  if (!check.ok) {
+    console.warn('probeRpc blocked:', check.reason);
+    return 0;
+  }
   const end = Date.now() + durationSeconds * 1000;
   let total = 0;
 
@@ -187,7 +239,7 @@ app.get('/api/sessions', async (req, res) => {
 });
 
 // Start a benchmark job
-app.post('/api/run', async (req, res) => {
+app.post('/api/run', writeLimiter, async (req, res) => {
   const { rpc = '', evm_tps = 1000, duration = 10, gpu = false, company_id = null } = req.body || {};
 
   const id = uuidv4();
@@ -299,21 +351,38 @@ app.post('/api/run', async (req, res) => {
   res.json({ jobId: id });
 });
 
+// UUID v4 regex — server-generated job ids are uuid v4. Restricting the param
+// shape prevents path-traversal payloads (CodeQL js/uncontrolled-data-in-path-expression
+// #2111, #2112). If the id doesn't match, return 404 instead of letting it
+// reach path.join / fs.readFileSync.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidJobId(id) {
+  return typeof id === 'string' && id.length <= 64 && UUID_RE.test(id);
+}
+
 // Stream job status and report
 app.get('/api/status/:id', (req, res) => {
   const id = req.params.id;
+  if (!isValidJobId(id)) return res.status(404).json({ error: 'job not found' });
   const job = jobs.get(id);
   if (!job) return res.status(404).json({ error: 'job not found' });
   const reportFile = path.join(__dirname, `reports/${id}.json`);
-  if (fs.existsSync(reportFile)) {
-    return res.json({ status: job.status, report: JSON.parse(fs.readFileSync(reportFile, 'utf8')) });
+  // Defense-in-depth: resolve and confirm the file is still under the reports dir.
+  const resolved = path.resolve(reportFile);
+  const reportsRoot = path.resolve(__dirname, 'reports');
+  if (!resolved.startsWith(reportsRoot + path.sep)) {
+    return res.status(400).json({ error: 'invalid path' });
+  }
+  if (fs.existsSync(resolved)) {
+    return res.json({ status: job.status, report: JSON.parse(fs.readFileSync(resolved, 'utf8')) });
   }
   res.json({ status: job.status });
 });
 
 // Simple stop
-app.post('/api/stop/:id', (req, res) => {
+app.post('/api/stop/:id', writeLimiter, (req, res) => {
   const id = req.params.id;
+  if (!isValidJobId(id)) return res.status(404).json({ error: 'job not found' });
   const job = jobs.get(id);
   if (!job) return res.status(404).json({ error: 'job not found' });
   try {
@@ -327,7 +396,7 @@ app.post('/api/stop/:id', (req, res) => {
 });
 
 // Persist company profile
-app.post('/api/company', (req, res) => {
+app.post('/api/company', writeLimiter, (req, res) => {
   const dataFile = path.join(__dirname, 'data', 'companies.json.enc');
   fs.mkdirSync(path.dirname(dataFile), { recursive: true });
   const payload = req.body || {};
@@ -398,11 +467,12 @@ app.get('/api/config', (req, res) => {
   res.json({
     turnstile_sitekey: process.env.TURNSTILE_SITE_KEY || null,
     calendar_link: process.env.SALES_CALENDAR_LINK || null,
+    accelerator_benchmark: ACCELERATOR_BENCHMARK,
   });
 });
 
 // Presale lead endpoint — capture a lead, store encrypted, notify sales
-app.post('/api/lead', async (req, res) => {
+app.post('/api/lead', writeLimiter, async (req, res) => {
   const payload = req.body || {};
   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
 
@@ -484,11 +554,17 @@ async function writeSystemBulletin(bulletin) {
   // Try to post to external social webhook if configured
   const hook = process.env.SOCIAL_POST_WEBHOOK;
   if (hook) {
-    try {
-      await fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bulletin) });
-      console.log('Posted system bulletin to social webhook');
-    } catch (e) {
-      console.error('Failed to post system bulletin to webhook', e);
+    // SSRF guard: env-supplied webhook must still point to a public host.
+    const check = await validateOutboundUrl(hook);
+    if (!check.ok) {
+      console.error('Refusing to post system bulletin to unsafe webhook:', check.reason);
+    } else {
+      try {
+        await fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bulletin) });
+        console.log('Posted system bulletin to social webhook');
+      } catch (e) {
+        console.error('Failed to post system bulletin to webhook', e);
+      }
     }
   }
 }

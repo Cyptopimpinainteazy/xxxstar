@@ -404,7 +404,7 @@ export function ChainExplorer({ onBack }: ChainExplorerProps) {
                       outerRadius={100}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }: { name: string; percent?: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name ?? 'unknown'} ${((percent ?? 0) * 100).toFixed(0)}%`}
                     >
                       {overviewStats.ecosystems.map((e) => (
                         <Cell key={e.ecosystem} fill={ECO_COLORS[e.ecosystem] || ECO_COLORS.other} />

@@ -1,3 +1,6 @@
+//! ⚠️ MODEL TEST — Simulated multi-node consensus. Does NOT boot real node processes
+//! or validate real p2p/gossip/grandpa round messages.
+//!
 //! BLOCKER 2: Multi-node consensus test harness
 //!
 //! This test verifies that a network of 3+ validators can reach consensus

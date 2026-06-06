@@ -184,8 +184,8 @@ pub mod pallet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use frame_support::{assert_ok, derive_impl};
     use frame_support::traits::ConstU32;
+    use frame_support::{assert_ok, derive_impl};
     use sp_core::H256;
     use sp_runtime::BuildStorage;
 

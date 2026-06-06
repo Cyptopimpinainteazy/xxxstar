@@ -22,6 +22,7 @@ use sp_runtime::{
 };
 use x3_asset_kernel_types::{
     AccountBytes, AssetId, DomainId, ProofTier, RouteConfig, RouteLimits, SupplyPolicy,
+    TransferStatus,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -2070,4 +2071,192 @@ fn amount_below_route_min_rejected() {
             Err(pallet_x3_cross_vm_router::Error::<Test>::AmountOutOfBounds.into())
         );
     });
+}
+
+// ============================================================================
+// PHASE 4 — EXPANDED ROUTE MATRIX + STATE MACHINE GUARD
+//
+// These tests complement the existing
+// `vm_adapter_six_routes_preserve_supply_and_clear_pending` test. That
+// test exercises the four VM-adapter routes (X3Evm→X3Native,
+// X3Evm→X3Svm, X3Svm→X3Native, X3Svm→X3Evm) alongside the two
+// native-source routes. The new tests below:
+//
+//   * Pin the SVM-source → EVM-destination and EVM-source →
+//     SVM-destination full round trips as named tests with explicit
+//     supply-and-pending assertions. The existing six-route test
+//     covers these implicitly; pinning them explicitly makes the
+//     cross-VM path test failures self-explanatory when a single
+//     direction regresses.
+//   * Add a state-machine guard test that enumerates the legal
+//     `TransferStatus` transitions and asserts every illegal
+//     transition is rejected. This is the keystone of the freeze
+//     that the cross-VM audit called out.
+//
+// These tests are unit-level only; live RPC + node build is out of
+// scope for this turn (build-chain blocker on rustc/libsecp256k1
+// per the cross-VM validation report).
+// ============================================================================
+
+/// SVM-source → EVM-destination full round trip via the VM-adapter
+/// origin. Pinned explicitly so a single direction's regression
+/// produces a self-explanatory test name in CI output.
+#[test]
+fn xvm_router_svm_to_evm_full_round_trip() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(20_000);
+
+        let l0 = Ledger::ledgers(asset_id).expect("ledger exists");
+        let svm0 = l0.svm_supply;
+        let evm0 = l0.evm_supply;
+
+        let _msg_id = do_xvm_vm(
+            asset_id,
+            DomainId::X3Svm,
+            alice_svm(),
+            DomainId::X3Evm,
+            alice_evm(),
+            250,
+        );
+
+        let l1 = Ledger::ledgers(asset_id).expect("ledger exists");
+        // The full round trip debits the SVM domain and credits the
+        // EVM domain.
+        assert!(
+            l1.svm_supply < svm0,
+            "SVM source supply must decrease (was {}, now {})",
+            svm0,
+            l1.svm_supply
+        );
+        assert!(
+            l1.evm_supply > evm0,
+            "EVM destination supply must increase (was {}, now {})",
+            evm0,
+            l1.evm_supply
+        );
+        assert_eq!(l1.pending_supply, 0, "pending must clear on completion");
+        l1.check_invariant().expect("ledger invariant must hold");
+    });
+}
+
+/// EVM-source → SVM-destination full round trip via the VM-adapter
+/// origin. Pinned explicitly so a single direction's regression
+/// produces a self-explanatory test name in CI output.
+#[test]
+fn xvm_router_evm_to_svm_full_round_trip() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(20_000);
+
+        let l0 = Ledger::ledgers(asset_id).expect("ledger exists");
+        let evm0 = l0.evm_supply;
+        let svm0 = l0.svm_supply;
+
+        let _msg_id = do_xvm_vm(
+            asset_id,
+            DomainId::X3Evm,
+            alice_evm(),
+            DomainId::X3Svm,
+            alice_svm(),
+            175,
+        );
+
+        let l1 = Ledger::ledgers(asset_id).expect("ledger exists");
+        assert!(
+            l1.evm_supply < evm0,
+            "EVM source supply must decrease (was {}, now {})",
+            evm0,
+            l1.evm_supply
+        );
+        assert!(
+            l1.svm_supply > svm0,
+            "SVM destination supply must increase (was {}, now {})",
+            svm0,
+            l1.svm_supply
+        );
+        assert_eq!(l1.pending_supply, 0, "pending must clear on completion");
+        l1.check_invariant().expect("ledger invariant must hold");
+    });
+}
+
+/// State-machine guard: enumerate every `TransferStatus` pair and
+/// assert that only the legal transitions succeed. The legal set
+/// is the one in `x3_asset_kernel_types::TransferStatus::can_transition_to`
+/// (the authoritative state graph). This is the keystone of the
+/// freeze the cross-VM audit called out — a regression that lets
+/// `Created → Finalized` through would let a destination-side
+/// credit occur before the source-side debit is recorded, breaking
+/// the supply invariant.
+#[test]
+fn xvm_router_state_machine_legal_transitions_only() {
+    use x3_asset_kernel_types::TransferStatus::*;
+    let all = [
+        Created,
+        SourceDebited,
+        DestinationCredited,
+        Finalized,
+        Expired,
+        Refunded,
+        Failed,
+    ];
+    // Authoritative set from `TransferStatus::can_transition_to`.
+    let legal: &[(TransferStatus, TransferStatus)] = &[
+        (Created, SourceDebited),
+        (Created, Failed),
+        (SourceDebited, DestinationCredited),
+        (SourceDebited, Expired),
+        (SourceDebited, Failed),
+        (DestinationCredited, Finalized),
+        (Expired, Refunded),
+        (Expired, Failed),
+    ];
+    let legal_pairs: std::collections::HashSet<(TransferStatus, TransferStatus)> =
+        legal.iter().copied().collect();
+
+    for from in all.iter() {
+        for to in all.iter() {
+            let key = (*from, *to);
+            let is_legal = legal_pairs.contains(&key);
+            // Self-transitions are always illegal (a state machine
+            // step must change state). The legal set above already
+            // excludes them, so we don't special-case.
+            assert_eq!(
+                from.can_transition_to(*to),
+                is_legal,
+                "transition {:?} -> {:?}: `can_transition_to` must match the legal set",
+                from,
+                to
+            );
+        }
+    }
+
+    // Spot-check a few illegal transitions that the audit
+    // specifically called out.
+    assert!(
+        !Created.can_transition_to(Finalized),
+        "Created -> Finalized must be illegal (skipping debit/credit)"
+    );
+    assert!(
+        !Created.can_transition_to(DestinationCredited),
+        "Created -> DestinationCredited must be illegal (skipping debit)"
+    );
+    assert!(
+        !Created.can_transition_to(Refunded),
+        "Created -> Refunded must be illegal (refund requires expiry first)"
+    );
+    assert!(
+        !Finalized.can_transition_to(Refunded),
+        "Finalized is terminal: any further transition is illegal"
+    );
+    assert!(
+        !Finalized.can_transition_to(Failed),
+        "Finalized is terminal: any further transition is illegal"
+    );
+    assert!(
+        !Refunded.can_transition_to(Finalized),
+        "Refunded is terminal: any further transition is illegal"
+    );
+    assert!(
+        !Failed.can_transition_to(Refunded),
+        "Failed is terminal: any further transition is illegal"
+    );
 }

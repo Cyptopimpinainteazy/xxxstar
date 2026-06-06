@@ -114,6 +114,15 @@ pub fn infer_expr(expr: &Expr, env: &TypeEnv, registry: &Registry) -> Result<Typ
             }
             Ok(tt)
         }
+        Expr::Assign { name: _, value } => {
+            // Type-check the right-hand side; the actual binding into the
+            // local environment is the responsibility of `typecheck_stmt`
+            // (which is what processes `Stmt::Let`/`Stmt::Assign` in the
+            // statement-level walker). Inference of the assignment
+            // expression itself yields Unit.
+            let _ = infer_expr(value, env, registry)?;
+            Ok(TypeExpr::Unit)
+        }
     }
 }
 

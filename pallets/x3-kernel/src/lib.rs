@@ -1086,7 +1086,262 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Submit a Comit with raw/legacy payloads (no packet validation).
+        ///
+        /// This extrinsic accepts arbitrary Vec<u8> payloads for both EVM and SVM
+        /// without requiring them to be valid packets targeting the correct domain.
+        /// It is provided for backward compatibility with SDK, CLI, and legacy
+        /// test callers that build payloads as raw bytes rather than as typed
+        /// `Packet` SCALE-encoded structs.
+        ///
+        /// For packet-based submission (recommended), use `submit_comit` which
+        /// validates domain masks and ensures payloads deserialize correctly.
+        ///
+        /// # Security
+        /// Raw submission bypasses domain-target validation. Callers MUST ensure
+        /// correct routing via their own mechanism (e.g. separate EVM/SVM RPC calls).
+        /// This path is rate-limited and nonce-checked identically to `submit_comit`.
+        #[pallet::call_index(43)]
+        #[pallet::weight(<T as Config>::WeightInfo::submit_comit())]
+        pub fn submit_comit_raw(
+            origin: OriginFor<T>,
+            comit_id: H256,
+            evm_payload: Vec<u8>,
+            svm_payload: Vec<u8>,
+            nonce: u64,
+            fee: T::Balance,
+            prepare_root: H256,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // SEC-009: Emergency pause guard
+            ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
+
+            // Check for duplicate comit_id (M-4: Comit ID uniqueness)
+            ensure!(
+                !SubmittedComits::<T>::contains_key(comit_id),
+                Error::<T>::DuplicateComitId
+            );
+
+            // Rate limiting check (L-6)
+            const MAX_SUBMISSIONS_PER_BLOCK: u32 = 10;
+            let current_block = frame_system::Pallet::<T>::block_number();
+            let current_count = SubmissionsPerBlock::<T>::get(&who, current_block);
+            ensure!(
+                current_count < MAX_SUBMISSIONS_PER_BLOCK,
+                Error::<T>::RateLimitExceeded
+            );
+
+            // Authorization check
+            let operation_context = Self::encode_submit_comit_context(&who, comit_id);
+            Self::auth_check(&who, &operation_context)?;
+
+            // First layer checks on payload sizes and emptiness.
+            Self::verify_payloads(&comit_id, &evm_payload, &svm_payload)?;
+
+            // NOTE: No packet validation — raw payloads are accepted as-is.
+
+            // Atomic nonce check and increment
+            Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {
+                if nonce != *current_nonce {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::InvalidNonce {
+                            code: 0x05,
+                            expected: *current_nonce,
+                            provided: nonce,
+                        },
+                    ));
+                }
+                *current_nonce = current_nonce
+                    .checked_add(1)
+                    .ok_or(Error::<T>::NonceOverflow)?;
+                Ok(())
+            })?;
+
+            // Build the comit record and proceed through execution pipeline
+            let comit = Comit::<T::AccountId, T::Balance> {
+                comit_id,
+                origin: who.clone(),
+                evm_payload: evm_payload.clone(),
+                svm_payload: svm_payload.clone(),
+                nonce,
+                fee,
+                prepare_root,
+            };
+
+            // Execute via configured VM adapters
+            let evm_tx = if !evm_payload.is_empty() {
+                Some(evm_payload.clone())
+            } else {
+                None
+            };
+            let svm_tx = if !svm_payload.is_empty() {
+                Some(svm_payload.clone())
+            } else {
+                None
+            };
+
+            let execution_start_timestamp =
+                <pallet_timestamp::Pallet<T> as UnixTime>::now().as_secs();
+
+            let evm_gas_limit = T::DefaultEvmGasLimit::get();
+            let svm_compute_limit = T::DefaultSvmComputeLimit::get();
+
+            let evm_receipt = if let Some(ref tx) = evm_tx {
+                match T::EvmAdapter::execute(tx, evm_gas_limit) {
+                    Ok(receipt) => Some(receipt),
+                    Err(_e) => {
+                        return Err(Self::fail_with_reason(
+                            comit_id,
+                            ComitFailureReason::EvmExecutionFailed {
+                                code: 0x10,
+                                evm_error: 1,
+                                gas_used: 0,
+                            },
+                        ));
+                    }
+                }
+            } else {
+                None
+            };
+
+            let svm_receipt = if let Some(ref tx) = svm_tx {
+                match T::SvmAdapter::execute(tx, svm_compute_limit) {
+                    Ok(receipt) => Some(receipt),
+                    Err(_e) => {
+                        return Err(Self::fail_with_reason(
+                            comit_id,
+                            ComitFailureReason::SvmExecutionFailed {
+                                code: 0x11,
+                                svm_error: 1,
+                                compute_units_used: 0,
+                            },
+                        ));
+                    }
+                }
+            } else {
+                None
+            };
+
+            if let Some(ref receipt) = evm_receipt {
+                if !receipt.success {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::EvmExecutionFailed {
+                            code: 0x10,
+                            evm_error: 1,
+                            gas_used: receipt.gas_used,
+                        },
+                    ));
+                }
+            }
+
+            if let Some(ref receipt) = svm_receipt {
+                if !receipt.success {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::SvmExecutionFailed {
+                            code: 0x11,
+                            svm_error: 1,
+                            compute_units_used: 0,
+                        },
+                    ));
+                }
+            }
+
+            let evm_gas_used = evm_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
+            let svm_compute_units = svm_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
+            let base_fee = T::Balance::default();
+            let required_fee =
+                Self::calculate_execution_fee(evm_gas_used, svm_compute_units, base_fee)?;
+
+            ensure!(fee >= required_fee, Error::<T>::IncorrectFee);
+
+            let free_balance = T::Currency::free_balance(&who);
+            ensure!(
+                free_balance >= required_fee.into(),
+                Error::<T>::InsufficientBalance
+            );
+
+            let imbalance = T::Currency::withdraw(
+                &who,
+                required_fee.into(),
+                frame_support::traits::WithdrawReasons::FEE,
+                frame_support::traits::ExistenceRequirement::KeepAlive,
+            )?;
+            drop(imbalance);
+
+            Self::deposit_event(Event::FeeDeducted {
+                account: who.clone(),
+                amount: required_fee,
+                comit_id,
+            });
+
+            if let Err(reason) = Self::verify_dual_vm_with_receipts(
+                &comit,
+                evm_receipt.as_ref(),
+                svm_receipt.as_ref(),
+            ) {
+                return Err(Self::fail_with_reason(comit_id, reason));
+            }
+
+            SubmittedComits::<T>::insert(comit_id, current_block);
+            SubmissionsPerBlock::<T>::mutate(&who, current_block, |count| {
+                *count = count.saturating_add(1);
+            });
+
+            AccountRegistry::<T>::mutate(&who, |maybe_id| {
+                if maybe_id.is_none() {
+                    *maybe_id = Some(T::AtlasId::default());
+                }
+            });
+
+            Self::deposit_event(Event::ComitSubmitted {
+                comit_id,
+                origin: who.clone(),
+                nonce,
+                fee,
+            });
+
+            Self::deposit_event(Event::ComitExecutionStarted {
+                comit_id,
+                timestamp: execution_start_timestamp,
+            });
+
+            let total_gas_used = evm_gas_used + svm_compute_units;
+
+            Self::deposit_event(Event::ComitExecutionCompleted {
+                comit_id,
+                success: true,
+                gas_used: total_gas_used,
+            });
+
+            let changes_applied = Self::apply_canonical_ledger_update(
+                comit_id,
+                evm_receipt.as_ref(),
+                svm_receipt.as_ref(),
+            )?;
+
+            if changes_applied > 0 {
+                Self::deposit_event(Event::CanonicalLedgerUpdated {
+                    comit_id,
+                    changes_applied,
+                });
+            }
+
+            Self::deposit_event(Event::ComitFinalized { comit_id });
+            Ok(())
+        }
+
         /// Submit a Comit transaction describing dual-VM execution intents.
+        ///
+        /// **Packet-ONLY**: All non-empty payloads MUST deserialize as valid
+        /// `Packet` structs carrying the correct domain mask. Malformed or
+        /// wrong-domain payloads are rejected at submission time.
+        ///
+        /// For raw/legacy payloads (SDK, CLI, tests that build payloads as
+        /// arbitrary bytes), use `submit_comit_raw` (call_index 43) instead.
         #[pallet::call_index(0)]
         #[pallet::weight(<T as Config>::WeightInfo::submit_comit())]
         pub fn submit_comit(
@@ -1125,12 +1380,13 @@ pub mod pallet {
             // First layer checks on payload sizes and emptiness.
             Self::verify_payloads(&comit_id, &evm_payload, &svm_payload)?;
 
-            // Phase 1.4: Strict packet validation is now enforced.
-            // Payloads >= 30 bytes are treated as packet-format and MUST
-            // deserialize successfully and target the correct domain.
-            // Payloads < 30 bytes are allowed as raw/legacy format (backward compat).
-            // Malformed or wrong-domain packets are rejected at submission time.
-            if !evm_payload.is_empty() && evm_payload.len() >= 30 {
+            // Phase 1.4 (FIX): Strict packet validation — ALL non-empty payloads
+            // MUST deserialize as valid packets with correct domain masks.
+            // The previous 30-byte threshold allowed undecodable or wrong-domain
+            // raw/legacy payloads to pass through the critical path, which broke
+            // the atomicity assumption.  Every packet targeting the EVM domain
+            // must deserialize cleanly and carry the EVM domain bit (0b0001).
+            if !evm_payload.is_empty() {
                 match deserialize_packet(&evm_payload) {
                     Ok(packet) => {
                         let domain_mask = get_domain_mask(&packet);
@@ -1144,7 +1400,7 @@ pub mod pallet {
                 }
             }
 
-            if !svm_payload.is_empty() && svm_payload.len() >= 30 {
+            if !svm_payload.is_empty() {
                 match deserialize_packet(&svm_payload) {
                     Ok(packet) => {
                         let domain_mask = get_domain_mask(&packet);
@@ -1418,10 +1674,13 @@ pub mod pallet {
 
             Self::verify_payloads_v2(&comit_id, &evm_payload, &svm_payload, &x3_payload)?;
 
-            // Phase 1.4: Strict packet validation for submit_comit_v2.
-            // Same rules as submit_comit: payloads >= 30 bytes must be valid
-            // packet-format targeting the correct domain.
-            if !evm_payload.is_empty() && evm_payload.len() >= 30 {
+            // Phase 1.4 (FIX): Strict packet validation — ALL non-empty payloads
+            // MUST deserialize as valid packets with correct domain masks.
+            // The previous 30-byte threshold allowed undecodable or wrong-domain
+            // raw/legacy payloads to pass through the critical path, which broke
+            // the atomicity assumption.  Every packet targeting the EVM domain
+            // must deserialize cleanly and carry the EVM domain bit (0b0001).
+            if !evm_payload.is_empty() {
                 match deserialize_packet(&evm_payload) {
                     Ok(packet) => {
                         let domain_mask = get_domain_mask(&packet);
@@ -1435,7 +1694,7 @@ pub mod pallet {
                 }
             }
 
-            if !svm_payload.is_empty() && svm_payload.len() >= 30 {
+            if !svm_payload.is_empty() {
                 match deserialize_packet(&svm_payload) {
                     Ok(packet) => {
                         let domain_mask = get_domain_mask(&packet);
@@ -1449,7 +1708,7 @@ pub mod pallet {
                 }
             }
 
-            if !x3_payload.is_empty() && x3_payload.len() >= 30 {
+            if !x3_payload.is_empty() {
                 match deserialize_packet(&x3_payload) {
                     Ok(packet) => {
                         let domain_mask = get_domain_mask(&packet);

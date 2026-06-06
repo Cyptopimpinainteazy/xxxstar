@@ -361,6 +361,14 @@ pub mod pallet {
             bundle_id: H256,
             executor: T::AccountId,
         },
+        /// One or more VM legs could not be reverted during rollback.
+        /// Runtime monitoring should alert on this: stale VM side effects
+        /// break the advertised atomicity guarantee.
+        IncompleteVmRevert {
+            bundle_id: H256,
+            leg_count: u32,
+            failed_count: u32,
+        },
     }
 
     /// Reason a bundle was rolled back.
@@ -683,15 +691,11 @@ pub mod pallet {
 
             // Initialize per-leg receipts for VM reversion during rollback.
             // Each leg starts as unexecuted with an empty state diff.
+            // Uses the new `LegReceipt::new()` constructor with durable tracking fields.
             let leg_receipts: BoundedVec<crate::vm_revert::LegReceipt, T::MaxLegsPerBundle> = legs
                 .iter()
                 .enumerate()
-                .map(|(i, leg)| crate::vm_revert::LegReceipt {
-                    leg_index: i as u32,
-                    vm_type: leg.vm_type.clone(),
-                    executed: false,
-                    state_diff: crate::vm_revert::StateDiff::from(Vec::new()),
-                })
+                .map(|(i, leg)| crate::vm_revert::LegReceipt::new(i as u32, leg.vm_type.clone()))
                 .collect::<Vec<_>>()
                 .try_into()
                 .expect("leg count already validated against MaxLegsPerBundle");
@@ -1110,6 +1114,7 @@ pub mod pallet {
         fn do_revert_bundle_legs(bundle_id: H256) -> u32 {
             let receipts = BundleLegReceipts::<T>::get(bundle_id);
             let mut revert_failures: u32 = 0;
+            let leg_count = receipts.len() as u32;
 
             for receipt in receipts.iter() {
                 if receipt.executed && !receipt.state_diff.is_empty() {
@@ -1132,8 +1137,15 @@ pub mod pallet {
                 log::error!(
                     target: "x3-atomic-kernel",
                     "Bundle {:?}: {}/{} legs failed VM revert",
-                    bundle_id, revert_failures, receipts.len()
+                    bundle_id, revert_failures, leg_count
                 );
+                // Emit event so runtime monitoring/alerting can react to stale
+                // VM side effects that break the advertised atomicity guarantee.
+                Self::deposit_event(Event::IncompleteVmRevert {
+                    bundle_id,
+                    leg_count,
+                    failed_count: revert_failures,
+                });
             }
 
             revert_failures

@@ -83,6 +83,8 @@ These are explicitly frozen and MUST NOT be enabled until audited:
 
 ## Honest Gap Analysis
 
+> See X3_END_TO_END_GAPS_MASTER_PLAN.md for the full gap execution plan covering the missing items below.
+
 ### Gaps Before Public Testnet
 1. **Block explorer**: `apps/explorer/` exists but needs connection to real node RPC
 2. **Faucet**: No automated testnet faucet deployed

@@ -7,8 +7,13 @@ use crate::ir::{
     ChainMetricKind, CrdtKind, EmergencyKind, LifecycleKind, Operation, ProofKind, SerialFormat,
     StorageKind, VectorOp, X3IR,
 };
+// Import shared opcode constants
+use crate::spec::opcodes::*;
 use std::io::Write;
-use x3_lang_common::{encode_capability_payload, CapabilityPayload, X3Error};
+use x3_lang_common::{
+    encode_asset_op_payload, encode_bridge_payload, encode_capability_payload, AssetOpPayload,
+    BridgePayload, CapabilityPayload, X3Error,
+};
 /// Pad `bytecode` so its length is a multiple of 4. The X3 VM verifier
 /// requires every instruction to start on a 4-byte boundary.
 fn pad_to_4(bytecode: &mut Vec<u8>) {
@@ -20,24 +25,22 @@ fn pad_to_4(bytecode: &mut Vec<u8>) {
     }
 }
 
-
-
 /// Emit X3IR to bytecode suitable for the X3 runtime
 pub fn emit_x3ir(ir: &X3IR) -> Result<Vec<u8>, X3Error> {
     let mut bytecode = Vec::new();
 
     // Header: version + metadata
-    bytecode.write_all(&[0x01])?; // Version 1
+    bytecode.write_all(&[BYTECODE_VERSION_1])?;
 
     // Encode metadata
     if let Some(nonce) = &ir.metadata.nonce {
-        bytecode.write_all(&[0x10])?; // Metadata marker for nonce
+        bytecode.write_all(&[META_NONCE])?;
         bytecode.write_all(&(nonce.len() as u16).to_le_bytes())?;
         bytecode.write_all(nonce.as_bytes())?;
     }
 
     if let Some(chain_id) = ir.metadata.chain_id {
-        bytecode.write_all(&[0x11])?; // Metadata marker for chain_id
+        bytecode.write_all(&[META_CHAIN_ID])?;
         bytecode.write_all(&chain_id.to_le_bytes())?;
     }
 
@@ -57,42 +60,18 @@ pub fn emit_x3ir(ir: &X3IR) -> Result<Vec<u8>, X3Error> {
 /// Emit a single operation to bytecode
 fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error> {
     match op {
-        Operation::Lock { .. } => {
-            // Opcode: 0x20 (LOCK) — no operand bytes; pad_to_4 fills.
-            // The IR carries the structured data (chain, asset, amount,
-            // from) for the runtime; the verifier does not parse
-            // operand bytes for these instructions.
-            bytecode.write_all(&[0x20])?;
-            bytecode.write_all(&0u16.to_le_bytes())?;
-        }
-        Operation::Mint { .. } => {
-            // Opcode: 0x21 (MINT)
-            bytecode.write_all(&[0x21])?;
-            bytecode.write_all(&0u16.to_le_bytes())?;
-        }
-        Operation::Burn { .. } => {
-            // Opcode: 0x22 (BURN)
-            bytecode.write_all(&[0x22])?;
-            bytecode.write_all(&0u16.to_le_bytes())?;
-        }
-        Operation::Release { .. } => {
-            // Opcode: 0x23 (RELEASE)
-            bytecode.write_all(&[0x23])?;
-            bytecode.write_all(&0u16.to_le_bytes())?;
-        }
-        Operation::Swap { .. } => {
-            // Opcode: 0x24 (SWAP) — no operand bytes; pad_to_4 fills.
-            bytecode.write_all(&[0x24])?;
-            bytecode.write_all(&0u16.to_le_bytes())?;
-        }
+        Operation::Lock { .. } => emit_asset_op(LOCK, op, bytecode)?,
+        Operation::Mint { .. } => emit_asset_op(MINT, op, bytecode)?,
+        Operation::Burn { .. } => emit_asset_op(BURN, op, bytecode)?,
+        Operation::Release { .. } => emit_asset_op(RELEASE, op, bytecode)?,
+        Operation::Swap { .. } => emit_asset_op(SWAP, op, bytecode)?,
+        Operation::Bridge { .. } => emit_bridge_op(op, bytecode)?,
         Operation::AtomicBegin => {
-            // Opcode: 0x50 (ATOMIC_BEGIN)
-            bytecode.write_all(&[0x50])?;
+            bytecode.write_all(&[ATOMIC_BEGIN])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
         Operation::AtomicEnd => {
-            // Opcode: 0x51 (ATOMIC_END)
-            bytecode.write_all(&[0x51])?;
+            bytecode.write_all(&[ATOMIC_END])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
         Operation::If {
@@ -100,8 +79,7 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
             then_ops,
             else_ops,
         } => {
-            // Opcode: 0x30 (IF)
-            bytecode.write_all(&[0x30])?;
+            bytecode.write_all(&[IF])?;
             let cond_str = format!("{:?}", condition);
             bytecode.write_all(&(cond_str.len() as u16).to_le_bytes())?;
             bytecode.write_all(cond_str.as_bytes())?;
@@ -130,8 +108,7 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
             max_iterations,
             body,
         } => {
-            // Opcode: 0x31 (LOOP)
-            bytecode.write_all(&[0x31])?;
+            bytecode.write_all(&[LOOP])?;
             bytecode.write_all(&max_iterations.to_le_bytes())?;
 
             // Loop body
@@ -143,68 +120,100 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
             bytecode.write_all(&body_bytecode)?;
         }
         Operation::Require { .. } => {
-            // Opcode: 0x40 (REQUIRE) — no operand bytes.
-            bytecode.write_all(&[0x40])?;
+            bytecode.write_all(&[REQUIRE])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
         Operation::OnFail { .. } => {
-            // Opcode: 0x41 (ON_FAIL) — no operand bytes.
-            bytecode.write_all(&[0x41])?;
+            bytecode.write_all(&[ON_FAIL])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
         Operation::OnTimeout { .. } => {
-            // Opcode: 0x42 (ON_TIMEOUT) — no operand bytes.
-            bytecode.write_all(&[0x42])?;
+            bytecode.write_all(&[ON_TIMEOUT])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
         Operation::Emit { name, data } => {
-            // Opcode: 0x60 (EMIT)
-            bytecode.write_all(&[0x60])?;
+            bytecode.write_all(&[EMIT])?;
             let payload = format!("{}:{:?}", name, data);
             bytecode.write_all(&(payload.len() as u16).to_le_bytes())?;
             bytecode.write_all(payload.as_bytes())?;
         }
         Operation::Call { function, args } => {
-            // Opcode: 0x61 (CALL)
-            bytecode.write_all(&[0x61])?;
+            bytecode.write_all(&[CALL_HOST])?;
             let payload = format!("{}:{:?}", function, args);
             bytecode.write_all(&(payload.len() as u16).to_le_bytes())?;
             bytecode.write_all(payload.as_bytes())?;
         }
-        Operation::GpuDispatch { .. } => emit_payload_op(0x80, op, bytecode)?,
-        Operation::Simulate { .. } => emit_payload_op(0x81, op, bytecode)?,
-        Operation::ScheduledDispatch { .. } => emit_payload_op(0x82, op, bytecode)?,
-        Operation::IntentResolve { .. } => emit_payload_op(0x83, op, bytecode)?,
-        Operation::CrdtOp { .. } => emit_payload_op(0x84, op, bytecode)?,
-        Operation::ProofVerify { .. } => emit_payload_op(0x85, op, bytecode)?,
-        Operation::StorageOp { .. } => emit_payload_op(0x86, op, bytecode)?,
-        Operation::Pathfind { .. } => emit_payload_op(0x87, op, bytecode)?,
-        Operation::MempoolScan { .. } => emit_payload_op(0x88, op, bytecode)?,
-        Operation::OracleRequest { .. } => emit_payload_op(0x89, op, bytecode)?,
-        Operation::EmergencyControl { .. } => emit_payload_op(0x8A, op, bytecode)?,
-        Operation::Lifecycle { .. } => emit_payload_op(0x8B, op, bytecode)?,
-        Operation::Serialize { .. } => emit_payload_op(0x8C, op, bytecode)?,
-        Operation::Deserialize { .. } => emit_payload_op(0x8D, op, bytecode)?,
-        Operation::GasEstimate { .. } => emit_payload_op(0x8E, op, bytecode)?,
-        Operation::ChainMetric { .. } => emit_payload_op(0x8F, op, bytecode)?,
-        Operation::EventProvenance { .. } => emit_payload_op(0x90, op, bytecode)?,
-        Operation::MultiHopSwap { .. } => emit_payload_op(0x91, op, bytecode)?,
-        Operation::VectorMath { .. } => emit_payload_op(0x92, op, bytecode)?,
-        Operation::RoleCheck { .. } => emit_payload_op(0x93, op, bytecode)?,
-        Operation::MultisigCheck { .. } => emit_payload_op(0x94, op, bytecode)?,
-        Operation::VersionMeta { .. } => emit_payload_op(0x95, op, bytecode)?,
-        Operation::StorageNamespace { .. } => emit_payload_op(0x96, op, bytecode)?,
-        Operation::AbiExport { .. } => emit_payload_op(0x97, op, bytecode)?,
-        Operation::DocEmbed { .. } => emit_payload_op(0x98, op, bytecode)?,
-        Operation::GasAdaptive { .. } => emit_payload_op(0x99, op, bytecode)?,
-        Operation::Bounty { .. } => emit_payload_op(0x9A, op, bytecode)?,
+        Operation::GpuDispatch { .. } => emit_payload_op(GPU_DISPATCH, op, bytecode)?,
+        Operation::Simulate { .. } => emit_payload_op(SIMULATE, op, bytecode)?,
+        Operation::ScheduledDispatch { .. } => emit_payload_op(SCHEDULED_DISPATCH, op, bytecode)?,
+        Operation::IntentResolve { .. } => emit_payload_op(INTENT_RESOLVE, op, bytecode)?,
+        Operation::CrdtOp { .. } => emit_payload_op(CRDT_OP, op, bytecode)?,
+        Operation::ProofVerify { .. } => emit_payload_op(PROOF_VERIFY, op, bytecode)?,
+        Operation::StorageOp { .. } => emit_payload_op(STORAGE_OP, op, bytecode)?,
+        Operation::Pathfind { .. } => emit_payload_op(PATHFIND, op, bytecode)?,
+        Operation::MempoolScan { .. } => emit_payload_op(MEMPOOL_SCAN, op, bytecode)?,
+        Operation::OracleRequest { .. } => emit_payload_op(ORACLE_REQUEST, op, bytecode)?,
+        Operation::EmergencyControl { .. } => emit_payload_op(EMERGENCY_CONTROL, op, bytecode)?,
+        Operation::Lifecycle { .. } => emit_payload_op(LIFECYCLE, op, bytecode)?,
+        Operation::Serialize { .. } => emit_payload_op(SERIALIZE, op, bytecode)?,
+        Operation::Deserialize { .. } => emit_payload_op(DESERIALIZE, op, bytecode)?,
+        Operation::GasEstimate { .. } => emit_payload_op(GAS_ESTIMATE, op, bytecode)?,
+        Operation::ChainMetric { .. } => emit_payload_op(CHAIN_METRIC, op, bytecode)?,
+        Operation::EventProvenance { .. } => emit_payload_op(EVENT_PROVENANCE, op, bytecode)?,
+        Operation::MultiHopSwap { .. } => emit_payload_op(MULTI_HOP_SWAP, op, bytecode)?,
+        Operation::VectorMath { .. } => emit_payload_op(VECTOR_MATH, op, bytecode)?,
+        Operation::RoleCheck { .. } => emit_payload_op(ROLE_CHECK, op, bytecode)?,
+        Operation::MultisigCheck { .. } => emit_payload_op(MULTISIG_CHECK, op, bytecode)?,
+        Operation::VersionMeta { .. } => emit_payload_op(VERSION_META, op, bytecode)?,
+        Operation::StorageNamespace { .. } => emit_payload_op(STORAGE_NAMESPACE, op, bytecode)?,
+        Operation::AbiExport { .. } => emit_payload_op(ABI_EXPORT, op, bytecode)?,
+        Operation::DocEmbed { .. } => emit_payload_op(DOC_EMBED, op, bytecode)?,
+        Operation::GasAdaptive { .. } => emit_payload_op(GAS_ADAPTIVE, op, bytecode)?,
+        Operation::Bounty { .. } => emit_payload_op(BOUNTY, op, bytecode)?,
         Operation::Nop => {
-            // Opcode: 0x00 (NOP)
-            bytecode.write_all(&[0x00])?;
+            bytecode.write_all(&[NOP])?;
             bytecode.write_all(&0u16.to_le_bytes())?;
         }
     }
     pad_to_4(bytecode);
+    Ok(())
+}
+
+fn emit_bridge_op(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error> {
+    bytecode.write_all(&[BRIDGE])?;
+    let payload = encode_bridge_payload(&operation_to_bridge_payload(op)?).map_err(|err| {
+        X3Error::CodegenError {
+            message: format!("failed to encode bridge payload: {err}"),
+            span: None,
+        }
+    })?;
+    if payload.len() > u16::MAX as usize {
+        return Err(X3Error::CodegenError {
+            message: "bridge operation payload too large".to_string(),
+            span: None,
+        });
+    }
+    bytecode.write_all(&(payload.len() as u16).to_le_bytes())?;
+    bytecode.write_all(&payload)?;
+    Ok(())
+}
+
+fn emit_asset_op(opcode: u8, op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error> {
+    bytecode.write_all(&[opcode])?;
+    let payload = encode_asset_op_payload(&operation_to_asset_payload(op)?).map_err(|err| {
+        X3Error::CodegenError {
+            message: format!("failed to encode asset payload: {err}"),
+            span: None,
+        }
+    })?;
+    if payload.len() > u16::MAX as usize {
+        return Err(X3Error::CodegenError {
+            message: format!("asset operation payload too large for opcode 0x{opcode:02x}"),
+            span: None,
+        });
+    }
+    bytecode.write_all(&(payload.len() as u16).to_le_bytes())?;
+    bytecode.write_all(&payload)?;
     Ok(())
 }
 
@@ -225,6 +234,103 @@ fn emit_payload_op(opcode: u8, op: &Operation, bytecode: &mut Vec<u8>) -> Result
     bytecode.write_all(&(payload.len() as u16).to_le_bytes())?;
     bytecode.write_all(&payload)?;
     Ok(())
+}
+
+fn operation_to_bridge_payload(op: &Operation) -> Result<BridgePayload, X3Error> {
+    if let Operation::Bridge {
+        via,
+        from_chain,
+        from_asset,
+        to_chain,
+        to_asset,
+        amount,
+        receiver,
+        source_finality_proof,
+        transfer_proof,
+    } = op
+    {
+        Ok(BridgePayload {
+            via: via.clone(),
+            from_chain: from_chain.clone(),
+            from_asset: from_asset.clone(),
+            to_chain: to_chain.clone(),
+            to_asset: to_asset.clone(),
+            amount: *amount,
+            receiver: receiver.clone(),
+            source_finality_proof: source_finality_proof.clone(),
+            transfer_proof: transfer_proof.clone(),
+        })
+    } else {
+        Err(X3Error::CodegenError {
+            message: "operation is not a bridge payload".to_string(),
+            span: None,
+        })
+    }
+}
+
+fn operation_to_asset_payload(op: &Operation) -> Result<AssetOpPayload, X3Error> {
+    let payload = match op {
+        Operation::Lock {
+            chain,
+            asset,
+            amount,
+            from,
+        } => AssetOpPayload::Lock {
+            chain: chain.clone(),
+            asset: asset.clone(),
+            amount: *amount,
+            from: from.clone(),
+        },
+        Operation::Mint {
+            chain,
+            asset,
+            amount,
+            to,
+        } => AssetOpPayload::Mint {
+            chain: chain.clone(),
+            asset: asset.clone(),
+            amount: *amount,
+            to: to.clone(),
+        },
+        Operation::Burn {
+            chain,
+            asset,
+            amount,
+            from,
+        } => AssetOpPayload::Burn {
+            chain: chain.clone(),
+            asset: asset.clone(),
+            amount: *amount,
+            from: from.clone(),
+        },
+        Operation::Release { chain, asset, to } => AssetOpPayload::Release {
+            chain: chain.clone(),
+            asset: asset.clone(),
+            to: to.clone(),
+        },
+        Operation::Swap {
+            from_chain,
+            from_asset,
+            to_asset,
+            input_amount,
+            min_output,
+            dex,
+        } => AssetOpPayload::Swap {
+            from_chain: from_chain.clone(),
+            from_asset: from_asset.clone(),
+            to_asset: to_asset.clone(),
+            input_amount: *input_amount,
+            min_output: *min_output,
+            dex: dex.clone(),
+        },
+        _ => {
+            return Err(X3Error::CodegenError {
+                message: "operation is not an asset opcode payload".to_string(),
+                span: None,
+            })
+        }
+    };
+    Ok(payload)
 }
 
 fn operation_to_payload(op: &Operation) -> Result<CapabilityPayload, X3Error> {
@@ -440,6 +546,160 @@ fn vector_op_id(op: &VectorOp) -> u8 {
         VectorOp::Mul => 2,
         VectorOp::Sub => 3,
     }
+}
+
+/// Disassemble X3 bytecode into a human-readable trace.
+///
+/// This is the "explain" subcommand of the x3c CLI: a reviewer can run
+/// `x3c explain program.x3b` and see per-instruction pseudo-code without
+/// reading raw bytes.
+pub fn disassemble(bytecode: &[u8]) -> Result<String, X3Error> {
+    if bytecode.is_empty() {
+        return Err(X3Error::CodegenError {
+            message: "bytecode is empty".to_string(),
+            span: None,
+        });
+    }
+    let mut out = String::new();
+    out.push_str(&format!("; x3-lang bytecode v0x{:02x}\n", bytecode[0]));
+    let mut pc = 1usize;
+    let mut idx = 0u32;
+    // Walk optional metadata: any leading 0x10/0x11 byte is metadata; the
+    // first non-metadata byte is the start of the operation stream.
+    loop {
+        if pc >= bytecode.len() {
+            break;
+        }
+        match bytecode[pc] {
+            0x10 => {
+                let len = u16::from_le_bytes([bytecode[pc + 1], bytecode[pc + 2]]) as usize;
+                let value = std::str::from_utf8(&bytecode[pc + 3..pc + 3 + len])
+                    .unwrap_or("<invalid utf-8>");
+                out.push_str(&format!("  {idx:04}  meta.nonce   = {value:?}\n"));
+                idx += 1;
+                pc = align4(pc + 3 + len);
+            }
+            0x11 => {
+                let id = u32::from_le_bytes([
+                    bytecode[pc + 1],
+                    bytecode[pc + 2],
+                    bytecode[pc + 3],
+                    bytecode[pc + 4],
+                ]);
+                out.push_str(&format!("  {idx:04}  meta.chain_id = {id}\n"));
+                idx += 1;
+                pc += 5;
+            }
+            _ => break,
+        }
+    }
+    while pc + 4 <= bytecode.len() {
+        if bytecode[pc..pc + 4].iter().all(|b| *b == 0) {
+            pc += 4;
+            continue;
+        }
+        let opcode = bytecode[pc];
+        let payload_len = u16::from_le_bytes([bytecode[pc + 1], bytecode[pc + 2]]) as usize;
+        let payload_end = align4(pc + 3 + payload_len);
+        let safe_end = payload_end.min(bytecode.len());
+        let payload = &bytecode[pc + 3..safe_end.min(pc + 3 + payload_len)];
+        let entry = disassemble_op(opcode, payload);
+        out.push_str(&format!("  {idx:04}  0x{opcode:02x}  {entry}\n"));
+        idx += 1;
+        if is_payload_opcode(opcode) {
+            pc = payload_end;
+        } else {
+            pc += 4;
+        }
+    }
+    Ok(out)
+}
+
+fn is_payload_opcode(opcode: u8) -> bool {
+    matches!(
+        opcode,
+        0x20..=0x25
+            | 0x40
+            | 0x41
+            | 0x42
+            | 0x50
+            | 0x51
+            | 0x52
+            | 0x60
+            | 0x66
+            | 0x70..=0x7F
+            | 0x80..=0x9B
+            | 0xA0..=0xA5
+    )
+}
+
+fn align4(value: usize) -> usize {
+    (value + 3) & !3
+}
+
+fn disassemble_op(opcode: u8, payload: &[u8]) -> String {
+    let payload_str = match decode_payload(opcode, payload) {
+        Ok(s) => s,
+        Err(_) => format!("<raw {} bytes>", payload.len()),
+    };
+    match opcode {
+        0x01 => "ADD".into(),
+        0x02 => "SUB".into(),
+        0x10 => "META_NONCE".into(),
+        0x11 => "META_CHAIN_ID".into(),
+        0x20 => format!("LOCK     {payload_str}"),
+        0x21 => format!("MINT     {payload_str}"),
+        0x22 => format!("BURN     {payload_str}"),
+        0x23 => format!("RELEASE  {payload_str}"),
+        0x24 => format!("SWAP     {payload_str}"),
+        0x25 => format!("BRIDGE   {payload_str}"),
+        0x30 => "IF".into(),
+        0x31 => "LOOP".into(),
+        0x32 => "CALL".into(),
+        0x33 => "RET".into(),
+        0x40 => "REQUIRE".into(),
+        0x41 => "ON_FAIL".into(),
+        0x42 => "ON_TIMEOUT".into(),
+        0x50 => "ATOMIC_BEGIN".into(),
+        0x51 => "ATOMIC_END".into(),
+        0x52 => "ATOMIC_ROLLBACK".into(),
+        0x60 => format!("EMIT     {payload_str}"),
+        0x66 => format!("CALL_HOST  {payload_str}"),
+        0x70..=0x7F => format!("VECTOR   {payload_str}"),
+        0x80..=0x9A => format!("CAP      {payload_str}"),
+        0x9B => "BOUNTY".into(),
+        0xA0..=0xA5 => format!("META     {payload_str}"),
+        0xFF => "HALT".into(),
+        other => format!("OP(0x{other:02x})"),
+    }
+}
+
+fn decode_payload(opcode: u8, payload: &[u8]) -> Result<String, X3Error> {
+    use x3_lang_common::{
+        decode_asset_op_payload, decode_bridge_payload, decode_capability_payload,
+    };
+    if matches!(opcode, 0x20..=0x24) {
+        let p = decode_asset_op_payload(opcode, payload).map_err(|_| X3Error::CodegenError {
+            message: "bad asset payload".into(),
+            span: None,
+        })?;
+        return Ok(format!("{p:?}"));
+    }
+    if opcode == 0x25 {
+        let p = decode_bridge_payload(payload).map_err(|_| X3Error::CodegenError {
+            message: "bad bridge payload".into(),
+            span: None,
+        })?;
+        return Ok(format!("{p:?}"));
+    }
+    if (0x80..=0x9A).contains(&opcode) {
+        let p = decode_capability_payload(opcode, payload).map_err(|_| X3Error::CodegenError {
+            message: "bad capability payload".into(),
+            span: None,
+        })?;
+        return Ok(format!("{p:?}"));
+    }
+    Ok(String::from_utf8_lossy(payload).to_string())
 }
 
 #[cfg(test)]
