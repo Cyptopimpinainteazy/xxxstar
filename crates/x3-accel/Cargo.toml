@@ -5,6 +5,10 @@ edition = "2021"
 description = "Vendor-neutral accelerator abstraction for X3 validator batch work"
 license = "Apache-2.0"
 
+[features]
+default = []
+wgpu = ["dep:x3-accel-wgpu"]
+
 [dependencies]
 blake2 = "0.10"
 ed25519-dalek = "2.1"
@@ -12,3 +16,4 @@ keccak-hash = "0.1"
 secp256k1 = "0.28"
 sha2 = "0.10"
 thiserror = "1.0"
+x3-accel-wgpu = { path = "../x3-accel-wgpu", optional = true }

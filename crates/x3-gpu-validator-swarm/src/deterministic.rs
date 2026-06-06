@@ -280,6 +280,21 @@ impl DeterministicEngine {
         }
     }
 
+    #[cfg(test)]
+    fn new_with_accel_backend(accel_backend: Box<dyn AccelBackend>) -> Self {
+        Self {
+            mode: RwLock::new(ExecutionMode::GpuWithCpuVerification),
+            verification_level: RwLock::new(VerificationLevel::Standard),
+            hash_algorithm: RwLock::new(HashAlgorithm::Keccak256),
+            cpu_verification_enabled: AtomicBool::new(true),
+            replay_mode_enabled: AtomicBool::new(true),
+            replay_records: RwLock::new(Vec::new()),
+            stats: EngineStats::default(),
+            gpu_backend: RwLock::new(None),
+            accel_backend: RwLock::new(accel_backend),
+        }
+    }
+
     /// Get the currently selected accelerator backend name.
     pub fn accelerator_backend_name(&self) -> &'static str {
         self.accel_backend.read().name()
@@ -936,6 +951,30 @@ mod tests {
         assert_eq!(result.verification, VerificationResult::Valid);
         assert_eq!(result.outputs, expected);
         assert_eq!(result.accelerator_backend, "cpu");
+        assert!(!result.accelerator_fallback_used);
+        assert!(!result.accelerator_parity_mismatch);
+    }
+
+    #[cfg(feature = "wgpu")]
+    #[test]
+    fn sha256_batches_can_use_wgpu_backend_with_cpu_truth() {
+        let Ok(backend) = x3_accel::WgpuBackend::try_new() else {
+            return;
+        };
+        let engine = DeterministicEngine::new_with_accel_backend(Box::new(backend));
+        engine.set_mode(ExecutionMode::CpuFallback);
+
+        let inputs = vec![b"abc".to_vec(), Vec::new(), b"x3".to_vec(), vec![42u8; 120]];
+        let task = create_batch_hash_task(inputs.clone(), HashAlgorithm::Sha256);
+        let result = engine.execute(task);
+        let expected = inputs
+            .iter()
+            .map(|input| crate::crypto::compute_hash(&HashAlgorithm::Sha256, input))
+            .collect::<Vec<_>>();
+
+        assert_eq!(result.verification, VerificationResult::Valid);
+        assert_eq!(result.outputs, expected);
+        assert_eq!(result.accelerator_backend, "wgpu");
         assert!(!result.accelerator_fallback_used);
         assert!(!result.accelerator_parity_mismatch);
     }

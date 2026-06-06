@@ -389,6 +389,11 @@ impl SwarmOrchestrator {
         serde_json::to_string_pretty(&state).map_err(|e| e.into())
     }
 
+    /// Export swarm metrics in Prometheus text exposition format.
+    pub fn export_metrics_prometheus(&self) -> String {
+        self.metrics.export_prometheus()
+    }
+
     /// Quarantine a validator
     pub fn quarantine_validator(&self, validator_id: &str, reason: QuarantineReason) {
         self.quarantine.quarantine(validator_id.to_string(), reason);

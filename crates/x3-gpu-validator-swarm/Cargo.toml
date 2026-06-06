@@ -29,6 +29,7 @@ cuda = []
 opencl = []
 metal = []
 vulkan = []
+wgpu = ["x3-accel/wgpu"]
 
 [dependencies]
 # Async runtime
@@ -100,4 +101,12 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 
 [[bench]]
 name = "e2e_tps"
+harness = false
+
+[[bench]]
+name = "accel_sha256"
+harness = false
+
+[[bench]]
+name = "swarm_tps"
 harness = false

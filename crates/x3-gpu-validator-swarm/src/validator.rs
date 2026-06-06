@@ -315,6 +315,11 @@ impl Validator {
         self.metrics.export_json()
     }
 
+    /// Export metrics in Prometheus text exposition format.
+    pub fn export_metrics_prometheus(&self) -> String {
+        self.metrics.export_prometheus()
+    }
+
     /// Get quarantine status
     pub fn get_quarantine_status(&self) -> Option<crate::quarantine::QuarantineStatus> {
         self.quarantine.get_status(&self.validator_id)

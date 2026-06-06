@@ -89,6 +89,7 @@ members = [
     "crates/poh-generator",
     "crates/x3-accounting-events",
     "crates/x3-accel",
+    "crates/x3-accel-wgpu",
     "crates/x3-asset-kernel-types",
     "crates/x3-atomic-trade",
     "crates/x3-automation",

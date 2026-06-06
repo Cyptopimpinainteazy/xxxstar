@@ -36,6 +36,11 @@ impl BackendKind {
 pub enum AccelError {
     #[error("backend {0:?} is not available")]
     BackendUnavailable(BackendKind),
+    #[error("backend {backend:?} has no kernel for {algorithm}")]
+    KernelUnavailable {
+        backend: BackendKind,
+        algorithm: &'static str,
+    },
     #[error("accelerator output diverged from CPU baseline")]
     ParityMismatch,
     #[error("invalid batch input: {0}")]
@@ -237,6 +242,87 @@ impl AccelBackend for UnavailableBackend {
     }
 }
 
+/// wgpu adapter-backed accelerator.
+///
+/// The backend is selected only when the `wgpu` feature is enabled and a wgpu
+/// adapter/device can be initialized. Algorithms without kernels fail closed so
+/// callers can count the accelerator fallback and keep CPU as consensus truth.
+#[cfg(feature = "wgpu")]
+pub struct WgpuBackend {
+    inner: x3_accel_wgpu::WgpuBackend,
+}
+
+#[cfg(feature = "wgpu")]
+impl WgpuBackend {
+    pub fn try_new() -> Result<Self, AccelError> {
+        x3_accel_wgpu::WgpuBackend::initialize()
+            .map(|inner| Self { inner })
+            .map_err(|_| AccelError::BackendUnavailable(BackendKind::Wgpu))
+    }
+}
+
+#[cfg(feature = "wgpu")]
+impl AccelBackend for WgpuBackend {
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn verify_secp256k1_batch(
+        &self,
+        _batch: &[Secp256k1VerifyJob],
+    ) -> Result<Vec<bool>, AccelError> {
+        Err(AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm: "secp256k1",
+        })
+    }
+
+    fn verify_ed25519_batch(&self, _batch: &[Ed25519VerifyJob]) -> Result<Vec<bool>, AccelError> {
+        Err(AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm: "ed25519",
+        })
+    }
+
+    fn keccak256_batch(&self, _inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+        Err(AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm: "keccak256",
+        })
+    }
+
+    fn sha256_batch(&self, inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+        self.inner.sha256_batch(inputs).map_err(|err| match err {
+            x3_accel_wgpu::WgpuAccelError::InvalidInput(message) => {
+                AccelError::InvalidInput(message)
+            }
+            x3_accel_wgpu::WgpuAccelError::AdapterUnavailable
+            | x3_accel_wgpu::WgpuAccelError::DeviceRequestFailed(_)
+            | x3_accel_wgpu::WgpuAccelError::BufferMapFailed(_) => {
+                AccelError::BackendUnavailable(BackendKind::Wgpu)
+            }
+            x3_accel_wgpu::WgpuAccelError::KernelUnavailable(_) => AccelError::KernelUnavailable {
+                backend: BackendKind::Wgpu,
+                algorithm: "sha256",
+            },
+        })
+    }
+
+    fn blake2b256_batch(&self, _inputs: &[Vec<u8>]) -> Result<Vec<[u8; 32]>, AccelError> {
+        Err(AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm: "blake2b256",
+        })
+    }
+
+    fn build_merkle_root(&self, _leaves: &[[u8; 32]]) -> Result<[u8; 32], AccelError> {
+        Err(AccelError::KernelUnavailable {
+            backend: BackendKind::Wgpu,
+            algorithm: "merkle_root",
+        })
+    }
+}
+
 /// Select a backend from `X3_ACCEL`; unsupported accelerators fail over to CPU
 /// unless strict mode is requested.
 pub fn select_backend() -> Box<dyn AccelBackend> {
@@ -249,8 +335,24 @@ pub fn select_backend() -> Box<dyn AccelBackend> {
 pub fn select_backend_with(value: &str, strict: bool) -> Box<dyn AccelBackend> {
     match BackendKind::from_env_value(value) {
         BackendKind::Cpu => Box::new(CpuBackend::new()),
+        BackendKind::Wgpu => select_wgpu_backend(strict),
         kind if strict => Box::new(UnavailableBackend::new(kind)),
         _ => Box::new(CpuBackend::new()),
+    }
+}
+
+fn select_wgpu_backend(strict: bool) -> Box<dyn AccelBackend> {
+    #[cfg(feature = "wgpu")]
+    {
+        if let Ok(backend) = WgpuBackend::try_new() {
+            return Box::new(backend);
+        }
+    }
+
+    if strict {
+        Box::new(UnavailableBackend::new(BackendKind::Wgpu))
+    } else {
+        Box::new(CpuBackend::new())
     }
 }
 
@@ -309,6 +411,22 @@ mod tests {
             backend.keccak256_batch(&[b"x".to_vec()]),
             Err(AccelError::BackendUnavailable(BackendKind::Vulkan))
         ));
+    }
+
+    #[test]
+    fn strict_wgpu_selection_fails_closed_when_unavailable_or_executes_sha256() {
+        let backend = select_backend_with("wgpu", true);
+        let result = backend.sha256_batch(&[b"x".to_vec()]);
+
+        match result {
+            Ok(outputs) => assert_eq!(outputs.len(), 1),
+            Err(AccelError::BackendUnavailable(BackendKind::Wgpu))
+            | Err(AccelError::KernelUnavailable {
+                backend: BackendKind::Wgpu,
+                algorithm: "sha256",
+            }) => {}
+            other => panic!("unexpected wgpu selection result: {other:?}"),
+        }
     }
 
     #[test]

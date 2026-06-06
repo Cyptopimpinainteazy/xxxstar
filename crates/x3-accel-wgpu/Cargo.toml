@@ -1,0 +1,15 @@
+[package]
+name = "x3-accel-wgpu"
+version = "0.1.0"
+edition = "2021"
+description = "wgpu accelerator support for X3 validator batch work"
+license = "Apache-2.0"
+
+[dependencies]
+bytemuck = "1.18"
+pollster = "0.3"
+thiserror = "1.0"
+wgpu = "0.20"
+
+[dev-dependencies]
+sha2 = "0.10"

@@ -399,16 +399,75 @@ impl MetricsCollector {
     /// Format sliding window metrics as a readable string
     pub fn format_sliding_window_metrics(&self) -> String {
         let metrics = self.get_sliding_window_metrics();
+        let swarm = self.get_swarm_metrics();
         format!(
-            "TPS: {:.1} (peak: {:.1}, avg: {:.1}) | Window: {}s | Latency p50/p95/p99: {:.2}/{:.2}/{:.2}ms | Tasks: {}",
+            "TPS: {:.1} (peak: {:.1}, avg: {:.1}) | Accelerator: {} | Accelerator fallbacks: {} | Accelerator parity mismatches: {} | Window: {}s | Latency p50/p95/p99: {:.2}/{:.2}/{:.2}ms | Tasks: {}",
             metrics.current_tps,
             metrics.peak_tps,
             metrics.avg_tps,
+            swarm.accelerator_backend,
+            swarm.accelerator_fallbacks,
+            swarm.accelerator_parity_mismatches,
             metrics.window_size_secs,
             metrics.p50_latency_ms,
             metrics.p95_latency_ms,
             metrics.p99_latency_ms,
             metrics.tasks_in_window,
+        )
+    }
+
+    /// Export metrics in Prometheus text exposition format.
+    pub fn export_prometheus(&self) -> String {
+        let swarm = self.get_swarm_metrics();
+        let sliding = self.get_sliding_window_metrics();
+        let backend = prometheus_escape_label(&swarm.accelerator_backend);
+
+        format!(
+            "# HELP x3_swarm_tasks_total Total tasks processed by the swarm.\n\
+             # TYPE x3_swarm_tasks_total counter\n\
+             x3_swarm_tasks_total {total_tasks}\n\
+             # HELP x3_swarm_tasks_successful_total Successful tasks processed by the swarm.\n\
+             # TYPE x3_swarm_tasks_successful_total counter\n\
+             x3_swarm_tasks_successful_total {successful_tasks}\n\
+             # HELP x3_swarm_tasks_failed_total Failed tasks processed by the swarm.\n\
+             # TYPE x3_swarm_tasks_failed_total counter\n\
+             x3_swarm_tasks_failed_total {failed_tasks}\n\
+             # HELP x3_swarm_tasks_divergent_total Divergent tasks detected by the swarm.\n\
+             # TYPE x3_swarm_tasks_divergent_total counter\n\
+             x3_swarm_tasks_divergent_total {divergent_tasks}\n\
+             # HELP x3_swarm_cpu_fallbacks_total CPU fallback count.\n\
+             # TYPE x3_swarm_cpu_fallbacks_total counter\n\
+             x3_swarm_cpu_fallbacks_total {cpu_fallbacks}\n\
+             # HELP x3_swarm_accelerator_selected Selected accelerator backend as a labeled gauge.\n\
+             # TYPE x3_swarm_accelerator_selected gauge\n\
+             x3_swarm_accelerator_selected{{backend=\"{backend}\"}} 1\n\
+             # HELP x3_swarm_accelerator_fallbacks_total Accelerator failures that fell back to CPU truth.\n\
+             # TYPE x3_swarm_accelerator_fallbacks_total counter\n\
+             x3_swarm_accelerator_fallbacks_total{{backend=\"{backend}\"}} {accelerator_fallbacks}\n\
+             # HELP x3_swarm_accelerator_parity_mismatches_total Accelerator parity mismatches against CPU truth.\n\
+             # TYPE x3_swarm_accelerator_parity_mismatches_total counter\n\
+             x3_swarm_accelerator_parity_mismatches_total{{backend=\"{backend}\"}} {accelerator_parity_mismatches}\n\
+             # HELP x3_swarm_tps Current lifetime tasks per second.\n\
+             # TYPE x3_swarm_tps gauge\n\
+             x3_swarm_tps{{backend=\"{backend}\"}} {tasks_per_second}\n\
+             # HELP x3_swarm_sliding_window_tps Current sliding-window tasks per second.\n\
+             # TYPE x3_swarm_sliding_window_tps gauge\n\
+             x3_swarm_sliding_window_tps{{backend=\"{backend}\",window_secs=\"{window_secs}\"}} {current_tps}\n\
+             # HELP x3_swarm_sliding_window_peak_tps Peak sliding-window tasks per second.\n\
+             # TYPE x3_swarm_sliding_window_peak_tps gauge\n\
+             x3_swarm_sliding_window_peak_tps{{backend=\"{backend}\",window_secs=\"{window_secs}\"}} {peak_tps}\n",
+            total_tasks = swarm.total_tasks,
+            successful_tasks = swarm.successful_tasks,
+            failed_tasks = swarm.failed_tasks,
+            divergent_tasks = swarm.divergent_tasks,
+            cpu_fallbacks = swarm.cpu_fallbacks,
+            backend = backend,
+            accelerator_fallbacks = swarm.accelerator_fallbacks,
+            accelerator_parity_mismatches = swarm.accelerator_parity_mismatches,
+            tasks_per_second = swarm.tasks_per_second,
+            window_secs = sliding.window_size_secs,
+            current_tps = sliding.current_tps,
+            peak_tps = sliding.peak_tps,
         )
     }
 
@@ -475,6 +534,13 @@ impl MetricsCollector {
 
         serde_json::to_string_pretty(&data).map_err(|e| e.into())
     }
+}
+
+fn prometheus_escape_label(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }
 
 impl Default for MetricsCollector {
@@ -548,5 +614,25 @@ mod tests {
         assert_eq!(swarm.accelerator_parity_mismatches, 1);
         assert_eq!(metrics.get_counter("accelerator_fallbacks"), 1);
         assert_eq!(metrics.get_counter("accelerator_parity_mismatches"), 1);
+    }
+
+    #[test]
+    fn prometheus_export_includes_accelerator_backend_and_tps_labels() {
+        let metrics = MetricsCollector::with_window(Duration::from_secs(5));
+        metrics.set_accelerator_backend("wgpu");
+        metrics.record_accelerator_fallback();
+        metrics.record_accelerator_parity_mismatch();
+        metrics.record_task("validator-1", 2, true, false);
+
+        let exported = metrics.export_prometheus();
+
+        assert!(exported.contains("x3_swarm_accelerator_selected{backend=\"wgpu\"} 1"));
+        assert!(exported.contains("x3_swarm_accelerator_fallbacks_total{backend=\"wgpu\"} 1"));
+        assert!(
+            exported.contains("x3_swarm_accelerator_parity_mismatches_total{backend=\"wgpu\"} 1")
+        );
+        assert!(
+            exported.contains("x3_swarm_sliding_window_tps{backend=\"wgpu\",window_secs=\"5\"}")
+        );
     }
 }
