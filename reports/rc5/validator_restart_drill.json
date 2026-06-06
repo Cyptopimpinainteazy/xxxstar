@@ -1,1 +1,0 @@
-{"timestamp":"2026-05-16T00:02:03Z","validator":"bob","pre_stop":{"block":644,"finalized":"0xa45757eced04c1ba8c2dfd66af30f38fcafef6656996ce0df6bdf77fae512177"},"during_stop":{"block":685,"finalized":"0xa45757eced04c1ba8c2dfd66af30f38fcafef6656996ce0df6bdf77fae512177","bob_alive":false},"post_restart":{"bob_catchup_ok":true},"drill_pass":1,"note":""}

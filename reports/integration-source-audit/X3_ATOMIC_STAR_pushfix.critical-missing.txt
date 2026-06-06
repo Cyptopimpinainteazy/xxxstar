@@ -1,5 +1,0 @@
-chain-specs/x3-local3-current-plain.json
-chain-specs/x3-local3-current-raw.json
-chain-specs/x3-local3-plain.json
-chain-specs/x3-local3-raw.json
-scripts/mainnet/rc2_internal_settlement_smoke.sh

@@ -1,9 +1,0 @@
-{
-  "global": {
-    "bytes": 1040,
-    "gas": 240,
-    "instr": 118,
-    "mode": "Baseline",
-    "samples": 8
-  }
-}
