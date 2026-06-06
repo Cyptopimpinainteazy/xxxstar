@@ -61,3 +61,20 @@ dmypy.json
 # Autoclaw runtime artifacts
 .autoclaw/
 .claude/
+
+# Next.js build output
+apps/dex/.next/
+apps/wallet/.next/
+apps/explorer/.next/
+
+# Cocoindex
+.cocoindex_code/
+
+# Generated binary assets
+*.wasm
+*.glb
+*.obj
+*.mp4
+*.zip
+*.tar.gz
+*.deb
