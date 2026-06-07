@@ -1,8 +1,12 @@
 //! X3 VM executor - fetch-decode-execute loop and handlers for opcodes.
 
 use crate::x3_lang_vm::VM;
-use sha2::{Digest, Sha256};
-use x3_lang_common::{decode_capability_payload, CapabilityPayload};
+// Import shared opcode constants
+use crate::spec::opcodes::*;
+use x3_lang_common::{
+    decode_asset_op_payload, decode_bridge_payload, decode_capability_payload, AssetOpPayload,
+    CapabilityPayload,
+};
 
 pub type ExecResult<T> = Result<T, ExecError>;
 
@@ -19,6 +23,10 @@ pub type GasCost = u128;
 
 /// Execute the VM until halt or out of gas.
 pub fn execute(vm: &mut VM) -> ExecResult<()> {
+    let has_compiler_header = has_compiler_header(vm.code.as_slice());
+    if vm.state.pc == 0 {
+        vm.state.pc = first_instruction_pc(vm.code.as_slice())?;
+    }
     loop {
         if vm.state.pc >= vm.code.len() {
             return Ok(());
@@ -32,9 +40,13 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
             .copied()
             .unwrap_or(0);
         let operand = read_u16_le(vm.code.as_slice(), vm.state.pc + 2).unwrap_or(0);
-        let pc_next = vm.state.pc + 4;
+        let pc_next = if has_compiler_header {
+            align4(vm.state.pc + 3)
+        } else {
+            vm.state.pc + 4
+        };
 
-        if vm.state.paused && opcode != 0x8A {
+        if vm.state.paused && opcode != EMERGENCY_CONTROL {
             return Err(ExecError::Panic("X3_PAUSED".to_string()));
         }
 
@@ -59,7 +71,7 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
                 vm.state.registers[ra as usize] =
                     vm.state.registers[rb as usize].wrapping_sub(vm.state.registers[rc as usize]);
             }
-            0x10 => {
+            META_NONCE => {
                 // LOAD_RAI: R[a] = mem[R[b] + imm16]
                 let (ra, rb, imm) = decode_reg_reg_imm(operand);
                 let addr = (vm.state.registers[rb as usize] as usize).wrapping_add(imm as usize);
@@ -73,7 +85,7 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
                 }
                 vm.state.registers[ra as usize] = val;
             }
-            0x11 => {
+            META_CHAIN_ID => {
                 // STORE_RAI
                 let (ra, rb, imm) = decode_reg_reg_imm(operand);
                 let addr = (vm.state.registers[rb as usize] as usize).wrapping_add(imm as usize);
@@ -85,47 +97,59 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
                     vm.state.memory[addr + i] = ((val >> (i * 8)) & 0xFF) as u8;
                 }
             }
-            0x20 => {
-                // PUSH_IMM - operand is immediate 16-bit sign-extended
-                let imm16 = operand as i16 as i128 as u128;
-                vm.state.registers[0] = imm16; // use R0 as push target then increment SP
-                vm.state.sp = vm.state.sp.wrapping_add(1);
-            }
-            0x21 => {
-                // POP dest
-                // operand holds dest register
-                let dest = (operand & 0xFF) as usize;
-                if vm.state.sp == 0 {
-                    return Err(ExecError::Panic("stack underflow".to_string()));
-                }
-                vm.state.sp -= 1;
-                vm.state.registers[dest] = vm.state.registers[0];
-            }
-            0x30 => {
-                // JMP offset
-                let rel = operand as i16;
-                let dst = (pc_next as i32).wrapping_add(rel as i32) as usize;
-                vm.state.pc = dst;
-                continue;
-            }
-            0x31 => {
-                // JZ - jump if top-of-stack zero
-                let dest = operand as i16;
-                let top = vm.state.registers[0];
-                if top == 0 {
-                    let dst = (pc_next as i32).wrapping_add(dest as i32) as usize;
-                    vm.state.pc = dst;
+            LOCK => {
+                execute_asset_opcode(vm, LOCK, has_compiler_header)?;
+                if has_compiler_header {
                     continue;
                 }
             }
-            0x32 => {
+            MINT => {
+                execute_asset_opcode(vm, MINT, has_compiler_header)?;
+                if has_compiler_header {
+                    continue;
+                }
+            }
+            BURN => {
+                execute_asset_opcode(vm, BURN, has_compiler_header)?;
+                if has_compiler_header {
+                    continue;
+                }
+            }
+            RELEASE => {
+                execute_asset_opcode(vm, RELEASE, has_compiler_header)?;
+                if has_compiler_header {
+                    continue;
+                }
+            }
+            SWAP => {
+                execute_asset_opcode(vm, SWAP, has_compiler_header)?;
+                if has_compiler_header {
+                    continue;
+                }
+            }
+            BRIDGE => {
+                if !has_compiler_header {
+                    return Err(ExecError::InvalidOpcode(BRIDGE));
+                }
+                execute_bridge_opcode(vm)?;
+                continue;
+            }
+            IF => {
+                vm.state.pc = skip_structured_if(vm.code.as_slice(), vm.state.pc)?;
+                continue;
+            }
+            LOOP => {
+                vm.state.pc = skip_structured_loop(vm.code.as_slice(), vm.state.pc)?;
+                continue;
+            }
+            CALL => {
                 // CALL - push return and jump
                 let addr = operand as usize;
                 vm.state.call_stack.push(pc_next);
                 vm.state.pc = addr;
                 continue;
             }
-            0x33 => {
+            RET => {
                 // RET
                 let retpc = vm
                     .state
@@ -135,65 +159,54 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
                 vm.state.pc = retpc;
                 continue;
             }
-            0x40 => {
-                // CRYPTO_SHA256 - hash low 16 bytes from R[b], write first 16 bytes to R[a].
-                let (ra, rb, _) = decode_reg_reg_imm(operand);
-                let mut input = [0u8; 16];
-                let value = vm.state.registers[rb as usize];
-                for i in 0..16 {
-                    input[i] = ((value >> (i * 8)) & 0xFF) as u8;
-                }
-                let digest = Sha256::digest(input);
-                vm.state.registers[ra as usize] = bytes_to_register(&digest[..16]);
+            REQUIRE => {
+                record_fixed_semantic_opcode(vm, REQUIRE);
             }
-            0x50 => {
+            ON_FAIL => {
+                record_fixed_semantic_opcode(vm, ON_FAIL);
+            }
+            ON_TIMEOUT => {
+                record_fixed_semantic_opcode(vm, ON_TIMEOUT);
+            }
+            ATOMIC_BEGIN => {
                 // ATOMIC_BEGIN - push current pc onto atomic stack
                 vm.state.atomic_stack.push(vm.state.pc + 4);
             }
-            0x51 => {
+            ATOMIC_END => {
                 // ATOMIC_COMMIT - pop atomic stack
                 vm.state.atomic_stack.pop();
             }
-            0x52 => {
+            ATOMIC_ROLLBACK => {
                 // ATOMIC_ROLLBACK - pop and jump to begin
                 if let Some(begin_pc) = vm.state.atomic_stack.pop() {
                     vm.state.pc = begin_pc;
                     continue;
                 }
             }
-            0x60 => {
-                // EVM_CALL - use bridge adapter
-                // For simplicity, use the next 2 bytes as dummy data
-                let data = &vm.code.as_slice()[vm.state.pc + 2..vm.state.pc + 4];
-                let res = bridge_result(vm.bridge.evm_call(data))?;
+            EMIT => {
+                let data = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
+                let res = bridge_result(vm.bridge.evm_call(&data))?;
                 vm.state.registers[0] = bytes_to_register(&res);
+                vm.state.pc = align4(vm.state.pc + 3 + data.len());
+                continue;
             }
-            0x61 => {
-                // SVM_CALL - use bridge adapter
-                let data = &vm.code.as_slice()[vm.state.pc + 2..vm.state.pc + 4];
-                let res = bridge_result(vm.bridge.svm_call(data))?;
+            CALL_HOST => {
+                let data = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
+                let res = bridge_result(vm.bridge.svm_call(&data))?;
                 vm.state.registers[0] = bytes_to_register(&res);
+                vm.state.pc = align4(vm.state.pc + 3 + data.len());
+                continue;
             }
-            0x70 => {
-                // SIMD_ADD_VV - Vector Add placeholder
-                let (va, vb, vc) = decode_regtriplet(operand);
-                let mut out = [0u8; 16];
-                for i in 0..16 {
-                    out[i] = vm.state.vector_registers[vb as usize][i]
-                        .wrapping_add(vm.state.vector_registers[vc as usize][i]);
-                }
-                vm.state.vector_registers[va as usize] = out;
-            }
-            0x80..=0x9B => {
+            GPU_DISPATCH..=SUB_EXEC => {
                 let payload = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
                 let result = dispatch_host_opcode(vm, opcode, &payload)?;
                 vm.state.registers[0] = bytes_to_register(&result);
-                vm.state.pc += 3 + payload.len();
+                vm.state.pc = align4(vm.state.pc + 3 + payload.len());
                 continue;
             }
-            0x00 => { // NOP
+            NOP => { // NOP
             }
-            0xFF => {
+            HALT => {
                 // HALT
                 return Ok(());
             }
@@ -204,11 +217,135 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
     }
 }
 
+fn has_compiler_header(bytes: &[u8]) -> bool {
+    bytes.first() == Some(&BYTECODE_VERSION_1) && bytes.get(1).copied().unwrap_or(NOP) != NOP
+}
+
+fn first_instruction_pc(bytes: &[u8]) -> ExecResult<usize> {
+    if !has_compiler_header(bytes) {
+        return Ok(0);
+    }
+
+    let mut pc = 1usize;
+    while pc < bytes.len() {
+        match bytes[pc] {
+            META_NONCE => {
+                let len = read_u16_le(bytes, pc + 1).ok_or(ExecError::InvalidOperand)? as usize;
+                pc = pc.checked_add(3 + len).ok_or(ExecError::InvalidOperand)?;
+            }
+            META_CHAIN_ID => {
+                pc = pc.checked_add(9).ok_or(ExecError::InvalidOperand)?;
+            }
+            _ => return Ok(pc),
+        }
+    }
+
+    Ok(pc)
+}
+
+fn align4(value: usize) -> usize {
+    (value + 3) & !3
+}
+
+fn execute_asset_opcode(vm: &mut VM, opcode: u8, compiler_stream: bool) -> ExecResult<()> {
+    if !compiler_stream {
+        record_fixed_semantic_opcode(vm, opcode);
+        return Ok(());
+    }
+
+    let payload = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
+    let decoded =
+        decode_asset_op_payload(opcode, &payload).map_err(|_| ExecError::InvalidOperand)?;
+    apply_asset_payload(vm, decoded);
+    vm.state.pc = align4(vm.state.pc + 3 + payload.len());
+    Ok(())
+}
+
+fn execute_bridge_opcode(vm: &mut VM) -> ExecResult<()> {
+    let payload = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
+    let decoded = decode_bridge_payload(&payload).map_err(|_| ExecError::InvalidOperand)?;
+    let receipt = bridge_result(vm.bridge.bridge_transfer(
+        &decoded.via,
+        &decoded.from_chain,
+        &decoded.from_asset,
+        &decoded.to_chain,
+        &decoded.to_asset,
+        decoded.amount,
+        decoded.receiver.as_bytes(),
+        &decoded.source_finality_proof,
+        &decoded.transfer_proof,
+    ))?;
+    vm.state.registers[0] = bytes_to_register(&receipt);
+    vm.state.registers[1] = decoded.amount;
+    vm.state.bridge_ops.push(decoded);
+    vm.state.bridge_receipts.push(receipt);
+    vm.state.pc = align4(vm.state.pc + 3 + payload.len());
+    Ok(())
+}
+
+fn apply_asset_payload(vm: &mut VM, payload: AssetOpPayload) {
+    match &payload {
+        AssetOpPayload::Lock { amount, .. }
+        | AssetOpPayload::Mint { amount, .. }
+        | AssetOpPayload::Burn { amount, .. } => {
+            vm.state.registers[0] = *amount;
+        }
+        AssetOpPayload::Release { .. } => {
+            vm.state.registers[0] = 0;
+        }
+        AssetOpPayload::Swap {
+            input_amount,
+            min_output,
+            ..
+        } => {
+            vm.state.registers[0] = *input_amount;
+            vm.state.registers[1] = *min_output;
+        }
+    }
+    vm.state.asset_ops.push(payload);
+}
+
+fn record_fixed_semantic_opcode(vm: &mut VM, opcode: u8) {
+    vm.state.registers[0] = opcode as u128;
+}
+
+fn skip_structured_if(bytes: &[u8], pc: usize) -> ExecResult<usize> {
+    let cond_len = read_u16_le(bytes, pc + 1).ok_or(ExecError::InvalidOperand)? as usize;
+    let then_len_pos = pc
+        .checked_add(3 + cond_len)
+        .ok_or(ExecError::InvalidOperand)?;
+    let then_len = read_u32_le(bytes, then_len_pos).ok_or(ExecError::InvalidOperand)? as usize;
+    let else_len_pos = then_len_pos
+        .checked_add(4 + then_len)
+        .ok_or(ExecError::InvalidOperand)?;
+    let else_len = read_u32_le(bytes, else_len_pos).ok_or(ExecError::InvalidOperand)? as usize;
+    let end = else_len_pos
+        .checked_add(4 + else_len)
+        .ok_or(ExecError::InvalidOperand)?;
+    if end > bytes.len() {
+        return Err(ExecError::InvalidOperand);
+    }
+    Ok(align4(end))
+}
+
+fn skip_structured_loop(bytes: &[u8], pc: usize) -> ExecResult<usize> {
+    let body_len_pos = pc.checked_add(5).ok_or(ExecError::InvalidOperand)?;
+    let body_len = read_u32_le(bytes, body_len_pos).ok_or(ExecError::InvalidOperand)? as usize;
+    let end = body_len_pos
+        .checked_add(4 + body_len)
+        .ok_or(ExecError::InvalidOperand)?;
+    if end > bytes.len() {
+        return Err(ExecError::InvalidOperand);
+    }
+    Ok(align4(end))
+}
+
 fn gas_cost_for_opcode(opcode: u8) -> u128 {
     match opcode {
         0x01 | 0x02 => 1,
         0x10 | 0x11 => 5,
         0x20 | 0x21 => 1,
+        BRIDGE => 100,
         0x30 | 0x31 => 2,
         0x32 | 0x33 => 5,
         0x40 => 10,
@@ -377,6 +514,18 @@ fn read_u16_le(bytes: &[u8], idx: usize) -> Option<u16> {
         return None;
     }
     Some((bytes[idx] as u16) | ((bytes[idx + 1] as u16) << 8))
+}
+
+fn read_u32_le(bytes: &[u8], idx: usize) -> Option<u32> {
+    if idx + 3 >= bytes.len() {
+        return None;
+    }
+    Some(u32::from_le_bytes([
+        bytes[idx],
+        bytes[idx + 1],
+        bytes[idx + 2],
+        bytes[idx + 3],
+    ]))
 }
 
 fn decode_regtriplet(operand: u16) -> (u8, u8, u8) {

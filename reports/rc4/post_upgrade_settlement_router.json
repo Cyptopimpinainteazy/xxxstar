@@ -1,5 +1,0 @@
-{
-  "log": "/home/lojak/Desktop/X3_ATOMIC_STAR/reports/rc4/post_upgrade_settlement_router.log",
-  "result": "PASS",
-  "test": "test_x3_native_evm_svm_roundtrip_preserves_supply"
-}

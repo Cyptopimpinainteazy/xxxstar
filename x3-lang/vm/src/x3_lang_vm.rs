@@ -2,6 +2,7 @@
 
 use crate::executor::{ExecError, ExecResult};
 use std::sync::Arc;
+use x3_lang_common::{AssetOpPayload, BridgePayload};
 
 pub type Register = u128; // 128-bit to match u256-like operations; adjust as needed
 
@@ -48,6 +49,9 @@ pub struct VMState {
     pub memory: Vec<u8>,
     pub atomic_stack: Vec<usize>, // stack of pc for atomic begin
     pub call_stack: Vec<usize>,
+    pub asset_ops: Vec<AssetOpPayload>,
+    pub bridge_ops: Vec<BridgePayload>,
+    pub bridge_receipts: Vec<Vec<u8>>,
     pub paused: bool,
 }
 
@@ -63,6 +67,9 @@ impl VMState {
             memory: vec![0u8; config.max_memory_pages * 64 * 1024],
             atomic_stack: Vec::new(),
             call_stack: Vec::new(),
+            asset_ops: Vec::new(),
+            bridge_ops: Vec::new(),
+            bridge_receipts: Vec::new(),
             paused: false,
         }
     }
@@ -85,6 +92,38 @@ impl VM {
         }
     }
 
+    /// Build a VM with an explicit bridge backend selection.
+    ///
+    /// `BackendMode::DryRun` is functionally equivalent to
+    /// [`VM::new`] — it just constructs the same `DryRunBridge` but
+    /// makes the choice explicit. `BackendMode::Production` requires
+    /// a fully-wired production adapter; the call fails closed if the
+    /// adapter is `None` rather than silently falling back to dry-run.
+    pub fn with_bridge(
+        code: Vec<u8>,
+        cfg: VMConfig,
+        initial_gas: u128,
+        bridge_config: BridgeConfig,
+    ) -> ExecResult<Self> {
+        let bridge: Box<dyn crate::bridge::BridgeAdapter> = match bridge_config.mode {
+            BackendMode::DryRun => Box::new(crate::bridge::DryRunBridge),
+            BackendMode::Production => bridge_config.adapter.ok_or_else(|| {
+                ExecError::Panic(
+                    "X3_BRIDGE_BACKEND_REQUIRED: BackendMode::Production requires a wired \
+                     production adapter (ProductionBridgeAdapter wrapping an EVM or SVM \
+                     backend); refusing to silently fall back to dry-run"
+                        .to_string(),
+                )
+            })?,
+        };
+        Ok(VM {
+            config: cfg.clone(),
+            state: VMState::new(&cfg, initial_gas),
+            code: InstructionStream::new(code),
+            bridge,
+        })
+    }
+
     pub fn execute(&mut self) -> ExecResult<()> {
         self.verify_and_execute()
     }
@@ -97,5 +136,87 @@ impl VM {
 
     pub(crate) fn execute_unverified(&mut self) -> ExecResult<()> {
         crate::executor::execute(self)
+    }
+}
+
+/// Bridge backend selection.
+///
+/// `DryRun` is the default and the only mode the CLI sandbox and unit
+/// tests exercise today. `Production` requires a real
+/// `BridgeAdapter` (an EVM or SVM backend wired with a verifier and a
+/// receipt store). The two are kept separate so a typo or a missing
+/// config cannot quietly turn a production call into a dry-run.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BackendMode {
+    /// In-process dry-run bridge. No RPC, no light client, no real
+    /// finality. Bridge operations are recorded in `state.bridge_ops`
+    /// and acknowledged with `dry-run-bridge_transfer:...` receipts.
+    DryRun,
+    /// Production bridge. The `BridgeConfig` must carry a wired
+    /// `BridgeAdapter` (an EVM or SVM backend); otherwise
+    /// [`VM::with_bridge`] fails closed.
+    Production,
+}
+
+impl Default for BackendMode {
+    fn default() -> Self {
+        BackendMode::DryRun
+    }
+}
+
+/// Configuration passed to [`VM::with_bridge`].
+///
+/// `mode` selects the backend family; `adapter` is the actual
+/// `BridgeAdapter` to install on the VM (typically a
+/// `ProductionBridgeAdapter<EthereumLightClientVerifier, _>` or
+/// `ProductionBridgeAdapter<SolanaLightClientVerifier, _>`). When
+/// `mode == DryRun` the adapter is ignored.
+///
+/// `BridgeConfig` is not `Clone` because the production adapter is a
+/// boxed trait object; clone is unnecessary in the call paths we
+/// support (constructed once at startup, consumed by `with_bridge`).
+pub struct BridgeConfig {
+    /// Backend mode.
+    pub mode: BackendMode,
+    /// Production adapter. Required iff `mode == Production`.
+    pub adapter: Option<Box<dyn crate::bridge::BridgeAdapter>>,
+}
+
+impl std::fmt::Debug for BridgeConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BridgeConfig")
+            .field("mode", &self.mode)
+            .field("adapter", &self.adapter.as_ref().map(|_| "<BridgeAdapter>"))
+            .finish()
+    }
+}
+
+impl Default for BridgeConfig {
+    fn default() -> Self {
+        Self {
+            mode: BackendMode::DryRun,
+            adapter: None,
+        }
+    }
+}
+
+impl BridgeConfig {
+    /// Build a dry-run config (default).
+    pub fn dry_run() -> Self {
+        Self::default()
+    }
+
+    /// Build a production config that wraps the supplied production
+    /// adapter. The adapter is `Box`-erased to a `BridgeAdapter`
+    /// trait object; callers in production code usually pass a
+    /// `ProductionBridgeAdapter<...>`.
+    pub fn with_production_adapter<A>(adapter: A) -> Self
+    where
+        A: crate::bridge::BridgeAdapter + 'static,
+    {
+        Self {
+            mode: BackendMode::Production,
+            adapter: Some(Box::new(adapter)),
+        }
     }
 }

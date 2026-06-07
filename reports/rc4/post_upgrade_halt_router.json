@@ -1,5 +1,0 @@
-{
-  "log": "/home/lojak/Desktop/X3_ATOMIC_STAR/reports/rc4/post_upgrade_halt_router.log",
-  "result": "PASS",
-  "test": "test_paused_asset_rejects_transfers"
-}

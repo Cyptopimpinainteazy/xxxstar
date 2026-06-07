@@ -124,6 +124,54 @@ pub enum CapabilityPayload {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssetOpPayload {
+    Lock {
+        chain: String,
+        asset: String,
+        amount: u128,
+        from: String,
+    },
+    Mint {
+        chain: String,
+        asset: String,
+        amount: u128,
+        to: String,
+    },
+    Burn {
+        chain: String,
+        asset: String,
+        amount: u128,
+        from: String,
+    },
+    Release {
+        chain: String,
+        asset: String,
+        to: String,
+    },
+    Swap {
+        from_chain: String,
+        from_asset: String,
+        to_asset: String,
+        input_amount: u128,
+        min_output: u128,
+        dex: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BridgePayload {
+    pub via: String,
+    pub from_chain: String,
+    pub from_asset: String,
+    pub to_chain: String,
+    pub to_asset: String,
+    pub amount: u128,
+    pub receiver: String,
+    pub source_finality_proof: Vec<u8>,
+    pub transfer_proof: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CapabilityCodecError {
     UnexpectedEof,
     InvalidUtf8,
@@ -288,6 +336,144 @@ pub fn encode_capability_payload(
     Ok(out)
 }
 
+pub fn encode_asset_op_payload(payload: &AssetOpPayload) -> Result<Vec<u8>, CapabilityCodecError> {
+    let mut out = Vec::new();
+    match payload {
+        AssetOpPayload::Lock {
+            chain,
+            asset,
+            amount,
+            from,
+        } => {
+            write_string(&mut out, chain)?;
+            write_string(&mut out, asset)?;
+            write_u128(&mut out, *amount);
+            write_string(&mut out, from)?;
+        }
+        AssetOpPayload::Mint {
+            chain,
+            asset,
+            amount,
+            to,
+        } => {
+            write_string(&mut out, chain)?;
+            write_string(&mut out, asset)?;
+            write_u128(&mut out, *amount);
+            write_string(&mut out, to)?;
+        }
+        AssetOpPayload::Burn {
+            chain,
+            asset,
+            amount,
+            from,
+        } => {
+            write_string(&mut out, chain)?;
+            write_string(&mut out, asset)?;
+            write_u128(&mut out, *amount);
+            write_string(&mut out, from)?;
+        }
+        AssetOpPayload::Release { chain, asset, to } => {
+            write_string(&mut out, chain)?;
+            write_string(&mut out, asset)?;
+            write_string(&mut out, to)?;
+        }
+        AssetOpPayload::Swap {
+            from_chain,
+            from_asset,
+            to_asset,
+            input_amount,
+            min_output,
+            dex,
+        } => {
+            write_string(&mut out, from_chain)?;
+            write_string(&mut out, from_asset)?;
+            write_string(&mut out, to_asset)?;
+            write_u128(&mut out, *input_amount);
+            write_u128(&mut out, *min_output);
+            write_optional_string(&mut out, dex.as_deref())?;
+        }
+    }
+    Ok(out)
+}
+
+pub fn decode_asset_op_payload(
+    opcode: u8,
+    bytes: &[u8],
+) -> Result<AssetOpPayload, CapabilityCodecError> {
+    let mut reader = Reader { bytes, pos: 0 };
+    let payload = match opcode {
+        0x20 => AssetOpPayload::Lock {
+            chain: reader.read_string()?,
+            asset: reader.read_string()?,
+            amount: reader.read_u128()?,
+            from: reader.read_string()?,
+        },
+        0x21 => AssetOpPayload::Mint {
+            chain: reader.read_string()?,
+            asset: reader.read_string()?,
+            amount: reader.read_u128()?,
+            to: reader.read_string()?,
+        },
+        0x22 => AssetOpPayload::Burn {
+            chain: reader.read_string()?,
+            asset: reader.read_string()?,
+            amount: reader.read_u128()?,
+            from: reader.read_string()?,
+        },
+        0x23 => AssetOpPayload::Release {
+            chain: reader.read_string()?,
+            asset: reader.read_string()?,
+            to: reader.read_string()?,
+        },
+        0x24 => AssetOpPayload::Swap {
+            from_chain: reader.read_string()?,
+            from_asset: reader.read_string()?,
+            to_asset: reader.read_string()?,
+            input_amount: reader.read_u128()?,
+            min_output: reader.read_u128()?,
+            dex: reader.read_optional_string()?,
+        },
+        _ => return Err(CapabilityCodecError::InvalidOpcode(opcode)),
+    };
+    if reader.pos != bytes.len() {
+        return Err(CapabilityCodecError::TrailingBytes);
+    }
+    Ok(payload)
+}
+
+pub fn encode_bridge_payload(payload: &BridgePayload) -> Result<Vec<u8>, CapabilityCodecError> {
+    let mut out = Vec::new();
+    write_string(&mut out, &payload.via)?;
+    write_string(&mut out, &payload.from_chain)?;
+    write_string(&mut out, &payload.from_asset)?;
+    write_string(&mut out, &payload.to_chain)?;
+    write_string(&mut out, &payload.to_asset)?;
+    write_u128(&mut out, payload.amount);
+    write_string(&mut out, &payload.receiver)?;
+    write_bytes(&mut out, &payload.source_finality_proof)?;
+    write_bytes(&mut out, &payload.transfer_proof)?;
+    Ok(out)
+}
+
+pub fn decode_bridge_payload(bytes: &[u8]) -> Result<BridgePayload, CapabilityCodecError> {
+    let mut reader = Reader { bytes, pos: 0 };
+    let payload = BridgePayload {
+        via: reader.read_string()?,
+        from_chain: reader.read_string()?,
+        from_asset: reader.read_string()?,
+        to_chain: reader.read_string()?,
+        to_asset: reader.read_string()?,
+        amount: reader.read_u128()?,
+        receiver: reader.read_string()?,
+        source_finality_proof: reader.read_bytes()?,
+        transfer_proof: reader.read_bytes()?,
+    };
+    if reader.pos != bytes.len() {
+        return Err(CapabilityCodecError::TrailingBytes);
+    }
+    Ok(payload)
+}
+
 pub fn decode_capability_payload(
     opcode: u8,
     bytes: &[u8],
@@ -446,6 +632,13 @@ fn write_string(out: &mut Vec<u8>, value: &str) -> Result<(), CapabilityCodecErr
     Ok(())
 }
 
+fn write_bytes(out: &mut Vec<u8>, bytes: &[u8]) -> Result<(), CapabilityCodecError> {
+    let len = u16::try_from(bytes.len()).map_err(|_| CapabilityCodecError::PayloadTooLarge)?;
+    out.extend_from_slice(&len.to_le_bytes());
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
 fn write_optional_string(
     out: &mut Vec<u8>,
     value: Option<&str>,
@@ -524,6 +717,13 @@ impl<'a> Reader<'a> {
         std::str::from_utf8(bytes)
             .map(|value| value.to_string())
             .map_err(|_| CapabilityCodecError::InvalidUtf8)
+    }
+
+    fn read_bytes(&mut self) -> Result<Vec<u8>, CapabilityCodecError> {
+        let mut len = [0u8; 2];
+        len.copy_from_slice(self.read_exact(2)?);
+        let len = u16::from_le_bytes(len) as usize;
+        Ok(self.read_exact(len)?.to_vec())
     }
 
     fn read_optional_string(&mut self) -> Result<Option<String>, CapabilityCodecError> {

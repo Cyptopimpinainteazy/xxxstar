@@ -13,3 +13,4 @@ serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 proptest = { workspace = true }
+x3-lang-vm = { path = "../vm" }

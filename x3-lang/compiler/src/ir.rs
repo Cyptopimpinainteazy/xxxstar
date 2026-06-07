@@ -91,6 +91,18 @@ pub enum Operation {
         min_output: u128,
         dex: Option<String>,
     },
+    /// Bridge assets across chains through a configured bridge route.
+    Bridge {
+        via: String,
+        from_chain: String,
+        from_asset: String,
+        to_chain: String,
+        to_asset: String,
+        amount: u128,
+        receiver: String,
+        source_finality_proof: Vec<u8>,
+        transfer_proof: Vec<u8>,
+    },
 
     // ===== Control Flow =====
     /// Conditional execution

@@ -8,7 +8,7 @@
 //! `timeout_refund_minimal.x3` example covers the parts that are
 //! implemented today: `from`, `to`, `route { ... }`, `timeout ... on_fail`.
 
-use x3_lang_compiler::{compile_program, compile_source, compile_to_ir, Operation};
+use x3_lang_compiler::{compile_source, compile_to_ir, Operation};
 use x3_lang_vm::verifier::verify;
 use x3_lang_vm::{InstructionStream, VMConfig, VM};
 
@@ -36,16 +36,19 @@ fn minimal_intent_compiles_to_bytecode() {
 #[test]
 fn minimal_intent_lowers_with_atomic_and_timeout() {
     let src = example_source("timeout_refund_minimal.x3");
-    let program = x3_lang_compiler::parser::parse_source(&src)
-        .expect("source should parse");
+    let program = x3_lang_compiler::parser::parse_source(&src).expect("source should parse");
     let ir = compile_to_ir(&program).expect("AST should lower");
 
     assert!(
-        ir.operations.iter().any(|op| matches!(op, Operation::AtomicBegin)),
+        ir.operations
+            .iter()
+            .any(|op| matches!(op, Operation::AtomicBegin)),
         "atomic block must wrap the bridge"
     );
     assert!(
-        ir.operations.iter().any(|op| matches!(op, Operation::AtomicEnd)),
+        ir.operations
+            .iter()
+            .any(|op| matches!(op, Operation::AtomicEnd)),
         "atomic block must terminate"
     );
     assert!(
@@ -55,14 +58,39 @@ fn minimal_intent_lowers_with_atomic_and_timeout() {
         )),
         "timeout 45s must produce OnTimeout with 45 blocks"
     );
-    let has_lock = ir.operations.iter().any(|op| matches!(
-        op,
-        Operation::Lock { chain, asset, .. } if chain == "ethereum" && asset == "USDC"
-    ));
-    let has_release = ir.operations.iter().any(|op| matches!(
-        op,
-        Operation::Release { chain, asset, .. } if chain == "ethereum" && asset == "USDC"
-    ));
+    let has_lock = ir.operations.iter().any(|op| {
+        matches!(
+            op,
+            Operation::Lock { chain, asset, .. } if chain == "ethereum" && asset == "USDC"
+        )
+    });
+    assert!(
+        ir.operations.iter().any(|op| matches!(
+            op,
+            Operation::Bridge {
+                via,
+                from_chain,
+                from_asset,
+                to_chain,
+                to_asset,
+                amount: 100,
+                receiver,
+                ..
+            } if via == "X3"
+                && from_chain == "ethereum"
+                && from_asset == "USDC"
+                && to_chain == "solana"
+                && to_asset == "USDC"
+                && receiver == "4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD"
+        )),
+        "route bridge must lower to a first-class bridge operation"
+    );
+    let has_release = ir.operations.iter().any(|op| {
+        matches!(
+            op,
+            Operation::Release { chain, asset, .. } if chain == "ethereum" && asset == "USDC"
+        )
+    });
     assert!(has_lock, "Ethereum.USDC must be locked");
     assert!(has_release, "Ethereum.USDC must be released on failure");
 }
@@ -79,6 +107,10 @@ fn minimal_intent_bytecode_runs_on_verified_executor() {
         "verified VM execution should succeed, got {:?}",
         result
     );
+    assert_eq!(vm.state.bridge_ops.len(), 1);
+    assert_eq!(vm.state.bridge_ops[0].amount, 100);
+    assert!(String::from_utf8_lossy(&vm.state.bridge_receipts[0])
+        .contains("dry-run-bridge_transfer:X3:ethereum.USDC->solana.USDC:100"));
 }
 
 #[test]

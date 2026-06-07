@@ -310,3 +310,57 @@ fn test_source_parser_capability_matrix_reaches_x3ir_and_bytecode() {
         );
     }
 }
+
+#[test]
+fn test_route_swap_min_output_reaches_ir() {
+    let source = r#"
+        intent guarded_swap {
+            route {
+                swap uniswap ethereum.USDC -> ethereum.ETH amount 1000 min_output 777;
+            }
+        }
+    "#;
+
+    let program = parse_source(source).expect("route source should parse");
+    let ir = compile_to_ir(&program).expect("route source should lower");
+
+    assert!(ir.operations.iter().any(|op| matches!(
+        op,
+        Operation::Swap {
+            input_amount: 1000,
+            min_output: 777,
+            dex: Some(dex),
+            ..
+        } if dex == "uniswap"
+    )));
+}
+
+#[test]
+fn test_route_bridge_light_client_proof_inputs_reach_ir() {
+    let source = r#"
+        intent proofed_bridge {
+            from Ethereum.USDC amount 100 receiver 0x1111111111111111111111111111111111111111
+            to Solana.USDC receiver 4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD
+            route {
+                bridge X3 Ethereum.USDC -> Solana.USDC
+                    receiver 4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD
+                    finality_proof "eth-header-receipt-trie-proof"
+                    transfer_proof "erc20-log-proof";
+            }
+        }
+    "#;
+
+    let program = parse_source(source).expect("proofed bridge route should parse");
+    let ir = compile_to_ir(&program).expect("proofed bridge route should lower");
+
+    assert!(ir.operations.iter().any(|op| matches!(
+        op,
+        Operation::Bridge {
+            amount: 100,
+            source_finality_proof,
+            transfer_proof,
+            ..
+        } if source_finality_proof == b"eth-header-receipt-trie-proof"
+            && transfer_proof == b"erc20-log-proof"
+    )));
+}

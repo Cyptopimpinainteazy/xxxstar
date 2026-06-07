@@ -244,12 +244,24 @@ pub enum Statement {
         asset: AssetRef,
         to: Expression,
     },
-    /// `swap from.ASSET -> to.ASSET [route <expr>] [dex <expr>]`
+    /// `swap from.ASSET -> to.ASSET [route <expr>] [min_output <expr>] [dex <expr>]`
     Swap {
         from: AssetRef,
         to: AssetRef,
         route: Option<Expression>,
+        min_output: Option<Expression>,
         dex: Option<Expression>,
+    },
+    /// `bridge via from.ASSET -> to.ASSET amount <expr> receiver <expr>
+    ///   [finality_proof <expr>] [transfer_proof <expr>]`
+    Bridge {
+        via: Symbol,
+        from: AssetRef,
+        to: AssetRef,
+        amount: Expression,
+        receiver: Expression,
+        source_finality_proof: Option<Expression>,
+        transfer_proof: Option<Expression>,
     },
 
     // ===== Cross-chain guards =====

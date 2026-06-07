@@ -11,10 +11,12 @@ pub mod symbol;
 pub mod token;
 
 pub use capability::{
-    decode_capability_payload, encode_capability_payload, CapabilityCodecError, CapabilityPayload,
+    decode_asset_op_payload, decode_bridge_payload, decode_capability_payload,
+    encode_asset_op_payload, encode_bridge_payload, encode_capability_payload, AssetOpPayload,
+    BridgePayload, CapabilityCodecError, CapabilityPayload,
 };
 pub use diagnostic::{Diagnostic, DiagnosticBuilder, DiagnosticLevel};
-pub use error::{X3Error, X3Result};
+pub use error::{ErrorAccumulator, ErrorReporter, X3Error, X3Result};
 pub use source::{SourceFile, SourceMap};
 pub use span::{BytePos, Span, Spanned};
 pub use symbol::{Symbol, SymbolInterner};
