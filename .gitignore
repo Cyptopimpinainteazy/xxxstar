@@ -78,3 +78,30 @@ apps/explorer/.next/
 *.zip
 *.tar.gz
 *.deb
+
+# Environment secrets
+.env.local
+.env.*.local
+
+# Vendor / dependency mirroring (large)
+vendor/
+vendov/
+
+# Build caches
+.cache/
+
+# Runtime artifacts
+logs/
+nohup.out
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Model / binary tooling
+ollama-models/
+protoc_bin/
+
+# Repomix
+.repomix/

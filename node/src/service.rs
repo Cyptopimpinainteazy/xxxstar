@@ -44,9 +44,7 @@ use x3_verification_router::{
 };
 
 #[cfg(feature = "gpu-validator")]
-use x3_gpu_validator_swarm::{
-    config::SwarmConfig, deterministic::DeterministicValidator, orchestrator::SwarmOrchestrator,
-};
+use x3_gpu_validator_swarm::{config::SwarmConfig, orchestrator::SwarmOrchestrator};
 
 /// Key type for Aura block authoring
 const AURA: KeyTypeId = KeyTypeId(*b"aura");
@@ -1296,28 +1294,13 @@ pub fn new_full<
         let orchestrator_id = format!("{}-gpu-validator", name.clone());
         let gpu_config = SwarmConfig::default();
 
-        let orchestrator = match SwarmOrchestrator::new(orchestrator_id.clone(), gpu_config) {
-            Ok(orch) => {
-                log::info!(
-                    "🎮 GPU Validator Orchestrator initialized: {}",
-                    orchestrator_id
-                );
-                Arc::new(tokio::sync::RwLock::new(orch))
-            }
-            Err(e) => {
-                log::error!(
-                    "❌ Failed to initialize GPU Validator Orchestrator: {}; GPU validation disabled",
-                    e
-                );
-                return Err(ServiceError::Other(format!(
-                    "GPU Validator Orchestrator initialization failed: {}",
-                    e
-                )));
-            }
-        };
+        let orchestrator = Arc::new(tokio::sync::RwLock::new(SwarmOrchestrator::new(gpu_config)));
+        log::info!(
+            "🎮 GPU Validator Orchestrator initialized: {}",
+            orchestrator_id
+        );
 
         let orch_clone = orchestrator.clone();
-        let client_for_gpu = client.clone();
         task_manager.spawn_essential_handle().spawn(
             "gpu-validator-orchestrator",
             Some("gpu-validator"),
@@ -1336,6 +1319,33 @@ pub fn new_full<
         );
 
         log::info!("🎮 GPU Validator Orchestrator spawned and monitoring");
+
+        {
+            let client_for_anchor = client.clone();
+            let orch_for_anchor = orchestrator.clone();
+            task_manager.spawn_handle().spawn(
+                "gpu-validator-finalized-anchor",
+                Some("gpu-validator"),
+                async move {
+                    use futures_util::StreamExt;
+
+                    let mut finality_notifications =
+                        client_for_anchor.finality_notification_stream();
+                    while let Some(notification) = finality_notifications.next().await {
+                        let finalized_block: u64 = (*notification.header.number()).saturated_into();
+                        let orch = orch_for_anchor.read().await;
+                        orch.update_finalized_block_anchor(finalized_block);
+                        if let Some(anchor) = orch.min_finalized_block_anchor() {
+                            log::debug!(
+                                "🎮 GPU validator proof anchor updated from finalized head: {}",
+                                anchor
+                            );
+                        }
+                    }
+                },
+            );
+            log::info!("🎮 GPU validator finalized-head anchor watcher spawned");
+        }
 
         // ISSUE #1 FIX: Spawn GPU Sidecar Health Monitor task
         // Tracks GPU sidecar process health and triggers restart on failure threshold
@@ -1438,8 +1448,6 @@ pub fn new_full<
 
                     log::info!("🏁 GPU Sidecar async task completed: {:?}", result);
                     gpu_sidecar_is_running.store(false, std::sync::atomic::Ordering::Release);
-
-                    result
                 },
             );
 
@@ -1447,9 +1455,32 @@ pub fn new_full<
                 "🚀 GPU Sidecar spawned and monitoring (service_id={})",
                 gpu_sidecar_handle_arc.config.service_id
             );
+        }
 
-            // Store sidecar handle in task manager extensions for access during shutdown
-            task_manager.extension().insert(gpu_sidecar_handle_arc);
+        {
+            use cross_chain_gpu_validator::CrossChainValidator;
+
+            let cross_chain_validator = CrossChainValidator::new(orchestrator.clone(), 1);
+
+            task_manager.spawn_handle().spawn(
+                "cross-chain-gpu-validator",
+                Some("gpu-validator"),
+                async move {
+                    match cross_chain_validator.run_validation_loop().await {
+                        Ok(()) => {
+                            log::info!("🌐 Cross-chain GPU validator loop completed");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "🌐 Cross-chain GPU validator critical failure: {} — validator disabled, node continues",
+                                e
+                            );
+                        }
+                    }
+                },
+            );
+
+            log::debug!("🌐 Cross-chain GPU validator spawned");
         }
     }
 
@@ -1595,13 +1626,6 @@ pub fn new_full<
         log::info!("⏱️ Proof of History (PoH) generator enabled and wired to block loop");
     }
 
-    // ── Store GPU Orchestrator reference for RPC access ────────────────────────────────
-    #[cfg(feature = "gpu-validator")]
-    if feature_flags.enable_gpu_validator {
-        task_manager.extension().insert(orchestrator.clone());
-        log::debug!("🎮 GPU Orchestrator reference stored in task manager extensions");
-    }
-
     // ─────────────────────────────────────────────────────────────────
     // Initialize Sidecar Service for Cross-VM Bridge
     // ─────────────────────────────────────────────────────────────────
@@ -1676,42 +1700,6 @@ pub fn new_full<
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // Initialize Cross-Chain GPU Validator
-    // ─────────────────────────────────────────────────────────────────
-    #[cfg(feature = "gpu-validator")]
-    if feature_flags.enable_gpu_validator {
-        use x3_cross_chain_gpu_validator::CrossChainValidator;
-
-        let cross_chain_validator =
-            CrossChainValidator::new(orchestrator.clone(), config.network.protocol_version);
-
-        // Spawn cross-chain validation task
-        task_manager.spawn_handle().spawn(
-            "cross-chain-gpu-validator",
-            Box::pin(async move {
-                match cross_chain_validator.run_validation_loop().await {
-                    Ok(()) => {
-                        log::info!("🌐 Cross-chain GPU validator loop completed");
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "🌐 Cross-chain GPU validator critical failure: {} — validator disabled, node continues",
-                            e
-                        );
-                        return;
-                    }
-                }
-            }),
-        );
-
-        // Export for RPC layer
-        task_manager
-            .extension()
-            .insert(cross_chain_validator.clone());
-        log::debug!("🌐 Cross-chain validator reference exported for RPC");
-    }
-
     log::info!("✨ X3 Chain node started successfully");
     log::info!("🔗 Network: {}", chain_name);
     log::info!("👤 Node name: {}", name);
@@ -1739,7 +1727,8 @@ async fn spawn_gpu_sidecar(
     mut shutdown_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
     orchestrator: Arc<tokio::sync::RwLock<SwarmOrchestrator>>,
 ) -> Result<(), String> {
-    use x3_gpu_validator_swarm::deterministic::{DeterministicTask, HashAlgorithm, TaskType};
+    use x3_gpu_validator_swarm::crypto::HashAlgorithm;
+    use x3_gpu_validator_swarm::deterministic::{DeterministicTask, TaskType};
 
     log::info!(
         "🚀 GPU Sidecar Service '{}' starting up",

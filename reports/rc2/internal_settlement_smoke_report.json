@@ -1,0 +1,230 @@
+{
+  "verdict": "PASS",
+  "chain": {
+    "rpc": "ws://127.0.0.1:9944",
+    "chain": "X3 Chain Local 3-Validator Testnet",
+    "runtime_spec_version": "9",
+    "latest_block": "273",
+    "finalized_block": "269",
+    "block_advanced_from": "108",
+    "finalized_advanced_from": "103"
+  },
+  "asset": {
+    "symbol": "X3",
+    "asset_id": "0x643684d53ab8670deefe8e5e566cda3d2b2ad6d1d4f040092d35fa28c9a3cbe3"
+  },
+  "supply_before": {
+    "canonical_supply": "120",
+    "native_supply": "40",
+    "evm_supply": "40",
+    "svm_supply": "40",
+    "external_locked_supply": "0",
+    "pending_supply": "0",
+    "represented_supply": "120"
+  },
+  "routes": [
+    {
+      "route": "X3Native -> X3Evm",
+      "amount": "10",
+      "message_id": "0xd2a1e8e8323aed1bbabdd5860ae004e4c289241966405a3d8d8c17b21b2f0e37",
+      "transfer_finalized": false,
+      "completion_finalized": false,
+      "finalized": true,
+      "settled_by_storage": true,
+      "pending_after_transfer": "10",
+      "pending_zero": true,
+      "canonical_supply_unchanged": true,
+      "source_delta": "-10",
+      "destination_delta": "10",
+      "source_leg_decreases": true,
+      "destination_leg_increases": true,
+      "represented_equals_canonical": true,
+      "supply_invariant": true,
+      "result": "PASS"
+    },
+    {
+      "route": "X3Native -> X3Svm",
+      "amount": "10",
+      "message_id": "0x65ecc978fb74fae2046bbec7c7ae1ff0bca50abbecdd3da869b6f09ba5bfe3c4",
+      "transfer_finalized": false,
+      "completion_finalized": false,
+      "finalized": true,
+      "settled_by_storage": true,
+      "pending_after_transfer": "10",
+      "pending_zero": true,
+      "canonical_supply_unchanged": true,
+      "source_delta": "-10",
+      "destination_delta": "10",
+      "source_leg_decreases": true,
+      "destination_leg_increases": true,
+      "represented_equals_canonical": true,
+      "supply_invariant": true,
+      "result": "PASS"
+    },
+    {
+      "route": "X3Evm -> X3Native",
+      "amount": "10",
+      "message_id": "0xddc44ea135da5de8f09302031a522652e84357ad869e3f4e8b539ec40ec0270d",
+      "transfer_finalized": false,
+      "completion_finalized": false,
+      "finalized": true,
+      "settled_by_storage": true,
+      "pending_after_transfer": "10",
+      "pending_zero": true,
+      "canonical_supply_unchanged": true,
+      "source_delta": "-10",
+      "destination_delta": "10",
+      "source_leg_decreases": true,
+      "destination_leg_increases": true,
+      "represented_equals_canonical": true,
+      "supply_invariant": true,
+      "result": "PASS"
+    },
+    {
+      "route": "X3Evm -> X3Svm",
+      "amount": "10",
+      "message_id": "0xd0523cf7de8f3707d09fe226d7811bdfac4d287b3028a92dcad319ece2d4854b",
+      "transfer_finalized": false,
+      "completion_finalized": false,
+      "finalized": true,
+      "settled_by_storage": true,
+      "pending_after_transfer": "10",
+      "pending_zero": true,
+      "canonical_supply_unchanged": true,
+      "source_delta": "-10",
+      "destination_delta": "10",
+      "source_leg_decreases": true,
+      "destination_leg_increases": true,
+      "represented_equals_canonical": true,
+      "supply_invariant": true,
+      "result": "PASS"
+    },
+    {
+      "route": "X3Svm -> X3Native",
+      "amount": "10",
+      "message_id": "0x8595c357bcb76b79a07571e0a9ad2c2065409257f4bab0e35456b55ab1f97bce",
+      "transfer_finalized": false,
+      "completion_finalized": false,
+      "finalized": true,
+      "settled_by_storage": true,
+      "pending_after_transfer": "10",
+      "pending_zero": true,
+      "canonical_supply_unchanged": true,
+      "source_delta": "-10",
+      "destination_delta": "10",
+      "source_leg_decreases": true,
+      "destination_leg_increases": true,
+      "represented_equals_canonical": true,
+      "supply_invariant": true,
+      "result": "PASS"
+    },
+    {
+      "route": "X3Svm -> X3Evm",
+      "amount": "10",
+      "message_id": "0x3866a4ff277e9a0e771336afd474abd76b09c8ac3907d5778abcb8dd1c80bb20",
+      "transfer_finalized": false,
+      "completion_finalized": false,
+      "finalized": true,
+      "settled_by_storage": true,
+      "pending_after_transfer": "10",
+      "pending_zero": true,
+      "canonical_supply_unchanged": true,
+      "source_delta": "-10",
+      "destination_delta": "10",
+      "source_leg_decreases": true,
+      "destination_leg_increases": true,
+      "represented_equals_canonical": true,
+      "supply_invariant": true,
+      "result": "PASS"
+    }
+  ],
+  "negative_tests": [
+    {
+      "test": "external Ethereum route rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "wrong EVM recipient rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "wrong SVM recipient rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "wrong sender type rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "duplicate message rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "duplicate nonce rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "refund after finalized rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "refund before expiry rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    },
+    {
+      "test": "completion after refund rejected",
+      "expected": "reject",
+      "result": "PASS",
+      "error": null,
+      "new_transfers": [],
+      "ledger_unchanged": true
+    }
+  ],
+  "supply_after": {
+    "canonical_supply": "120",
+    "native_supply": "30",
+    "evm_supply": "50",
+    "svm_supply": "40",
+    "external_locked_supply": "0",
+    "pending_supply": "0",
+    "represented_supply": "120"
+  },
+  "final_invariant": {
+    "represented_equals_canonical": true,
+    "pending_zero": true,
+    "external_bridges_disabled": true
+  },
+  "blockers": []
+}

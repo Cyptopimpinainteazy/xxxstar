@@ -3,6 +3,7 @@
 //! Every type here is serializable and hash-stable. No runtime state lives here —
 //! only the declarative structure the user (or compiler) provides.
 
+use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,7 +49,14 @@ impl ChainKind {
     }
 
     /// Parse from the canonical lowercase identifier used in x3-lang.
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::from_canonical(s)
+    }
+
+    /// Internal canonical-name parser. Renamed from `from_str` to
+    /// avoid collision with `std::str::FromStr`. The public
+    /// `parse` is the user-facing entry point.
+    fn from_canonical(s: &str) -> Option<Self> {
         match s {
             "eth" | "ethereum" => Some(ChainKind::Ethereum),
             "sol" | "solana" => Some(ChainKind::Solana),
@@ -250,7 +258,7 @@ pub struct ProofRequirement {
 ///
 /// The compiler checks every field that can introduce risk. Missing fields
 /// that are required for bridge or swap operations produce compile errors.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Requirements {
     /// Per-chain finality requirements.
     pub finality: Vec<FinalityRequirement>,
@@ -260,8 +268,11 @@ pub struct Requirements {
     /// Maximum total fee the user will pay (in source asset base units).
     /// Required for all intents (X3-INTENT-007).
     pub max_total_fee: Option<u128>,
-    /// Receiver must equal wallet owner (prevents drain attacks).
-    pub require_receiver_is_owner: bool,
+    /// Receiver authorization rule. Replaces the previous bare
+    /// `require_receiver_is_owner: bool` with a structured rule that
+    /// encodes the actual authorization policy.
+    /// Required for all intents (X3-INTENT-005).
+    pub receiver_authorization: ReceiverAuthorization,
     /// On-chain proofs that must be verified before proceeding.
     pub proofs: Vec<ProofRequirement>,
     /// Canonical supply invariant must hold after any mint.
@@ -270,12 +281,79 @@ pub struct Requirements {
     pub require_route_simulated: bool,
 }
 
+impl Default for Requirements {
+    fn default() -> Self {
+        // Default to the strictest possible authorization so a forgotten
+        // `requirements` field cannot silently downgrade to `AllowAny`.
+        Self {
+            finality: Vec::new(),
+            max_slippage_bps: None,
+            max_total_fee: None,
+            receiver_authorization: ReceiverAuthorization::OwnerOnly,
+            proofs: Vec::new(),
+            require_canonical_supply_valid: false,
+            require_route_simulated: false,
+        }
+    }
+}
+
+/// Receiver authorization rule.
+///
+/// The previous `require_receiver_is_owner: bool` was a bare boolean
+/// flag that the compiler checked for truthiness; it could not
+/// distinguish a strict same-owner rule from an explicit "send to a
+/// different but pre-approved account" rule, nor could it carry the
+/// chain-mapping needed for cross-chain receivers. This enum replaces
+/// that boolean with an explicit policy that the runtime can enforce
+/// without consulting the compiler at execution time.
+///
+/// Variants:
+///
+/// - [`OwnerOnly`](ReceiverAuthorization::OwnerOnly) — the destination
+///   `receiver` must exactly equal the source `owner`. Same-chain and
+///   cross-chain: the canonical address must match. This is the
+///   default.
+/// - [`ExplicitAccount`](ReceiverAuthorization::ExplicitAccount) —
+///   the user has named a specific destination account (and only that
+///   account) that is allowed. Used when the user is paying into a
+///   service they own on a different address on the same chain.
+/// - [`MappedAccount`](ReceiverAuthorization::MappedAccount) — a
+///   cross-chain account-mapping policy: the user has registered that
+///   `source_chain:source_owner` is allowed to send to
+///   `dest_chain:dest_account`. Used when the user owns accounts on
+///   both chains and has an explicit bridge-side mapping.
+/// - [`AllowAny`](ReceiverAuthorization::AllowAny) — the user is
+///   explicitly opting out of receiver validation. **Only** the user
+///   can opt in by choosing this variant; the compiler does not
+///   default to it. Production runtimes should require an additional
+///   governance signature for this variant.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ReceiverAuthorization {
+    /// Receiver must equal the source owner (default; same-chain and
+    /// cross-chain compared by canonical string identity).
+    OwnerOnly,
+    /// User has named a specific destination account that is allowed.
+    ExplicitAccount { account: String },
+    /// Cross-chain account mapping: source chain/owner is allowed to
+    /// send to a specific destination chain/account.
+    MappedAccount {
+        source_chain: ChainKind,
+        source_owner: String,
+        dest_chain: ChainKind,
+        dest_account: String,
+    },
+    /// User is explicitly opting out of receiver validation. The
+    /// runtime MUST require an additional governance signature or
+    /// risk-control gate before honoring this.
+    AllowAny,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Route specification
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Route optimization objective.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum RouteObjective {
     /// Choose the path that maximizes what the user receives.
     MaximizeOutput,
@@ -284,13 +362,8 @@ pub enum RouteObjective {
     /// Minimize bridge/execution time.
     MinimizeLatency,
     /// Best = MaximizeOutput with MinimizeTotalCost as tiebreaker.
+    #[default]
     Best,
-}
-
-impl Default for RouteObjective {
-    fn default() -> Self {
-        RouteObjective::Best
-    }
 }
 
 /// An explicitly allowed or denied venue in the route.
@@ -327,7 +400,7 @@ impl Default for RouteSpec {
 /// What to do with funds if execution fails or times out.
 ///
 /// Must be present for any cross-chain operation (X3-INTENT-003, X3-INTENT-004).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FailureAction {
     /// Return funds to the source chain in the source asset.
     RefundSource,

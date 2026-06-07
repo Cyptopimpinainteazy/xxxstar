@@ -23,6 +23,7 @@
 //! SimulationResult::risk_score < RISK_THRESHOLD`.
 
 use crate::intent::CrossChainIntent;
+use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// The result of pre-execution simulation.
@@ -171,18 +172,122 @@ pub struct SimulatedFailureCase {
 /// integration testing, and local development.
 ///
 /// Replace the `fetch_*` methods with real oracle calls for production use.
-pub struct IntentSimulator;
+pub struct IntentSimulator {
+    mode: SimulationMode,
+}
+
+/// Mode under which the simulator is operating.
+///
+/// **Test mode** is permitted to return synthetic `route_found = true`
+/// values for unit and integration tests that do not have access to
+/// live DEX liquidity oracles, bridge fee APIs, gas price oracles, or
+/// historical bridge performance data.
+///
+/// **Production mode** is the only safe mode for `require_route_simulated`
+/// intents that will actually move funds. In production mode the
+/// simulator MUST be wired to a real data source for every leg of the
+/// route. If the data source is absent, the simulator fails closed
+/// (returns `route_found = false` and a blocking
+/// `SimulatedFailureCase`); it never returns a synthetic success that
+/// would let the runtime proceed to execution on a phantom quote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimulationMode {
+    /// Synthetic stub. Suitable for unit/integration tests only.
+    /// MUST NOT be used to gate production execution when
+    /// `require_route_simulated` is set.
+    Test,
+    /// Production mode. The simulator must be backed by real quote,
+    /// liquidity, and bridge data sources. If any source is missing
+    /// the simulator fails closed.
+    Production,
+}
 
 impl IntentSimulator {
+    /// Build a test-mode simulator. Equivalent to `test_mode()`.
     pub fn new() -> Self {
-        Self
+        Self::test_mode()
+    }
+
+    /// Build an explicit test-mode simulator. Synthetic `route_found = true`
+    /// values are returned. **Must not** be used to gate production
+    /// execution when `require_route_simulated` is set.
+    pub fn test_mode() -> Self {
+        Self {
+            mode: SimulationMode::Test,
+        }
+    }
+
+    /// Build a production-mode simulator. The simulator fails closed
+    /// when no real data source is wired up. Callers MUST wire real
+    /// quote / liquidity / bridge / gas sources before relying on
+    /// `SimulationResult::route_found == true`.
+    pub fn production_mode() -> Self {
+        Self {
+            mode: SimulationMode::Production,
+        }
+    }
+
+    /// The mode this simulator is running in.
+    pub fn mode(&self) -> SimulationMode {
+        self.mode
     }
 
     /// Simulate a cross-chain intent.
     ///
     /// Returns a [`SimulationResult`] describing the predicted execution.
     /// The simulation does NOT modify any state.
+    ///
+    /// **Fail-closed behavior:** in [`SimulationMode::Production`],
+    /// this method only returns `route_found = true` when the runtime
+    /// has wired up real quote / liquidity / bridge / gas data
+    /// sources. When no real source is available the simulator
+    /// returns `route_found = false` with a blocking
+    /// `SimulatedFailureCase` so the compiler and runtime cannot
+    /// silently downgrade missing data to synthetic success.
     pub fn simulate(&self, intent: &CrossChainIntent) -> SimulationResult {
+        match self.mode {
+            SimulationMode::Test => self.simulate_test(intent),
+            SimulationMode::Production => self.simulate_production(intent),
+        }
+    }
+
+    fn simulate_production(&self, intent: &CrossChainIntent) -> SimulationResult {
+        // In production mode, the simulator MUST NOT return a
+        // synthetic success. The real implementation lives in the
+        // consuming runtime crate and queries live oracles; here we
+        // model the contract: no oracle wired up, no route found.
+        let failure = SimulatedFailureCase {
+            label: "no_real_data_source".to_string(),
+            description:
+                "Production-mode simulator has no real quote/liquidity/bridge oracle wired up. \
+                         Refusing to return a synthetic route_found=true. Wire the runtime to a \
+                         real data source before allowing this intent to proceed."
+                    .to_string(),
+            is_blocking: true,
+            probability: 1.0,
+            mitigation: Some(
+                "Call IntentSimulator::production_mode() only after wiring real quote/liquidity \
+                 sources; otherwise unset require_route_simulated or run in test_mode."
+                    .to_string(),
+            ),
+        };
+        SimulationResult {
+            intent_id: intent.id,
+            route_found: false,
+            estimated_output: None,
+            estimated_fees: 0,
+            estimated_slippage_bps: 0,
+            liquidity_depth_score: 0,
+            risk_score: 100,
+            route: Vec::new(),
+            failure_cases: vec![failure],
+            estimated_execution_secs: 0,
+            slippage_exceeds_limit: true,
+            fee_exceeds_cap: true,
+        }
+    }
+
+    fn simulate_test(&self, intent: &CrossChainIntent) -> SimulationResult {
         let source_chain = intent.source.asset.chain;
         let dest_chain = intent.destination.asset.chain;
 

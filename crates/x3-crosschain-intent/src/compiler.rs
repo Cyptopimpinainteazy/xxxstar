@@ -48,7 +48,11 @@
 use crate::error::IntentCompileError;
 use crate::instructions::{TimeoutAction, X3Instruction};
 use crate::intent::CrossChainIntent;
-use crate::types::{AssetRef, ChainKind, FailureAction, FinalityLevel, ProofKind};
+use crate::prelude::*;
+use crate::simulation::{IntentSimulator, SimulationMode, SimulationResult};
+use crate::types::{
+    AssetRef, ChainKind, FailureAction, FinalityLevel, ProofKind, ReceiverAuthorization,
+};
 
 /// The result of intent compilation.
 ///
@@ -95,10 +99,67 @@ impl IntentCompiler {
 
     /// Compile a [`CrossChainIntent`] into an execution plan.
     ///
-    /// Runs all 13 safety checks. Returns all errors found, not just the first.
-    /// Returns an instruction plan only if all checks pass.
+    /// Runs all 13 safety checks plus the canonical-hash integrity
+    /// check (X3-INTENT-014) and the receiver authorization rule
+    /// validation (X3-INTENT-015). Returns all errors found, not just
+    /// the first. Returns an instruction plan only if all checks pass.
+    ///
+    /// When `intent.requirements.require_route_simulated` is set, the
+    /// compiler will run the simulator in **test mode** (no live
+    /// data sources) and require a `route_found == true` result. For
+    /// production gating, use [`IntentCompiler::compile_with_simulator`]
+    /// with a `production_mode()` simulator whose oracle is wired up;
+    /// the compiler will treat a missing real data source as
+    /// X3-INTENT-016 (hard failure) and a missing route as
+    /// X3-INTENT-017 (hard failure).
     pub fn compile(&self, intent: &CrossChainIntent) -> CompileResult {
+        // Safety check 0: intent hash integrity (X3-INTENT-014).
+        // This MUST be the very first check — if the hash doesn't
+        // match, every downstream field might have been edited and
+        // the safety checks themselves could be running on tampered
+        // data. We refuse to emit any plan or run any other check
+        // until the integrity is restored.
         let mut errors: Vec<IntentCompileError> = Vec::new();
+        let recomputed = intent.compute_hash();
+        if intent.intent_hash != recomputed {
+            errors.push(IntentCompileError::IntentHashMismatch {
+                stored: hex::encode(intent.intent_hash),
+                recomputed: hex::encode(recomputed),
+            });
+            return CompileResult::failed(errors);
+        }
+
+        // Test-mode simulator is used by `compile()` for convenience.
+        // Production callers should use `compile_with_simulator`.
+        let simulator = IntentSimulator::test_mode();
+        self.compile_with_simulator(intent, &simulator)
+    }
+
+    /// Compile a [`CrossChainIntent`] using a caller-supplied
+    /// simulator. This is the production path: callers wire the
+    /// simulator to real quote / liquidity / bridge / gas oracles
+    /// and pass it here. The compiler enforces the
+    /// `require_route_simulated` flag against the simulator's mode:
+    /// a test-mode simulator used to gate a simulation-required
+    /// intent is rejected (X3-INTENT-016), and a production-mode
+    /// simulator that returns `route_found == false` is rejected
+    /// (X3-INTENT-017).
+    pub fn compile_with_simulator(
+        &self,
+        intent: &CrossChainIntent,
+        simulator: &IntentSimulator,
+    ) -> CompileResult {
+        let mut errors: Vec<IntentCompileError> = Vec::new();
+
+        // Safety check 0: intent hash integrity (X3-INTENT-014).
+        let recomputed = intent.compute_hash();
+        if intent.intent_hash != recomputed {
+            errors.push(IntentCompileError::IntentHashMismatch {
+                stored: hex::encode(intent.intent_hash),
+                recomputed: hex::encode(recomputed),
+            });
+            return CompileResult::failed(errors);
+        }
 
         // ── Safety check 1: Unknown chains ───────────────────────────────────
         let source_chain = intent.source.asset.chain;
@@ -221,12 +282,13 @@ impl IntentCompiler {
         }
 
         // ── Safety check 10: Canonical supply check ───────────────────────────
-        if intent.requires_bridge() && dest_chain == ChainKind::X3 {
-            if !intent.requirements.require_canonical_supply_valid {
-                errors.push(IntentCompileError::MissingCanonicalSupplyCheck {
-                    asset: intent.destination.asset.display(),
-                });
-            }
+        if intent.requires_bridge()
+            && dest_chain == ChainKind::X3
+            && !intent.requirements.require_canonical_supply_valid
+        {
+            errors.push(IntentCompileError::MissingCanonicalSupplyCheck {
+                asset: intent.destination.asset.display(),
+            });
         }
         // For full bridge-and-swap (source external → dest external via X3):
         if intent.requires_bridge()
@@ -251,9 +313,24 @@ impl IntentCompiler {
             });
         }
 
-        // ── Safety check 12: Receiver validation ─────────────────────────────
-        if !intent.requirements.require_receiver_is_owner {
-            errors.push(IntentCompileError::MissingReceiverValidation);
+        // ── Safety check 12: Receiver authorization rule (X3-INTENT-015) ────
+        // The previous implementation only checked a `bool`. We now
+        // validate the declared `ReceiverAuthorization` against the
+        // actual owner/receiver pair. The `AllowAny` variant is
+        // permitted (the user is explicitly opting out) but flagged so
+        // the runtime can apply its governance/risk-control gate.
+        if !receiver_authorization_covers(
+            &intent.requirements.receiver_authorization,
+            &intent.source.owner,
+            &intent.destination.receiver,
+            intent.source.asset.chain,
+            intent.destination.asset.chain,
+        ) {
+            errors.push(IntentCompileError::ReceiverAuthorizationMismatch {
+                rule: format!("{:?}", intent.requirements.receiver_authorization),
+                owner: intent.source.owner.clone(),
+                receiver: intent.destination.receiver.clone(),
+            });
         }
 
         // ── Safety check 13: Unsafe bridge venues ────────────────────────────
@@ -270,6 +347,34 @@ impl IntentCompiler {
                 errors.push(IntentCompileError::UnsafeRoute {
                     venue: denied.clone(),
                 });
+            }
+        }
+
+        // ── Safety check 14: Route simulation gating (X3-INTENT-016/-017) ───
+        // When `require_route_simulated` is set the compiler runs the
+        // simulator. The simulator's mode determines the contract:
+        //   * Production mode without a real data source → hard fail
+        //     (X3-INTENT-016).
+        //   * Production mode that returns `route_found == false` →
+        //     hard fail (X3-INTENT-017).
+        //   * Test mode is permitted to return synthetic results, but
+        //     is ONLY safe inside the unit/integration test suite; the
+        //     production runtime MUST wire a real data source.
+        if intent.requirements.require_route_simulated {
+            if simulator.mode() == SimulationMode::Test {
+                // A test-mode simulator used to gate a
+                // simulation-required intent is a configuration error
+                // in production. The compiler rejects it here so the
+                // runtime cannot be told to gate on synthetic results.
+                errors.push(IntentCompileError::NoRealSimulationSource);
+            } else {
+                let sim: SimulationResult = simulator.simulate(intent);
+                if !sim.route_found {
+                    errors.push(IntentCompileError::NoValidRoute {
+                        source_asset: intent.source.asset.display(),
+                        destination_asset: intent.destination.asset.display(),
+                    });
+                }
             }
         }
 
@@ -302,6 +407,19 @@ impl IntentCompiler {
         plan.push(X3Instruction::ValidateWalletOwner {
             owner: intent.source.owner.clone(),
             chain: source_chain,
+        });
+
+        // Step 1b: Enforce the structured receiver authorization rule.
+        // The runtime MUST execute this before any irreversible step
+        // (LockAsset, MintCanonical, BridgeToDestination,
+        // ReleaseDestination). The rule is part of the plan as data —
+        // not a yes/no boolean — so the runtime can verify it
+        // without consulting the compiler at execution time.
+        plan.push(X3Instruction::EnforceReceiverAuthorization {
+            owner: intent.source.owner.clone(),
+            receiver: intent.destination.receiver.clone(),
+            dest_chain,
+            rule: intent.requirements.receiver_authorization.clone(),
         });
 
         // Step 2: Check source balance
@@ -545,6 +663,42 @@ impl IntentCompiler {
     fn strip_chain_prefix(owner: &str) -> &str {
         // e.g. "alice.eth" → "alice"
         owner.split('.').next().unwrap_or(owner)
+    }
+}
+
+/// True if `rule` actually covers the declared `owner` → `receiver` pair.
+///
+/// The rule must match the real accounts on the chain pair, not just
+/// declare an authorization style. `OwnerOnly` is satisfied when the
+/// strings are equal. `ExplicitAccount` is satisfied when the receiver
+/// matches the named account. `MappedAccount` is satisfied when the
+/// source chain/owner and destination chain/account all match.
+/// `AllowAny` is always satisfied (the user has explicitly opted
+/// out of validation).
+pub fn receiver_authorization_covers(
+    rule: &ReceiverAuthorization,
+    owner: &str,
+    receiver: &str,
+    source_chain: ChainKind,
+    dest_chain: ChainKind,
+) -> bool {
+    match rule {
+        ReceiverAuthorization::OwnerOnly => owner == receiver,
+        ReceiverAuthorization::ExplicitAccount { account } => account == receiver,
+        ReceiverAuthorization::MappedAccount {
+            source_chain: sc,
+            source_owner: so,
+            dest_chain: dc,
+            dest_account: da,
+        } => {
+            // The mapping must be a real, chain-aware assignment:
+            //   source chain must equal the actual source chain,
+            //   source owner must equal the actual source owner,
+            //   destination chain must equal the actual dest chain,
+            //   destination account must equal the actual receiver.
+            *sc == source_chain && so == owner && *dc == dest_chain && da == receiver
+        }
+        ReceiverAuthorization::AllowAny => true,
     }
 }
 

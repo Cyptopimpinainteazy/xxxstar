@@ -4362,6 +4362,9 @@ sp_api::decl_runtime_apis! {
 mod mock;
 
 #[cfg(test)]
+mod test_helpers;
+
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]

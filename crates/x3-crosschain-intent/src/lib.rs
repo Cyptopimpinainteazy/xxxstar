@@ -25,7 +25,24 @@
 //! - [`compiler`] — [`IntentCompiler`] — intent → instructions with 13 safety checks
 //! - [`simulation`] — pre-execution simulation: fees, slippage, liquidity, risk score
 //! - [`error`] — all error types with diagnostic codes (X3-INTENT-NNN)
+//! - [`adapter`] — the canonical boundary between language compilers,
+//!   this crate, and the settlement runtime
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+pub(crate) mod prelude {
+    pub(crate) use alloc::{
+        format,
+        string::{String, ToString},
+        vec,
+        vec::Vec,
+    };
+}
+
+pub mod adapter;
+pub mod canonical;
 pub mod compiler;
 pub mod error;
 pub mod instructions;
@@ -34,12 +51,18 @@ pub mod lifecycle;
 pub mod simulation;
 pub mod types;
 
+pub use adapter::{
+    asset_ref_from_canonical, chain_kind_from_canonical, intent_spec_to_crosschain_intent,
+    validate_intent_spec, AdapterError, IntentSpec,
+};
+pub use canonical::encode_intent_canonical;
 pub use compiler::IntentCompiler;
 pub use error::{IntentCompileError, IntentValidationError};
 pub use instructions::X3Instruction;
 pub use intent::CrossChainIntent;
 pub use lifecycle::{CrossChainIntentState, IntentStateMachine};
 pub use types::{
-    AssetRef, ChainKind, FailureAction, FinalityLevel, ProofRequirement, ReceiptSpec, RouteSpec,
+    AssetRef, ChainKind, DestinationSpec, FailureAction, FinalityLevel, ProofRequirement,
+    ReceiptSpec, ReceiverAuthorization, Requirements, RouteObjective, RouteSpec, SourceSpec,
     TimeoutSpec,
 };

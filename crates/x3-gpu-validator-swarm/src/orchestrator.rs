@@ -133,9 +133,63 @@ impl SwarmOrchestrator {
             .update_validator_count(total, active, quarantined);
     }
 
+    /// Basic orchestrator health check used by node-side monitoring.
+    pub fn health_check(&self) -> SwarmResult<()> {
+        let total = self.validators.read().len();
+        let quarantined = self.get_quarantined_validators();
+
+        if total > 0 && quarantined >= total {
+            return Err(crate::error::SwarmError::Internal(
+                "all registered GPU validators are quarantined".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Signal a sidecar restart through the orchestration layer.
+    ///
+    /// The current node owns the sidecar task handle, so this method reports
+    /// that no orchestrator-managed restart backend has been registered yet.
+    pub fn trigger_restart(&self) -> SwarmResult<()> {
+        Err(crate::error::SwarmError::Internal(
+            "sidecar restart backend is not registered with the swarm orchestrator".to_string(),
+        ))
+    }
+
     /// Unregister a validator
     pub fn unregister_validator(&self, validator_id: &str) {
         self.validators.write().remove(validator_id);
+    }
+
+    /// Broadcast a finalized chain block anchor to every registered validator.
+    ///
+    /// Anchors are monotonic: stale finality notifications are ignored so a
+    /// validator cannot move its proof anchor backwards.
+    pub fn update_finalized_block_anchor(&self, finalized_block: u64) {
+        if finalized_block == 0 {
+            return;
+        }
+
+        for validator in self.validators.read().values() {
+            if finalized_block > validator.chain_block_anchor() {
+                validator.set_chain_block_anchor(finalized_block);
+            }
+        }
+    }
+
+    /// Return the minimum nonzero finalized block anchor currently held by
+    /// registered validators. `None` means no validator has observed a usable
+    /// anchor yet.
+    pub fn min_finalized_block_anchor(&self) -> Option<u64> {
+        self.validators
+            .read()
+            .values()
+            .filter_map(|v| {
+                let anchor = v.chain_block_anchor();
+                (anchor > 0).then_some(anchor)
+            })
+            .min()
     }
 
     /// Get active validators
@@ -436,6 +490,44 @@ mod tests {
         orchestrator.register_validator(validator);
 
         assert_eq!(orchestrator.get_active_validators(), 0); // Not started
+    }
+
+    #[test]
+    fn test_finalized_block_anchor_broadcasts_to_validators() {
+        let orchestrator = SwarmOrchestrator::new(SwarmConfig::default());
+        let validator_a = Arc::new(Validator::new(
+            SwarmConfig::default(),
+            "anchor-validator-a".to_string(),
+        ));
+        let validator_b = Arc::new(Validator::new(
+            SwarmConfig::default(),
+            "anchor-validator-b".to_string(),
+        ));
+
+        orchestrator.register_validator(validator_a.clone());
+        orchestrator.register_validator(validator_b.clone());
+        orchestrator.update_finalized_block_anchor(128);
+
+        assert_eq!(validator_a.chain_block_anchor(), 128);
+        assert_eq!(validator_b.chain_block_anchor(), 128);
+        assert_eq!(orchestrator.min_finalized_block_anchor(), Some(128));
+    }
+
+    #[test]
+    fn test_finalized_block_anchor_does_not_regress() {
+        let orchestrator = SwarmOrchestrator::new(SwarmConfig::default());
+        let validator = Arc::new(Validator::new(
+            SwarmConfig::default(),
+            "anchor-validator-monotonic".to_string(),
+        ));
+
+        orchestrator.register_validator(validator.clone());
+        orchestrator.update_finalized_block_anchor(128);
+        orchestrator.update_finalized_block_anchor(64);
+        orchestrator.update_finalized_block_anchor(0);
+
+        assert_eq!(validator.chain_block_anchor(), 128);
+        assert_eq!(orchestrator.min_finalized_block_anchor(), Some(128));
     }
 
     #[test]

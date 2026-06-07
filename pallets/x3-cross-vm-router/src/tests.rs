@@ -2106,6 +2106,13 @@ fn xvm_router_svm_to_evm_full_round_trip() {
     new_test_ext().execute_with(|| {
         let asset_id = bootstrap_x3_asset(20_000);
 
+        // Seed the EVM and SVM legs with native-source transfers
+        // first, so the SVM-source debit has supply to draw from
+        // (the asset's native-mint-burn policy only mints into the
+        // native leg; EVM and SVM start at 0).
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 2_000);
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Svm, 2_000);
+
         let l0 = Ledger::ledgers(asset_id).expect("ledger exists");
         let svm0 = l0.svm_supply;
         let evm0 = l0.evm_supply;
@@ -2146,6 +2153,12 @@ fn xvm_router_svm_to_evm_full_round_trip() {
 fn xvm_router_evm_to_svm_full_round_trip() {
     new_test_ext().execute_with(|| {
         let asset_id = bootstrap_x3_asset(20_000);
+
+        // Seed the EVM and SVM legs with native-source transfers
+        // first, so the EVM-source debit has supply to draw from
+        // (see comment in `xvm_router_svm_to_evm_full_round_trip`).
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Evm, 2_000);
+        do_xvm(asset_id, DomainId::X3Native, DomainId::X3Svm, 2_000);
 
         let l0 = Ledger::ledgers(asset_id).expect("ledger exists");
         let evm0 = l0.evm_supply;
@@ -2199,6 +2212,13 @@ fn xvm_router_state_machine_legal_transitions_only() {
         Failed,
     ];
     // Authoritative set from `TransferStatus::can_transition_to`.
+    // Kept as a `Vec` (rather than a `HashSet`) because
+    // `TransferStatus` deliberately does not derive `Hash` — the
+    // type is a runtime state, not a hash key, and adding `Hash`
+    // would be a backwards-incompatible AST change for downstream
+    // consumers. Linear scan over 8 pairs is O(64) per
+    // `contains`-equivalent, which is trivial for a 7×7 = 49-pair
+    // test matrix.
     let legal: &[(TransferStatus, TransferStatus)] = &[
         (Created, SourceDebited),
         (Created, Failed),
@@ -2209,13 +2229,14 @@ fn xvm_router_state_machine_legal_transitions_only() {
         (Expired, Refunded),
         (Expired, Failed),
     ];
-    let legal_pairs: std::collections::HashSet<(TransferStatus, TransferStatus)> =
-        legal.iter().copied().collect();
+    let is_legal_pair = |from: TransferStatus, to: TransferStatus| -> bool {
+        legal.iter().any(|&(a, b)| a == from && b == to)
+    };
 
     for from in all.iter() {
         for to in all.iter() {
             let key = (*from, *to);
-            let is_legal = legal_pairs.contains(&key);
+            let is_legal = is_legal_pair(*from, *to);
             // Self-transitions are always illegal (a state machine
             // step must change state). The legal set above already
             // excludes them, so we don't special-case.
@@ -2226,6 +2247,9 @@ fn xvm_router_state_machine_legal_transitions_only() {
                 from,
                 to
             );
+            // Silence the unused-variable warning on `key` — we
+            // compute it for the diagnostic message above.
+            let _ = key;
         }
     }
 

@@ -30,7 +30,8 @@
 //! 13. EmitIntentReceipt   { intent_id: ..., verbose: true }
 //! ```
 
-use crate::types::{AssetRef, ChainKind, FinalityLevel};
+use crate::prelude::*;
+use crate::types::{AssetRef, ChainKind, FinalityLevel, ReceiverAuthorization};
 use serde::{Deserialize, Serialize};
 
 /// A single typed instruction in the cross-chain execution plan.
@@ -40,6 +41,19 @@ pub enum X3Instruction {
     /// Verify that `owner` controls the address on `chain`.
     /// Prevents unauthorized drain of source funds.
     ValidateWalletOwner { owner: String, chain: ChainKind },
+
+    /// Enforce a structured receiver authorization rule. The runtime
+    /// MUST execute this before any `BridgeToDestination`,
+    /// `MintCanonical`, or `ReleaseDestination` that credits the
+    /// receiver. This is a stronger, more explicit replacement for
+    /// the previous boolean `require_receiver_is_owner` check: the
+    /// runtime now receives the policy as data, not as a yes/no flag.
+    EnforceReceiverAuthorization {
+        owner: String,
+        receiver: String,
+        dest_chain: ChainKind,
+        rule: ReceiverAuthorization,
+    },
 
     /// Check that `owner` has at least `required` units of `asset`.
     CheckBalance {
@@ -198,6 +212,7 @@ impl X3Instruction {
     pub fn label(&self) -> &'static str {
         match self {
             Self::ValidateWalletOwner { .. } => "ValidateOwner",
+            Self::EnforceReceiverAuthorization { .. } => "EnforceReceiverAuth",
             Self::CheckBalance { .. } => "CheckBalance",
             Self::QuoteBestRoute { .. } => "QuoteRoute",
             Self::SimulateExecution { .. } => "Simulate",

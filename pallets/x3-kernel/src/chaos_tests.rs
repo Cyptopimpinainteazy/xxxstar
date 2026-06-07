@@ -15,6 +15,7 @@
 //! Run with: `cargo test --package pallet-x3-kernel --lib chaos_tests`
 
 use super::mock::*;
+use super::test_helpers::{wrap_evm_payload, wrap_svm_payload, wrap_x3_payload};
 use super::*;
 use frame_support::{assert_noop, assert_ok};
 use sp_core::H256;
@@ -49,7 +50,13 @@ fn compute_prepare_root_v2(
     AtlasKernel::compute_prepare_root_v2(comit_id, evm_payload, svm_payload, x3_payload, nonce, fee)
 }
 
-/// Submit a comit with automatically computed prepare_root
+/// Submit a comit with automatically computed prepare_root.
+///
+/// The intent bytes (`evm`, `svm`) are wrapped as valid SCALE-encoded
+/// `Packet::Evm` / `Packet::Svm` packets before they reach the kernel,
+/// to satisfy the post-Phase-1.4 strict-packet validation. The wrapped
+/// form is also what flows into `compute_prepare_root`, so the
+/// prepare_root the kernel computes internally matches.
 fn submit_comit(
     who: AccountId,
     comit_id: H256,
@@ -57,12 +64,14 @@ fn submit_comit(
     svm: &[u8],
     nonce: u64,
 ) -> frame_support::dispatch::DispatchResult {
-    let prepare_root = compute_prepare_root(comit_id, evm, svm, nonce, FEE);
+    let evm_wrapped = wrap_evm_payload(evm);
+    let svm_wrapped = wrap_svm_payload(svm);
+    let prepare_root = compute_prepare_root(comit_id, &evm_wrapped, &svm_wrapped, nonce, FEE);
     AtlasKernel::submit_comit(
         RuntimeOrigin::signed(who),
         comit_id,
-        evm.to_vec(),
-        svm.to_vec(),
+        evm_wrapped,
+        svm_wrapped,
         nonce,
         FEE,
         prepare_root,
@@ -132,9 +141,14 @@ mod cross_vm {
     fn comit_v2_triple_vm_atomicity() {
         new_test_ext().execute_with(|| {
             let comit_id = random_comit_id(1);
-            let evm = vec![0x01];
-            let svm = vec![0x02];
-            let x3 = vec![0x03];
+            let evm_intent = vec![0x01];
+            let svm_intent = vec![0x02];
+            let x3_intent = vec![0x03];
+            // Wrap intent bytes as valid packets so the kernel's
+            // post-Phase-1.4 strict-packet validation accepts them.
+            let evm = wrap_evm_payload(&evm_intent);
+            let svm = wrap_svm_payload(&svm_intent);
+            let x3 = wrap_x3_payload(&x3_intent);
             let prepare_root = compute_prepare_root_v2(comit_id, &evm, &svm, &x3, 0, FEE);
 
             // Submit V2 comit with all three payloads
@@ -604,8 +618,8 @@ mod prepare_root {
             let result = AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![0x01],
-                vec![0x02],
+                wrap_evm_payload(&[0x01]),
+                wrap_svm_payload(&[0x02]),
                 0,
                 FEE,
                 wrong_root,

@@ -23,6 +23,7 @@
 //! | X3-INTENT-013    | Unbounded execution (no fee cap + no timeout = rejected) |
 
 use crate::lifecycle::CrossChainIntentState;
+use crate::prelude::*;
 use thiserror::Error;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,6 +190,60 @@ pub enum IntentCompileError {
         chain: String,
         specified: u32,
         minimum: u32,
+    },
+
+    /// X3-INTENT-014: Stored intent hash does not match the recomputed
+    /// canonical hash. The intent has been mutated after `intent_hash`
+    /// was assigned, or the stored hash was forged. Compilation is
+    /// rejected before any safety check or plan emission runs.
+    #[error(
+        "X3-INTENT-014: intent_hash mismatch — stored hash does not match recomputed canonical hash.\n\
+         Every user-controlled field (name, source, destination, route, requirements, timeout.on_fail, receipt) \
+         is covered by the canonical encoding. Re-run the builder's `build()` or call \
+         `CrossChainIntent::recompute_and_store_hash()` after any edit."
+    )]
+    IntentHashMismatch {
+        /// The hash that was stored on the intent.
+        stored: String,
+        /// The hash that was recomputed from the current fields.
+        recomputed: String,
+    },
+
+    /// X3-INTENT-015: Receiver authorization rule does not match the
+    /// declared source/destination accounts. The compiler enforces
+    /// this before any plan emission so the runtime cannot be told
+    /// to release funds to an unauthorized account.
+    #[error(
+        "X3-INTENT-015: Receiver authorization rule '{rule}' does not match the intent's owner/receiver pair.\n\
+         The declared rule must cover '{receiver}' (destination receiver) given owner '{owner}'."
+    )]
+    ReceiverAuthorizationMismatch {
+        rule: String,
+        owner: String,
+        receiver: String,
+    },
+
+    /// X3-INTENT-016: Route simulation in production mode must come
+    /// from a real quote/liquidity/bridge data source. The
+    /// `IntentSimulator` was constructed in test/stub mode, but
+    /// `require_route_simulated` is set. Compilation is rejected.
+    #[error(
+        "X3-INTENT-016: Route simulation is required but the simulator has no real data source.\n\
+         Compile-time simulators and test-only stubs cannot gate production execution.\n\
+         Either wire the runtime to a real quote/liquidity/bridge oracle, or unset `require_route_simulated`."
+    )]
+    NoRealSimulationSource,
+
+    /// X3-INTENT-017: Simulation in production mode produced no valid
+    /// route. The simulator must fail closed when no path exists for
+    /// the requested source/destination pair.
+    #[error(
+        "X3-INTENT-017: Route simulation found no valid execution route.\n\
+         Source '`{source_asset}`' cannot reach destination '`{destination_asset}`' with the declared venue policy."
+    )]
+    NoValidRoute {
+        source_asset: String,
+        destination_asset: String,
     },
 }
 

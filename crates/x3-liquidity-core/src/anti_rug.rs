@@ -239,7 +239,7 @@ impl LpLockRegistry {
         let time_score = if days_since_launch > 30 {
             10
         } else {
-            (days_since_launch as u32) * 10 / 30
+            days_since_launch * 10 / 30
         };
         score += time_score;
 

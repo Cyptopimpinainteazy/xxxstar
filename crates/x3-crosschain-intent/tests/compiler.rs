@@ -21,7 +21,7 @@ use x3_crosschain_intent::{
 /// Builds a minimal but fully-safe bridge+swap intent (ETH USDC → SOL SOL).
 /// All 13 safety requirements satisfied. Should compile to a valid plan.
 fn safe_bridge_swap_intent() -> CrossChainIntent {
-    CrossChainIntent {
+    let mut intent = CrossChainIntent {
         id: 1,
         name: "test_usdc_to_sol".to_string(),
         source: SourceSpec {
@@ -53,7 +53,16 @@ fn safe_bridge_swap_intent() -> CrossChainIntent {
             ],
             max_slippage_bps: Some(100),
             max_total_fee: Some(10_000_000), // 10 USDC fee cap
-            require_receiver_is_owner: true,
+            // Cross-chain owner→receiver mapping so the receiver
+            // authorization rule (X3-INTENT-015) passes; the safety
+            // checks we are testing are unrelated to receiver auth.
+            receiver_authorization:
+                x3_crosschain_intent::types::ReceiverAuthorization::MappedAccount {
+                    source_chain: ChainKind::Ethereum,
+                    source_owner: "alice.eth".to_string(),
+                    dest_chain: ChainKind::Solana,
+                    dest_account: "alice.sol".to_string(),
+                },
             proofs: vec![
                 ProofRequirement {
                     chain: ChainKind::Ethereum,
@@ -73,7 +82,12 @@ fn safe_bridge_swap_intent() -> CrossChainIntent {
                 },
             ],
             require_canonical_supply_valid: true,
-            require_route_simulated: true,
+            // Route simulation is opt-in. Tests that exercise the
+            // simulation safety check (X3-INTENT-016/-017) set this
+            // explicitly. Tests that exercise other safety checks
+            // leave it off so they don't trip the simulator-mode
+            // gate.
+            require_route_simulated: false,
         },
         timeout: TimeoutSpec {
             timeout_secs: 1800, // 30 minutes
@@ -86,85 +100,120 @@ fn safe_bridge_swap_intent() -> CrossChainIntent {
             include_state_transitions: false,
         },
         intent_hash: [0u8; 32],
-    }
+    };
+    intent.recompute_and_store_hash();
+    intent
 }
 
 /// Returns `safe_bridge_swap_intent()` but with the given field(s) modified
-/// to trigger a specific compile error.
+/// to trigger a specific compile error. The helper recomputes the
+/// intent hash so the X3-INTENT-014 check passes and the safety check
+/// we are actually testing can fire.
+fn with_recomputed_hash(mut intent: CrossChainIntent) -> CrossChainIntent {
+    intent.recompute_and_store_hash();
+    intent
+}
+
 fn intent_with_no_timeout() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.timeout.timeout_secs = 0;
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.timeout.timeout_secs = 0;
+        i
+    })
 }
 
 fn intent_with_no_refund_path() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.timeout.on_fail = vec![];
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.timeout.on_fail = vec![];
+        i
+    })
 }
 
 fn intent_with_no_fee_cap() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.requirements.max_total_fee = None;
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.requirements.max_total_fee = None;
+        i
+    })
 }
 
 fn intent_with_no_finality() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.requirements.finality = vec![]; // remove all finality requirements
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.requirements.finality = vec![];
+        i
+    })
 }
 
 fn intent_with_insufficient_finality() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    // ETH safe minimum is 12; set to 3 (insufficient)
-    i.requirements.finality = vec![
-        FinalityRequirement {
-            chain: ChainKind::Ethereum,
-            level: FinalityLevel::Confirmations(3),
-        },
-        FinalityRequirement {
-            chain: ChainKind::Solana,
-            level: FinalityLevel::Finalized,
-        },
-    ];
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        // ETH safe minimum is 12; set to 3 (insufficient)
+        i.requirements.finality = vec![
+            FinalityRequirement {
+                chain: ChainKind::Ethereum,
+                level: FinalityLevel::Confirmations(3),
+            },
+            FinalityRequirement {
+                chain: ChainKind::Solana,
+                level: FinalityLevel::Finalized,
+            },
+        ];
+        i
+    })
 }
 
 fn intent_with_no_proof() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.requirements.proofs = vec![]; // no proofs at all
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.requirements.proofs = vec![];
+        i
+    })
 }
 
 fn intent_with_no_canonical_supply_check() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.requirements.require_canonical_supply_valid = false;
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.requirements.require_canonical_supply_valid = false;
+        i
+    })
 }
 
 fn intent_with_no_slippage_guard() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.requirements.max_slippage_bps = None;
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.requirements.max_slippage_bps = None;
+        i
+    })
 }
 
 fn intent_with_no_receiver_validation() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.requirements.require_receiver_is_owner = false;
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        // The default safe intent has MappedAccount(alice.eth ->
+        // alice.sol). Change to a strict OwnerOnly so the cross-chain
+        // string mismatch triggers X3-INTENT-015.
+        i.requirements.receiver_authorization =
+            x3_crosschain_intent::types::ReceiverAuthorization::OwnerOnly;
+        i
+    })
 }
 
 fn intent_with_unsafe_venue() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.route.allow.push("bridge.unknown".to_string()); // explicitly allowed AND denied
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.route.allow.push("bridge.unknown".to_string());
+        i
+    })
 }
 
 fn intent_with_unknown_asset() -> CrossChainIntent {
-    let mut i = safe_bridge_swap_intent();
-    i.source.asset = AssetRef::new(ChainKind::Ethereum, ""); // empty symbol
-    i
+    with_recomputed_hash({
+        let mut i = safe_bridge_swap_intent();
+        i.source.asset = AssetRef::new(ChainKind::Ethereum, "");
+        i
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,7 +223,17 @@ fn intent_with_unknown_asset() -> CrossChainIntent {
 #[test]
 fn happy_path_compiles_to_valid_plan() {
     let compiler = IntentCompiler::new();
-    let intent = safe_bridge_swap_intent();
+    // Use an explicit cross-chain mapping so the receiver rule passes
+    // for owner=alice.eth / receiver=alice.sol.
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::MappedAccount {
+            source_chain: ChainKind::Ethereum,
+            source_owner: "alice.eth".to_string(),
+            dest_chain: ChainKind::Solana,
+            dest_account: "alice.sol".to_string(),
+        };
+    intent.recompute_and_store_hash();
     let result = compiler.compile(&intent);
 
     assert!(
@@ -201,8 +260,11 @@ fn happy_path_compiles_to_valid_plan() {
         "Missing RegisterWatchdog"
     );
     assert!(labels.contains(&"ValidateOwner"), "Missing ValidateOwner");
+    assert!(
+        labels.contains(&"EnforceReceiverAuth"),
+        "Missing EnforceReceiverAuth"
+    );
     assert!(labels.contains(&"CheckBalance"), "Missing CheckBalance");
-    assert!(labels.contains(&"Simulate"), "Missing SimulateExecution");
     assert!(labels.contains(&"LockAsset"), "Missing LockAsset");
     assert!(labels.contains(&"WaitFinality"), "Missing WaitFinality");
     assert!(labels.contains(&"VerifyProof"), "Missing VerifyProof");
@@ -267,6 +329,7 @@ fn check_013_unbounded_execution() {
     intent.timeout.timeout_secs = 0;
     intent.timeout.on_fail = vec![];
     intent.requirements.max_total_fee = None;
+    intent.recompute_and_store_hash();
 
     let result = compiler.compile(&intent);
     assert!(!result.is_ok(), "Expected compile error");
@@ -399,11 +462,12 @@ fn check_006_missing_slippage_guard() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Safety check 12: X3-INTENT-005 — Missing receiver validation
+// Safety check 12: X3-INTENT-015 — receiver authorization mismatch
+// (replaces the old boolean-flag `require_receiver_is_owner` check)
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
-fn check_005_missing_receiver_validation() {
+fn check_015_receiver_authorization_mismatch() {
     let compiler = IntentCompiler::new();
     let result = compiler.compile(&intent_with_no_receiver_validation());
 
@@ -412,8 +476,8 @@ fn check_005_missing_receiver_validation() {
         result
             .errors
             .iter()
-            .any(|e| matches!(e, IntentCompileError::MissingReceiverValidation)),
-        "Expected MissingReceiverValidation error, got: {:?}",
+            .any(|e| matches!(e, IntentCompileError::ReceiverAuthorizationMismatch { .. })),
+        "Expected ReceiverAuthorizationMismatch error, got: {:?}",
         result.errors
     );
 }
@@ -466,13 +530,17 @@ fn check_009_unknown_asset() {
 fn multiple_errors_reported_together() {
     let compiler = IntentCompiler::new();
 
-    // Intent with both no timeout AND no slippage guard AND no receiver validation
+    // Intent with both no timeout AND no slippage guard AND receiver mismatch
     let mut intent = safe_bridge_swap_intent();
     intent.timeout.timeout_secs = 0;
     intent.timeout.on_fail = vec![];
     intent.requirements.max_total_fee = None;
     intent.requirements.max_slippage_bps = None;
-    intent.requirements.require_receiver_is_owner = false;
+    // Drop the MappedAccount rule so the mismatched receiver fires
+    // X3-INTENT-015 in addition to the other errors.
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::OwnerOnly;
+    intent.recompute_and_store_hash();
 
     let result = compiler.compile(&intent);
     assert!(!result.is_ok(), "Expected compile errors");
@@ -496,10 +564,15 @@ fn x3_native_swap_requires_slippage_guard() {
     // Make it X3-native swap
     intent.source.asset = AssetRef::new(ChainKind::X3, "USDC");
     intent.destination.asset = AssetRef::new(ChainKind::X3, "SOL");
+    intent.source.owner = "alice.x3".to_string();
+    intent.destination.receiver = "alice.x3".to_string();
     intent.requirements.finality = vec![]; // no bridge, no finality needed
     intent.requirements.proofs = vec![]; // no bridge, no proofs needed
     intent.requirements.require_canonical_supply_valid = false; // no bridge mint
     intent.requirements.max_slippage_bps = None; // missing guard
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::OwnerOnly;
+    intent.recompute_and_store_hash();
 
     let result = compiler.compile(&intent);
     assert!(!result.is_ok(), "Expected compile error");
@@ -556,4 +629,411 @@ fn simulation_detects_slippage_violation() {
         "Slippage sim result: {}bps, exceeds: {}",
         result.estimated_slippage_bps, result.slippage_exceeds_limit
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Comment 1: X3-INTENT-014 — intent hash covers every user-controlled field.
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn mutate_route(intent: &mut CrossChainIntent) {
+    intent.route.allow.push("bridge.layerzero".to_string());
+}
+
+fn mutate_proof(intent: &mut CrossChainIntent) {
+    intent.requirements.proofs.push(ProofRequirement {
+        chain: ChainKind::Ethereum,
+        label: "eth.extra_lock_proof".to_string(),
+        kind: ProofKind::MerkleProof {
+            root_type: "eth.state_root".to_string(),
+        },
+    });
+}
+
+fn mutate_fee_cap(intent: &mut CrossChainIntent) {
+    intent.requirements.max_total_fee = Some(9_999_999);
+}
+
+fn mutate_slippage(intent: &mut CrossChainIntent) {
+    intent.requirements.max_slippage_bps = Some(77);
+}
+
+fn mutate_refund_path(intent: &mut CrossChainIntent) {
+    intent
+        .timeout
+        .on_fail
+        .push(x3_crosschain_intent::types::FailureAction::Quarantine);
+}
+
+fn mutate_receipt(intent: &mut CrossChainIntent) {
+    intent.receipt.include_state_transitions = true;
+}
+
+fn mutate_receiver_auth(intent: &mut CrossChainIntent) {
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::AllowAny;
+}
+
+#[test]
+fn hash_changes_when_route_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    let old_hash = a.intent_hash;
+    mutate_route(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+    // Sanity: a's hash didn't change just because we recomputed.
+    assert_eq!(a.intent_hash, old_hash);
+}
+
+#[test]
+fn hash_changes_when_proof_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    mutate_proof(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+}
+
+#[test]
+fn hash_changes_when_fee_cap_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    mutate_fee_cap(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+}
+
+#[test]
+fn hash_changes_when_slippage_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    mutate_slippage(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+}
+
+#[test]
+fn hash_changes_when_refund_path_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    mutate_refund_path(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+}
+
+#[test]
+fn hash_changes_when_receipt_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    mutate_receipt(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+}
+
+#[test]
+fn hash_changes_when_receiver_auth_changes() {
+    let mut a = safe_bridge_swap_intent();
+    let mut b = safe_bridge_swap_intent();
+    a.recompute_and_store_hash();
+    mutate_receiver_auth(&mut b);
+    b.recompute_and_store_hash();
+    assert_ne!(a.intent_hash, b.intent_hash);
+}
+
+#[test]
+fn compiler_rejects_stale_hash() {
+    // The intent's stored hash is from before the route was edited.
+    // Even though the user could try to set the stored hash back to
+    // match, the regression we want to prove is: tampering with the
+    // intent after computing the hash is detected and compilation is
+    // refused (X3-INTENT-014).
+    let mut intent = safe_bridge_swap_intent();
+    intent.recompute_and_store_hash(); // hash matches current fields
+    let original_hash = intent.intent_hash;
+    // Now edit the route without recomputing the hash.
+    intent.route.allow.push("bridge.layerzero".to_string());
+    // The stored hash no longer matches.
+    assert_ne!(intent.intent_hash, intent.compute_hash());
+    assert_eq!(intent.intent_hash, original_hash);
+
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(!result.is_ok(), "Stale hash must be rejected");
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|e| matches!(e, IntentCompileError::IntentHashMismatch { .. })),
+        "Expected IntentHashMismatch error, got: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn compiler_rejects_hash_mismatch_even_on_safe_intent() {
+    // The intent is otherwise valid; only the hash is wrong. The
+    // compiler MUST still refuse (X3-INTENT-014) and must NOT emit a
+    // plan.
+    let mut intent = safe_bridge_swap_intent();
+    intent.recompute_and_store_hash();
+    intent.intent_hash = [0u8; 32]; // poison the stored hash
+
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(!result.is_ok());
+    assert!(
+        result.plan.is_empty(),
+        "no plan must be emitted on hash mismatch"
+    );
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, IntentCompileError::IntentHashMismatch { .. })));
+}
+
+#[test]
+fn happy_path_still_works_with_full_hash() {
+    // The happy-path test now exercises the new full canonical hash.
+    let mut intent = safe_bridge_swap_intent();
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(
+        result.is_ok(),
+        "Expected clean compile, got errors: {:?}",
+        result.errors
+    );
+    assert!(!result.plan.is_empty());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Comment 2: X3-INTENT-015 — receiver authorization rule is enforced.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn owner_only_with_mismatched_receiver_rejected() {
+    // The default intent has owner=alice.eth, receiver=alice.sol. Same
+    // canonical user but different chain, so the rule's default
+    // "OwnerOnly" (which compares strings) rejects it. The user must
+    // opt into an explicit cross-chain mapping.
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::OwnerOnly;
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(
+        !result.is_ok(),
+        "OwnerOnly should reject cross-chain owner/receiver string mismatch"
+    );
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, IntentCompileError::ReceiverAuthorizationMismatch { .. })));
+}
+
+#[test]
+fn owner_only_same_string_succeeds() {
+    let mut intent = safe_bridge_swap_intent();
+    // Make owner == receiver exactly. The X3-only swap uses
+    // ChainKind::X3 on both sides so this is unambiguous.
+    intent.source.asset = AssetRef::new(ChainKind::X3, "USDC");
+    intent.destination.asset = AssetRef::new(ChainKind::X3, "SOL");
+    intent.source.owner = "alice.x3".to_string();
+    intent.destination.receiver = "alice.x3".to_string();
+    intent.requirements.finality = vec![];
+    intent.requirements.proofs = vec![];
+    intent.requirements.require_canonical_supply_valid = false;
+    intent.route.allow = vec!["x3.dex".to_string()];
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::OwnerOnly;
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(
+        result.is_ok(),
+        "OwnerOnly with matching strings should succeed: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn explicit_account_rule_with_matching_account_succeeds() {
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::ExplicitAccount {
+            account: "alice.sol".to_string(),
+        };
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(
+        result.is_ok(),
+        "ExplicitAccount with matching account should succeed: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn explicit_account_rule_with_mismatched_account_rejected() {
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::ExplicitAccount {
+            account: "mallory.sol".to_string(),
+        };
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(!result.is_ok());
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, IntentCompileError::ReceiverAuthorizationMismatch { .. })));
+}
+
+#[test]
+fn mapped_account_rule_with_full_chain_match_succeeds() {
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::MappedAccount {
+            source_chain: ChainKind::Ethereum,
+            source_owner: "alice.eth".to_string(),
+            dest_chain: ChainKind::Solana,
+            dest_account: "alice.sol".to_string(),
+        };
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(
+        result.is_ok(),
+        "MappedAccount with full chain match should succeed: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn mapped_account_rule_with_wrong_chain_rejected() {
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::MappedAccount {
+            source_chain: ChainKind::Ethereum,
+            source_owner: "alice.eth".to_string(),
+            dest_chain: ChainKind::Polygon, // wrong dest chain
+            dest_account: "alice.sol".to_string(),
+        };
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(!result.is_ok());
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, IntentCompileError::ReceiverAuthorizationMismatch { .. })));
+}
+
+#[test]
+fn allow_any_rule_always_succeeds() {
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::AllowAny;
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(
+        result.is_ok(),
+        "AllowAny should pass the receiver auth check: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn compiler_emits_enforce_receiver_authorization_instruction() {
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.receiver_authorization =
+        x3_crosschain_intent::types::ReceiverAuthorization::MappedAccount {
+            source_chain: ChainKind::Ethereum,
+            source_owner: "alice.eth".to_string(),
+            dest_chain: ChainKind::Solana,
+            dest_account: "alice.sol".to_string(),
+        };
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile(&intent);
+    assert!(result.is_ok());
+    let labels: Vec<&'static str> = result.plan.iter().map(|i| i.label()).collect();
+    assert!(
+        labels.contains(&"EnforceReceiverAuth"),
+        "Plan must contain EnforceReceiverAuth: {:?}",
+        labels
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Comment 3: X3-INTENT-016 / X3-INTENT-017 — fail-closed simulation.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn production_simulator_without_data_source_returns_no_route() {
+    use x3_crosschain_intent::simulation::{IntentSimulator, SimulationMode};
+    let sim = IntentSimulator::production_mode();
+    let intent = safe_bridge_swap_intent();
+    let result = sim.simulate(&intent);
+    assert_eq!(sim.mode(), SimulationMode::Production);
+    assert!(
+        !result.route_found,
+        "production simulator with no oracle must return route_found=false"
+    );
+    assert!(!result.failure_cases.is_empty());
+    assert!(result.failure_cases.iter().any(|f| f.is_blocking));
+}
+
+#[test]
+fn test_simulator_synthetic_route_for_unit_tests() {
+    use x3_crosschain_intent::simulation::{IntentSimulator, SimulationMode};
+    let sim = IntentSimulator::test_mode();
+    let intent = safe_bridge_swap_intent();
+    let result = sim.simulate(&intent);
+    assert_eq!(sim.mode(), SimulationMode::Test);
+    assert!(
+        result.route_found,
+        "test-mode synthetic result returns true"
+    );
+}
+
+#[test]
+fn compiler_rejects_test_simulator_used_to_gate_simulation_required_intent() {
+    use x3_crosschain_intent::simulation::IntentSimulator;
+    let sim = IntentSimulator::test_mode();
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.require_route_simulated = true;
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile_with_simulator(&intent, &sim);
+    assert!(!result.is_ok());
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, IntentCompileError::NoRealSimulationSource)));
+}
+
+#[test]
+fn compiler_rejects_production_simulator_with_no_route() {
+    use x3_crosschain_intent::simulation::IntentSimulator;
+    let sim = IntentSimulator::production_mode();
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.require_route_simulated = true;
+    intent.recompute_and_store_hash();
+    let result = IntentCompiler::new().compile_with_simulator(&intent, &sim);
+    assert!(!result.is_ok());
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| matches!(e, IntentCompileError::NoValidRoute { .. })));
+}
+
+#[test]
+fn simulation_not_required_skips_safety_check_14() {
+    use x3_crosschain_intent::simulation::IntentSimulator;
+    let mut intent = safe_bridge_swap_intent();
+    intent.requirements.require_route_simulated = false;
+    intent.recompute_and_store_hash();
+    // Both test and production simulators should pass the simulation
+    // check when the flag is off.
+    let result =
+        IntentCompiler::new().compile_with_simulator(&intent, &IntentSimulator::production_mode());
+    assert!(result.is_ok());
 }

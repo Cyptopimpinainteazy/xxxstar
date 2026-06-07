@@ -30,7 +30,7 @@
 //! to write reverted state back to the FRAME storage overlay. Storage key
 //! derivation follows the Substrate convention:
 //!
-//! ```
+//! ```text
 //! key = twox_128(PalletName) ++ twox_128(StorageName) ++ blake2_128_concat(key)
 //! ```
 //!
@@ -228,6 +228,11 @@ pub struct EvmStorageChange {
 /// Decode an EVM state diff into a list of storage changes.
 pub fn decode_evm_state_diff(diff: &StateDiff) -> Result<Vec<EvmStorageChange>, RevertError> {
     let bytes = diff.as_bytes();
+    if bytes.is_empty() {
+        // An empty diff is the canonical "no side effects" signal — callers
+        // construct `StateDiff::from(Vec::new())` to mean "nothing to revert".
+        return Ok(Vec::new());
+    }
     if bytes.len() < 4 {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -385,6 +390,9 @@ pub struct SvmStorageChange {
 /// Decode an SVM state diff into a list of storage changes.
 pub fn decode_svm_state_diff(diff: &StateDiff) -> Result<Vec<SvmStorageChange>, RevertError> {
     let bytes = diff.as_bytes();
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
     if bytes.len() < 4 {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -512,6 +520,9 @@ pub struct X3VmStorageChange {
 /// Decode an X3VM state diff into storage changes.
 pub fn decode_x3vm_state_diff(diff: &StateDiff) -> Result<Vec<X3VmStorageChange>, RevertError> {
     let bytes = diff.as_bytes();
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
     if bytes.len() < 4 {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -745,6 +756,16 @@ impl LegReceipt {
 mod tests {
     use super::*;
 
+    /// The reverters write to `sp_io::storage::set` / `sp_io::storage::clear`
+    /// — substrate runtime storage APIs that panic (`set_version_1 called
+    /// outside of an Externalities-provided environment`) when no
+    /// `Externalities` is installed. Wrap such test bodies in this closure
+    /// so the test runs inside an empty `TestExternalities` overlay.
+    fn run<F: FnOnce()>(f: F) {
+        let mut ext = sp_io::TestExternalities::new_empty();
+        ext.execute_with(f);
+    }
+
     // ── StateDiff basics ───────────────────────────────────────────────────
 
     #[test]
@@ -794,11 +815,13 @@ mod tests {
 
     #[test]
     fn test_evm_reverter_reverts_non_empty_diff() {
-        let changes = vec![make_evm_storage_change(0x01, &[0xAA; 32], &[0xBB; 32])];
-        let diff = encode_evm_state_diff(&changes, Some([0xCA; 20]));
-        let result = EvmReverter::revert(&diff);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        run(|| {
+            let changes = vec![make_evm_storage_change(0x01, &[0xAA; 32], &[0xBB; 32])];
+            let diff = encode_evm_state_diff(&changes, Some([0xCA; 20]));
+            let result = EvmReverter::revert(&diff);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        });
     }
 
     #[test]
@@ -845,11 +868,13 @@ mod tests {
 
     #[test]
     fn test_svm_reverter_reverts_non_empty_diff() {
-        let changes = vec![make_svm_storage_change(0x01, b"balance", &[0x00, 0x01])];
-        let diff = encode_svm_state_diff(&changes);
-        let result = SvmReverter::revert(&diff);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        run(|| {
+            let changes = vec![make_svm_storage_change(0x01, b"balance", &[0x00, 0x01])];
+            let diff = encode_svm_state_diff(&changes);
+            let result = SvmReverter::revert(&diff);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        });
     }
 
     // ── X3VM Reverter ──────────────────────────────────────────────────────
@@ -877,34 +902,40 @@ mod tests {
 
     #[test]
     fn test_x3vm_reverter_reverts_non_empty_diff() {
-        let changes = vec![X3VmStorageChange {
-            key: [0x11; 32],
-            old_value: Some([0xAA; 32]),
-        }];
-        let diff = encode_x3vm_state_diff(&changes);
-        let result = X3VmReverter::revert(&diff);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        run(|| {
+            let changes = vec![X3VmStorageChange {
+                key: [0x11; 32],
+                old_value: Some([0xAA; 32]),
+            }];
+            let diff = encode_x3vm_state_diff(&changes);
+            let result = X3VmReverter::revert(&diff);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        });
     }
 
     // ── Composite Reverter ─────────────────────────────────────────────────
 
     #[test]
     fn test_composite_reverter_dispatches_to_evm() {
-        let changes = vec![make_evm_storage_change(0x01, &[0xAA; 32], &[0xBB; 32])];
-        let diff = encode_evm_state_diff(&changes, Some([0xCA; 20]));
-        let result = CompositeReverter::revert_leg(VmType::Evm, &diff);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        run(|| {
+            let changes = vec![make_evm_storage_change(0x01, &[0xAA; 32], &[0xBB; 32])];
+            let diff = encode_evm_state_diff(&changes, Some([0xCA; 20]));
+            let result = CompositeReverter::revert_leg(VmType::Evm, &diff);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        });
     }
 
     #[test]
     fn test_composite_reverter_dispatches_to_svm() {
-        let changes = vec![make_svm_storage_change(0x01, b"balance", &[0x00, 0x01])];
-        let diff = encode_svm_state_diff(&changes);
-        let result = CompositeReverter::revert_leg(VmType::Svm, &diff);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        run(|| {
+            let changes = vec![make_svm_storage_change(0x01, b"balance", &[0x00, 0x01])];
+            let diff = encode_svm_state_diff(&changes);
+            let result = CompositeReverter::revert_leg(VmType::Svm, &diff);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        });
     }
 
     #[test]

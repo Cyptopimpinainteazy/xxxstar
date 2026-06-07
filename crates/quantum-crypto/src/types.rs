@@ -50,20 +50,15 @@ pub struct EncapsulationResult {
 }
 
 /// Signature type preference
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SignaturePreference {
     /// Use SPHINCS+ for maximum security
     Sphincs,
     /// Use Dilithium for speed
+    #[default]
     Dilithium,
     /// Use both for hybrid security
     Hybrid,
-}
-
-impl Default for SignaturePreference {
-    fn default() -> Self {
-        SignaturePreference::Dilithium
-    }
 }
 
 /// Quantum-resistant hash output

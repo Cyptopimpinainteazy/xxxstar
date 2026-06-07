@@ -1,4 +1,7 @@
 #![warn(dead_code, unused_imports, unused_variables)]
+#![allow(clippy::single_match)]
+#![allow(clippy::extend_with_drain)]
+#![allow(clippy::len_without_is_empty)]
 
 //! X3 Virtual Machine
 //!

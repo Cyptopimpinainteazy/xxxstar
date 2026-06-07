@@ -263,6 +263,22 @@ impl SigningKey {
         }
     }
 
+    /// Create a signing key from an explicitly provisioned ed25519 secret.
+    ///
+    /// This path is available in release builds and is intended for a
+    /// configured custody/key-provider integration. The caller is
+    /// responsible for reading the bytes from the configured provider and
+    /// protecting the source material.
+    pub fn from_secret_bytes(secret: [u8; 32]) -> Result<Self, SwarmError> {
+        if Self::is_weak_seed(&secret) {
+            return Err(SwarmError::CryptoError(
+                "Signing secret appears to have insufficient entropy".to_string(),
+            ));
+        }
+
+        Ok(Self { secret })
+    }
+
     /// Sign a message
     pub fn sign(&self, msg: &[u8]) -> SignatureOutput {
         use ed25519_dalek::{Signer, SigningKey};

@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(unused, dead_code, deprecated)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::implicit_saturating_sub)]
 
 use sp_std::vec;
 

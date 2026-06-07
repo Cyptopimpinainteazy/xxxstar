@@ -31,6 +31,7 @@ frame-benchmarking = { workspace = true, default-features = false, optional = tr
 pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
 pallet-x3-atomic-kernel = { path = "../x3-atomic-kernel", default-features = false }
 pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
+x3-crosschain-intent = { path = "../../crates/x3-crosschain-intent", default-features = false }
 
 [dev-dependencies]
 pallet-timestamp = { workspace = true }
@@ -59,6 +60,7 @@ std = [
     "pallet-x3-kernel/std",
     "pallet-x3-atomic-kernel/std",
     "pallet-atomic-trade-engine/std",
+    "x3-crosschain-intent/std",
 ]
 runtime-benchmarks = [
     "frame-support/runtime-benchmarks",

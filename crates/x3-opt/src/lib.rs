@@ -16,6 +16,7 @@
     clippy::needless_borrow,
     clippy::needless_range_loop,
     clippy::new_without_default,
+    clippy::question_mark,
     clippy::single_match,
     clippy::unnecessary_cast,
     clippy::unwrap_or_default

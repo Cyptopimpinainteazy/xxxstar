@@ -1,3 +1,13 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::doc_markdown,
+    clippy::too_many_arguments,
+    dead_code,
+    unused_imports
+)]
+#![deny(unused_must_use)]
+#![warn(unused_extern_crates)]
+
 //! # X3 Accounting Events — Phase 3 Revenue Spine
 //!
 //! This crate defines the **single canonical accounting event type** for the X3 DeFi

@@ -226,8 +226,16 @@ pub struct TestX3Adapter;
 
 impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
     fn execute(payload: &[u8], _gas_limit: u64) -> Result<crate::ExecutionReceipt, DispatchError> {
-        // Simulate an execution failure when payload starts with 0xFF.
-        if payload.first() == Some(&0xFF) {
+        // Simulate an execution failure when the SCALE-encoded
+        // `Packet::X3Vm(X3VmPacket::Transfer)`'s recipient field's
+        // first byte is 0xFF. With Phase-1.4 strict-packet validation
+        // the executor receives the SCALE-encoded packet, not the raw
+        // intent bytes; the recipient's first byte sits at offset 25
+        // for the Transfer variant
+        // (1 Packet discriminant + 1 X3VmPacket variant + 1 from_domain
+        //  + 1 to_domain + 4 asset_id + 16 amount + 1 compact-int
+        //  length, for recipients < 64 bytes).
+        if payload.get(25) == Some(&0xFF) {
             return Err(DispatchError::Other("X3 execution failed"));
         }
 

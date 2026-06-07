@@ -191,11 +191,10 @@ pub mod execution {
 
     /// Calculate execution fee based on gas used and gas price
     pub fn calculate_fee(gas_used: u64, gas_price: u128) -> Result<u128, crate::AutomationError> {
-        gas_used
+        let product = gas_used
             .checked_mul(gas_price as u64)
-            .ok_or(crate::AutomationError::FeeOverflow)?
-            .try_into()
-            .map_err(|_| crate::AutomationError::FeeOverflow)
+            .ok_or(crate::AutomationError::FeeOverflow)?;
+        Ok(u128::from(product))
     }
 
     /// Validate task parameters (simplified for demo)

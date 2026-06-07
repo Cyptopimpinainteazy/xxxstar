@@ -2,6 +2,7 @@
 //!
 //! Dilithium is a lattice-based digital signature scheme that is a NIST PQC winner.
 //! It provides fast signing and verification with post-quantum security.
+#![allow(clippy::needless_borrows_for_generic_args)]
 
 use crate::{QuantumError, QuantumResult, SecurityLevel};
 use rand::{thread_rng, Rng};
@@ -246,7 +247,7 @@ pub fn sign(secret_key: &DilithiumSecretKey, message: &[u8]) -> DilithiumSignatu
         let block = h.finalize();
 
         // Combine multiple hash outputs for better distribution
-        sig[i] = block[i % 32] ^ block[(i + 7) % 32] ^ challenge[(i + 13) % 64] as u8;
+        sig[i] = block[i % 32] ^ block[(i + 7) % 32] ^ challenge[(i + 13) % 64];
     }
 
     // Add determinism from message

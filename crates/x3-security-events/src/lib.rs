@@ -46,6 +46,7 @@ use scale_info::TypeInfo;
 #[derive(
     Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
 )]
+#[allow(clippy::cast_possible_truncation)]
 pub enum SecurityEventKind {
     /// An on-chain invariant check found a breach.
     InvariantBreach,

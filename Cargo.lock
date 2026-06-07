@@ -2970,6 +2970,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "cross-chain-gpu-validator"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "criterion",
+ "ecdsa",
+ "hex",
+ "k256",
+ "log",
+ "prometheus 0.13.4",
+ "rand 0.8.6",
+ "redis",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "sha3",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tokio-util 0.7.18",
+ "tracing",
+ "tracing-subscriber",
+ "x3-gpu-validator-swarm",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11160,6 +11186,7 @@ dependencies = [
  "sp-runtime",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "x3-asset-kernel-types",
+ "x3-crosschain-intent",
 ]
 
 [[package]]
@@ -12480,6 +12507,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "parking_lot 0.12.5",
+ "protobuf 2.28.0",
  "thiserror 1.0.69",
 ]
 
@@ -12494,7 +12522,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "parking_lot 0.12.5",
- "protobuf",
+ "protobuf 3.7.2",
  "thiserror 2.0.18",
 ]
 
@@ -12688,6 +12716,12 @@ checksum = "8991c4cbdb8bc5b11f0b074ffe286c30e523de90fee5ba8132f1399f23cb3dd7"
 dependencies = [
  "prost 0.14.3",
 ]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "protobuf"
@@ -23163,6 +23197,7 @@ dependencies = [
  "clap",
  "contention-predictor",
  "criterion",
+ "cross-chain-gpu-validator",
  "env_logger 0.10.2",
  "frame-benchmarking-cli",
  "frame-system",
@@ -23409,10 +23444,11 @@ dependencies = [
 name = "x3-crosschain-intent"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

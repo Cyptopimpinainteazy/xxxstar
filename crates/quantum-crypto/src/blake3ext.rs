@@ -49,7 +49,7 @@ impl HashDomain {
 }
 
 /// 256-bit hash output
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Hash256(pub [u8; 32]);
 
 impl Hash256 {
@@ -63,12 +63,6 @@ impl Hash256 {
 
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
-    }
-}
-
-impl Default for Hash256 {
-    fn default() -> Self {
-        Self([0u8; 32])
     }
 }
 

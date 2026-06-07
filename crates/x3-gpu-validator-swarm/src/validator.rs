@@ -17,6 +17,7 @@ use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -46,6 +47,62 @@ fn signing_message(
     hasher.update(&legs_hash);
     let digest = hasher.finalize();
     digest.to_vec()
+}
+
+fn expand_home(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    if path_str == "~" {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home);
+        }
+    } else if let Some(stripped) = path_str.strip_prefix("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(stripped);
+        }
+    }
+
+    path.to_path_buf()
+}
+
+fn parse_secret_key_bytes(contents: &[u8]) -> SwarmResult<[u8; 32]> {
+    let trimmed = std::str::from_utf8(contents)
+        .ok()
+        .map(str::trim)
+        .unwrap_or_default();
+    let hex_value = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+
+    let decoded = if hex_value.len() == 64 && hex_value.chars().all(|c| c.is_ascii_hexdigit()) {
+        hex::decode(hex_value)
+            .map_err(|e| SwarmError::CryptoError(format!("Invalid signing key hex: {e}")))?
+    } else {
+        contents.to_vec()
+    };
+
+    if decoded.len() != 32 {
+        return Err(SwarmError::CryptoError(format!(
+            "Signing key must be exactly 32 bytes, got {}",
+            decoded.len()
+        )));
+    }
+
+    let mut secret = [0u8; 32];
+    secret.copy_from_slice(&decoded);
+    Ok(secret)
+}
+
+fn load_configured_signing_key(path: &Path) -> SwarmResult<Option<SigningKey>> {
+    let expanded = expand_home(path);
+    match std::fs::read(&expanded) {
+        Ok(contents) => {
+            let secret = parse_secret_key_bytes(&contents)?;
+            Ok(Some(SigningKey::from_secret_bytes(secret)?))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(SwarmError::IoError(format!(
+            "Failed to read signing key {}: {e}",
+            expanded.display()
+        ))),
+    }
 }
 
 /// Validator state
@@ -143,27 +200,30 @@ impl Validator {
         let engine = DeterministicEngine::new();
         metrics.set_accelerator_backend(engine.accelerator_backend_name());
 
-        // Derive a per-validator signing key from a deterministic seed in
-        // test/debug builds. Release builds must wire a custody/HSM
-        // service; `SigningKey::from_seed` is gated to fail closed in
-        // release. We still construct the field with `None` so the
-        // release-without-HSM path returns a typed error at proof time
-        // instead of crashing the validator at startup.
-        let signing_key = {
-            #[cfg(any(test, debug_assertions))]
-            {
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(b"x3-validator-key-seed-v1");
-                hasher.update(validator_id.as_bytes());
-                let seed = hasher.finalize();
-                SigningKey::from_seed(&seed).ok()
-            }
-            #[cfg(not(any(test, debug_assertions)))]
-            {
+        let signing_key = load_configured_signing_key(&config.identity.keypair_path)
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "[Validator {}] configured signing key unavailable: {:?}",
+                    validator_id,
+                    e
+                );
                 None
-            }
-        };
+            })
+            .or_else(|| {
+                #[cfg(any(test, debug_assertions))]
+                {
+                    let mut hasher = Sha256::new();
+                    hasher.update(b"x3-validator-key-seed-v1");
+                    hasher.update(validator_id.as_bytes());
+                    let seed = hasher.finalize();
+                    SigningKey::from_seed(&seed).ok()
+                }
+
+                #[cfg(not(any(test, debug_assertions)))]
+                {
+                    None
+                }
+            });
 
         Self {
             validator_id,
@@ -312,7 +372,7 @@ impl Validator {
                 // error below rather than minting an empty signature.
                 let key_guard = self.signing_key.lock();
                 let signing_result: Option<
-                    Result<(crate::crypto::SignatureOutput, [u8; 32], u64), SwarmError>,
+                    Result<(crate::crypto::SignatureOutput, [u8; 32], u64, [u8; 32]), SwarmError>,
                 > = key_guard.as_ref().map(|key| {
                     // Derive a deterministic bundle_id from task_id and
                     // pull the current chain anchor. Both feed the
@@ -327,11 +387,16 @@ impl Validator {
                     let legs_hash =
                         crate::proof_integration::compute_legs_hash_pub(&result.task_id);
                     let msg = signing_message(&receipt, bundle_id, finalized_block, legs_hash);
-                    Ok::<_, SwarmError>((key.sign(&msg), bundle_id, finalized_block))
+                    Ok::<_, SwarmError>((
+                        key.sign(&msg),
+                        bundle_id,
+                        finalized_block,
+                        key.public_key_bytes(),
+                    ))
                 });
                 drop(key_guard);
 
-                let (signature, bundle_id, finalized_block) = match signing_result {
+                let (signature, bundle_id, finalized_block, pubkey) = match signing_result {
                     Some(Ok(triple)) => triple,
                     Some(Err(e)) => {
                         log::warn!("[Validator {}] signing failed: {:?}", self.validator_id, e);
@@ -355,7 +420,9 @@ impl Validator {
                     10, // total validators
                 ) {
                     // Submit proof to aggregator for consensus
-                    let _ = self.proof_aggregator.lock().submit_proof(proof);
+                    let mut aggregator = self.proof_aggregator.lock();
+                    aggregator.register_validator_pubkey(self.validator_address, pubkey);
+                    let _ = aggregator.submit_proof(proof);
                 }
             }
         }
@@ -751,6 +818,174 @@ mod tests {
         assert!(
             !empty.verify(b"any message", &pubkey),
             "empty signature must never verify"
+        );
+    }
+
+    #[test]
+    fn two_validator_task_proof_attestation_aggregation_uses_finalized_anchor() {
+        let orchestrator = crate::orchestrator::SwarmOrchestrator::new(SwarmConfig::default());
+        let validator_a = Arc::new(Validator::new(
+            SwarmConfig::default(),
+            "multi-proof-validator-a".to_string(),
+        ));
+        let validator_b = Arc::new(Validator::new(
+            SwarmConfig::default(),
+            "multi-proof-validator-b".to_string(),
+        ));
+
+        validator_a.initialize().unwrap();
+        validator_b.initialize().unwrap();
+        orchestrator.register_validator(validator_a.clone());
+        orchestrator.register_validator(validator_b.clone());
+        orchestrator.update_finalized_block_anchor(777);
+
+        assert_eq!(orchestrator.min_finalized_block_anchor(), Some(777));
+
+        let task = DeterministicTask::new(
+            crate::deterministic::TaskType::BatchHash,
+            vec![b"multi-validator-proof-exchange".to_vec()],
+            HashAlgorithm::Keccak256,
+        );
+
+        let result_a = validator_a.process_task(task.clone());
+        let result_b = validator_b.process_task(task);
+        assert_eq!(
+            result_a.verification,
+            crate::crypto::VerificationResult::Valid
+        );
+        assert_eq!(
+            result_b.verification,
+            crate::crypto::VerificationResult::Valid
+        );
+
+        let proof_a = validator_a
+            .get_proof_aggregator()
+            .lock()
+            .latest_proof()
+            .expect("validator A should submit a signed proof");
+        let proof_b = validator_b
+            .get_proof_aggregator()
+            .lock()
+            .latest_proof()
+            .expect("validator B should submit a signed proof");
+
+        assert_eq!(proof_a.header.bundle_id, proof_b.header.bundle_id);
+        assert_eq!(proof_a.header.legs_hash, proof_b.header.legs_hash);
+        assert_eq!(proof_a.header.finalized_block, 777);
+        assert_eq!(proof_b.header.finalized_block, 777);
+        assert_eq!(proof_a.gpu_attestations.len(), 1);
+        assert_eq!(proof_b.gpu_attestations.len(), 1);
+        assert_ne!(
+            proof_a.gpu_attestations[0].validator_id,
+            proof_b.gpu_attestations[0].validator_id
+        );
+
+        let mut aggregate = ProofAggregator::new(2);
+        aggregate.register_validator_pubkey(
+            proof_a.gpu_attestations[0].validator_id,
+            validator_a
+                .public_key_bytes()
+                .expect("validator A should expose a signing pubkey in tests"),
+        );
+        aggregate.register_validator_pubkey(
+            proof_b.gpu_attestations[0].validator_id,
+            validator_b
+                .public_key_bytes()
+                .expect("validator B should expose a signing pubkey in tests"),
+        );
+
+        let proof_hash = proof_a.proof_hash();
+        let commitment = proof_a.gpu_attestations[0].receipt.output_commitment;
+        aggregate
+            .submit_proof(proof_a.clone())
+            .expect("validator A proof should verify and enter aggregation");
+        aggregate
+            .submit_proof(proof_b.clone())
+            .expect("validator B proof should verify with its registered pubkey");
+        aggregate
+            .add_attestation(
+                proof_hash,
+                proof_a.gpu_attestations[0].validator_id,
+                proof_a.gpu_attestations[0].signature.clone(),
+                commitment,
+            )
+            .expect("validator A consensus vote should be accepted");
+        aggregate
+            .add_attestation(
+                proof_hash,
+                proof_b.gpu_attestations[0].validator_id,
+                proof_b.gpu_attestations[0].signature.clone(),
+                commitment,
+            )
+            .expect("validator B consensus vote should finalize the aggregate");
+
+        let (state, count, _) = aggregate.get_aggregation_state(proof_hash).unwrap();
+        assert_eq!(
+            state,
+            crate::proof_aggregator::AggregationState::ByzantineFinalized
+        );
+        assert_eq!(count, 2);
+        assert!(aggregate.is_finalized(proof_hash));
+        assert!(aggregate.is_byzantine_finalized(proof_hash));
+    }
+
+    #[test]
+    fn configured_hex_signing_key_is_used_for_attestations() {
+        let tempdir = tempfile::tempdir().expect("tempdir should be created");
+        let key_path = tempdir.path().join("validator.key");
+        let secret = [42u8; 32];
+        std::fs::write(&key_path, hex::encode(secret)).expect("key file should be written");
+
+        let mut config = SwarmConfig::default();
+        config.identity.keypair_path = key_path;
+        let validator = Validator::new(config, "configured-key-validator".to_string());
+
+        let expected_key =
+            SigningKey::from_secret_bytes(secret).expect("configured key should be accepted");
+        assert_eq!(
+            validator.public_key_bytes(),
+            Some(expected_key.public_key_bytes())
+        );
+
+        validator.initialize().unwrap();
+        validator.set_chain_block_anchor(99);
+
+        let task = DeterministicTask::new(
+            crate::deterministic::TaskType::BatchHash,
+            vec![b"configured-key".to_vec()],
+            HashAlgorithm::Keccak256,
+        );
+        let _ = validator.process_task(task);
+
+        let (attestation, header) = latest_attestation(&validator);
+        let msg = Validator::build_signing_message(
+            &attestation.receipt,
+            header.bundle_id,
+            header.finalized_block,
+            header.legs_hash,
+        );
+        let mut pubkey = [0u8; 33];
+        pubkey[..32].copy_from_slice(&expected_key.public_key_bytes());
+        let sig = attestation_to_signature_output(&attestation.signature);
+        assert!(sig.verify(&msg, &pubkey));
+    }
+
+    #[test]
+    fn configured_raw_signing_key_is_used_for_attestations() {
+        let tempdir = tempfile::tempdir().expect("tempdir should be created");
+        let key_path = tempdir.path().join("validator.raw.key");
+        let secret = [43u8; 32];
+        std::fs::write(&key_path, secret).expect("raw key file should be written");
+
+        let mut config = SwarmConfig::default();
+        config.identity.keypair_path = key_path;
+        let validator = Validator::new(config, "configured-raw-key-validator".to_string());
+
+        let expected_key =
+            SigningKey::from_secret_bytes(secret).expect("configured key should be accepted");
+        assert_eq!(
+            validator.public_key_bytes(),
+            Some(expected_key.public_key_bytes())
         );
     }
 }

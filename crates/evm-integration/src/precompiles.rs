@@ -3,6 +3,7 @@
 //! Precompiles are native implementations of commonly-used operations that would
 //! be too expensive to implement in EVM bytecode. X3 supports the standard
 //! Ethereum precompiles plus X3-specific cross-VM precompiles.
+#![allow(clippy::manual_div_ceil)]
 
 use sp_std::collections::btree_map::BTreeMap;
 

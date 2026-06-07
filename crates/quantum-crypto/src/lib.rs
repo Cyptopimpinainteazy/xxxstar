@@ -1,4 +1,7 @@
 #![warn(unused_imports, unused_variables)]
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(clippy::empty_line_after_doc_comments)]
+#![allow(clippy::should_implement_trait)]
 
 //! Quantum-Resistant Cryptography for X3 Chain
 //!
@@ -53,20 +56,15 @@ pub use types::*;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Security level for quantum-resistant operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum SecurityLevel {
     /// NIST Level 1 (AES-128 equivalent)
     Level1,
     /// NIST Level 3 (AES-192 equivalent)
+    #[default]
     Level3,
     /// NIST Level 5 (AES-256 equivalent)
     Level5,
-}
-
-impl Default for SecurityLevel {
-    fn default() -> Self {
-        SecurityLevel::Level3
-    }
 }
 
 /// Combined quantum-resistant keypair

@@ -14,6 +14,8 @@
 //! Use [`CrossChainIntentBuilder`] for ergonomic construction, or construct
 //! the struct directly if loading from a parsed representation.
 
+use crate::canonical::encode_intent_canonical;
+use crate::prelude::*;
 use crate::types::{
     DestinationSpec, FailureAction, FinalityRequirement, ProofRequirement, ReceiptSpec,
     Requirements, RouteSpec, SourceSpec, TimeoutSpec,
@@ -60,18 +62,32 @@ impl CrossChainIntent {
     /// The `id` field is excluded so that the hash covers only the
     /// user-supplied content. Two intents with identical declarations
     /// produce the same hash regardless of registry assignment.
+    ///
+    /// **Every** user-controlled field is included in the hash:
+    /// name, source, destination, **route**, **requirements** (including
+    /// the receiver authorization rule, proofs, finality, slippage,
+    /// fee cap, simulation flag, and canonical supply flag),
+    /// **timeout.on_fail**, and the **receipt** flags. The encoding
+    /// scheme lives in [`crate::canonical`] and is deterministic across
+    /// processes, architectures, and Rust versions (length-prefixed,
+    /// little-endian integers, discriminant-tagged enums). Any safety-
+    /// critical edit to the intent therefore changes the hash, and
+    /// the compiler rejects intents whose stored `intent_hash` does
+    /// not match the recomputed value (X3-INTENT-014).
     pub fn compute_hash(&self) -> [u8; 32] {
+        let mut buf = Vec::with_capacity(512);
+        encode_intent_canonical(
+            &self.name,
+            &self.source,
+            &self.destination,
+            &self.route,
+            &self.requirements,
+            &self.timeout,
+            &self.receipt,
+            &mut buf,
+        );
         let mut h = Sha256::new();
-        h.update(self.name.as_bytes());
-        h.update(self.source.asset.display().as_bytes());
-        h.update(self.source.amount.to_le_bytes());
-        h.update(self.source.owner.as_bytes());
-        h.update(self.destination.asset.display().as_bytes());
-        h.update(self.destination.receiver.as_bytes());
-        if let Some(min) = self.destination.min_amount {
-            h.update(min.to_le_bytes());
-        }
-        h.update(self.timeout.timeout_secs.to_le_bytes());
+        h.update(&buf);
         h.finalize().into()
     }
 
@@ -79,6 +95,14 @@ impl CrossChainIntent {
     /// Returns `false` if the intent has been tampered with.
     pub fn verify_hash(&self) -> bool {
         self.intent_hash == self.compute_hash()
+    }
+
+    /// Recompute the intent hash and assign it to `self.intent_hash`.
+    /// Call this after any in-place mutation that should be reflected
+    /// in the hash. The compiler also does this automatically before
+    /// running the safety checks.
+    pub fn recompute_and_store_hash(&mut self) {
+        self.intent_hash = self.compute_hash();
     }
 
     /// True if a swap step is required to satisfy this intent
@@ -159,7 +183,40 @@ impl CrossChainIntentBuilder {
     }
 
     pub fn require_receiver_is_owner(mut self) -> Self {
-        self.requirements.require_receiver_is_owner = true;
+        self.requirements.receiver_authorization = crate::types::ReceiverAuthorization::OwnerOnly;
+        self
+    }
+
+    /// Set an explicit (non-owner) destination account as the authorized receiver.
+    pub fn require_receiver_explicit_account(mut self, account: impl Into<String>) -> Self {
+        self.requirements.receiver_authorization =
+            crate::types::ReceiverAuthorization::ExplicitAccount {
+                account: account.into(),
+            };
+        self
+    }
+
+    /// Set a cross-chain account-mapping policy.
+    pub fn require_receiver_mapping(
+        mut self,
+        source_chain: crate::types::ChainKind,
+        source_owner: impl Into<String>,
+        dest_chain: crate::types::ChainKind,
+        dest_account: impl Into<String>,
+    ) -> Self {
+        self.requirements.receiver_authorization =
+            crate::types::ReceiverAuthorization::MappedAccount {
+                source_chain,
+                source_owner: source_owner.into(),
+                dest_chain,
+                dest_account: dest_account.into(),
+            };
+        self
+    }
+
+    /// Set the receiver authorization rule directly.
+    pub fn receiver_authorization(mut self, rule: crate::types::ReceiverAuthorization) -> Self {
+        self.requirements.receiver_authorization = rule;
         self
     }
 

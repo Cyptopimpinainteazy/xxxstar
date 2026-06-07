@@ -406,17 +406,21 @@ mod integration_tests {
             });
         }
 
-        /// Short raw payload (<30 bytes) should pass through — backward compat.
+        /// Post-Phase-1.4: a short raw payload (10 bytes) is no longer
+        /// treated as a legacy exemption. The kernel now rejects any
+        /// non-empty payload that does not SCALE-decode as a valid
+        /// `Packet::Evm` with the EVM domain bit set, regardless of
+        /// length. This test pins that stricter contract.
         #[test]
-        fn short_raw_payload_passes_validation() {
+        fn short_raw_payload_rejected_post_phase_1_4() {
             new_test_ext().execute_with(|| {
-                // 10 bytes — below the 30-byte packet validation threshold
+                // 10 bytes — below the historical 30-byte threshold, but
+                // still non-empty, so the new strict-packet validation
+                // fires. The kernel must reject it as InvalidEvmPacket
+                // because it is not a SCALE-decodable Packet.
                 let short_payload: Vec<u8> = vec![0x01; 10];
                 assert!(short_payload.len() < 30);
 
-                // This should NOT fail with InvalidEvmPacket.
-                // It may fail for other reasons (nonce, auth, etc.) but not
-                // packet validation.
                 let result = AtlasKernel::submit_comit(
                     RuntimeOrigin::signed(ALICE),
                     H256::repeat_byte(0x03),
@@ -427,14 +431,7 @@ mod integration_tests {
                     H256::zero(),
                 );
 
-                // Must NOT be an InvalidEvmPacket error
-                if let Err(e) = result {
-                    let invalid_evm: DispatchError = Error::<Test>::InvalidEvmPacket.into();
-                    assert!(
-                        e != invalid_evm,
-                        "Short raw payload must not be rejected as InvalidEvmPacket"
-                    );
-                }
+                assert_err!(result, Error::<Test>::InvalidEvmPacket);
             });
         }
 

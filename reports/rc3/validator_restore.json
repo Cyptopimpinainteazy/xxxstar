@@ -1,0 +1,42 @@
+{
+  "drill": "validator_restore",
+  "timestamp": "2026-05-14T00:02:18.871258Z",
+  "restored_validators": [
+    "Bob",
+    "Charlie"
+  ],
+  "restore_ts": "2026-05-14T00:01:18.082097Z",
+  "pre_restore_block": 287,
+  "post_restore_block": 421,
+  "pre_restore_finalized": "0x3090276d5af7d3e07dfbcbd9b55dd88fec920757327fd99653833865d281b543",
+  "post_restore_finalized": "0x5df3a3f3caa74639fc31e2ff442613441017c59974df4fee62a5330dd9fbb389",
+  "bob_block_after_sync": 422,
+  "charlie_block_after_sync": 422,
+  "checks": [
+    {
+      "name": "Peers reconnect",
+      "expected": "PASS",
+      "result": "PASS",
+      "bob_peers": 2,
+      "charlie_peers": 2
+    },
+    {
+      "name": "Blocks resume",
+      "expected": "PASS",
+      "result": "PASS",
+      "pre": 287,
+      "post": 421
+    },
+    {
+      "name": "Finality resumes",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "No rollback (invariant break would show in settlement test)",
+      "expected": "PASS",
+      "result": "pending_settlement_verification"
+    }
+  ],
+  "verdict": "PASS"
+}

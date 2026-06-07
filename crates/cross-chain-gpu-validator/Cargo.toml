@@ -43,16 +43,11 @@ hex = "0.4"
 # Workspace integrations
 x3-gpu-validator-swarm = { path = "../x3-gpu-validator-swarm" }
 
-# Benchmarking
-criterion = "0.5"
-
-# Test utilities
-mockall = "0.12"
-
 # Random for testing
 rand = "0.8"
 
 [dev-dependencies]
+criterion = "0.5"
 tokio-test = "0.4"
 
 [[bin]]

@@ -1,0 +1,25 @@
+{
+  "asset": "X3",
+  "asset_id": "0x643684d53ab8670deefe8e5e566cda3d2b2ad6d1d4f040092d35fa28c9a3cbe3",
+  "minted_for_setup": [
+    {
+      "domain": "X3Native",
+      "amount": "40"
+    },
+    {
+      "domain": "X3Evm",
+      "amount": "40"
+    },
+    {
+      "domain": "X3Svm",
+      "amount": "40"
+    }
+  ],
+  "canonical_supply": "120",
+  "native_supply": "40",
+  "evm_supply": "40",
+  "svm_supply": "40",
+  "external_locked_supply": "0",
+  "pending_supply": "0",
+  "represented_supply": "120"
+}

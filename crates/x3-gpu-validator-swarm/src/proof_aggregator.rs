@@ -37,6 +37,9 @@ pub struct AggregationEntry {
 pub struct ProofAggregator {
     /// Map of proof_hash -> aggregation entry
     proofs: BTreeMap<Hash, AggregationEntry>,
+    /// Validator identity -> ed25519 public key bytes, padded to the
+    /// SignatureOutput verifier's 33-byte input shape.
+    validator_pubkeys: BTreeMap<Address, [u8; 33]>,
     /// Total validators in system
     total_validators: u32,
     /// Byzantine finality threshold (2/3 + 1)
@@ -54,10 +57,84 @@ impl ProofAggregator {
 
         Self {
             proofs: BTreeMap::new(),
+            validator_pubkeys: BTreeMap::new(),
             total_validators,
             finality_threshold,
             supermajority_threshold,
         }
+    }
+
+    /// Register the public key used to verify a validator's GPU attestations.
+    pub fn register_validator_pubkey(&mut self, validator_id: Address, pubkey: [u8; 32]) {
+        let mut padded = [0u8; 33];
+        padded[..32].copy_from_slice(&pubkey);
+        self.validator_pubkeys.insert(validator_id, padded);
+    }
+
+    fn attestation_signing_message(
+        receipt: &crate::gpu_receipt::GpuReceipt,
+        bundle_id: Hash,
+        finalized_block: u64,
+        legs_hash: Hash,
+    ) -> Vec<u8> {
+        use sha2::{Digest, Sha256};
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"x3-validator-attestation-v1");
+        hasher.update(&receipt.kernel_hash);
+        hasher.update(&receipt.input_commitment);
+        hasher.update(&receipt.output_commitment);
+        hasher.update(&receipt.executor);
+        hasher.update(&receipt.gpu_cycles_used.to_le_bytes());
+        hasher.update(&bundle_id);
+        hasher.update(&finalized_block.to_le_bytes());
+        hasher.update(&legs_hash);
+        hasher.finalize().to_vec()
+    }
+
+    fn signature_from_bytes(signature: &[u8]) -> SwarmResult<crate::crypto::SignatureOutput> {
+        if signature.len() != 65 {
+            return Err(SwarmError::VerificationFailed(format!(
+                "Invalid signature length: expected 65, got {}",
+                signature.len()
+            )));
+        }
+
+        let mut r = [0u8; 32];
+        let mut s = [0u8; 32];
+        r.copy_from_slice(&signature[..32]);
+        s.copy_from_slice(&signature[32..64]);
+        Ok(crate::crypto::SignatureOutput::new(r, s, signature[64]))
+    }
+
+    fn verify_attestations(&self, proof: &UnifiedProof) -> SwarmResult<()> {
+        for attestation in &proof.gpu_attestations {
+            let pubkey = self
+                .validator_pubkeys
+                .get(&attestation.validator_id)
+                .ok_or_else(|| {
+                    SwarmError::VerificationFailed(format!(
+                        "Missing public key for validator {:?}",
+                        attestation.validator_id
+                    ))
+                })?;
+            let signature = Self::signature_from_bytes(&attestation.signature)?;
+            let msg = Self::attestation_signing_message(
+                &attestation.receipt,
+                proof.header.bundle_id,
+                proof.header.finalized_block,
+                proof.header.legs_hash,
+            );
+
+            if !signature.verify(&msg, pubkey) {
+                return Err(SwarmError::VerificationFailed(format!(
+                    "Invalid attestation signature for validator {:?}",
+                    attestation.validator_id
+                )));
+            }
+        }
+
+        Ok(())
     }
 
     /// Submit a unified proof for aggregation
@@ -72,6 +149,7 @@ impl ProofAggregator {
                 validation.errors
             )));
         }
+        self.verify_attestations(&proof)?;
 
         if self.proofs.contains_key(&proof_hash) {
             return Err(SwarmError::DuplicateProof);
@@ -286,6 +364,9 @@ pub struct AggregatorStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crypto::SigningKey;
+    use crate::gpu_receipt::{GpuClass, GpuReceipt, ProofType};
+    use crate::unified_proof::GpuValidatorAttestation;
     use crate::unified_proof::{AtomicVmProof, ProofHeader};
 
     fn create_test_proof(bundle_id: Hash, block: u64) -> UnifiedProof {
@@ -297,6 +378,40 @@ mod tests {
             finality_cert_data: vec![1, 2, 3],
         };
         UnifiedProof::new(header, atomic_proof, 10).unwrap()
+    }
+
+    fn create_signed_test_proof(
+        key: &SigningKey,
+        validator_id: Address,
+        bundle_id: Hash,
+        block: u64,
+    ) -> UnifiedProof {
+        let mut proof = create_test_proof(bundle_id, block);
+        let receipt = GpuReceipt {
+            kernel_hash: [9u8; 32],
+            input_commitment: [8u8; 32],
+            output_commitment: [7u8; 32],
+            gpu_cycles_used: 42,
+            device_class: GpuClass::DataCenter,
+            executor: validator_id,
+            proof_type: ProofType::RecomputeA,
+        };
+        let msg = ProofAggregator::attestation_signing_message(
+            &receipt,
+            proof.header.bundle_id,
+            proof.header.finalized_block,
+            proof.header.legs_hash,
+        );
+        let attestation = GpuValidatorAttestation::new(
+            validator_id,
+            receipt,
+            key.sign(&msg).to_bytes(),
+            0,
+            ProofType::RecomputeA,
+            1,
+        );
+        proof.add_attestation(attestation).unwrap();
+        proof
     }
 
     #[test]
@@ -322,6 +437,49 @@ mod tests {
 
         // Should be in collecting state
         assert!(aggregator.proofs.contains_key(&proof_hash));
+    }
+
+    #[test]
+    fn test_submit_proof_requires_registered_attestation_pubkey() {
+        let key = SigningKey::from_seed(b"registered attestation pubkey test seed 32b")
+            .expect("test seed must be accepted");
+        let validator_id = [11u8; 32];
+        let mut aggregator = ProofAggregator::new(10);
+        let proof = create_signed_test_proof(&key, validator_id, [12u8; 32], 100);
+
+        let result = aggregator.submit_proof(proof);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_submit_proof_rejects_invalid_attestation_signature() {
+        let key = SigningKey::from_seed(b"valid signing key for rejection test 32b")
+            .expect("test seed must be accepted");
+        let wrong_key = SigningKey::from_seed(b"wrong signing key for rejection test 32b")
+            .expect("test seed must be accepted");
+        let validator_id = [13u8; 32];
+        let mut aggregator = ProofAggregator::new(10);
+        aggregator.register_validator_pubkey(validator_id, wrong_key.public_key_bytes());
+        let proof = create_signed_test_proof(&key, validator_id, [14u8; 32], 100);
+
+        let result = aggregator.submit_proof(proof);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_submit_proof_accepts_registered_valid_attestation_signature() {
+        let key = SigningKey::from_seed(b"valid registered attestation signature 32b")
+            .expect("test seed must be accepted");
+        let validator_id = [15u8; 32];
+        let mut aggregator = ProofAggregator::new(10);
+        aggregator.register_validator_pubkey(validator_id, key.public_key_bytes());
+        let proof = create_signed_test_proof(&key, validator_id, [16u8; 32], 100);
+
+        let result = aggregator.submit_proof(proof);
+
+        assert!(result.is_ok());
     }
 
     #[test]

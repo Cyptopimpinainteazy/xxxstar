@@ -1,3 +1,18 @@
+#![allow(dead_code, unused_imports, unused_mut, unused_variables)]
+#![allow(
+    clippy::derivable_impls,
+    clippy::doc_lazy_continuation,
+    clippy::len_zero,
+    clippy::manual_is_multiple_of,
+    clippy::map_entry,
+    clippy::needless_borrows_for_generic_args,
+    clippy::new_without_default,
+    clippy::redundant_closure,
+    clippy::type_complexity,
+    clippy::unnecessary_cast,
+    clippy::unwrap_or_default
+)]
+
 //! X3 GPU Validator Swarm
 //!
 //! A deterministic GPU validator swarm with CPU verification, replay mode,

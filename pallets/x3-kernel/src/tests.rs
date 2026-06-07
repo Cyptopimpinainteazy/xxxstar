@@ -3,6 +3,7 @@ use parity_scale_codec::Encode;
 use sp_core::{hashing::blake2_256, H160, H256};
 use sp_runtime::DispatchError;
 
+use crate::test_helpers::{wrap_evm_payload, wrap_svm_payload, wrap_x3_payload};
 use crate::{
     AccountRegistry, AssetRegistry, CanonicalLedger, ComitFailureReason, EvmTransactionData,
     EvmTransactionReceipts, EvmTransactions, KernelCrossVmDispatcher, Nonces, SubmittedComits,
@@ -87,8 +88,8 @@ fn legacy_evm_tx(
 fn submit_comit_successful_flow() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(1);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
         let nonce = 0;
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -135,9 +136,9 @@ fn submit_comit_successful_flow() {
 fn submit_comit_v2_successful_flow() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(101);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
-        let x3_payload = vec![0x58, 0x33, 0x00, 0x01];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
+        let x3_payload = wrap_x3_payload(&vec![0x58, 0x33, 0x00, 0x01]);
         let nonce = 0;
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root_v2(
@@ -185,10 +186,10 @@ fn submit_comit_v2_successful_flow() {
 fn submit_comit_v2_fails_when_x3_execution_errors() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(102);
-        let evm_payload = vec![1];
-        let svm_payload = vec![1];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![1]);
         // 0xFF triggers FailingMockX3Adapter Err
-        let x3_payload = vec![0xFF, 0x00, 0x00, 0x00];
+        let x3_payload = wrap_x3_payload(&vec![0xFF, 0x00, 0x00, 0x00]);
         let nonce = 0;
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root_v2(
@@ -224,8 +225,8 @@ fn submit_comit_v2_fails_when_x3_execution_errors() {
 fn submit_comit_with_matching_prepare_root_succeeds() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(11);
-        let evm_payload = vec![9, 9, 9];
-        let svm_payload = vec![7, 7];
+        let evm_payload = wrap_evm_payload(&vec![9, 9, 9]);
+        let svm_payload = wrap_svm_payload(&vec![7, 7]);
         let fee: Balance = 42;
         let nonce = 0;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -388,8 +389,8 @@ fn submit_comit_rejects_invalid_nonce() {
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![1],
-                vec![1],
+                wrap_evm_payload(&[1]),
+                wrap_svm_payload(&[1]),
                 1,
                 fee,
                 H256::zero(),
@@ -409,8 +410,8 @@ fn submit_comit_rejects_invalid_nonce() {
 fn submit_comit_rejects_when_prepare_root_mismatch() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(6);
-        let evm_payload = vec![1, 2];
-        let svm_payload = vec![3, 4];
+        let evm_payload = wrap_evm_payload(&vec![1, 2]);
+        let svm_payload = wrap_svm_payload(&vec![3, 4]);
         let fee: Balance = 26; // Must be >= required fee to reach verification check
         let correct_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
         let mismatched_root = H256::from_low_u64_be(999);
@@ -442,8 +443,8 @@ fn submit_comit_fails_when_nonce_overflows() {
     new_test_ext().execute_with(|| {
         Nonces::<Test>::insert(ALICE, u64::MAX);
         let comit_id = H256::from_low_u64_be(12);
-        let evm_payload = vec![1];
-        let svm_payload = vec![1];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![1]);
         let fee: Balance = 26;
         let prepare_root =
             compute_prepare_root(comit_id, &evm_payload, &svm_payload, u64::MAX, fee);
@@ -475,8 +476,8 @@ fn account_registry_not_updated_on_failed_submission() {
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 H256::from_low_u64_be(20),
-                vec![1],
-                vec![2],
+                wrap_evm_payload(&[1]),
+                wrap_svm_payload(&[2]),
                 1,
                 10,
                 H256::zero(),
@@ -492,8 +493,8 @@ fn account_registry_not_updated_on_failed_submission() {
 fn submit_comit_rejects_duplicate_comit_id() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(5);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let fee: Balance = 26;
         let prepare_root_0 = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
         let prepare_root_1 = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 1, fee);
@@ -533,8 +534,8 @@ fn submit_comit_allows_different_comit_ids_with_sequential_nonces() {
     new_test_ext().execute_with(|| {
         let comit_id_1 = H256::from_low_u64_be(5);
         let comit_id_2 = H256::from_low_u64_be(6);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let fee: Balance = 26;
         let prepare_root_0 = compute_prepare_root(comit_id_1, &evm_payload, &svm_payload, 0, fee);
         let prepare_root_1 = compute_prepare_root(comit_id_2, &evm_payload, &svm_payload, 1, fee);
@@ -765,8 +766,8 @@ fn update_canonical_balance_can_record_zero_balance() {
 fn submit_comit_with_max_balance_value() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(100);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let max_balance: Balance = Balance::MAX;
         let prepare_root =
             compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, max_balance);
@@ -789,8 +790,16 @@ fn submit_comit_with_max_balance_value() {
 fn submit_comit_with_very_large_payloads_near_limit() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(101);
-        let large_payload = vec![0u8; 4_095];
-        let small_payload = vec![1u8; 1];
+        // Use intent just below the kernel's EVM payload limit
+        // (`MaxEvmPayloadLength = 4096`) once the wrap is applied.
+        // The wrap framing is roughly 60 bytes (variant +
+        // contract + selector + value + compact-int length), so an
+        // intent of 4,000 bytes yields a wrapped payload of about
+        // 4,062 — still below the 4,096 ceiling.
+        let raw_evm_intent = vec![0u8; 4_000];
+        let svm_intent = vec![1u8; 1];
+        let large_payload = wrap_evm_payload(&raw_evm_intent);
+        let small_payload = wrap_svm_payload(&svm_intent);
         let fee: Balance = 26;
         let prepare_root = compute_prepare_root(comit_id, &large_payload, &small_payload, 0, fee);
 
@@ -837,8 +846,8 @@ fn submit_comit_rejects_malformed_payloads_at_max_size() {
 fn submit_comit_one_payload_empty_one_populated() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(103);
-        let evm_payload = vec![];
-        let svm_payload = vec![1, 2, 3];
+        let evm_payload = wrap_evm_payload(&vec![]);
+        let svm_payload = wrap_svm_payload(&vec![1, 2, 3]);
         let fee = 5u128; // Only SVM: 5000/1000 = 5
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
@@ -860,8 +869,8 @@ fn submit_comit_one_payload_empty_one_populated() {
 fn submit_comit_only_evm_payload() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(104);
-        let evm_payload = vec![9, 8, 7];
-        let svm_payload = vec![];
+        let evm_payload = wrap_evm_payload(&vec![9, 8, 7]);
+        let svm_payload = wrap_svm_payload(&vec![]);
         let fee = 21u128; // Only EVM: 21000/1000 = 21
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
@@ -883,8 +892,8 @@ fn submit_comit_only_evm_payload() {
 fn sequential_nonce_increments_per_account() {
     new_test_ext().execute_with(|| {
         let base_id = H256::from_low_u64_be(200);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let fee = 26u128;
 
         for nonce in 0..10 {
@@ -911,10 +920,10 @@ fn multiple_accounts_independent_nonces() {
     new_test_ext().execute_with(|| {
         let comit_id_alice = H256::from_low_u64_be(1);
         let comit_id_bob = H256::from_low_u64_be(2);
-        let evm_payload_alice = vec![1];
-        let svm_payload_alice = vec![2];
-        let evm_payload_bob = vec![3];
-        let svm_payload_bob = vec![4];
+        let evm_payload_alice = wrap_evm_payload(&vec![1]);
+        let svm_payload_alice = wrap_svm_payload(&vec![2]);
+        let evm_payload_bob = wrap_evm_payload(&vec![3]);
+        let svm_payload_bob = wrap_svm_payload(&vec![4]);
         let fee_alice = 26u128;
         let fee_bob = 26u128;
         let prepare_root_alice = compute_prepare_root(
@@ -956,8 +965,8 @@ fn multiple_accounts_independent_nonces() {
 fn prepare_root_zero_hash_accepted_as_bypass() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(500);
-        let evm_payload = vec![1, 2];
-        let svm_payload = vec![3, 4];
+        let evm_payload = wrap_evm_payload(&vec![1, 2]);
+        let svm_payload = wrap_svm_payload(&vec![3, 4]);
         let fee = 100u128;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
@@ -979,8 +988,8 @@ fn prepare_root_zero_hash_accepted_as_bypass() {
 fn prepare_root_verification_correct_hash_passes() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(501);
-        let evm_payload = vec![10, 20, 30];
-        let svm_payload = vec![40, 50];
+        let evm_payload = wrap_evm_payload(&vec![10, 20, 30]);
+        let svm_payload = wrap_svm_payload(&vec![40, 50]);
         let fee: Balance = 555;
         let nonce = 0;
         let correct_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -1003,8 +1012,8 @@ fn prepare_root_verification_correct_hash_passes() {
 fn prepare_root_verification_incorrect_hash_fails() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(502);
-        let evm_payload = vec![100];
-        let svm_payload = vec![200];
+        let evm_payload = wrap_evm_payload(&vec![100]);
+        let svm_payload = wrap_svm_payload(&vec![200]);
         let fee: Balance = 777;
         let wrong_root = H256::from_low_u64_be(9999);
 
@@ -1149,8 +1158,8 @@ fn account_registry_created_on_successful_submission() {
         assert!(AccountRegistry::<Test>::get(CHARLIE).is_none());
 
         let comit_id = H256::from_low_u64_be(1);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let nonce = 0;
         let fee = 26u128;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -1178,8 +1187,8 @@ fn account_registry_not_overwritten_on_repeated_submission() {
         let stored_id = AtlasId::default();
 
         let comit_id_1 = H256::from_low_u64_be(1);
-        let evm_payload_1 = vec![1];
-        let svm_payload_1 = vec![2];
+        let evm_payload_1 = wrap_evm_payload(&vec![1]);
+        let svm_payload_1 = wrap_svm_payload(&vec![2]);
         let fee = 26u128;
         let prepare_root_1 =
             compute_prepare_root(comit_id_1, &evm_payload_1, &svm_payload_1, 0, fee);
@@ -1197,8 +1206,8 @@ fn account_registry_not_overwritten_on_repeated_submission() {
         assert_eq!(AccountRegistry::<Test>::get(ALICE), Some(stored_id));
 
         let comit_id_2 = H256::from_low_u64_be(2);
-        let evm_payload_2 = vec![3];
-        let svm_payload_2 = vec![4];
+        let evm_payload_2 = wrap_evm_payload(&vec![3]);
+        let svm_payload_2 = wrap_svm_payload(&vec![4]);
         let prepare_root_2 =
             compute_prepare_root(comit_id_2, &evm_payload_2, &svm_payload_2, 1, fee);
 
@@ -1220,8 +1229,8 @@ fn account_registry_not_overwritten_on_repeated_submission() {
 fn comit_submission_emits_all_required_event_fields() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(2000);
-        let evm_payload = vec![1, 2, 3, 4, 5];
-        let svm_payload = vec![6, 7, 8];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3, 4, 5]);
+        let svm_payload = wrap_svm_payload(&vec![6, 7, 8]);
         let fee: Balance = 12_345;
         let nonce = 0u64;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -1310,8 +1319,8 @@ fn comit_failed_event_emitted_on_empty_payloads() {
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![],
-                vec![],
+                wrap_evm_payload(&[]),
+                wrap_svm_payload(&[]),
                 0,
                 1,
                 H256::zero(),
@@ -1334,8 +1343,8 @@ fn comit_failed_event_emitted_on_invalid_nonce() {
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![1],
-                vec![2],
+                wrap_evm_payload(&[1]),
+                wrap_svm_payload(&[2]),
                 5,
                 1,
                 H256::zero(),
@@ -1409,8 +1418,8 @@ fn submit_comit_insufficient_balance_fails() {
         .build()
         .execute_with(|| {
             let comit_id = H256::from_low_u64_be(10000);
-            let evm_payload = vec![1];
-            let svm_payload = vec![2];
+            let evm_payload = wrap_evm_payload(&vec![1]);
+            let svm_payload = wrap_svm_payload(&vec![2]);
             let nonce = 0;
             // Required fee will be (21000/1000) + (5000/1000) = 26
             let fee = 26u128;
@@ -1487,8 +1496,8 @@ fn submit_comit_rejects_unauthorized_account() {
         .build()
         .execute_with(|| {
             let comit_id = H256::from_low_u64_be(9001);
-            let evm_payload = vec![1, 2, 3];
-            let svm_payload = vec![4, 5];
+            let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+            let svm_payload = wrap_svm_payload(&vec![4, 5]);
             let nonce = 0;
             let fee = 26u128;
             let prepare_root =
@@ -1521,8 +1530,8 @@ fn authorize_account_enables_comit_submission() {
         .build()
         .execute_with(|| {
             let comit_id = H256::from_low_u64_be(9002);
-            let evm_payload = vec![1];
-            let svm_payload = vec![2];
+            let evm_payload = wrap_evm_payload(&vec![1]);
+            let svm_payload = wrap_svm_payload(&vec![2]);
             let nonce = 0;
             let fee = 26u128;
             let prepare_root =
@@ -1569,8 +1578,8 @@ fn deauthorize_account_blocks_comit_submission() {
         .execute_with(|| {
             let comit_id_1 = H256::from_low_u64_be(9003);
             let comit_id_2 = H256::from_low_u64_be(9004);
-            let evm_payload = vec![1];
-            let svm_payload = vec![2];
+            let evm_payload = wrap_evm_payload(&vec![1]);
+            let svm_payload = wrap_svm_payload(&vec![2]);
             let fee = 26u128;
             let prepare_root_1 =
                 compute_prepare_root(comit_id_1, &evm_payload, &svm_payload, 0, fee);
@@ -1781,8 +1790,8 @@ fn fee_calculation_enforces_minimum_fee() {
 fn submit_comit_emits_fee_deducted_event() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(8001);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let nonce = 0;
         let fee = 26u128;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -1828,8 +1837,8 @@ fn nonce_increments_atomically_on_success() {
         assert_eq!(Nonces::<Test>::get(ALICE), 0);
 
         let comit_id = H256::from_low_u64_be(100);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
@@ -1884,8 +1893,8 @@ fn nonce_not_incremented_on_failure() {
 fn submitted_comit_id_is_recorded() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(200);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let fee: Balance = 100;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
@@ -1911,8 +1920,8 @@ fn submitted_comit_id_is_recorded() {
 fn different_accounts_cannot_reuse_comit_id() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(201);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let fee: Balance = 100;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
@@ -1956,8 +1965,8 @@ fn rate_limiting_allows_submissions_under_limit() {
         // Submit 5 comits (under the limit of 10)
         for i in 0u64..5 {
             let comit_id = H256::from_low_u64_be(300 + i);
-            let evm_payload = vec![i as u8 + 1];
-            let svm_payload = vec![i as u8 + 2];
+            let evm_payload = wrap_evm_payload(&vec![i as u8 + 1]);
+            let svm_payload = wrap_svm_payload(&vec![i as u8 + 2]);
             let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, i, fee);
 
             assert_ok!(AtlasKernel::submit_comit(
@@ -1984,8 +1993,8 @@ fn rate_limiting_blocks_excessive_submissions() {
         // Submit 10 comits (at the limit)
         for i in 0u64..10 {
             let comit_id = H256::from_low_u64_be(400 + i);
-            let evm_payload = vec![i as u8 + 1];
-            let svm_payload = vec![i as u8 + 2];
+            let evm_payload = wrap_evm_payload(&vec![i as u8 + 1]);
+            let svm_payload = wrap_svm_payload(&vec![i as u8 + 2]);
             let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, i, fee);
 
             assert_ok!(AtlasKernel::submit_comit(
@@ -2001,8 +2010,8 @@ fn rate_limiting_blocks_excessive_submissions() {
 
         // 11th submission should fail with RateLimitExceeded
         let comit_id = H256::from_low_u64_be(410);
-        let evm_payload = vec![11];
-        let svm_payload = vec![12];
+        let evm_payload = wrap_evm_payload(&vec![11]);
+        let svm_payload = wrap_svm_payload(&vec![12]);
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 10, fee);
 
         assert_noop!(
@@ -2028,8 +2037,8 @@ fn rate_limiting_is_per_account() {
         // Alice submits 10 (at her limit)
         for i in 0u64..10 {
             let comit_id = H256::from_low_u64_be(500 + i);
-            let evm_payload = vec![i as u8 + 1];
-            let svm_payload = vec![i as u8 + 2];
+            let evm_payload = wrap_evm_payload(&vec![i as u8 + 1]);
+            let svm_payload = wrap_svm_payload(&vec![i as u8 + 2]);
             let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, i, fee);
 
             assert_ok!(AtlasKernel::submit_comit(
@@ -2045,8 +2054,8 @@ fn rate_limiting_is_per_account() {
 
         // Bob can still submit (his own counter is 0)
         let comit_id = H256::from_low_u64_be(600);
-        let evm_payload = vec![1];
-        let svm_payload = vec![2];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![2]);
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, 0, fee);
 
         assert_ok!(AtlasKernel::submit_comit(
@@ -2073,8 +2082,8 @@ fn decode_failure_counter_tracks_failures() {
 
         // Submit a valid comit (may or may not have decode failures depending on state changes)
         let comit_id = H256::from_low_u64_be(700);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
         let nonce = 0;
         let fee: Balance = 100;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -2103,8 +2112,8 @@ fn decode_failure_counter_tracks_failures() {
 fn comit_execution_started_event_has_timestamp() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(800);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
         let nonce = 0;
         let fee: Balance = 100;
         let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
@@ -2151,8 +2160,8 @@ fn comit_execution_started_event_has_timestamp() {
 fn compute_prepare_root_matches_pallet_implementation() {
     new_test_ext().execute_with(|| {
         let comit_id = H256::from_low_u64_be(900);
-        let evm_payload = vec![1, 2, 3, 4, 5];
-        let svm_payload = vec![6, 7, 8];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3, 4, 5]);
+        let svm_payload = wrap_svm_payload(&vec![6, 7, 8]);
         let nonce = 42u64;
         let fee: Balance = 12345;
 
@@ -2220,8 +2229,8 @@ fn emergency_pause_blocks_submit_comit() {
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![1, 2],
-                vec![3, 4],
+                wrap_evm_payload(&[1, 2]),
+                wrap_svm_payload(&[3, 4]),
                 1u64,
                 100u128,
                 H256::zero(),
@@ -2269,8 +2278,8 @@ fn test_canonical_supply_invariant_sequential() {
             let nonce = op_idx;
 
             // Compute prepare_root for this comit
-            let evm_payload = vec![1, 2, (op_idx % 256) as u8];
-            let svm_payload = vec![3, 4];
+            let evm_payload = wrap_evm_payload(&vec![1, 2, (op_idx % 256) as u8]);
+            let svm_payload = wrap_svm_payload(&vec![3, 4]);
             let prepare_root =
                 compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
 
@@ -2317,8 +2326,8 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
             let comit_id = H256::from_low_u64_be(5000 + i);
             let fee: Balance = 100;
             let nonce = i;
-            let evm_payload = vec![(i % 256) as u8];
-            let svm_payload = vec![(i / 256) as u8];
+            let evm_payload = wrap_evm_payload(&vec![(i % 256) as u8]);
+            let svm_payload = wrap_svm_payload(&vec![(i / 256) as u8]);
             let prepare_root =
                 compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
             let result = AtlasKernel::submit_comit(
@@ -2340,8 +2349,8 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
             let comit_id = H256::from_low_u64_be(5100 + i);
             let fee: Balance = 100;
             let nonce = i;
-            let evm_payload = vec![(i % 256) as u8];
-            let svm_payload = vec![(i / 256) as u8];
+            let evm_payload = wrap_evm_payload(&vec![(i % 256) as u8]);
+            let svm_payload = wrap_svm_payload(&vec![(i / 256) as u8]);
             let prepare_root =
                 compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
             let result = AtlasKernel::submit_comit(
@@ -2363,8 +2372,8 @@ fn test_canonical_supply_invariant_fuzz_1000_ops() {
             let comit_id = H256::from_low_u64_be(5200 + i);
             let fee: Balance = 100;
             let nonce = i;
-            let evm_payload = vec![(i % 256) as u8];
-            let svm_payload = vec![(i / 256) as u8];
+            let evm_payload = wrap_evm_payload(&vec![(i % 256) as u8]);
+            let svm_payload = wrap_svm_payload(&vec![(i / 256) as u8]);
             let prepare_root =
                 compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
             let result = AtlasKernel::submit_comit(
@@ -2402,14 +2411,20 @@ fn test_emergency_halt_blocks_comit_submission() {
 
         let comit_id = H256::from_low_u64_be(1);
         let fee: Balance = 500;
-        let prepare_root = compute_prepare_root(comit_id, &vec![1, 2, 3], &vec![4, 5], 0, fee);
+        let prepare_root = compute_prepare_root(
+            comit_id,
+            &wrap_evm_payload(&[1, 2, 3]),
+            &wrap_svm_payload(&[4, 5]),
+            0,
+            fee,
+        );
 
         // First, verify submission works BEFORE pause
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             comit_id,
-            vec![1, 2, 3],
-            vec![4, 5],
+            wrap_evm_payload(&[1, 2, 3]),
+            wrap_svm_payload(&[4, 5]),
             0,
             fee,
             prepare_root,
@@ -2421,14 +2436,20 @@ fn test_emergency_halt_blocks_comit_submission() {
 
         // Try to submit another COMIT — should be blocked
         let comit_id_2 = H256::from_low_u64_be(2);
-        let prepare_root_2 = compute_prepare_root(comit_id_2, &vec![1, 2], &vec![3, 4], 1, fee);
+        let prepare_root_2 = compute_prepare_root(
+            comit_id_2,
+            &wrap_evm_payload(&[1, 2]),
+            &wrap_svm_payload(&[3, 4]),
+            1,
+            fee,
+        );
 
         assert_noop!(
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(BOB),
                 comit_id_2,
-                vec![1, 2],
-                vec![3, 4],
+                wrap_evm_payload(&[1, 2]),
+                wrap_svm_payload(&[3, 4]),
                 1,
                 fee,
                 prepare_root_2,
@@ -2447,7 +2468,13 @@ fn test_emergency_halt_recovery_restores_functionality() {
 
         let comit_id = H256::from_low_u64_be(100);
         let fee: Balance = 500;
-        let prepare_root = compute_prepare_root(comit_id, &vec![1, 2], &vec![3, 4], 0, fee);
+        let prepare_root = compute_prepare_root(
+            comit_id,
+            &wrap_evm_payload(&[1, 2]),
+            &wrap_svm_payload(&[3, 4]),
+            0,
+            fee,
+        );
 
         // Pause the system
         assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
@@ -2458,8 +2485,8 @@ fn test_emergency_halt_recovery_restores_functionality() {
             AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![1, 2],
-                vec![3, 4],
+                wrap_evm_payload(&[1, 2]),
+                wrap_svm_payload(&[3, 4]),
                 0,
                 fee,
                 prepare_root.clone(),
@@ -2475,8 +2502,8 @@ fn test_emergency_halt_recovery_restores_functionality() {
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             comit_id,
-            vec![1, 2],
-            vec![3, 4],
+            wrap_evm_payload(&[1, 2]),
+            wrap_svm_payload(&[3, 4]),
             0,
             fee,
             prepare_root,
@@ -2497,7 +2524,13 @@ fn test_emergency_halt_multiple_pause_unpause_cycles() {
         for cycle in 0..3u64 {
             let comit_id = H256::from_low_u64_be(200 + cycle);
             let fee: Balance = 100;
-            let prepare_root = compute_prepare_root(comit_id, &vec![1], &vec![2], cycle, fee);
+            let prepare_root = compute_prepare_root(
+                comit_id,
+                &wrap_evm_payload(&[1]),
+                &wrap_svm_payload(&[2]),
+                cycle,
+                fee,
+            );
 
             // Pause
             assert_ok!(AtlasKernel::emergency_pause(RuntimeOrigin::root()));
@@ -2508,8 +2541,8 @@ fn test_emergency_halt_multiple_pause_unpause_cycles() {
                 AtlasKernel::submit_comit(
                     RuntimeOrigin::signed(ALICE),
                     comit_id,
-                    vec![1],
-                    vec![2],
+                    wrap_evm_payload(&[1]),
+                    wrap_svm_payload(&[2]),
                     cycle,
                     fee,
                     prepare_root.clone(),
@@ -2525,8 +2558,8 @@ fn test_emergency_halt_multiple_pause_unpause_cycles() {
             assert_ok!(AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![1],
-                vec![2],
+                wrap_evm_payload(&[1]),
+                wrap_svm_payload(&[2]),
                 cycle,
                 fee,
                 prepare_root,
@@ -2548,13 +2581,19 @@ fn test_emergency_halt_preserves_state_through_cycles() {
         // Submit initial transaction
         let comit_id_1 = H256::from_low_u64_be(300);
         let fee: Balance = 100;
-        let prepare_root_1 = compute_prepare_root(comit_id_1, &vec![1], &vec![2], 0, fee);
+        let prepare_root_1 = compute_prepare_root(
+            comit_id_1,
+            &wrap_evm_payload(&[1]),
+            &wrap_svm_payload(&[2]),
+            0,
+            fee,
+        );
 
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             comit_id_1,
-            vec![1],
-            vec![2],
+            wrap_evm_payload(&[1]),
+            wrap_svm_payload(&[2]),
             0,
             fee,
             prepare_root_1,
@@ -2578,13 +2617,19 @@ fn test_emergency_halt_preserves_state_through_cycles() {
 
         // Verify next transaction uses incremented nonce
         let comit_id_2 = H256::from_low_u64_be(301);
-        let prepare_root_2 = compute_prepare_root(comit_id_2, &vec![3], &vec![4], 1, fee);
+        let prepare_root_2 = compute_prepare_root(
+            comit_id_2,
+            &wrap_evm_payload(&[3]),
+            &wrap_svm_payload(&[4]),
+            1,
+            fee,
+        );
 
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             comit_id_2,
-            vec![3],
-            vec![4],
+            wrap_evm_payload(&[3]),
+            wrap_svm_payload(&[4]),
             1,
             fee,
             prepare_root_2,
@@ -2803,8 +2848,8 @@ fn test_cross_domain_balance_consistency() {
                 }
             };
 
-            let evm_payload = vec![(op_idx % 256) as u8];
-            let svm_payload = vec![(op_idx / 256) as u8];
+            let evm_payload = wrap_evm_payload(&vec![(op_idx % 256) as u8]);
+            let svm_payload = wrap_svm_payload(&vec![(op_idx / 256) as u8]);
             let prepare_root = compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
 
             let result = AtlasKernel::submit_comit(
@@ -2865,8 +2910,8 @@ fn test_global_supply_reconciliation() {
                 _ => RuntimeOrigin::signed(CHARLIE),
             };
 
-            let evm_payload = vec![(seed % 256) as u8];
-            let svm_payload = vec![(seed / 256) as u8];
+            let evm_payload = wrap_evm_payload(&vec![(seed % 256) as u8]);
+            let svm_payload = wrap_svm_payload(&vec![(seed / 256) as u8]);
             let prepare_root =
                 compute_prepare_root(comit_id, &evm_payload, &svm_payload, nonce, fee);
 
@@ -2913,14 +2958,19 @@ fn test_no_balance_drift_on_operations() {
                 let fee: Balance = 100;
                 let nonce = cycle * 10 + op;
 
-                let prepare_root =
-                    compute_prepare_root(comit_id, &vec![1, (op as u8)], &vec![2], nonce, fee);
+                let prepare_root = compute_prepare_root(
+                    comit_id,
+                    &wrap_evm_payload(&[1, (op as u8)]),
+                    &wrap_svm_payload(&[2]),
+                    nonce,
+                    fee,
+                );
 
                 let _ = AtlasKernel::submit_comit(
                     RuntimeOrigin::signed(ALICE),
                     comit_id,
-                    vec![1, (op as u8)],
-                    vec![2],
+                    wrap_evm_payload(&[1, (op as u8)]),
+                    wrap_svm_payload(&[2]),
                     nonce,
                     fee,
                     prepare_root,
@@ -2957,13 +3007,13 @@ fn test_balance_after_finalization() {
             let nonce = op;
 
             let prepare_root =
-                compute_prepare_root(comit_id, &vec![1], &vec![2], nonce, fee);
+                compute_prepare_root(comit_id, &wrap_evm_payload(&[1]), &wrap_svm_payload(&[2]), nonce, fee);
 
             let _ = AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![1],
-                vec![2],
+                wrap_evm_payload(&[1]),
+                wrap_svm_payload(&[2]),
                 nonce,
                 fee,
                 prepare_root,
@@ -2979,13 +3029,13 @@ fn test_balance_after_finalization() {
             let nonce = block_1_ops + op;
 
             let prepare_root =
-                compute_prepare_root(comit_id, &vec![3], &vec![4], nonce, fee);
+                compute_prepare_root(comit_id, &wrap_evm_payload(&[3]), &wrap_svm_payload(&[4]), nonce, fee);
 
             let _ = AtlasKernel::submit_comit(
                 RuntimeOrigin::signed(ALICE),
                 comit_id,
-                vec![3],
-                vec![4],
+                wrap_evm_payload(&[3]),
+                wrap_svm_payload(&[4]),
                 nonce,
                 fee,
                 prepare_root,
@@ -3020,13 +3070,19 @@ fn test_emergency_reconciliation() {
         // Create some state
         let initial_comit = H256::from_low_u64_be(4400);
         let fee: Balance = 100;
-        let prepare_root = compute_prepare_root(initial_comit, &vec![1], &vec![2], 0, fee);
+        let prepare_root = compute_prepare_root(
+            initial_comit,
+            &wrap_evm_payload(&[1]),
+            &wrap_svm_payload(&[2]),
+            0,
+            fee,
+        );
 
         assert_ok!(AtlasKernel::submit_comit(
             RuntimeOrigin::signed(ALICE),
             initial_comit,
-            vec![1],
-            vec![2],
+            wrap_evm_payload(&[1]),
+            wrap_svm_payload(&[2]),
             0,
             fee,
             prepare_root,
@@ -3064,9 +3120,9 @@ fn test_fee_accounting_on_successful_comit() {
 
         let initial_balance = crate::mock::Balances::free_balance(&ALICE);
         let comit_id = H256::from_low_u64_be(5001);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
-        let x3_payload = vec![0x58, 0x33, 0x00, 0x01];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
+        let x3_payload = wrap_x3_payload(&vec![0x58, 0x33, 0x00, 0x01]);
         let nonce = 0;
         let max_fee: Balance = 1000; // User provides max fee
         let prepare_root = compute_prepare_root_v2(
@@ -3127,10 +3183,10 @@ fn test_fee_not_charged_on_execution_failure() {
 
         let initial_balance = crate::mock::Balances::free_balance(&ALICE);
         let comit_id = H256::from_low_u64_be(5002);
-        let evm_payload = vec![1];
-        let svm_payload = vec![1];
+        let evm_payload = wrap_evm_payload(&vec![1]);
+        let svm_payload = wrap_svm_payload(&vec![1]);
         // 0xFF triggers FailingMockX3Adapter Err causing execution failure
-        let x3_payload = vec![0xFF, 0x00, 0x00, 0x00];
+        let x3_payload = wrap_x3_payload(&vec![0xFF, 0x00, 0x00, 0x00]);
         let nonce = 0;
         let fee: Balance = 500;
         let prepare_root = compute_prepare_root_v2(
@@ -3186,9 +3242,9 @@ fn test_cumulative_fee_accounting() {
 
         for i in 0..num_comits {
             let comit_id = H256::from_low_u64_be(6000 + i);
-            let evm_payload = vec![1, 2, 3];
-            let svm_payload = vec![4, 5];
-            let x3_payload = vec![0x58, 0x33, 0x00, 0x01];
+            let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+            let svm_payload = wrap_svm_payload(&vec![4, 5]);
+            let x3_payload = wrap_x3_payload(&vec![0x58, 0x33, 0x00, 0x01]);
             let prepare_root = compute_prepare_root_v2(
                 comit_id,
                 &evm_payload,
@@ -3254,9 +3310,9 @@ fn test_nonce_prevents_fee_double_charge() {
 
         let initial_balance = crate::mock::Balances::free_balance(&ALICE);
         let comit_id = H256::from_low_u64_be(7001);
-        let evm_payload = vec![1, 2, 3];
-        let svm_payload = vec![4, 5];
-        let x3_payload = vec![0x58, 0x33, 0x00, 0x01];
+        let evm_payload = wrap_evm_payload(&vec![1, 2, 3]);
+        let svm_payload = wrap_svm_payload(&vec![4, 5]);
+        let x3_payload = wrap_x3_payload(&vec![0x58, 0x33, 0x00, 0x01]);
         let nonce = 0;
         let max_fee: Balance = 500;
         let prepare_root = compute_prepare_root_v2(

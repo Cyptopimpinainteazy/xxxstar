@@ -40,6 +40,7 @@
 //! ```
 
 use crate::error::IntentValidationError;
+use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Every possible state an intent can occupy.

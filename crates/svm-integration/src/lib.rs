@@ -249,6 +249,9 @@ pub trait SvmExecutor {
 /// Real SVM executor using solana-rbpf (replaces mock for testing)
 #[cfg(any(test, feature = "test-utils"))]
 pub struct MockSvmExecutor {
+    /// Inner real executor that the mock currently delegates away
+    /// from. Held for parity with future revisions that may use it.
+    #[allow(dead_code)]
     inner: RbpfSvmExecutor,
 }
 

@@ -1,3 +1,10 @@
+#![allow(dead_code, unused_imports, unused_mut, unused_variables)]
+#![allow(
+    clippy::derivable_impls,
+    clippy::new_without_default,
+    clippy::unnecessary_map_or
+)]
+
 //! X3 Full Compiler Pipeline with YOLO + Loop-Pack v1 Optimization
 //!
 //! Complete compilation pipeline from source code to optimized bytecode:

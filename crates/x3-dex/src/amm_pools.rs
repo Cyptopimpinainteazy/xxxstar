@@ -234,7 +234,7 @@ impl AMMPool {
         };
 
         // Check minimums
-        if (amount_a as u128) < amount_a_min || (amount_b as u128) < amount_b_min {
+        if amount_a < amount_a_min || amount_b < amount_b_min {
             return Err("Output amounts below minimums");
         }
 
