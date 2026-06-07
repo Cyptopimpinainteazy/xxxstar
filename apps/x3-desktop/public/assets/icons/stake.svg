@@ -1,0 +1,18 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stakeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6d00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e65100;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Stacked coins -->
+  <ellipse cx="64" cy="92" rx="32" ry="10" fill="url(#stakeGrad)" opacity="0.4"/>
+  <ellipse cx="64" cy="80" rx="32" ry="10" fill="url(#stakeGrad)" opacity="0.5"/>
+  <ellipse cx="64" cy="68" rx="32" ry="10" fill="url(#stakeGrad)" opacity="0.6"/>
+  <ellipse cx="64" cy="56" rx="32" ry="10" fill="url(#stakeGrad)" opacity="0.7"/>
+  <ellipse cx="64" cy="44" rx="32" ry="10" fill="none" stroke="url(#stakeGrad)" stroke-width="2.5"/>
+  <!-- Lock icon on top -->
+  <path d="M56 30 V24 Q56 16 64 16 Q72 16 72 24 V30" fill="none" stroke="url(#stakeGrad)" stroke-width="2.5"/>
+  <rect x="52" y="30" width="24" height="16" rx="3" fill="url(#stakeGrad)" opacity="0.8"/>
+  <circle cx="64" cy="38" r="3" fill="#0a0a0b"/>
+</svg>

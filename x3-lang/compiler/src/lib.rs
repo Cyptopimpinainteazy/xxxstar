@@ -1,4 +1,5 @@
 pub mod emitter;
+pub mod intent_emit;
 pub mod ir;
 pub mod lowering;
 pub mod parser;
@@ -71,6 +72,18 @@ pub fn compile_program_with_context(program: &Program, ctx: LowerCtx) -> Result<
 pub fn compile_to_ir(program: &Program) -> Result<X3IR, X3Error> {
     lower_program(program, LowerCtx::new())
 }
+
+/// Re-export the cross-chain intent adapter boundary.
+///
+/// `x3-lang` does not depend on the cross-chain intent crate (no
+/// dependency cycle). Instead the language compiler builds an
+/// `IntentSpecDraft` (a JSON-serializable value) at the compiler
+/// boundary, and the main workspace's
+/// `x3-crosschain-intent::adapter::intent_spec_to_crosschain_intent`
+/// is the single canonical consumer that converts the draft into
+/// a fully-validated `CrossChainIntent` and stamps the canonical
+/// hash.
+pub use intent_emit::{IntentSpecDraft, SourceConstraint};
 
 /// Verify bytecode is properly formed (basic checks)
 fn verify_bytecode(bytecode: &[u8]) -> Result<(), X3Error> {

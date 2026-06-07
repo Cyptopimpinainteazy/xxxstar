@@ -1,0 +1,54 @@
+{
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "command_run": "x3-proof verify x3.observability.telemetry_pipeline",
+  "artifact_hash": "64fd2025e6439d2132280359cd3eacffa02a17ba17213051b288d270baa7f23e",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "docs/testnet-config/prometheus-config.json",
+    "docs/testnet-config/grafana-dashboards.json",
+    "crates/x3-indexer/src/metrics.rs",
+    "crates/x3-sidecar/src/telemetry.rs",
+    "tests_phase4/x3_operator/test_telemetry.py"
+  ],
+  "timestamp": "2026-05-02T02:30:13.650702227Z",
+  "result": {
+    "claim_id": "x3.observability.telemetry_pipeline",
+    "claim": "Observability telemetry and dashboards are configured with executable evidence",
+    "status": "verified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "docs/testnet-config/prometheus-config.json",
+      "docs/testnet-config/grafana-dashboards.json",
+      "crates/x3-indexer/src/metrics.rs",
+      "crates/x3-sidecar/src/telemetry.rs",
+      "tests_phase4/x3_operator/test_telemetry.py"
+    ],
+    "commands_run": [],
+    "passed_checks": [
+      "Prometheus scrape config present",
+      "Grafana dashboard config present",
+      "Indexer metrics surface implemented",
+      "Sidecar telemetry surface implemented",
+      "Operator telemetry test exists"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "docs/testnet-config/prometheus-config.json": "true",
+      "crates/x3-indexer/src/metrics.rs": "true",
+      "crates/x3-sidecar/src/telemetry.rs": "true",
+      "tests_phase4/x3_operator/test_telemetry.py": "true",
+      "docs/testnet-config/grafana-dashboards.json": "true"
+    },
+    "timestamp": "2026-05-02T02:30:13.646627277Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "059a587e44480b86ec47103974e444a67541da4491cf26462ddf826db6258a43"
+}

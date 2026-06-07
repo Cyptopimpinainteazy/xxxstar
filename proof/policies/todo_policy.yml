@@ -1,0 +1,176 @@
+# TODO/Gap Detection Policy
+version: "1.0.0"
+
+# Keywords to scan for
+keywords:
+  dangerous:
+    - TODO
+    - FIXME
+    - HACK
+    - XXX
+    - stub
+    - mock
+    - placeholder
+    - temporary
+    - "for now"
+    - later
+    - "not implemented"
+  
+  code_markers:
+    - "unimplemented!"
+    - "todo!"
+    - "panic!"
+    - "unwrap("
+    - "expect("
+    - ".unwrap()"
+    - ".expect("
+  
+  fake_implementations:
+    - "Ok(true)"
+    - "Ok(())"
+    - "Ok(vec![])"
+    - "Default::default()"
+    - "fake finality"
+    - "mock verifier"
+    - "dummy signature"
+    - "hardcoded timestamp"
+    - "hardcoded price"
+    - "hardcoded admin"
+    - "FAKE_"
+    - "MOCK_"
+    - "TEST_ONLY"
+
+# Severity classification
+severity_levels:
+  T0:
+    name: "Harmless note"
+    description: "Documentation note, no action needed"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  T1:
+    name: "Cleanup"
+    description: "Code cleanup, no functional impact"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  T2:
+    name: "Test debt"
+    description: "Missing tests, test cleanup needed"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  T3:
+    name: "Stub debt"
+    description: "Incomplete implementation in non-critical path"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  T4:
+    name: "Mock debt"
+    description: "Mock/fake implementation in test-only code"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  T5:
+    name: "Panic debt"
+    description: "Panic/unwrap in non-critical path"
+    blocks_mainnet: true
+    blocks_testnet: false
+    
+  T6:
+    name: "Security debt"
+    description: "Security-related TODO in any path"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  T7:
+    name: "Funds-at-risk debt"
+    description: "TODO in custody/treasury/vault code"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  T8:
+    name: "Launch blocker"
+    description: "Critical missing functionality"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  T9:
+    name: "False completion marker"
+    description: "Fake green/mock passing production test"
+    blocks_mainnet: true
+    blocks_testnet: true
+
+# Critical paths where TODOs are blockers
+critical_paths:
+  - "pallets/x3-kernel"
+  - "pallets/atomic-trade-engine"
+  - "pallets/x3-settlement-engine"
+  - "pallets/x3-atomic-kernel"
+  - "crates/x3-bridge"
+  - "crates/cross-vm-bridge"
+  - "crates/evm-integration"
+  - "crates/svm-integration"
+  - "crates/x3-atomic-trade"
+  - "crates/x3-flashloan"
+  - "crates/x3-dex"
+  - "crates/x3-vm"
+  - "crates/x3-compiler"
+  - "pallets/governance"
+  - "pallets/treasury"
+  - "runtime"
+  - "X3-contracts/evm/contracts"
+  - "X3-contracts/svm/programs"
+
+# Exempt paths (TODOs allowed)
+exempt_paths:
+  - "tests/"
+  - "benches/"
+  - "examples/"
+  - "docs/"
+  - "scripts/"
+  - ".md"
+  - "test_"
+  - "_test.rs"
+  - "mock_"
+
+# Auto-classification rules
+classification_rules:
+  - pattern: "TODO.*security"
+    severity: T6
+  - pattern: "TODO.*vault"
+    severity: T7
+  - pattern: "TODO.*custody"
+    severity: T7
+  - pattern: "TODO.*treasury"
+    severity: T7
+  - pattern: "TODO.*bridge"
+    severity: T6
+  - pattern: "TODO.*finality"
+    severity: T6
+  - pattern: "fake finality"
+    severity: T9
+  - pattern: "mock verifier"
+    severity: T9
+  - pattern: "hardcoded admin"
+    severity: T6
+  - pattern: "unimplemented!"
+    severity: T8
+  - pattern: "panic!"
+    severity: T5
+
+# Gate rules
+gates:
+  mainnet:
+    max_t5: 0
+    max_t6: 0
+    max_t7: 0
+    max_t8: 0
+    max_t9: 0
+    
+  testnet:
+    max_t6: 0
+    max_t7: 0
+    max_t8: 0
+    max_t9: 0

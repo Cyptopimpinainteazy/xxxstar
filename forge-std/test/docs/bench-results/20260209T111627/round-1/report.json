@@ -1,0 +1,9 @@
+{
+  "global": {
+    "bytes": 888,
+    "gas": 165,
+    "instr": 71,
+    "mode": "YOLO Pass",
+    "samples": 8
+  }
+}

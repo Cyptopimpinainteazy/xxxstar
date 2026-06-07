@@ -1,0 +1,36 @@
+{
+  "drill": "validator_restart",
+  "timestamp": "2026-05-14T00:00:49.730461Z",
+  "restarted_validator": "Bob",
+  "restart_ts": "2026-05-14T00:00:08.916124Z",
+  "bob_block_after_sync": 286,
+  "alice_block_at_check": 286,
+  "bob_peers_after": 2,
+  "checks": [
+    {
+      "name": "Bob rejoins peers",
+      "expected": "PASS",
+      "result": "PASS",
+      "peers": 2
+    },
+    {
+      "name": "Bob catches up",
+      "expected": "PASS",
+      "result": "PASS",
+      "bob_block": 286,
+      "alice_block": 286,
+      "diff": 0
+    },
+    {
+      "name": "No database corruption",
+      "expected": "PASS",
+      "result": "PASS"
+    },
+    {
+      "name": "Finality resumes",
+      "expected": "PASS",
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS"
+}

@@ -1,0 +1,122 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.mainnet-check
+#
+# Purpose: Mainnet RC-1 compile-time and static-analysis gate.
+#
+# This image does NOT produce a runtime artifact for deployment.
+# It proves, in a reproducible build environment, that the RC-1 scope gates
+# pass and the codebase is clean enough to proceed to the next launch gate.
+#
+# Usage:
+#   docker build -f Dockerfile.mainnet-check -t x3-mainnet-check .
+#   docker run --rm x3-mainnet-check
+#
+# If the build exits 0: gate PASS.
+# If the build exits non-zero: gate FAIL — do not proceed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: Planner (cache Cargo registry separately) ───────────────────────
+FROM rust:1.82-slim-bookworm AS planner
+WORKDIR /x3
+
+# Install system deps for Substrate builds
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang \
+    cmake \
+    curl \
+    git \
+    libssl-dev \
+    pkg-config \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin toolchain to match rust-toolchain.toml
+COPY rust-toolchain.toml ./
+RUN rustup show
+
+# ── Stage 2: Builder ──────────────────────────────────────────────────────────
+FROM planner AS builder
+WORKDIR /x3
+
+# Copy manifests first for layer-cache efficiency
+COPY Cargo.toml Cargo.lock deny.toml ./
+COPY crates/ crates/
+COPY pallets/ pallets/
+COPY runtime/ runtime/
+COPY node/ node/
+
+# ── Gate 1: Scope-fence compile-time check ────────────────────────────────────
+# The mainnet-rc1 feature activates compile-time #[cfg] errors if any forbidden
+# feature (external-gateway, parallel-executor, appzone-factory, pq-experimental,
+# advanced-dex, ai-optimizer, gpu-acceleration) is co-enabled.
+RUN echo "==> Gate 1: RC-1 scope fence" && \
+    cargo check \
+        --package pallet-x3-cross-vm-router \
+        --features mainnet-rc1 \
+        --no-default-features \
+    && echo "Gate 1: PASS"
+
+# ── Gate 2: workspace fmt ─────────────────────────────────────────────────────
+RUN echo "==> Gate 2: cargo fmt" && \
+    cargo fmt --all -- --check \
+    && echo "Gate 2: PASS"
+
+# ── Gate 3: workspace clippy – deny warnings ──────────────────────────────────
+RUN echo "==> Gate 3: clippy" && \
+    cargo clippy --workspace --all-targets -- -D warnings \
+    && echo "Gate 3: PASS"
+
+# ── Gate 4: dependency audit ──────────────────────────────────────────────────
+RUN echo "==> Gate 4: cargo audit" && \
+    cargo install cargo-audit --locked -q && \
+    cargo audit \
+    && echo "Gate 4: PASS"
+
+# ── Gate 5: deny.toml license / ban / advisory check ─────────────────────────
+RUN echo "==> Gate 5: cargo deny" && \
+    cargo install cargo-deny --locked -q && \
+    cargo deny check \
+    && echo "Gate 5: PASS"
+
+# ── Gate 6: cross-VM router unit tests ────────────────────────────────────────
+RUN echo "==> Gate 6: pallet-x3-cross-vm-router tests" && \
+    cargo test \
+        --package pallet-x3-cross-vm-router \
+        --features mainnet-rc1 \
+    && echo "Gate 6: PASS"
+
+# ── Gate 7: supply ledger unit tests ─────────────────────────────────────────
+RUN echo "==> Gate 7: pallet-x3-supply-ledger tests" && \
+    cargo test \
+        --package pallet-x3-supply-ledger \
+    && echo "Gate 7: PASS"
+
+# ── Gate 8: atomic kernel unit tests ─────────────────────────────────────────
+RUN echo "==> Gate 8: pallet-x3-atomic-kernel tests" && \
+    cargo test \
+        --package pallet-x3-atomic-kernel \
+    && echo "Gate 8: PASS"
+
+# ── Gate 9: runtime check (not full build – fast) ────────────────────────────
+RUN echo "==> Gate 9: x3-chain-runtime check" && \
+    cargo check \
+        --package x3-chain-runtime \
+    && echo "Gate 9: PASS"
+
+# ── Gate 10: node binary check ───────────────────────────────────────────────
+RUN echo "==> Gate 10: x3-chain-node check" && \
+    cargo check \
+        --package x3-chain-node \
+    && echo "Gate 10: PASS"
+
+# ── Final summary ─────────────────────────────────────────────────────────────
+FROM debian:bookworm-slim AS report
+WORKDIR /x3
+
+COPY --from=builder /x3/reports/ ./reports/ 2>/dev/null || true
+
+# Write a minimal pass receipt so the caller can inspect it
+RUN echo "x3-mainnet-check: PASS" > /x3/mainnet_check_result.txt && \
+    cat /x3/mainnet_check_result.txt
+
+CMD ["cat", "/x3/mainnet_check_result.txt"]

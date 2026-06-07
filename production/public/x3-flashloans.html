@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3-VM | Flashloan Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#060612;--s1:#7B2FFF;--s2:#FF2F6E;--s3:#2FFFB4;--s4:#FFD700;
+  --panel:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);
+}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x:hidden;}
+
+/* AURORA BG */
+.aurora{position:fixed;inset:0;pointer-events:none;z-index:0;}
+.aurora-blob{position:absolute;border-radius:50%;filter:blur(120px);animation:aurora-move 20s ease-in-out infinite;}
+.a1{width:700px;height:700px;background:radial-gradient(circle,rgba(123,47,255,.25),transparent);top:-200px;left:-100px;animation-delay:0s;}
+.a2{width:600px;height:600px;background:radial-gradient(circle,rgba(255,47,110,.2),transparent);bottom:-150px;right:-100px;animation-delay:-7s;}
+.a3{width:500px;height:500px;background:radial-gradient(circle,rgba(47,255,180,.15),transparent);top:40%;left:30%;animation-delay:-14s;}
+@keyframes aurora-move{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.1)}}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 60px;display:flex;justify-content:space-between;align-items:center;backdrop-filter:blur(24px);border-bottom:1px solid var(--border);}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;background:linear-gradient(90deg,var(--s1),var(--s2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+nav ul{list-style:none;display:flex;gap:32px;}
+nav a{color:rgba(255,255,255,.5);text-decoration:none;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;transition:.2s;}
+nav a:hover{color:#fff;}
+.nav-btn{background:linear-gradient(135deg,var(--s1),var(--s2));color:#fff!important;padding:10px 24px;border-radius:6px;}
+
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:120px 60px;z-index:1;}
+.hero-content{max-width:800px;}
+.hero-label{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:5px;color:var(--s3);text-transform:uppercase;margin-bottom:24px;display:flex;align-items:center;gap:12px;}
+.hero-label::before{content:'';width:32px;height:1px;background:var(--s3);}
+.hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,10vw,130px);line-height:.9;margin-bottom:32px;}
+.hero h1 .w1{color:#fff;display:block;}
+.hero h1 .w2{background:linear-gradient(135deg,var(--s1) 0%,var(--s2) 50%,var(--s4) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:block;}
+.hero h1 .w3{color:var(--s3);display:block;font-size:.55em;letter-spacing:6px;font-family:'DM Mono',monospace;font-weight:300;}
+.hero-para{font-size:18px;color:rgba(255,255,255,.55);line-height:1.8;max-width:600px;margin-bottom:48px;}
+.hero-para strong{color:#fff;}
+.hero-buttons{display:flex;gap:16px;flex-wrap:wrap;}
+.btn-grad{background:linear-gradient(135deg,var(--s1),var(--s2));color:#fff;padding:16px 40px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;border:none;border-radius:8px;cursor:pointer;transition:.3s;text-decoration:none;display:inline-block;}
+.btn-grad:hover{transform:translateY(-3px);box-shadow:0 20px 60px rgba(123,47,255,.5);}
+.btn-outline{border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.6);padding:16px 40px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;border-radius:8px;cursor:pointer;transition:.3s;text-decoration:none;display:inline-block;background:transparent;}
+.btn-outline:hover{border-color:var(--s3);color:var(--s3);transform:translateY(-3px);}
+
+/* FLOATING CARDS (hero right) */
+.hero-visual{position:absolute;right:60px;top:50%;transform:translateY(-50%);width:440px;z-index:2;}
+.flash-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:24px;backdrop-filter:blur(20px);margin-bottom:16px;transform:translateX(0);transition:.3s;}
+.flash-card:hover{transform:translateX(-8px);border-color:var(--s1);}
+.fc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.fc-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:#fff;}
+.fc-chain{padding:3px 10px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;}
+.fc-evm{background:rgba(98,126,234,.2);color:#627eea;}
+.fc-svm{background:rgba(153,69,255,.2);color:#9945ff;}
+.fc-bar{height:4px;border-radius:2px;margin-bottom:12px;}
+.fc-stats{display:flex;justify-content:space-between;}
+.fc-stat{text-align:center;}
+.fc-stat-v{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;}
+.fc-stat-l{font-size:10px;color:rgba(255,255,255,.3);margin-top:2px;}
+.fee-free{color:var(--s3);}
+.fee-small{color:var(--s4);}
+.fee-mid{color:var(--s2);}
+
+/* LIVE WIDGET */
+.live-bar{position:relative;z-index:1;background:rgba(47,255,180,.05);border-top:1px solid rgba(47,255,180,.15);border-bottom:1px solid rgba(47,255,180,.15);padding:14px 0;overflow:hidden;}
+.live-inner{display:flex;gap:60px;animation:scroll 25s linear infinite;white-space:nowrap;}
+.live-item{font-family:'DM Mono',monospace;font-size:12px;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:10px;}
+.live-item strong{color:var(--s3);}
+.live-dot{width:6px;height:6px;background:var(--s3);border-radius:50%;animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* HOW IT WORKS */
+.how{position:relative;z-index:1;padding:120px 60px;}
+.how h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,7vw,90px);margin-bottom:16px;}
+.how-sub{font-size:16px;color:rgba(255,255,255,.4);margin-bottom:80px;max-width:500px;}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);}
+.step{background:var(--bg);padding:48px 32px;position:relative;overflow:hidden;transition:.4s;}
+.step:hover{background:rgba(123,47,255,.06);}
+.step-line{position:absolute;top:0;left:0;right:0;height:3px;}
+.step:nth-child(1) .step-line{background:var(--s1);}
+.step:nth-child(2) .step-line{background:var(--s2);}
+.step:nth-child(3) .step-line{background:var(--s3);}
+.step:nth-child(4) .step-line{background:var(--s4);}
+.step-n{font-family:'Bebas Neue',sans-serif;font-size:80px;color:rgba(255,255,255,.05);position:absolute;bottom:20px;right:20px;line-height:1;}
+.step-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:24px;}
+.step:nth-child(1) .step-icon{background:rgba(123,47,255,.2);}
+.step:nth-child(2) .step-icon{background:rgba(255,47,110,.2);}
+.step:nth-child(3) .step-icon{background:rgba(47,255,180,.2);}
+.step:nth-child(4) .step-icon{background:rgba(255,215,0,.2);}
+.step-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:12px;}
+.step-text{font-size:14px;color:rgba(255,255,255,.5);line-height:1.7;}
+.step-tag{margin-top:16px;font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:2px;}
+
+/* PROVIDER GRID */
+.providers{position:relative;z-index:1;padding:120px 60px;background:rgba(0,0,0,.3);}
+.providers h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,6vw,80px);}
+.prov-subtitle{font-size:16px;color:rgba(255,255,255,.4);margin:12px 0 80px;}
+.prov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.prov-card{border:1px solid var(--border);border-radius:16px;padding:40px 32px;transition:.4s;position:relative;overflow:hidden;}
+.prov-card::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(123,47,255,.1),transparent);opacity:0;transition:.4s;}
+.prov-card:hover::after{opacity:1;}
+.prov-card:hover{border-color:rgba(123,47,255,.4);transform:translateY(-4px);}
+.prov-card.zero .prov-fee-badge{background:rgba(47,255,180,.15);color:var(--s3);border-color:rgba(47,255,180,.3);}
+.prov-card.low .prov-fee-badge{background:rgba(255,215,0,.1);color:var(--s4);border-color:rgba(255,215,0,.2);}
+.prov-card.mid .prov-fee-badge{background:rgba(255,47,110,.1);color:var(--s2);border-color:rgba(255,47,110,.2);}
+.prov-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;}
+.prov-name{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;}
+.prov-chain-badge{padding:4px 12px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;}
+.prov-chain-evm{background:rgba(98,126,234,.15);color:#627eea;}
+.prov-chain-svm{background:rgba(153,69,255,.15);color:#9945ff;}
+.prov-fee-badge{padding:6px 14px;border-radius:6px;font-family:'DM Mono',monospace;font-size:14px;font-weight:500;display:inline-block;border:1px solid;margin-bottom:20px;}
+.prov-detail{font-size:13px;color:rgba(255,255,255,.45);line-height:1.7;margin-bottom:20px;}
+.prov-callback{background:rgba(255,255,255,.04);border-radius:6px;padding:10px 14px;font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.5);}
+.prov-liq{margin-top:16px;display:flex;gap:4px;}
+.liq-dot{width:8px;height:8px;border-radius:50%;background:var(--s3);}
+.liq-dot.empty{background:rgba(255,255,255,.1);}
+
+/* CODE SHOWCASE */
+.code-section{position:relative;z-index:1;padding:120px 60px;}
+.code-section h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,6vw,80px);margin-bottom:16px;}
+.code-tabs{display:flex;gap:4px;margin-bottom:0;border-bottom:1px solid var(--border);}
+.code-tab{padding:12px 24px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;color:rgba(255,255,255,.3);border-bottom:2px solid transparent;transition:.2s;background:transparent;border-top:none;border-left:none;border-right:none;}
+.code-tab.active{color:var(--s3);border-bottom-color:var(--s3);}
+.code-window{background:rgba(0,0,0,.6);border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;padding:40px;overflow-x:auto;}
+.code-window pre{font-family:'DM Mono',monospace;font-size:13px;line-height:1.9;color:rgba(255,255,255,.6);}
+.kw{color:#c792ea;}
+.fn{color:#82aaff;}
+.str{color:var(--s3);}
+.num{color:var(--s4);}
+.cm{color:rgba(255,255,255,.25);}
+.id{color:#fff;}
+.op{color:var(--s2);}
+
+/* CTA */
+.cta{position:relative;z-index:1;padding:160px 60px;text-align:center;overflow:hidden;}
+.cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(123,47,255,.15) 0%,transparent 60%);}
+.cta h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,10vw,130px);line-height:.9;margin-bottom:32px;}
+.cta h2 span{background:linear-gradient(135deg,var(--s1),var(--s2),var(--s4));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.cta p{font-size:18px;color:rgba(255,255,255,.5);max-width:500px;margin:0 auto 48px;}
+
+footer{padding:40px 60px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.2);letter-spacing:1px;}
+
+@media(max-width:900px){
+  nav{padding:16px 24px;}
+  nav ul{display:none;}
+  .hero{padding:100px 24px;flex-direction:column;}
+  .hero-visual{position:relative;right:auto;top:auto;transform:none;width:100%;margin-top:48px;}
+  .how,.providers,.code-section,.cta{padding:80px 24px;}
+  .steps,.prov-grid{grid-template-columns:1fr;}
+  footer{flex-direction:column;gap:16px;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<div class="aurora">
+  <div class="aurora-blob a1"></div>
+  <div class="aurora-blob a2"></div>
+  <div class="aurora-blob a3"></div>
+</div>
+
+<nav>
+  <div class="logo">X3 FLASHLOAN ENGINE</div>
+  <ul>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#providers">Providers</a></li>
+    <li><a href="#code">Code</a></li>
+    <li><a href="#" class="nav-btn">Launch</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-content">
+    <div class="hero-label">Multi-Chain Flashloan Coordinator</div>
+    <h1>
+      <span class="w1">BORROW.</span>
+      <span class="w2">SWAP. PROFIT.</span>
+      <span class="w3">// in one transaction //</span>
+    </h1>
+    <p class="hero-para">The X3-VM Flashloan Engine routes through <strong>6 providers across 2 chains</strong> — picking lowest fees, highest liquidity, every time. Atomic execution. Zero custody. No rug.</p>
+    <div class="hero-buttons">
+      <a href="#providers" class="btn-grad">View Providers</a>
+      <a href="#code" class="btn-outline">See The Code</a>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="flash-card">
+      <div class="fc-header">
+        <div class="fc-name">Balancer V2 Vault</div>
+        <span class="fc-chain fc-evm">EVM</span>
+      </div>
+      <div class="fc-bar" style="background:linear-gradient(90deg,var(--s1),var(--s3));width:95%;"></div>
+      <div class="fc-stats">
+        <div class="fc-stat"><div class="fc-stat-v fee-free">0.00%</div><div class="fc-stat-l">Fee</div></div>
+        <div class="fc-stat"><div class="fc-stat-v">$2.8B</div><div class="fc-stat-l">Liquidity</div></div>
+        <div class="fc-stat"><div class="fc-stat-v fee-free">Multi</div><div class="fc-stat-l">Assets</div></div>
+      </div>
+    </div>
+    <div class="flash-card">
+      <div class="fc-header">
+        <div class="fc-name">Kamino Finance</div>
+        <span class="fc-chain fc-svm">SVM</span>
+      </div>
+      <div class="fc-bar" style="background:linear-gradient(90deg,#9945ff,var(--s3));width:80%;"></div>
+      <div class="fc-stats">
+        <div class="fc-stat"><div class="fc-stat-v fee-free">0.00%</div><div class="fc-stat-l">Fee</div></div>
+        <div class="fc-stat"><div class="fc-stat-v">$800M</div><div class="fc-stat-l">Liquidity</div></div>
+        <div class="fc-stat"><div class="fc-stat-v fee-free">USDC/SOL</div><div class="fc-stat-l">Assets</div></div>
+      </div>
+    </div>
+    <div class="flash-card">
+      <div class="fc-header">
+        <div class="fc-name">Aave V3</div>
+        <span class="fc-chain fc-evm">EVM</span>
+      </div>
+      <div class="fc-bar" style="background:linear-gradient(90deg,#627eea,var(--s4));width:90%;"></div>
+      <div class="fc-stats">
+        <div class="fc-stat"><div class="fc-stat-v fee-small">0.05%</div><div class="fc-stat-l">Fee</div></div>
+        <div class="fc-stat"><div class="fc-stat-v">$5.1B</div><div class="fc-stat-l">Liquidity</div></div>
+        <div class="fc-stat"><div class="fc-stat-v">Multi</div><div class="fc-stat-l">Assets</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIVE BAR -->
+<div class="live-bar">
+  <div class="live-inner">
+    <div class="live-item"><div class="live-dot"></div><span>Balancer V2 —</span><strong>0.00% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>Kamino —</span><strong>0.00% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>MarginFi —</span><strong>0.00% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>Aave V3 —</span><strong>0.05% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>Uniswap V3 —</span><strong>0.05–1% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>Solend —</span><strong>0.30% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <!-- duplicate -->
+    <div class="live-item"><div class="live-dot"></div><span>Balancer V2 —</span><strong>0.00% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>Kamino —</span><strong>0.00% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>MarginFi —</span><strong>0.00% fee</strong></div>
+    <div class="live-item">⟡</div>
+    <div class="live-item"><div class="live-dot"></div><span>Aave V3 —</span><strong>0.05% fee</strong></div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <h2>HOW IT<br>WORKS.</h2>
+  <p class="how-sub">Four phases. Cross-chain atomic execution. No exceptions.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-line"></div>
+      <div class="step-icon">🔒</div>
+      <div class="step-title">Lock HTLCs</div>
+      <p class="step-text">Secret S and hash H=sha256(S) are generated. Funds lock into HTLC contracts on both Solana (T_S) and Ethereum (T_E) with staggered timelocks.</p>
+      <div class="step-tag">// PHASE 01</div>
+      <div class="step-n">1</div>
+    </div>
+    <div class="step">
+      <div class="step-line"></div>
+      <div class="step-icon">⚡</div>
+      <div class="step-title">Fire Flashloans</div>
+      <p class="step-text">The planner picks the optimal provider per chain. Kamino/MarginFi for SVM, Balancer/Aave for EVM. Borrow → Swap → Repay. One TX each.</p>
+      <div class="step-tag">// PHASE 02</div>
+      <div class="step-n">2</div>
+    </div>
+    <div class="step">
+      <div class="step-line"></div>
+      <div class="step-icon">🔑</div>
+      <div class="step-title">Reveal Secret</div>
+      <p class="step-text">Both legs succeed? Initiator calls claimHTLC(S) on Solana. Secret emits on-chain. Relayer picks it up and fires claimHTLC on Ethereum within milliseconds.</p>
+      <div class="step-tag">// PHASE 03</div>
+      <div class="step-n">3</div>
+    </div>
+    <div class="step">
+      <div class="step-line"></div>
+      <div class="step-icon">💰</div>
+      <div class="step-title">Collect Profit</div>
+      <p class="step-text">Both HTLCs release funds to initiator. Flash pools return to full liquidity. If anything failed — no secret, both chains refund after timeouts. Zero loss.</p>
+      <div class="step-tag">// PHASE 04</div>
+      <div class="step-n">4</div>
+    </div>
+  </div>
+</section>
+
+<!-- PROVIDERS -->
+<section class="providers" id="providers">
+  <h2>FLASH<br>PROVIDERS.</h2>
+  <p class="prov-subtitle">The coordinator auto-selects the best source. Always lowest fee, highest liquidity.</p>
+  <div class="prov-grid">
+    <div class="prov-card zero">
+      <div class="prov-top">
+        <div class="prov-name">Balancer V2</div>
+        <span class="prov-chain-badge prov-chain-evm">EVM</span>
+      </div>
+      <div class="prov-fee-badge">0.00% Fee</div>
+      <p class="prov-detail">The Vault architecture enables zero-fee flash loans across any pool token. Massive liquidity depth makes it the preferred EVM source.</p>
+      <div class="prov-callback">receiveFlashLoan(tokens, amounts, feeAmounts, userData)</div>
+      <div class="prov-liq"><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div></div>
+    </div>
+    <div class="prov-card zero">
+      <div class="prov-top">
+        <div class="prov-name">Kamino</div>
+        <span class="prov-chain-badge prov-chain-svm">SVM</span>
+      </div>
+      <div class="prov-fee-badge">0.00% Fee</div>
+      <p class="prov-detail">Kamino's SDK provides flashBorrowIx and flashRepayIx bundled in one atomic Solana transaction. Zero fee, deep USDC/SOL liquidity.</p>
+      <div class="prov-callback">flashBorrowIx(reserve, amount) + flashRepayIx(reserve, amount)</div>
+      <div class="prov-liq"><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot empty"></div></div>
+    </div>
+    <div class="prov-card zero">
+      <div class="prov-top">
+        <div class="prov-name">MarginFi</div>
+        <span class="prov-chain-badge prov-chain-svm">SVM</span>
+      </div>
+      <div class="prov-fee-badge">0.00% Fee</div>
+      <p class="prov-detail">Anchor-based Solana protocol. Zero fee flashloans where borrow and repay are instructions in the same transaction. Direct CPI integration.</p>
+      <div class="prov-callback">marginfi::flashloan { borrow_and_repay_ixs }</div>
+      <div class="prov-liq"><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot empty"></div><div class="liq-dot empty"></div></div>
+    </div>
+    <div class="prov-card low">
+      <div class="prov-top">
+        <div class="prov-name">Aave V3</div>
+        <span class="prov-chain-badge prov-chain-evm">EVM</span>
+      </div>
+      <div class="prov-fee-badge">0.05% Fee</div>
+      <p class="prov-detail">The gold standard for EVM flashloans. Unmatched liquidity across ETH and major ERC-20s. Fallback when Balancer depth is insufficient.</p>
+      <div class="prov-callback">executeOperation(assets[], amounts[], premiums[], initiator, params)</div>
+      <div class="prov-liq"><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div></div>
+    </div>
+    <div class="prov-card mid">
+      <div class="prov-top">
+        <div class="prov-name">Solend</div>
+        <span class="prov-chain-badge prov-chain-svm">SVM</span>
+      </div>
+      <div class="prov-fee-badge">0.30% Fee</div>
+      <p class="prov-detail">The largest Solana lending protocol by TVL. Used as fallback when Kamino/MarginFi depth is insufficient. SOL, USDC, TULIP support.</p>
+      <div class="prov-callback">flash_loan_begin_ix + flash_loan_end_ix</div>
+      <div class="prov-liq"><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div></div>
+    </div>
+    <div class="prov-card low">
+      <div class="prov-top">
+        <div class="prov-name">Uniswap V3</div>
+        <span class="prov-chain-badge prov-chain-evm">EVM</span>
+      </div>
+      <div class="prov-fee-badge">0.05–1% Fee</div>
+      <p class="prov-detail">Flash swaps via concentrated liquidity pools. Used when specific token pairs aren't available in Balancer or Aave. Pool-dependent fee structure.</p>
+      <div class="prov-callback">uniswapV3FlashCallback(fee0, fee1, data)</div>
+      <div class="prov-liq"><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot"></div><div class="liq-dot empty"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CODE -->
+<section class="code-section" id="code">
+  <h2>THE<br>CODE.</h2>
+  <div class="code-tabs">
+    <button class="code-tab active" onclick="showTab('x3',this)">X3-Lang HTLC</button>
+    <button class="code-tab" onclick="showTab('evm',this)">EVM Adapter</button>
+    <button class="code-tab" onclick="showTab('svm',this)">Solana (Anchor)</button>
+  </div>
+  <div class="code-window">
+    <div id="tab-x3">
+<pre><span class="cm">// X3-lang HTLC contract — x3vm WASM runtime</span>
+<span class="kw">contract</span> <span class="id">AtomicHTLC</span> {
+
+  <span class="kw">struct</span> <span class="id">Htlc</span> {
+    sender:    <span class="id">Address</span>,
+    recipient: <span class="id">Address</span>,
+    hash_lock: [<span class="id">u8</span>; <span class="num">32</span>],
+    timelock:  <span class="id">u64</span>,
+    asset:     <span class="id">AssetId</span>,
+    amount:    <span class="id">u128</span>,
+    claimed:   <span class="id">bool</span>,
+  }
+
+  <span class="kw">pub fn</span> <span class="fn">create_htlc</span>(
+    recipient: <span class="id">Address</span>, hash_lock: [<span class="id">u8</span>; <span class="num">32</span>],
+    timelock: <span class="id">u64</span>,   asset: <span class="id">AssetId</span>, amount: <span class="id">u128</span>
+  ) <span class="op">-></span> <span class="id">HtlcId</span> {
+    <span class="fn">assert!</span>(amount <span class="op">></span> <span class="num">0</span>, <span class="str">"NonzeroAmount"</span>);
+    <span class="fn">assert!</span>(timelock <span class="op">></span> <span class="fn">block_time()</span>, <span class="str">"FutureTimelock"</span>);
+    <span class="cm">// lock asset from caller, store HTLC</span>
+    <span class="kw">emit</span> <span class="id">HtlcCreated</span> { id, recipient, hash_lock, timelock };
+    id
+  }
+
+  <span class="kw">pub fn</span> <span class="fn">claim_htlc</span>(id: <span class="id">HtlcId</span>, secret: [<span class="id">u8</span>; <span class="num">32</span>]) {
+    <span class="kw">let</span> h = <span class="fn">sha256(secret)</span>;
+    <span class="fn">assert!</span>(h <span class="op">==</span> htlc.hash_lock, <span class="str">"InvalidSecret"</span>);
+    <span class="fn">assert!</span>(<span class="fn">block_time()</span> <span class="op"><</span> htlc.timelock, <span class="str">"TimelockExpired"</span>);
+    htlc.claimed = <span class="kw">true</span>;
+    <span class="fn">transfer(htlc.recipient, htlc.asset, htlc.amount)</span>;
+    <span class="kw">emit</span> <span class="id">HtlcClaimed</span> { id, secret };  <span class="cm">// relayer watches this</span>
+  }
+
+  <span class="kw">pub fn</span> <span class="fn">refund_htlc</span>(id: <span class="id">HtlcId</span>) {
+    <span class="fn">assert!</span>(<span class="fn">block_time()</span> <span class="op">>=</span> htlc.timelock, <span class="str">"TooEarly"</span>);
+    <span class="fn">transfer(htlc.sender, htlc.asset, htlc.amount)</span>;
+    <span class="kw">emit</span> <span class="id">HtlcRefunded</span> { id };
+  }
+}</pre>
+    </div>
+    <div id="tab-evm" style="display:none">
+<pre><span class="cm">// AtlasHTLC.sol — EVM atomic HTLC with flashloan adapter</span>
+<span class="kw">interface</span> <span class="id">IFlashLoanReceiver</span> {
+  <span class="kw">function</span> <span class="fn">executeOperation</span>(
+    <span class="id">address</span>[] calldata assets, <span class="id">uint256</span>[] calldata amounts,
+    <span class="id">uint256</span>[] calldata premiums, <span class="id">address</span> initiator, <span class="id">bytes</span> calldata params
+  ) <span class="kw">external returns</span> (<span class="id">bool</span>);
+}
+
+<span class="kw">contract</span> <span class="id">AtlasHTLC</span> <span class="kw">is</span> <span class="id">IFlashLoanReceiver</span>, <span class="id">ReentrancyGuard</span> {
+
+  <span class="kw">function</span> <span class="fn">createHTLC</span>(
+    <span class="id">address</span> recipient, <span class="id">bytes32</span> hashLock,
+    <span class="id">uint256</span> timeLock, <span class="id">address</span> token, <span class="id">uint256</span> amount
+  ) <span class="kw">external returns</span> (<span class="id">bytes32</span> id) {
+    <span class="cm">// transfer tokens in, store HTLC struct</span>
+    <span class="kw">emit</span> <span class="id">HTLCCreated</span>(id, recipient, hashLock, timeLock);
+  }
+
+  <span class="kw">function</span> <span class="fn">executeOperation</span>(<span class="cm">/* Aave callback */</span>) <span class="kw">external returns</span> (<span class="id">bool</span>) {
+    <span class="cm">// decode params: swap instructions</span>
+    <span class="fn">IUniswapV3Router(router).exactInputSingle(swapParams)</span>;
+    <span class="cm">// approve Aave pool to pull back principal + premium</span>
+    <span class="id">IERC20</span>(asset).<span class="fn">approve</span>(aavePool, amount <span class="op">+</span> premium);
+    <span class="kw">return true</span>;
+  }
+
+  <span class="kw">function</span> <span class="fn">claimHTLC</span>(<span class="id">bytes32</span> id, <span class="id">bytes32</span> secret)
+    <span class="kw">external nonReentrant</span> {
+    <span class="fn">require</span>(keccak256(abi.encode(secret)) <span class="op">==</span> htlc.hashLock);
+    <span class="fn">require</span>(block.timestamp <span class="op"><</span> htlc.timeLock);
+    <span class="id">IERC20</span>(htlc.token).<span class="fn">transfer</span>(htlc.recipient, htlc.amount);
+    <span class="kw">emit</span> <span class="id">HTLCClaimed</span>(id, secret);
+  }
+}</pre>
+    </div>
+    <div id="tab-svm" style="display:none">
+<pre><span class="cm">// Solana Anchor HTLC + Kamino flash integration</span>
+<span class="op">#[program]</span>
+<span class="kw">pub mod</span> <span class="id">x3_htlc</span> {
+  <span class="kw">pub fn</span> <span class="fn">create_htlc</span>(ctx: <span class="id">Context</span>, params: <span class="id">HtlcParams</span>) <span class="op">-></span> <span class="id">Result</span><()> {
+    <span class="kw">let</span> htlc = &<span class="kw">mut</span> ctx.accounts.htlc;
+    <span class="fn">require!</span>(params.amount <span class="op">></span> <span class="num">0</span>, <span class="id">HtlcError</span>::NonzeroAmount);
+    <span class="fn">require!</span>(params.timelock <span class="op">></span> <span class="fn">Clock::get()?</span>.unix_timestamp, ...);
+    <span class="cm">// CPI: transfer USDC to HTLC PDA</span>
+    <span class="fn">token::transfer</span>(cpi_ctx, params.amount)?;
+    <span class="fn">emit!</span>(<span class="id">HtlcCreated</span> { ... });
+    <span class="id">Ok</span>(())
+  }
+
+  <span class="kw">pub fn</span> <span class="fn">kamino_flash_arb</span>(ctx: <span class="id">Context</span>, amount: <span class="id">u64</span>) <span class="op">-></span> <span class="id">Result</span><()> {
+    <span class="cm">// Kamino borrow instruction (same TX)</span>
+    <span class="kw">let</span> borrow_ix = <span class="fn">kamino::flash_borrow_ix</span>(&ctx.accounts, amount);
+    <span class="fn">invoke</span>(&borrow_ix, accounts)?;
+    <span class="cm">// DEX swap via Jupiter aggregator</span>
+    <span class="fn">jupiter::route_swap</span>(<span class="id">USDC</span>, <span class="id">SOL</span>, amount, min_out)?;
+    <span class="cm">// Kamino repay (same TX — atomic)</span>
+    <span class="kw">let</span> repay_ix = <span class="fn">kamino::flash_repay_ix</span>(&ctx.accounts, amount);
+    <span class="fn">invoke</span>(&repay_ix, accounts)?;
+    <span class="id">Ok</span>(())
+  }
+
+  <span class="kw">pub fn</span> <span class="fn">claim_htlc</span>(ctx: <span class="id">Context</span>, secret: [<span class="id">u8</span>; <span class="num">32</span>]) <span class="op">-></span> <span class="id">Result</span><()> {
+    <span class="kw">let</span> h = <span class="fn">hash::hashv</span>(&[&secret]);
+    <span class="fn">require!</span>(h.to_bytes() <span class="op">==</span> htlc.hash_lock, <span class="id">InvalidSecret</span>);
+    <span class="fn">token::transfer</span>(cpi_ctx, htlc.amount)?;
+    <span class="fn">emit!</span>(<span class="id">HtlcClaimed</span> { secret }); <span class="cm">// relayer observes, claims EVM</span>
+    <span class="id">Ok</span>(())
+  }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <h2>ZERO FEES.<br><span>ATOMIC PROFIT.</span></h2>
+  <p>The X3-VM flashloan engine is live on testnet. Three VMs. Six providers. One coordinator. Start building.</p>
+  <div class="hero-buttons" style="justify-content:center;">
+    <a href="#" class="btn-grad">Access Testnet</a>
+    <a href="#" class="btn-outline">Read the Docs</a>
+  </div>
+</section>
+
+<footer>
+  <span>X3-VM FLASHLOAN ENGINE — CROSS-CHAIN ATOMIC EXECUTION</span>
+  <span>DOCS · GITHUB · DISCORD</span>
+</footer>
+
+<script>
+function showTab(id, btn) {
+  document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
+  document.querySelectorAll('.code-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).style.display='block';
+  btn.classList.add('active');
+}
+const obs=new IntersectionObserver(entries=>{entries.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>{e.target.style.opacity='1';e.target.style.transform='translateY(0)';},i*100);}});},{threshold:.05});
+document.querySelectorAll('.step,.prov-card,.flash-card').forEach(el=>{el.style.opacity='0';el.style.transform='translateY(24px)';el.style.transition='opacity .6s ease,transform .6s ease';obs.observe(el);});
+</script>
+</body>
+</html>

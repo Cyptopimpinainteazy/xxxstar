@@ -20,3 +20,6 @@ smallvec = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 internment = { workspace = true, optional = true }
+
+[lints]
+workspace = true

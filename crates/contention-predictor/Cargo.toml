@@ -1,0 +1,22 @@
+[package]
+name = "contention-predictor"
+version = "0.1.0"
+edition = "2021"
+description = "Machine learning-based contention prediction for blockchain transactions"
+license = "Apache-2.0"
+repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
+keywords = ["blockchain", "machine-learning", "contention", "prediction", "optimization"]
+
+[dependencies]
+anyhow = { version = "1.0", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tokio = { version = "1.0", features = ["sync", "time"] }
+rand = "0.8"
+once_cell = "1.0"
+thiserror = "1.0"
+[dev-dependencies]
+criterion = "0.5"
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"], default-features = false }
+serde_json = { version = "1.0", default-features = false }

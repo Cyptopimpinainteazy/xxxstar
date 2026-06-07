@@ -1,0 +1,9 @@
+graph LR
+    A[Start: 1 Thread<br/>~43k TPS] --> B[Add: Multi-threading<br/>~344k TPS<br/>8× faster]
+    B --> C[Add: Batch Processing<br/>~500k TPS<br/>~12× faster]
+    C --> D[Add: GPU Acceleration<br/>~19.5M TPS<br/>300× faster]
+    
+    style A fill:#ffcccc
+    style B fill:#ffff99
+    style C fill:#ccffcc
+    style D fill:#00ff00,stroke:#00aa00,stroke-width:3px

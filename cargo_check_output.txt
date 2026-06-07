@@ -1,0 +1,55 @@
+warning: patch for `sp-crypto-hashing` uses the features mechanism. default-features and features will not take effect because the patch dependency does not support this mechanism
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#36341e59)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/vendor/sp-wasm-interface
+warning: Patch `rustix v1.1.2 (/home/lojak/Desktop/X3_ATOMIC_STAR_corrupt_backup_20260518-225645/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+warning: unexpected `cfg` condition value: `dev`
+    --> pallets/x3-atomic-kernel/src/lib.rs:1037:31
+     |
+1037 |                 #[cfg(not(any(feature = "dev", feature = "testnet")))]
+     |                               ^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `default`, `frame-benchmarking`, `runtime-benchmarks`, `std`, and `try-runtime`
+     = help: consider adding `dev` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+     = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition value: `testnet`
+    --> pallets/x3-atomic-kernel/src/lib.rs:1037:48
+     |
+1037 |                 #[cfg(not(any(feature = "dev", feature = "testnet")))]
+     |                                                ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `default`, `frame-benchmarking`, `runtime-benchmarks`, `std`, and `try-runtime`
+     = help: consider adding `testnet` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `dev`
+    --> pallets/x3-atomic-kernel/src/lib.rs:1083:31
+     |
+1083 |                 #[cfg(not(any(feature = "dev", feature = "testnet")))]
+     |                               ^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `default`, `frame-benchmarking`, `runtime-benchmarks`, `std`, and `try-runtime`
+     = help: consider adding `dev` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `testnet`
+    --> pallets/x3-atomic-kernel/src/lib.rs:1083:48
+     |
+1083 |                 #[cfg(not(any(feature = "dev", feature = "testnet")))]
+     |                                                ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `default`, `frame-benchmarking`, `runtime-benchmarks`, `std`, and `try-runtime`
+     = help: consider adding `testnet` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: `pallet-x3-atomic-kernel` (lib) generated 4 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.30s
+warning: the following packages contain code that will be rejected by a future version of Rust: trie-db v0.30.0
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

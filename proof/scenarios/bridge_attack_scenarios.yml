@@ -1,0 +1,223 @@
+# Bridge Attack Scenarios
+# Comprehensive test scenarios for bridge security
+
+scenarios:
+  - id: BRIDGE_001
+    name: "Replay Attack"
+    category: replay_protection
+    severity: CRITICAL
+    description: "Attacker attempts to replay a valid bridge message to double-spend"
+    
+    setup:
+      - user_bridges_100_tokens_from_evm_to_x3
+      - bridge_message_submitted_and_processed
+      - tokens_minted_on_x3_side
+    
+    attack:
+      - attacker_captures_bridge_message
+      - attacker_resubmits_same_message
+      - bridge_processes_message_again
+    
+    expected_behavior:
+      - second_submission_rejected_with_error("ReplayDetected")
+      - no_additional_tokens_minted
+      - nonce_tracking_prevents_replay
+    
+    proof_requirements:
+      - unit_test: test_bridge_replay_rejected
+      - integration_test: test_bridge_replay_across_finality
+      - fuzz_test: test_replay_with_variations
+    
+    related_claims:
+      - x3.bridge.replay_protection
+      - x3.bridge.nonce_tracking
+  
+  - id: BRIDGE_002
+    name: "Fake Finality Attack"
+    category: finality_verification
+    severity: CATASTROPHIC
+    description: "Attacker submits bridge message claiming finality that has not occurred"
+    
+    setup:
+      - attacker_controls_relayer_node
+      - user_initiates_bridge_transaction
+      - transaction_not_yet_finalized_on_source_chain
+    
+    attack:
+      - attacker_forges_finality_proof
+      - attacker_submits_bridge_message_with_fake_proof
+      - bridge_attempts_to_process_message
+    
+    expected_behavior:
+      - finality_verification_fails
+      - bridge_message_rejected_with_error("InvalidFinalityProof")
+      - no_tokens_minted_on_destination
+      - attacker_slashed_if_bond_posted
+    
+    proof_requirements:
+      - unit_test: test_fake_finality_rejected
+      - integration_test: test_finality_verification_e2e
+      - adversarial_test: test_malicious_relayer_scenarios
+    
+    related_claims:
+      - x3.bridge.finality_verification
+      - x3.bridge.relayer_slashing
+  
+  - id: BRIDGE_003
+    name: "Bridge Message Corruption"
+    category: message_integrity
+    severity: CRITICAL
+    description: "Attacker modifies bridge message in transit"
+    
+    setup:
+      - user_bridges_50_tokens_to_address_A
+      - bridge_message_in_transit
+    
+    attack:
+      - attacker_intercepts_bridge_message
+      - attacker_modifies_recipient_to_address_B
+      - attacker_modifies_amount_to_500_tokens
+      - attacker_submits_modified_message
+    
+    expected_behavior:
+      - message_integrity_check_fails
+      - signature_verification_fails
+      - bridge_message_rejected
+      - original_tokens_remain_locked
+    
+    proof_requirements:
+      - unit_test: test_bridge_message_signature_verification
+      - integration_test: test_tampered_message_rejected
+      - fuzz_test: test_message_mutation_detection
+    
+    related_claims:
+      - x3.bridge.message_integrity
+      - x3.bridge.cryptographic_verification
+  
+  - id: BRIDGE_004
+    name: "Supply Inflation via Bridge Exploit"
+    category: supply_integrity
+    severity: CATASTROPHIC
+    description: "Attacker exploits bridge to mint unbacked tokens"
+    
+    setup:
+      - bridge_initialized_with_clean_state
+      - canonical_supply_tracking_enabled
+    
+    attack:
+      - attacker_crafts_malicious_mint_message
+      - attacker_bypasses_external_locked_tracking
+      - attacker_mints_1000000_unbacked_tokens
+    
+    expected_behavior:
+      - mint_operation_fails_at_supply_guard
+      - canonical_supply_invariant_violated_error
+      - transaction_reverted
+      - no_tokens_created
+      - incident_logged_for_investigation
+    
+    proof_requirements:
+      - unit_test: test_supply_invariant_enforcement
+      - integration_test: test_bridge_supply_conservation
+      - invariant_test: test_canonical_supply_never_violated
+    
+    related_claims:
+      - x3.asset_kernel.supply_conservation
+      - x3.bridge.supply_integrity
+  
+  - id: BRIDGE_005
+    name: "Bridge Relayer Censorship"
+    category: liveness
+    severity: HIGH
+    description: "Malicious relayers refuse to relay valid bridge messages"
+    
+    setup:
+      - user_initiates_legitimate_bridge_transaction
+      - transaction_finalized_on_source_chain
+      - majority_of_relayers_collude_to_censor
+    
+    attack:
+      - colluding_relayers_ignore_bridge_message
+      - user_unable_to_complete_bridge_transfer
+      - tokens_locked_indefinitely
+    
+    expected_behavior:
+      - timeout_mechanism_triggers_after_threshold
+      - user_can_submit_proof_of_censorship
+      - emergency_refund_path_activated
+      - tokens_returned_to_user_on_source_chain
+      - malicious_relayers_slashed
+    
+    proof_requirements:
+      - integration_test: test_bridge_timeout_refund
+      - integration_test: test_censorship_proof_submission
+      - integration_test: test_relayer_slashing_on_censorship
+    
+    related_claims:
+      - x3.bridge.liveness_guarantee
+      - x3.bridge.refund_path
+  
+  - id: BRIDGE_006
+    name: "Bridge Pause During Attack"
+    category: emergency_controls
+    severity: MEDIUM
+    description: "Emergency pause mechanism activated during ongoing attack"
+    
+    setup:
+      - bridge_operating_normally
+      - security_council_monitors_bridge_activity
+      - attacker_begins_exploit_attempt
+    
+    attack:
+      - attacker_submits_suspicious_bridge_messages
+      - security_monitoring_detects_anomaly
+      - guardian_initiates_emergency_pause
+    
+    expected_behavior:
+      - bridge_immediately_halts_all_operations
+      - in_flight_messages_queued_safely
+      - no_state_corruption_during_pause
+      - pause_can_be_lifted_after_investigation
+      - queued_messages_resume_correctly
+    
+    proof_requirements:
+      - unit_test: test_emergency_pause_mechanism
+      - integration_test: test_pause_during_transactions
+      - integration_test: test_resume_after_pause
+    
+    related_claims:
+      - x3.bridge.emergency_pause
+      - x3.bridge.pause_guardian
+  
+  - id: BRIDGE_007
+    name: "Cross-Chain Reorg During Bridge"
+    category: finality_edge_cases
+    severity: CRITICAL
+    description: "Source chain reorganizes after bridge message processed"
+    
+    setup:
+      - user_bridges_tokens_from_chain_A_to_x3
+      - bridge_message_processed_on_x3
+      - tokens_minted_on_x3
+      - chain_A_undergoes_deep_reorg
+      - original_bridge_transaction_removed_from_chain_A
+    
+    attack:
+      - attacker_triggers_reorg_on_chain_A
+      - bridge_transaction_no_longer_exists_on_chain_A
+      - tokens_on_x3_now_unbacked
+    
+    expected_behavior:
+      - finality_threshold_set_high_enough_to_prevent_reorg
+      - if_reorg_detected_tokens_frozen_on_x3
+      - cross_chain_dispute_resolution_activated
+      - if_transaction_not_resubmitted_within_window_tokens_burned
+    
+    proof_requirements:
+      - integration_test: test_finality_threshold_configuration
+      - integration_test: test_reorg_detection_mechanism
+      - integration_test: test_dispute_resolution_flow
+    
+    related_claims:
+      - x3.bridge.finality_verification
+      - x3.bridge.reorg_protection

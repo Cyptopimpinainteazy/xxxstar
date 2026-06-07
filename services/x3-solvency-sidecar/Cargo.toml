@@ -1,0 +1,31 @@
+# Standalone workspace declaration prevents the root workspace from absorbing
+# this crate through automatic member discovery.
+[workspace]
+
+[package]
+name = "x3-solvency-sidecar"
+version = "0.1.0"
+edition = "2021"
+description = "Real-time solvency telemetry, Prometheus metrics, and alerting for X3 Phase 4.5"
+
+[[bin]]
+name = "x3-solvency-sidecar"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", features = ["json"] }
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+prometheus = "0.13"
+lazy_static = "1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

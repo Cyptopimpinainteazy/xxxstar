@@ -1,0 +1,207 @@
+# Gap Detection Policy
+version: "1.0.0"
+
+# Gap types
+gap_types:
+  G0:
+    name: "Documentation gap"
+    description: "Missing documentation for public API"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  G1:
+    name: "Code gap"
+    description: "Declared but not implemented"
+    blocks_mainnet: true
+    blocks_testnet: false
+    
+  G2:
+    name: "Wiring gap"
+    description: "Component exists but not wired to runtime"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  G3:
+    name: "Test gap"
+    description: "Missing unit/integration tests"
+    blocks_mainnet: true
+    blocks_testnet: false
+    
+  G4:
+    name: "Negative test gap"
+    description: "Missing failure/rejection tests"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  G5:
+    name: "Invariant gap"
+    description: "Missing invariant enforcement/monitoring"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  G6:
+    name: "Operational gap"
+    description: "Missing operator tooling/runbooks"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  G7:
+    name: "Benchmark gap"
+    description: "Missing performance benchmarks"
+    blocks_mainnet: false
+    blocks_testnet: false
+    
+  G8:
+    name: "Recovery gap"
+    description: "Missing incident recovery procedures"
+    blocks_mainnet: true
+    blocks_testnet: false
+    
+  G9:
+    name: "Security gap"
+    description: "Missing security test/audit"
+    blocks_mainnet: true
+    blocks_testnet: true
+    
+  G10:
+    name: "Mainnet gate gap"
+    description: "Missing required mainnet readiness proof"
+    blocks_mainnet: true
+    blocks_testnet: false
+
+# S0 gaps (critical blockers)
+s0_gaps:
+  - name: "Supply invariant missing"
+    area: "asset-kernel"
+    description: "No proof of supply conservation across VMs"
+    detection: "Check for canonical_supply tests"
+    
+  - name: "Bridge replay proof missing"
+    area: "bridge"
+    description: "No proof that replay protection works"
+    detection: "Check for replay guard tests"
+    
+  - name: "Fake finality rejection missing"
+    area: "bridge"
+    description: "No proof that fake finality proofs are rejected"
+    detection: "Check for fake_proof rejection tests"
+    
+  - name: "Cross-VM rollback missing"
+    area: "atomic"
+    description: "No proof of safe rollback on partial failure"
+    detection: "Check for cross_vm_rollback tests"
+    
+  - name: "Runtime migration proof missing"
+    area: "runtime"
+    description: "No proof that runtime upgrades migrate state safely"
+    detection: "Check for migration tests"
+    
+  - name: "Governance bypass proof missing"
+    area: "governance"
+    description: "No proof that governance cannot be bypassed"
+    detection: "Check for governance bypass rejection tests"
+    
+  - name: "X3VM determinism missing"
+    area: "x3vm"
+    description: "No proof that X3VM execution is deterministic"
+    detection: "Check for determinism tests"
+    
+  - name: "Flashloan repay-or-revert missing"
+    area: "flashloan"
+    description: "No proof that flashloans cannot be stolen"
+    detection: "Check for repay_or_revert tests"
+    
+  - name: "EVM/SVM parity missing"
+    area: "contracts"
+    description: "No proof that EVM and SVM implement equivalent behavior"
+    detection: "Check for cross-VM behavior parity tests"
+
+# Required evidence by area
+required_evidence:
+  asset_kernel:
+    - supply_conservation_test
+    - cross_vm_mint_burn_test
+    - canonical_registry_test
+    - supply_monitor_receipt
+    
+  bridge:
+    - replay_protection_test
+    - finality_verification_test
+    - message_validation_test
+    - fake_proof_rejection_test
+    - wrong_chain_rejection_test
+    
+  atomic:
+    - one_terminal_state_test
+    - rollback_safety_test
+    - cross_vm_atomicity_test
+    - partial_failure_handling_test
+    
+  flashloan:
+    - repay_or_revert_test
+    - fee_validation_test
+    - reentrancy_protection_test
+    - profit_path_test
+    - failure_path_test
+    
+  x3vm:
+    - determinism_test
+    - state_root_consistency_test
+    - gas_accounting_test
+    - storage_correctness_test
+    
+  x3lang:
+    - compiler_determinism_test
+    - bytecode_stability_test
+    - abi_stability_test
+    
+  governance:
+    - proof_gate_enforcement_test
+    - timelock_test
+    - multisig_requirement_test
+    - upgrade_safety_test
+    
+  contracts:
+    - evm_svm_parity_test
+    - cross_vm_invariant_test
+    - message_format_test
+
+# Gap detection sources
+detection_sources:
+  - name: "Code structure"
+    description: "Compare declared vs implemented functions"
+    
+  - name: "Test coverage"
+    description: "Compare code vs test files"
+    
+  - name: "Runtime wiring"
+    description: "Check if pallets are in runtime/lib.rs"
+    
+  - name: "Claims registry"
+    description: "Check if claims have evidence"
+    
+  - name: "Receipt freshness"
+    description: "Check if receipts match current code hash"
+
+# Auto-detection rules
+detection_rules:
+  - type: G1
+    rule: "Function declared but body is unimplemented!()"
+    
+  - type: G2
+    rule: "Pallet has Config but not in construct_runtime!"
+    
+  - type: G3
+    rule: "Module has no corresponding test file"
+    
+  - type: G4
+    rule: "Function has no failure test case"
+    
+  - type: G5
+    rule: "Invariant mentioned in docs but no test"
+    
+  - type: G9
+    rule: "Security-critical function has no security test"
+    
+  - type: G10
+    rule: "S0 claim has no receipt"

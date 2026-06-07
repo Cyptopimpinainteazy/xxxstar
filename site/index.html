@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X3 Chain — No Frontend Left Behind</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07070d;
+      --bg-card: #0d0d1a;
+      --border: #1a1a2e;
+      --accent: #ff6b35;
+      --accent2: #00e5c3;
+      --text: #e0e0e0;
+      --muted: #666;
+      --infra: #00bfff;
+      --trading: #00e5c3;
+      --validators: #a78bfa;
+      --analytics: #fbbf24;
+      --site: #ff6b35;
+      --tools: #34d399;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(7, 7, 13, 0.92);
+      backdrop-filter: blur(12px);
+      z-index: 50;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 5rem 2rem 3rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero p {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+      border-radius: 100px;
+      padding: 0.2rem 0.8rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── SEARCH ── */
+    .search-bar {
+      max-width: 420px;
+      margin: 0 auto 3rem;
+      position: relative;
+    }
+
+    .search-bar input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem 0.75rem 2.5rem;
+      font-size: 0.875rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .search-bar input::placeholder { color: var(--muted); }
+    .search-bar input:focus { border-color: rgba(255,107,53,0.5); }
+
+    .search-bar::before {
+      content: "🔍";
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.875rem;
+    }
+
+    /* ── CATEGORY FILTER ── */
+    .category-filter {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2.5rem;
+    }
+
+    .cat-btn {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .cat-btn:hover, .cat-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── GRID SECTIONS ── */
+    main { max-width: 1200px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    .section { margin-bottom: 3rem; }
+
+    .section-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .app-card {
+      display: block;
+      text-decoration: none;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .app-card:hover {
+      border-color: rgba(255,107,53,0.4);
+      background: #0f0f20;
+    }
+
+    .app-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+
+    .app-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+      line-height: 1.3;
+    }
+
+    .app-card:hover .app-title { color: var(--accent); }
+
+    .app-desc {
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 0.75rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .app-tag {
+      font-size: 0.6rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 100px;
+      border: 1px solid;
+      display: inline-block;
+    }
+
+    .tag-infra       { color: var(--infra);      border-color: var(--infra);      background: rgba(0,191,255,.08); }
+    .tag-trading     { color: var(--trading);    border-color: var(--trading);    background: rgba(0,229,195,.08); }
+    .tag-validators  { color: var(--validators); border-color: var(--validators); background: rgba(167,139,250,.08); }
+    .tag-analytics   { color: var(--analytics);  border-color: var(--analytics);  background: rgba(251,191,36,.08); }
+    .tag-site        { color: var(--site);        border-color: var(--site);        background: rgba(255,107,53,.08); }
+    .tag-tools       { color: var(--tools);       border-color: var(--tools);       background: rgba(52,211,153,.08); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* ── HIDDEN ── */
+    .app-card[data-hidden="true"] { display: none; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">⬡ X3 <span>Chain</span></a>
+  <ul class="nav-links">
+    <li><a href="intelligence/">Intelligence</a></li>
+    <li><a href="wallet/">Wallet</a></li>
+    <li><a href="dex/">DEX</a></li>
+    <li><a href="validators/">Validators</a></li>
+    <li><a href="dashboard/">Dashboard</a></li>
+    <li><a href="inferstructor/">Inferstructor</a></li>
+    <li><a href="tps/">TPS</a></li>
+  </ul>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">No Frontend Left Behind</div>
+  <h1>All <em>13</em> frontends.<br/>One hub.</h1>
+  <p>Every UI surface of X3 Chain — from the Validator Globe to the DEX — unified in one place.</p>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="search" placeholder="Search apps…" oninput="filterApps()" />
+</div>
+
+<div class="category-filter">
+  <button class="cat-btn active" onclick="setCat('All', this)">All</button>
+  <button class="cat-btn" onclick="setCat('Infrastructure', this)">Infrastructure</button>
+  <button class="cat-btn" onclick="setCat('Trading & DeFi', this)">Trading &amp; DeFi</button>
+  <button class="cat-btn" onclick="setCat('Validators', this)">Validators</button>
+  <button class="cat-btn" onclick="setCat('Analytics', this)">Analytics</button>
+  <button class="cat-btn" onclick="setCat('Site Pages', this)">Site Pages</button>
+  <button class="cat-btn" onclick="setCat('Tools', this)">Tools</button>
+</div>
+
+<main>
+
+  <section class="section" data-category="Infrastructure">
+    <div class="section-title">Infrastructure</div>
+    <div class="app-grid">
+      <a class="app-card" href="inferstructor/" data-category="Infrastructure" data-title="Inferstructor Dashboard" data-desc="GPU validator admin with TPS leaderboard and orchestra controls">
+        <div class="app-icon">⚡</div>
+        <div class="app-title">Inferstructor Dashboard</div>
+        <div class="app-desc">GPU validator admin with TPS leaderboard and orchestra controls</div>
+        <span class="app-tag tag-infra">Infrastructure</span>
+      </a>
+      <a class="app-card" href="infra-dashboard/" data-category="Infrastructure" data-title="Infra Dashboard" data-desc="Infrastructure monitoring and blockchain explorer">
+        <div class="app-icon">🔧</div>
+        <div class="app-title">Infra Dashboard</div>
+        <div class="app-desc">Infrastructure monitoring and blockchain explorer</div>
+        <span class="app-tag tag-infra">Infrastructure</span>
+      </a>
+      <a class="app-card" href="tps/" data-category="Infrastructure" data-title="TPS Monitor" data-desc="Blockchain transactions-per-second monitoring and leaderboard">
+        <div class="app-icon">📈</div>
+        <div class="app-title">TPS Monitor</div>
+        <div class="app-desc">Blockchain transactions-per-second monitoring and leaderboard</div>
+        <span class="app-tag tag-infra">Infrastructure</span>
+      </a>
+      <a class="app-card" href="swarm-autonomic/" data-category="Infrastructure" data-title="Swarm Autonomic" data-desc="Swarm infrastructure autonomic control plane">
+        <div class="app-icon">🤖</div>
+        <div class="app-title">Swarm Autonomic</div>
+        <div class="app-desc">Swarm infrastructure autonomic control plane</div>
+        <span class="app-tag tag-infra">Infrastructure</span>
+      </a>
+      <a class="app-card" href="jury/" data-category="Infrastructure" data-title="Jury Anchoring UI" data-desc="Blockchain jury anchoring visualization component">
+        <div class="app-icon">⚖️</div>
+        <div class="app-title">Jury Anchoring UI</div>
+        <div class="app-desc">Blockchain jury anchoring visualization component</div>
+        <span class="app-tag tag-infra">Infrastructure</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section" data-category="Trading &amp; DeFi">
+    <div class="section-title">Trading &amp; DeFi</div>
+    <div class="app-grid">
+      <a class="app-card" href="intelligence/" data-category="Trading & DeFi" data-title="X3 Intelligence" data-desc="Arbitrage control surface with floor analytics and intent matching">
+        <div class="app-icon">🧠</div>
+        <div class="app-title">X3 Intelligence</div>
+        <div class="app-desc">Arbitrage control surface with floor analytics and intent matching</div>
+        <span class="app-tag tag-trading">Trading &amp; DeFi</span>
+      </a>
+      <a class="app-card" href="wallet/" data-category="Trading & DeFi" data-title="X3 Wallet" data-desc="Multi-chain cryptocurrency wallet with Polkadex launchpad">
+        <div class="app-icon">💼</div>
+        <div class="app-title">X3 Wallet</div>
+        <div class="app-desc">Multi-chain cryptocurrency wallet with Polkadex launchpad</div>
+        <span class="app-tag tag-trading">Trading &amp; DeFi</span>
+      </a>
+      <a class="app-card" href="dex/" data-category="Trading & DeFi" data-title="X3 DEX" data-desc="Decentralized exchange interface">
+        <div class="app-icon">🔄</div>
+        <div class="app-title">X3 DEX</div>
+        <div class="app-desc">Decentralized exchange interface</div>
+        <span class="app-tag tag-trading">Trading &amp; DeFi</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section" data-category="Validators">
+    <div class="section-title">Validators</div>
+    <div class="app-grid">
+      <a class="app-card" href="validators/" data-category="Validators" data-title="Validator Globe" data-desc="3D globe visualization of validator nodes with live RPC polling">
+        <div class="app-icon">🌐</div>
+        <div class="app-title">Validator Globe</div>
+        <div class="app-desc">3D globe visualization of validator nodes with live RPC polling</div>
+        <span class="app-tag tag-validators">Validators</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section" data-category="Analytics">
+    <div class="section-title">Analytics</div>
+    <div class="app-grid">
+      <a class="app-card" href="dashboard/" data-category="Analytics" data-title="Modular Dashboard" data-desc="Extensible 50+ panel modular dashboard system">
+        <div class="app-icon">📊</div>
+        <div class="app-title">Modular Dashboard</div>
+        <div class="app-desc">Extensible 50+ panel modular dashboard system</div>
+        <span class="app-tag tag-analytics">Analytics</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section" data-category="Site Pages">
+    <div class="section-title">Site Pages</div>
+    <div class="app-grid">
+      <a class="app-card" href="./" data-category="Site Pages" data-title="X3 Landing & Pages" data-desc="Marketing landing page and 40+ specialized blockchain dashboard pages">
+        <div class="app-icon">🚀</div>
+        <div class="app-title">X3 Landing &amp; Pages</div>
+        <div class="app-desc">Marketing landing page and 40+ specialized blockchain dashboard pages</div>
+        <span class="app-tag tag-site">Site Pages</span>
+      </a>
+      <a class="app-card" href="mainnet-progress/" data-category="Site Pages" data-title="Mainnet Progress" data-desc="Network mainnet launch progress tracker">
+        <div class="app-icon">🏁</div>
+        <div class="app-title">Mainnet Progress</div>
+        <div class="app-desc">Network mainnet launch progress tracker</div>
+        <span class="app-tag tag-site">Site Pages</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section" data-category="Tools">
+    <div class="section-title">Tools</div>
+    <div class="app-grid">
+      <a class="app-card" href="extension/" data-category="Tools" data-title="X3 Browser Extension" data-desc="Chrome/browser extension for X3 Chain">
+        <div class="app-icon">🧩</div>
+        <div class="app-title">X3 Browser Extension</div>
+        <div class="app-desc">Chrome/browser extension for X3 Chain</div>
+        <span class="app-tag tag-tools">Tools</span>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>X3 Chain &mdash; <a href="https://x3-chain.io">x3-chain.io</a> &mdash; No Frontend Left Behind</p>
+</footer>
+
+<script>
+  let activeCategory = 'All';
+
+  function setCat(cat, btn) {
+    activeCategory = cat;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filterApps();
+  }
+
+  function filterApps() {
+    const q = document.getElementById('search').value.toLowerCase();
+    document.querySelectorAll('.app-card').forEach(card => {
+      const cardCat = card.dataset.category;
+      const title = (card.dataset.title || '').toLowerCase();
+      const desc = (card.dataset.desc || '').toLowerCase();
+      const matchesCat = activeCategory === 'All' || cardCat === activeCategory;
+      const matchesQ = !q || title.includes(q) || desc.includes(q) || cardCat.toLowerCase().includes(q);
+      card.dataset.hidden = String(!(matchesCat && matchesQ));
+    });
+    // Hide empty sections
+    document.querySelectorAll('.section').forEach(section => {
+      const visible = [...section.querySelectorAll('.app-card')].some(c => c.dataset.hidden !== 'true');
+      section.style.display = visible ? '' : 'none';
+    });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+[package]
+name = "x3-canonical-truth"
+version = "0.1.0"
+edition = "2021"
+description = "Canonical truth types: identity, asset, and treasury models shared across X3 runtime, services, and client SDKs."
+license = "Apache-2.0"
+
+[dependencies]
+# max-encoded-len feature required so #[derive(MaxEncodedLen)] is available.
+codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-std = { workspace = true, default-features = false }
+# alloc feature: serde support in no_std+alloc environments (Substrate WASM runtimes).
+serde = { workspace = true, default-features = false, features = ["alloc", "derive"] }
+
+[dev-dependencies]
+codec = { workspace = true, features = ["std"] }
+serde_json = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "sp-std/std",
+    "serde/std",
+]

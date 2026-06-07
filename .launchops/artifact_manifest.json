@@ -1,0 +1,103 @@
+{
+  "schema_version": "launchops-artifacts/v1",
+  "generated_at": "2026-05-30T11:04:54.189994904+00:00",
+  "artifacts": [
+    {
+      "file": "artifact_schemas.json",
+      "kind": "artifact_schemas",
+      "format": "json",
+      "schema_version": "launchops-artifact-fields/v1"
+    },
+    {
+      "file": "blockers.json",
+      "kind": "blockers",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#blockers"
+    },
+    {
+      "file": "feature_matrix.json",
+      "kind": "feature_matrix",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#feature_matrix"
+    },
+    {
+      "file": "frontend_route_allowlist.json",
+      "kind": "frontend_route_allowlist",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#frontend_route_allowlist"
+    },
+    {
+      "file": "frontend_route_allowlist.md",
+      "kind": "frontend_route_allowlist_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#frontend_route_allowlist_report"
+    },
+    {
+      "file": "readiness.json",
+      "kind": "readiness",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#readiness"
+    },
+    {
+      "file": "report.md",
+      "kind": "scan_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#scan_report"
+    },
+    {
+      "file": "rpc_consumer_contracts.json",
+      "kind": "rpc_consumer_contracts",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_consumer_contracts"
+    },
+    {
+      "file": "rpc_consumer_contracts.md",
+      "kind": "rpc_consumer_contracts_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_consumer_contracts_report"
+    },
+    {
+      "file": "rpc_contract_matrix.json",
+      "kind": "rpc_contract_matrix",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_contract_matrix"
+    },
+    {
+      "file": "rpc_contract_matrix.md",
+      "kind": "rpc_contract_matrix_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_contract_matrix_report"
+    },
+    {
+      "file": "runtime_rpc_inventory.json",
+      "kind": "runtime_rpc_inventory",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#runtime_rpc_inventory"
+    },
+    {
+      "file": "sidecar_adapter_backlog.json",
+      "kind": "sidecar_adapter_backlog",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#sidecar_adapter_backlog"
+    },
+    {
+      "file": "sidecar_adapter_backlog.md",
+      "kind": "sidecar_adapter_backlog_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#sidecar_adapter_backlog_report"
+    }
+  ]
+}

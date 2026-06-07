@@ -1,0 +1,19 @@
+[package]
+name = "x3-crosschain-intent"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "X3 Cross-Chain Intent System — user-facing intent language, compiler, state machine, and safety checks"
+
+[features]
+default = ["std"]
+std = ["serde/std", "hex/alloc", "sha2/std"]
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+thiserror = { version = "2.0", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+hex = { version = "0.4", default-features = false }
+
+[dev-dependencies]
+serde_json = "1.0"

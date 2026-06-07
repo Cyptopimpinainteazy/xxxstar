@@ -1,0 +1,56 @@
+# Orchestrator Configuration
+
+lanes:
+  - id: primary
+    name: "Primary GPU Lane A"
+    role: primary
+    priority: 1
+    endpoint: http://10.0.1.10:9000
+    metrics_endpoint: http://10.0.1.10:9091
+    region: us-east-1a
+    
+  - id: shadow
+    name: "Shadow GPU Lane B"
+    role: shadow
+    priority: 2
+    endpoint: http://10.0.2.10:9000
+    metrics_endpoint: http://10.0.2.10:9092
+    region: us-east-1b
+    
+  - id: tertiary
+    name: "Tertiary Lane C"
+    role: tertiary
+    priority: 3
+    endpoint: http://10.1.1.10:9000
+    metrics_endpoint: http://10.1.1.10:9093
+    region: us-west-2a
+
+health_check:
+  interval_seconds: 5
+  timeout_seconds: 2
+  heartbeat_timeout_seconds: 10
+  
+failover:
+  health_threshold: 0.3
+  promotion_timeout_ms: 3000
+  demotion_cooldown_seconds: 60
+  
+signer:
+  lock_mechanism: etcd  # or "redis", "consul"
+  lock_ttl_seconds: 30
+  heartbeat_interval_seconds: 5
+  endpoint: http://etcd:2379
+
+toll_booth:
+  endpoint: http://toll-booth:7000
+  notify_on_failover: true
+  notify_on_degraded: true
+
+metrics:
+  port: 8000
+  path: /metrics
+  
+logging:
+  level: INFO
+  format: json
+  output: /var/log/ccgv/orchestrator.log

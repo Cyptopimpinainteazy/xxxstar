@@ -1,0 +1,1 @@
+c929307bb41b92cbb71f828d58c0776bf1ee2d647d9b035ee71cb4b52288cd99  chain-specs/x3-rc1-testnet.json

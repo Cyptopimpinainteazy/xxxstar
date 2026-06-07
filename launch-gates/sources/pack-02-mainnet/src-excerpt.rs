@@ -1,0 +1,359 @@
+#![deny(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+pub use pallet::*;
+
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
+#[frame_support::pallet]
+pub mod pallet {
+    use frame_support::{pallet_prelude::*, storage::bounded_vec::BoundedVec};
+    use frame_system::pallet_prelude::*;
+    use sp_runtime::traits::Hash;
+    use sp_std::vec::Vec;
+    use x3_wallet::{
+        HardwareWallet, MultisigWallet, GuardianAccount, TokenBalance,
+        TransactionApproval, AddressBook, BiometricProfile, UnlockSession,
+    };
+
+    /// Max wallets per account
+    pub const MAX_WALLETS_PER_ACCOUNT: u32 = 10;
+    /// Max multisig signers
+    pub const MAX_MULTISIG_SIGNERS: u32 = 50;
+    /// Max contacts in address book
+    pub const MAX_CONTACTS: u32 = 1000;
+
+    #[pallet::config]
+    pub trait Config: frame_system::Config {
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+    }
+
+    #[pallet::pallet]
+    pub struct Pallet<T>(_);
+
+    /// Store hardware wallets per account
+    #[pallet::storage]
+    pub type HardwareWallets<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        (T::AccountId, [u8; 32]),
+        HardwareWallet,
+        OptionQuery,
+    >;
+
+    /// Store multisig wallets per account
+    #[pallet::storage]
+    pub type MultisigWallets<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        (T::AccountId, [u8; 32]),
+        MultisigWallet,
+        OptionQuery,
+    >;
+
+    /// Store social recovery accounts per user
+    #[pallet::storage]
+    pub type RecoveryAccounts<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        GuardianAccount,
+        OptionQuery,
+    >;
+
+    /// Store token balances
+    #[pallet::storage]
+    pub type TokenBalances<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        (T::AccountId, [u8; 32]),
+        u128, // balance
+        ValueQuery,
+    >;
+
+    /// Store transaction approvals
+    #[pallet::storage]
+    pub type TransactionApprovals<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        [u8; 32],
+        TransactionApproval,
+        OptionQuery,
+    >;
+
+    /// Store address books per account
+    #[pallet::storage]
+    pub type AddressBooks<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        AddressBook,
+        OptionQuery,
+    >;
+
+    /// Store biometric profiles
+    #[pallet::storage]
+    pub type BiometricProfiles<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        BiometricProfile,
+        OptionQuery,
+    >;
+
+    /// Store unlock sessions
+    #[pallet::storage]
+    pub type UnlockSessions<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        [u8; 32],
+        UnlockSession,
+        OptionQuery,
+    >;
+
+    #[pallet::event]
+    #[pallet::generate_deposit(pub(super) fn deposit_event)]
+    pub enum Event<T: Config> {
+        /// Hardware wallet connected
+        HardwareWalletConnected { account: T::AccountId, device_type: u8 },
+        /// Multisig wallet created
+        MultisigWalletCreated { account: T::AccountId, threshold: u32 },
+        /// Social recovery initiated
+        RecoveryInitiated { account: T::AccountId, new_owner: [u8; 32] },
+        /// Transaction approval requested
+        ApprovalRequested { account: T::AccountId, amount: u128 },
+        /// Token balance updated
+        BalanceUpdated { account: T::AccountId, token_id: [u8; 32], amount: u128 },
+        /// Biometric profile created
+        BiometricProfileCreated { account: T::AccountId },
+        /// Unlock session created
+        UnlockSessionCreated { account: T::AccountId },
+    }
+
+    #[pallet::error]
+    pub enum Error<T> {
+        /// Wallet not found
+        WalletNotFound,
+        /// Unauthorized
+        Unauthorized,
+        /// Invalid amount
+        InvalidAmount,
+        /// Balance too low
+        InsufficientBalance,
+        /// Multisig threshold error
+        InvalidThreshold,
+        /// Too many wallets
+        TooManyWallets,
+        /// Recovery not approved
+        RecoveryNotApproved,
+    }
+
+    #[pallet::call]
+    impl<T: Config> Pallet<T> {
+        /// Register a new hardware wallet
+        #[pallet::call_index(0)]
+        #[pallet::weight(10_000)]
+        pub fn register_hardware_wallet(
+            origin: OriginFor<T>,
+            device_type: u8,
+            device_model: Vec<u8>,
+            public_key: [u8; 32],
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let wallet_id = T::Hashing::hash_of(&public_key).encode();
+            let mut wallet_id_array = [0u8; 32];
+            wallet_id_array.copy_from_slice(&wallet_id[..32.min(wallet_id.len())]);
+
+            let hardware_wallet = HardwareWallet {
+                id: wallet_id_array,
+                device_type,
+                device_model: device_model.clone(),
+                derivation_path: vec![],
+                public_key,
+                address: [0u8; 32],
+                is_connected: true,
+                last_connected_block: frame_system::Pallet::<T>::block_number().saturated_into(),
+                transaction_count: 0,
+                firmware_version: 1,
+            };
+
+            HardwareWallets::<T>::insert((who.clone(), wallet_id_array), hardware_wallet);
+            Self::deposit_event(Event::HardwareWalletConnected {
+                account: who,
+                device_type,
+            });
+
+            Ok(())
+        }
+
+        /// Create a multisig wallet
+        #[pallet::call_index(1)]
+        #[pallet::weight(15_000)]
+        pub fn create_multisig_wallet(
+            origin: OriginFor<T>,
+            signers: BoundedVec<[u8; 32], { MAX_MULTISIG_SIGNERS as usize }>,
+            threshold: u32,
+            timelock_delay: u64,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            ensure!(threshold > 0 && threshold as usize <= signers.len(), Error::<T>::InvalidThreshold);
+
+            let mut wallet_id = [0u8; 32];
+            wallet_id[0..16].copy_from_slice(&who.encode()[0..16.min(who.encode().len())]);
+
+            let multisig = MultisigWallet {
+                id: wallet_id,
+                signers: signers.to_vec(),
+                threshold,
+                owner: [0u8; 32],
+                created_block: frame_system::Pallet::<T>::block_number().saturated_into(),
+                timelock_delay,
+                is_active: true,
+            };
+
+            MultisigWallets::<T>::insert((who.clone(), wallet_id), multisig);
+            Self::deposit_event(Event::MultisigWalletCreated {
+                account: who,
+                threshold,
+            });
+
+            Ok(())
+        }
+
+        /// Transfer tokens (with approval checks)
+        #[pallet::call_index(2)]
+        #[pallet::weight(10_000)]
+        pub fn transfer_tokens(
+            origin: OriginFor<T>,
+            token_id: [u8; 32],
+            to: T::AccountId,
+            amount: u128,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            ensure!(amount > 0, Error::<T>::InvalidAmount);
+
+            let current_balance = TokenBalances::<T>::get((who.clone(), token_id));
+            ensure!(current_balance >= amount, Error::<T>::InsufficientBalance);
+
+            let new_balance = current_balance - amount;
+            TokenBalances::<T>::insert((who.clone(), token_id), new_balance);
+
+            let to_balance = TokenBalances::<T>::get((to.clone(), token_id));
+            TokenBalances::<T>::insert((to.clone(), token_id), to_balance + amount);
+
+            Self::deposit_event(Event::BalanceUpdated {
+                account: who,
+                token_id,
+                amount: new_balance,
+            });
+
+            Ok(())
+        }
+
+        /// Register biometric profile
+        #[pallet::call_index(3)]
+        #[pallet::weight(8_000)]
+        pub fn register_biometric(
+            origin: OriginFor<T>,
+            biometric_type: u8,
+            template_hash: [u8; 32],
+            pin_hash: [u8; 32],
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            let profile = BiometricProfile {
+                id: T::Hashing::hash_of(&template_hash).encode()[..32].try_into().unwrap_or([0u8; 32]),
+                owner: [0u8; 32],
+                biometric_type,
+                template_hash,
+                pin_hash,
+                is_enabled: true,
+                attempts_remaining: 5,
+                locked_until_block: 0,
+                created_block: frame_system::Pallet::<T>::block_number().saturated_into(),
+            };
+
+            BiometricProfiles::<T>::insert(who.clone(), profile);
+            Self::deposit_event(Event::BiometricProfileCreated { account: who });
+
+            Ok(())
+        }
+
+        /// Initiate recovery with guardians
+        #[pallet::call_index(4)]
+        #[pallet::weight(12_000)]
+        pub fn initiate_recovery(
+            origin: OriginFor<T>,
+            new_owner: [u8; 32],
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            let recovery = RecoveryAccounts::<T>::get(who.clone());
+            ensure!(recovery.is_some(), Error::<T>::WalletNotFound);
+
+            Self::deposit_event(Event::RecoveryInitiated {
+                account: who,
+                new_owner,
+            });
+
+            Ok(())
+        }
+
+        /// Mint tokens (admin only, simplified)
+        #[pallet::call_index(5)]
+        #[pallet::weight(5_000)]
+        pub fn mint_tokens(
+            origin: OriginFor<T>,
+            token_id: [u8; 32],
+            to: T::AccountId,
+            amount: u128,
+        ) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+
+            let current = TokenBalances::<T>::get((to.clone(), token_id));
+            TokenBalances::<T>::insert((to.clone(), token_id), current + amount);
+
+            Self::deposit_event(Event::BalanceUpdated {
+                account: to,
+                token_id,
+                amount: current + amount,
+            });
+
+            Ok(())
+        }
+    }
+
+    // RPC query methods
+    impl<T: Config> Pallet<T> {
+        /// Get hardware wallet by ID
+        pub fn get_hardware_wallet(account: &T::AccountId, wallet_id: &[u8; 32]) -> Option<HardwareWallet> {
+            HardwareWallets::<T>::get((account.clone(), *wallet_id))
+        }
+
+        /// Get multisig wallet
+        pub fn get_multisig_wallet(account: &T::AccountId, wallet_id: &[u8; 32]) -> Option<MultisigWallet> {
+            MultisigWallets::<T>::get((account.clone(), *wallet_id))
+        }
+
+        /// Get token balance
+        pub fn get_token_balance(account: &T::AccountId, token_id: &[u8; 32]) -> u128 {
+            TokenBalances::<T>::get((account.clone(), *token_id))
+        }
+
+        /// Get biometric profile
+        pub fn get_biometric_profile(account: &T::AccountId) -> Option<BiometricProfile> {
+            BiometricProfiles::<T>::get(account)
+        }
+
+        /// Get recovery account
+        pub fn get_recovery_account(account: &T::AccountId) -> Option<GuardianAccount> {
+            RecoveryAccounts::<T>::get(account)
+        }
+    }
+}

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3-VM | Validator Program</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--ink:#0A0806;--paper:#F5F0E8;--red:#E63000;--yellow:#FFB800;--green:#00A651;--blue:#0037FF;--gray:#888078;}
+html{scroll-behavior:smooth;}
+body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;overflow-x:hidden;}
+
+/* NOISE TEXTURE */
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.4;}
+
+/* TOP ALERT BAR */
+.alert-bar{background:var(--red);color:#fff;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:4px;text-transform:uppercase;display:flex;justify-content:center;align-items:center;gap:20px;}
+.alert-dot{width:8px;height:8px;background:#fff;border-radius:50%;animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* NAV */
+nav{background:var(--ink);color:var(--paper);display:flex;justify-content:space-between;align-items:center;padding:20px 60px;position:sticky;top:0;z-index:100;}
+.nav-logo{font-family:'Black Han Sans',sans-serif;font-size:28px;letter-spacing:6px;color:var(--yellow);}
+.nav-logo sub{font-size:12px;color:rgba(255,255,255,.4);letter-spacing:2px;}
+.nav-links{display:flex;gap:32px;align-items:center;}
+.nav-links a{color:rgba(255,255,255,.5);text-decoration:none;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;transition:.2s;}
+.nav-links a:hover{color:var(--yellow);}
+.nav-apply{background:var(--red);color:#fff;padding:10px 24px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border:none;cursor:pointer;transition:.2s;}
+.nav-apply:hover{background:var(--yellow);color:var(--ink);}
+
+/* HERO */
+.hero{background:var(--ink);min-height:92vh;display:grid;grid-template-columns:1fr 1fr;position:relative;overflow:hidden;}
+.hero-left{padding:100px 60px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;}
+.hero-stamp{display:inline-flex;align-items:center;gap:12px;border:2px solid var(--red);padding:8px 16px;margin-bottom:32px;width:fit-content;}
+.hero-stamp span{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--red);text-transform:uppercase;}
+.hero h1{font-family:'Black Han Sans',sans-serif;font-size:clamp(52px,7vw,96px);line-height:.95;text-transform:uppercase;color:var(--paper);margin-bottom:32px;}
+.hero h1 em{font-style:normal;color:var(--yellow);display:block;}
+.hero h1 span{display:block;font-size:.45em;color:rgba(255,255,255,.3);letter-spacing:6px;font-family:'Space Mono',monospace;font-weight:400;margin-top:8px;}
+.hero-body{color:rgba(255,255,255,.55);font-size:16px;line-height:1.8;max-width:480px;margin-bottom:48px;}
+.hero-body strong{color:var(--yellow);}
+.hero-cta-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.cta-main{background:var(--yellow);color:var(--ink);padding:16px 40px;font-family:'Black Han Sans',sans-serif;font-size:18px;letter-spacing:3px;border:none;cursor:pointer;transition:.2s;text-decoration:none;display:inline-block;}
+.cta-main:hover{background:var(--red);color:#fff;transform:translate(-2px,-2px);box-shadow:4px 4px 0 rgba(255,255,255,.2);}
+.cta-secondary{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,.4);text-decoration:none;text-transform:uppercase;transition:.2s;}
+.cta-secondary:hover{color:var(--yellow);}
+
+.hero-right{position:relative;overflow:hidden;}
+.hero-bg-text{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;overflow:hidden;padding:20px;}
+.big-text{font-family:'Black Han Sans',sans-serif;font-size:clamp(80px,12vw,180px);color:rgba(255,255,255,.03);line-height:.8;white-space:nowrap;animation:slide 30s linear infinite;}
+@keyframes slide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.hero-metrics{position:absolute;inset:40px;display:grid;grid-template-rows:repeat(3,1fr);gap:2px;z-index:2;}
+.metric-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:32px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;transition:.3s;}
+.metric-box:hover{background:rgba(255,184,0,.05);border-color:rgba(255,184,0,.2);}
+.metric-val{font-family:'Black Han Sans',sans-serif;font-size:48px;color:#fff;line-height:1;}
+.metric-val em{font-style:normal;color:var(--yellow);}
+.metric-label{font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:3px;text-transform:uppercase;margin-top:4px;}
+.metric-num{position:absolute;top:16px;right:20px;font-family:'Black Han Sans',sans-serif;font-size:80px;color:rgba(255,255,255,.03);}
+
+/* DIVIDER */
+.divider{height:4px;background:linear-gradient(90deg,var(--red),var(--yellow),var(--green),var(--blue));}
+
+/* EARN SECTION */
+.earn{padding:120px 60px;background:var(--paper);}
+.section-header{display:flex;align-items:baseline;gap:24px;margin-bottom:80px;}
+.section-tag{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--gray);text-transform:uppercase;border:1px solid var(--gray);padding:4px 12px;}
+.section-h{font-family:'Black Han Sans',sans-serif;font-size:clamp(36px,5vw,72px);text-transform:uppercase;line-height:1;}
+.section-h em{font-style:normal;color:var(--red);}
+
+.earn-list{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:2px solid var(--ink);}
+.earn-item{padding:48px 40px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative;transition:.2s;overflow:hidden;}
+.earn-item:nth-child(3n){border-right:none;}
+.earn-item:nth-child(n+4){border-bottom:none;}
+.earn-item::before{content:'';position:absolute;inset:0;background:var(--ink);transform:translateY(100%);transition:.3s ease;}
+.earn-item:hover::before{transform:translateY(0);}
+.earn-item:hover .earn-title,.earn-item:hover .earn-body,.earn-item:hover .earn-num{color:var(--paper);}
+.earn-item:hover .earn-badge{background:var(--yellow);color:var(--ink);}
+.earn-num{font-family:'Black Han Sans',sans-serif;font-size:72px;color:rgba(0,0,0,.07);position:absolute;top:8px;right:16px;transition:.3s;line-height:1;}
+.earn-badge{display:inline-block;background:var(--ink);color:var(--paper);padding:4px 12px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;margin-bottom:20px;position:relative;z-index:1;transition:.3s;}
+.earn-title{font-family:'Black Han Sans',sans-serif;font-size:24px;text-transform:uppercase;margin-bottom:12px;position:relative;z-index:1;transition:.3s;}
+.earn-body{font-size:14px;color:rgba(0,0,0,.55);line-height:1.7;position:relative;z-index:1;transition:.3s;}
+
+/* TECHNICAL SPECS */
+.specs{background:var(--ink);color:var(--paper);padding:120px 60px;}
+.specs-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;margin-top:80px;}
+.spec-group{border-top:1px solid rgba(255,255,255,.1);padding-top:40px;}
+.spec-group-title{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--yellow);text-transform:uppercase;margin-bottom:32px;}
+.spec-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+.spec-key{font-size:14px;color:rgba(255,255,255,.4);}
+.spec-val{font-family:'Space Mono',monospace;font-size:13px;color:#fff;text-align:right;}
+.spec-val.good{color:var(--green);}
+.spec-val.warn{color:var(--yellow);}
+.spec-val.crit{color:var(--red);}
+
+/* ATTACK VECTORS */
+.attacks{padding:120px 60px;background:#F5F0E8;}
+.attack-grid{display:grid;grid-template-columns:1fr;gap:2px;margin-top:60px;}
+.attack-row{display:grid;grid-template-columns:200px 1fr 200px;gap:0;background:var(--ink);border-bottom:1px solid rgba(255,255,255,.05);}
+.attack-threat{padding:24px 32px;background:var(--red);display:flex;align-items:center;}
+.attack-threat-text{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;color:#fff;text-transform:uppercase;}
+.attack-desc{padding:24px 32px;font-size:14px;color:rgba(255,255,255,.6);line-height:1.6;}
+.attack-status{padding:24px 32px;display:flex;align-items:center;justify-content:center;}
+.status-pill{padding:6px 16px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;}
+.status-mitigated{background:rgba(0,166,81,.15);color:var(--green);border:1px solid var(--green);}
+.status-partial{background:rgba(255,184,0,.15);color:var(--yellow);border:1px solid var(--yellow);}
+.attack-row:first-child{border-top:none;}
+
+/* TIMELINE ROADMAP */
+.roadmap{background:var(--ink);padding:120px 60px;}
+.roadmap-track{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin-top:80px;position:relative;}
+.roadmap-track::before{content:'';position:absolute;top:30px;left:0;right:0;height:1px;background:rgba(255,255,255,.1);}
+.rm-item{padding-top:70px;padding-right:24px;position:relative;}
+.rm-dot{position:absolute;top:22px;left:0;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.2);background:var(--ink);}
+.rm-item.done .rm-dot{background:var(--green);border-color:var(--green);}
+.rm-item.active .rm-dot{background:var(--yellow);border-color:var(--yellow);box-shadow:0 0 16px var(--yellow);}
+.rm-item.next .rm-dot{background:transparent;border-color:rgba(255,255,255,.3);}
+.rm-phase{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.3);margin-bottom:8px;text-transform:uppercase;}
+.rm-item.done .rm-phase{color:var(--green);}
+.rm-item.active .rm-phase{color:var(--yellow);}
+.rm-title{font-family:'Black Han Sans',sans-serif;font-size:14px;color:var(--paper);margin-bottom:8px;line-height:1.2;}
+.rm-desc{font-size:12px;color:rgba(255,255,255,.35);line-height:1.6;}
+
+/* VALIDATOR APPLY */
+.apply-section{background:var(--red);padding:100px 60px;text-align:center;position:relative;overflow:hidden;}
+.apply-section::before{content:'VALIDATOR';position:absolute;font-family:'Black Han Sans',sans-serif;font-size:300px;color:rgba(0,0,0,.07);top:50%;left:50%;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none;}
+.apply-h{font-family:'Black Han Sans',sans-serif;font-size:clamp(52px,8vw,100px);color:#fff;text-transform:uppercase;line-height:.9;margin-bottom:32px;position:relative;}
+.apply-sub{font-size:18px;color:rgba(255,255,255,.7);max-width:600px;margin:0 auto 48px;line-height:1.7;}
+.apply-btn{background:#fff;color:var(--red);padding:20px 64px;font-family:'Black Han Sans',sans-serif;font-size:22px;letter-spacing:3px;border:none;cursor:pointer;transition:.2s;text-decoration:none;display:inline-block;}
+.apply-btn:hover{background:var(--ink);color:var(--yellow);transform:translate(-3px,-3px);box-shadow:6px 6px 0 rgba(0,0,0,.3);}
+
+footer{background:var(--ink);padding:40px 60px;display:flex;justify-content:space-between;align-items:center;}
+footer .fl{font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,255,255,.2);letter-spacing:2px;}
+footer .fl a{color:rgba(255,255,255,.3);text-decoration:none;margin:0 16px;}
+footer .fl a:hover{color:var(--yellow);}
+
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr;}
+  .hero-right{height:300px;}
+  nav{padding:16px 24px;}
+  .nav-links{display:none;}
+  section,.earn,.specs,.attacks,.roadmap,.apply-section{padding:80px 24px;}
+  .earn-list{grid-template-columns:1fr;}
+  .earn-item{border-right:none!important;}
+  .specs-grid{grid-template-columns:1fr;gap:40px;}
+  .attack-row{grid-template-columns:1fr;}
+  .roadmap-track{grid-template-columns:1fr;gap:32px;}
+  .roadmap-track::before{display:none;}
+  .rm-item{padding-top:0;padding-left:32px;}
+  .rm-dot{top:0;left:0;}
+  footer{flex-direction:column;gap:16px;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<div class="alert-bar">
+  <div class="alert-dot"></div>
+  <span>VALIDATOR APPLICATIONS OPEN — X3-VM MAINNET Q2 2025</span>
+  <div class="alert-dot"></div>
+</div>
+
+<nav>
+  <div class="nav-logo">X3-VM <sub>VALIDATOR PROGRAM</sub></div>
+  <div class="nav-links">
+    <a href="#earn">Earn</a>
+    <a href="#specs">Specs</a>
+    <a href="#security">Security</a>
+    <a href="#roadmap">Roadmap</a>
+    <button class="nav-apply">Apply Now</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-left">
+    <div class="hero-stamp"><div class="alert-dot" style="background:var(--yellow)"></div><span>Validator Recruitment — Active</span></div>
+    <h1>
+      <em>Validate</em>
+      THE FUTURE<br>OF ATOMIC
+      <span>CROSS-CHAIN DEFI</span>
+    </h1>
+    <p class="hero-body">
+      X3-VM validators secure <strong>three chains simultaneously</strong>. Earn fees from ComitV2 weight, HTLC relay bonuses, and flashloan pool participation. Sub-200ms finality. <strong>Zero partial fills. Always.</strong>
+    </p>
+    <div class="hero-cta-row">
+      <a href="#apply" class="cta-main">Apply as Validator</a>
+      <a href="#specs" class="cta-secondary">→ View Technical Specs</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div class="hero-bg-text">
+      <div class="big-text">X3ATOMICX3ATOMICX3ATOMICX3ATOMICX3ATOMICX3ATOMIC</div>
+    </div>
+    <div class="hero-metrics">
+      <div class="metric-box">
+        <div class="metric-num">A</div>
+        <div class="metric-val"><em>~200</em>ms</div>
+        <div class="metric-label">X3 Chain Finality</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-num">B</div>
+        <div class="metric-val">10K<em>+</em></div>
+        <div class="metric-label">Transactions Per Second</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-num">C</div>
+        <div class="metric-val"><em>3</em> VMs</div>
+        <div class="metric-label">Chains Coordinated Atomically</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- EARN -->
+<section class="earn" id="earn">
+  <div class="section-header">
+    <span class="section-tag">Revenue</span>
+    <h2 class="section-h">HOW YOU<br><em>EARN.</em></h2>
+  </div>
+  <div class="earn-list">
+    <div class="earn-item">
+      <div class="earn-num">1</div>
+      <div class="earn-badge">PRIMARY</div>
+      <div class="earn-title">ComitV2 Weight Fees</div>
+      <p class="earn-body">Every cross-chain call through X3-kernel's submitComitV2 incurs a weight fee. Validators processing these extrinsics earn proportional fees from the X3 planned fee market — stable and predictable.</p>
+    </div>
+    <div class="earn-item">
+      <div class="earn-num">2</div>
+      <div class="earn-badge">SECONDARY</div>
+      <div class="earn-title">HTLC Relay Bonuses</div>
+      <p class="earn-body">Validator-run relayer nodes that detect secret reveals and broadcast cross-chain HTLC claims earn relay bonuses. Speed is rewarded: first valid claim relay collects the bonus.</p>
+    </div>
+    <div class="earn-item">
+      <div class="earn-num">3</div>
+      <div class="earn-badge">PASSIVE</div>
+      <div class="earn-title">Flashloan Pool Share</div>
+      <p class="earn-body">Validators may opt into the multi-provider flashloan registry. Balancer V2 (0% fee, high liquidity) and Kamino (Solana, 0%) allocate pool rewards to liquidity contributors.</p>
+    </div>
+    <div class="earn-item">
+      <div class="earn-num">4</div>
+      <div class="earn-badge">MEV ADVANTAGE</div>
+      <div class="earn-title">Priority Ordering Rights</div>
+      <p class="earn-body">X3's Flash Finality and encrypted mempool give validators first-mover advantage on cross-chain arb windows. With 200ms finality vs ETH's 60s, X3 validators close arb before competitors see it.</p>
+    </div>
+    <div class="earn-item">
+      <div class="earn-num">5</div>
+      <div class="earn-badge">STAKING</div>
+      <div class="earn-title">Collateral Vault Yield</div>
+      <p class="earn-body">X3-lang vault contracts allow validators to deposit collateral that backs atomic swaps. In exchange, vaults generate yield from swap execution fees and cross-chain PnL settlement.</p>
+    </div>
+    <div class="earn-item">
+      <div class="earn-num">6</div>
+      <div class="earn-badge">GOVERNANCE</div>
+      <div class="earn-title">Protocol Governance</div>
+      <p class="earn-body">Validator nodes participate in protocol upgrades, fee parameter voting, and flash provider registry decisions. Early validators carry weighted governance as the ecosystem scales.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SPECS -->
+<section class="specs" id="specs">
+  <div class="section-header" style="color:var(--paper);">
+    <span class="section-tag" style="color:var(--yellow);border-color:var(--yellow);">Technical</span>
+    <h2 class="section-h" style="color:var(--paper);">NODE<br><em style="color:var(--yellow);">SPECS.</em></h2>
+  </div>
+  <div class="specs-grid">
+    <div class="spec-group">
+      <div class="spec-group-title">// X3 Chain</div>
+      <div class="spec-row"><span class="spec-key">Runtime</span><span class="spec-val">WASM (x3-lang)</span></div>
+      <div class="spec-row"><span class="spec-key">Finality</span><span class="spec-val good">~200–400ms</span></div>
+      <div class="spec-row"><span class="spec-key">TPS Target</span><span class="spec-val good">10,000+</span></div>
+      <div class="spec-row"><span class="spec-key">TX Type</span><span class="spec-val">submitComitV2</span></div>
+      <div class="spec-row"><span class="spec-key">Fee Model</span><span class="spec-val">Weight-based (EIP-1559 planned)</span></div>
+      <div class="spec-row"><span class="spec-key">Crypto Hostcalls</span><span class="spec-val">SHA-256, Keccak-256, secp256k1, ed25519</span></div>
+      <div class="spec-row"><span class="spec-key">GPU Acceleration</span><span class="spec-val good">Planned (hostcall verification)</span></div>
+    </div>
+    <div class="spec-group">
+      <div class="spec-group-title">// Ethereum Integration</div>
+      <div class="spec-row"><span class="spec-key">HTLC Contract</span><span class="spec-val">AtlasHTLC.sol</span></div>
+      <div class="spec-row"><span class="spec-key">Finality</span><span class="spec-val warn">~60 seconds</span></div>
+      <div class="spec-key">Confirmations Required</span><span class="spec-val warn">12 blocks</span></div>
+      <div class="spec-row"><span class="spec-key">Flash Provider 1</span><span class="spec-val">Balancer V2 (0% fee)</span></div>
+      <div class="spec-row"><span class="spec-key">Flash Provider 2</span><span class="spec-val">Aave V3 (0.05% fee)</span></div>
+      <div class="spec-row"><span class="spec-key">Reentrancy Guard</span><span class="spec-val good">nonReentrant modifier</span></div>
+    </div>
+    <div class="spec-group">
+      <div class="spec-group-title">// Solana Integration</div>
+      <div class="spec-row"><span class="spec-key">Runtime</span><span class="spec-val">BPF (Anchor/Rust)</span></div>
+      <div class="spec-row"><span class="spec-key">Finality</span><span class="spec-val good">~400ms</span></div>
+      <div class="spec-row"><span class="spec-key">Confirmations</span><span class="spec-val">5 blocks</span></div>
+      <div class="spec-row"><span class="spec-key">Flash Provider 1</span><span class="spec-val good">Kamino (0% fee)</span></div>
+      <div class="spec-row"><span class="spec-key">Flash Provider 2</span><span class="spec-val good">MarginFi (0% fee)</span></div>
+      <div class="spec-row"><span class="spec-key">Flash Provider 3</span><span class="spec-val warn">Solend (0.30% fee)</span></div>
+    </div>
+    <div class="spec-group">
+      <div class="spec-group-title">// HTLC Parameters</div>
+      <div class="spec-row"><span class="spec-key">Hash Function</span><span class="spec-val">SHA-256</span></div>
+      <div class="spec-row"><span class="spec-key">Secret Length</span><span class="spec-val">32 bytes</span></div>
+      <div class="spec-row"><span class="spec-key">T_S (Solana)</span><span class="spec-val">now + 1 hour</span></div>
+      <div class="spec-row"><span class="spec-key">T_E (Ethereum)</span><span class="spec-val">now + 2 hours</span></div>
+      <div class="spec-row"><span class="spec-key">Max Loan Size</span><span class="spec-val warn">≤50% inventory</span></div>
+      <div class="spec-row"><span class="spec-key">Events Emitted</span><span class="spec-val">Created / Claimed / Refunded</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ATTACK VECTORS -->
+<section id="security" style="padding:120px 60px;background:var(--paper);">
+  <div class="section-header">
+    <span class="section-tag">Security</span>
+    <h2 class="section-h">ATTACK<br><em>VECTORS.</em></h2>
+  </div>
+  <div class="attack-grid">
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Frontrunning</span></div>
+      <div class="attack-desc">Secret S stays off-chain until both flashlegs succeed. Flashbots/private relay and high gas tips prevent extraction. X3 encrypted mempool adds additional layer.</div>
+      <div class="attack-status"><span class="status-pill status-mitigated">MITIGATED</span></div>
+    </div>
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Chain Reorg</span></div>
+      <div class="attack-desc">12 EVM block confirms, 5 SVM confirms, X3 flash finality (&lt;400ms). Relayer detects orphaned TX and either rebroadcasts or triggers timeout refund.</div>
+      <div class="attack-status"><span class="status-pill status-mitigated">MITIGATED</span></div>
+    </div>
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Partial Fill</span></div>
+      <div class="attack-desc">Atomic executor guarantees all legs succeed or zero execute. If one flashleg reverts, no secret is revealed. Both HTLCs refund after respective timelocks expire.</div>
+      <div class="attack-status"><span class="status-pill status-mitigated">MITIGATED</span></div>
+    </div>
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Oracle Manip.</span></div>
+      <div class="attack-desc">Uses AMM pool prices and TWAPs instead of centralized feeds. Trade size limited to &lt;5% of pool depth to prevent single-trade price manipulation.</div>
+      <div class="attack-status"><span class="status-pill status-mitigated">MITIGATED</span></div>
+    </div>
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Censorship</span></div>
+      <div class="attack-desc">Multi-party forwarding + X3 Private Mempool feature. ComitV2 submissions can route through multiple RPC nodes if one validator censors.</div>
+      <div class="attack-status"><span class="status-pill status-partial">PARTIAL</span></div>
+    </div>
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Inventory Drain</span></div>
+      <div class="attack-desc">Max loan size capped at 50% of vault inventory. Reserves diversified across assets. Automated alerts on imbalance with multi-sig kill-switch available.</div>
+      <div class="attack-status"><span class="status-pill status-mitigated">MITIGATED</span></div>
+    </div>
+    <div class="attack-row">
+      <div class="attack-threat"><span class="attack-threat-text">Fee Spike</span></div>
+      <div class="attack-desc">Relayer continuously updates gas estimates and resubmits. If deadline approaches, it escalates priority. If expired, treated as failure — full refund triggered.</div>
+      <div class="attack-status"><span class="status-pill status-mitigated">MITIGATED</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section class="roadmap" id="roadmap">
+  <div class="section-header" style="color:var(--paper);">
+    <span class="section-tag" style="color:var(--yellow);border-color:var(--yellow);">Timeline</span>
+    <h2 class="section-h" style="color:var(--paper);">DEPLOY<br><em style="color:var(--yellow);">ROADMAP.</em></h2>
+  </div>
+  <div class="roadmap-track">
+    <div class="rm-item done">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">✓ Complete</div>
+      <div class="rm-title">Prototype Contracts</div>
+      <p class="rm-desc">X3-lang HTLC + Vault contracts. Unit tests pass.</p>
+    </div>
+    <div class="rm-item done">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">✓ Complete</div>
+      <div class="rm-title">Kernel Integration</div>
+      <p class="rm-desc">submitComitV2 dry run. ComiT workflow end-to-end.</p>
+    </div>
+    <div class="rm-item active">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">● Active</div>
+      <div class="rm-title">Flashloan Integration</div>
+      <p class="rm-desc">Aave + Kamino adapters live. Small-loan testing.</p>
+    </div>
+    <div class="rm-item next">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">Next</div>
+      <div class="rm-title">Fuzz + Devnet</div>
+      <p class="rm-desc">Goerli + Solana Devnet + X3 testnet full flows.</p>
+    </div>
+    <div class="rm-item next">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">Q2 2025</div>
+      <div class="rm-title">Staging Deploy</div>
+      <p class="rm-desc">Gas benchmarks, latency analysis, relayer hardening.</p>
+    </div>
+    <div class="rm-item next">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">Q3 2025</div>
+      <div class="rm-title">Audit + Formal</div>
+      <p class="rm-desc">X3-lang + Anchor code audits. HTLC invariant proofs.</p>
+    </div>
+    <div class="rm-item next">
+      <div class="rm-dot"></div>
+      <div class="rm-phase">Q4 2025</div>
+      <div class="rm-title">Mainnet Go-Live</div>
+      <p class="rm-desc">Production deployment. Validator onboarding open.</p>
+    </div>
+  </div>
+</section>
+
+<!-- APPLY -->
+<section class="apply-section" id="apply">
+  <h2 class="apply-h">BECOME A<br>VALIDATOR.</h2>
+  <p class="apply-sub">The first wave of X3-VM validators shapes the protocol. Early nodes earn outsized fees, governance weight, and priority relayer rights. The window is open — for now.</p>
+  <a href="#" class="apply-btn">APPLY NOW →</a>
+</section>
+
+<footer>
+  <div class="fl">© 2025 X3-VM ATOMIC COORDINATOR</div>
+  <div class="fl">
+    <a href="#">DOCS</a>
+    <a href="#">GITHUB</a>
+    <a href="#">DISCORD</a>
+    <a href="#">WHITEPAPER</a>
+  </div>
+</footer>
+
+<script>
+// Intersection observer for earn items
+const obs=new IntersectionObserver(entries=>{entries.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>{e.target.style.opacity='1';e.target.style.transform='translateY(0)';},i*80);}});},{threshold:.05});
+document.querySelectorAll('.earn-item,.spec-group,.attack-row,.rm-item').forEach(el=>{el.style.opacity='0';el.style.transform='translateY(20px)';el.style.transition='opacity .6s ease, transform .6s ease';obs.observe(el);});
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+[package]
+name = "x3-revenue-sharing"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Revenue split types for the X3 dApp hub and marketplace."
+
+[dependencies]
+codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-std = { workspace = true, default-features = false }
+
+[features]
+default = ["std"]
+std = ["codec/std", "scale-info/std", "sp-std/std"]

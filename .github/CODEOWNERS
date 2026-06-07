@@ -1,0 +1,77 @@
+# X3 Atomic Star — Code Ownership
+
+# Kernel & Foundation Layer
+pallets/x3-kernel/ @lojak
+pallets/atomic-trade-engine/ @lojak
+pallets/x3-settlement-engine/ @lojak
+crates/x3-common/ @lojak
+
+# Runtime & Node
+runtime/ @lojak
+node/ @lojak
+
+# VM Integration (EVM/SVM)
+crates/evm-integration/ @lojak
+crates/svm-integration/ @lojak
+crates/svm-counter/ @lojak
+
+# Cross-VM & Bridge
+crates/cross-vm-bridge/ @lojak
+crates/external-chains/ @lojak
+crates/x3-bridge/ @lojak
+
+# Atomic Trading Engine
+crates/x3-atomic-trade/ @lojak
+pallets/atomic-trade-engine/ @lojak
+
+# SDK & CLI
+crates/x3-sdk/ @lojak
+crates/x3-cli/ @lojak
+crates/x3-wallet/ @lojak
+
+# Indexing & Gateway
+crates/x3-indexer/ @lojak
+crates/x3-gateway/ @lojak
+
+# Language & Compilation
+crates/x3-lexer/ @lojak
+crates/x3-ast/ @lojak
+crates/x3-parser/ @lojak
+crates/x3-hir/ @lojak
+crates/x3-mir/ @lojak
+crates/x3-semantics/ @lojak
+
+# Advanced Features (GPU, Quantum)
+crates/x3-gpu-validator-swarm/ @lojak
+crates/quantum-crypto/ @lojak
+crates/quantum-swarm/ @lojak
+
+# Experimental/Next-Gen
+pallets/agent-accounts/ @lojak
+pallets/agent-memory/ @lojak
+pallets/evolution-core/ @lojak
+pallets/meme-overlord/ @lojak
+pallets/swarm/ @lojak
+crates/voice-to-x3/ @lojak
+crates/dream-mining/ @lojak
+
+# Performance & Monitoring
+crates/chronos-flash/ @lojak
+crates/tps-tracker/ @lojak
+crates/x3-integration/ @lojak
+
+# Testing & Governance
+pallets/governance/ @lojak
+pallets/treasury/ @lojak
+pallets/x3-verifier/ @lojak
+pallets/x3-domain-registry/ @lojak
+pallets/svm-runtime/ @lojak
+
+# CI/CD & Infrastructure
+.github/ @lojak
+Dockerfile* @lojak
+Makefile @lojak
+
+# Documentation
+*.md @lojak
+docs/ @lojak

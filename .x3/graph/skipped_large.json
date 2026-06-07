@@ -1,0 +1,38 @@
+[
+  {
+    "path": "CODE_COVERAGE_TRACKER.md",
+    "bytes": 13299191
+  },
+  {
+    "path": "benchmarks/atlas-local-raw-1s.clean.json",
+    "bytes": 1315252
+  },
+  {
+    "path": "benchmarks/atlas-local-raw-1s.json",
+    "bytes": 1315326
+  },
+  {
+    "path": "benchmarks/atlas-testnet-raw-1s.json",
+    "bytes": 6179856
+  },
+  {
+    "path": "deployment/chain-specs/x3-testnet-plain.json",
+    "bytes": 6173885
+  },
+  {
+    "path": "deployment/chain-specs/x3-testnet-raw.json",
+    "bytes": 6179783
+  },
+  {
+    "path": "packages/blockchain-connector/src/chains/generated/chains.json",
+    "bytes": 1489293
+  },
+  {
+    "path": "packages/blockchain-connector/src/chains/generated/index.ts",
+    "bytes": 1489509
+  },
+  {
+    "path": "scripts_infrastructure/chains.json",
+    "bytes": 1472197
+  }
+]

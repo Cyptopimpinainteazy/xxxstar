@@ -26,3 +26,6 @@ path = "src/bin/build_eth_receipt_archive.rs"
 [[bin]]
 name = "x3c"
 path = "src/bin/x3c.rs"
+
+[lints]
+workspace = true

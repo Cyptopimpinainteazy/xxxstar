@@ -1,0 +1,19 @@
+[package]
+name = "x3-gateway-indexer"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "In-memory gateway index records for X3 external routes and transfers."
+
+[lib]
+name = "x3_gateway_indexer"
+path = "src/lib.rs"
+
+[dependencies]
+x3-external-route-registry = { path = "../x3-external-route-registry" }
+x3-circuit-breaker = { path = "../x3-circuit-breaker" }
+x3-gateway-insurance = { path = "../x3-gateway-insurance" }
+x3-gateway-risk-engine = { path = "../x3-gateway-risk-engine" }
+x3-proof-dispute = { path = "../x3-proof-dispute" }
+x3-proof-envelope = { path = "../x3-proof-envelope" }
+x3-verification-router = { path = "../x3-verification-router" }

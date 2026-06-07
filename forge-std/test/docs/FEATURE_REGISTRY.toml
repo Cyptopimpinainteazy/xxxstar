@@ -1,0 +1,32 @@
+[[feature]]
+name = "atomic_kernel"
+mode = "LIVE_TESTNET"
+proof_required = true
+crate_or_service = "pallets/x3-atomic-kernel"
+tauri_app = "AtomicConsole"
+required_tests = ["canonical_supply_invariant_holds", "represented_total_equals_canonical_supply"]
+health_endpoint = "/health/atomic-kernel"
+proof_report = "reports/testnet_readiness_report.md"
+blockers = ["missing_canonical_supply_test"]
+
+[[feature]]
+name = "atomic_router"
+mode = "LIVE_TESTNET"
+proof_required = true
+crate_or_service = "pallets/x3-cross-vm-router"
+tauri_app = "SwarmCommand"
+required_tests = ["six_route_invariants", "malicious_path_tests"]
+health_endpoint = "/health/atomic-router"
+proof_report = "reports/six_route_invariants.md"
+blockers = ["missing_malicious_path_test"]
+
+[[feature]]
+name = "btc_fortress_gateway"
+mode = "SIM_TESTNET"
+proof_required = true
+crate_or_service = "btc_fortress_gateway"
+tauri_app = "BTCGateway"
+required_tests = ["btc_regtest_deposit_detected", "btc_withdrawal_requires_quorum"]
+health_endpoint = "/health/btc-gateway"
+proof_report = "reports/btc_gateway_report.md"
+blockers = ["sim_mode_only"]

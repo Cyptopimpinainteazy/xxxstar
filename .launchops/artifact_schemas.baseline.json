@@ -1,0 +1,393 @@
+{
+  "schema_version": "launchops-artifact-fields/v1",
+  "generated_at": "2026-06-01T00:00:00Z",
+  "artifacts": [],
+  "manifest_schema_version": "launchops-artifacts/v1",
+  "schemas_schema_version": "launchops-artifact-fields/v1",
+  "manifest_artifacts": [
+    {
+      "file": "artifact_schemas.json",
+      "kind": "artifact_schemas",
+      "format": "json",
+      "schema_version": "launchops-artifact-fields/v1",
+      "schema_ref": null
+    },
+    {
+      "file": "blockers.json",
+      "kind": "blockers",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#blockers"
+    },
+    {
+      "file": "feature_matrix.json",
+      "kind": "feature_matrix",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#feature_matrix"
+    },
+    {
+      "file": "frontend_route_allowlist.json",
+      "kind": "frontend_route_allowlist",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#frontend_route_allowlist"
+    },
+    {
+      "file": "frontend_route_allowlist.md",
+      "kind": "frontend_route_allowlist_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#frontend_route_allowlist_report"
+    },
+    {
+      "file": "readiness.json",
+      "kind": "readiness",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#readiness"
+    },
+    {
+      "file": "report.md",
+      "kind": "scan_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#scan_report"
+    },
+    {
+      "file": "rpc_consumer_contracts.json",
+      "kind": "rpc_consumer_contracts",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_consumer_contracts"
+    },
+    {
+      "file": "rpc_consumer_contracts.md",
+      "kind": "rpc_consumer_contracts_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_consumer_contracts_report"
+    },
+    {
+      "file": "rpc_contract_matrix.json",
+      "kind": "rpc_contract_matrix",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_contract_matrix"
+    },
+    {
+      "file": "rpc_contract_matrix.md",
+      "kind": "rpc_contract_matrix_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#rpc_contract_matrix_report"
+    },
+    {
+      "file": "runtime_rpc_inventory.json",
+      "kind": "runtime_rpc_inventory",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#runtime_rpc_inventory"
+    },
+    {
+      "file": "sidecar_adapter_backlog.json",
+      "kind": "sidecar_adapter_backlog",
+      "format": "json",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#sidecar_adapter_backlog"
+    },
+    {
+      "file": "sidecar_adapter_backlog.md",
+      "kind": "sidecar_adapter_backlog_report",
+      "format": "markdown",
+      "schema_version": "launchops-artifacts/v1",
+      "schema_ref": "artifact_schemas.json#sidecar_adapter_backlog_report"
+    }
+  ],
+  "schemas_artifacts": [
+    {
+      "file": "audit_report.md",
+      "kind": "audit_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "blockers.json",
+      "kind": "blockers",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "e0bfc34b7aba5fa9",
+      "field_names": [
+        "id",
+        "line",
+        "module",
+        "reason",
+        "severity",
+        "source_file"
+      ]
+    },
+    {
+      "file": "deep_red_flags.json",
+      "kind": "deep_red_flags",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "7da5571f6b45e726",
+      "field_names": [
+        "files",
+        "flag_type",
+        "reason",
+        "required_evidence",
+        "severity"
+      ]
+    },
+    {
+      "file": "drift_report.json",
+      "kind": "drift_report",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "4ba50d0143d495dd",
+      "field_names": [
+        "baseline_branch",
+        "changed_files",
+        "drift_flags"
+      ]
+    },
+    {
+      "file": "feature_matrix.json",
+      "kind": "feature_matrix",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "b37597480879862c",
+      "field_names": [
+        "code_evidence",
+        "feature",
+        "module",
+        "risk",
+        "score",
+        "source_file",
+        "status",
+        "test_evidence"
+      ]
+    },
+    {
+      "file": "final_report.md",
+      "kind": "final_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "frontend_route_allowlist.json",
+      "kind": "frontend_route_allowlist",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "956438e617ec1410",
+      "field_names": [
+        "generated_at",
+        "routes",
+        "source_consumer_contracts_file"
+      ]
+    },
+    {
+      "file": "frontend_route_allowlist.md",
+      "kind": "frontend_route_allowlist_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "gates.json",
+      "kind": "gates",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "607e2016eb4748da",
+      "field_names": [
+        "id",
+        "name",
+        "reason",
+        "required",
+        "source",
+        "status",
+        "weight"
+      ]
+    },
+    {
+      "file": "readiness.json",
+      "kind": "readiness",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "32b4991f7a4d5fcf",
+      "field_names": [
+        "final_readiness",
+        "generated_at",
+        "module_breakdown",
+        "multipliers",
+        "scan_score",
+        "status",
+        "totals"
+      ]
+    },
+    {
+      "file": "red_flags.json",
+      "kind": "red_flags",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "865c755617921fc2",
+      "field_names": [
+        "file",
+        "line",
+        "pattern",
+        "reason",
+        "severity"
+      ]
+    },
+    {
+      "file": "report.md",
+      "kind": "scan_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "requirement_conflicts.json",
+      "kind": "requirement_conflicts",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "a4a7709a82eae7bf",
+      "field_names": [
+        "conflict_type",
+        "reason",
+        "requirement_a",
+        "requirement_b",
+        "severity"
+      ]
+    },
+    {
+      "file": "rpc_consumer_contracts.json",
+      "kind": "rpc_consumer_contracts",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "91b52d7705a11191",
+      "field_names": [
+        "frontend_safe_count",
+        "frontend_safe_methods",
+        "generated_at",
+        "mock_only_count",
+        "mock_only_methods",
+        "sidecar_only_count",
+        "sidecar_only_methods",
+        "source_matrix_file"
+      ]
+    },
+    {
+      "file": "rpc_consumer_contracts.md",
+      "kind": "rpc_consumer_contracts_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "rpc_contract_matrix.json",
+      "kind": "rpc_contract_matrix",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "dbbd795e120940b5",
+      "field_names": [
+        "bucket_drift_count",
+        "duplicate_registration_count",
+        "flags",
+        "generated_at",
+        "methods",
+        "node_local_adapter_count",
+        "placeholder_count",
+        "rpc_source_file",
+        "runtime_backed_count"
+      ]
+    },
+    {
+      "file": "rpc_contract_matrix.md",
+      "kind": "rpc_contract_matrix_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "runtime_rpc_inventory.json",
+      "kind": "runtime_rpc_inventory",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "39d47515a6ad63b3",
+      "field_names": [
+        "generated_at",
+        "rpc_source_file",
+        "runtime_source_file",
+        "runtime_traits"
+      ]
+    },
+    {
+      "file": "sidecar_adapter_backlog.json",
+      "kind": "sidecar_adapter_backlog",
+      "format": "json",
+      "shape": "object",
+      "fields_digest": "9639696ee376d6f8",
+      "field_names": [
+        "backlog",
+        "generated_at",
+        "source_consumer_contracts_file"
+      ]
+    },
+    {
+      "file": "sidecar_adapter_backlog.md",
+      "kind": "sidecar_adapter_backlog_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    },
+    {
+      "file": "stale_docs.json",
+      "kind": "stale_docs",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "6525123f6f53d19b",
+      "field_names": [
+        "file",
+        "linked_code",
+        "reason",
+        "severity"
+      ]
+    },
+    {
+      "file": "test_results.json",
+      "kind": "test_results",
+      "format": "json",
+      "shape": "array<object>",
+      "fields_digest": "12e3246c742fc465",
+      "field_names": [
+        "command",
+        "duration_ms",
+        "exit_code",
+        "name",
+        "status",
+        "stderr_excerpt",
+        "stdout_excerpt"
+      ]
+    },
+    {
+      "file": "verify_report.md",
+      "kind": "verify_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields_digest": "43702884d114ea23",
+      "field_names": []
+    }
+  ],
+  "accepted_reason": "TODO: document why this schema pin is accepted at baseline update time"
+}

@@ -1,0 +1,55 @@
+[package]
+name = "x3-vm"
+version = "0.1.0"
+edition = "2021"
+description = "X3 Virtual Machine - bytecode verifier and deterministic interpreter"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/x3-chain/x3"
+
+[dependencies]
+# Core dependencies
+x3-backend = { path = "../x3-backend" }
+x3-common = { path = "../x3-common" }
+
+# Substrate primitives — H160/U256 used in EVM bridge hostcalls
+sp-core = { workspace = true, default-features = false }
+
+# EVM/SVM integration (std only — used by X3VMBridge for real cross-VM calls)
+x3-evm-integration = { path = "../evm-integration", optional = true }
+x3-svm-integration = { path = "../svm-integration", optional = true }
+
+# Dynamic library loading for GPU FFI
+libloading = "0.8"
+
+# Error handling
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+tracing = "0.1"
+
+# Synchronization primitives
+parking_lot = "0.12"
+
+# Serialization (for VM state snapshots)
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+env_logger = "0.10"
+
+[features]
+default = ["std"]
+std = [
+    "serde/std",
+    "sp-core/std",
+    "x3-backend/std",
+    "x3-common/std",
+    "x3-evm-integration",
+    "x3-svm-integration",
+]
+# Enable debug opcodes (DebugPrint, DebugDump) - NEVER for on-chain
+debug-ops = []
+# Enable JIT hints (for future JIT compiler)
+jit-hints = []
+# Enable detailed gas metering
+gas-metering = []

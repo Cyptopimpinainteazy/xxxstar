@@ -1,0 +1,3 @@
+{"timestamp":"2026-05-15T23:55:42Z","validator":"alice","alive":false,"cpu_percent":null,"mem_percent":null,"rss_kb":null,"disk_used_kb":426753004}
+{"timestamp":"2026-05-15T23:55:42Z","validator":"bob","alive":false,"cpu_percent":null,"mem_percent":null,"rss_kb":null,"disk_used_kb":426753004}
+{"timestamp":"2026-05-15T23:55:42Z","validator":"charlie","alive":false,"cpu_percent":null,"mem_percent":null,"rss_kb":null,"disk_used_kb":426753004}

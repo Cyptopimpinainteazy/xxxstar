@@ -1,0 +1,324 @@
+[package]
+name = "x3-chain-runtime"
+version = "0.1.0"
+edition = "2021"
+publish = false
+authors = ["Traycer.AI <dev@x3-chain.io>"]
+description = "X3 Chain L1 Substrate runtime with dual-VM scaffolding."
+license = "Apache-2.0"
+# Ensures X3 Chain runtime Cargo manifest aligns with required Substrate runtime dependencies and feature flags.
+# Maintains std/runtime-benchmarks enablement and WASM build configuration for dual-VM execution tooling.
+build = "build.rs"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[lib]
+name = "x3_chain_runtime"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+codec = { workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+log = { workspace = true, default-features = false }
+
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+frame-executive = { workspace = true, default-features = false }
+
+pallet-aura = { workspace = true, default-features = false }
+pallet-grandpa = { workspace = true, default-features = false }
+pallet-session = { workspace = true, default-features = false, features = ["historical"] }
+pallet-offences = { workspace = true, default-features = false }
+pallet-timestamp = { workspace = true, default-features = false }
+pallet-balances = { workspace = true, default-features = false }
+pallet-transaction-payment = { workspace = true, default-features = false }
+pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+pallet-sudo = { workspace = true, default-features = false, optional = true }
+pallet-collective = { workspace = true, default-features = false }
+pallet-scheduler = { workspace = true, default-features = false }
+pallet-preimage = { workspace = true, default-features = false }
+# Frontier EVM stack — OPTIONAL, gated behind the `frontier` feature.
+# Pulling these unconditionally drags `cumulus-primitives-storage-weight-reclaim`
+# -> `cumulus-primitives-proof-size-hostfunction` which is broken under
+# `wasm32v1-none --no-default-features` in polkadot-sdk stable2512 (its
+# `runtime_interface` macro references std-only items in the no_std codepath).
+# Per audit: Real Frontier EVM execution = post-RC1.
+pallet-evm = { workspace = true, default-features = false, optional = true }
+pallet-ethereum = { workspace = true, default-features = false, optional = true }
+pallet-evm-precompile-simple = { workspace = true, default-features = false, optional = true }
+pallet-evm-precompile-modexp = { workspace = true, default-features = false, optional = true }
+pallet-evm-precompile-sha3fips = { workspace = true, default-features = false, optional = true }
+fp-evm = { workspace = true, default-features = false, optional = true }
+fp-ethereum = { workspace = true, default-features = false, optional = true }
+
+pallet-x3-kernel = { path = "../pallets/x3-kernel", default-features = false }
+pallet-x3-consensus = { path = "../pallets/x3-consensus", default-features = false }
+pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false }
+pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = false }
+pallet-x3-account-registry = { path = "../pallets/x3-account-registry", default-features = false }
+x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge", default-features = false }
+pallet-x3-coin = { path = "../pallets/x3-coin", default-features = false }
+pallet-atomic-trade-engine = { path = "../pallets/atomic-trade-engine", default-features = false }
+pallet-governance = { path = "../pallets/governance", default-features = false }
+pallet-treasury = { path = "../pallets/treasury", default-features = false }
+pallet-agent-accounts = { path = "../pallets/agent-accounts", default-features = false }
+pallet-agent-memory = { path = "../pallets/agent-memory", default-features = false }
+pallet-evolution-core = { path = "../pallets/evolution-core", default-features = false }
+pallet-x3-verifier = { path = "../pallets/x3-verifier", default-features = false }
+pallet-x3-domain-registry = { path = "../pallets/x3-domain-registry", default-features = false }
+pallet-x3-settlement-engine = { path = "../pallets/x3-settlement-engine", default-features = false }
+pallet-x3-jury-anchor = { path = "../pallets/x3-jury-anchor", default-features = false }
+pallet-swarm = { path = "../pallets/swarm", default-features = false }
+pallet-depin-marketplace = { path = "../pallets/depin-marketplace", default-features = false }
+pallet-private-execution = { path = "../pallets/private-execution", default-features = false }
+pallet-x3-sequencer = { path = "../pallets/x3-sequencer", default-features = false }
+pallet-x3-da = { path = "../pallets/x3-da", default-features = false }
+pallet-x3-atomic-kernel = { path = "../pallets/x3-atomic-kernel", default-features = false }
+# Universal Asset Kernel MVP — internal cross-VM transfer stack (X3Native / X3Evm / X3Svm).
+x3-asset-kernel-types = { path = "../crates/x3-asset-kernel-types", default-features = false }
+pallet-x3-asset-registry = { path = "../pallets/x3-asset-registry", default-features = false }
+pallet-x3-supply-ledger = { path = "../pallets/x3-supply-ledger", default-features = false }
+pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false }
+pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false }
+pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
+pallet-x3-automation = { path = "../pallets/x3-automation", default-features = false }
+pallet-x3-oracle = { path = "../pallets/x3-oracle", default-features = false }
+pallet-x3-vrf = { path = "../pallets/x3-vrf", default-features = false }
+pallet-x3-dex = { path = "../pallets/x3-dex", default-features = false }
+x3-svm-integration = { path = "../crates/svm-integration", default-features = false }
+pallet-meme-overlord = { path = "../pallets/meme-overlord", default-features = false }
+# IXL instruction-set and IBC-style packet standard (no_std, safe in WASM).
+x3-ixl = { path = "../crates/x3-ixl", default-features = false }
+x3-packet-standard = { path = "../crates/x3-packet-standard", default-features = false }
+# Post-quantum crypto (std-only; thiserror/anyhow are not no_std — gated via "pq" feature).
+quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
+# staged-pallets (now wired)
+pallet-x3-slash = { path = "../pallets/x3-slash", default-features = false }
+x3-accounting-events = { path = "../crates/x3-accounting-events", default-features = false }
+x3-security-events = { path = "../crates/x3-security-events", default-features = false }
+pallet-x3-solvency = { path = "../pallets/x3-solvency", default-features = false }
+pallet-x3-wallet-pallet = { package = "pallet-x3-wallet", path = "../pallets/x3-wallet-pallet", default-features = false }
+pallet-x3-inventory = { path = "../pallets/x3-inventory", default-features = false }
+pallet-x3-reservation = { path = "../pallets/x3-reservation", default-features = false }
+pallet-x3-rebalance = { path = "../pallets/x3-rebalance", default-features = false }
+pallet-x3-partner = { path = "../pallets/x3-partner", default-features = false }
+pallet-x3-treasury-policy = { path = "../pallets/x3-treasury-policy", default-features = false }
+pallet-x3-custody = { path = "../pallets/x3-custody", default-features = false }
+pallet-x3-reconciliation = { path = "../pallets/x3-reconciliation", default-features = false }
+pallet-x3-wrapped = { path = "../pallets/x3-wrapped", default-features = false }
+pallet-x3-auction = { path = "../pallets/x3-auction", default-features = false }
+pallet-x3-launchpad = { path = "../pallets/x3-launchpad", default-features = false }
+pallet-x3-dapp-hub = { path = "../pallets/x3-dapp-hub", default-features = false }
+x3-revenue-sharing = { path = "../crates/x3-revenue-sharing", default-features = false }
+pallet-x3-compute-market = { path = "../pallets/x3-compute-market", default-features = false }
+pallet-x3-flashloan = { path = "../pallets/x3-flashloan", default-features = false }
+pallet-svm-runtime = { package = "pallet-svm", path = "../pallets/svm-runtime", default-features = false }
+
+sp-api = { workspace = true, default-features = false }
+sp-block-builder = { workspace = true, default-features = false }
+sp-consensus-aura = { workspace = true, default-features = false, features = ["serde"] }
+sp-consensus-grandpa = { workspace = true, default-features = false, features = ["serde"] }
+sp-core = { workspace = true, default-features = false, features = ["serde"] }
+sp-genesis-builder = { workspace = true, default-features = false }
+sp-inherents = { workspace = true, default-features = false }
+sp-offchain = { workspace = true, default-features = false }
+# Canonical solochain template pattern (polkadot-sdk stable2512):
+# `sp-runtime/serde` (and sp-core/sp-version/sp-consensus-*/serde) MUST be enabled
+# unconditionally so that `RuntimeGenesisConfig`'s unconditional `Serialize/Deserialize`
+# derives emitted by `construct_runtime!` can resolve. The `feature = "serde"` of these
+# crates pulls in `Serialize/Deserialize` impls for `BlockNumber`, `AccountId`, etc.,
+# without forcing libstd. Pallet `GenesisConfig` derives still require std-gating
+# upstream; we patch frame-support-procedural locally if that gap manifests.
+sp-runtime = { workspace = true, default-features = false, features = ["serde"] }
+sp-session = { workspace = true, default-features = false }
+sp-staking = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-transaction-pool = { workspace = true, default-features = false }
+sp-version = { workspace = true, default-features = false, features = ["serde"] }
+sp-weights = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+
+frame-system-rpc-runtime-api = { workspace = true, default-features = false }
+
+serde = { workspace = true, default-features = false, features = ["alloc", "derive"] }
+# Local X3 Chain EVM integration utilities (Frontier temporarily removed)
+# x3-evm-integration = { path = "../crates/evm-integration", default-features = false }
+
+[build-dependencies]
+substrate-wasm-builder = { workspace = true }
+
+[dev-dependencies]
+
+[features]
+default = ["std"]
+dev = ["pallet-sudo"]
+
+# Narrow pallet set for first public testnet / mainnet-rc1 release.
+# Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
+# swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
+# DePIN marketplace, private execution).
+# Use `--features mainnet-rc1` to build the RC1 runtime WASM.
+mainnet-rc1 = []
+# Enable post-quantum crypto primitives on native (non-WASM) builds.
+# quantum-crypto depends on thiserror/anyhow/rand which require std; never enable in WASM.
+pq = ["quantum-crypto"]
+std = [
+	"codec/std",
+	"scale-info/std",
+	"frame-support/std",
+	"frame-system/std",
+	"frame-executive/std",
+	"frame-system-rpc-runtime-api/std",
+	"pallet-aura/std",
+	"pallet-grandpa/std",
+	"pallet-session/std",
+	"pallet-timestamp/std",
+	"pallet-balances/std",
+	"pallet-transaction-payment/std",
+	"pallet-transaction-payment-rpc-runtime-api/std",
+	"pallet-sudo",
+	"pallet-sudo/std",
+	"pallet-collective/std",
+	"pallet-scheduler/std",
+	"pallet-preimage/std",
+	# Frontier std propagation only when `frontier` feature is enabled.
+	"pallet-evm?/std",
+	"pallet-ethereum?/std",
+	"pallet-evm-precompile-simple?/std",
+	"pallet-evm-precompile-modexp?/std",
+	"pallet-evm-precompile-sha3fips?/std",
+	"fp-evm?/std",
+	"fp-ethereum?/std",
+	"pallet-x3-kernel/std",
+	"pallet-x3-invariants/std",
+	"x3-cross-vm-bridge/std",
+	"pallet-atomic-trade-engine/std",
+	"pallet-governance/std",
+	"pallet-treasury/std",
+	"pallet-agent-accounts/std",
+	"pallet-agent-memory/std",
+	"pallet-evolution-core/std",
+	"pallet-x3-verifier/std",
+	"pallet-x3-domain-registry/std",
+	"pallet-x3-settlement-engine/std",
+	"pallet-swarm/std",
+	"pallet-x3-coin/std",
+	"pallet-depin-marketplace/std",
+	"pallet-private-execution/std",
+	"pallet-x3-sequencer/std",
+	"pallet-x3-da/std",
+	"pallet-x3-atomic-kernel/std",
+	"pallet-x3-jury-anchor/std",
+	"pallet-meme-overlord/std",
+	"pallet-x3-slash/std",
+	"x3-accounting-events/std",
+	"x3-security-events/std",
+	"pallet-x3-solvency/std",
+	"pallet-x3-wallet-pallet/std",
+	"pallet-x3-inventory/std",
+	"pallet-x3-reservation/std",
+	"pallet-x3-rebalance/std",
+	"pallet-x3-partner/std",
+	"pallet-x3-treasury-policy/std",
+	"pallet-x3-custody/std",
+	"pallet-x3-reconciliation/std",
+	"pallet-x3-wrapped/std",
+	"pallet-x3-auction/std",
+	"pallet-x3-launchpad/std",
+	"pallet-x3-dapp-hub/std",
+	"x3-revenue-sharing/std",
+	"pallet-x3-compute-market/std",
+	"pallet-x3-flashloan/std",
+	"pallet-svm-runtime/std",
+	"x3-asset-kernel-types/std",
+	"pallet-x3-asset-registry/std",
+	"pallet-x3-account-registry/std",
+	"pallet-x3-supply-ledger/std",
+	"pallet-x3-cross-vm-router/std",
+	"pallet-x3-token-factory/std",
+	"pallet-x3-automation/std",
+	"pallet-x3-oracle/std",
+	"pallet-x3-vrf/std",
+	"pallet-x3-dex/std",
+	"x3-svm-integration/std",
+	"x3-ixl/std",
+	"x3-packet-standard/std",
+	"sp-api/std",
+	"sp-block-builder/std",
+	"sp-consensus-aura/std",
+	"sp-consensus-grandpa/std",
+	"sp-core/std",
+	"sp-genesis-builder/std",
+	"sp-inherents/std",
+	"sp-offchain/std",
+	"sp-runtime/std",
+	"sp-session/std",
+	"sp-staking/std",
+	"sp-std/std",
+	"sp-transaction-pool/std",
+	"sp-version/std",
+	"sp-weights/std",
+	"sp-io/std",
+	"serde/std",
+	# "x3-evm-integration/std",
+]
+runtime-benchmarks = [
+	"frame-support/runtime-benchmarks",
+	"frame-system/runtime-benchmarks",
+	"pallet-balances/runtime-benchmarks",
+	"pallet-timestamp/runtime-benchmarks",
+	"pallet-collective/runtime-benchmarks",
+	"pallet-x3-kernel/runtime-benchmarks",
+	"pallet-x3-invariants/runtime-benchmarks",
+	"pallet-atomic-trade-engine/runtime-benchmarks",
+	"pallet-evolution-core/runtime-benchmarks",
+	"pallet-x3-verifier/runtime-benchmarks",
+	"pallet-x3-account-registry/runtime-benchmarks",
+	"pallet-x3-domain-registry/runtime-benchmarks",
+	"pallet-x3-settlement-engine/runtime-benchmarks",
+	"pallet-x3-oracle/runtime-benchmarks",
+	"pallet-x3-vrf/runtime-benchmarks",
+	"pallet-x3-dex/runtime-benchmarks",
+	"pallet-swarm/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+]
+
+native = []
+
+gpu-validator = []
+
+# Opt-in: enable real VM adapters for native-only developer workflows.
+# Default behavior keeps native and WASM execution equivalent by using mocks.
+native-real-vm-adapters = []
+
+# Bridge support features
+evm-bridge = []
+solana-integration = []
+
+# Real Frontier EVM execution path (post-RC1; OFF by default).
+# Enabling this pulls pallet-evm/pallet-ethereum/precompiles/fp-evm into the
+# build and activates the gated EVM Config + runtime APIs in src/lib.rs.
+# Default RC-1 wasm runtime ships WITHOUT this feature — the cross-VM router
+# uses the X3Evm scaffold path only.
+frontier = [
+	"pallet-evm",
+	"pallet-ethereum",
+	"pallet-evm-precompile-simple",
+	"pallet-evm-precompile-modexp",
+	"pallet-evm-precompile-sha3fips",
+	"fp-evm",
+	"fp-ethereum",
+]
+
+# Advanced analytics and indexer features
+advanced-analytics = []
+
+disable-runtime-api = []
+
+try-runtime = [
+	"frame-support/try-runtime",
+	"frame-system/try-runtime",
+	"pallet-x3-invariants/try-runtime",
+]

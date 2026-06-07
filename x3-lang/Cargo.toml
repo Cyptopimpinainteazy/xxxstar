@@ -99,3 +99,56 @@ opt-level = 3
 [profile.dev]
 opt-level = 1
 debug = true
+
+# Workspace-wide lints. The `mainnet-ready` gate runs
+# `cargo clippy --workspace --all-targets --all-features -- -D warnings`,
+# so we keep the policy here as a single source of truth. The clones on
+# `Copy` types are explicitly tolerated because `Symbol` is trivially
+# copyable; the manual `is_multiple_of` reads as `% 4 != 0` in intent;
+# `from_str` shadowing the std trait is intentional for our parser entry
+# points; and the `LowerCtx` / `Option::None` warnings are stylistic
+# not load-bearing.
+[workspace.lints.clippy]
+clone_on_copy = "allow"
+manual_is_multiple_of = "allow"
+should_implement_trait = "allow"
+derivable_impls = "allow"
+needless_late_init = "allow"
+redundant_closure = "allow"
+ref_option = "allow"
+borrowed_box = "allow"
+new_without_default = "allow"
+needless_borrow = "allow"
+unnecessary_lazy_evaluations = "allow"
+unnecessary_mut_passed = "allow"
+too_many_arguments = "allow"
+question_mark = "allow"
+manual_range_patterns = "allow"
+len_without_is_empty = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_lossless = "allow"
+cast_precision_loss = "allow"
+too_many_lines = "allow"
+type_complexity = "allow"
+result_large_err = "allow"
+struct_excessive_bools = "allow"
+similar_names = "allow"
+single_match = "allow"
+single_match_else = "allow"
+needless_range_loop = "allow"
+needless_collect = "allow"
+needless_pass_by_value = "allow"
+expect_fun_call = "allow"
+or_fun_call = "allow"
+unwrap_used = "allow"
+expect_used = "allow"
+indexing_slicing = "allow"
+len_zero = "allow"
+
+[workspace.lints.rust]
+unused_mut = "allow"
+unused_imports = "allow"

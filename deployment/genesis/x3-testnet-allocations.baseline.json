@@ -1,0 +1,55 @@
+{
+  "_comment": "Governance baseline for deployment/genesis/x3-testnet-allocations.json. Pins token supply, treasury multisig signer set (by sorted-hash), per-bucket allocation fingerprints, and bonus pool breakdown. The gate also asserts the accounting identity: treasury + sum(allocations) == total_supply_base. Regenerate with UPDATE_BASELINE=1 and fill accepted_reason per changed bucket.",
+  "token": {
+    "asset_id": 1000,
+    "symbol": "X3",
+    "decimals": 18,
+    "total_supply": "8888888888",
+    "total_supply_base": "8888888888000000000000000000"
+  },
+  "treasury": {
+    "multisig_threshold": 4,
+    "address": "5Gm3cbEyVgrzTJghqvePTFkfP5Gyw8JxpQPv73r2ycWjc7DL",
+    "allocation_amount_base": "2222222222000000000000000000",
+    "signer_set_fingerprint": "c4cd9e18cec93ea4",
+    "signer_count": 7
+  },
+  "bonus_pool_breakdown": {
+    "gpu_hardware_contributors": "40%",
+    "validators_staking_spot_buyers": "20%",
+    "presale_traders": "10%",
+    "auditors_bug_hunters": "30%"
+  },
+  "buckets": {
+    "validators_staking": {
+      "address": "5DCNYZ4PPFZyCKZZkqFn5oiWd78zRAyG41L6SzkugAVE5uHV",
+      "amount_base": "1777777778000000000000000000",
+      "fingerprint": "479b7e0366f2c987",
+      "accepted_reason": ""
+    },
+    "ecosystem_grants": {
+      "address": "5G472MxRo1XGtWudyXtq2oh9uKGACRqFqv2QoH2ygTnNoDBR",
+      "amount_base": "1777777778000000000000000000",
+      "fingerprint": "d07f1ff563d01aaf",
+      "accepted_reason": ""
+    },
+    "presale_early_investors": {
+      "address": "5DPXVzc36fT9sEtHLb4Xo5e28xCVAx5exytFLxPAwrKbLBfL",
+      "amount_base": "1333333333000000000000000000",
+      "fingerprint": "c29208884dd99518",
+      "accepted_reason": ""
+    },
+    "bonus_pool": {
+      "address": "5CqSUtcWaxen8F5Q4XPhDPzFmPqVRyuPKMzrvnw932k2bdcT",
+      "amount_base": "888888889000000000000000000",
+      "fingerprint": "4b1ac5eaf9ddbe87",
+      "accepted_reason": ""
+    },
+    "team_core_contributors": {
+      "address": "5CzThhqqAD52z4qzdZE1Gk9DgfpnzoZfYZBNLSZcukjbJQep",
+      "amount_base": "888888888000000000000000000",
+      "fingerprint": "47aa7a609532de46",
+      "accepted_reason": ""
+    }
+  }
+}

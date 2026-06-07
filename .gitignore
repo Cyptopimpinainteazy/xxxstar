@@ -1,0 +1,107 @@
+Build artifacts
+target/
+/bin/x3-chain-node-fresh
+*.wasm
+*.o
+*.so
+*.rlib
+
+# Large packs
+launch-gates/packs/
+launch-gates/repomix/*.md
+launch-gates/evidence/ci/
+repomix-output.md
+
+# Node
+node_modules/
+*.log
+
+# Misc
+.DS_Store
+.env
+.venv
+venv/
+.codex
+
+# Local validation/build outputs
+target_phase2_validation/
+target_phase3_test/
+target_phase3_validation/
+target_strict/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Autoclaw runtime artifacts
+.autoclaw/
+.claude/
+
+# Next.js build output
+apps/dex/.next/
+apps/wallet/.next/
+apps/explorer/.next/
+
+# Cocoindex
+.cocoindex_code/
+
+# Generated binary assets
+*.wasm
+*.glb
+*.obj
+*.mp4
+*.zip
+*.tar.gz
+*.deb
+
+# Environment secrets
+.env.local
+.env.*.local
+
+# Vendor / dependency mirroring (large)
+vendor/
+vendov/
+
+# Build caches
+.cache/
+
+# Runtime artifacts
+logs/
+nohup.out
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Model / binary tooling
+ollama-models/
+protoc_bin/
+
+# Repomix
+.repomix/

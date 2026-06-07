@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "spec": "flashloan/repay_or_revert",
+  "spec_doc": "../specs/flashloan_repay_or_revert.md",
+  "fee_bps": 9,
+  "vectors": [
+    {
+      "id": "flashloan/repay_or_revert/1-honest-small",
+      "asset": "MOCK",
+      "amount": "100000000000000000000",
+      "borrower_kind": "honest",
+      "expected": {
+        "result": "ok",
+        "revert_reason": null,
+        "pool_delta": "90000000000000000"
+      }
+    },
+    {
+      "id": "flashloan/repay_or_revert/2-deadbeat",
+      "asset": "MOCK",
+      "amount": "100000000000000000000",
+      "borrower_kind": "deadbeat",
+      "expected": {
+        "result": "revert",
+        "revert_reason": "CallbackFailed",
+        "pool_delta": "0"
+      }
+    },
+    {
+      "id": "flashloan/repay_or_revert/3-underpay-by-one-wei",
+      "asset": "MOCK",
+      "amount": "100000000000000000000",
+      "borrower_kind": "underpay",
+      "expected": {
+        "result": "revert",
+        "revert_reason": "NotRepaid",
+        "pool_delta": "0"
+      }
+    },
+    {
+      "id": "flashloan/repay_or_revert/4-tiny-amount-fee-rounds-up",
+      "asset": "MOCK",
+      "amount": "1",
+      "borrower_kind": "honest",
+      "expected": {
+        "result": "ok",
+        "revert_reason": null,
+        "pool_delta": "1"
+      }
+    }
+  ]
+}

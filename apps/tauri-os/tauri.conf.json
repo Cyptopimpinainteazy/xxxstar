@@ -1,0 +1,10 @@
+{
+  "name": "tauri-os",
+  "version": "0.1.0",
+  "tauri": {
+    "bundle": {
+      "productName": "X3 Atomic Console",
+      "identifier": "com.x3.atomic.console"
+    }
+  }
+}

@@ -239,7 +239,18 @@ mod tests {
         let result = adapter.transfer("btc", "BTC", "ethereum", "WBTC", 100, b"0x", b"", b"");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(err.code, BTC_DISABLED_CODE);
+        // When the `bitcoin-adapter` feature is enabled the
+        // production path first runs the (placeholder) finality
+        // proof check, which rejects the empty proof with
+        // `X3_BTC_PROOF_EMPTY`. With the feature off it returns
+        // `X3_BTC_ADAPTER_DISABLED` directly. Either failure is
+        // acceptable proof that production BTC cannot silently
+        // succeed; the adapter fails closed in both configurations.
+        assert!(
+            err.code == BTC_DISABLED_CODE || err.code == "X3_BTC_PROOF_EMPTY",
+            "expected production BTC to fail closed, got code={}",
+            err.code
+        );
     }
 
     #[test]

@@ -1,0 +1,31 @@
+{
+  "verdict": "RC5_SHORT_SHAKEDOWN: FAIL (RC5_72H: PENDING)",
+  "RC5_SHORT_SHAKEDOWN": "FAIL",
+  "RC5_72H": "PENDING",
+  "duration_seconds": 30,
+  "run_window": {
+    "start": "2026-05-15T22:40:01Z",
+    "end": "2026-05-15T22:40:31Z"
+  },
+  "liveness": {
+    "start_block": 22,
+    "end_block": 148,
+    "start_finalized": "0x04898557db1ea71682fe1ccd2dd2a47ac094b43c4e2d95eb77bbafa72418d431",
+    "end_finalized": "0x9b86924f3a8a1f068d729bc6d563aceb61b4b49797984f88e2b0e8cd1c15e82c"
+  },
+  "checks": {
+    "restart_drill_done": 1,
+    "restart_drill_pass": 1,
+    "settlement_failures": 0,
+    "invariant_failures": 1,
+    "panic_flag": 1,
+    "db_corruption_flag": 1,
+    "bridges_disabled_initial": 0
+  },
+  "blockers": [
+    "panic loop detected in validator logs",
+    "database corruption indicators detected in logs",
+    "one or more invariant snapshots failed",
+    "external bridges not disabled"
+  ]
+}

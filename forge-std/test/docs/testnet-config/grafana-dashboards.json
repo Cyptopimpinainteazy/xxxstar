@@ -1,0 +1,103 @@
+{
+  "tps_throughput": {
+    "title": "TPS & Throughput",
+    "panels": [
+      {
+        "title": "Transactions Per Second",
+        "target": "rate(solana_validator_confirmed_transactions_total[1m])"
+      },
+      {
+        "title": "GPU Signature Verification",
+        "target": "rate(gpu_signature_verify_total[1m])"
+      },
+      {
+        "title": "PoH GPU Hash Rate",
+        "target": "rate(gpu_poh_hash_total[1m])"
+      },
+      {
+        "title": "TX Validator GPU Throughput",
+        "target": "rate(gpu_tx_validate_total[1m])"
+      }
+    ]
+  },
+  "gpu_utilization": {
+    "title": "GPU Utilization",
+    "panels": [
+      {
+        "title": "GPU0 Memory Usage",
+        "target": "gpu_memory_used_bytes{gpu='0'}"
+      },
+      {
+        "title": "GPU1 Memory Usage",
+        "target": "gpu_memory_used_bytes{gpu='1'}"
+      },
+      {
+        "title": "GPU2 Memory Usage",
+        "target": "gpu_memory_used_bytes{gpu='2'}"
+      },
+      {
+        "title": "GPU Utilization %",
+        "target": "gpu_utilization_percent"
+      }
+    ]
+  },
+  "latency": {
+    "title": "Latency Analysis",
+    "panels": [
+      {
+        "title": "Block Confirmation Latency",
+        "target": "histogram_quantile(0.95, rate(solana_validator_block_latency_seconds_bucket[1m]))"
+      },
+      {
+        "title": "TX Validation Latency",
+        "target": "histogram_quantile(0.95, rate(gpu_tx_validate_latency_seconds_bucket[1m]))"
+      },
+      {
+        "title": "Signature Verify Latency",
+        "target": "histogram_quantile(0.95, rate(gpu_sig_verify_latency_seconds_bucket[1m]))"
+      }
+    ]
+  },
+  "consensus": {
+    "title": "Consensus Health",
+    "panels": [
+      {
+        "title": "Fork Distance",
+        "target": "solana_validator_fork_distance_slots"
+      },
+      {
+        "title": "Slot Height",
+        "target": "solana_validator_root_slot"
+      },
+      {
+        "title": "Vote Success Rate",
+        "target": "rate(solana_validator_votes_success_total[5m])"
+      },
+      {
+        "title": "Cluster Size",
+        "target": "solana_validator_cluster_info_size"
+      }
+    ]
+  },
+  "system_health": {
+    "title": "System Health",
+    "panels": [
+      {
+        "title": "CPU Usage",
+        "target": "100 - (avg(rate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
+      },
+      {
+        "title": "Memory Usage",
+        "target": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes"
+      },
+      {
+        "title": "Disk I/O",
+        "target": "rate(node_disk_io_now[1m])"
+      },
+      {
+        "title": "Network Traffic",
+        "target": "rate(node_network_transmit_bytes_total[1m])"
+      }
+    ]
+  }
+}

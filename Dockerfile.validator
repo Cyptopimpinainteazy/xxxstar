@@ -1,0 +1,97 @@
+# Dockerfile for x3-chain-node validator
+# Multi-stage build: compile from source OR use pre-built binary
+# Usage: docker build -f Dockerfile.validator -t x3-chain-node:latest .
+
+ARG RUST_VERSION=1.80
+ARG DEBIAN_VERSION=bookworm
+
+# ── Stage 1: Builder (only used if building from source) ───────────────────
+FROM rust:${RUST_VERSION}-slim-${DEBIAN_VERSION} as builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    clang \
+    cmake \
+    git \
+    pkg-config \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy source code
+COPY . .
+
+# Build x3-chain-node release binary
+# Takes ~15 minutes on moderate hardware
+RUN cargo build --release -p x3-chain-node \
+    && ls -lh target/release/x3-chain-node
+
+# ── Stage 2: Runtime Image ──────────────────────────────────────────────────
+FROM ubuntu:24.04 as runtime
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for validator process
+RUN useradd -m -u 2000 validator
+
+WORKDIR /home/validator
+
+# Copy compiled binary from builder stage
+COPY --from=builder --chown=validator:validator /build/target/release/x3-chain-node /usr/local/bin/x3-chain-node
+
+# Bundle chain spec into image
+COPY --chown=validator:validator deployment/chain-specs/x3-testnet-raw.json /etc/x3/chain-spec.json
+
+# Create data directory with proper permissions
+RUN mkdir -p /home/validator/data && \
+    chown -R validator:validator /home/validator/data /etc/x3
+
+USER validator
+
+# ── Health Check ─────────────────────────────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:9933 || exit 1
+
+# ── Ports ────────────────────────────────────────────────────────────────
+# 30333 - P2P peer discovery port
+# 9933  - RPC endpoint
+# 9616  - Prometheus metrics
+EXPOSE 30333 9933 9616
+
+# ── Default Command ──────────────────────────────────────────────────────
+# Override with `docker run -e VALIDATOR_NAME=val-1 ...` for custom names
+# Flags explained:
+#   --chain: Chain specification file
+#   --validator: Enable validator mode (block production)
+#   --name: Human-readable validator name (used in logs/telemetry)
+#   --base-path: Data directory for validator state
+#   --rpc-port: RPC server port
+#   --unsafe-rpc-external: Allow RPC access from containers (required for external RPC + validator mode)
+#   --prometheus-port: Metrics endpoint
+#   --tmp: Use temporary storage (clean state on restart)
+#   --log: Logging level
+
+CMD [ \
+    "x3-chain-node", \
+    "--chain", "/etc/x3/chain-spec.json", \
+    "--validator", \
+    "--name", "${VALIDATOR_NAME:-x3-validator}", \
+    "--base-path", "/home/validator/data", \
+    "--rpc-port", "9933", \
+    "--unsafe-rpc-external", \
+    "--rpc-methods", "Unsafe", \
+    "--prometheus-port", "9616", \
+    "--prometheus-external", \
+    "--log", "info", \
+    "--tmp" \
+]
+
+# ── Metadata ─────────────────────────────────────────────────────────────
+LABEL org.opencontainers.image.title="X3 Chain Validator" \
+      org.opencontainers.image.description="Substrate-based validator node for X3 blockchain" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.source="https://github.com/x3-chain/x3-atomic-star"
