@@ -19,6 +19,9 @@ codec = { workspace = true, default-features = false, features = ["std"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 blake2 = { version = "0.10", default-features = false }
 
+# X3 packet schema for structured cross-VM payload submission
+x3-packet-schema = { path = "../x3-packet-schema" }
+
 # Async runtime
 tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "sync", "time"] }
 futures = { workspace = true }

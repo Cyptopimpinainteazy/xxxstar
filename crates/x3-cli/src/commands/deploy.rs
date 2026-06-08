@@ -104,10 +104,12 @@ pub async fn execute(args: DeployArgs) -> Result<()> {
     let signer = x3_sdk::Sr25519Signer::from_seed(&seed);
     let client = client.with_signer(signer);
 
-    // Build deployment Comit
+    // Build deployment Comit — use evm_deploy to construct a valid
+    // Packet::Evm(EvmPacket::Deploy{..}) for the packet-validated
+    // submit_comit path.
     let gas_limit = args.gas_limit.unwrap_or(1_000_000);
 
-    let comit = ComitBuilder::evm(&bytecode)
+    let comit = ComitBuilder::evm_deploy(bytecode)
         .with_evm_gas_limit(gas_limit)
         .with_auto_fee()
         .build()?;

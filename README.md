@@ -105,15 +105,17 @@ cargo test --workspace
 
 ## CI
 
-All merges to `main` require all jobs in `.github/workflows/ci.yml` to pass:
+All merges to `main` require the `x3 / critical-path-all-pass` check (9 worker jobs + 1 aggregate job in `.github/workflows/ci.yml`; the branch-protection required status check name is `x3 / critical-path-all-pass`):
 
-- Format, Clippy (deny warnings)
-- `cargo check -p x3-chain-runtime`
-- `cargo check -p x3-chain-node`
-- `cargo test -p pallet-x3-cross-vm-router` (13 production-proof tests)
-- `cargo test -p pallet-x3-supply-ledger`
-- `cargo test -p pallet-x3-settlement-engine`
-- `cargo test -p pallet-x3-atomic-kernel`
+- `cargo fmt --all -- --check` — format gate
+- `cargo check -p x3-chain-runtime` — runtime compile gate
+- `cargo check -p x3-chain-node` — node compile gate
+- `cargo test -p pallet-x3-cross-vm-router` — 6-route matrix, invariants, replay protection (8 named production-proof tests verified individually)
+- `cargo test -p pallet-x3-supply-ledger` — canonical supply invariant
+- `cargo test -p pallet-x3-settlement-engine` — atomic settlement state machine
+- `cargo test -p pallet-x3-atomic-kernel` — bundle lifecycle + PoAE proof
+- `cargo clippy --workspace --all-targets -- -D warnings` — workspace-wide lint gate
+- `cargo build --release -p x3-chain-node` — release binary gate
 
 ---
 

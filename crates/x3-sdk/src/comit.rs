@@ -7,6 +7,10 @@ use crate::error::{AtlasError, Result};
 use crate::types::{Balance, BlockNumber, ComitPayload, Gas, Nonce};
 use crate::utils::compute_prepare_root;
 use crate::{MAX_COMBINED_PAYLOAD_SIZE, MAX_EVM_PAYLOAD_SIZE, MAX_SVM_PAYLOAD_SIZE};
+use codec::Encode;
+use x3_packet_schema::{
+    EvmCall, EvmPacket, Packet, SvmAccount, SvmDeployMetadata, SvmPacket, U256,
+};
 
 /// Default EVM gas limit
 pub const DEFAULT_EVM_GAS_LIMIT: Gas = 500_000;
@@ -51,9 +55,95 @@ impl ComitBuilder {
         Self::default()
     }
 
-    /// Create a new EVM-only Comit builder.
+    /// Create a new EVM-only Comit builder with raw payload.
+    ///
+    /// **Deprecated for `submit_comit`**: The kernel's `submit_comit` extrinsic
+    /// now requires SCALE-encoded [`Packet`] objects with proper domain
+    /// validation.  Use [`evm_deploy`](Self::evm_deploy),
+    /// [`evm_call`](Self::evm_call), or [`evm_batch`](Self::evm_batch)
+    /// for the packet-validated path.  This method remains for the legacy
+    /// `submit_comit_raw` path that accepts arbitrary byte payloads.
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use evm_deploy(), evm_call(), or evm_batch() for the packet-validated submit_comit path"
+    )]
     pub fn evm(payload: impl AsRef<[u8]>) -> Self {
         Self::new().with_evm_payload(payload)
+    }
+
+    /// Create an EVM Deploy packet from contract bytecode.
+    ///
+    /// Produces `Packet::Evm(EvmPacket::Deploy { bytecode, args: vec![], value: 0 })`
+    /// and SCALE-encodes it for submission via `submit_comit` (packet-validated path).
+    pub fn evm_deploy(bytecode: Vec<u8>) -> Self {
+        let packet = Packet::Evm(EvmPacket::Deploy {
+            bytecode,
+            args: Vec::new(),
+            value: U256::zero(),
+        });
+        let encoded = packet.encode();
+        Self::new().with_evm_payload(encoded)
+    }
+
+    /// Create an EVM Call packet.
+    ///
+    /// Produces `Packet::Evm(EvmPacket::Call { contract, function_selector, args, value })`
+    /// and SCALE-encodes it for submission via `submit_comit` (packet-validated path).
+    pub fn evm_call(
+        contract: [u8; 20],
+        function_selector: [u8; 4],
+        args: Vec<u8>,
+        value: U256,
+    ) -> Self {
+        let packet = Packet::Evm(EvmPacket::Call {
+            contract,
+            function_selector,
+            args,
+            value,
+        });
+        let encoded = packet.encode();
+        Self::new().with_evm_payload(encoded)
+    }
+
+    /// Create an EVM Batch packet from a list of (call, value) pairs.
+    pub fn evm_batch(calls: Vec<(EvmCall, Option<U256>)>, continue_on_revert: bool) -> Self {
+        let packet = Packet::Evm(EvmPacket::Batch {
+            calls,
+            continue_on_revert,
+        });
+        let encoded = packet.encode();
+        Self::new().with_evm_payload(encoded)
+    }
+
+    /// Create an SVM Invoke packet.
+    ///
+    /// Produces `Packet::Svm(SvmPacket::Invoke { program_id, accounts, data })`
+    /// and SCALE-encodes it for submission via `submit_comit` (packet-validated path).
+    pub fn svm_invoke(program_id: [u8; 32], accounts: Vec<SvmAccount>, data: Vec<u8>) -> Self {
+        let packet = Packet::Svm(SvmPacket::Invoke {
+            program_id,
+            accounts,
+            data,
+        });
+        let encoded = packet.encode();
+        Self::new().with_svm_payload(encoded)
+    }
+
+    /// Create an SVM Deploy packet.
+    ///
+    /// Produces `Packet::Svm(SvmPacket::Deploy { bytecode, metadata })`
+    /// and SCALE-encodes it for submission via `submit_comit` (packet-validated path).
+    pub fn svm_deploy(bytecode: Vec<u8>, name: String, version: String) -> Self {
+        let packet = Packet::Svm(SvmPacket::Deploy {
+            bytecode,
+            metadata: SvmDeployMetadata {
+                name,
+                version,
+                upgrade_authority: None,
+            },
+        });
+        let encoded = packet.encode();
+        Self::new().with_svm_payload(encoded)
     }
 
     /// Create a new SVM-only Comit builder.
@@ -241,6 +331,14 @@ pub fn evm_comit(payload: impl AsRef<[u8]>) -> ComitBuilder {
 }
 
 /// Create an SVM-only Comit transaction.
+///
+/// **Deprecated for `submit_comit`**: Use [`ComitBuilder::svm_invoke`]
+/// or [`ComitBuilder::svm_deploy`] for the packet-validated path.
+/// This function remains for the legacy `submit_comit_raw` path.
+#[deprecated(
+    since = "0.2.0",
+    note = "Use svm_invoke() or svm_deploy() for the packet-validated submit_comit path"
+)]
 pub fn svm_comit(payload: impl AsRef<[u8]>) -> ComitBuilder {
     ComitBuilder::svm(payload)
 }

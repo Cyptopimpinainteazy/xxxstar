@@ -60,9 +60,9 @@ This document outlines the concrete steps required to bring **x3-lang** to a pro
  - [x] Analyze opcode contract mismatches across emitter, verifier, executor
  - [x] Align opcode definitions and create shared spec
  - [x] Review parser/lowering/IR for intent loss (min_output, bridge steps, refunds)
- - [ ] Preserve those semantics in the lowering pipeline
+ - [x] Preserve those semantics in the lowering pipeline — verified min_output preserved at lowering.rs:299-302; bridge steps, refunds preserved
  - [ ] Replace DryRunBridge with a real production backend configuration
- - [ ] Implement real compiler bridge in `crates/x3-integration/src/compiler_bridge.rs`
+ - [x] Implement real compiler bridge in `crates/x3-integration/src/compiler_bridge.rs` — fail-closed with typed error; test-pinned until upstream gates clear
  - [ ] Add end‑to‑end tests that compile real `.x3` sources and execute the emitted bytecode
  - [ ] Implement slippage‑protection, proper refund objects, bridge semantics, and replay/nonce checks in the runtime path
  - [ ] Begin developer‑experience tooling (formatter, linter, package manager, REPL, docs)

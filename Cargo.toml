@@ -50,6 +50,8 @@ members = [
     "pallets/x3-automation",
     # DEX pallet for AMM operations
     "pallets/x3-dex",
+    # LP Locker pallet for anti-rug LP token locking
+    "pallets/x3-lp-locker",
     # Concrete implementations of x3-vm BalanceProvider + CrossVmEscrow for node use
     # Phase 4: Unified RPC operational policy layer (health scoring + failover)
     "tests/e2e",

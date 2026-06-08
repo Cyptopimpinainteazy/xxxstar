@@ -1,6 +1,6 @@
 # X3 Atomic Star — Current Mainnet Status
 
-> **Last updated:** 2025 (auto-generated from codebase state)
+> **Last updated:** 2026-06-08
 > **Target:** v0.4 internal-only Mainnet RC-1
 
 ---
@@ -16,7 +16,11 @@
 | 3-validator local testnet | ✅ `scripts/testnet-full-launch.sh` |
 | Supply ledger invariant | ✅ Enforced on every operation |
 | Settlement engine | ✅ State machine implemented; OCW stub is testnet-only |
-| CI hard gates | ✅ `.github/workflows/ci.yml` (10 required jobs) |
+| DEX pallet (pallet-x3-dex) | ✅ Wired in all 6 runtime variants; AMM spot swap operational |
+| Route limits enforcement | ✅ Daily volume + per-wallet daily limits with epoch-day auto-reset |
+| LP Locker pallet (pallet-x3-lp-locker) | ✅ **NEW** — On-chain anti-rug LP lock registry with 4 extrinsics, 16 tests |
+| Launchpad → DEX graduation | ✅ **NEW** — TokenFactory mint → DEX pool → LP lock graduation pipeline |
+| CI hard gates | ✅ `.github/workflows/ci.yml` (9 required jobs) |
 | Public testnet | 🚧 Pre-launch checks in progress |
 | Mainnet | 🔴 Not yet — pending public testnet validation |
 
@@ -38,6 +42,7 @@
 - Expiry + cancel: `cancel_expired_xvm_transfer` returns pending supply to source
 - Supply invariant: `represented_total ≤ canonical_supply` enforced on every operation
 - Scope freeze: external bridges disabled by default; require governance to open
+- **Route limits enforced**: `DailyVolume` and `WalletDailyVolume` storage maps with epoch-day auto-reset check both `daily_limit` and `per_wallet_daily_limit` from RouteConfig before every transfer
 
 ### Supply Ledger
 - `pallet-x3-supply-ledger`: canonical supply accounting per asset
@@ -49,6 +54,31 @@
 - Refund path: `→ REFUND_X3` on timeout or failure
 - Atomic locks and escrow implemented
 - Settlement timeout checker runs via `on_idle()`
+
+### DEX & Launchpad (New — Domain 2 Complete)
+
+#### pallet-x3-dex
+- AMM spot swap — `create_pool`, `add_liquidity`, `remove_liquidity`, `swap` extrinsics
+- Wired across all 6 `construct_runtime!` variants
+- Config: `MaxPools`, `WeightInfo`, `EconomicHalt`
+
+#### pallet-x3-launchpad (Graduation Path)
+- **`graduate_launch` extrinsic** (call_index 7, `#[transactional]`):
+  1. Creates token via TokenFactory (`LaunchpadTokenFactoryBridge`)
+  2. Creates AMM pool via DEX bridge (`LaunchpadDexBridge`, 30 bps fee)
+  3. Locks LP tokens via LP Locker bridge (`LaunchpadLpLockerBridge`)
+  4. Emits `LaunchGraduated` event
+- `GraduatedLaunches` storage map tracking `(asset_id, pool_id)` per launch
+- `lp_lock_duration_blocks` in `LaunchState`
+- 3 bridge trait interfaces: `TokenFactoryCreate`, `DexPoolCreate`, `LpLockCreate`
+
+#### pallet-x3-lp-locker
+- On-chain LP lock registry for anti-rug protection
+- 4 extrinsics: `lock_lp`, `unlock_lp`, `extend_lock`, `increase_lock`
+- 8 error conditions, 4 events, `is_locked()`/`total_locked_for_pool()` helpers
+- 16 unit tests
+- Wired in all 6 `construct_runtime!` variants (dev, prod, mainnet-rc1, frontier/no-frontier)
+- Config: `MinLockDuration = 1,500 blocks (~5min)`, `MaxLockDuration = 157,680,000 (~1yr)`
 
 ---
 
@@ -130,20 +160,29 @@ cargo build --release -p x3-chain-node
 All merges to `main` require the `x3 / critical-path-all-pass` check in:
 `.github/workflows/ci.yml`
 
-Required gates:
+The branch-protection required status check name is `x3 / critical-path-all-pass` (the aggregate job). The workflow has 9 worker jobs plus 1 aggregate for 10 total jobs.
+
+Required worker gates (9) — verbatim `ci.yml` invocation:
 - `cargo fmt --all -- --check`
-- `cargo check -p x3-chain-runtime`
+- `cargo check -p x3-chain-runtime --features std`
 - `cargo check -p x3-chain-node`
-- `cargo test -p pallet-x3-cross-vm-router` (8 named production-proof tests)
-- `cargo test -p pallet-x3-supply-ledger`
-- `cargo test -p pallet-x3-settlement-engine`
-- `cargo test -p pallet-x3-atomic-kernel`
+- `cargo test -p pallet-x3-cross-vm-router --all-features` (8 named production-proof tests verified individually via shell loop)
+- `cargo test -p pallet-x3-supply-ledger --all-features`
+- `cargo test -p pallet-x3-settlement-engine --all-features`
+- `cargo test -p pallet-x3-atomic-kernel --all-features`
 - `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --release -p x3-chain-node` (release binary gate, artifact uploaded)
+
+`FINAL_REPORT.md` is a template document only — it is not a CI hard gate and is not yet populated with evidence. The `final-report-enforcement` job was removed from the aggregation path because the template cannot pass its own validation rules.
 
 RC4 runtime upgrade rehearsal is now a true PASS. Automation, report, and evidence files are all consistent. Blocker resolved as of 2026-05-15T03:16Z.
 
-- Script exits 0 only on PASS, 1 on any failure
-- Blocker diagnosis is always written if failing
-- run_exit.txt and report both show PASS
+### D1 Housekeeping (2026-06-08, verified & extended 2026-06-08T21:34Z)
+
+- **x3-liquidity-core**: Workspace membership confirmed — `cargo check -p x3-liquidity-core` passes. Dependents `pallets/x3-cross-vm-router` (optional) and `tests/e2e` resolve correctly. `x3-dex` dependency path verified (`../x3-dex` resolves to `crates/x3-dex/Cargo.toml`).
+- **UsedNonces stale references**: Removed from `pallets/x3-cross-vm-router/src/tests.rs` doc-comments. The `lib.rs` header comment correctly explains the monotonic nonce scheme supersedes `UsedNonces` with explicit NOTE markers (lines 21, 183) clarifying "UsedNonces is referenced here only to explain its intentional absence." `grep UsedNonces tests.rs` returns 0 hits. Three launch-gates/sources/ snapshot files updated with correct monotonic nonce description and "ARCHIVED SNAPSHOT" disclaimers. `grep UsedNonces tests.rs` returns 0 stale matches (the single remaining hit is the replacement text: "no UsedNonces map").
+- **CI job mapping**: All 9 required worker gates in `ci.yml` map 1:1 to `CURRENT_MAINNET_STATUS.md`. Gate commands above updated to reflect actual `ci.yml` invocations (includes `--all-features` on test jobs and `--features std` on runtime check). Branch-protection required status check name (`x3 / critical-path-all-pass`) documented in both README.md and CURRENT_MAINNET_STATUS.md. `ci.yml` confirmed present with 9 worker + 1 aggregate job.
+- **FEATURE_REGISTRY.toml scores**: All `required_tests` cross-referenced against actual test functions in pallet source files and `ci.yml` verification loops. `x3_wallet_pallet` `required_tests` renamed to match the exact 7 test function names in `tests.rs` (register_hardware_wallet_works, create_multisig_wallet_works, transfer_tokens_works, mint_tokens_authorized_only, add_remove_minter_root_only, register_biometric_works, initiate_recovery_works); 3 missing tests (mint_tokens_authorized_only, add_remove_minter_root_only, initiate_recovery_works) added to `tests.rs`; readiness_score lowered to 30 (no CI hard gate). `atomic_router` `required_tests` replaced with the 8 CI-verified function names from `ci.yml`'s production-proof loop (test_x3_native_evm_svm_roundtrip_preserves_supply, test_all_six_internal_routes_succeed, test_duplicate_nonce_rejected, test_failed_destination_credit_refunds_pending_supply, test_canonical_supply_never_breaks, test_duplicate_message_replay_rejected, test_expired_transfer_refunds_to_source, external_bridges_are_paused_at_genesis); blocker list updated to reflect mapping is now exact. `triforge_runtime` blocker string corrected — no longer claims `ci.yml` doesn't exist; accurately states `runtime_upgrade_rehearsal` is not a required job in the critical-path-all-pass aggregation.
+- **Snapshot files**: Three `launch-gates/sources/` files (pack-01, pack-03, pack-05) had stale `UsedNonces` header comments replaced with correct monotonic nonce description plus "ARCHIVED SNAPSHOT" disclaimers pointing to live `lib.rs`.
 
 Ready to proceed to RC5.

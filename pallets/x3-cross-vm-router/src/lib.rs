@@ -18,6 +18,7 @@
 //      * `UsedMessages` — any derived `message_id` can be consumed once.
 //      * `NextNonce` / `NonceBatchAllocation` — monotonic per-(source_domain,
 //        sender) nonce sequence. Batch allocation (default 100 slots) reduces
+// NOTE: UsedNonces is referenced here only to explain its intentional absence.
 //        storage contention. A `UsedNonces` point-lookup map is intentionally
 //        absent: the monotonic `NextNonce` subsumes per-sender dedup (see
 //        line comment in `do_initiate_transfer`). Old intents with a lower
@@ -180,6 +181,7 @@ pub mod pallet {
     ///
     /// Senders must submit strictly monotonic nonces; duplicates are rejected.
     ///
+    /// NOTE: UsedNonces is referenced here only to explain its intentional absence.
     /// Design note: this storage replaces the `UsedNonces` per-message point-
     /// lookup map that appears in some older design docs. The monotonic nonce
     /// guarantee is strictly stronger: any nonce ≤ `NextNonce - 1` is a replay

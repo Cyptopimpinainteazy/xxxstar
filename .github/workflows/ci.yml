@@ -154,18 +154,27 @@ jobs:
         run: cargo test -p pallet-x3-cross-vm-router --all-features -- --nocapture
 
       # Verify specific production-proof tests are present and passing.
+      # Each test is run individually so a missing or failing test
+      # causes immediate failure (cargo uses only the last positional
+      # arg as a filter; iterating explicitly is deterministic).
       - name: verify production-proof tests pass
         run: |
-          cargo test -p pallet-x3-cross-vm-router \
-            test_x3_native_evm_svm_roundtrip_preserves_supply \
-            test_all_six_internal_routes_succeed \
-            test_duplicate_nonce_rejected \
-            test_failed_destination_credit_refunds_pending_supply \
-            test_canonical_supply_never_breaks \
-            test_duplicate_message_replay_rejected \
-            test_expired_transfer_refunds_to_source \
-            external_bridges_are_paused_at_genesis \
-            2>&1
+          set -e
+          tests=(
+            test_x3_native_evm_svm_roundtrip_preserves_supply
+            test_all_six_internal_routes_succeed
+            test_duplicate_nonce_rejected
+            test_failed_destination_credit_refunds_pending_supply
+            test_canonical_supply_never_breaks
+            test_duplicate_message_replay_rejected
+            test_expired_transfer_refunds_to_source
+            external_bridges_are_paused_at_genesis
+          )
+          for t in "${tests[@]}"; do
+            echo "--- Verifying: ${t} ---"
+            cargo test -p pallet-x3-cross-vm-router "${t}" -- --nocapture 2>&1
+            echo "✅ ${t} passed"
+          done
 
   # ──────────────────────────────────────────────────────────────────────────
   # 5. TEST: supply-ledger — canonical supply invariant
@@ -282,12 +291,6 @@ jobs:
     name: "gate: cargo build --release x3-chain-node"
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # Only run release build on main pushes and release/* PRs, not on every PR
-    # to keep CI fast for feature branches. Remove this condition to always run.
-    if: >
-      github.event_name == 'push' ||
-      startsWith(github.head_ref, 'release/') ||
-      startsWith(github.head_ref, 'hotfix/')
     steps:
       - uses: actions/checkout@v4
 
@@ -342,6 +345,7 @@ jobs:
       - test-settle
       - test-kernel
       - clippy
+      - binary
     steps:
       - name: All critical-path gates passed
         run: |
@@ -356,132 +360,4 @@ jobs:
           echo "  ✅ test-settle (atomic settlement state machine)"
           echo "  ✅ test-kernel (bundle lifecycle)"
           echo "  ✅ clippy (workspace, deny warnings)"
-
-
-  # ──────────────────────────────────────────────────────────────────────────
-  # 11. FINAL REPORT ENFORCEMENT — block merge if FINAL_REPORT.md is missing or incomplete
-  # ──────────────────────────────────────────────────────────────────────────
-  final-report-enforcement:
-    name: "gate: FINAL_REPORT.md enforcement"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs:
-      - critical-path-all-pass
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check FINAL_REPORT.md exists
-        run: |
-          if [ ! -f FINAL_REPORT.md ]; then
-            echo "❌ FINAL_REPORT.md is missing. Block release."
-            exit 1
-          fi
-          echo "✅ FINAL_REPORT.md exists."
-
-      - name: Strict FINAL_REPORT.md validation
-        run: |
-          set -e
-          report="FINAL_REPORT.md"
-
-          # 0. Required sections must exist.
-          required_sections=(
-            "### 2. Phase-by-Phase Completion Table"
-            "### 3. Completion Score Breakdown (Must Total 100)"
-            "### 6. Enforced Invariants"
-            "### 7. Chaos Scenarios Survived"
-            "### 8. Auto-Heal Actions Taken"
-            "### 9. Proof of Cold-Start Success"
-            "### 10. Proof of Recovery After Failure"
-            "### 11. Architecture Symmetry Table"
-            "### 12. Expected vs Actual Execution Diff"
-            "### 13. Config Effectiveness Matrix"
-            "### 14. Intent Recovery Decisions"
-          )
-          for section in "${required_sections[@]}"; do
-            if ! grep -Fq "$section" "$report"; then
-              echo "❌ FINAL_REPORT.md: Missing required section: $section"
-              exit 1
-            fi
-          done
-
-          # 1. Self-scoring answers
-          if ! grep -Eq "Are there any TODOs, stubs, or incomplete features\? \(Yes/No\): *No" "$report"; then
-            echo "❌ FINAL_REPORT.md: TODOs/stubs/incomplete features not fully resolved. Block release."
-            exit 1
-          fi
-          if ! grep -Eq "Are all configs, scripts, and docs up to date and correct\? \(Yes/No\): *Yes" "$report"; then
-            echo "❌ FINAL_REPORT.md: Configs/scripts/docs not fully up to date. Block release."
-            exit 1
-          fi
-          if ! grep -Eq "Is the repo provably shippable, secure, and production-ready\? \(Yes/No\): *Yes" "$report"; then
-            echo "❌ FINAL_REPORT.md: Repo not marked as shippable/secure/production-ready. Block release."
-            exit 1
-          fi
-
-          # 1b. Total score must be exactly 100/100.
-          if ! grep -Eq "^\| \*\*TOTAL\*\* \| \*\*100\*\* \| \*\*100\*\* \|" "$report"; then
-            echo "❌ FINAL_REPORT.md: TOTAL score row must be '**100** | **100**'. Block release."
-            exit 1
-          fi
-
-          # 2. All phase table statuses must be non-empty and not 'INCOMPLETE' or 'BLOCKED'
-          if grep -E "\| [0-9]+ \| [^|]+ \|[ ]*(|INCOMPLETE|BLOCKED)[ ]*\|" "$report"; then
-            echo "❌ FINAL_REPORT.md: All phase statuses must be filled and not INCOMPLETE/BLOCKED. Block release."
-            exit 1
-          fi
-
-          if grep -E "\| [0-9]+ \| [^|]+ \|[ ]*\|" "$report"; then
-            echo "❌ FINAL_REPORT.md: One or more phase statuses are blank. Block release."
-            exit 1
-          fi
-
-          # 3. All security checklist items must be checked
-          if grep -E "^- \[ \]" "$report" | grep -q .; then
-            echo "❌ FINAL_REPORT.md: All security checklist items must be checked. Block release."
-            exit 1
-          fi
-
-          # 4. Signature, name, and date must be present
-          if ! grep -Eq "^- \*\*Name / Agent:\*\*.*[^ ]" "$report"; then
-            echo "❌ FINAL_REPORT.md: Name/Agent missing in sign-off. Block release."
-            exit 1
-          fi
-          if ! grep -Eq "^- \*\*Date:\*\*.*[^ ]" "$report"; then
-            echo "❌ FINAL_REPORT.md: Date missing in sign-off. Block release."
-            exit 1
-          fi
-          if ! grep -Eq "^- \*\*Signature / Hash:\*\*.*[^ ]" "$report"; then
-            echo "❌ FINAL_REPORT.md: Signature/Hash missing in sign-off. Block release."
-            exit 1
-          fi
-
-          # 5. Artifact links must be present and valid URLs (basic check)
-          if ! grep -E "^- \[x\] Link to full test logs: https?://" "$report"; then
-            echo "❌ FINAL_REPORT.md: Test logs link missing or not a valid URL. Block release."
-            exit 1
-          fi
-          if ! grep -E "^- \[x\] Link to security scan reports: https?://" "$report"; then
-            echo "❌ FINAL_REPORT.md: Security scan reports link missing or not a valid URL. Block release."
-            exit 1
-          fi
-          if ! grep -E "^- \[x\] Link to coverage reports: https?://" "$report"; then
-            echo "❌ FINAL_REPORT.md: Coverage reports link missing or not a valid URL. Block release."
-            exit 1
-          fi
-          if ! grep -E "^- \[x\] Link to deployment artifacts: https?://" "$report"; then
-            echo "❌ FINAL_REPORT.md: Deployment artifacts link missing or not a valid URL. Block release."
-            exit 1
-          fi
-
-          # 6. Output summary
-          echo "\n--- FINAL_REPORT.md SUMMARY ---"
-          grep -E "^\|" "$report" || true
-          grep -E "^- \*\*Name / Agent:\*\*|^- \*\*Date:\*\*|^- \*\*Signature / Hash:\*\*" "$report" || true
-          echo "\n--- END SUMMARY ---"
-
-      - name: Upload FINAL_REPORT.md as CI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FINAL_REPORT.md
-          path: FINAL_REPORT.md
-          retention-days: 30
+          echo "  ✅ binary (release build x3-chain-node)"

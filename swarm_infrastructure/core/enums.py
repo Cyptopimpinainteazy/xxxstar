@@ -18,6 +18,7 @@ class Domain(str, Enum):
     INFRASTRUCTURE = "INFRASTRUCTURE"
     NARRATIVE = "NARRATIVE"
     CROSS_DOMAIN = "CROSS_DOMAIN"
+    FREE_BUFF = "FREE_BUFF"
 
 
 class Outcome(str, Enum):

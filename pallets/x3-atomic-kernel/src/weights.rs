@@ -48,6 +48,9 @@ pub trait WeightInfo {
     
     /// Record Flash Finality anchor (unsigned OCW path).
     fn record_flash_finality_anchor() -> Weight;
+
+    /// Record a single leg execution receipt (unsigned OCW path).
+    fn record_leg_execution_receipt() -> Weight;
 }
 
 /// Weights for `pallet_x3_atomic_kernel` using the Substrate node and recommended hardware.
@@ -114,6 +117,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(1_u64))
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
+
+    /// Storage: `BundleLegReceipts` (r:1 w:1)
+    fn record_leg_execution_receipt() -> Weight {
+        Weight::from_parts(12_000_000, 1_000)
+            .saturating_add(T::DbWeight::get().reads(1_u64))
+            .saturating_add(T::DbWeight::get().writes(1_u64))
+    }
 }
 
 /// For testing: unit weights that don't scale with DB operations.
@@ -135,5 +145,8 @@ impl WeightInfo for () {
     }
     fn record_flash_finality_anchor() -> Weight {
         Weight::from_parts(3_000, 0)
+    }
+    fn record_leg_execution_receipt() -> Weight {
+        Weight::from_parts(5_000, 0)
     }
 }

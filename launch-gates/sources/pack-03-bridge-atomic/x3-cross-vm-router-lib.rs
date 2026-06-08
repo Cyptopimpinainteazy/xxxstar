@@ -16,8 +16,10 @@
 //
 //   1. **Replay protection (two layers).**
 //      * `UsedMessages` — any derived `message_id` can be consumed once.
-//      * `UsedNonces` — per-(source_domain, sender, nonce) dedup so resubmitting
-//        the same intent under a new message id still fails.
+//      * `NextNonce` / `NonceBatchAllocation` — monotonic per-(source_domain,
+//        sender) nonce sequence. A `UsedNonces` point-lookup map is intentionally
+//        absent: the monotonic nonce guarantee is strictly stronger.
+// ARCHIVED SNAPSHOT — live implementation is in pallets/x3-cross-vm-router/src/lib.rs.
 //
 //   2. **State machine.** Every status transition goes through
 //      `TransferStatus::can_transition_to`. Illegal transitions are rejected.

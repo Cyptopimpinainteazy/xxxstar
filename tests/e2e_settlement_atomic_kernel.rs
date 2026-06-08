@@ -6,16 +6,6 @@
 //! kernel integration paths.  They are written as documentation to guide future
 //! implementation.  They are NOT executable assertions.
 //!
-//! To make these tests real, you must:
-//! 1. Wire a concrete runtime with `pallet-x3-atomic-kernel`,
-//!    `pallet-x3-settlement-engine`, `pallet-x3-cross-vm-router`, and
-//!    `pallet-x3-kernel`.
-//! 2. Provide a running dev-node or an in-memory test runtime with
-//!    `sp_io::TestExternalities` + integration mock pallets.
-//! 3. Replace every `unimplemented!()` and todo stubs with real calls to
-//!    the pallet extrinsics (via `Pallet::<Runtime>::submit_atomic_bundle(...)`
-//!    etc.).
-//!
 //! ## Test Scenarios (Design)
 //!
 //! ### Scenario 1: Happy-path atomic bundle → settlement
@@ -40,11 +30,15 @@
 //! 4. Call `finalize_with_settlement` from the settlement gateway account.
 //! 5. Verify success.
 //!
+//! → **Executable regression tests for this scenario live at**
+//! `pallets/x3-atomic-kernel/tests/e2e_settlement.rs`
+//!
 //! ### Scenario 4: Rollback with VM state reversion
 //!
-//! 1. Submit bundle, execute legs (populate state diffs).
+//! 1. Submit bundle, execute legs (populate state diffs via
+//!    `record_leg_execution_receipt`).
 //! 2. Rollback via `rollback_atomic_bundle(ExecutionFailed)`.
-//! 3. Verify `IncompleteVmRevert` event (or no event if all reverts OK).
+//! 3. Verify `IncompleteVmRevert` event (or no event if reverts succeed).
 //!
 //! ### Scenario 5: Cross-VM packet validation rejects bad packets
 //!

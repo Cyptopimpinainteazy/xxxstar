@@ -3,7 +3,13 @@
 //! Universal account registry for the X3 chain.
 //!
 //! This pallet tracks a canonical Atlas ID, optional account kind, and a
-//! cross-VM nonce for replay prevention across EVM / SVM / X3-VM flows.
+//! `CrossVmNonces` counter that serves as a non-consensus, application-layer
+//! helper (off-chain indexers, explorers, future application-level ordering).
+//! `CrossVmNonces` plays NO role in cross-VM replay protection — that is
+//! enforced entirely by `pallet-x3-cross-vm-router`'s `NextNonce` /
+//! `NonceBatchAllocation` storage (monotonic per-(domain, sender) sequence).
+//! See the deprecation notes on the `CrossVmNonces` storage and
+//! `anchor_nonce` extrinsic below.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

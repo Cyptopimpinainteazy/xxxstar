@@ -336,6 +336,40 @@ fn test_route_swap_min_output_reaches_ir() {
 }
 
 #[test]
+fn test_swap_min_output_survives_ir_to_bytecode_roundtrip() {
+    use x3_lang_compiler::X3IR;
+
+    // Build IR with a Swap operation carrying a non-zero min_output
+    let mut ir = X3IR::new();
+    ir.push(Operation::Swap {
+        from_chain: "ethereum".to_string(),
+        from_asset: "USDC".to_string(),
+        to_asset: "ETH".to_string(),
+        input_amount: 1000,
+        min_output: 777,
+        dex: Some("uniswap".to_string()),
+    });
+
+    let bytecode = x3_lang_compiler::emitter::emit_x3ir(&ir)
+        .expect("swap IR should emit to bytecode");
+
+    // Disassemble and confirm min_output appears in the human-readable trace
+    let trace = x3_lang_compiler::emitter::disassemble(&bytecode)
+        .expect("swap bytecode should disassemble");
+    assert!(
+        trace.contains("777"),
+        "disassembly should contain min_output value: {}",
+        trace
+    );
+
+    // Bytecode should contain the swap opcode (0x24)
+    assert!(
+        bytecode.contains(&0x24u8),
+        "bytecode should emit SWAP opcode (0x24)"
+    );
+}
+
+#[test]
 fn test_route_bridge_light_client_proof_inputs_reach_ir() {
     let source = r#"
         intent proofed_bridge {

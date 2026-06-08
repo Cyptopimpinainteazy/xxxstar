@@ -1145,17 +1145,18 @@ fn wrong_sender_type_rejected() {
 // PHASE 3 — PRODUCTION PROOF TESTS
 // Required by the X3 production gameplan. These prove the three flows that
 // MUST hold before public testnet:
-//   1. Duplicate nonce rejected (UsedNonces store dedup, not just message ID)
+//   1. Duplicate nonce rejected (NextNonce monotonic dedup — no UsedNonces map)
 //   2. Failed destination credit refunds pending supply (supply bookkeeping)
 //   3. Canonical supply NEVER breaks across many transfers (stress invariant)
 // ============================================================================
 
-/// Prove that the per-origin nonce dedup (`UsedNonces`) rejects a transfer
-/// that reuses the same (source_domain, sender, nonce) triple even when the
-/// caller fabricates a new message_id by changing a field.
+/// Prove that the per-origin nonce dedup (`NextNonce` monotonic scheme) rejects
+/// a transfer that reuses the same (source_domain, sender, nonce) triple even
+/// when the caller fabricates a new message_id by changing a field.
 ///
-/// The `UsedMessages` store catches identical message_ids; `UsedNonces` is the
-/// second layer that prevents nonce recycling with any payload mutation.
+/// The `UsedMessages` store catches identical message_ids; `NextNonce`
+/// monotonicity is the second layer — any nonce ≤ current NextNonce is rejected
+/// as a replay.
 #[test]
 fn test_duplicate_nonce_rejected() {
     new_test_ext().execute_with(|| {

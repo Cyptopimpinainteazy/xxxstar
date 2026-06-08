@@ -322,3 +322,6 @@ try-runtime = [
 	"frame-system/try-runtime",
 	"pallet-x3-invariants/try-runtime",
 ]
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ["cfg(feature, values(\"dev\", \"frontier\", \"mainnet-rc1\"))"] }

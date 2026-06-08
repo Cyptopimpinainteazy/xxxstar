@@ -57,6 +57,11 @@ pub use comit::ComitBuilder;
 pub use error::{AtlasError, Result};
 pub use types::*;
 
+// Re-export x3-packet-schema types so SDK users don't need a direct dep
+pub use x3_packet_schema::{
+    EvmCall, EvmPacket, Packet, SvmAccount, SvmDeployMetadata, SvmPacket, U256,
+};
+
 /// SDK version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

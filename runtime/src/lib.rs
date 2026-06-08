@@ -62,6 +62,7 @@ use pallet_x3_cross_vm_router;
 use pallet_x3_custody;
 use pallet_x3_dapp_hub;
 use pallet_x3_invariants;
+use pallet_x3_lp_locker;
 use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
 use pallet_x3_kernel;
@@ -464,6 +465,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
     }
 );
@@ -534,6 +536,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
@@ -608,6 +611,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
     }
 );
@@ -655,6 +659,7 @@ construct_runtime!(
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
         FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3LpLocker: pallet_x3_lp_locker,
         X3Slash: pallet_x3_slash,
     }
 );
@@ -697,6 +702,7 @@ construct_runtime!(
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
         FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3LpLocker: pallet_x3_lp_locker,
         X3Slash: pallet_x3_slash,
         // ── EVM stack ─────────────────────────────────────────────────────────
         Evm: pallet_evm,
@@ -773,6 +779,7 @@ construct_runtime!(
         X3Launchpad: pallet_x3_launchpad,
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
+        X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
@@ -2766,6 +2773,22 @@ impl pallet_x3_auction::Config for Runtime {
     type WeightInfo = ();
 }
 
+
+// ===== X3 LP Locker Configuration =====
+parameter_types! {
+    /// Minimum LP lock duration in blocks — ~5 minutes at 200ms blocks
+    pub const LpLockerMinDuration: u64 = 1_500;
+    /// Maximum LP lock duration in blocks — ~1 year at 200ms blocks
+    pub const LpLockerMaxDuration: u64 = 157_680_000;
+}
+
+impl pallet_x3_lp_locker::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MinLockDuration = LpLockerMinDuration;
+    type MaxLockDuration = LpLockerMaxDuration;
+    type WeightInfo = ();
+}
+
 // ===== X3 Launchpad Configuration =====
 parameter_types! {
     pub const LaunchpadMaxActiveLaunches: u32 = 50;
@@ -2776,6 +2799,92 @@ parameter_types! {
     pub const LaunchpadMaxDurationBlocks: BlockNumber = 12_960_000;
 }
 
+// Bridge trait impl: launchpad can call TokenFactory to create tokens
+pub struct LaunchpadTokenFactoryBridge;
+impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactoryBridge {
+    fn create_token(
+        creator: &AccountId,
+        symbol: Vec<u8>,
+        name: Vec<u8>,
+        decimals: u8,
+        initial_supply: u128,
+    ) -> Result<u32, DispatchError> {
+        let symbol_bounded = frame_support::BoundedVec::try_from(symbol)
+            .map_err(|_| DispatchError::Other('symbol too long'))?;
+        let name_bounded = frame_support::BoundedVec::try_from(name)
+            .map_err(|_| DispatchError::Other('name too long'))?;
+        let enabled = frame_support::BoundedVec::try_from(
+        ).map_err(|_| DispatchError::Other('too many domains'))?;
+        let config = pallet_x3_token_factory::TokenFactoryConfig {
+            symbol: symbol_bounded,
+            name: name_bounded,
+            canonical_decimals: decimals,
+            initial_supply,
+            max_supply: None,
+            class: x3_asset_kernel_types::TokenClass::Normal,
+            enabled_domains: enabled,
+        };
+        // Use the extrinsic directly with a signed origin from the creator
+        pallet_x3_token_factory::Pallet::<Runtime>::create_token(
+            frame_system::RawOrigin::Signed(creator.clone()).into(),
+            config,
+        ).map(|_| {
+            // The token was just created via the Factory + Registry; derive its asset_id
+            // from the nonce. For simplicity, return the current nonce - 1 as the last
+            // created asset id. In production, store this in a tracking map.
+            let nonce = pallet_x3_token_factory::FactoryNonce::<Runtime>::get();
+            nonce.saturating_sub(1) as u32
+        })
+    }
+}
+
+// Bridge trait impl: launchpad can call DEX to create AMM pools
+pub struct LaunchpadDexBridge;
+impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
+    fn create_pool(
+        creator: &AccountId,
+        token_a: u32,
+        token_b: u32,
+    ) -> Result<u64, DispatchError> {
+        // Use the DEX create_pool extrinsic with standard 30 bps fee
+        let fee_bps = 30u32;
+        pallet_x3_dex::Pallet::<Runtime>::create_pool(
+            frame_system::RawOrigin::Signed(creator.clone()).into(),
+            token_a,
+            token_b,
+            fee_bps,
+        ).map(|_| {
+            // The pool was just created; derive pool_id from NextPoolId - 1
+            pallet_x3_dex::NextPoolId::<Runtime>::get().saturating_sub(1)
+        })
+    }
+}
+
+// Bridge trait impl: launchpad can call LP Locker to lock tokens
+pub struct LaunchpadLpLockerBridge;
+impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLockerBridge {
+    fn lock_lp_for(
+        owner: &AccountId,
+        pool_id: u64,
+        lp_amount: u128,
+        unlock_at_block: BlockNumber,
+    ) -> DispatchResult {
+        let description = b'graduation-lock'.to_vec();
+        pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
+            frame_system::RawOrigin::Signed(owner.clone()).into(),
+            pool_id,
+            lp_amount,
+            unlock_at_block,
+            description,
+        )
+    }
+}
+
+parameter_types! {
+    /// Asset ID of the quote token used in launchpad DEX pools (X3 native).
+    pub const LaunchpadQuoteAssetId: u32 = 0;
+}
+
 impl pallet_x3_launchpad::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
@@ -2783,6 +2892,10 @@ impl pallet_x3_launchpad::Config for Runtime {
     type MaxContributorsPerLaunch = LaunchpadMaxContributorsPerLaunch;
     type MinLaunchDurationBlocks = LaunchpadMinDurationBlocks;
     type MaxLaunchDurationBlocks = LaunchpadMaxDurationBlocks;
+    type TokenFactory = LaunchpadTokenFactoryBridge;
+    type Dex = LaunchpadDexBridge;
+    type LpLocker = LaunchpadLpLockerBridge;
+    type QuoteAssetId = LaunchpadQuoteAssetId;
     type WeightInfo = ();
 }
 

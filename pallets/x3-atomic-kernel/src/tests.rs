@@ -668,6 +668,120 @@ fn test_leg_receipt_encode_decode_roundtrip() {
     assert_eq!(decoded.finalized_block, receipt.finalized_block);
 }
 
+// ── OCW leg receipt key protocol tests ────────────────────────────────────
+//
+// These tests verify the pallet OCW's leg-receipt key convention agrees
+// with what the off-chain executor writes to off-chain local storage.
+// Key: b"x3leg:" (6) + bundle_id (32) + leg_index LE u32 (4) = 42 bytes
+// Value: SCALE-encoded StateDiff
+
+/// OCW leg key = b"x3leg:" (6) + bundle_id (32) + leg_index_le (4) = 42 bytes.
+#[test]
+fn test_ocw_leg_key_is_42_bytes_with_correct_prefix() {
+    let bundle_id = H256::repeat_byte(0xCC);
+    let leg_index: u32 = 5;
+
+    let mut key = b"x3leg:".to_vec();
+    key.extend_from_slice(bundle_id.as_bytes());
+    key.extend_from_slice(&leg_index.to_le_bytes());
+
+    assert_eq!(
+        key.len(),
+        42,
+        "leg key must be 42 bytes (6 prefix + 32 bundle_id + 4 LE u32)"
+    );
+    assert_eq!(&key[..6], b"x3leg:", "key must start with 'x3leg:'");
+    assert_eq!(&key[6..38], bundle_id.as_bytes());
+    let decoded_leg = u32::from_le_bytes(key[38..42].try_into().unwrap());
+    assert_eq!(decoded_leg, leg_index, "leg_index must roundtrip");
+}
+
+/// OCW leg keys must be unique per (bundle_id, leg_index) pair.
+#[test]
+fn test_ocw_leg_keys_are_unique_per_bundle_and_leg() {
+    let bundle_id = H256::repeat_byte(0xDD);
+
+    let key_leg0: Vec<u8> = {
+        let mut k = b"x3leg:".to_vec();
+        k.extend_from_slice(bundle_id.as_bytes());
+        k.extend_from_slice(&0u32.to_le_bytes());
+        k
+    };
+    let key_leg1: Vec<u8> = {
+        let mut k = b"x3leg:".to_vec();
+        k.extend_from_slice(bundle_id.as_bytes());
+        k.extend_from_slice(&1u32.to_le_bytes());
+        k
+    };
+    assert_ne!(
+        key_leg0, key_leg1,
+        "distinct leg indices in same bundle must produce distinct keys"
+    );
+
+    // Different bundle, same leg index — keys must differ
+    let other_bundle = H256::repeat_byte(0xEE);
+    let key_other: Vec<u8> = {
+        let mut k = b"x3leg:".to_vec();
+        k.extend_from_slice(other_bundle.as_bytes());
+        k.extend_from_slice(&0u32.to_le_bytes());
+        k
+    };
+    assert_ne!(
+        key_leg0, key_other,
+        "same leg index in different bundles must produce distinct keys"
+    );
+}
+
+/// OCW value roundtrip: StateDiff SCALE-encode → decode must be deterministic.
+#[test]
+fn test_ocw_leg_value_state_diff_roundtrip() {
+    let diff = StateDiff::from(vec![0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02]);
+
+    // Encode (off-chain executor writer side)
+    let encoded = parity_scale_codec::Encode::encode(&diff);
+    assert!(
+        !encoded.is_empty(),
+        "SCALE-encoded StateDiff must be non-empty"
+    );
+
+    // Decode (OCW reader side — mirrors offchain_worker() leg scan)
+    let decoded: StateDiff =
+        parity_scale_codec::Decode::decode(&mut &encoded[..]).expect("decode should succeed");
+    assert_eq!(decoded, diff, "StateDiff must roundtrip through SCALE");
+}
+
+/// OCW key prefixes must not collide: x3leg vs x3fin vs x3ff.
+#[test]
+fn test_ocw_leg_key_prefix_does_not_collide_with_finality_or_cert() {
+    let bundle_id = H256::repeat_byte(0xBB);
+
+    let leg_key: Vec<u8> = {
+        let mut k = b"x3leg:".to_vec();
+        k.extend_from_slice(bundle_id.as_bytes());
+        k.extend_from_slice(&0u32.to_le_bytes());
+        k
+    };
+    let fin_key: Vec<u8> = {
+        let mut k = b"x3fin:".to_vec();
+        k.extend_from_slice(bundle_id.as_bytes());
+        k
+    };
+    let cert_key: Vec<u8> = {
+        let mut k = b"x3ff:".to_vec();
+        k.extend_from_slice(&42u64.to_le_bytes());
+        k
+    };
+
+    assert_ne!(
+        leg_key, fin_key,
+        "'x3leg:' keys must not collide with 'x3fin:' keys"
+    );
+    assert_ne!(
+        leg_key, cert_key,
+        "'x3leg:' keys must not collide with 'x3ff:' keys"
+    );
+}
+
 #[test]
 fn test_revert_error_variants() {
     let err = RevertError::InvalidStateDiff;

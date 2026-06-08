@@ -252,6 +252,33 @@ fn initiate_recovery_fails_without_guardian() {
     });
 }
 
+#[test]
+fn initiate_recovery_works() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        // Pre-seed a guardian record for ALICE so recovery can succeed.
+        let guardian = x3_wallet::GuardianAccount {
+            owner: [0u8; 32],
+            guardians: vec![[1u8; 32]],
+            threshold: 1,
+            recovery_delay_blocks: 100,
+            initiated_block: 0,
+        };
+        crate::RecoveryAccounts::<Test>::insert(ALICE, guardian);
+
+        assert_ok!(X3Wallet::initiate_recovery(
+            RuntimeOrigin::signed(ALICE),
+            [9u8; 32], // new owner
+        ));
+
+        System::assert_has_event(RuntimeEvent::X3Wallet(Event::RecoveryInitiated {
+            account: ALICE,
+            new_owner: [9u8; 32],
+        }));
+    });
+}
+
 // ============================================================================
 // Token Minting Tests
 // ============================================================================
@@ -302,6 +329,72 @@ fn mint_tokens_accumulates() {
         ));
 
         assert_eq!(X3Wallet::get_token_balance(&BOB, &token_id), 1500);
+    });
+}
+
+// ============================================================================
+// Minter Authorization Tests
+// ============================================================================
+
+#[test]
+fn mint_tokens_authorized_only() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        let token_id = [42u8; 32];
+
+        // BOB is not an authorized minter — mint should fail.
+        assert_noop!(
+            X3Wallet::mint_tokens(
+                RuntimeOrigin::signed(BOB),
+                token_id,
+                BOB,
+                100,
+            ),
+            Error::<Test>::Unauthorized
+        );
+    });
+}
+
+#[test]
+fn add_remove_minter_root_only() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        // Non-root (signed) call to add_minter must fail
+        assert_noop!(
+            X3Wallet::add_minter(RuntimeOrigin::signed(ALICE), BOB),
+            frame_support::error::BadOrigin
+        );
+
+        // Non-root (signed) call to remove_minter must fail
+        assert_noop!(
+            X3Wallet::remove_minter(RuntimeOrigin::signed(ALICE), ALICE),
+            frame_support::error::BadOrigin
+        );
+
+        // Root can add BOB as minter
+        assert_ok!(X3Wallet::add_minter(RuntimeOrigin::root(), BOB));
+
+        // BOB should now be an authorized minter
+        assert!(crate::Minters::<Test>::contains_key(BOB));
+
+        // Root can remove ALICE as minter
+        assert_ok!(X3Wallet::remove_minter(RuntimeOrigin::root(), ALICE));
+
+        // ALICE should no longer be authorized
+        assert!(!crate::Minters::<Test>::contains_key(ALICE));
+
+        // ALICE can no longer mint after removal
+        assert_noop!(
+            X3Wallet::mint_tokens(
+                RuntimeOrigin::signed(ALICE),
+                [42u8; 32],
+                BOB,
+                100,
+            ),
+            Error::<Test>::Unauthorized
+        );
     });
 }
 

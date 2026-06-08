@@ -113,34 +113,16 @@ The following features from original design documents are **not yet implemented*
 - ❌ Native binary / WASM / Bytecode output from Rust compiler
 - ❌ X3 Runtime Integration into chain runtime
 
-## Compilation Pipeline (Planned Architecture)
+## Compilation Pipeline (Current Production Surface)
 
 ```
-Source (.x3)
-    │
-    ▼
-┌─────────┐
-│  Lexer  │ ─── Tokenization — PARTIAL in Rust, working in Python
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│ Parser  │ ─── AST Construction — PARTIAL in Rust, working in Python
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│ Lowering│ ─── IR & Optimization — NOT IMPLEMENTED
-└────┬────┘
-     │
-     ▼
-┌─────────┐
-│ Emitter │ ─── Bytecode Generation — STUB only
-└────┬────┘
-     │
-     ▼
-Native Binary / WASM / Bytecode — NOT IMPLEMENTED
+Intent source  →  parser  →  AST  →  semantic verifier  →  IR  →  emitter  →  bytecode  →  verifier  →  dry-run VM
+                    ✓          ✓            ✓ (8 rules)          ✓          ✓            ✓            ✓ (aligned, jumps)
 ```
+
+The full pipeline is implemented end-to-end under `x3-lang/compiler` and `x3-lang/vm`.
+See [Current Rust Production Surface](#current-rust-production-surface-as-of-2026-06-06) below
+for details, verifier rules, CLI entry points, and test coverage.
 
 ## Recommendation
 

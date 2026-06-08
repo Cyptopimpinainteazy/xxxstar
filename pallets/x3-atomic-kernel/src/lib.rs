@@ -82,8 +82,8 @@ pub use weights::WeightInfo;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use super::proof::{BundleLeg, PoaeProof};
-    use crate::vm_revert::VmReverter;
+    use super::proof::{BundleLeg, PoaeProof, VmType};
+    use crate::vm_revert::{LegReceipt, StateDiff, VmReverter};
     use crate::weights::WeightInfo;
     use frame_support::{
         dispatch::DispatchResult,
@@ -92,6 +92,7 @@ pub mod pallet {
     };
     use frame_system::offchain::SubmitTransaction;
     use frame_system::pallet_prelude::*;
+    use parity_scale_codec::Decode;
     use sp_core::H256;
     use sp_io::hashing::{blake2_256, sha2_256};
     use sp_runtime::offchain::StorageKind;
@@ -369,6 +370,14 @@ pub mod pallet {
             leg_count: u32,
             failed_count: u32,
         },
+        /// A leg execution receipt was recorded on-chain by the off-chain
+        /// executor.  This persists the state diff so that the VM reverter
+        /// can restore pre-execution state if the bundle is rolled back.
+        LegExecutionRecorded {
+            bundle_id: H256,
+            leg_index: u32,
+            vm_type: VmType,
+        },
     }
 
     /// Reason a bundle was rolled back.
@@ -419,6 +428,10 @@ pub mod pallet {
         EconomicHaltActive,
         /// Bundle nonce is stale or already used for this chain/account.
         InvalidNonce,
+        /// Leg execution receipt has already been recorded for this leg index.
+        /// The off-chain executor should not re-submit receipts for legs that
+        /// have already been persisted.
+        LegAlreadyExecuted,
     }
 
     // ── Hooks ─────────────────────────────────────────────────────────────────
@@ -474,59 +487,110 @@ pub mod pallet {
                 let _ = SubmitTransaction::<T, Call<T>>::submit_transaction(xt);
             }
 
+            // ── Single-pass scan: finalization + leg receipts per bundle ──
             for (bundle_id, record) in Bundles::<T>::iter() {
                 if record.status != BundleStatus::Executing {
                     continue;
                 }
 
-                // Build the storage key used by the orchestrator to signal finalization.
-                let mut key = b"x3fin:".to_vec();
-                key.extend_from_slice(bundle_id.as_bytes());
+                // --- Finalization result (x3fin:) ---
+                {
+                    let mut key = b"x3fin:".to_vec();
+                    key.extend_from_slice(bundle_id.as_bytes());
 
-                let data = match sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &key) {
-                    Some(v) if v.len() >= 40 => v,
-                    _ => continue,
-                };
+                    if let Some(data) =
+                        sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &key)
+                    {
+                        if data.len() >= 40 {
+                            let receipt_root = H256::from_slice(&data[..32]);
+                            let committed_at_ns =
+                                u64::from_le_bytes(data[32..40].try_into().unwrap_or([0u8; 8]));
 
-                // Parse receipt_root and committed_at_ns from the 40-byte payload.
-                let receipt_root = H256::from_slice(&data[..32]);
-                let committed_at_ns =
-                    u64::from_le_bytes(data[32..40].try_into().unwrap_or([0u8; 8]));
-
-                if receipt_root == H256::zero() {
-                    log::warn!(
-                        target: "x3-atomic-kernel",
-                        "[OCW] bundle {:?}: skipping zero receipt_root in local storage",
-                        bundle_id
-                    );
-                    continue;
+                            if receipt_root != H256::zero() {
+                                let call = Call::submit_finalization_result {
+                                    bundle_id,
+                                    receipt_root,
+                                    finality_cert,
+                                    committed_at_ns,
+                                };
+                                match SubmitTransaction::<T, Call<T>>::submit_transaction(
+                                    T::create_bare(call.into()),
+                                ) {
+                                    Ok(()) => {
+                                        sp_io::offchain::local_storage_clear(
+                                            StorageKind::PERSISTENT,
+                                            &key,
+                                        );
+                                        log::info!(
+                                            target: "x3-atomic-kernel",
+                                            "[OCW] submitted finalization for bundle {:?}",
+                                            bundle_id
+                                        );
+                                    }
+                                    Err(()) => {
+                                        log::error!(
+                                            target: "x3-atomic-kernel",
+                                            "[OCW] failed to submit finalization for bundle {:?}",
+                                            bundle_id
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                let call = Call::submit_finalization_result {
-                    bundle_id,
-                    receipt_root,
-                    finality_cert,
-                    committed_at_ns,
-                };
+                // --- Leg execution receipts (x3leg:) ---
+                let leg_count = record.leg_count;
+                for leg_index in 0..leg_count {
+                    let mut leg_key = b"x3leg:".to_vec();
+                    leg_key.extend_from_slice(bundle_id.as_bytes());
+                    leg_key.extend_from_slice(&leg_index.to_le_bytes());
 
-                match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(
-                    call.into(),
-                )) {
-                    Ok(()) => {
-                        // Clear the entry so we don't resubmit next block.
-                        sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &key);
-                        log::info!(
-                            target: "x3-atomic-kernel",
-                            "[OCW] submitted finalization for bundle {:?} (receipt_root={:?}, finality_cert={:?})",
-                            bundle_id, receipt_root, finality_cert
-                        );
-                    }
-                    Err(()) => {
-                        log::error!(
-                            target: "x3-atomic-kernel",
-                            "[OCW] failed to submit unsigned tx for bundle {:?}",
-                            bundle_id
-                        );
+                    let data =
+                        match sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &leg_key)
+                        {
+                            Some(v) if !v.is_empty() => v,
+                            _ => continue,
+                        };
+
+                    let state_diff = match StateDiff::decode(&mut &data[..]) {
+                        Ok(diff) => diff,
+                        Err(e) => {
+                            log::warn!(
+                                target: "x3-atomic-kernel",
+                                "[OCW] bundle {:?} leg {}: corrupt StateDiff, clearing: {:?}",
+                                bundle_id, leg_index, e
+                            );
+                            sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &leg_key);
+                            continue;
+                        }
+                    };
+
+                    let call = Call::record_leg_execution_receipt {
+                        bundle_id,
+                        leg_index,
+                        state_diff,
+                    };
+
+                    match SubmitTransaction::<T, Call<T>>::submit_transaction(T::create_bare(
+                        call.into(),
+                    )) {
+                        Ok(()) => {
+                            sp_io::offchain::local_storage_clear(StorageKind::PERSISTENT, &leg_key);
+                            log::debug!(
+                                target: "x3-atomic-kernel",
+                                "[OCW] submitted leg receipt for bundle {:?} leg {}/{}",
+                                bundle_id, leg_index, leg_count
+                            );
+                        }
+                        Err(()) => {
+                            log::error!(
+                                target: "x3-atomic-kernel",
+                                "[OCW] failed to submit leg receipt for bundle {:?} leg {}",
+                                bundle_id, leg_index
+                            );
+                        }
                     }
                 }
             }
@@ -1019,6 +1083,60 @@ pub mod pallet {
 
             Ok(())
         }
+
+        /// Record a single leg's execution receipt on-chain.
+        ///
+        /// Called by the off-chain executor (via unsigned transaction)
+        /// after each leg completes execution.  Stores the VM-specific
+        /// `state_diff` so that [`crate::vm_revert::VmReverter`] can
+        /// restore pre-execution VM state if the bundle is rolled back
+        /// before finalisation.
+        ///
+        /// # Security
+        ///
+        /// - Unsigned only — the validate_unsigned guard ensures the
+        ///   bundle is `Executing` and the leg index is in-range.
+        /// - Each leg may be recorded at most once per bundle.
+        #[pallet::call_index(7)]
+        #[pallet::weight(T::WeightInfo::record_leg_execution_receipt())]
+        pub fn record_leg_execution_receipt(
+            origin: OriginFor<T>,
+            bundle_id: H256,
+            leg_index: u32,
+            state_diff: StateDiff,
+        ) -> DispatchResult {
+            ensure_none(origin)?;
+
+            let mut receipts = BundleLegReceipts::<T>::get(bundle_id);
+            let idx = leg_index as usize;
+            ensure!(idx < receipts.len(), Error::<T>::InvalidBundleState);
+
+            // Check leg not already executed before taking mutable reference.
+            ensure!(!receipts[idx].executed, Error::<T>::LegAlreadyExecuted);
+
+            // Mutate and write back — scoped so the immutable borrow for the
+            // vm_type clone below doesn't conflict.
+            {
+                let receipt = &mut receipts[idx];
+                receipt.executed = true;
+                receipt.state_diff = state_diff;
+            }
+            let vm_type = receipts[idx].vm_type.clone();
+            BundleLegReceipts::<T>::insert(bundle_id, receipts);
+            Self::deposit_event(Event::LegExecutionRecorded {
+                bundle_id,
+                leg_index,
+                vm_type,
+            });
+
+            log::debug!(
+                target: "x3-atomic-kernel",
+                "Bundle {:?} leg {} executed and receipt stored",
+                bundle_id, leg_index
+            );
+
+            Ok(())
+        }
     }
 
     // ── ValidateUnsigned ──────────────────────────────────────────────────
@@ -1093,6 +1211,40 @@ pub mod pallet {
                     .longevity(10)
                     .propagate(true)
                     .build()
+            } else if let Call::record_leg_execution_receipt {
+                bundle_id,
+                leg_index,
+                state_diff: _,
+            } = call
+            {
+                // Guard: state diffs must be non-trivial.
+                // An empty diff signals a read-only leg — no revert needed,
+                // so recording it is wasteful but not harmful.
+
+                // Bundle must be Executing and have an assigned executor.
+                match Bundles::<T>::get(bundle_id) {
+                    Some(record)
+                        if record.status == BundleStatus::Executing
+                            && record.executor.is_some() =>
+                    {
+                        let receipts = BundleLegReceipts::<T>::get(bundle_id);
+                        if (*leg_index as usize) >= receipts.len() {
+                            return InvalidTransaction::Stale.into();
+                        }
+                        if receipts[*leg_index as usize].executed {
+                            return InvalidTransaction::Stale.into();
+                        }
+                        let mut tag = bundle_id.as_bytes().to_vec();
+                        tag.extend_from_slice(&leg_index.to_le_bytes());
+                        ValidTransaction::with_tag_prefix("X3AtomicLegReceipt")
+                            .priority(TransactionPriority::MAX / 2)
+                            .and_provides([tag.as_slice()])
+                            .longevity(5)
+                            .propagate(true)
+                            .build()
+                    }
+                    _ => InvalidTransaction::Stale.into(),
+                }
             } else {
                 InvalidTransaction::Call.into()
             }

@@ -23,6 +23,11 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from swarm.causal.graph import CausalGraph
+from swarm.agents.freebuff import (
+    FreebuffAgent,
+    FreebuffAgentConfig,
+    GpuMemorySnapshot,
+)
 from swarm.core.agent import Agent, Consequence
 from swarm.core.lifecycle import EpochOrchestrator, EpochStats
 from swarm.event_bus.bus import AsyncEventBus
@@ -225,7 +230,115 @@ class SubstrateWiring:
         """Return event counts by type."""
         return dict(self._event_counts)
 
-    @property
-    def total_events_routed(self) -> int:
-        """Total events that passed through the wiring."""
-        return sum(self._event_counts.values())
+    # ------------------------------------------------------------------
+    # FreebuffAgent factory
+    # ------------------------------------------------------------------
+
+    def spawn_freebuff_agent(
+        self,
+        agent_id: Optional[str] = None,
+        initial_budget: float = 2000.0,
+        initial_mandates: Optional[List[str]] = None,
+        idle_buffer_ttl_epochs: int = 30,
+        max_reclaim_per_epoch: int = 50,
+        fragmentation_rebalance_threshold: float = 0.7,
+        target_gpu_nodes: Optional[List[str]] = None,
+    ) -> FreebuffAgent:
+        """Create and register a FreebuffAgent in the swarm.
+
+        The agent is fully wired into all subsystems (event bus,
+        world state, prediction market, reaper, tripwire, causal graph)
+        and registered with the orchestrator.
+
+        Args:
+            agent_id: Optional unique agent ID (auto-generated if None).
+            initial_budget: Starting resource budget.
+            initial_mandates: Initial goals/mandates for the agent.
+            idle_buffer_ttl_epochs: Epochs before an idle buffer is
+                eligible for reclamation.
+            max_reclaim_per_epoch: Max buffers reclaimed per epoch.
+            fragmentation_rebalance_threshold: Fragmentation score
+                above which defrag recommendations are emitted.
+            target_gpu_nodes: Optional list of GPU node IDs to monitor.
+
+        Returns:
+            A fully wired FreebuffAgent registered with the orchestrator.
+
+        Raises:
+            RuntimeError: If build() has not been called yet.
+        """
+        if self.orchestrator is None:
+            raise RuntimeError(
+                "Must call build() before spawning agents"
+            )
+
+        config = FreebuffAgentConfig(
+            agent_id=agent_id,
+            initial_budget=initial_budget,
+            initial_mandates=initial_mandates,
+            idle_buffer_ttl_epochs=idle_buffer_ttl_epochs,
+            max_reclaim_per_epoch=max_reclaim_per_epoch,
+            fragmentation_rebalance_threshold=fragmentation_rebalance_threshold,
+            target_gpu_nodes=target_gpu_nodes,
+        )
+
+        agent = FreebuffAgent(
+            config=config,
+            storage=self._storage,
+            event_bus=self._bus,
+            world_state=self.world_state,
+            prediction_market=self.prediction_market,
+            reaper=self.reaper,
+            postmortem_analyzer=self.postmortem,
+            scar_propagator=self.scar_propagator,
+            tripwire=self.tripwire,
+        )
+
+        self.orchestrator.register_agent(agent)
+
+        logger.info(
+            "FreebuffAgent spawned: id=%s budget=%.2f ttl=%d nodes=%s",
+            agent.agent_id,
+            initial_budget,
+            idle_buffer_ttl_epochs,
+            target_gpu_nodes or ["*"],
+        )
+
+        return agent
+
+    def push_gpu_snapshot(
+        self,
+        agent: FreebuffAgent,
+        gpu_node_id: str,
+        total_vram_bytes: int,
+        used_vram_bytes: int,
+        free_vram_bytes: int,
+        fragment_count: int = 0,
+        idle_buffer_count: int = 0,
+        reclaimable_bytes: int = 0,
+    ) -> None:
+        """Push a GPU memory snapshot into a FreebuffAgent.
+
+        This is the primary data feed for the agent's memory-management
+        loop. Call this before each epoch (or on a cadence) to keep
+        the agent's view of GPU memory state current.
+        """
+        snapshot = GpuMemorySnapshot(
+            gpu_node_id=gpu_node_id,
+            total_vram_bytes=total_vram_bytes,
+            used_vram_bytes=used_vram_bytes,
+            free_vram_bytes=free_vram_bytes,
+            fragment_count=fragment_count,
+            fragmentation_score=0.0,  # Computed by agent on next act()
+            idle_buffer_count=idle_buffer_count,
+            reclaimable_bytes=reclaimable_bytes,
+        )
+        agent.update_gpu_snapshot(snapshot)
+
+        logger.debug(
+            "GPU snapshot pushed to FreebuffAgent %s: node=%s used=%d/%d MB",
+            agent.agent_id[:8],
+            gpu_node_id,
+            used_vram_bytes // (1024 * 1024),
+            total_vram_bytes // (1024 * 1024),
+        )
