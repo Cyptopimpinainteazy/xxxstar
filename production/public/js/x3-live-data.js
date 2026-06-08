@@ -12,6 +12,11 @@
  * To override, set before loading this script:
  *   window.X3_RPC_WS  = 'wss://ws.x3star.net' or 'ws://localhost:9933'
  *   window.X3_RPC_HTTP = 'https://rpc.x3star.net' or 'http://localhost:9933'
+ *
+ * TODO(production-bundle): the production bundle at
+ *   production/public/assets/index-*.js is a Vite build artifact. These
+ *   source-level XSS fixes will not reach end users until the bundle is
+ *   rebuilt. Track as a follow-up to "chore/regenerate-production-bundle".
  */
 (function X3LiveData() {
   'use strict';

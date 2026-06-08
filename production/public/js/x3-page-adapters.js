@@ -1,3 +1,13 @@
+/*
+ * X3 page adapters — DOM glue between x3-live-data.js and the various
+ * x3star-*.html pages (mission terminal, KYC onboarding, etc.).
+ *
+ * TODO(production-bundle): the production bundle at
+ *   production/public/assets/index-*.js is a Vite build artifact. The
+ *   source-level XSS hardening in this file (innerHTML → textContent
+ *   and createElement) will not reach end users until the bundle is
+ *   rebuilt. Track as a follow-up to "chore/regenerate-production-bundle".
+ */
 (function (global) {
   "use strict";
 
