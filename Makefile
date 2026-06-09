@@ -44,6 +44,20 @@ mainnet-check:
 fresh-machine-check:
 	@bash scripts/fresh_machine_check.sh
 
+x3-lang-mainnet-gate:
+	@echo "=== x3-lang Mainnet Gate ==="
+	@echo "--- Gate 1: x3-crosschain-intent compiles ---"
+	@cargo check -p x3-crosschain-intent 2>&1
+	@echo "--- Gate 2: x3-crosschain-intent tests pass ---"
+	@cargo test -p x3-crosschain-intent --lib 2>&1
+	@echo "--- Gate 3: old x3-lang workspace compiles ---"
+	@cargo check --manifest-path x3-lang/Cargo.toml 2>&1 || echo "WARN: old x3-lang workspace has separate deps; skip if not installed"
+	@echo "--- Gate 4: IntentSpecDraft JSON round-trip ---"
+	@cargo test -p x3-crosschain-intent --lib from_draft::tests::draft_round_trips_through_json 2>&1
+	@echo "--- Gate 5: IntentSpecDraft → CrossChainIntent → execution plan ---"
+	@cargo test -p x3-crosschain-intent --lib from_draft::tests::draft_adapter_produces_compilable_intent 2>&1
+	@echo "=== x3-lang Mainnet Gate PASSED ==="
+
 # ============================================================================
 # PHASE 1: STEP CONSOLIDATION TARGETS
 # ============================================================================

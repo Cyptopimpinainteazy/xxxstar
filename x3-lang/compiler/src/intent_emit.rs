@@ -17,6 +17,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// AST types for building the intent draft from parsed source.
+use x3_lang_ast::ast::{Expression, IntentDecl, LiteralExpr, RequireKind as AstRequireKind};
+
 /// A single source-level constraint emitted by the x3-lang parser.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SourceConstraint {
@@ -136,6 +139,168 @@ impl IntentSpecDraft {
         } else {
             arg.parse::<u64>().ok()
         }
+    }
+}
+
+/// Extract a canonical [`IntentSpecDraft`] from an X3 AST [`IntentDecl`].
+///
+/// This function walks the intent declaration's body and constraints to
+/// populate a `IntentSpecDraft` that can be serialized to JSON and fed to
+/// the cross-chain intent crate's `draft_to_compiled_plan()` adapter.
+///
+/// The body is expected to contain statements like:
+/// - `Lock { chain: "eth", asset: "USDC", amount: 500_000_000u128, from: "alice.eth" }`
+/// - `Mint { chain: "sol", asset: "SOL", ... }`
+/// - `Require { kind: Finality, subject: Some("eth"), value: >= 12 }`
+/// - `Require { kind: Slippage, value: <= 50 bps }`
+///
+/// Returns `None` if the intent body cannot be parsed into a valid draft
+/// (e.g., no source lock operation found). The intent compiler downstream
+/// will also run its own 13 safety checks on whatever this produces.
+pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
+    let name = intent.name.as_str().to_string();
+    let mut draft = IntentSpecDraft::new(
+        &name,
+        "x3",   // default source chain
+        "UNKNOWN",
+        0,
+        "unknown",
+        "x3",
+        "UNKNOWN",
+        "unknown",
+    );
+
+    // Walk constraints (from `require` guards) and body statements.
+    // Constraints from the `require` annotations are encoded as Expressions
+    // in the AST. We convert them here.
+    for expr in &intent.constraints {
+        if let Some(kv) = expression_to_keyword_value(expr) {
+            draft = draft.with_constraint(kv.0, kv.1);
+        }
+    }
+
+    // Walk body statements for Lock, Mint, Swap, RequireGuard
+    for stmt in &intent.body.stmts {
+        match stmt {
+            x3_lang_ast::ast::Statement::Lock {
+                chain, asset, amount, from, ..
+            } => {
+                let chain_str = chain.0.as_str().to_string();
+                let asset_str = asset.name.as_str().to_string();
+                let amt = match &amount.node {
+                    Expression::Literal(LiteralExpr::Int { value, .. }) => *value,
+                    _ => 0,
+                };
+                let from_str = string_from_expr(from);
+                draft.source_chain = chain_str;
+                draft.source_asset = asset_str;
+                draft.source_amount = amt;
+                draft.source_owner = from_str;
+            }
+            x3_lang_ast::ast::Statement::Mint { asset, amount, to, .. } => {
+                let chain_str = asset.chain.as_str().to_string();
+                let asset_str = asset.name.as_str().to_string();
+                let amt = match &amount.node {
+                    Expression::Literal(LiteralExpr::Int { value, .. }) => Some(*value),
+                    _ => None,
+                };
+                draft.dest_chain = chain_str;
+                draft.dest_asset = asset_str;
+                draft.dest_min_amount = amt;
+                draft.dest_receiver = string_from_expr(to);
+            }
+            x3_lang_ast::ast::Statement::Require(guard) => {
+                let kind = &guard.kind;
+                let subject = &guard.subject;
+                let value = &guard.value;
+                let constraint_str = match kind {
+                    AstRequireKind::Finality => {
+                        let chain_str = subject
+                            .as_ref()
+                            .map(|s| s.as_str().to_string())
+                            .unwrap_or_else(|| "x3".to_string());
+                        let val_str = value_string_from_expr(value);
+                        draft = draft.with_constraint("finality", format!("{chain_str} >= {val_str}"));
+                        continue;
+                    }
+                    AstRequireKind::Slippage => {
+                        "slippage"
+                    }
+                    AstRequireKind::CanonicalSupply => {
+                        draft = draft.with_constraint("require_canonical_supply", "");
+                        continue;
+                    }
+                    AstRequireKind::Nonce => {
+                        "require_receiver_owner"
+                    }
+                    _ => continue,
+                };
+                let val_str = value_string_from_expr(value);
+                draft = draft.with_constraint(constraint_str, val_str);
+            }
+            x3_lang_ast::ast::Statement::Atomic(x3_lang_ast::ast::AtomicBlock { meta, body: _ }) => {
+                // The `atomic` block inside an intent likely contains
+                // the route specification. We record this as a hint
+                // for the adapter.
+                if let Some(expr) = meta {
+                    if let Some(kv) = expression_to_keyword_value(expr) {
+                        draft = draft.with_constraint(kv.0, kv.1);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    draft
+}
+
+/// Attempt to extract a (kind, value) pair from an expression
+/// that might be a `require` guard expression.
+fn expression_to_keyword_value(expr: &Expression) -> Option<(String, String)> {
+    match &expr.node {
+        // String literals like "finality eth >= 12"
+        Expression::Literal(LiteralExpr::String(s)) => {
+            let text = s.as_str();
+            if let Some((kind, rest)) = text.split_once(char::is_whitespace) {
+                let rest = rest.trim();
+                Some((kind.to_string(), rest.to_string()))
+            } else {
+                Some((text.to_string(), String::new()))
+            }
+        }
+        // Binary expressions like finality(eth) >= 12
+        Expression::Binary { op: _, lhs, rhs } => {
+            let lhs_str = string_from_expr(lhs);
+            let rhs_str = string_from_expr(rhs);
+            Some((lhs_str, rhs_str))
+        }
+        _ => None,
+    }
+}
+
+/// Extract a string value from an expression (likely a literal or identifier).
+fn value_string_from_expr(expr: &Expression) -> String {
+    match &expr.node {
+        Expression::Literal(LiteralExpr::Int { value, .. }) => value.to_string(),
+        Expression::Literal(LiteralExpr::String(s)) => s.as_str().to_string(),
+        Expression::Literal(LiteralExpr::Percentage { value }) => format!("{value}%"),
+        Expression::Literal(LiteralExpr::Duration { value, unit: _ }) => value.to_string(),
+        Expression::Ident(s) => s.as_str().to_string(),
+        _ => format!("{:?}", expr.node),
+    }
+}
+
+/// Extract a string from an expression that is a path/identifier/string literal.
+fn string_from_expr(expr: &Expression) -> String {
+    match &expr.node {
+        Expression::Literal(LiteralExpr::String(s)) => s.as_str().to_string(),
+        Expression::Literal(LiteralExpr::Address(s)) => s.as_str().to_string(),
+        Expression::Ident(s) => s.as_str().to_string(),
+        Expression::FieldAccess { target, field } => {
+            format!("{}.{}", string_from_expr(target), field.as_str())
+        }
+        _ => format!("{:?}", expr.node),
     }
 }
 

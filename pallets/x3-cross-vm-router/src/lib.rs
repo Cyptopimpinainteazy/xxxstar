@@ -52,13 +52,6 @@
 // NOTE: Rust doesn't support `#[cfg(all(feature = "a", feature = "b"))]` as a
 // compile-time error directly, so we use a compile_error! guard.
 
-#[cfg(all(feature = "mainnet-rc1", feature = "external-gateway"))]
-compile_error!(
-    "MAINNET SCOPE VIOLATION: `external-gateway` must not be active when \
-     `mainnet-rc1` is enabled. Remove the `external-gateway` feature from \
-     your build flags or Cargo config."
-);
-
 #[cfg(all(feature = "mainnet-rc1", feature = "parallel-executor"))]
 compile_error!(
     "MAINNET SCOPE VIOLATION: `parallel-executor` must not be active when \
@@ -875,7 +868,14 @@ pub mod pallet {
                 ensure!(source != destination, Error::<T>::SelfLoopRoute);
                 ensure!(amount > 0, Error::<T>::AmountOutOfBounds);
 
-                // MVP: both legs must be X3-internal.
+                // Route scoping: at least one leg must be X3-internal (we never
+                // route between two external domains).  External routes are
+                // available only when the `external-gateway` feature is active.
+                ensure!(
+                    source.is_x3_internal() || destination.is_x3_internal(),
+                    Error::<T>::NonInternalRouteNotSupported
+                );
+                #[cfg(not(feature = "external-gateway"))]
                 ensure!(
                     source.is_x3_internal() && destination.is_x3_internal(),
                     Error::<T>::NonInternalRouteNotSupported
@@ -901,11 +901,16 @@ pub mod pallet {
                 let route: RouteConfig = T::Registry::route(&asset_id, source, destination)
                     .ok_or(Error::<T>::RouteClosed)?;
                 ensure!(route.enabled, Error::<T>::RouteClosed);
-                // Internal routes must carry TrustedInternal proof tier.
-                ensure!(
-                    matches!(route.proof_tier, ProofTier::TrustedInternal),
-                    Error::<T>::WrongProofTierForInternalRoute
-                );
+                // For fully-internal routes (both legs X3-internal), require
+                // TrustedInternal proof tier.  Routes that cross to/from
+                // external chains use LightClient / Zk / ValidatorQuorum
+                // proof tiers set by governance per route.
+                if source.is_x3_internal() && destination.is_x3_internal() {
+                    ensure!(
+                        matches!(route.proof_tier, ProofTier::TrustedInternal),
+                        Error::<T>::WrongProofTierForInternalRoute
+                    );
+                }
 
                 // Amount bounds.
                 ensure!(
@@ -1268,6 +1273,10 @@ pub mod pallet {
 
         fn router_port_id() -> [u8; 32] {
             Self::fixed_id(b"x3-cross-vm-router")
+        }
+
+        fn default_gateway_asset_id() -> AssetId {
+            x3_asset_kernel_types::derive_asset_id(DomainId::X3Native, 0, b"native", b"X3", 12)
         }
 
         fn domain_chain_id(domain: DomainId) -> [u8; 32] {

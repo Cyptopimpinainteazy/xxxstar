@@ -232,6 +232,12 @@ impl X3Instruction {
             Self::Quarantine { .. } => "Quarantine",
         }
     }
+
+    /// Alias for `label()`, used by the adapter boundary for diagnostic display.
+    /// Returns the same short human-readable instruction name.
+    pub fn name(&self) -> &'static str {
+        self.label()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

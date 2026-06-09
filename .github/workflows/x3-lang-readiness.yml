@@ -11,6 +11,7 @@ on:
       - "crates/svm-integration/**"
       - "patches/**"
       - "vendor/**"
+      - "x3-lang/**"
       - ".github/workflows/x3-lang-readiness.yml"
   push:
     branches: [main, master]
@@ -23,6 +24,7 @@ on:
       - "crates/svm-integration/**"
       - "patches/**"
       - "vendor/**"
+      - "x3-lang/**"
       - ".github/workflows/x3-lang-readiness.yml"
 
 jobs:

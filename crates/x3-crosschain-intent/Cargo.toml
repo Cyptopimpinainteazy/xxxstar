@@ -17,3 +17,9 @@ hex = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 serde_json = "1.0"
+
+# IntentSpecDraft bridge — the old x3-lang compiler produces JSON-serializable
+# draft intents; the adapter boundary here converts them into canonical
+# CrossChainIntent. The draft types live in x3-lang::compiler::intent_emit.
+# There is no runtime dependency — the bridge only uses serde_json to
+# deserialize the draft at the adapter boundary.

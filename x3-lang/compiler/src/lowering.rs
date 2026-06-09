@@ -4,6 +4,7 @@
 //! which is a semantic representation suitable for verification, optimization,
 //! and code generation.
 
+use crate::intent_emit;
 use crate::ir::{
     self, ChainMetricKind, Condition, CrdtKind as IrCrdtKind, EmergencyKind, LifecycleKind,
     Operation, ProofKind, SerialFormat, StorageKind, VectorOp, X3IR,

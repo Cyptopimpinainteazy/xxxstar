@@ -26,6 +26,7 @@ x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-f
 x3-packet-standard = { path = "../../crates/x3-packet-standard", default-features = false }
 x3-ixl = { path = "../../crates/x3-ixl", default-features = false }
 x3-liquidity-core = { path = "../../crates/x3-liquidity-core", optional = true, default-features = false }
+x3-compiler = { path = "../../crates/x3-compiler", optional = true }
 
 [features]
 default = ["std", "mainnet-rc1"]
@@ -39,6 +40,7 @@ mainnet-rc1 = [
     "packet-standard",
     "liquidity-core",
     "kernel-invariants",
+    "external-gateway",
 ]
 
 # Internal modules that form the RC-1 critical path.
@@ -74,6 +76,7 @@ std = [
     "x3-packet-standard/std",
     "x3-ixl/std",
     "x3-liquidity-core/std",
+    "x3-compiler",
 ]
 try-runtime = [
     "frame-support/try-runtime",

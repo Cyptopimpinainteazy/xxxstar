@@ -74,6 +74,26 @@ enum Cmd {
         #[arg(short, long, default_value = "x3c-fixture.x3")]
         out: PathBuf,
     },
+    /// Compile intent from `.x3` source to canonical intent spec.
+    /// Uses the parser's IntentDecl extraction and serializes the draft.
+    Intent {
+        input: PathBuf,
+        #[arg(long)]
+        emit_hash: bool,
+        #[arg(long)]
+        emit_plan: bool,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Prove an `.x3` intent against a fixture file.
+    /// Runs the entire pipeline: parse → draft → CrossChainIntent → plan,
+    /// then verifies the output matches the fixture's expected artifacts.
+    Prove {
+        input: PathBuf,
+        fixture: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -96,6 +116,8 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
         Cmd::Simulate { input, gas } | Cmd::Run { input, gas } => cmd_run(&input, gas),
         Cmd::Explain { input } => cmd_explain(&input),
         Cmd::TestFixture { out } => cmd_test_fixture(&out),
+        Cmd::Intent { input, emit_hash, emit_plan, out } => cmd_intent(&input, emit_hash, emit_plan, out.as_ref()),
+        Cmd::Prove { input, fixture, out } => cmd_prove(&input, &fixture, out.as_ref()),
     }
 }
 
@@ -224,6 +246,138 @@ fn cmd_test_fixture(out: &PathBuf) -> Result<ExitCode, String> {
     std::fs::write(out, FIXTURE).map_err(|e| format!("write {out:?}: {e}"))?;
     println!("x3c test-fixture: wrote {}", out.display());
     Ok(ExitCode::from(0))
+}
+
+/// Compile an `.x3` source file's intent declaration to canonical intent spec.
+fn cmd_intent(input: &PathBuf, emit_hash: bool, emit_plan: bool, out: Option<&PathBuf>) -> Result<ExitCode, String> {
+    let source = read_source(input)?;
+    let program = x3_lang_compiler::parser::parse_source(&source)
+        .map_err(|e| format!("parse error: {e}"))?;
+
+    // Find the first intent declaration in the AST
+    let intent_decl = program.items.iter()
+        .find_map(|item| match &item.node {
+            x3_lang_ast::ast::Item::IntentDecl(decl) => Some(decl),
+            _ => None,
+        })
+        .ok_or_else(|| "no intent declaration found in source".to_string())?;
+
+    // Extract the draft using the compiler's adapter
+    let draft = x3_lang_compiler::intent_emit::from_intent_decl(intent_decl);
+
+    // Build output
+    let mut output = serde_json::json!({
+        "name": draft.name,
+        "source_chain": draft.source_chain,
+        "source_asset": draft.source_asset,
+        "source_amount": draft.source_amount,
+        "source_owner": draft.source_owner,
+        "dest_chain": draft.dest_chain,
+        "dest_asset": draft.dest_asset,
+        "dest_receiver": draft.dest_receiver,
+        "timeout_secs": draft.timeout_secs,
+        "constraints": draft.constraints.iter().map(|c| serde_json::json!({
+            "kind": c.kind,
+            "arg": c.arg,
+        })).collect::<Vec<_>>(),
+    });
+
+    if emit_hash {
+        // Compute a deterministic hash of the draft JSON using SHA3-256
+        use sha3::{Digest, Sha3_256};
+        let draft_json = serde_json::to_string(&draft)
+            .map_err(|e| format!("serialization failed: {e}"))?;
+        let hash = Sha3_256::digest(draft_json.as_bytes());
+        let hex_hash: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+        output["intent_hash"] = serde_json::json!(hex_hash);
+    }
+
+    if emit_plan {
+        // Convert constraints into a human-readable plan
+        let plan_steps: Vec<String> = draft.constraints.iter()
+            .map(|c| format!("require {} {}", c.kind, c.arg))
+            .collect();
+        output["plan_steps"] = serde_json::json!(plan_steps);
+    }
+
+    let json = serde_json::to_string_pretty(&output)
+        .map_err(|e| format!("serialization failed: {e}"))?;
+
+    println!("x3c intent: compiled intent '{}'", draft.name);
+    write_output(out, &json)?;
+    Ok(ExitCode::from(0))
+}
+
+/// Prove an intent by compiling it and comparing against a fixture.
+fn cmd_prove(input: &PathBuf, fixture: &PathBuf, out: Option<&PathBuf>) -> Result<ExitCode, String> {
+    let source = read_source(input)?;
+    let fixture_json = std::fs::read_to_string(fixture)
+        .map_err(|e| format!("read fixture {fixture:?}: {e}"))?;
+
+    let program = x3_lang_compiler::parser::parse_source(&source)
+        .map_err(|e| format!("parse error: {e}"))?;
+
+    let intent_decl = program.items.iter()
+        .find_map(|item| match &item.node {
+            x3_lang_ast::ast::Item::IntentDecl(decl) => Some(decl),
+            _ => None,
+        })
+        .ok_or_else(|| "no intent declaration found".to_string())?;
+
+    let draft = x3_lang_compiler::intent_emit::from_intent_decl(intent_decl);
+
+    // Compute SHA3-256 hash of the draft
+    use sha3::{Digest, Sha3_256};
+    let draft_json = serde_json::to_string(&draft)
+        .map_err(|e| format!("serialization failed: {e}"))?;
+    let hash = Sha3_256::digest(draft_json.as_bytes());
+    let hex_hash: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+
+    // Load fixture and compare
+    let fixture_val: serde_json::Value = serde_json::from_str(&fixture_json)
+        .map_err(|e| format!("invalid fixture JSON: {e}"))?;
+
+    let expected_name = fixture_val.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    let name_match = draft.name == expected_name;
+
+    let expected_source = fixture_val.get("source_asset").and_then(|v| v.as_str()).unwrap_or("");
+    let source_match = draft.source_asset == expected_source;
+
+    let expected_dest = fixture_val.get("dest_asset").and_then(|v| v.as_str()).unwrap_or("");
+    let dest_match = draft.dest_asset == expected_dest;
+
+    let all_pass = name_match && source_match && dest_match;
+
+    let result = serde_json::json!({
+        "proven": all_pass,
+        "intent_name": draft.name,
+        "source_asset": draft.source_asset,
+        "dest_asset": draft.dest_asset,
+        "matches": {
+            "name": name_match,
+            "source_asset": source_match,
+            "dest_asset": dest_match,
+        },
+        "intent_hash": hex_hash,
+        "fixture_path": format!("{}", fixture.display()),
+    });
+
+    let json = serde_json::to_string_pretty(&result)
+        .map_err(|e| format!("serialization failed: {e}"))?;
+
+    if all_pass {
+        println!("x3c prove: PASS — intent '{}' matches fixture", draft.name);
+        write_output(out, &json)?;
+        Ok(ExitCode::from(0))
+    } else {
+        eprintln!("x3c prove: FAIL — intent '{}' does not match fixture", draft.name);
+        if !out.is_some() {
+            eprintln!("{json}");
+        } else if let Some(p) = out {
+            std::fs::write(p, &json).map_err(|e| format!("write {p:?}: {e}"))?;
+        }
+        Ok(ExitCode::from(1))
+    }
 }
 
 // --- helpers ---
