@@ -98,7 +98,6 @@ impl<T: SourcedType, S: MetricSource> Collector for SourcedMetric<T, S> {
                 Ordering::Equal => {}
             }
 
-            // FIX: Convert Vec to RepeatedField using .into()
             m.set_label(
                 self.desc
                     .variable_labels
@@ -111,8 +110,7 @@ impl<T: SourcedType, S: MetricSource> Collector for SourcedMetric<T, S> {
                         l
                     })
                     .chain(self.desc.const_label_pairs.iter().cloned())
-                    .collect::<Vec<_>>()
-                    .into(),
+                    .collect(),
             );
 
             counters.push(m);
@@ -122,7 +120,6 @@ impl<T: SourcedType, S: MetricSource> Collector for SourcedMetric<T, S> {
         m.set_name(self.desc.fq_name.clone());
         m.set_help(self.desc.help.clone());
         m.set_field_type(T::proto());
-        // FIX: Convert Vec to RepeatedField using .into()
         m.set_metric(counters.into());
 
         vec![m]

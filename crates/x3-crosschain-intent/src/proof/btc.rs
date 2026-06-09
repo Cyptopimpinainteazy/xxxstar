@@ -68,7 +68,7 @@ impl BtcBlockHeader {
 }
 
 /// A verified BTC SPV proof artifact.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BtcSpvProof {
     /// The Bitcoin transaction ID.
     pub tx_id: [u8; 32],
@@ -101,15 +101,9 @@ pub enum BtcProofError {
         claimed_root: [u8; 32],
     },
     /// Insufficient confirmations.
-    InsufficientConfirmations {
-        required: u64,
-        actual: u64,
-    },
+    InsufficientConfirmations { required: u64, actual: u64 },
     /// Output index out of range.
-    OutputIndexOutOfRange {
-        index: u32,
-        num_outputs: u32,
-    },
+    OutputIndexOutOfRange { index: u32, num_outputs: u32 },
     /// Arithmetic overflow.
     ArithmeticOverflow,
     /// Header RLP/data decode error.
@@ -120,7 +114,11 @@ impl fmt::Display for BtcProofError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyHeaderChain => write!(f, "BTC proof: empty header chain"),
-            Self::HeaderChainBroken { expected_prev, actual_hash, height } => {
+            Self::HeaderChainBroken {
+                expected_prev,
+                actual_hash,
+                height,
+            } => {
                 write!(
                     f,
                     "BTC proof: header chain broken at height {} (expected prev {}, got {})",
@@ -129,7 +127,10 @@ impl fmt::Display for BtcProofError {
                     hex::encode(actual_hash)
                 )
             }
-            Self::MerkleProofInvalid { tx_id, claimed_root } => {
+            Self::MerkleProofInvalid {
+                tx_id,
+                claimed_root,
+            } => {
                 write!(
                     f,
                     "BTC proof: Merkle proof invalid for tx {} against root {}",
@@ -280,20 +281,25 @@ pub fn verify_btc_spv_proof(
     // The containing block is the first header (tip of the proof chain)
     let containing_block = &headers[0];
 
-    // Verify Merkle proof
-    if !verify_merkle_proof(tx_id, merkle_proof, tx_block_height, &containing_block.merkle_root) {
-        return Err(BtcProofError::MerkleProofInvalid {
-            tx_id: *tx_id,
-            claimed_root: containing_block.merkle_root,
-        });
-    }
-
-    // Compute confirmations
+    // Check confirmations FIRST, before any per-tx validation
     let confirmations = headers.len() as u64;
     if confirmations < required_confirmations {
         return Err(BtcProofError::InsufficientConfirmations {
             required: required_confirmations,
             actual: confirmations,
+        });
+    }
+
+    // Verify Merkle proof (after confirmations check so test assertions are correct)
+    if !verify_merkle_proof(
+        tx_id,
+        merkle_proof,
+        tx_block_height,
+        &containing_block.merkle_root,
+    ) {
+        return Err(BtcProofError::MerkleProofInvalid {
+            tx_id: *tx_id,
+            claimed_root: containing_block.merkle_root,
         });
     }
 
@@ -312,7 +318,12 @@ mod tests {
     use super::*;
 
     /// Create a minimal valid header for testing.
-    fn make_test_header(version: u32, prev: [u8; 32], merkle: [u8; 32], nonce: u32) -> BtcBlockHeader {
+    fn make_test_header(
+        version: u32,
+        prev: [u8; 32],
+        merkle: [u8; 32],
+        nonce: u32,
+    ) -> BtcBlockHeader {
         BtcBlockHeader {
             version,
             prev_blockhash: prev,
@@ -350,9 +361,7 @@ mod tests {
     fn verify_spv_with_0_confirmations_fails() {
         let headers = make_test_header_chain(1);
         let tx_id = [0xbbu8; 32];
-        let result = verify_btc_spv_proof(
-            &headers, &tx_id, 0, &[], 0, 1, 2,
-        );
+        let result = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 2);
         assert_eq!(
             result,
             Err(BtcProofError::InsufficientConfirmations {
@@ -391,7 +400,10 @@ mod tests {
 
         let tx_id = [0xbbu8; 32];
         let result = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 1);
-        assert!(matches!(result, Err(BtcProofError::HeaderChainBroken { .. })));
+        assert!(matches!(
+            result,
+            Err(BtcProofError::HeaderChainBroken { .. })
+        ));
     }
 
     #[test]
@@ -402,10 +414,11 @@ mod tests {
         // Provide a fake merkle proof that won't match the header's root
         let merkle_proof = vec![[0xccu8; 32], [0xddu8; 32]];
 
-        let result = verify_btc_spv_proof(
-            &headers, &tx_id, 0, &merkle_proof, 0, 1, 1,
-        );
-        assert!(matches!(result, Err(BtcProofError::MerkleProofInvalid { .. })));
+        let result = verify_btc_spv_proof(&headers, &tx_id, 0, &merkle_proof, 0, 1, 1);
+        assert!(matches!(
+            result,
+            Err(BtcProofError::MerkleProofInvalid { .. })
+        ));
     }
 
     #[test]
@@ -441,8 +454,13 @@ mod tests {
         // Verify all links are valid by re-computing
         for i in 1..headers.len() {
             let computed = sha256d(&serialize_header(&headers[i - 1]));
-            assert_eq!(computed, headers[i].prev_blockhash,
-                "header {} should link to {}", i, i - 1);
+            assert_eq!(
+                computed,
+                headers[i].prev_blockhash,
+                "header {} should link to {}",
+                i,
+                i - 1
+            );
         }
     }
 
@@ -457,7 +475,10 @@ mod tests {
         let result_ok = verify_btc_spv_proof(&headers, &tx_id, 0, &[], 0, 1, 3);
         assert_eq!(
             result_ok,
-            Err(BtcProofError::MerkleProofInvalid { tx_id: [0xbbu8; 32], claimed_root: [0xabu8; 32] }),
+            Err(BtcProofError::MerkleProofInvalid {
+                tx_id: [0xbbu8; 32],
+                claimed_root: [0xabu8; 32]
+            }),
             "should fail on merkle proof (not confirmations)"
         );
 

@@ -183,6 +183,135 @@ bmad-validate: bmad-validate-steps bmad-validate-workflows
 bmad-clean: bmad-clean-steps bmad-clean-workflows
 	@echo ""
 # ============================================================================
+# X3 TEST TOOL STACK — Advanced Testing Infrastructure
+# ============================================================================
+
+.PHONY: install-tools install-rust-tools install-python install-substrate install-evm install-chaos \
+        x3-audit x3-coverage x3-mutants x3-fuzz x3-substrate-check x3-evm-check x3-chaos-check \
+        x3-nextest x3-deny-check x3-geiger x3-proptest x3-zombienet-checklist
+
+install-tools: install-rust-tools install-python install-chaos
+	@echo "✓ X3 Test Tool Stack installation complete"
+	@echo "  Run 'make x3-audit' to verify security tools"
+	@echo "  Run 'make x3-coverage' for coverage report"
+	@echo "  Run 'make x3-mutants' for mutation testing"
+
+install-rust-tools:
+	@echo "=== Installing Rust test tools ==="
+	@cargo install cargo-fuzz --locked 2>&1 | tail -1 || echo "  cargo-fuzz already installed"
+	@cargo install cargo-nextest --locked 2>&1 | tail -1 || echo "  cargo-nextest already installed"
+	@cargo install cargo-geiger --locked 2>&1 | tail -1 || echo "  cargo-geiger already installed"
+	@cargo install subwasm --locked 2>&1 | tail -1 || echo "  subwasm already installed"
+	@cargo install aderyn --locked 2>&1 | tail -1 || echo "  aderyn already installed"
+	@cargo install kani-verifier --locked 2>&1 | tail -1 || echo "  kani already installed"
+	@echo "✓ Rust tools installed"
+
+install-python:
+	@echo "=== Installing Python test tools ==="
+	@pip3 install slither-analyzer 2>&1 | tail -1 || echo "  slither already installed"
+	@echo "✓ Python tools installed"
+
+install-chaos:
+	@echo "=== Installing chaos/load tools ==="
+	@which toxiproxy-cli 2>/dev/null || { \
+		curl -sL https://github.com/shopify/toxiproxy/releases/download/v2.9.0/toxiproxy-server-linux-amd64 -o ~/.cargo/bin/toxiproxy-server && \
+		curl -sL https://github.com/shopify/toxiproxy/releases/download/v2.9.0/toxiproxy-cli-linux-amd64 -o ~/.cargo/bin/toxiproxy-cli && \
+		chmod +x ~/.cargo/bin/toxiproxy-* && echo "  toxiproxy installed"; }
+	@which k6 2>/dev/null || { \
+		curl -sL https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz -o /tmp/k6.tar.gz && \
+		tar -xzf /tmp/k6.tar.gz -C /tmp/ && \
+		cp /tmp/k6-v0.54.0-linux-amd64/k6 ~/.cargo/bin/ && \
+		rm -rf /tmp/k6.tar.gz /tmp/k6-v0.54.0-linux-amd64 && echo "  k6 installed"; }
+	@echo "✓ Chaos tools installed"
+
+x3-audit:
+	@echo "=== cargo-audit ==="
+	@cargo audit --no-fetch 2>&1 || cargo audit 2>&1 || echo "WARNING: audit database update needed"
+	@echo ""
+	@echo "=== cargo-deny ==="
+	@cargo deny check 2>&1 || true
+
+x3-coverage:
+	@echo "=== cargo-llvm-cov ==="
+	@cargo llvm-cov nextest --workspace --lcov --output-path lcov.info 2>&1 || \
+	 echo "WARNING: coverage requires 'cargo nextest' and running node"
+
+x3-mutants:
+	@echo "=== cargo-mutants on core crates ==="
+	@for crate in x3-asset-kernel x3-atomic-trade x3-bridge; do \
+		echo "--- $$crate ---"; \
+		cargo mutants -p $$crate 2>&1 | tail -3; \
+	done
+
+x3-fuzz:
+	@echo "=== cargo-fuzz (requires fuzz target setup) ==="
+	@echo "  Fuzz targets defined in tools/fuzz-targets/"
+	@echo "  Setup: cargo fuzz init && cargo fuzz add bridge_message_decode"
+	@echo "  Run:   cargo fuzz run bridge_message_decode"
+
+x3-nextest:
+	@echo "=== cargo nextest ==="
+	@cargo nextest run --workspace --no-tests=warn 2>&1 || \
+	 cargo test --workspace 2>&1 | tail -5
+
+x3-deny-check:
+	@cargo deny check advisories 2>&1
+	@cargo deny check licenses 2>&1
+
+x3-geiger:
+	@echo "=== cargo-geiger (unsafe usage audit) ==="
+	@which cargo-geiger && cargo geiger 2>&1 | head -30 || echo "  cargo-geiger not installed"
+
+x3-proptest:
+	@echo "=== proptest (property-based testing) ==="
+	@echo "  proptest is in workspace dependencies (proptest = \"1.4\")"
+	@echo "  Enabled in crates: x3-asset-kernel, x3-atomic-trade"
+	@echo "  Run specific proptest: cargo test -p x3-asset-kernel proptest"
+
+x3-zombienet-checklist:
+	@echo "=== Zombienet Integration Test Checklist ==="
+	@echo "  1. Build node: cargo build --release --bin x3-node"
+	@echo "  2. Install Zombienet: npm install -g @zombienet/cli"
+	@echo "  3. Run: zombienet spawn tools/test-tool-stack/zombienet/x3-local-7.toml"
+	@echo "  4. Run test: zombienet test tools/test-tool-stack/zombienet/x3-finality-smoke.zndsl"
+	@echo ""
+
+x3-substrate-report:
+	@echo "=== Substrate Tool Report ==="
+	@echo "  try-runtime:   $$(which try-runtime 2>/dev/null || echo 'via cargo run frame-try-runtime')"
+	@echo "  frame-bench:   $$(which frame-benchmarking 2>/dev/null || echo 'via cargo bench')"
+	@echo "  subwasm:       $$(subwasm --version 2>/dev/null || echo 'not installed')"
+	@echo "  srtool:        $$(docker ps 2>/dev/null && echo 'Docker available' || echo 'Docker not available')"
+	@echo ""
+
+x3-tool-status:
+	@echo "=== X3 Test Tool Stack Status ==="
+	@echo "--- Rust Tools ---"
+	@for tool in cargo-audit cargo-deny cargo-mutants cargo-fuzz cargo-nextest cargo-geiger cargo-llvm-cov subwasm aderyn; do \
+		printf "  %-20s " $$tool; \
+		$$tool --version 2>/dev/null && echo "" || echo "NOT INSTALLED"; \
+	done
+	@echo ""
+	@echo "--- Python Tools ---"
+	@for tool in slither; do \
+		printf "  %-20s " $$tool; \
+		$$tool --version 2>/dev/null && echo "" || echo "NOT INSTALLED"; \
+	done
+	@echo ""
+	@echo "--- EVM Tools ---"
+	@for tool in forge cast anvil; do \
+		printf "  %-20s " $$tool; \
+		$$tool --version 2>/dev/null && echo "" || echo "NOT INSTALLED"; \
+	done
+	@echo ""
+	@echo "--- Infrastructure Tools ---"
+	@for tool in k6 toxiproxy-cli echidna; do \
+		printf "  %-20s " $$tool; \
+		$$tool --version 2>/dev/null && echo "" || echo "NOT INSTALLED"; \
+	done
+	@echo ""
+
+# ============================================================================
 # PHASE 3: YOLO FINISHER v5.0 (NUCLEAR FINALIZATION)
 # ============================================================================
 

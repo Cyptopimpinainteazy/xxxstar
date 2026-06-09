@@ -345,12 +345,7 @@ fn mint_tokens_authorized_only() {
 
         // BOB is not an authorized minter — mint should fail.
         assert_noop!(
-            X3Wallet::mint_tokens(
-                RuntimeOrigin::signed(BOB),
-                token_id,
-                BOB,
-                100,
-            ),
+            X3Wallet::mint_tokens(RuntimeOrigin::signed(BOB), token_id, BOB, 100,),
             Error::<Test>::Unauthorized
         );
     });
@@ -387,12 +382,7 @@ fn add_remove_minter_root_only() {
 
         // ALICE can no longer mint after removal
         assert_noop!(
-            X3Wallet::mint_tokens(
-                RuntimeOrigin::signed(ALICE),
-                [42u8; 32],
-                BOB,
-                100,
-            ),
+            X3Wallet::mint_tokens(RuntimeOrigin::signed(ALICE), [42u8; 32], BOB, 100,),
             Error::<Test>::Unauthorized
         );
     });

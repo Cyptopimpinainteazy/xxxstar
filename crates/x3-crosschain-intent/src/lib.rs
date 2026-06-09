@@ -47,10 +47,10 @@ pub mod compiler;
 pub mod error;
 pub mod from_draft;
 pub mod instructions;
-pub mod journal;
-pub mod proof;
 pub mod intent;
+pub mod journal;
 pub mod lifecycle;
+pub mod proof;
 pub mod simulation;
 pub mod types;
 

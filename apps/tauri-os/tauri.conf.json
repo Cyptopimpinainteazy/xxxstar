@@ -1,10 +1,49 @@
 {
-  "name": "tauri-os",
+  "name": "x3-atomic-star-os",
   "version": "0.1.0",
   "tauri": {
     "bundle": {
-      "productName": "X3 Atomic Console",
-      "identifier": "com.x3.atomic.console"
+      "productName": "X3 Atomic Star OS",
+      "identifier": "io.x3atomicstar.os"
+    },
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://localhost:*; font-src 'self'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'self'",
+      "dangerousDisableAssetCspModification": false,
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:*;"
+    },
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "open": true,
+        "scope": [
+          {
+            "name": "x3-validator",
+            "cmd": "x3-chain-node",
+            "args": true
+          }
+        ]
+      },
+      "fs": {
+        "all": false,
+        "scope": ["$APPDATA/**", "$RESOURCE/**"]
+      },
+      "http": {
+        "all": false,
+        "request": true,
+        "scope": ["http://localhost:*", "https://rpc.x3atomicstar.io"]
+      },
+      "protocol": {
+        "all": false,
+        "asset": true
+      },
+      "clipboard": {
+        "all": false,
+        "writeText": true,
+        "readText": false
+      },
+      "notification": {
+        "all": false
+      }
     }
   }
 }

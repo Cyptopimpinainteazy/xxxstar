@@ -100,16 +100,20 @@ fn assess_x3language(workspace: &Path, claim_id: &str) -> ProofResult {
             label,
             result.exit_code
         ));
-        evidence.insert(format!("cmd:{}", label), format!(
-            "exit={} stdout={} stderr={}",
-            result.exit_code,
-            result.stdout,
-            result.stderr
-        ));
+        evidence.insert(
+            format!("cmd:{}", label),
+            format!(
+                "exit={} stdout={} stderr={}",
+                result.exit_code, result.stdout, result.stderr
+            ),
+        );
         if result.passed {
             passed_checks.push(label.to_string());
         } else {
-            failed_checks.push(format!("{} — exit {}: {}", label, result.exit_code, result.stderr));
+            failed_checks.push(format!(
+                "{} — exit {}: {}",
+                label, result.exit_code, result.stderr
+            ));
         }
     }
 
@@ -145,7 +149,8 @@ fn assess_x3language(workspace: &Path, claim_id: &str) -> ProofResult {
 
     ProofResult {
         claim_id: claim_id.to_string(),
-        claim: "X3Language: compiler adapter, atomic journal, proof backends, and example intents".to_string(),
+        claim: "X3Language: compiler adapter, atomic journal, proof backends, and example intents"
+            .to_string(),
         status,
         proof_level: Some(ProofLevel::P6),
         edge_case_level: Some(EdgeCaseLevel::E5),

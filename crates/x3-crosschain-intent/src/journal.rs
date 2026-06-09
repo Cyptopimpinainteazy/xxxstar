@@ -227,7 +227,10 @@ impl AtomicJournal {
     ///
     /// Panics if no atomic block is open (`begin()` was not called).
     pub fn append(&mut self, entry: JournalEntry) {
-        assert!(self.is_open, "AtomicJournal: append() called without begin()");
+        assert!(
+            self.is_open,
+            "AtomicJournal: append() called without begin()"
+        );
         self.entries.push(entry);
     }
 
@@ -238,7 +241,8 @@ impl AtomicJournal {
     /// After rollback, the atomic block is closed.
     pub fn rollback(&mut self, snapshot: JournalSnapshot) -> Vec<JournalEntry> {
         self.is_open = false;
-        let rolled_back: Vec<JournalEntry> = self.entries.drain(snapshot.entry_count..).rev().collect();
+        let rolled_back: Vec<JournalEntry> =
+            self.entries.drain(snapshot.entry_count..).rev().collect();
         rolled_back
     }
 
@@ -324,7 +328,11 @@ impl AtomicJournal {
                         });
                     }
                 }
-                JournalEntry::SupplyDelta { asset, before, after } => {
+                JournalEntry::SupplyDelta {
+                    asset,
+                    before,
+                    after,
+                } => {
                     if *after > *before {
                         // Minted → need to burn
                         let diff = after - before;
@@ -364,7 +372,8 @@ impl AtomicJournal {
                                 intent_id: self.intent_id,
                                 reason: format!(
                                     "rollback: burned escrow ticket for {} {}",
-                                    amount, asset.display()
+                                    amount,
+                                    asset.display()
                                 ),
                             });
                         }
@@ -378,7 +387,11 @@ impl AtomicJournal {
                         ReceiptAction::Revoked => {}
                     }
                 }
-                JournalEntry::StorageWrite { key, before, after: _ } => {
+                JournalEntry::StorageWrite {
+                    key,
+                    before,
+                    after: _,
+                } => {
                     if let Some(prev) = before {
                         plan.push(crate::instructions::X3Instruction::ExecuteRefund {
                             intent_id: self.intent_id,
@@ -478,8 +491,8 @@ impl FailurePoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ChainKind;
     use crate::instructions::RefundAction;
+    use crate::types::ChainKind;
 
     fn usdc_asset() -> AssetRef {
         AssetRef::new(ChainKind::Ethereum, "USDC")
@@ -531,13 +544,17 @@ mod tests {
         // Rollback removes both entries
         let rolled = journal.rollback(snapshot);
         assert_eq!(rolled.len(), 2, "should roll back 2 entries");
-        assert_eq!(journal.entry_count(), 0, "journal should be empty after rollback");
+        assert_eq!(
+            journal.entry_count(),
+            0,
+            "journal should be empty after rollback"
+        );
     }
 
     #[test]
     fn journal_rollback_plan_has_correct_reversal() {
         let mut journal = AtomicJournal::new(1);
-        let snapshot = journal.begin();
+        let _snapshot = journal.begin();
 
         journal.append(JournalEntry::BalanceDelta {
             chain: ChainKind::Ethereum,
@@ -597,7 +614,7 @@ mod tests {
     #[test]
     fn journal_rollback_plan_many_entries() {
         let mut journal = AtomicJournal::new(42);
-        let snapshot = journal.begin();
+        let _snapshot = journal.begin();
 
         // Simulate a full eth→sol bridge flow
         journal.append(JournalEntry::BalanceDelta {
@@ -608,8 +625,9 @@ mod tests {
             after: 0, // locked all
         });
 
+        let ticket_id = journal.alloc_ticket_id();
         journal.append(JournalEntry::EscrowTicket {
-            ticket_id: journal.alloc_ticket_id(),
+            ticket_id,
             asset: usdc_asset(),
             amount: 500_000_000,
             owner: "alice.eth".to_string(),
@@ -632,7 +650,11 @@ mod tests {
 
         let plan = journal.rollback_plan();
         assert!(!plan.is_empty(), "should produce rollback instructions");
-        assert!(plan.len() >= 3, "should have at least 3 rollback steps, got {}", plan.len());
+        assert!(
+            plan.len() >= 3,
+            "should have at least 3 rollback steps, got {}",
+            plan.len()
+        );
 
         // Verify plan order is reverse (last entry first)
         for instr in &plan {

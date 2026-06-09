@@ -327,6 +327,214 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────────────────────────────────
+  # 8a. TEST: dex — AMM swap pool operations
+  # ──────────────────────────────────────────────────────────────────────────
+  test-dex:
+    name: "gate: test pallet-x3-dex"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-dex
+
+      - name: cargo test pallet-x3-dex
+        run: cargo test -p pallet-x3-dex --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8b. TEST: launchpad — token presale lifecycle
+  # ──────────────────────────────────────────────────────────────────────────
+  test-launchpad:
+    name: "gate: test pallet-x3-launchpad"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-launchpad
+
+      - name: cargo test pallet-x3-launchpad
+        run: cargo test -p pallet-x3-launchpad --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8c. TEST: token-factory — on-chain asset creation
+  # ──────────────────────────────────────────────────────────────────────────
+  test-token-factory:
+    name: "gate: test pallet-x3-token-factory"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-token-factory
+
+      - name: cargo test pallet-x3-token-factory
+        run: cargo test -p pallet-x3-token-factory --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8d. TEST: dapp-hub — dApp listing and revenue share
+  # ──────────────────────────────────────────────────────────────────────────
+  test-dapp-hub:
+    name: "gate: test pallet-x3-dapp-hub"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-dapp-hub
+
+      - name: cargo test pallet-x3-dapp-hub
+        run: cargo test -p pallet-x3-dapp-hub --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8e. TEST: auction — English auction lifecycle
+  # ──────────────────────────────────────────────────────────────────────────
+  test-auction:
+    name: "gate: test pallet-x3-auction"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-auction
+
+      - name: cargo test pallet-x3-auction
+        run: cargo test -p pallet-x3-auction --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8f. TEST: wallet — account abstraction + biometric/recovery
+  # ──────────────────────────────────────────────────────────────────────────
+  test-wallet:
+    name: "gate: test pallet-x3-wallet-pallet"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-wallet
+
+      - name: cargo test pallet-x3-wallet-pallet
+        run: cargo test -p pallet-x3-wallet-pallet --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8g. TEST: northern-swarm — on-chain swarm registry
+  # ──────────────────────────────────────────────────────────────────────────
+  test-northern-swarm:
+    name: "gate: test pallet-northern-swarm"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-northern-swarm
+
+      - name: cargo test pallet-northern-swarm
+        run: cargo test -p pallet-northern-swarm --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 8h. TEST: lp-locker — anti-rug LP token locking
+  # ──────────────────────────────────────────────────────────────────────────
+  test-lp-locker:
+    name: "gate: test pallet-x3-lp-locker"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: gate-lp-locker
+
+      - name: cargo test pallet-x3-lp-locker
+        run: cargo test -p pallet-x3-lp-locker --all-features -- --nocapture
+
+  # ──────────────────────────────────────────────────────────────────────────
   # 10. AGGREGATE — single required status check for branch protection
   # ──────────────────────────────────────────────────────────────────────────
   # Configure GitHub branch protection to require:
@@ -344,12 +552,21 @@ jobs:
       - test-ledger
       - test-settle
       - test-kernel
+      - test-dex
+      - test-launchpad
+      - test-token-factory
+      - test-dapp-hub
+      - test-auction
+      - test-wallet
+      - test-northern-swarm
+      - test-lp-locker
       - clippy
       - binary
+    if: always()
     steps:
-      - name: All critical-path gates passed
+      - name: Aggregate all critical-path gates
         run: |
-          echo "✅ All X3 critical-path CI gates passed."
+          echo "✅ All X3 critical-path CI gates processed."
           echo ""
           echo "Gates:"
           echo "  ✅ format"
@@ -359,5 +576,30 @@ jobs:
           echo "  ✅ test-ledger (canonical supply invariant)"
           echo "  ✅ test-settle (atomic settlement state machine)"
           echo "  ✅ test-kernel (bundle lifecycle)"
+          echo "  ✅ test-dex (AMM swap pool)"
+          echo "  ✅ test-launchpad (token presale)"
+          echo "  ✅ test-token-factory (asset creation)"
+          echo "  ✅ test-dapp-hub (dApp listing)"
+          echo "  ✅ test-auction (English auction)"
+          echo "  ✅ test-wallet (account abstraction)"
+          echo "  ✅ test-northern-swarm (swarm registry)"
+          echo "  ✅ test-lp-locker (anti-rug LP lock)"
           echo "  ✅ clippy (workspace, deny warnings)"
           echo "  ✅ binary (release build x3-chain-node)"
+
+      - name: Check if any required gate failed
+        run: |
+          FAILED=""
+          for gate in test-dex test-launchpad test-token-factory test-dapp-hub \
+                      test-auction test-wallet test-northern-swarm test-lp-locker \
+                      format check-runtime check-node test-router test-ledger \
+                      test-settle test-kernel clippy binary; do
+            if [ "${{ needs.${gate}.result }}" != "success" ]; then
+              FAILED="${FAILED} ${gate}"
+            fi
+          done
+          if [ -n "${FAILED}" ]; then
+            echo "❌ FAILED gates:${FAILED}"
+            exit 1
+          fi
+          echo "✅ ALL gates passed."

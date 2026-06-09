@@ -309,12 +309,21 @@ pub mod pallet {
             let now = frame_system::Pallet::<T>::block_number();
             ensure!(start_block >= now, Error::<T>::BadDuration);
             ensure!(end_block > start_block, Error::<T>::BadDuration);
-            ensure!(soft_cap > 0 && hard_cap >= soft_cap, Error::<T>::SoftCapExceeded);
+            ensure!(
+                soft_cap > 0 && hard_cap >= soft_cap,
+                Error::<T>::SoftCapExceeded
+            );
             ensure!(price_per_token > 0, Error::<T>::BadDuration);
 
             let duration = end_block.saturating_sub(start_block);
-            ensure!(duration >= T::MinLaunchDurationBlocks::get(), Error::<T>::BadDuration);
-            ensure!(duration <= T::MaxLaunchDurationBlocks::get(), Error::<T>::BadDuration);
+            ensure!(
+                duration >= T::MinLaunchDurationBlocks::get(),
+                Error::<T>::BadDuration
+            );
+            ensure!(
+                duration <= T::MaxLaunchDurationBlocks::get(),
+                Error::<T>::BadDuration
+            );
 
             let active = ActiveLaunchCount::<T>::get();
             ensure!(
@@ -370,7 +379,10 @@ pub mod pallet {
 
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Active, Error::<T>::LaunchNotActive);
+                ensure!(
+                    state.status == LaunchStatus::Active,
+                    Error::<T>::LaunchNotActive
+                );
                 ensure!(now >= state.start_block, Error::<T>::LaunchNotActive);
                 ensure!(now <= state.end_block, Error::<T>::LaunchNotEnded);
 
@@ -406,7 +418,10 @@ pub mod pallet {
 
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Active, Error::<T>::LaunchNotActive);
+                ensure!(
+                    state.status == LaunchStatus::Active,
+                    Error::<T>::LaunchNotActive
+                );
                 ensure!(now > state.end_block, Error::<T>::LaunchNotEnded);
 
                 let new_status = if state.total_raised >= state.soft_cap {
@@ -442,8 +457,14 @@ pub mod pallet {
 
             let state = Launches::<T>::get(launch_id).ok_or(Error::<T>::LaunchNotFound)?;
             ensure!(state.creator == caller, Error::<T>::NotCreator);
-            ensure!(state.status == LaunchStatus::Completed, Error::<T>::LaunchNotSuccessful);
-            ensure!(!GraduatedLaunches::<T>::contains_key(launch_id), Error::<T>::AlreadyGraduated);
+            ensure!(
+                state.status == LaunchStatus::Completed,
+                Error::<T>::LaunchNotSuccessful
+            );
+            ensure!(
+                !GraduatedLaunches::<T>::contains_key(launch_id),
+                Error::<T>::AlreadyGraduated
+            );
 
             let total_tokens = state.total_raised / state.price_per_token;
             ensure!(total_tokens > 0, Error::<T>::TokenFactoryFailed);
@@ -457,7 +478,8 @@ pub mod pallet {
                 name,
                 18u8, // standard decimals
                 total_tokens,
-            ).map_err(|_| Error::<T>::TokenFactoryFailed)?;
+            )
+            .map_err(|_| Error::<T>::TokenFactoryFailed)?;
 
             // Step 2: Create AMM pool with quote token
             let quote_asset = T::QuoteAssetId::get();
@@ -498,9 +520,16 @@ pub mod pallet {
             );
             let amount = Contributions::<T>::get(launch_id, &contributor);
             ensure!(amount > 0, Error::<T>::NotContributor);
-            ensure!(!RefundClaimed::<T>::get(launch_id, &contributor), Error::<T>::AlreadyClaimed);
+            ensure!(
+                !RefundClaimed::<T>::get(launch_id, &contributor),
+                Error::<T>::AlreadyClaimed
+            );
             RefundClaimed::<T>::insert(launch_id, &contributor, true);
-            Self::deposit_event(Event::RefundClaimed { launch_id, contributor, amount });
+            Self::deposit_event(Event::RefundClaimed {
+                launch_id,
+                contributor,
+                amount,
+            });
             Ok(())
         }
 
@@ -516,7 +545,10 @@ pub mod pallet {
             );
             let contribution = Contributions::<T>::get(launch_id, &contributor);
             ensure!(contribution > 0, Error::<T>::NotContributor);
-            ensure!(!AllocationClaimed::<T>::get(launch_id, &contributor), Error::<T>::AlreadyClaimed);
+            ensure!(
+                !AllocationClaimed::<T>::get(launch_id, &contributor),
+                Error::<T>::AlreadyClaimed
+            );
             let total_tokens = state.total_raised / state.price_per_token;
             let tokens = if state.total_raised > 0 {
                 contribution.saturating_mul(total_tokens) / state.total_raised
@@ -524,7 +556,11 @@ pub mod pallet {
                 0
             };
             AllocationClaimed::<T>::insert(launch_id, &contributor, true);
-            Self::deposit_event(Event::AllocationClaimed { launch_id, contributor, tokens });
+            Self::deposit_event(Event::AllocationClaimed {
+                launch_id,
+                contributor,
+                tokens,
+            });
             Ok(())
         }
 
@@ -535,7 +571,10 @@ pub mod pallet {
             T::GovernanceOrigin::ensure_origin(origin)?;
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Active, Error::<T>::LaunchNotActive);
+                ensure!(
+                    state.status == LaunchStatus::Active,
+                    Error::<T>::LaunchNotActive
+                );
                 ExpiryQueue::<T>::remove(state.end_block, launch_id);
                 state.status = LaunchStatus::Failed;
                 ActiveLaunchCount::<T>::mutate(|c| *c = c.saturating_sub(1));
@@ -551,11 +590,18 @@ pub mod pallet {
             let caller = ensure_signed(origin)?;
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(state.status == LaunchStatus::Successful, Error::<T>::LaunchNotSuccessful);
+                ensure!(
+                    state.status == LaunchStatus::Successful,
+                    Error::<T>::LaunchNotSuccessful
+                );
                 ensure!(state.creator == caller, Error::<T>::NotCreator);
                 let amount = state.total_raised;
                 state.status = LaunchStatus::Completed;
-                Self::deposit_event(Event::FundsWithdrawn { launch_id, creator: caller, amount });
+                Self::deposit_event(Event::FundsWithdrawn {
+                    launch_id,
+                    creator: caller,
+                    amount,
+                });
                 Ok(())
             })
         }
@@ -575,13 +621,29 @@ pub mod pallet {
     }
 
     impl WeightInfo for () {
-        fn create_launch() -> Weight { Weight::from_parts(25_000, 0) }
-        fn contribute() -> Weight { Weight::from_parts(30_000, 0) }
-        fn finalize_launch() -> Weight { Weight::from_parts(15_000, 0) }
-        fn claim_refund() -> Weight { Weight::from_parts(15_000, 0) }
-        fn claim_allocation() -> Weight { Weight::from_parts(15_000, 0) }
-        fn cancel_launch() -> Weight { Weight::from_parts(15_000, 0) }
-        fn withdraw_raised_funds() -> Weight { Weight::from_parts(15_000, 0) }
-        fn graduate_launch() -> Weight { Weight::from_parts(40_000, 0) }
+        fn create_launch() -> Weight {
+            Weight::from_parts(25_000, 0)
+        }
+        fn contribute() -> Weight {
+            Weight::from_parts(30_000, 0)
+        }
+        fn finalize_launch() -> Weight {
+            Weight::from_parts(15_000, 0)
+        }
+        fn claim_refund() -> Weight {
+            Weight::from_parts(15_000, 0)
+        }
+        fn claim_allocation() -> Weight {
+            Weight::from_parts(15_000, 0)
+        }
+        fn cancel_launch() -> Weight {
+            Weight::from_parts(15_000, 0)
+        }
+        fn withdraw_raised_funds() -> Weight {
+            Weight::from_parts(15_000, 0)
+        }
+        fn graduate_launch() -> Weight {
+            Weight::from_parts(40_000, 0)
+        }
     }
 }

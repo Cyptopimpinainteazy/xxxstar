@@ -12,10 +12,10 @@ fn lock_lp_creates_lock() {
 
         assert_ok!(LpLocker::lock_lp(
             RuntimeOrigin::signed(1),
-            42,           // pool_id
-            1000,         // lp_amount
-            200,          // unlock_at_block (duration = 199 blocks, >= 100 min)
-            vec![],       // description
+            42,     // pool_id
+            1000,   // lp_amount
+            200,    // unlock_at_block (duration = 199 blocks, >= 100 min)
+            vec![], // description
         ));
 
         let record = LpLocks::<Test>::get(1, 42).unwrap();
@@ -26,12 +26,15 @@ fn lock_lp_creates_lock() {
         assert_eq!(record.locked_at_block, 1);
 
         // Verify event was emitted
-        System::assert_has_event(Event::LpLocked {
-            owner: 1,
-            pool_id: 42,
-            lp_amount: 1000,
-            unlock_at_block: 200,
-        }.into());
+        System::assert_has_event(
+            Event::LpLocked {
+                owner: 1,
+                pool_id: 42,
+                lp_amount: 1000,
+                unlock_at_block: 200,
+            }
+            .into(),
+        );
     });
 }
 
@@ -53,7 +56,11 @@ fn lock_lp_rejects_duplicate() {
         frame_system::Pallet::<Test>::set_block_number(1);
 
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
         assert_noop!(
@@ -107,7 +114,11 @@ fn unlock_lp_removes_lock_after_expiry() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
         // Advance past unlock block
@@ -116,11 +127,14 @@ fn unlock_lp_removes_lock_after_expiry() {
         assert_ok!(LpLocker::unlock_lp(RuntimeOrigin::signed(1), 42));
         assert!(LpLocks::<Test>::get(1, 42).is_none());
 
-        System::assert_has_event(Event::LpUnlocked {
-            owner: 1,
-            pool_id: 42,
-            lp_amount: 1000,
-        }.into());
+        System::assert_has_event(
+            Event::LpUnlocked {
+                owner: 1,
+                pool_id: 42,
+                lp_amount: 1000,
+            }
+            .into(),
+        );
     });
 }
 
@@ -129,7 +143,11 @@ fn unlock_lp_rejects_before_expiry() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
         // At block 150, lock has not expired
@@ -157,12 +175,14 @@ fn extend_lock_increases_duration() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
-        assert_ok!(LpLocker::extend_lock(
-            RuntimeOrigin::signed(1), 42, 500
-        ));
+        assert_ok!(LpLocker::extend_lock(RuntimeOrigin::signed(1), 42, 500));
 
         let record = LpLocks::<Test>::get(1, 42).unwrap();
         assert_eq!(record.unlock_at_block, 500);
@@ -174,7 +194,11 @@ fn extend_lock_rejects_shorten() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
         assert_noop!(
@@ -199,12 +223,14 @@ fn increase_lock_adds_amount() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
-        assert_ok!(LpLocker::increase_lock(
-            RuntimeOrigin::signed(1), 42, 500
-        ));
+        assert_ok!(LpLocker::increase_lock(RuntimeOrigin::signed(1), 42, 500));
 
         let record = LpLocks::<Test>::get(1, 42).unwrap();
         assert_eq!(record.lp_amount, 1500);
@@ -226,7 +252,11 @@ fn increase_lock_rejects_zero_amount() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
 
         assert_noop!(
@@ -243,7 +273,11 @@ fn is_locked_returns_correct_state() {
         assert!(!LpLocker::is_locked(&1, 42)); // no lock yet
 
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
         assert!(LpLocker::is_locked(&1, 42)); // lock active
 
@@ -259,13 +293,25 @@ fn total_locked_for_pool_aggregates() {
 
         // Multiple users lock LP in same pool
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 42, 1000, 200, vec![]
+            RuntimeOrigin::signed(1),
+            42,
+            1000,
+            200,
+            vec![]
         ));
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(2), 42, 500, 300, vec![]
+            RuntimeOrigin::signed(2),
+            42,
+            500,
+            300,
+            vec![]
         ));
         assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1), 7, 2000, 200, vec![] // different pool
+            RuntimeOrigin::signed(1),
+            7,
+            2000,
+            200,
+            vec![] // different pool
         ));
 
         assert_eq!(LpLocker::total_locked_for_pool(42), 1500);

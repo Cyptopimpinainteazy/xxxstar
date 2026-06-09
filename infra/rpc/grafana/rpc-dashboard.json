@@ -1,0 +1,199 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "X3 Mainnet RPC Gateway Dashboard",
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Requests/sec",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(rpc_requests_total[1m])",
+          "legendFormat": "total",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(rpc_errors_total[1m])",
+          "legendFormat": "errors",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [{ "format": "reqps" }, { "format": "short" }]
+    },
+    {
+      "title": "P50/P95/P99 Latency",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rpc_request_duration_seconds_bucket[1m]))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rpc_request_duration_seconds_bucket[1m]))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(rpc_request_duration_seconds_bucket[1m]))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [{ "format": "s" }, { "format": "short" }]
+    },
+    {
+      "title": "Healthy Upstreams per Chain",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rpc_healthy_upstreams",
+          "legendFormat": "{{chain}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": "0,1,2",
+      "colors": ["#d44a3a", "#e5ac0e", "#299c46"]
+    },
+    {
+      "title": "Error Rate %",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(rpc_errors_total[5m]) / rate(rpc_requests_total[5m]) * 100",
+          "legendFormat": "error_rate",
+          "refId": "A"
+        }
+      ],
+      "thresholds": "0,1,5",
+      "colors": ["#299c46", "#e5ac0e", "#d44a3a"],
+      "format": "percent"
+    },
+    {
+      "title": "Rate-Limited Requests",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(rpc_rate_limited_total[5m])",
+          "legendFormat": "rate_limited",
+          "refId": "A"
+        }
+      ],
+      "thresholds": "0,1,10",
+      "colors": ["#299c46", "#e5ac0e", "#d44a3a"],
+      "format": "reqps"
+    },
+    {
+      "title": "Active WS Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        {
+          "expr": "rpc_ws_connections",
+          "legendFormat": "ws",
+          "refId": "A"
+        }
+      ],
+      "thresholds": "0,200,500",
+      "colors": ["#299c46", "#e5ac0e", "#d44a3a"]
+    },
+    {
+      "title": "Upstream Health Scores",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "rpc_upstream_score",
+          "legendFormat": "{{upstream}}",
+          "refId": "A"
+        }
+      ],
+      "columns": [
+        { "type": "time", "unit": "dateTimeFromNow" },
+        { "type": "number", "unit": "short", "title": "Score" }
+      ],
+      "color": {
+        "mode": "thresholds",
+        "thresholds": ["0:#d44a3a", "30:#e5ac0e", "60:#299c46"]
+      }
+    },
+    {
+      "title": "Upstream Block Lag",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "rpc_upstream_block_lag",
+          "legendFormat": "{{upstream}}",
+          "refId": "A"
+        }
+      ],
+      "color": {
+        "mode": "thresholds",
+        "thresholds": ["0:#299c46", "2:#e5ac0e", "10:#d44a3a"]
+      }
+    },
+    {
+      "title": "Upstream Latency (ms)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "rpc_upstream_latency_ms",
+          "legendFormat": "{{upstream}}",
+          "refId": "A"
+        }
+      ],
+      "color": {
+        "mode": "thresholds",
+        "thresholds": ["0:#299c46", "80:#e5ac0e", "250:#d44a3a"]
+      }
+    },
+    {
+      "title": "Quorum Mismatches (5m)",
+      "type": "graph",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "expr": "increase(rpc_quorum_mismatch_total[5m])",
+          "legendFormat": "{{chain}}/{{method}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Transaction Broadcast Results",
+      "type": "graph",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 28 },
+      "targets": [
+        {
+          "expr": "rate(rpc_tx_broadcast_total[1m])",
+          "legendFormat": "{{chain}}/{{result}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": ["x3", "rpc", "mainnet"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "X3 RPC Gateway — Mainnet",
+  "uid": "x3-rpc-mainnet",
+  "version": 0
+}

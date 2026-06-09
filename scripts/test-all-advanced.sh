@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: ./scripts/test-all-advanced.sh [--quick|--thorough] [--ci] [--with-fragile] [--targeted <crate>]"
             echo "  --ci            Deterministic profile, skips fragile phases by default"
             echo "  --with-fragile  Re-enable fragile phases under --ci"
-            echo "  --targeted      Restrict stable property tests to one crate (x3-swap-router|x3-fees)"
+            echo "  --targeted      Restrict stable property tests to one crate (x3-dex|x3-fees)"
             exit 0
             ;;
         *)
@@ -110,11 +110,11 @@ fi
 header "PHASE 1: Property-Based Testing"
 
 if [[ -n "$TARGET_CRATE" ]]; then
-    if [[ "$TARGET_CRATE" == "x3-swap-router" ]]; then
-        if cargo test -p x3-swap-router --test prop_swap_math -- --nocapture --test-threads=1; then
-            pass "Property-based tests (proptest, targeted: x3-swap-router)"
+    if [[ "$TARGET_CRATE" == "x3-dex" ]]; then
+        if cargo test -p x3-dex --test prop_swap_math -- --nocapture --test-threads=1; then
+            pass "Property-based tests (proptest, targeted: x3-dex)"
         else
-            fail "Property-based tests (proptest, targeted: x3-swap-router)"
+            fail "Property-based tests (proptest, targeted: x3-dex)"
         fi
     elif [[ "$TARGET_CRATE" == "x3-fees" ]]; then
         if cargo test -p x3-fees --test prop_fee_invariants -- --nocapture --test-threads=1; then
@@ -125,7 +125,7 @@ if [[ -n "$TARGET_CRATE" ]]; then
     else
         skip "Unknown --targeted crate for stable properties: $TARGET_CRATE"
     fi
-elif cargo test -p x3-swap-router --test prop_swap_math -- --nocapture --test-threads=1 && \
+elif cargo test -p x3-dex --test prop_swap_math -- --nocapture --test-threads=1 && \
      cargo test -p x3-fees --test prop_fee_invariants -- --nocapture --test-threads=1; then
     pass "Property-based tests (proptest)"
 else
@@ -323,7 +323,7 @@ else
     fail "Runtime compilation"
 fi
 
-if cargo test -p x3-swap-router --test prop_swap_math --no-run && \
+if cargo test -p x3-dex --test prop_swap_math --no-run && \
    cargo test -p x3-fees --test prop_fee_invariants --no-run && \
    cargo check -p x3-gateway --tests; then
     pass "Test binaries built"

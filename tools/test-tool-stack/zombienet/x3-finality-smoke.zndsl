@@ -1,0 +1,28 @@
+Description: X3 Local 7-Validator Finality Smoke Test
+Network: ./x3-local-7.toml
+Creds: config
+
+# All 7 validators should start producing blocks
+alice: level(1) within 100 seconds
+bob: level(1) within 100 seconds
+charlie: level(1) within 100 seconds
+dave: level(1) within 100 seconds
+eve: level(1) within 100 seconds
+ferdie: level(1) within 100 seconds
+grace: level(1) within 100 seconds
+
+# Finality must advance past block 10 on all nodes
+alice: block 10 exists within 60 seconds
+bob: block 10 exists within 60 seconds
+charlie: block 10 exists within 60 seconds
+
+# RPC node syncs from the network
+rpc-node: is reporting peers >= 3 within 30 seconds
+rpc-node: block 10 exists within 120 seconds
+
+# Chain metrics are reported
+alice: reports block height >= 10 within 120 seconds
+alice: reports finalized height >= 5 within 120 seconds
+
+# Validator session should rotate at least once (NPoS)
+# alice: reports current era >= 1 within 300 seconds

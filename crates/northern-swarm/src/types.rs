@@ -197,6 +197,9 @@ pub enum NorthernSwarmError {
     #[error("chain RPC error: {0}")]
     ChainRpc(String),
 
+    #[error("chain connection failed (url={url}): {reason}")]
+    ChainConnection { url: String, reason: String },
+
     #[error("payload fetch error (uri={uri}): {reason}")]
     PayloadFetch { uri: String, reason: String },
 
@@ -211,4 +214,7 @@ pub enum NorthernSwarmError {
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("crypto error: {0}")]
+    Crypto(String),
 }

@@ -1,0 +1,299 @@
+# X3 Mainnet RPC — Provider Configuration Template
+# Copy to providers.yaml and fill in your real API keys / private endpoints.
+# NEVER commit providers.yaml — it is in .gitignore.
+#
+# Each upstream needs: id, chain, url (or ws_url), tier (0=X3-owned, 1=paid, 2=fallback),
+# and optional capabilities array.
+
+providers:
+  # -----------------------------------------------------------------------
+  # Ethereum
+  # -----------------------------------------------------------------------
+  - id: eth-local-reth
+    chain: ethereum
+    kind: evm
+    url: "http://localhost:8545"
+    tier: 0
+    priority: 0
+    capabilities: [full, trace, archive]
+    rate_limit_rps: 500
+    labels:
+      location: local
+      node_type: reth
+
+  - id: eth-local-erigon
+    chain: ethereum
+    kind: evm
+    url: "http://localhost:8546"
+    tier: 0
+    priority: 1
+    capabilities: [full, archive]
+    rate_limit_rps: 300
+    labels:
+      location: local
+      node_type: erigon
+
+  - id: eth-drpc-paid
+    chain: ethereum
+    kind: evm
+    url: "https://lb.drpc.live/evm/ethereum/YOUR_DRPC_KEY"
+    tier: 1
+    priority: 2
+    capabilities: [full]
+    rate_limit_rps: 200
+    labels:
+      provider: drpc
+      sla: paid
+
+  - id: eth-ankr-paid
+    chain: ethereum
+    kind: evm
+    url: "https://rpc.ankr.com/eth/YOUR_ANKR_KEY"
+    tier: 1
+    priority: 3
+    capabilities: [full]
+    rate_limit_rps: 150
+    labels:
+      provider: ankr
+      sla: paid
+
+  - id: eth-backup
+    chain: ethereum
+    kind: evm
+    url: "https://eth.llamarpc.com"
+    tier: 2
+    priority: 4
+    capabilities: [full]
+    rate_limit_rps: 30
+    labels:
+      provider: llamanodes
+      sla: public
+
+  # -----------------------------------------------------------------------
+  # Base
+  # -----------------------------------------------------------------------
+  - id: base-drpc-paid
+    chain: base
+    kind: evm
+    url: "https://lb.drpc.live/evm/base/YOUR_DRPC_KEY"
+    tier: 1
+    priority: 0
+    capabilities: [full]
+    rate_limit_rps: 200
+    labels:
+      provider: drpc
+      sla: paid
+
+  - id: base-ankr-paid
+    chain: base
+    kind: evm
+    url: "https://rpc.ankr.com/base/YOUR_ANKR_KEY"
+    tier: 1
+    priority: 1
+    capabilities: [full]
+    rate_limit_rps: 150
+    labels:
+      provider: ankr
+      sla: paid
+
+  - id: base-backup
+    chain: base
+    kind: evm
+    url: "https://base.llamarpc.com"
+    tier: 2
+    priority: 2
+    capabilities: [full]
+    rate_limit_rps: 30
+    labels:
+      provider: llamanodes
+      sla: public
+
+  # -----------------------------------------------------------------------
+  # Arbitrum
+  # -----------------------------------------------------------------------
+  - id: arb-drpc-paid
+    chain: arbitrum
+    kind: evm
+    url: "https://lb.drpc.live/evm/arbitrum/YOUR_DRPC_KEY"
+    tier: 1
+    priority: 0
+    capabilities: [full]
+    rate_limit_rps: 200
+    labels:
+      provider: drpc
+      sla: paid
+
+  - id: arb-ankr-paid
+    chain: arbitrum
+    kind: evm
+    url: "https://rpc.ankr.com/arbitrum/YOUR_ANKR_KEY"
+    tier: 1
+    priority: 1
+    capabilities: [full]
+    rate_limit_rps: 150
+    labels:
+      provider: ankr
+      sla: paid
+
+  # -----------------------------------------------------------------------
+  # Polygon
+  # -----------------------------------------------------------------------
+  - id: polygon-drpc-paid
+    chain: polygon
+    kind: evm
+    url: "https://lb.drpc.live/evm/polygon/YOUR_DRPC_KEY"
+    tier: 1
+    priority: 0
+    capabilities: [full]
+    rate_limit_rps: 200
+    labels:
+      provider: drpc
+      sla: paid
+
+  - id: polygon-ankr-paid
+    chain: polygon
+    kind: evm
+    url: "https://rpc.ankr.com/polygon/YOUR_ANKR_KEY"
+    tier: 1
+    priority: 1
+    capabilities: [full]
+    rate_limit_rps: 150
+    labels:
+      provider: ankr
+      sla: paid
+
+  # -----------------------------------------------------------------------
+  # BSC
+  # -----------------------------------------------------------------------
+  - id: bsc-drpc-paid
+    chain: bsc
+    kind: evm
+    url: "https://lb.drpc.live/evm/bsc/YOUR_DRPC_KEY"
+    tier: 1
+    priority: 0
+    capabilities: [full]
+    rate_limit_rps: 200
+    labels:
+      provider: drpc
+      sla: paid
+
+  - id: bsc-ankr-paid
+    chain: bsc
+    kind: evm
+    url: "https://rpc.ankr.com/bsc/YOUR_ANKR_KEY"
+    tier: 1
+    priority: 1
+    capabilities: [full]
+    rate_limit_rps: 150
+    labels:
+      provider: ankr
+      sla: paid
+
+  # -----------------------------------------------------------------------
+  # Solana
+  # -----------------------------------------------------------------------
+  - id: solana-private-rpc
+    chain: solana
+    kind: svm
+    url: "https://YOUR_PRIVATE_SOLANA_RPC_URL"
+    ws_url: "wss://YOUR_PRIVATE_SOLANA_WS_URL"
+    tier: 0
+    priority: 0
+    capabilities: [full, websocket]
+    rate_limit_rps: 500
+    labels:
+      provider: private
+      sla: dedicated
+
+  - id: solana-drpc-paid
+    chain: solana
+    kind: svm
+    url: "https://lb.drpc.live/solana/YOUR_DRPC_KEY"
+    ws_url: "wss://lb.drpc.live/solana/YOUR_DRPC_KEY"
+    tier: 1
+    priority: 1
+    capabilities: [full, websocket]
+    rate_limit_rps: 200
+    labels:
+      provider: drpc
+      sla: paid
+
+  - id: solana-ankr-paid
+    chain: solana
+    kind: svm
+    url: "https://rpc.ankr.com/solana/YOUR_ANKR_KEY"
+    tier: 1
+    priority: 2
+    capabilities: [full]
+    rate_limit_rps: 150
+    labels:
+      provider: ankr
+      sla: paid
+
+  # -----------------------------------------------------------------------
+  # Bitcoin
+  # -----------------------------------------------------------------------
+  - id: btc-local-core
+    chain: bitcoin
+    kind: bitcoin
+    url: "http://localhost:8332"
+    tier: 0
+    priority: 0
+    capabilities: [full]
+    rate_limit_rps: 100
+    labels:
+      location: local
+      node_type: bitcoin-core
+    auth:
+      rpc_user: "YOUR_RPC_USER"
+      rpc_password: "YOUR_RPC_PASSWORD"
+
+  - id: btc-backup
+    chain: bitcoin
+    kind: bitcoin
+    url: "https://YOUR_BTC_BACKUP_URL"
+    tier: 2
+    priority: 1
+    capabilities: [full]
+    rate_limit_rps: 30
+    labels:
+      sla: public
+
+  # -----------------------------------------------------------------------
+  # X3
+  # -----------------------------------------------------------------------
+  - id: x3-validator-1
+    chain: x3
+    kind: x3
+    url: "ws://localhost:9944"
+    tier: 0
+    priority: 0
+    capabilities: [full, proof, atomic]
+    rate_limit_rps: 1000
+    labels:
+      location: local
+      node_type: validator
+
+  - id: x3-validator-2
+    chain: x3
+    kind: x3
+    url: "ws://localhost:9945"
+    tier: 0
+    priority: 1
+    capabilities: [full, proof, atomic]
+    rate_limit_rps: 1000
+    labels:
+      location: local
+      node_type: validator
+
+  - id: x3-archive-indexer
+    chain: x3
+    kind: x3
+    url: "ws://localhost:9946"
+    tier: 0
+    priority: 2
+    capabilities: [full, archive, proof]
+    rate_limit_rps: 500
+    labels:
+      location: local
+      node_type: archive-indexer

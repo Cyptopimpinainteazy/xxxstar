@@ -80,6 +80,7 @@ use pallet_x3_treasury_policy;
 use pallet_x3_verifier;
 use pallet_x3_wallet_pallet;
 use pallet_x3_wrapped;
+use pallet_northern_swarm;
 
 use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
@@ -467,6 +468,7 @@ construct_runtime!(
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
     }
 );
 
@@ -538,6 +540,7 @@ construct_runtime!(
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
+        NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
     }
@@ -2810,11 +2813,11 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
         initial_supply: u128,
     ) -> Result<u32, DispatchError> {
         let symbol_bounded = frame_support::BoundedVec::try_from(symbol)
-            .map_err(|_| DispatchError::Other('symbol too long'))?;
+            .map_err(|_| DispatchError::Other("symbol too long"))?;
         let name_bounded = frame_support::BoundedVec::try_from(name)
-            .map_err(|_| DispatchError::Other('name too long'))?;
+            .map_err(|_| DispatchError::Other("name too long"))?;
         let enabled = frame_support::BoundedVec::try_from(
-        ).map_err(|_| DispatchError::Other('too many domains'))?;
+        ).map_err(|_| DispatchError::Other("too many domains"))?;
         let config = pallet_x3_token_factory::TokenFactoryConfig {
             symbol: symbol_bounded,
             name: name_bounded,

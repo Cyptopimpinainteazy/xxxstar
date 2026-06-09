@@ -82,8 +82,14 @@ pub mod pallet {
     /// Map from (owner, pool_id) -> LP lock record.
     #[pallet::storage]
     #[pallet::getter(fn lp_locks)]
-    pub type LpLocks<T: Config> =
-        StorageDoubleMap<_, Blake2_128Concat, T::AccountId, Blake2_128Concat, u64, LpLockRecord<T::AccountId, T::BlockNumber>>;
+    pub type LpLocks<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        Blake2_128Concat,
+        u64,
+        LpLockRecord<T::AccountId, T::BlockNumber>,
+    >;
 
     // ── Events ──────────────────────────────────────────────────────────────
 
@@ -159,13 +165,22 @@ pub mod pallet {
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(lp_amount > 0, Error::<T>::ZeroAmount);
-            ensure!(!LpLocks::<T>::contains_key(&who, pool_id), Error::<T>::AlreadyLocked);
+            ensure!(
+                !LpLocks::<T>::contains_key(&who, pool_id),
+                Error::<T>::AlreadyLocked
+            );
             ensure!(description.len() <= 128, Error::<T>::DescriptionTooLong);
 
             let current_block = frame_system::Pallet::<T>::block_number();
             let duration = unlock_at_block.saturating_sub(current_block);
-            ensure!(duration >= T::MinLockDuration::get(), Error::<T>::DurationBelowMinimum);
-            ensure!(duration <= T::MaxLockDuration::get(), Error::<T>::DurationAboveMaximum);
+            ensure!(
+                duration >= T::MinLockDuration::get(),
+                Error::<T>::DurationBelowMinimum
+            );
+            ensure!(
+                duration <= T::MaxLockDuration::get(),
+                Error::<T>::DurationAboveMaximum
+            );
 
             let record = LpLockRecord {
                 owner: who.clone(),
@@ -191,15 +206,15 @@ pub mod pallet {
         /// Unlock and withdraw LP tokens after the lock period has expired.
         #[pallet::call_index(1)]
         #[pallet::weight(T::WeightInfo::unlock_lp())]
-        pub fn unlock_lp(
-            origin: OriginFor<T>,
-            pool_id: u64,
-        ) -> DispatchResult {
+        pub fn unlock_lp(origin: OriginFor<T>, pool_id: u64) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let record = LpLocks::<T>::get(&who, pool_id).ok_or(Error::<T>::NotFound)?;
 
             let current_block = frame_system::Pallet::<T>::block_number();
-            ensure!(current_block >= record.unlock_at_block, Error::<T>::LockNotExpired);
+            ensure!(
+                current_block >= record.unlock_at_block,
+                Error::<T>::LockNotExpired
+            );
 
             let lp_amount = record.lp_amount;
             LpLocks::<T>::remove(&who, pool_id);
@@ -231,7 +246,10 @@ pub mod pallet {
 
             let current_block = frame_system::Pallet::<T>::block_number();
             let new_duration = new_unlock_at_block.saturating_sub(current_block);
-            ensure!(new_duration <= T::MaxLockDuration::get(), Error::<T>::DurationAboveMaximum);
+            ensure!(
+                new_duration <= T::MaxLockDuration::get(),
+                Error::<T>::DurationAboveMaximum
+            );
 
             record.unlock_at_block = new_unlock_at_block;
             LpLocks::<T>::insert(&who, pool_id, record);
@@ -304,9 +322,17 @@ pub mod pallet {
     }
 
     impl WeightInfo for () {
-        fn lock_lp() -> Weight { Weight::from_parts(10_000, 0) }
-        fn unlock_lp() -> Weight { Weight::from_parts(10_000, 0) }
-        fn extend_lock() -> Weight { Weight::from_parts(10_000, 0) }
-        fn increase_lock() -> Weight { Weight::from_parts(10_000, 0) }
+        fn lock_lp() -> Weight {
+            Weight::from_parts(10_000, 0)
+        }
+        fn unlock_lp() -> Weight {
+            Weight::from_parts(10_000, 0)
+        }
+        fn extend_lock() -> Weight {
+            Weight::from_parts(10_000, 0)
+        }
+        fn increase_lock() -> Weight {
+            Weight::from_parts(10_000, 0)
+        }
     }
 }

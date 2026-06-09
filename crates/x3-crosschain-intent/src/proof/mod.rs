@@ -13,13 +13,13 @@
 //! artifact. The intent compiler's `VerifyProof` instruction calls into
 //! this module through the `ProofVerifier` trait.
 
+mod btc;
 mod evm;
 mod svm;
-mod btc;
 
-/// Re-export public types and functions.
-pub use evm::{
-    verify_evm_receipt_proof, EvmLog, EvmProofError, EvmReceiptProof, RlpDecodedLog,
-};
-pub use svm::{verify_svm_validator_quorum, SvmProofError, SvmValidatorQuorumProof, ValidatorEntry};
 pub use btc::{verify_btc_spv_proof, BtcBlockHeader, BtcProofError, BtcSpvProof};
+/// Re-export public types and functions.
+pub use evm::{verify_evm_receipt_proof, EvmLog, EvmProofError, EvmReceiptProof, RlpDecodedLog};
+pub use svm::{
+    verify_svm_validator_quorum, SvmProofError, SvmValidatorQuorumProof, ValidatorEntry,
+};
