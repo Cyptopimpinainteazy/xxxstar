@@ -1,0 +1,372 @@
+// yield_optimizer.x3 - Yield Optimizer with Deposits, Strategy Allocation, Auto-Compounding, Risk Score
+//
+// @version("1.0.0")
+// @audit
+
+contract YieldOptimizer {
+    // Configuration constants
+    const PERFORMANCE_FEE_BPS: u256 = 1000;     // 10% performance fee
+    const WITHDRAWAL_FEE_BPS: u256 = 50;        // 0.5% withdrawal fee
+    const MIN_DEPOSIT: u256 = 0.1 ether;
+    const MAX_STRATEGIES: u256 = 10;
+    const REBALANCE_THRESHOLD_BPS: u256 = 500;  // 5% deviation triggers rebalance
+    const COMPOUND_INTERVAL: u256 = 86400;      // Daily compounding
+
+    // Storage
+    address owner;
+    mapping(address => UserVault) user_vaults;
+    mapping(u256 => YieldStrategy) strategies;
+    mapping(u256 => PoolInfo) pools;
+    u256 strategy_counter;
+    u256 pool_counter;
+    u256 total_deposits;
+    u256 total_yield_generated;
+
+    // Structs
+    struct UserVault {
+        address user;
+        u256 total_deposited;
+        u256 total_withdrawn;
+        u256 current_balance;
+        u256 yield_earned;
+        u256 last_compound_time;
+        mapping(u256 => u256) strategy_allocations; // strategy_id => amount
+        u256[] active_strategies;
+    }
+
+    struct YieldStrategy {
+        u256 id;
+        string name;
+        string protocol;
+        u256 pool_id;
+        u256 allocation_percentage;
+        u256 current_deposits;
+        u256 apy;
+        u256 risk_score;
+        u256 total_yield;
+        bool active;
+    }
+
+    struct PoolInfo {
+        u256 id;
+        string name;
+        address pool_address;
+        address lp_token;
+        u256 total_liquidity;
+        u256 current_apy;
+        u256 risk_score;
+        u256 tvl;
+    }
+
+    // Events
+    event Deposited(address indexed user, u256 amount);
+    event Withdrawn(address indexed user, u256 amount, u256 fee);
+    event StrategyAllocated(u256 indexed strategy_id, u256 amount);
+    event YieldCompounded(u256 indexed strategy_id, u256 yield_amount);
+    event APYUpdated(u256 indexed strategy_id, u256 new_apy);
+    event Rebalanced(u256 indexed strategy_id, u256 old_allocation, u256 new_allocation);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== DEPOSIT =====
+
+    fn deposit() {
+        require(msg.value >= MIN_DEPOSIT, "Below minimum deposit");
+
+        let vault = user_vaults[msg.sender];
+        let new_balance = vault.current_balance + msg.value;
+
+        user_vaults[msg.sender] = UserVault {
+            user: msg.sender,
+            total_deposited: vault.total_deposited + msg.value,
+            total_withdrawn: vault.total_withdrawn,
+            current_balance: new_balance,
+            yield_earned: vault.yield_earned,
+            last_compound_time: block.timestamp,
+            strategy_allocations: vault.strategy_allocations,
+            active_strategies: vault.active_strategies,
+        };
+
+        total_deposits = total_deposits + msg.value;
+
+        // Auto-allocate to strategies based on current allocation
+        for i in 0..strategy_counter {
+            let strategy = strategies[i + 1];
+            if strategy.active && strategy.allocation_percentage > 0 {
+                let alloc_amount = msg.value * strategy.allocation_percentage / 10000;
+                if alloc_amount > 0 {
+                    _allocate_to_strategy(msg.sender, i + 1, alloc_amount);
+                }
+            }
+        }
+
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    // ===== WITHDRAW =====
+
+    fn withdraw(amount: u256) {
+        let vault = user_vaults[msg.sender];
+        require(vault.current_balance >= amount, "Insufficient balance");
+        require(amount > 0, "Amount must be > 0");
+
+        // Calculate withdrawal fee
+        let fee = amount * WITHDRAWAL_FEE_BPS / 10000;
+        let net_amount = amount - fee;
+
+        // Withdraw from strategies proportionally
+        let total_allocated: u256 = 0;
+        for sid in vault.active_strategies {
+            total_allocated = total_allocated + vault.strategy_allocations[sid];
+        }
+
+        for sid in vault.active_strategies {
+            let alloc = vault.strategy_allocations[sid];
+            if alloc > 0 {
+                let withdraw_from_strategy = amount * alloc / vault.current_balance;
+                if withdraw_from_strategy > 0 {
+                    _withdraw_from_strategy(msg.sender, sid, withdraw_from_strategy);
+                }
+            }
+        }
+
+        // Update vault
+        user_vaults[msg.sender].current_balance = vault.current_balance - amount;
+        user_vaults[msg.sender].total_withdrawn = vault.total_withdrawn + net_amount;
+
+        total_deposits = total_deposits - amount;
+
+        // Transfer funds
+        if fee > 0 {
+            transfer(owner, fee);
+        }
+        transfer(msg.sender, net_amount);
+
+        emit Withdrawn(msg.sender, net_amount, fee);
+    }
+
+    // ===== ALLOCATE STRATEGY =====
+
+    fn allocate_strategy(strategy_id: u256, percentage_bps: u256) {
+        require(msg.sender == owner, "Only owner");
+        let strategy = strategies[strategy_id];
+        require(strategy.id != 0, "Strategy not found");
+        require(percentage_bps <= 10000, "Max 100%");
+
+        let old_allocation = strategy.allocation_percentage;
+        strategies[strategy_id].allocation_percentage = percentage_bps;
+
+        emit Rebalanced(strategy_id, old_allocation, percentage_bps);
+    }
+
+    fn _allocate_to_strategy(user: address, strategy_id: u256, amount: u256) {
+        let strategy = strategies[strategy_id];
+        require(strategy.active, "Strategy not active");
+
+        // Deposit into underlying protocol
+        let pool = pools[strategy.pool_id];
+        call(pool.pool_address, "deposit", (amount));
+
+        // Track allocation
+        user_vaults[user].strategy_allocations[strategy_id] = 
+            user_vaults[user].strategy_allocations[strategy_id] + amount;
+
+        // Track active strategies for user
+        let found: bool = false;
+        for sid in user_vaults[user].active_strategies {
+            if sid == strategy_id {
+                found = true;
+            }
+        }
+        if !found {
+            user_vaults[user].active_strategies.push(strategy_id);
+        }
+
+        strategies[strategy_id].current_deposits = strategy.current_deposits + amount;
+        emit StrategyAllocated(strategy_id, amount);
+    }
+
+    fn _withdraw_from_strategy(user: address, strategy_id: u256, amount: u256) {
+        let strategy = strategies[strategy_id];
+        let pool = pools[strategy.pool_id];
+
+        // Withdraw from underlying protocol
+        call(pool.pool_address, "withdraw", (amount));
+
+        user_vaults[user].strategy_allocations[strategy_id] = 
+            user_vaults[user].strategy_allocations[strategy_id] - amount;
+
+        strategies[strategy_id].current_deposits = strategy.current_deposits - amount;
+    }
+
+    // ===== COMPOUND YIELD =====
+
+    fn compound_yield(strategy_id: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        require(strategy.active, "Strategy not active");
+
+        let pool = pools[strategy.pool_id];
+        let yield_amount = call(pool.pool_address, "getAccruedYield", (strategy_id));
+
+        if yield_amount > 0 {
+            // Reinvest yield into the strategy
+            call(pool.pool_address, "deposit", (yield_amount));
+
+            strategies[strategy_id].total_yield = strategy.total_yield + yield_amount;
+            total_yield_generated = total_yield_generated + yield_amount;
+
+            // Update APY based on recent yield
+            let new_apy = _calculate_current_apy(strategy_id);
+            strategies[strategy_id].apy = new_apy;
+
+            emit YieldCompounded(strategy_id, yield_amount);
+            emit APYUpdated(strategy_id, new_apy);
+        }
+
+        return yield_amount;
+    }
+
+    fn compound_all() -> u256 {
+        require(msg.sender == owner, "Only owner");
+        let total_yield: u256 = 0;
+
+        for i in 0..strategy_counter {
+            let sid = i + 1;
+            if strategies[sid].active {
+                let yield_amount = compound_yield(sid);
+                total_yield = total_yield + yield_amount;
+            }
+        }
+
+        return total_yield;
+    }
+
+    // ===== GET APY =====
+
+    fn get_apy(strategy_id: u256) -> u256 {
+        return strategies[strategy_id].apy;
+    }
+
+    fn get_weighted_apy(user: address) -> u256 {
+        let vault = user_vaults[user];
+        if vault.current_balance == 0 {
+            return 0;
+        }
+
+        let weighted_apy: u256 = 0;
+        for sid in vault.active_strategies {
+            let alloc = vault.strategy_allocations[sid];
+            if alloc > 0 {
+                let strategy_apy = strategies[sid].apy;
+                weighted_apy = weighted_apy + (strategy_apy * alloc / vault.current_balance);
+            }
+        }
+
+        return weighted_apy;
+    }
+
+    fn _calculate_current_apy(strategy_id: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        if strategy.current_deposits == 0 {
+            return 0;
+        }
+
+        let pool = pools[strategy.pool_id];
+        let recent_yield = call(pool.pool_address, "getRecentYield", (strategy_id, 86400));
+        let daily_rate = recent_yield * 10000 / strategy.current_deposits;
+        let apy = daily_rate * 365; // Simple APY approximation
+        return apy;
+    }
+
+    // ===== RISK SCORE =====
+
+    fn get_risk_score(strategy_id: u256) -> u256 {
+        return strategies[strategy_id].risk_score;
+    }
+
+    fn get_portfolio_risk_score(user: address) -> u256 {
+        let vault = user_vaults[user];
+        if vault.current_balance == 0 {
+            return 0;
+        }
+
+        let weighted_risk: u256 = 0;
+        for sid in vault.active_strategies {
+            let alloc = vault.strategy_allocations[sid];
+            if alloc > 0 {
+                let strategy_risk = strategies[sid].risk_score;
+                weighted_risk = weighted_risk + (strategy_risk * alloc / vault.current_balance);
+            }
+        }
+
+        return weighted_risk;
+    }
+
+    // ===== STRATEGY MANAGEMENT =====
+
+    fn add_strategy(
+        name: string,
+        protocol: string,
+        pool_address: address,
+        lp_token: address,
+        allocation_percentage: u256,
+        risk_score: u256
+    ) -> u256 {
+        require(msg.sender == owner, "Only owner");
+        require(strategy_counter < MAX_STRATEGIES, "Max strategies reached");
+        require(risk_score <= 100, "Risk score 0-100");
+
+        pool_counter = pool_counter + 1;
+        pools[pool_counter] = PoolInfo {
+            id: pool_counter,
+            name: name,
+            pool_address: pool_address,
+            lp_token: lp_token,
+            total_liquidity: 0,
+            current_apy: 0,
+            risk_score: risk_score,
+            tvl: 0,
+        };
+
+        strategy_counter = strategy_counter + 1;
+        strategies[strategy_counter] = YieldStrategy {
+            id: strategy_counter,
+            name: name,
+            protocol: protocol,
+            pool_id: pool_counter,
+            allocation_percentage: allocation_percentage,
+            current_deposits: 0,
+            apy: 0,
+            risk_score: risk_score,
+            total_yield: 0,
+            active: true,
+        };
+
+        return strategy_counter;
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_user_vault(user: address) -> UserVault {
+        return user_vaults[user];
+    }
+
+    fn get_strategy(strategy_id: u256) -> YieldStrategy {
+        return strategies[strategy_id];
+    }
+
+    fn get_pool(pool_id: u256) -> PoolInfo {
+        return pools[pool_id];
+    }
+
+    fn get_total_deposits() -> u256 {
+        return total_deposits;
+    }
+
+    fn get_total_yield() -> u256 {
+        return total_yield_generated;
+    }
+}

@@ -4,11 +4,13 @@
 
 pub mod committee;
 pub mod freeze;
+pub mod meta;
 pub mod pallet;
 pub mod scheduler_v1;
 pub mod types;
 pub mod verifier;
 pub mod witness_v1;
+
 
 // startup_gate is std-only (runs before consensus join, not inside the WASM runtime).
 #[cfg(feature = "std")]
@@ -21,7 +23,13 @@ pub use committee::{
 pub use freeze::{engaged_state, freeze_summary, is_frozen_from_bytes, FreezeReason, FreezeState};
 pub use pallet::pallet as fraud_proof_pallet;
 pub use scheduler_v1::{recompute_from_bytes, scheduler_commitment_from_bytes};
-pub use types::{DisputedBlockMeta, FraudProofV1, HeaderRef, PROOF_TYPE_SCHED_MISMATCH_V1};
+pub use meta::load_disputed_block_meta;
+pub use types::{
+    DisputedBlockMeta, FraudProofV1, HeaderRef, NoProposer,
+    NoSchedulerCommitment, ProposerQuery, SchedulerCommitmentQuery,
+    PROOF_TYPE_SCHED_MISMATCH_V1,
+};
+
 pub use verifier::{compute_proof_id, verify_scheduler_mismatch_v1, VerifyError};
 pub use witness_v1::{
     AccessKeyV1, AccessListV1, SchedulerCommitments, SchedulerWitnessV1, WitnessError,

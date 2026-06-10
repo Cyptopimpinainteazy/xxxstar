@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../contracts/AtlasSphereX3.sol";
-import "../contracts/WrappedX3.sol";
+import "../AtlasSphereX3.sol";
+import "../WrappedX3.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract CrossChainGovernance is Ownable {

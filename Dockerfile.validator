@@ -1,8 +1,26 @@
-# Dockerfile for x3-chain-node validator
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.validator
+#
+# ⚠️  IMPORTANT: Docker is for DEV/TEST only.
+# Mainnet validators MUST run directly from signed binaries via systemd.
+# See packaging/systemd/ for production deployment.
+#
+# This Dockerfile is suitable for:
+#   - Local devnet testing
+#   - CI ephemeral test chains
+#   - Controlled staging environments
+#
+# NOT suitable for:
+#   - Public mainnet validators
+#   - Public testnet validators in production
+#
+# For production: use scripts/install-validator.sh + packaging/systemd/
+#
 # Multi-stage build: compile from source OR use pre-built binary
 # Usage: docker build -f Dockerfile.validator -t x3-chain-node:latest .
+# ─────────────────────────────────────────────────────────────────────────────
 
-ARG RUST_VERSION=1.80
+ARG RUST_VERSION=1.90.0
 ARG DEBIAN_VERSION=bookworm
 
 # ── Stage 1: Builder (only used if building from source) ───────────────────
@@ -70,10 +88,12 @@ EXPOSE 30333 9933 9616
 #   --name: Human-readable validator name (used in logs/telemetry)
 #   --base-path: Data directory for validator state
 #   --rpc-port: RPC server port
-#   --unsafe-rpc-external: Allow RPC access from containers (required for external RPC + validator mode)
+#   --rpc-external: Bind RPC to 0.0.0.0 (safe inside container network)
+#   --rpc-methods Safe: Only expose safe RPC methods in production
 #   --prometheus-port: Metrics endpoint
-#   --tmp: Use temporary storage (clean state on restart)
+#   --prometheus-external: Expose Prometheus metrics
 #   --log: Logging level
+#   --no-tmp: Persistent storage (replace --tmp for dev)
 
 CMD [ \
     "x3-chain-node", \
@@ -82,12 +102,11 @@ CMD [ \
     "--name", "${VALIDATOR_NAME:-x3-validator}", \
     "--base-path", "/home/validator/data", \
     "--rpc-port", "9933", \
-    "--unsafe-rpc-external", \
-    "--rpc-methods", "Unsafe", \
+    "--rpc-external", \
+    "--rpc-methods", "Safe", \
     "--prometheus-port", "9616", \
     "--prometheus-external", \
-    "--log", "info", \
-    "--tmp" \
+    "--log", "info" \
 ]
 
 # ── Metadata ─────────────────────────────────────────────────────────────

@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# zombienet-integration.yml — Zombienet Multi-Node Integration Tests
+#
+# Spawns an ephemeral N-validator testnet and runs smoke tests.
+# Validates block production, finality, peer connectivity, and runtime health.
+#
+# Prerequisites:
+#   - Zombienet CLI installed
+#   - Release node binary built
+# ─────────────────────────────────────────────────────────────────────────────
+name: x3 zombienet integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  zombienet-smoke:
+    name: 4-validator smoke (finality + block production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: sudo apt-get update -qq && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: zombienet-node
+
+      - name: Build release node binary
+        run: cargo build --release -p x3-chain-node
+
+      - name: Verify binary
+        run: test -x target/release/x3-chain-node
+
+      - name: Setup Zombienet
+        run: |
+          npm install -g @zombienet/cli
+          zombienet --version
+
+      - name: Generate chain spec for testing
+        run: |
+          ./target/release/x3-chain-node build-spec --chain x3-local3-raw --raw > /tmp/x3-test-chain-spec.json
+
+      - name: Run Zombienet smoke tests
+        run: |
+          zombienet test \
+            --provider native \
+            tests/zombienet/finality-smoke.zndsl \
+            2>&1 | tee zombienet-output.txt
+
+      - name: Upload Zombienet logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zombienet-logs
+          path: zombienet-output.txt
+          retention-days: 7

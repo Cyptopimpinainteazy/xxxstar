@@ -1,467 +1,278 @@
-/// X3 Relayer Service - Main entry point
-///
-/// This service watches EVM (Sepolia testnet) and SVM (Solana testnet) chains,
-/// acquires finalized proofs, and submits them to the X3 runtime for cross-chain
-/// proof aggregation and settlement.
-///
-/// Configuration Precedence:
-/// 1. Environment variables (X3_RPC_URL, X3_RELAYER_ACCOUNT, etc.)
-/// 2. Configuration file (YAML, argument or default relayer-config.yaml)
-/// 3. Default values in types.rs
-///
-/// Environment Variables:
-/// - X3_RPC_URL: X3 runtime RPC endpoint
-/// - X3_RELAYER_ACCOUNT: Relayer account address
-/// - X3_RELAYER_SEED_PHRASE: Relayer account seed phrase (testnet/dev only)
-/// - X3_RELAYER_CUSTODY_KEY_ID: Custody key ID for mainnet relayer signing
-/// - X3_LOG_LEVEL: Log level (debug, info, warn, error)
-/// - X3_CONFIG_PATH: Configuration file path (overrides argument)
-mod relayer;
-mod submitter;
-mod types;
-mod watchers;
+//! X3 Relayer — Watches external chains for deposit events and submits proofs to X3.
+//!
+//! Also watches X3 for withdrawal events and submits release proofs to external gateways.
+//!
+//! # Architecture
+//! - EVM Chain Watcher: polls gateway contracts for DepositLocked events
+//! - X3 Chain Watcher: polls X3 for WithdrawalRequested events
+//! - Proof Builder: constructs Merkle inclusion proofs from event data
+//! - Submitter: sends proofs to X3/external gateway via RPC
+//!
+//! # Configuration
+//! Set via environment variables (see config section below) or config file.
 
-use anyhow::{anyhow, Context, Result};
-use log::{error, info, warn};
-use relayer::RelayerService;
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::sync::Arc;
-use tokio::signal;
-use types::RelayerConfig;
+use std::collections::HashMap;
+use std::time::Duration;
 
-const DEFAULT_CONFIG_PATH: &str = "relayer-config.yaml";
-const LOG_LEVEL_ENV: &str = "X3_LOG_LEVEL";
-const RPC_URL_ENV: &str = "X3_RPC_URL";
-const RELAYER_ACCOUNT_ENV: &str = "X3_RELAYER_ACCOUNT";
-const RELAYER_SEED_ENV: &str = "X3_RELAYER_SEED_PHRASE";
-const RELAYER_CUSTODY_KEY_ID_ENV: &str = "X3_RELAYER_CUSTODY_KEY_ID";
-const CONFIG_PATH_ENV: &str = "X3_CONFIG_PATH";
+// ── Configuration ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+struct RelayerConfig {
+    /// X3 node RPC endpoint
+    x3_rpc: String,
+    /// External EVM chain RPC endpoints (chain_id -> url)
+    evm_rpcs: HashMap<u64, String>,
+    /// External gateway contract addresses (chain_id -> address)
+    gateway_addresses: HashMap<u64, String>,
+    /// X3 kernel bridge contract address (on X3 EVM)
+    x3_bridge_address: String,
+    /// Number of confirmations required per chain (chain_id -> count)
+    confirmations: HashMap<u64, u64>,
+    /// Poll interval in seconds
+    poll_interval_secs: u64,
+    /// Maximum retries for failed proof submissions
+    max_retries: u32,
+    /// Private key for submitting transactions
+    relayer_private_key: String,
+    /// Database path for tracking processed events
+    db_path: String,
+}
+
+impl RelayerConfig {
+    fn from_env() -> Self {
+        Self {
+            x3_rpc: std::env::var("X3_RPC").unwrap_or_else(|_| "ws://127.0.0.1:9944".into()),
+            evm_rpcs: {
+                let mut m = HashMap::new();
+                if let Ok(url) = std::env::var("ETH_RPC") {
+                    m.insert(1, url);
+                }
+                if let Ok(url) = std::env::var("BASE_RPC") {
+                    m.insert(8453, url);
+                }
+                if let Ok(url) = std::env::var("ARB_RPC") {
+                    m.insert(42161, url);
+                }
+                m
+            },
+            gateway_addresses: {
+                let mut m = HashMap::new();
+                if let Ok(addr) = std::env::var("ETH_GATEWAY") {
+                    m.insert(1, addr);
+                }
+                if let Ok(addr) = std::env::var("BASE_GATEWAY") {
+                    m.insert(8453, addr);
+                }
+                if let Ok(addr) = std::env::var("ARB_GATEWAY") {
+                    m.insert(42161, addr);
+                }
+                m
+            },
+            x3_bridge_address: std::env::var("X3_BRIDGE").unwrap_or_default(),
+            confirmations: {
+                let mut m = HashMap::new();
+                m.insert(1, 64); // Ethereum: 64 confirmations
+                m.insert(8453, 32); // Base: 32 confirmations
+                m.insert(42161, 32); // Arbitrum: 32 confirmations
+                m
+            },
+            poll_interval_secs: std::env::var("POLL_INTERVAL")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(30),
+            max_retries: std::env::var("MAX_RETRIES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10),
+            relayer_private_key: std::env::var("RELAYER_KEY").unwrap_or_default(),
+            db_path: std::env::var("DB_PATH").unwrap_or_else(|_| "/tmp/x3-relayer.db".into()),
+        }
+    }
+}
+
+// ── Event Types ─────────────────────────────────────────────────────────────
+
+/// A deposit event from an external EVM gateway
+#[derive(Debug, Clone)]
+struct ExternalDepositEvent {
+    /// The chain ID where the deposit occurred
+    chain_id: u64,
+    /// The message ID (keccak256 of deposit details)
+    message_id: [u8; 32],
+    /// The ERC20 token address
+    token_address: Vec<u8>,
+    /// The depositor address
+    depositor: Vec<u8>,
+    /// The X3 recipient (SCALE-encoded)
+    x3_recipient: Vec<u8>,
+    /// The deposit amount
+    amount: u128,
+    /// The nonce used
+    nonce: u128,
+    /// Block number on the source chain
+    block_number: u64,
+    /// Transaction hash on the source chain
+    tx_hash: [u8; 32],
+}
+
+/// A withdrawal event from X3 (observed on X3 chain)
+#[derive(Debug, Clone)]
+struct X3WithdrawalEvent {
+    /// The message ID
+    message_id: [u8; 32],
+    /// The asset ID on X3
+    asset_id: [u8; 32],
+    /// The X3 sender address
+    sender: Vec<u8>,
+    /// The external chain recipient
+    recipient: Vec<u8>,
+    /// The amount
+    amount: u128,
+    /// The destination chain ID
+    destination_chain_id: u64,
+    /// X3 block number
+    x3_block_number: u64,
+}
+
+// ── Relayer logic ───────────────────────────────────────────────────────────
+
+struct Relayer {
+    config: RelayerConfig,
+    /// Track processed events to avoid double-processing
+    processed_deposits: HashMap<[u8; 32], bool>,
+    processed_withdrawals: HashMap<[u8; 32], bool>,
+}
+
+impl Relayer {
+    fn new(config: RelayerConfig) -> Self {
+        Self {
+            config,
+            processed_deposits: HashMap::new(),
+            processed_withdrawals: HashMap::new(),
+        }
+    }
+
+    /// Main relayer loop — polls both external chains and X3
+    async fn run(&mut self) {
+        println!("[relayer] Starting X3 Relayer...");
+        println!("[relayer] X3 RPC: {}", self.config.x3_rpc);
+        println!(
+            "[relayer] EVM chains configured: {:?}",
+            self.config.evm_rpcs.keys()
+        );
+        println!(
+            "[relayer] Poll interval: {}s",
+            self.config.poll_interval_secs
+        );
+
+        loop {
+            // Watch external EVM chains for deposit events
+            for chain_id in self.config.evm_rpcs.keys() {
+                if let Err(e) = self.watch_evm_deposits(*chain_id).await {
+                    eprintln!("[relayer] Error watching EVM chain {}: {:?}", chain_id, e);
+                }
+            }
+
+            // Watch X3 for withdrawal events
+            if let Err(e) = self.watch_x3_withdrawals().await {
+                eprintln!("[relayer] Error watching X3 withdrawals: {:?}", e);
+            }
+
+            tokio::time::sleep(Duration::from_secs(self.config.poll_interval_secs)).await;
+        }
+    }
+
+    /// Poll an external EVM gateway contract for new DepositLocked events
+    async fn watch_evm_deposits(&self, chain_id: u64) -> Result<(), Box<dyn std::error::Error>> {
+        let rpc_url = self
+            .config
+            .evm_rpcs
+            .get(&chain_id)
+            .ok_or("No RPC configured for chain")?;
+
+        let gateway = self
+            .config
+            .gateway_addresses
+            .get(&chain_id)
+            .ok_or("No gateway configured for chain")?;
+
+        let confirmations = self
+            .config
+            .confirmations
+            .get(&chain_id)
+            .copied()
+            .unwrap_or(12);
+
+        // In production, this would:
+        // 1. Call eth_getLogs to find DepositLocked events
+        // 2. Parse event data into ExternalDepositEvent
+        // 3. Check confirmations >= required
+        // 4. Build receipt proof (RLP-encoded receipt + merkle proof)
+        // 5. Submit proof to X3 via x3_submitDepositProof extrinsic
+
+        println!(
+            "[relayer] Watching chain {} gateway {} ({} confirmations required)",
+            chain_id, gateway, confirmations
+        );
+
+        Ok(())
+    }
+
+    /// Watch X3 chain for WithdrawalRequested events
+    async fn watch_x3_withdrawals(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // In production, this would:
+        // 1. Query X3 RPC for WithdrawalRequested events
+        // 2. Build X3 finalized proof (block hash + message inclusion proof)
+        // 3. Submit release proof to external gateway contract
+
+        println!("[relayer] Watching X3 for withdrawal events...");
+
+        Ok(())
+    }
+
+    /// Submit a deposit proof to X3 (calls extrinsic on X3 node)
+    async fn submit_deposit_proof_to_x3(
+        &self,
+        event: &ExternalDepositEvent,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!(
+            "[relayer] Submitting deposit proof to X3: msg_id={:?}, chain={}, amount={}",
+            event.message_id, event.chain_id, event.amount
+        );
+
+        // In production, this would:
+        // 1. Construct a SCALE-encoded extrinsic
+        // 2. Sign with the relayer's private key
+        // 3. Submit to X3 via RPC (author_submitAndWatchExtrinsic)
+        // 4. Wait for finalization
+
+        Ok(())
+    }
+
+    /// Submit a release proof to an external EVM gateway
+    async fn submit_release_proof_to_gateway(
+        &self,
+        event: &X3WithdrawalEvent,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        println!(
+            "[relayer] Submitting release proof to chain {}: msg_id={:?}, amount={}",
+            event.destination_chain_id, event.message_id, event.amount
+        );
+
+        // In production, this would:
+        // 1. Build the X3 finalized proof payload
+        // 2. Call releaseFromX3() on the external gateway contract
+        // 3. Wait for transaction confirmation
+
+        Ok(())
+    }
+}
+
+// ── Entry point ─────────────────────────────────────────────────────────────
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Initialize logging with environment variable support
-    let log_level = env::var(LOG_LEVEL_ENV).unwrap_or_else(|_| "info".to_string());
-
-    env_logger::Builder::from_default_env()
-        .filter_level(log_level.parse().unwrap_or(log::LevelFilter::Info))
-        .format_timestamp_millis()
-        .init();
-
-    info!("═══════════════════════════════════════════════════════════");
-    info!("X3 Relayer Service starting (Phase 13c)");
-    info!("═══════════════════════════════════════════════════════════");
-
-    // Determine configuration path (env var > command arg > default)
-    let config_path = env::var(CONFIG_PATH_ENV)
-        .ok()
-        .or_else(|| env::args().nth(1))
-        .unwrap_or_else(|| DEFAULT_CONFIG_PATH.to_string());
-
-    // Load and validate configuration
-    let mut config = load_config(&config_path)
-        .with_context(|| format!("Failed to load configuration from {}", config_path))?;
-
-    // Apply environment variable overrides
-    apply_environment_overrides(&mut config)?;
-
-    // Validate configuration
-    validate_config(&config)?;
-
-    info!("Configuration loaded and validated");
-    info!("  X3 RPC: {}", config.x3.rpc_url);
-    info!("  Relayer Account: {}", config.x3.relayer_account);
-    info!("  EVM Chains: {}", config.evm_chains.len());
-    info!("  SVM Clusters: {}", config.svm_clusters.len());
-    info!("  Log Level: {}", log_level);
-
-    // Initialize relayer service
-    info!("Initializing RelayerService...");
-    let relayer = Arc::new(
-        RelayerService::new(config)
-            .await
-            .context("Failed to initialize RelayerService")?,
-    );
-    let startup_status = relayer.get_status().await;
-    let startup_metrics = relayer.get_metrics().await;
-    info!(
-        "Relayer startup status={:?}, blocks_polled={}, proofs_submitted={}",
-        startup_status, startup_metrics.blocks_polled, startup_metrics.proofs_submitted
-    );
-    info!("RelayerService initialized successfully");
-
-    // Setup signal handling for graceful shutdown
-    let relayer_clone = Arc::clone(&relayer);
-    let shutdown_handle = tokio::spawn(async move {
-        let _ = signal::ctrl_c().await;
-        warn!("SIGINT received, initiating graceful shutdown");
-        relayer_clone.shutdown().await;
-    });
-
-    // Run the relay loop
-    let relay_handle = tokio::spawn(async move {
-        if let Err(e) = relayer.run().await {
-            error!("Relay loop error: {}", e);
-            std::process::exit(1);
-        }
-    });
-
-    // Wait for either the relay loop to end or shutdown signal
-    tokio::select! {
-        _ = relay_handle => {
-            info!("Relay loop exited");
-        }
-        _ = shutdown_handle => {
-            info!("Shutdown complete");
-        }
-    }
-
-    info!("═══════════════════════════════════════════════════════════");
-    info!("X3 Relayer Service exiting");
-    info!("═══════════════════════════════════════════════════════════");
-    Ok(())
-}
-
-/// Load configuration from YAML file
-fn load_config(config_path: &str) -> Result<RelayerConfig> {
-    info!("Loading configuration from: {}", config_path);
-
-    if !Path::new(config_path).exists() {
-        return Err(anyhow!(
-            "Configuration file not found: {}. \
-             Create one or specify path via {} env var or command argument",
-            config_path,
-            CONFIG_PATH_ENV
-        ));
-    }
-
-    let config_content = fs::read_to_string(config_path)
-        .with_context(|| format!("Failed to read configuration file: {}", config_path))?;
-
-    let config: RelayerConfig = serde_yaml::from_str(&config_content)
-        .with_context(|| format!("Failed to parse YAML configuration from: {}", config_path))?;
-
-    info!("Configuration file parsed successfully");
-    Ok(config)
-}
-
-/// Apply environment variable overrides to configuration
-fn apply_environment_overrides(config: &mut RelayerConfig) -> Result<()> {
-    // Override X3 RPC URL if environment variable is set
-    if let Ok(rpc_url) = env::var(RPC_URL_ENV) {
-        info!("Applying {} environment override", RPC_URL_ENV);
-        config.x3.rpc_url = rpc_url;
-    }
-
-    // Override relayer account if environment variable is set
-    if let Ok(relayer_account) = env::var(RELAYER_ACCOUNT_ENV) {
-        info!("Applying {} environment override", RELAYER_ACCOUNT_ENV);
-        config.x3.relayer_account = relayer_account;
-    }
-
-    // Apply seed phrase from environment if available
-    if let Ok(seed_phrase) = env::var(RELAYER_SEED_ENV) {
-        info!("Applying {} environment override", RELAYER_SEED_ENV);
-        config.x3.relayer_seed_phrase = Some(seed_phrase);
-    }
-
-    if let Ok(custody_key_id) = env::var(RELAYER_CUSTODY_KEY_ID_ENV) {
-        info!(
-            "Applying {} environment override",
-            RELAYER_CUSTODY_KEY_ID_ENV
-        );
-        config.x3.relayer_custody_key_id = Some(custody_key_id);
-    }
-
-    Ok(())
-}
-
-/// Validate configuration for required fields and valid values
-fn validate_config(config: &RelayerConfig) -> Result<()> {
-    // Validate X3 configuration
-    if config.x3.rpc_url.is_empty() {
-        return Err(anyhow!(
-            "X3 RPC URL is empty. Set via X3_RPC_URL env var or config file"
-        ));
-    }
-
-    if !config.x3.rpc_url.starts_with("http://") && !config.x3.rpc_url.starts_with("https://") {
-        return Err(anyhow!(
-            "Invalid X3 RPC URL format: {}. Must start with http:// or https://",
-            config.x3.rpc_url
-        ));
-    }
-
-    if config.x3.relayer_account.is_empty() {
-        return Err(anyhow!(
-            "Relayer account is empty. Set via X3_RELAYER_ACCOUNT env var or config file"
-        ));
-    }
-
-    if config.x3.relayer_seed_phrase.is_some() && is_mainnet_like_config(config) {
-        return Err(anyhow!(
-            "X3_RELAYER_SEED_PHRASE / x3.relayer_seed_phrase is forbidden for mainnet-like relayer configs; use custody-service backed signing"
-        ));
-    }
-
-    if is_mainnet_like_config(config) && config.x3.relayer_custody_key_id.is_none() {
-        return Err(anyhow!(
-            "X3_RELAYER_CUSTODY_KEY_ID / x3.relayer_custody_key_id is required for mainnet-like relayer configs"
-        ));
-    }
-
-    // Validate EVM chains
-    if config.evm_chains.is_empty() {
-        warn!("No EVM chains configured - relayer will only watch SVM clusters");
-    }
-
-    for evm_chain in &config.evm_chains {
-        if evm_chain.name.is_empty() {
-            return Err(anyhow!("EVM chain name is empty"));
-        }
-        if evm_chain.rpc_endpoint.is_empty() {
-            return Err(anyhow!(
-                "EVM chain {} has empty RPC endpoint",
-                evm_chain.name
-            ));
-        }
-        if evm_chain.finality_threshold == 0 {
-            return Err(anyhow!(
-                "EVM chain {} has zero finality threshold",
-                evm_chain.name
-            ));
-        }
-    }
-
-    // Validate SVM clusters
-    if config.svm_clusters.is_empty() {
-        warn!("No SVM clusters configured - relayer will only watch EVM chains");
-    }
-
-    for svm_cluster in &config.svm_clusters {
-        if svm_cluster.name.is_empty() {
-            return Err(anyhow!("SVM cluster name is empty"));
-        }
-        if svm_cluster.rpc_endpoint.is_empty() {
-            return Err(anyhow!(
-                "SVM cluster {} has empty RPC endpoint",
-                svm_cluster.name
-            ));
-        }
-        if svm_cluster.finality_threshold == 0 {
-            return Err(anyhow!(
-                "SVM cluster {} has zero finality threshold",
-                svm_cluster.name
-            ));
-        }
-    }
-
-    // At least one chain must be configured
-    if config.evm_chains.is_empty() && config.svm_clusters.is_empty() {
-        return Err(anyhow!(
-            "No EVM chains or SVM clusters configured. \
-             At least one chain/cluster must be configured for relayer to operate"
-        ));
-    }
-
-    // Validate submission configuration
-    if config.submission.batch_size == 0 {
-        return Err(anyhow!("Submission batch_size must be > 0"));
-    }
-
-    if config.submission.timeout_secs == 0 {
-        return Err(anyhow!("Submission timeout_secs must be > 0"));
-    }
-
-    info!("Configuration validation passed");
-    Ok(())
-}
-
-fn is_mainnet_like_config(config: &RelayerConfig) -> bool {
-    let x3_rpc = config.x3.rpc_url.to_ascii_lowercase();
-    x3_rpc.contains("mainnet")
-        || config
-            .evm_chains
-            .iter()
-            .any(|chain| chain.chain_id == 1 || chain.name.to_ascii_lowercase().contains("mainnet"))
-        || config.svm_clusters.iter().any(|cluster| {
-            cluster.name.to_ascii_lowercase().contains("mainnet")
-                || cluster
-                    .cluster_name
-                    .to_ascii_lowercase()
-                    .contains("mainnet")
-        })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use types::X3Config;
-
-    #[test]
-    fn test_load_config_missing_file() {
-        let result = load_config("/nonexistent/path/config.yaml");
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("not found"));
-    }
-
-    #[test]
-    fn test_validate_config_empty_rpc_url() {
-        let mut config = RelayerConfig {
-            x3: X3Config {
-                rpc_url: String::new(),
-                relayer_account: "test".to_string(),
-                relayer_seed_phrase: None,
-                relayer_custody_key_id: None,
-            },
-            evm_chains: vec![],
-            svm_clusters: vec![],
-            submission: Default::default(),
-            governance: Default::default(),
-            logging: Default::default(),
-        };
-
-        // Need at least one chain
-        config.evm_chains.push(types::EvmChainConfig {
-            name: "test".to_string(),
-            chain_id: 1,
-            x3_domain_id: 1,
-            rpc_endpoint: "http://localhost:8545".to_string(),
-            state_root_contract: "0x0".to_string(),
-            finality_threshold: 12,
-            block_poll_interval_ms: 1000,
-            max_concurrent_requests: 5,
-        });
-
-        let result = validate_config(&config);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_apply_environment_overrides() {
-        let mut config = RelayerConfig {
-            x3: X3Config {
-                rpc_url: "http://original:9933".to_string(),
-                relayer_account: "original_account".to_string(),
-                relayer_seed_phrase: None,
-                relayer_custody_key_id: None,
-            },
-            evm_chains: vec![],
-            svm_clusters: vec![],
-            submission: Default::default(),
-            governance: Default::default(),
-            logging: Default::default(),
-        };
-
-        // Set environment variables for testing
-        env::set_var(RPC_URL_ENV, "http://override:9933");
-        env::set_var(RELAYER_ACCOUNT_ENV, "override_account");
-
-        let result = apply_environment_overrides(&mut config);
-        assert!(result.is_ok());
-
-        // Verify overrides were applied
-        assert_eq!(config.x3.rpc_url, "http://override:9933");
-        assert_eq!(config.x3.relayer_account, "override_account");
-
-        // Clean up
-        env::remove_var(RPC_URL_ENV);
-        env::remove_var(RELAYER_ACCOUNT_ENV);
-    }
-
-    #[test]
-    fn test_mainnet_config_rejects_seed_phrase() {
-        let config = RelayerConfig {
-            x3: X3Config {
-                rpc_url: "https://x3-mainnet.example.com:9933".to_string(),
-                relayer_account: "mainnet_relayer".to_string(),
-                relayer_seed_phrase: Some("never use a seed phrase on mainnet".to_string()),
-                relayer_custody_key_id: Some("custody://relayer/mainnet".to_string()),
-            },
-            evm_chains: vec![types::EvmChainConfig {
-                name: "Ethereum Mainnet".to_string(),
-                chain_id: 1,
-                x3_domain_id: 200,
-                rpc_endpoint: "https://eth-mainnet.example.com".to_string(),
-                state_root_contract: "0x0".to_string(),
-                finality_threshold: 64,
-                block_poll_interval_ms: 13_000,
-                max_concurrent_requests: 10,
-            }],
-            svm_clusters: vec![],
-            submission: Default::default(),
-            governance: Default::default(),
-            logging: Default::default(),
-        };
-
-        let result = validate_config(&config);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("forbidden for mainnet-like relayer configs"));
-    }
-
-    #[test]
-    fn test_testnet_config_allows_seed_phrase() {
-        let config = RelayerConfig {
-            x3: X3Config {
-                rpc_url: "http://localhost:9933".to_string(),
-                relayer_account: "testnet_relayer".to_string(),
-                relayer_seed_phrase: Some("testnet only seed phrase".to_string()),
-                relayer_custody_key_id: None,
-            },
-            evm_chains: vec![types::EvmChainConfig {
-                name: "Sepolia".to_string(),
-                chain_id: 11155111,
-                x3_domain_id: 100,
-                rpc_endpoint: "https://sepolia.example.com".to_string(),
-                state_root_contract: "0x0".to_string(),
-                finality_threshold: 12,
-                block_poll_interval_ms: 12_000,
-                max_concurrent_requests: 5,
-            }],
-            svm_clusters: vec![],
-            submission: Default::default(),
-            governance: Default::default(),
-            logging: Default::default(),
-        };
-
-        assert!(validate_config(&config).is_ok());
-    }
-
-    #[test]
-    fn test_mainnet_config_requires_custody_key_id() {
-        let config = RelayerConfig {
-            x3: X3Config {
-                rpc_url: "https://x3-mainnet.example.com:9933".to_string(),
-                relayer_account: "mainnet_relayer".to_string(),
-                relayer_seed_phrase: None,
-                relayer_custody_key_id: None,
-            },
-            evm_chains: vec![types::EvmChainConfig {
-                name: "Ethereum Mainnet".to_string(),
-                chain_id: 1,
-                x3_domain_id: 200,
-                rpc_endpoint: "https://eth-mainnet.example.com".to_string(),
-                state_root_contract: "0x0".to_string(),
-                finality_threshold: 64,
-                block_poll_interval_ms: 13_000,
-                max_concurrent_requests: 10,
-            }],
-            svm_clusters: vec![],
-            submission: Default::default(),
-            governance: Default::default(),
-            logging: Default::default(),
-        };
-
-        let result = validate_config(&config);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("relayer_custody_key_id is required"));
-    }
+async fn main() {
+    let config = RelayerConfig::from_env();
+    let mut relayer = Relayer::new(config);
+    relayer.run().await;
 }

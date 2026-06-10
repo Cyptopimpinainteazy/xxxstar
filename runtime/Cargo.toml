@@ -82,6 +82,7 @@ pallet-x3-asset-registry = { path = "../pallets/x3-asset-registry", default-feat
 pallet-x3-supply-ledger = { path = "../pallets/x3-supply-ledger", default-features = false }
 pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false }
 pallet-x3-token-factory = { path = "../pallets/x3-token-factory", default-features = false }
+pallet-x3-crosschain-gateway = { path = "../pallets/x3-crosschain-gateway", default-features = false }
 pallet-cross-chain-validator = { path = "../pallets/cross-chain-validator", default-features = false }
 pallet-x3-automation = { path = "../pallets/x3-automation", default-features = false }
 pallet-x3-oracle = { path = "../pallets/x3-oracle", default-features = false }
@@ -95,7 +96,11 @@ x3-packet-standard = { path = "../crates/x3-packet-standard", default-features =
 # Post-quantum crypto (std-only; thiserror/anyhow are not no_std — gated via "pq" feature).
 quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
 # staged-pallets (now wired)
+pallet-x3-lp-locker = { path = "../pallets/x3-lp-locker", default-features = false }
+pallet-northern-swarm = { path = "../pallets/northern-swarm", default-features = false }
 pallet-x3-slash = { path = "../pallets/x3-slash", default-features = false }
+pallet-x3-agent-registry = { path = "../pallets/pallet-x3-agent-registry", default-features = false }
+pallet-x3-proof-carrying-agent = { path = "../pallets/pallet-x3-proof-carrying-agent", default-features = false }
 x3-accounting-events = { path = "../crates/x3-accounting-events", default-features = false }
 x3-security-events = { path = "../crates/x3-security-events", default-features = false }
 pallet-x3-solvency = { path = "../pallets/x3-solvency", default-features = false }
@@ -212,7 +217,12 @@ std = [
 	"pallet-x3-atomic-kernel/std",
 	"pallet-x3-jury-anchor/std",
 	"pallet-meme-overlord/std",
+	"pallet-x3-consensus/std",
+	"pallet-x3-lp-locker/std",
+	"pallet-northern-swarm/std",
 	"pallet-x3-slash/std",
+	"pallet-x3-agent-registry/std",
+	"pallet-x3-proof-carrying-agent/std",
 	"x3-accounting-events/std",
 	"x3-security-events/std",
 	"pallet-x3-solvency/std",

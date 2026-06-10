@@ -77,3 +77,114 @@ pub struct FraudProofAcceptedRecord<AccountId, Balance> {
     pub slash_amount: Balance,
     pub reward: Balance,
 }
+
+// ── Trait abstractions for dependency injection ───────────────────────────────
+
+
+/// Trait for querying the scheduler commitment for a given block.
+///
+/// Implemented by the sequencer pallet or any other pallet that stores
+/// per-block scheduler commitments.
+pub trait SchedulerCommitmentQuery {
+    /// Return the scheduler commitment for the given block number, or `None`
+    /// if the block is unknown or the commitment is not yet finalized.
+    fn get_scheduler_commitment(block_number: u32) -> Option<H256>;
+}
+
+/// Trait for querying the block proposer (author) for a given block.
+///
+/// Implemented by the Aura, Babe, or any other consensus pallet.
+pub trait ProposerQuery<AccountId> {
+    /// Return the proposer account for the given block number, or `None`
+    /// if the block is unknown.
+    fn get_proposer(block_number: u32) -> Option<AccountId>;
+}
+
+// ── Default no-op implementations (for testing / when not wired) ──────────────
+
+/// A no-op `SchedulerCommitmentQuery` that always returns `None`.
+/// Useful as a default type parameter or in test configurations.
+pub struct NoSchedulerCommitment;
+
+impl SchedulerCommitmentQuery for NoSchedulerCommitment {
+    fn get_scheduler_commitment(_block_number: u32) -> Option<H256> {
+        None
+    }
+}
+
+/// A no-op `ProposerQuery` that always returns `None`.
+pub struct NoProposer;
+
+impl<AccountId> ProposerQuery<AccountId> for NoProposer {
+    fn get_proposer(_block_number: u32) -> Option<AccountId> {
+        None
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sp_core::H256;
+
+    /// A mock `SchedulerCommitmentQuery` that returns a fixed commitment.
+    struct MockSchedulerCommitment;
+
+    impl SchedulerCommitmentQuery for MockSchedulerCommitment {
+        fn get_scheduler_commitment(block_number: u32) -> Option<H256> {
+            if block_number == 0 || block_number > 100 {
+                return None;
+            }
+            let mut h = [0u8; 32];
+            h[..4].copy_from_slice(&block_number.to_le_bytes());
+            Some(H256(h))
+        }
+    }
+
+    /// A mock `ProposerQuery` that returns a fixed proposer.
+    struct MockProposer;
+
+    impl ProposerQuery<u64> for MockProposer {
+        fn get_proposer(block_number: u32) -> Option<u64> {
+            if block_number == 0 || block_number > 100 {
+                return None;
+            }
+            Some(42u64)
+        }
+    }
+
+    /// LOAD-META-001: SchedulerCommitmentQuery returns None for unknown blocks
+    #[test]
+    fn scheduler_commitment_none_for_unknown_block() {
+        assert_eq!(
+            NoSchedulerCommitment::get_scheduler_commitment(999),
+            None
+        );
+    }
+
+    /// LOAD-META-002: ProposerQuery returns None for unknown blocks
+    #[test]
+    fn proposer_none_for_unknown_block() {
+        assert_eq!(NoProposer::get_proposer(999), None::<u64>);
+    }
+
+    /// LOAD-META-003: MockSchedulerCommitment returns deterministic values
+    #[test]
+    fn mock_scheduler_commitment_deterministic() {
+        let c1 = MockSchedulerCommitment::get_scheduler_commitment(5);
+        let c2 = MockSchedulerCommitment::get_scheduler_commitment(5);
+        assert_eq!(c1, c2);
+        assert!(c1.is_some());
+    }
+
+    /// LOAD-META-004: MockProposer returns deterministic values
+    #[test]
+    fn mock_proposer_deterministic() {
+        let p1 = MockProposer::get_proposer(10);
+        let p2 = MockProposer::get_proposer(10);
+        assert_eq!(p1, p2);
+        assert_eq!(p1, Some(42u64));
+    }
+
+}

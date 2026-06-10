@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 # scripts/mainnet/genesis_ceremony.sh
 #
-# X3 Atomic Star — Genesis Ceremony Script.
+# X3 Atomic Star — Genesis Ceremony Script (MAINNET-TIGHT).
 #
 # This script is RUN ONCE to produce the frozen, reproducible genesis artifacts.
-# It must be run from a clean checkout of the tagged release commit.
+# It must be run from a clean checkout of a tagged release commit.
+#
+# EVERY warning in this script is a HARD FAILURE for mainnet.
+# If any step cannot be verified as production-grade, the ceremony halts.
 #
 # Steps:
-#   1. Verify we are on a release-tagged commit.
-#   2. Build WASM via srtool (deterministic, matches on-chain hash).
-#   3. Generate plain-text chain spec from env vars (no dev seeds).
+#   1. Verify we are on a tagged release commit (FATAL if untagged).
+#   2. Build WASM via srtool (MUST use srtool; cargo fallback = FAIL).
+#   3. Generate plain-text chain spec from mainnet preset (no testnet fallback).
 #   4. Convert plain spec to raw spec.
 #   5. Compute and record SHA256 hashes of all artifacts.
 #   6. Generate genesis summary report.
@@ -31,7 +34,7 @@
 #
 # Exit 0 → ceremony COMPLETE and artifacts signed.
 # Exit 1 → ceremony FAILED — do NOT use produced artifacts.
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -61,9 +64,8 @@ CURRENT_TAG="$(git -C "$ROOT_DIR" describe --exact-match --tags HEAD 2>/dev/null
 declare -A RESULTS
 OVERALL="PASS"
 
-pass()  { RESULTS["$1"]="PASS";  echo "[PASS] $1"; }
-fail()  { RESULTS["$1"]="FAIL";  OVERALL="FAIL"; echo "[FAIL] $1 — ${2:-}"; }
-skip()  { RESULTS["$1"]="SKIP";  echo "[SKIP] $1 — ${2:-}"; }
+pass()  { RESULTS["$1"]="PASS"; echo "[PASS] $1"; }
+fail()  { RESULTS["$1"]="FAIL"; OVERALL="FAIL"; echo "[FAIL] $1 — ${2:-}"; }
 
 echo ""
 echo "══════════════════════════════════════════════════════════"
@@ -74,36 +76,38 @@ echo "  Chain:   $CHAIN_NAME ($CHAIN_ID)"
 echo "══════════════════════════════════════════════════════════"
 echo ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-# STEP 1: Release tag verification
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
+# STEP 1: Release tag verification (HARD FAILURE)
+#─────────────────────────────────────────────────────────────────────────────
 echo "→ [1] Verifying release tag..."
 if [[ "$CURRENT_TAG" == "UNTAGGED" ]]; then
-    echo "  WARNING: HEAD is not on a release tag."
-    echo "  For production genesis, run: git tag -a mainnet-genesis-v1.0.0 -m 'Genesis commit'"
-    echo "  Continuing in DEVELOPMENT MODE..."
-    RESULTS["release_tag"]="WARN"
+    fail "release_tag" "HEAD is NOT on a release tag. Tag the genesis commit first: git tag -a mainnet-genesis-v1.0.0 -m 'Genesis commit'"
+    echo ""
+    echo "  ╔═══════════════════════════════════════════════════════════╗"
+    echo "  ║  HALT: Ceremony requires a tagged release commit.        ║"
+    echo "  ║  Run: git tag -a mainnet-genesis-v1.0.0 -m 'message'    ║"
+    echo "  ╚═══════════════════════════════════════════════════════════╝"
+    echo ""
 else
     echo "  Tag: $CURRENT_TAG"
     pass "release_tag"
 fi
 
-# Verify no uncommitted changes
+# Verify no uncommitted changes (HARD FAILURE)
 if ! git -C "$ROOT_DIR" diff --quiet HEAD 2>/dev/null; then
     fail "clean_worktree" "uncommitted changes present — genesis must be from clean state"
 else
     pass "clean_worktree"
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# STEP 2: Build WASM (use srtool if available, else cargo build)
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
+# STEP 2: Build WASM (MUST use srtool; cargo fallback = FAILURE)
+#─────────────────────────────────────────────────────────────────────────────
 echo "→ [2] Building runtime WASM..."
 cd "$ROOT_DIR"
 
 if command -v srtool >/dev/null 2>&1; then
     echo "  Using srtool for deterministic build..."
-    # srtool build --package x3-chain-runtime --runtime-dir runtime
     if srtool build \
         --package x3-chain-runtime \
         --runtime-dir runtime \
@@ -113,14 +117,7 @@ if command -v srtool >/dev/null 2>&1; then
         fail "wasm_srtool_build" "srtool build failed"
     fi
 else
-    echo "  srtool not found — using cargo build (non-deterministic, not for final production)"
-    echo "  Install srtool: https://github.com/paritytech/srtool"
-    if cargo build --release -p x3-chain-runtime >/dev/null 2>&1; then
-        RESULTS["wasm_srtool_build"]="WARN"
-        echo "[WARN] wasm_srtool_build — built without srtool, not reproducible"
-    else
-        fail "wasm_srtool_build" "cargo build failed"
-    fi
+    fail "wasm_srtool_build" "srtool NOT found — required for reproducible mainnet WASM. Install from https://github.com/paritytech/srtool"
 fi
 
 if [[ -f "$WASM_COMPACT" ]]; then
@@ -139,39 +136,29 @@ else
     fail "node_binary_build"
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# STEP 3: Generate plain chain spec (env-sourced, no dev seeds)
-# ─────────────────────────────────────────────────────────────────────────────
-echo "→ [3] Generating plain chain spec..."
+#─────────────────────────────────────────────────────────────────────────────
+# STEP 3: Generate plain chain spec (mainnet preset ONLY; NO testnet fallback)
+#─────────────────────────────────────────────────────────────────────────────
+echo "→ [3] Generating plain chain spec (mainnet preset)..."
 
 if [[ ! -f "$NODE_BIN" ]]; then
     fail "plain_spec_generation" "node binary not found at $NODE_BIN"
 else
-    # Generate from mainnet or custom chain preset
-    # For production: --chain must NOT be dev/local
+    # For mainnet: MUST use the mainnet/preset or full mainnet chain config.
+    # NO fallback to x3-testnet. If --chain production fails, ceremony halts.
     if "$NODE_BIN" build-spec \
-        --chain "$CHAIN_ID" \
+        --chain production \
         --disable-default-bootnode \
         2>/dev/null > "$PLAIN_SPEC" 2>&1; then
         pass "plain_spec_generation"
     else
-        # Fallback: try with testnet preset if custom chain spec not configured
-        echo "  Custom chain ID not found, using testnet spec as base..."
-        if "$NODE_BIN" build-spec \
-            --chain x3-testnet \
-            --disable-default-bootnode \
-            >"$PLAIN_SPEC" 2>/dev/null; then
-            RESULTS["plain_spec_generation"]="WARN"
-            echo "[WARN] plain_spec_generation — using testnet preset, customise before use"
-        else
-            fail "plain_spec_generation" "could not generate chain spec for '$CHAIN_ID' or 'x3-testnet'"
-        fi
+        fail "plain_spec_generation" "Could not generate mainnet chain spec. The node's --chain=production preset must be configured."
     fi
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# STEP 4: Verify plain spec — no dev seeds
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
+# STEP 4: Verify plain spec — no dev seeds (HARD FAILURE)
+#─────────────────────────────────────────────────────────────────────────────
 echo "→ [4] Verifying plain spec has no dev seeds..."
 if [[ -f "$PLAIN_SPEC" ]]; then
     DEV_PATTERNS_FOUND=()
@@ -208,9 +195,9 @@ else
     fail "external_bridges_disabled_in_spec" "plain spec not generated"
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 # STEP 5: Convert plain spec to raw spec
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 echo "→ [5] Converting to raw spec..."
 if [[ -f "$NODE_BIN" ]] && [[ -f "$PLAIN_SPEC" ]] && [[ "${RESULTS[no_dev_seeds_in_spec]:-}" != "FAIL" ]]; then
     if "$NODE_BIN" build-spec \
@@ -223,12 +210,12 @@ if [[ -f "$NODE_BIN" ]] && [[ -f "$PLAIN_SPEC" ]] && [[ "${RESULTS[no_dev_seeds_
         fail "raw_spec_generation" "failed to convert plain → raw"
     fi
 else
-    skip "raw_spec_generation" "blocked by prior failures"
+    fail "raw_spec_generation" "blocked by prior failures"
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 # STEP 6: Compute and record artifact hashes
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 echo "→ [6] Recording artifact hashes..."
 {
     echo "# X3 Atomic Star — Release Artifact Hashes"
@@ -253,9 +240,9 @@ echo "→ [6] Recording artifact hashes..."
 pass "artifact_hashes_recorded"
 echo "  Hashes written to: $HASHES_FILE"
 
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 # STEP 7: Generate ceremony report
-# ─────────────────────────────────────────────────────────────────────────────
+#─────────────────────────────────────────────────────────────────────────────
 CEREMONY_REPORT="$REPORT_DIR/genesis_ceremony.md"
 {
     echo "# X3 Genesis Ceremony Report"

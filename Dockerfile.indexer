@@ -2,7 +2,7 @@
 # Multi-stage build for minimal image size
 # Usage: docker build -f Dockerfile.indexer -t x3-indexer:latest .
 
-ARG RUST_VERSION=1.80
+ARG RUST_VERSION=1.90.0
 ARG DEBIAN_VERSION=bookworm
 
 # ── Stage 1: Builder ────────────────────────────────────────────────────────

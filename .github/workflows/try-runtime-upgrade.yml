@@ -1,0 +1,97 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# try-runtime-upgrade.yml — Runtime Upgrade Rehearsal Pipeline
+#
+# Dry-runs a runtime upgrade against a snapshot of the current chain state.
+# Must pass before any real runtime upgrade is executed.
+#
+# Usage:
+#   Triggers automatically on PRs that modify runtime/
+#   Can also be triggered manually to rehearse against specific snapshot.
+# ─────────────────────────────────────────────────────────────────────────────
+name: x3 try-runtime upgrade
+
+on:
+  pull_request:
+    paths:
+      - "runtime/**"
+      - "pallets/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+    inputs:
+      snapshot_url:
+        description: "URL to chain state snapshot (leave empty for auto)"
+        required: false
+        default: ""
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  try-runtime:
+    name: try-runtime on-runtime-upgrade dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: sudo apt-get update -qq && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: try-runtime
+
+      - name: Build runtime WASM
+        run: cargo build --release -p x3-chain-runtime --features std
+
+      - name: Install try-runtime CLI
+        run: cargo install --locked try-runtime-cli
+
+      - name: Dry-run runtime upgrade (mock network)
+        run: |
+          try-runtime \
+            --runtime target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.wasm \
+            on-runtime-upgrade \
+            --checks all \
+            --no-check-spec-version \
+            live \
+            --uri "wss://rpc.testnet.x3.network:443" \
+            2>&1 | tee try-runtime-output.txt
+
+      - name: Dry-run storage migration
+        run: |
+          try-runtime \
+            --runtime target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.wasm \
+            execute-block \
+            --checks all \
+            live \
+            --uri "wss://rpc.testnet.x3.network:443" \
+            2>&1 | tee execute-block-output.txt
+
+      - name: Check for migration errors
+        run: |
+          if grep -q "ERROR\|FAILED\|panic" try-runtime-output.txt execute-block-output.txt 2>/dev/null; then
+            echo "❌ try-runtime detected migration errors"
+            cat try-runtime-output.txt execute-block-output.txt
+            exit 1
+          fi
+          echo "✅ try-runtime: all checks passed"
+
+      - name: Upload try-runtime logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: try-runtime-logs
+          path: |
+            try-runtime-output.txt
+            execute-block-output.txt
+          retention-days: 30

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/config.schema.json",
+  "productName": "X3 Combat Arena",
+  "version": "0.1.0",
+  "identifier": "com.x3chain.combat-arena",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "X3 Combat Arena",
+        "width": 1600,
+        "height": 1000,
+        "resizable": true,
+        "fullscreen": false,
+        "minWidth": 1024,
+        "minHeight": 768
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' asset:; base-uri 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: ipc: data: blob:; font-src 'self' asset:; connect-src 'self' ipc: asset: http://ipc.localhost ws://127.0.0.1:* ws://localhost:* http://127.0.0.1:* http://localhost:* wss://127.0.0.1:* wss://localhost:* https://rpc.x3-chain.io https://rpc.x3-chain.io:9944 wss://rpc.x3-chain.io wss://rpc.x3-chain.io:9944 https://ws.x3star.net wss://ws.x3star.net; frame-src 'none'; child-src 'none'; object-src 'none'; worker-src 'self' blob:;"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "wix": null,
+      "nsis": null
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  },
+  "plugins": {
+    "autostart": {
+      "enabled": true
+    },
+    "window-state": {
+      "enabled": true
+    }
+  }
+}

@@ -144,6 +144,13 @@ members = [
     "crates/x3-universal-contracts",   # <- tests/e2e/Cargo.toml
     "crates/x3-validator-attestation", # <- node/Cargo.toml
     "crates/x3-verification-router",   # <- node/Cargo.toml
+    "crates/x3-circuit-breaker",       # <- crosschain-gateway, pallets
+    "crates/x3-external-route-registry", # <- crosschain-gateway, pallets
+    "crates/x3-gateway-indexer",       # <- crosschain-gateway
+    "crates/x3-gateway-insurance",     # <- crosschain-gateway
+    "crates/x3-proof-envelope",        # <- crosschain-gateway, proof-attestation
+    "crates/x3-crosschain-gateway",    # <- pallet-x3-crosschain-gateway
+    "pallets/x3-crosschain-gateway",   # <- crosschain-gateway pallet
     # P1-FIX: excluded crates referenced as path deps by workspace members (x3-gateway, x3-gpu-validator-swarm, x3-integration)
     # Direct imports (level-1):
     "crates/x3-orchestra-control-plane", # <- x3-gateway, x3-gpu-validator-swarm (required)
@@ -166,6 +173,10 @@ members = [
     "crates/x3-relayer",
     "crates/x3-bridge-security-council",
     "crates/x3-genesis-builder",
+    "crates/x3-foundry-core",
+    "crates/x3-foundry-auditor",
+    "crates/x3-foundry-revenue",
+    "crates/x3-foundry-indexer",
 ]
 default-members = ["node"]
 resolver = "2"

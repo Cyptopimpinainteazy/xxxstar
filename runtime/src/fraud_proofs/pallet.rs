@@ -311,11 +311,130 @@ pub mod pallet {
 }
 
 // ---------------------------------------------------------------------------
-// Unit tests for the pallet
+// Mock runtime for pallet tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+pub mod mock {
+    use super::pallet::*;
+    use frame_support::{
+        construct_runtime, derive_impl, parameter_types,
+        traits::{ConstU32, ConstU64, Everything},
+    };
+    use sp_core::H256;
+    use sp_runtime::{
+        traits::{BlakeTwo256, IdentityLookup},
+        BuildStorage,
+    };
+
+    pub type AccountId = u64;
+    pub type BlockNumber = u64;
+    pub type Balance = u128;
+
+    #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
+    impl frame_system::Config for Test {
+        type BaseCallFilter = Everything;
+        type BlockWeights = ();
+        type BlockLength = ();
+        type DbWeight = ();
+        type RuntimeOrigin = RuntimeOrigin;
+        type RuntimeCall = RuntimeCall;
+        type Nonce = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type AccountId = AccountId;
+        type Lookup = IdentityLookup<Self::AccountId>;
+        type Block = Block;
+        type RuntimeEvent = RuntimeEvent;
+        type BlockHashCount = ConstU64<250>;
+        type Version = ();
+        type PalletInfo = PalletInfo;
+        type AccountData = pallet_balances::AccountData<Balance>;
+        type OnNewAccount = ();
+        type OnKilledAccount = ();
+        type SystemWeightInfo = ();
+        type SS58Prefix = ();
+        type OnSetCode = ();
+        type MaxConsumers = frame_support::traits::ConstU32<16>;
+    }
+
+    parameter_types! {
+        pub const ExistentialDeposit: Balance = 1;
+        pub const MaxLocks: u32 = 50;
+    }
+
+    impl pallet_balances::Config for Test {
+        type MaxLocks = MaxLocks;
+        type MaxReserves = ();
+        type ReserveIdentifier = [u8; 8];
+        type Balance = Balance;
+        type RuntimeEvent = RuntimeEvent;
+        type DustRemoval = ();
+        type ExistentialDeposit = ExistentialDeposit;
+        type AccountStore = frame_system::Pallet<Test>;
+        type WeightInfo = ();
+        type FreezeIdentifier = ();
+        type MaxFreezes = ();
+        type RuntimeHoldReason = ();
+        type MaxHolds = ();
+    }
+
+    parameter_types! {
+        pub const FraudProofMaxTxCount: u32 = 256;
+        pub const FraudProofDisputeWindowBlocks: u32 = 100;
+        pub const FraudProofReporterReward: Balance = 100;
+    }
+
+    impl Config for Test {
+        type RuntimeEvent = RuntimeEvent;
+        type Currency = Balances;
+        type MaxTxCount = FraudProofMaxTxCount;
+        type DisputeWindowBlocks = FraudProofDisputeWindowBlocks;
+        type ReporterRewardAmount = FraudProofReporterReward;
+        type GovernanceOrigin = frame_system::EnsureRoot<AccountId>;
+    }
+
+    pub type Block = frame_system::mocking::MockBlockU32<Test>;
+
+    construct_runtime!(
+        pub enum Runtime {
+            System: frame_system,
+            Balances: pallet_balances,
+            FraudProofs: crate::fraud_proofs::pallet::pallet,
+        }
+    );
+
+    /// Build a test externalities with initial balances.
+    pub fn new_test_ext() -> sp_io::TestExternalities {
+        let mut t = frame_system::GenesisConfig::<Test>::default()
+            .build_storage()
+            .unwrap();
+
+        pallet_balances::GenesisConfig::<Test> {
+            balances: vec![
+                (1u64, 1_000_000),
+                (2u64, 1_000_000),
+                (99u64, 1_000_000),
+            ],
+        }
+        .assimilate_storage(&mut t)
+        .unwrap();
+
+        let mut ext = sp_io::TestExternalities::new(t);
+        ext.execute_with(|| {
+            frame_system::Pallet::<Test>::set_block_number(50u32.into());
+        });
+        ext
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pallet extrinsic tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
+    use super::mock::*;
     use super::pallet::*;
     use crate::fraud_proofs::{
         freeze::{FreezeReason, FreezeState},
@@ -323,6 +442,7 @@ mod tests {
         types::{DisputedBlockMeta, FraudProofV1, HeaderRef, PROOF_TYPE_SCHED_MISMATCH_V1},
         verifier::compute_proof_id,
     };
+    use codec::Encode;
     use sp_core::H256;
 
     fn zero_hash() -> H256 {
@@ -330,19 +450,19 @@ mod tests {
     }
 
     /// Build a minimal valid fraud proof with real commitment values.
+    /// `observed_hash` is the (forged) commitment in the block.
+    /// `expected_hash` is what the reporter claims the correct commitment is.
     fn make_valid_proof(
         reporter: u64,
         observed_hash: H256,
         expected_hash: H256,
     ) -> (FraudProofV1<u64>, DisputedBlockMeta<u64>) {
-        // Minimal 1-tx no-deps witness bytes — must match SCALE encoding of
-        // SchedulerWitnessV1 exactly (rules_version is u32, NOT Compact).
+        // Minimal 1-tx no-deps witness bytes
         let witness_bytes: Vec<u8> = vec![
             0x01, // version: u8 = 1
-            0x01, 0x00, 0x00, 0x00, // rules_version: u32 = 1 (4-byte LE)
+            0x01, 0x00, 0x00, 0x00, // rules_version: u32 = 1
             0x04, // tx_count: Compact<u32> = 1
             0x04, // tx_ids Vec length: Compact(1)
-            // tx_ids[0]: H256::zero() (32 bytes)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x04, // access_lists Vec length: Compact(1)
@@ -381,7 +501,8 @@ mod tests {
         (proof, disputed)
     }
 
-    /// FRAUD-PROOF-PALLET-001: compute_proof_id is stable
+    // ── FRAUD-PROOF-PALLET-001: compute_proof_id is stable ──────────────────
+
     #[test]
     fn proof_id_is_stable() {
         let (proof, disputed) =
@@ -391,19 +512,361 @@ mod tests {
         assert_eq!(id1, id2);
     }
 
-    /// FRAUD-PROOF-PALLET-002: FreezeState default is not frozen
+    // ── FRAUD-PROOF-PALLET-002: FreezeState default is not frozen ──────────
+
     #[test]
     fn default_freeze_state_not_frozen() {
         let state = FreezeState::default();
         assert!(!state.is_consensus_frozen());
     }
 
-    /// FRAUD-PROOF-PALLET-003: engaging freeze sets flags
+    // ── FRAUD-PROOF-PALLET-003: engaging freeze sets flags ─────────────────
+
     #[test]
     fn engage_freeze_sets_flags() {
         let mut state = FreezeState::default();
         state.engage(FreezeReason::DivergenceDetected, 10);
         assert!(state.is_consensus_frozen());
         assert_eq!(state.frozen_at_block, Some(10));
+    }
+
+    // ── FRAUD-PROOF-PALLET-004: submit_fraud_proof accepts valid proof ─────
+
+    #[test]
+    fn submit_valid_fraud_proof_succeeds() {
+        new_test_ext().execute_with(|| {
+            // Forge a wrong commitment that the block claims
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+
+            // The disputed block's meta must have the forged commitment
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof,
+                disputed_with_forged,
+            ));
+
+            // Verify freeze was engaged
+            assert!(FraudProofs::is_frozen());
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-005: duplicate proof rejected ───────────────────
+
+    #[test]
+    fn duplicate_proof_rejected() {
+        new_test_ext().execute_with(|| {
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            // First submission succeeds
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof.clone(),
+                disputed_with_forged.clone(),
+            ));
+
+            // Second submission with same proof fails
+            assert_noop!(
+                FraudProofs::submit_fraud_proof(
+                    RuntimeOrigin::signed(2u64),
+                    proof,
+                    disputed_with_forged,
+                ),
+                Error::<Test>::DuplicateProof
+            );
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-006: non-fraudulent proof rejected ──────────────
+
+    #[test]
+    fn non_fraudulent_proof_rejected() {
+        new_test_ext().execute_with(|| {
+            let (proof, disputed) = make_valid_proof(
+                1u64,
+                disputed.scheduler_commitment, // observed == real (no fraud)
+                disputed.scheduler_commitment, // expected == real
+            );
+
+            assert_noop!(
+                FraudProofs::submit_fraud_proof(
+                    RuntimeOrigin::signed(1u64),
+                    proof,
+                    disputed,
+                ),
+                Error::<Test>::ProofNotFraudulent
+            );
+
+            // Freeze should NOT be engaged
+            assert!(!FraudProofs::is_frozen());
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-007: dispute window expired ─────────────────────
+
+    #[test]
+    fn dispute_window_expired_rejected() {
+        new_test_ext().execute_with(|| {
+            // Set current block far in the future
+            frame_system::Pallet::<Test>::set_block_number(1000u32.into());
+
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            // Disputed block is at 5, current is 1000, window is 100
+            // 1000 > 5 + 100 = 105 → expired
+            assert_noop!(
+                FraudProofs::submit_fraud_proof(
+                    RuntimeOrigin::signed(1u64),
+                    proof,
+                    disputed_with_forged,
+                ),
+                Error::<Test>::DisputeWindowExpired
+            );
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-008: governance_unfreeze works ──────────────────
+
+    #[test]
+    fn governance_unfreeze_works() {
+        new_test_ext().execute_with(|| {
+            // First, submit a valid proof to freeze
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof,
+                disputed_with_forged,
+            ));
+            assert!(FraudProofs::is_frozen());
+
+            // Governance unfreeze
+            assert_ok!(FraudProofs::governance_unfreeze(
+                RuntimeOrigin::root(),
+            ));
+            assert!(!FraudProofs::is_frozen());
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-009: non-root cannot unfreeze ───────────────────
+
+    #[test]
+    fn non_root_cannot_unfreeze() {
+        new_test_ext().execute_with(|| {
+            assert_noop!(
+                FraudProofs::governance_unfreeze(RuntimeOrigin::signed(1u64)),
+                sp_runtime::DispatchError::BadOrigin,
+            );
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-010: reporter gets reward ───────────────────────
+
+    #[test]
+    fn reporter_gets_reward() {
+        new_test_ext().execute_with(|| {
+            let reporter_balance_before = Balances::free_balance(1u64);
+
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof,
+                disputed_with_forged,
+            ));
+
+            let reporter_balance_after = Balances::free_balance(1u64);
+            assert_eq!(
+                reporter_balance_after,
+                reporter_balance_before + FraudProofReporterReward::get(),
+                "reporter should receive reward"
+            );
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-011: invalid proof type rejected ────────────────
+
+    #[test]
+    fn invalid_proof_type_rejected() {
+        new_test_ext().execute_with(|| {
+            let forged = H256([0xFF; 32]);
+            let (mut proof, disputed) =
+                make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            proof.proof_type = 0x02; // unknown type
+
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            assert_noop!(
+                FraudProofs::submit_fraud_proof(
+                    RuntimeOrigin::signed(1u64),
+                    proof,
+                    disputed_with_forged,
+                ),
+                Error::<Test>::UnsupportedProofType
+            );
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-012: commitment mismatch rejected ───────────────
+
+    #[test]
+    fn commitment_mismatch_rejected() {
+        new_test_ext().execute_with(|| {
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+
+            // Disputed meta has a DIFFERENT commitment than what proof.observed_hash says
+            let disputed_wrong_commitment = DisputedBlockMeta {
+                scheduler_commitment: H256([0xEE; 32]), // different from forged
+                ..disputed
+            };
+
+            assert_noop!(
+                FraudProofs::submit_fraud_proof(
+                    RuntimeOrigin::signed(1u64),
+                    proof,
+                    disputed_wrong_commitment,
+                ),
+                Error::<Test>::CommitmentMismatch
+            );
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-013: events emitted correctly ───────────────────
+
+    #[test]
+    fn events_emitted_correctly() {
+        new_test_ext().execute_with(|| {
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof.clone(),
+                disputed_with_forged.clone(),
+            ));
+
+            // Check events
+            let events = frame_system::Pallet::<Test>::events();
+            let proof_id = compute_proof_id(&proof, disputed_with_forged.block_hash);
+
+            let submitted = events.iter().any(|e| {
+                matches!(
+                    e.event,
+                    RuntimeEvent::FraudProofs(Event::FraudProofSubmitted { proof_id: pid, .. })
+                    if pid == proof_id
+                )
+            });
+            assert!(submitted, "FraudProofSubmitted event must be emitted");
+
+            let accepted = events.iter().any(|e| {
+                matches!(
+                    e.event,
+                    RuntimeEvent::FraudProofs(Event::FraudProofAccepted { proof_id: pid, .. })
+                    if pid == proof_id
+                )
+            });
+            assert!(accepted, "FraudProofAccepted event must be emitted");
+
+            let frozen = events.iter().any(|e| {
+                matches!(
+                    e.event,
+                    RuntimeEvent::FraudProofs(Event::ConsensusFrozen { .. })
+                )
+            });
+            assert!(frozen, "ConsensusFrozen event must be emitted");
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-014: DisputedMeta stored after acceptance ───────
+
+    #[test]
+    fn disputed_meta_stored_after_acceptance() {
+        new_test_ext().execute_with(|| {
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof,
+                disputed_with_forged.clone(),
+            ));
+
+            let stored = FraudProofs::disputed_meta(disputed_with_forged.block_hash);
+            assert!(stored.is_some(), "DisputedMeta must be stored");
+            assert_eq!(stored.unwrap().proposer, 99u64);
+        });
+    }
+
+    // ── FRAUD-PROOF-PALLET-015: ProofsSeen prevents replay ─────────────────
+
+    #[test]
+    fn proofs_seen_prevents_replay() {
+        new_test_ext().execute_with(|| {
+            let forged = H256([0xFF; 32]);
+            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let disputed_with_forged = DisputedBlockMeta {
+                scheduler_commitment: forged,
+                ..disputed
+            };
+
+            let proof_id = compute_proof_id(&proof, disputed_with_forged.block_hash);
+
+            // Submit once
+            assert_ok!(FraudProofs::submit_fraud_proof(
+                RuntimeOrigin::signed(1u64),
+                proof.clone(),
+                disputed_with_forged.clone(),
+            ));
+
+            // ProofsSeen should contain the proof_id
+            assert!(FraudProofs::proofs_seen(proof_id).is_some());
+
+            // Re-submit with different reporter should still fail
+            assert_noop!(
+                FraudProofs::submit_fraud_proof(
+                    RuntimeOrigin::signed(2u64),
+                    proof,
+                    disputed_with_forged,
+                ),
+                Error::<Test>::DuplicateProof
+            );
+        });
     }
 }

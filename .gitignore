@@ -85,6 +85,24 @@ apps/explorer/.next/
 .env.local
 .env.*.local
 
+# Deployment key templates (FILL_IN placeholders only; real keys injected at deploy)
+deployment/keys/*.json
+deployment/keys/*-key
+deployment/keys/README.md
+!deployment/keys/README.md
+!deployment/keys/key-rotation-template.json
+!deployment/keys/key-rotation-template.key
+
+# Systemd packaging (compiled .service files, not templates)
+packaging/*.service
+!packaging/systemd/*.service
+
+# Docker support infra (not for validators)
+docker/
+
+# Dev/test artifacts
+devnet/
+
 # Vendor / dependency mirroring (large)
 vendor/
 vendov/

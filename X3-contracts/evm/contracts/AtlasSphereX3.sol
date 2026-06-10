@@ -53,6 +53,14 @@ contract AtlasSphereX3 is ERC20, ERC20Burnable, ERC20Pausable, Ownable {
         }
     }
 
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override(ERC20, ERC20Pausable) {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
     function pause() public onlyOwner { _pause(); }
     function unpause() public onlyOwner { _unpause(); }
 

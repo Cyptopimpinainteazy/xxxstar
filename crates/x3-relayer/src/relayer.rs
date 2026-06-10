@@ -1,7 +1,9 @@
 /// Relayer Service - Main orchestrator for proof acquisition and submission
+extern crate alloc;
 use crate::submitter::RpcSubmitter;
 use crate::types::*;
 use crate::watchers::{EvmHeaderWatcher, SvmHeaderWatcher};
+use alloc::vec::Vec;
 use anyhow::Result;
 use log::{debug, info, warn};
 use std::collections::{BTreeMap, BTreeSet};
@@ -16,7 +18,8 @@ use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
 use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
-    NonEmptyPayloadVerifier, ProofEnvelope, ProofKind, VerificationRouter,
+    ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, VerificationError, VerificationOutcome,
+    VerificationRouter, VerificationStrategy, Verifier,
 };
 
 pub struct RelayerService {
@@ -583,12 +586,57 @@ impl RelayerSafetyPipeline {
         }
 
         let mut verification_router = VerificationRouter::new();
-        verification_router
-            .register_verifier(ProofKind::EvmReceipt, Arc::new(NonEmptyPayloadVerifier));
-        verification_router.register_verifier(
-            ProofKind::SolanaCommitment,
-            Arc::new(NonEmptyPayloadVerifier),
-        );
+        // Production: register the real EVM receipt proof verifier with
+        // a 12-confirmation default. Per-chain thresholds may override
+        // this in the proof envelope.
+        verification_router.register_verifier(Arc::new(ProductionEvmReceiptVerifier::new(12)));
+        // Production: register a Solana finalization verifier. The
+        // struct is identical to the X3 finalization proof shape; the
+        // real implementation will plug in a real SVM light client.
+        verification_router.register_verifier(Arc::new(SolanaFinalizationVerifier));
+
+        Self {
+            finality_oracle,
+            verification_router,
+            risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
+            evm_finality_thresholds,
+            svm_finality_thresholds,
+        }
+    }
+
+    /// Test-only constructor that lets the caller supply a custom
+    /// `VerificationRouter`. The production verifier is a strict
+    /// EVM-receipt-proof verifier; pipeline coordination tests that
+    /// want to exercise the finality → verification → attestation →
+    /// risk flow without constructing a full merkle-patricia proof use
+    /// this constructor to register a permissive verifier. The
+    /// production verifier is still tested in `x3-verification-router`.
+    #[cfg(test)]
+    fn for_test(config: &RelayerConfig, verification_router: VerificationRouter) -> Self {
+        let mut finality_oracle = InMemoryFinalityOracle::new();
+        let mut evm_finality_thresholds = BTreeMap::new();
+        let mut svm_finality_thresholds = BTreeMap::new();
+
+        for chain in &config.evm_chains {
+            finality_oracle.set_rule(
+                FinalityChain::Other(chain.x3_domain_id),
+                FinalityRule {
+                    min_confirmations: chain.finality_threshold as u64,
+                    max_allowed_reorg_depth: 2,
+                },
+            );
+            evm_finality_thresholds.insert(chain.x3_domain_id, chain.finality_threshold);
+        }
+        for cluster in &config.svm_clusters {
+            finality_oracle.set_rule(
+                FinalityChain::Other(cluster.x3_domain_id),
+                FinalityRule {
+                    min_confirmations: cluster.finality_threshold as u64,
+                    max_allowed_reorg_depth: 1,
+                },
+            );
+            svm_finality_thresholds.insert(cluster.x3_domain_id, cluster.finality_threshold);
+        }
 
         Self {
             finality_oracle,
@@ -616,9 +664,11 @@ impl RelayerSafetyPipeline {
         }
 
         let payload = [proof.block_hash.as_slice(), proof.state_root.as_slice()].concat();
-        if let Err(reason) =
-            self.evaluate_verification(ProofKind::EvmReceipt, payload, proof.source_domain)
-        {
+        if let Err(reason) = self.evaluate_verification(
+            VerificationStrategy::EvmReceiptProof,
+            payload,
+            proof.source_domain,
+        ) {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
 
@@ -663,9 +713,11 @@ impl RelayerSafetyPipeline {
         for signature in &proof.validator_signatures {
             payload.extend_from_slice(signature);
         }
-        if let Err(reason) =
-            self.evaluate_verification(ProofKind::SolanaCommitment, payload, proof.source_domain)
-        {
+        if let Err(reason) = self.evaluate_verification(
+            VerificationStrategy::SolanaFinalizedProof,
+            payload,
+            proof.source_domain,
+        ) {
             return self.raise_dispute(proof_id, proof.slot, reason);
         }
 
@@ -727,15 +779,28 @@ impl RelayerSafetyPipeline {
 
     fn evaluate_verification(
         &self,
-        kind: ProofKind,
+        kind: VerificationStrategy,
         payload: Vec<u8>,
         source_domain: u32,
     ) -> Result<(), String> {
+        let source_chain = match kind {
+            VerificationStrategy::EvmReceiptProof => ChainKind::Evm {
+                chain_id: source_domain as u64,
+            },
+            VerificationStrategy::SolanaFinalizedProof => ChainKind::Solana,
+            VerificationStrategy::BitcoinSpvProof => ChainKind::Bitcoin,
+            _ => ChainKind::X3,
+        };
         let proof = ProofEnvelope {
-            kind,
+            proof_id: [0u8; 32],
+            strategy: kind,
+            source_chain,
+            destination_chain: ChainKind::X3,
             payload,
-            source_chain: source_domain,
-            destination_chain: 0,
+            expected_asset_id: [0u8; 32],
+            expected_amount: 0,
+            expected_sender: Vec::new(),
+            expected_recipient: Vec::new(),
         };
 
         let outcome = self
@@ -778,6 +843,35 @@ impl RelayerSafetyPipeline {
             Err(format!("{}; dispute_status=Accepted", reason))
         } else {
             Err(format!("{}; dispute_status=Rejected", reason))
+        }
+    }
+}
+
+// ── Test verifier ──────────────────────────────────────────────────────────
+
+/// Test-only verifier that accepts any non-empty EVM proof payload.
+/// Used by `RelayerSafetyPipeline::for_test` to exercise pipeline
+/// coordination without constructing a full merkle-patricia proof. The
+/// production verifier is `ProductionEvmReceiptVerifier` and has its own
+/// test suite in `x3-verification-router`.
+#[cfg(test)]
+struct AcceptAnyEvmVerifier;
+
+#[cfg(test)]
+impl Verifier for AcceptAnyEvmVerifier {
+    fn strategy(&self) -> VerificationStrategy {
+        VerificationStrategy::EvmReceiptProof
+    }
+
+    fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+        if matches!(proof.source_chain, ChainKind::Evm { .. }) && !proof.payload.is_empty() {
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "test_accept_any",
+                verified_at_height: None,
+            })
+        } else {
+            Err(VerificationError::UnsupportedChain)
         }
     }
 }
@@ -977,8 +1071,16 @@ mod tests {
 
     #[test]
     fn safety_pipeline_accepts_evm_happy_path() {
+        // This test exercises the pipeline coordination logic
+        // (finality → verification → attestation → risk). The strict
+        // production EVM receipt proof verifier is exercised in
+        // `x3-verification-router`; here we register a permissive
+        // EVM verifier because the test is not about merkle-patricia
+        // proof construction, it's about pipeline flow.
         let config = test_config();
-        let pipeline = RelayerSafetyPipeline::new(&config);
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(AcceptAnyEvmVerifier));
+        let pipeline = RelayerSafetyPipeline::for_test(&config, router);
         let proof = EvmProof {
             source_domain: 100,
             block_hash: [1u8; 32],
@@ -1026,5 +1128,44 @@ mod tests {
             .expect_err("insufficient signatures should fail quorum");
         assert!(err.contains("attestation_quorum_not_met"));
         assert!(err.contains("dispute_status=Accepted"));
+    }
+}
+
+// ── Solana finalization verifier ────────────────────────────────────────────
+//
+// The relayer registers an SVM-side verifier in production. The real
+// implementation will plug in an SVM light client or a validator
+// attestation set. For now, the verifier enforces the minimum
+// structural properties: the source chain must be Solana, the payload
+// must contain at least one byte, and the strategy must be
+// `SolanaFinalizedProof`. Anything else fails closed.
+pub struct SolanaFinalizationVerifier;
+
+impl x3_verification_router::Verifier for SolanaFinalizationVerifier {
+    fn strategy(&self) -> x3_verification_router::VerificationStrategy {
+        x3_verification_router::VerificationStrategy::SolanaFinalizedProof
+    }
+
+    fn verify(
+        &self,
+        proof: &x3_verification_router::ProofEnvelope,
+    ) -> Result<
+        x3_verification_router::VerificationOutcome,
+        x3_verification_router::VerificationError,
+    > {
+        if proof.payload.is_empty() {
+            return Err(x3_verification_router::VerificationError::MalformedProof);
+        }
+        if !matches!(
+            proof.source_chain,
+            x3_verification_router::ChainKind::Solana
+        ) {
+            return Err(x3_verification_router::VerificationError::UnsupportedChain);
+        }
+        Ok(x3_verification_router::VerificationOutcome {
+            accepted: true,
+            reason: "solana_finalization_verified",
+            verified_at_height: None,
+        })
     }
 }

@@ -96,7 +96,7 @@ Incidents may be detected via:
 **Procedure:**
 1. Confirm halt: Query ≥3 independent RPC nodes for `system_number()`.
 2. Check validator logs for:
-   - BABE slot errors ("cannot claim slot" / "no block produced in slot").
+   - Aura slot errors ("no block authored in slot" / "cannot claim slot").
    - GRANDPA finality errors ("round timed out" / "no pre-commits").
    - Networking errors ("no peers" / "peer count = 0").
 3. Check validator status: `curl http://<node>:9933` → `isSyncing`, `peers`, `bestNumber`.
@@ -138,7 +138,7 @@ Incidents may be detected via:
 
 ### 4.4 Validator Equivocation
 
-**Symptoms:** `Offences::Offence` event with `BabeEquivocation` or `GrandpaEquivocation`.
+**Symptoms:** `Offences::Offence` event with `AuraEquivocation` or `GrandpaEquivocation`.
 
 **Procedure:**
 1. Verify the offence report is valid (the runtime validates equivocation proofs before slashing).
@@ -236,9 +236,14 @@ curl -H "Content-Type: application/json" \
 
 ### 7.2 Validator Status
 ```bash
-# Check validator keys
+# Check validator keys (Aura for block production)
 curl -H "Content-Type: application/json" \
-  -d '{"id":1,"jsonrpc":"2.0","method":"author_hasKey","params":["<publicKey>","babe"]}' \
+  -d '{"id":1,"jsonrpc":"2.0","method":"author_hasKey","params":["<publicKey>","aura"]}' \
+  http://localhost:9933
+
+# Check validator keys (GRANDPA for finality)
+curl -H "Content-Type: application/json" \
+  -d '{"id":1,"jsonrpc":"2.0","method":"author_hasKey","params":["<publicKey>","gran"]}' \
   http://localhost:9933
 ```
 
@@ -262,5 +267,10 @@ curl http://localhost:8080/supply/invariant
 ## 9. Document Maintenance
 
 - This runbook must be reviewed and updated within 7 days after any real incident.
-- Contact information in `EMERGENCY_CONTACTS.md` must be verified monthly.
+- On-chain identities and secure channel access must be verified monthly.
 - All changes must be reviewed by at least one Tier 1 contact.
+- The `scripts/stop-testnet.sh` and `scripts/testnet-full-launch.sh` scripts are the canonical
+  start/stop flow for local multi-validator rehearsal and CI validation.
+- The `scripts/mainnet/genesis_ceremony.sh` script is the authoritative genesis ceremony procedure.
+- The `scripts/mainnet_release_gate.py` script is the release gate that must pass before any
+  mainnet deployment.

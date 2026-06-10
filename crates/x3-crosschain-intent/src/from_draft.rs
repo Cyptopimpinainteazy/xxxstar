@@ -709,7 +709,13 @@ mod tests {
             "X3-only intent should compile without errors (no cross-chain bridge needed): {:?}",
             result.errors
         );
-        assert_eq!(result.intent.source.asset.chain, crate::types::ChainKind::X3);
-        assert_eq!(result.intent.destination.asset.chain, crate::types::ChainKind::X3);
+        assert_eq!(
+            result.intent.source.asset.chain,
+            crate::types::ChainKind::X3
+        );
+        assert_eq!(
+            result.intent.destination.asset.chain,
+            crate::types::ChainKind::X3
+        );
     }
 }

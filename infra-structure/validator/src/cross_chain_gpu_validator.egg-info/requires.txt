@@ -1,2 +1,2 @@
 redis>=5.0.0
-pycryptodome>=3.19.0
+pycrypme>=3.19.0

@@ -4055,6 +4055,7 @@ dependencies = [
  "x3-proof",
  "x3-slash",
  "x3-universal-contracts",
+ "x3-verification-router",
 ]
 
 [[package]]
@@ -10721,6 +10722,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-agent-registry"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-api",
+ "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "x3-accounting-events",
+]
+
+[[package]]
 name = "pallet-x3-asset-registry"
 version = "0.1.0"
 dependencies = [
@@ -10869,6 +10890,23 @@ dependencies = [
  "x3-ixl",
  "x3-liquidity-core",
  "x3-packet-standard",
+]
+
+[[package]]
+name = "pallet-x3-crosschain-gateway"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "x3-verification-router",
 ]
 
 [[package]]
@@ -11102,6 +11140,25 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "serde",
+ "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+]
+
+[[package]]
+name = "pallet-x3-proof-carrying-agent"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-api",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-io",
  "sp-runtime",
@@ -23313,6 +23370,7 @@ dependencies = [
  "pallet-governance",
  "pallet-grandpa",
  "pallet-meme-overlord",
+ "pallet-northern-swarm",
  "pallet-offences",
  "pallet-preimage",
  "pallet-private-execution",
@@ -23327,6 +23385,7 @@ dependencies = [
  "pallet-treasury",
  "pallet-x3-account-registry",
  "pallet-x3-agent-law",
+ "pallet-x3-agent-registry",
  "pallet-x3-asset-registry",
  "pallet-x3-atomic-kernel",
  "pallet-x3-auction",
@@ -23335,6 +23394,7 @@ dependencies = [
  "pallet-x3-compute-market",
  "pallet-x3-consensus",
  "pallet-x3-cross-vm-router",
+ "pallet-x3-crosschain-gateway",
  "pallet-x3-custody",
  "pallet-x3-da",
  "pallet-x3-dapp-hub",
@@ -23346,8 +23406,10 @@ dependencies = [
  "pallet-x3-jury-anchor",
  "pallet-x3-kernel",
  "pallet-x3-launchpad",
+ "pallet-x3-lp-locker",
  "pallet-x3-oracle",
  "pallet-x3-partner",
+ "pallet-x3-proof-carrying-agent",
  "pallet-x3-rebalance",
  "pallet-x3-reconciliation",
  "pallet-x3-reservation",
@@ -23392,6 +23454,10 @@ dependencies = [
  "x3-security-events",
  "x3-svm-integration",
 ]
+
+[[package]]
+name = "x3-circuit-breaker"
+version = "0.1.0"
 
 [[package]]
 name = "x3-common"
@@ -23453,6 +23519,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-crosschain-gateway"
+version = "0.1.0"
+dependencies = [
+ "x3-asset-kernel-types",
+ "x3-circuit-breaker",
+ "x3-external-route-registry",
+ "x3-gateway-indexer",
+ "x3-gateway-insurance",
+ "x3-gateway-risk-engine",
+ "x3-proof-dispute",
+ "x3-proof-envelope",
+ "x3-validator-attestation",
+ "x3-verification-router",
+]
+
+[[package]]
 name = "x3-crosschain-intent"
 version = "0.1.0"
 dependencies = [
@@ -23494,6 +23576,13 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+]
+
+[[package]]
+name = "x3-external-route-registry"
+version = "0.1.0"
+dependencies = [
+ "x3-verification-router",
 ]
 
 [[package]]
@@ -23563,6 +23652,23 @@ dependencies = [
  "x3-orchestra-control-plane",
  "x3-rpc",
 ]
+
+[[package]]
+name = "x3-gateway-indexer"
+version = "0.1.0"
+dependencies = [
+ "x3-circuit-breaker",
+ "x3-external-route-registry",
+ "x3-gateway-insurance",
+ "x3-gateway-risk-engine",
+ "x3-proof-dispute",
+ "x3-proof-envelope",
+ "x3-verification-router",
+]
+
+[[package]]
+name = "x3-gateway-insurance"
+version = "0.1.0"
 
 [[package]]
 name = "x3-gateway-risk-engine"
@@ -23808,6 +23914,13 @@ name = "x3-proof-dispute"
 version = "0.1.0"
 
 [[package]]
+name = "x3-proof-envelope"
+version = "0.1.0"
+dependencies = [
+ "x3-verification-router",
+]
+
+[[package]]
 name = "x3-proving-harness"
 version = "0.1.0"
 dependencies = [
@@ -23969,6 +24082,12 @@ version = "0.1.0"
 [[package]]
 name = "x3-verification-router"
 version = "0.1.0"
+dependencies = [
+ "hex-literal",
+ "rlp 0.5.2",
+ "scale-info",
+ "tiny-keccak 2.0.2",
+]
 
 [[package]]
 name = "x3-verifier"

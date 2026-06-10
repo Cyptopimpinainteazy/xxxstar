@@ -648,3 +648,461 @@ class TestIntegrationPipeline:
         # Execute still routes through remaining lanes
         result = lo.execute(lambda: "ok")
         assert result == "ok"
+
+
+# ── Watchdog Tests ────────────────────────────────────────────
+
+from cross_chain_gpu_validator.resilience.watchdog import (
+    Watchdog,
+    WatchdogState,
+    RestartReason,
+    RestartEvent,
+    HealthCheck,
+    MemoryMonitor,
+)
+
+
+class TestWatchdog:
+    """INV-FALLBACK-001: Process supervision."""
+
+    def test_starts_stopped(self):
+        wd = Watchdog(cmd=["sleep", "10"])
+        assert wd.state == WatchdogState.STOPPED
+
+    def test_start_launches_process(self):
+        wd = Watchdog(cmd=["sleep", "10"])
+        wd.start()
+        assert wd.is_running
+        assert wd.pid is not None
+        wd.stop()
+
+    def test_stop_terminates_process(self):
+        wd = Watchdog(cmd=["sleep", "10"])
+        wd.start()
+        wd.stop()
+        assert wd.state == WatchdogState.STOPPED
+
+    def test_restart_count_starts_at_zero(self):
+        wd = Watchdog(cmd=["sleep", "10"])
+        assert wd.restart_count == 0
+        wd.stop()
+
+    def test_pause_and_resume(self):
+        wd = Watchdog(cmd=["sleep", "10"])
+        wd.start()
+        wd.pause()
+        assert wd.state == WatchdogState.PAUSED
+        wd.resume()
+        assert wd.is_running
+        wd.stop()
+
+    def test_status_returns_dict(self):
+        wd = Watchdog(cmd=["sleep", "10"])
+        wd.start()
+        status = wd.status()
+        assert isinstance(status, dict)
+        assert "state" in status
+        assert "pid" in status
+        assert "restart_count" in status
+        wd.stop()
+
+    def test_max_restarts_gives_up(self):
+        wd = Watchdog(cmd=["false"], max_restarts=1, restart_delay=0.1)
+        wd.start()
+        import time
+        time.sleep(3)
+        assert wd.state == WatchdogState.FAILED
+        assert wd.restart_count >= 1
+
+    def test_restart_event_logging(self):
+        wd = Watchdog(cmd=["false"], max_restarts=1, restart_delay=0.1)
+        wd.start()
+        import time
+        time.sleep(0.5)
+        status = wd.status()
+        assert status["total_events"] >= 1
+        wd.stop()
+
+    def test_pid_file_written(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".pid", delete=False) as f:
+            pid_path = f.name
+        wd = Watchdog(cmd=["sleep", "5"], pid_file=pid_path)
+        wd.start()
+        import os
+        assert os.path.exists(pid_path)
+        with open(pid_path) as f:
+            pid = int(f.read().strip())
+            assert pid > 0
+        wd.stop()
+        # PID file is cleaned up by stop() — verify it's gone
+        assert not os.path.exists(pid_path)
+
+    def test_restart_event_dataclass(self):
+        event = RestartEvent(
+            attempt=1,
+            reason=RestartReason.CRASH,
+            exit_code=1,
+            uptime_seconds=10.5,
+            timestamp="2026-01-01T00:00:00Z",
+            backoff_seconds=2.0,
+        )
+        d = event.to_dict()
+        assert d["attempt"] == 1
+        assert d["reason"] == "crash"
+        assert d["exit_code"] == 1
+        assert d["uptime_seconds"] == 10.5
+
+
+class TestHealthCheck:
+    """Health check component tests."""
+
+    def test_health_check_accepts_custom_checks(self):
+        called = []
+        def custom():
+            called.append(True)
+            return True
+        hc = HealthCheck(interval=0.1, custom_checks=[custom])
+        hc.set_pid(999999)  # Non-existent PID — will fail liveness
+        hc.start()
+        import time
+        time.sleep(0.3)
+        hc.stop()
+        # Custom check was registered (may or may not have run)
+        assert len(hc._custom_checks) == 1
+
+    def test_is_alive_returns_false_for_dead_pid(self):
+        assert not HealthCheck._is_alive(999999999)
+
+    def test_is_alive_returns_true_for_current_process(self):
+        import os
+        assert HealthCheck._is_alive(os.getpid())
+
+
+class TestMemoryMonitor:
+    """Memory monitor component tests."""
+
+    def test_no_monitoring_with_zero_limit(self):
+        mm = MemoryMonitor(limit_mb=0)
+        mm.set_pid(1)
+        mm.start_monitoring()
+        mm.stop_monitoring()  # Should not raise
+
+    def test_get_memory_mb_returns_none_for_dead_pid(self):
+        result = MemoryMonitor._get_memory_mb(999999999)
+        assert result is None
+
+
+# ── Standby Manager Tests ─────────────────────────────────────
+
+from cross_chain_gpu_validator.resilience.standby import (
+    StandbyManager,
+    StandbyConfig,
+    StandbyRole,
+    StandbyState,
+    StateSyncTracker,
+)
+
+
+class TestStateSyncTracker:
+    """State sync tracker tests."""
+
+    def test_starts_not_synced(self):
+        sst = StateSyncTracker()
+        assert not sst.is_synced
+        assert sst.lag_blocks == 0
+
+    def test_synced_within_3_blocks(self):
+        sst = StateSyncTracker()
+        sst.update_primary_height(100)
+        sst.update_standby_height(98)
+        assert sst.is_synced
+        assert sst.lag_blocks == 2
+
+    def test_not_synced_with_more_than_3_blocks_lag(self):
+        sst = StateSyncTracker()
+        sst.update_primary_height(100)
+        sst.update_standby_height(95)
+        assert not sst.is_synced
+        assert sst.lag_blocks == 5
+
+    def test_to_dict_returns_all_fields(self):
+        sst = StateSyncTracker()
+        sst.update_primary_height(100)
+        sst.update_standby_height(98)
+        d = sst.to_dict()
+        assert d["primary_height"] == 100
+        assert d["standby_height"] == 98
+        assert d["lag_blocks"] == 2
+        assert d["synced"] is True
+
+    def test_thread_safe_updates(self):
+        sst = StateSyncTracker()
+        import threading
+        def updater():
+            for i in range(100):
+                sst.update_primary_height(i)
+                sst.update_standby_height(i - 1)
+        threads = [threading.Thread(target=updater) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        # Should not crash — thread safety verified
+        assert sst.primary_height >= 0
+
+
+class TestStandbyManager:
+    """INV-FALLBACK-002: Hot standby failover."""
+
+    def test_starts_as_primary(self):
+        config = StandbyConfig(role=StandbyRole.PRIMARY, node_id="test-node")
+        sm = StandbyManager(config=config)
+        assert sm.role == StandbyRole.PRIMARY
+        assert sm.is_primary
+        assert not sm.is_standby
+
+    def test_starts_as_standby(self):
+        config = StandbyConfig(role=StandbyRole.STANDBY, node_id="test-node")
+        sm = StandbyManager(config=config)
+        assert sm.role == StandbyRole.STANDBY
+        assert sm.is_standby
+        assert not sm.is_primary
+
+    def test_promotions_starts_at_zero(self):
+        config = StandbyConfig(role=StandbyRole.PRIMARY, node_id="test-node")
+        sm = StandbyManager(config=config)
+        assert sm.promotions == 0
+
+    def test_sync_status_returns_dict(self):
+        config = StandbyConfig(role=StandbyRole.PRIMARY, node_id="test-node")
+        sm = StandbyManager(config=config)
+        status = sm.sync_status
+        assert isinstance(status, dict)
+        assert "primary_height" in status
+        assert "standby_height" in status
+
+    def test_status_returns_dict(self):
+        config = StandbyConfig(role=StandbyRole.PRIMARY, node_id="test-node")
+        sm = StandbyManager(config=config)
+        status = sm.status()
+        assert isinstance(status, dict)
+        assert "role" in status
+        assert "state" in status
+        assert "node_id" in status
+
+    def test_config_from_env(self):
+        import os
+        os.environ["X3_STANDBY_ROLE"] = "standby"
+        os.environ["X3_NODE_ID"] = "env-node"
+        config = StandbyConfig.from_env()
+        assert config.role == StandbyRole.STANDBY
+        assert config.node_id == "env-node"
+        # Cleanup
+        del os.environ["X3_STANDBY_ROLE"]
+        del os.environ["X3_NODE_ID"]
+
+    def test_generates_node_id_if_empty(self):
+        config = StandbyConfig(role=StandbyRole.PRIMARY)
+        sm = StandbyManager(config=config)
+        assert sm.status()["node_id"] != ""
+
+
+# ── Cluster Coordinator Tests ─────────────────────────────────
+
+from cross_chain_gpu_validator.resilience.cluster import (
+    ClusterCoordinator,
+    ClusterConfig,
+    ClusterRole,
+    ClusterState,
+    ClusterNode,
+)
+
+
+class TestClusterNode:
+    """Cluster node data type tests."""
+
+    def test_to_dict_returns_all_fields(self):
+        node = ClusterNode(
+            node_id="node-1",
+            region="us-east",
+            role=ClusterRole.LEADER,
+            rpc_endpoint="http://127.0.0.1:9933",
+            last_heartbeat=1000.0,
+            health_score=0.95,
+            block_height=100,
+            is_alive=True,
+            term=3,
+        )
+        d = node.to_dict()
+        assert d["node_id"] == "node-1"
+        assert d["region"] == "us-east"
+        assert d["role"] == "leader"
+        assert d["term"] == 3
+        assert d["is_alive"] is True
+
+
+class TestClusterConfig:
+    """Cluster config tests."""
+
+    def test_from_env(self):
+        import os
+        os.environ["X3_CLUSTER_ID"] = "test-cluster"
+        os.environ["X3_NODE_ID"] = "env-node"
+        os.environ["X3_REGION"] = "us-west"
+        os.environ["X3_CLUSTER_ROLE"] = "leader"
+        os.environ["X3_CLUSTER_PEERS"] = "peer1,peer2"
+        config = ClusterConfig.from_env()
+        assert config.cluster_id == "test-cluster"
+        assert config.node_id == "env-node"
+        assert config.region == "us-west"
+        assert config.role == ClusterRole.LEADER
+        assert "peer1" in config.peers
+        assert "peer2" in config.peers
+        # Cleanup
+        for key in ["X3_CLUSTER_ID", "X3_NODE_ID", "X3_REGION",
+                     "X3_CLUSTER_ROLE", "X3_CLUSTER_PEERS"]:
+            del os.environ[key]
+
+    def test_defaults(self):
+        config = ClusterConfig()
+        assert config.cluster_id == "x3-default"
+        assert config.region == "unknown"
+        assert config.role == ClusterRole.FOLLOWER
+        assert config.heartbeat_interval == 5.0
+        assert config.heartbeat_timeout == 30.0
+        assert config.election_timeout == 15.0
+        assert config.quorum_majority == 0.51
+
+
+class TestClusterCoordinator:
+    """INV-FALLBACK-003: Cluster leader election."""
+
+    def test_starts_with_configured_role(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        assert not cc.is_leader
+        assert cc.leader_id is None
+
+    def test_starts_as_leader_if_configured(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.LEADER,
+        )
+        cc = ClusterCoordinator(config=config)
+        assert cc.is_leader
+
+    def test_current_term_starts_at_zero(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        assert cc.current_term == 0
+
+    def test_node_count_reflects_registered_nodes(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        assert cc.node_count >= 1  # Self-registered
+
+    def test_register_peer_adds_node(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        cc.register_peer("node-2", "us-west", "http://127.0.0.1:9944")
+        assert cc.node_count >= 2
+
+    def test_register_peer_does_not_duplicate(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        cc.register_peer("node-2", "us-west", "http://127.0.0.1:9944")
+        cc.register_peer("node-2", "us-west", "http://127.0.0.1:9944")
+        # Should not duplicate
+        assert cc.node_count == 2  # self + 1 peer
+
+    def test_status_returns_dict(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        status = cc.status()
+        assert isinstance(status, dict)
+        assert "cluster_id" in status
+        assert "node_id" in status
+        assert "role" in status
+        assert "cluster_state" in status
+        assert "nodes" in status
+
+    def test_force_election_increments_term(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        old_term = cc.current_term
+        cc.force_election()
+        assert cc.current_term > old_term
+
+    def test_split_brain_detection_returns_list(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.LEADER,
+        )
+        cc = ClusterCoordinator(config=config)
+        leaders = cc.detect_split_brain()
+        assert isinstance(leaders, list)
+
+    def test_update_peer_heartbeat(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        cc.register_peer("node-2", "us-west", "http://127.0.0.1:9944")
+        cc.update_peer_heartbeat("node-2", "follower", 1, "node-1")
+        status = cc.status()
+        nodes = status["nodes"]
+        assert nodes["node-2"]["is_alive"] is True
+
+    def test_alive_count(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        assert cc.alive_count >= 1
+        assert cc.alive_count <= cc.node_count
+
+    def test_quorum_needed(self):
+        config = ClusterConfig(
+            cluster_id="test",
+            node_id="node-1",
+            role=ClusterRole.FOLLOWER,
+        )
+        cc = ClusterCoordinator(config=config)
+        status = cc.status()
+        assert status["quorum_needed"] >= 1
+        assert status["quorum_needed"] <= cc.node_count

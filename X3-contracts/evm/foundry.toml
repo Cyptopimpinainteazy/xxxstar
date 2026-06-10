@@ -13,7 +13,12 @@ verbosity = 2
 fuzz = { runs = 256 }
 invariant = { runs = 64, depth = 32, fail_on_revert = false }
 remappings = [
-    "forge-std/=../forge-std/src/",
+    "forge-std/=lib/forge-std/src/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+]
+
+fs_permissions = [
+    { access = "read", path = "../shared" },
 ]
 
 [profile.ci]

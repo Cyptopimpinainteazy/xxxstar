@@ -2375,3 +2375,332 @@ fn xvm_router_state_machine_legal_transitions_only() {
         "Failed is terminal: any further transition is illegal"
     );
 }
+
+// ── Property-based edge-case tests (5% gap) ───────────────────────────────
+//
+// These tests target validation paths that are rarely hit in the
+// happy-path test suite. Each test exercises a single boundary or
+// unusual input combination against the real `xvm_transfer` path
+// using a deterministic pseudo-random source (no `proptest` dep).
+
+// ── Tiny deterministic PRNG (xorshift64) ────────────────────────────────────
+
+struct XorShift(u64);
+
+impl XorShift {
+    fn new(seed: u64) -> Self {
+        Self(seed.max(1))
+    }
+    fn next_u64(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.0 = x;
+        x
+    }
+    fn next_range(&mut self, lo: u64, hi: u64) -> u64 {
+        let span = hi.saturating_sub(lo).max(1);
+        lo + (self.next_u64() % span)
+    }
+    fn next_bytes(&mut self, n: usize) -> Vec<u8> {
+        (0..n).map(|_| (self.next_u64() & 0xff) as u8).collect()
+    }
+}
+
+fn edge_asset_id(byte: u8) -> AssetId {
+    AssetId::from([byte; 32])
+}
+
+fn register_x3evm_route(
+    ext: &mut sp_io::TestExternalities,
+    asset: AssetId,
+    min: u128,
+    max: u128,
+    daily: u128,
+    pending: u32,
+) {
+    ext.execute_with(|| {
+        // The mock uses RootOrAny as RegistryOrigin, so any signed
+        // origin works for governance calls.
+        assert_ok!(Registry::register_asset(
+            RuntimeOrigin::signed(1),
+            b"XUSD".to_vec(),
+            b"XUSD Token".to_vec(),
+            6,
+            DomainId::X3Native,
+            0,
+            b"native".to_vec(),
+            SupplyPolicy::NativeMintBurn,
+        ));
+        assert_ok!(Registry::activate_asset(RuntimeOrigin::signed(1), asset));
+        assert_ok!(Registry::configure_route(
+            RuntimeOrigin::signed(1),
+            asset,
+            DomainId::X3Native,
+            DomainId::X3Evm,
+            RouteConfig {
+                enabled: true,
+                proof_tier: ProofTier::TrustedInternal,
+                limits: RouteLimits {
+                    min_amount: min,
+                    max_amount: max,
+                    daily_limit: daily,
+                    per_wallet_daily_limit: daily,
+                    pending_limit: pending,
+                },
+                fee_bps: 0,
+                expiry_blocks: 100,
+            },
+        ));
+    });
+}
+
+fn mint_supply(ext: &mut sp_io::TestExternalities, asset: AssetId, to: u64, amount: u128) {
+    ext.execute_with(|| {
+        pallet_x3_supply_ledger::Pallet::<Test>::mint_canonical(
+            RuntimeOrigin::signed(to),
+            asset,
+            DomainId::X3Native,
+            amount,
+            0u64,
+        )
+        .expect("mint_canonical should succeed in test");
+    });
+}
+
+// Self-loop is detected by the storage-layer route lookup (since
+// xvm_transfer is a 6-arg native-source API and cannot be a self-loop
+// in the same call: source is always X3Native, so for the loop we'd
+// need destination == X3Native). We assert that the second leg
+// (X3Native -> X3Native) is rejected by the route lookup.
+#[test]
+fn edge_native_to_native_rejected() {
+    let mut ext = new_test_ext();
+    let asset = edge_asset_id(1);
+    // Register only X3Native -> X3Evm; X3Native -> X3Native has no route.
+    register_x3evm_route(&mut ext, asset, 1, 1_000_000, 100_000_000, 10);
+    mint_supply(&mut ext, asset, 1, 1_000_000);
+
+    ext.execute_with(|| {
+        // The xvm_transfer extrinsic's destination = X3Native should
+        // fail because no X3Native -> X3Native route is registered.
+        // The error is `RouteClosed` (returned by the storage route
+        // lookup returning None).
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset,
+                DomainId::X3Native,
+                alice_native(),
+                100,
+                100,
+            ),
+            Error::<Test>::RouteClosed
+        );
+    });
+}
+
+// Zero amount is always rejected.
+#[test]
+fn edge_zero_amount_always_rejected() {
+    let mut ext = new_test_ext();
+    let asset = edge_asset_id(2);
+    register_x3evm_route(&mut ext, asset, 1, 1_000_000, 100_000_000, 10);
+    mint_supply(&mut ext, asset, 1, 1_000_000);
+
+    ext.execute_with(|| {
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset,
+                DomainId::X3Evm,
+                alice_evm(),
+                0,
+                100,
+            ),
+            Error::<Test>::AmountOutOfBounds
+        );
+    });
+}
+
+// Amount above max is rejected.
+#[test]
+fn edge_amount_above_max_rejected() {
+    let mut ext = new_test_ext();
+    let asset = edge_asset_id(3);
+    register_x3evm_route(&mut ext, asset, 1, 1_000, 100_000_000, 10);
+    mint_supply(&mut ext, asset, 1, 1_000_000);
+
+    ext.execute_with(|| {
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset,
+                DomainId::X3Evm,
+                alice_evm(),
+                1_001,
+                100,
+            ),
+            Error::<Test>::AmountOutOfBounds
+        );
+    });
+}
+
+// Amount below min is rejected.
+#[test]
+fn edge_amount_below_min_rejected() {
+    let mut ext = new_test_ext();
+    let asset = edge_asset_id(4);
+    register_x3evm_route(&mut ext, asset, 100, 1_000_000, 100_000_000, 10);
+    mint_supply(&mut ext, asset, 1, 1_000_000);
+
+    ext.execute_with(|| {
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset,
+                DomainId::X3Evm,
+                alice_evm(),
+                99,
+                100,
+            ),
+            Error::<Test>::AmountOutOfBounds
+        );
+    });
+}
+
+// Unknown asset is rejected.
+#[test]
+fn edge_unknown_asset_rejected() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                edge_asset_id(0xFF),
+                DomainId::X3Evm,
+                alice_evm(),
+                100,
+                100,
+            ),
+            Error::<Test>::UnknownAsset
+        );
+    });
+}
+
+// Expiry in the past is rejected.
+#[test]
+fn edge_expired_transfer_rejected() {
+    let mut ext = new_test_ext();
+    let asset = edge_asset_id(5);
+    register_x3evm_route(&mut ext, asset, 1, 1_000_000, 100_000_000, 10);
+    mint_supply(&mut ext, asset, 1, 1_000_000);
+
+    ext.execute_with(|| {
+        // Block is 1 in fresh ext; expiry 0 < 1 must be rejected.
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset,
+                DomainId::X3Evm,
+                alice_evm(),
+                100,
+                0,
+            ),
+            Error::<Test>::BadExpiry
+        );
+    });
+}
+
+// Randomized stress: 16 random (valid) transfers succeed.
+#[test]
+fn edge_randomized_valid_transfers_succeed() {
+    let mut ext = new_test_ext();
+    let asset = edge_asset_id(7);
+    register_x3evm_route(&mut ext, asset, 1, 1_000_000, 100_000_000, 1_000);
+    mint_supply(&mut ext, asset, 1, 100_000_000);
+
+    let mut rng = XorShift::new(0xDEADBEEF);
+    for i in 0..16u64 {
+        let amount: u128 = rng.next_range(1, 1_000_000);
+        let exp = 100u64 + (i % 10);
+        ext.execute_with(|| {
+            let r = Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset,
+                DomainId::X3Evm,
+                alice_evm(),
+                amount,
+                exp,
+            );
+            assert!(
+                r.is_ok(),
+                "transfer #{i} (amount={amount}, exp={exp}) failed: {:?}",
+                r
+            );
+        });
+    }
+}
+
+// Encoding roundtrip for X3TransferMessage.
+#[test]
+fn edge_transfer_message_encoding_roundtrip() {
+    use codec::Decode;
+    use x3_asset_kernel_types::X3TransferMessage;
+
+    let mut rng = XorShift::new(0x1234_5678);
+    for i in 0..16 {
+        let mut bytes_a = [0u8; 32];
+        for b in bytes_a.iter_mut() {
+            *b = (rng.next_u64() & 0xff) as u8;
+        }
+        let mut bytes_b = [0u8; 32];
+        for b in bytes_b.iter_mut() {
+            *b = (rng.next_u64() & 0xff) as u8;
+        }
+        let asset: AssetId = AssetId::from(bytes_a);
+        let sender = AccountBytes::X3Native(bytes_b);
+        let amount: u128 = rng.next_u64() as u128;
+        let now: u64 = rng.next_range(1, 1_000_000);
+
+        let msg: X3TransferMessage<u64> = X3TransferMessage {
+            version: 1,
+            asset_id: asset,
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender: sender.clone(),
+            recipient: sender.clone(),
+            amount,
+            nonce: 1,
+            created_at: now,
+            expires_at: now + 100,
+        };
+        let encoded = msg.encode();
+        let decoded =
+            X3TransferMessage::<u64>::decode(&mut &encoded[..]).expect("decode should succeed");
+        assert_eq!(decoded.asset_id, asset, "iter {i}");
+        assert_eq!(decoded.amount, amount, "iter {i}");
+        assert_eq!(decoded.sender, sender, "iter {i}");
+        assert_eq!(decoded.source_domain, DomainId::X3Native);
+        assert_eq!(decoded.destination_domain, DomainId::X3Evm);
+        assert_eq!(decoded.expires_at, now + 100, "iter {i}");
+    }
+}
+
+// Randomized PRNG: distribution of next_u64 is non-trivial.
+// Sanity: 1000 calls produce 1000 distinct values (overwhelmingly
+// likely for a 64-bit xorshift with non-degenerate seed).
+#[test]
+fn edge_xorshift_produces_distinct_values() {
+    let mut rng = XorShift::new(0xABCD_1234);
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..1000 {
+        seen.insert(rng.next_u64());
+    }
+    assert!(
+        seen.len() >= 999,
+        "xorshift must produce ~unique values; got {} distinct",
+        seen.len()
+    );
+}

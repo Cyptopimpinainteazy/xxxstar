@@ -97,6 +97,14 @@ pub mod pallet {
     #[pallet::getter(fn global_sequence)]
     pub type GlobalSequence<T: Config> = StorageValue<_, u64, ValueQuery>;
 
+    /// Per-block scheduler commitment (batch Merkle root).
+    ///
+    /// Set during `on_finalize` when a batch is sealed.  Used by the fraud-proof
+    /// pallet to verify scheduler commitment divergence claims.
+    #[pallet::storage]
+    #[pallet::getter(fn scheduler_commitment)]
+    pub type SchedulerCommitment<T: Config> = StorageMap<_, Blake2_128Concat, u32, H256, OptionQuery>;
+
     // ── Types ──────────────────────────────────────────────────────────────
 
     /// A single sequenced transaction.
@@ -202,6 +210,11 @@ pub mod pallet {
             };
 
             Batches::<T>::insert(batch_id, &batch);
+
+            // Store the Merkle root as the scheduler commitment for this block.
+            // The fraud-proof pallet uses this to verify scheduler commitment
+            // divergence claims.
+            SchedulerCommitment::<T>::insert(sealed_at, merkle_root);
 
             Self::deposit_event(Event::BatchFinalized {
                 batch_id,
@@ -324,4 +337,5 @@ pub mod pallet {
             PendingTxs::<T>::get().len() as u32
         }
     }
+
 }

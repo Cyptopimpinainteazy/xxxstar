@@ -2,43 +2,78 @@
 
 #############################################################################
 # X3_ATOMIC_STAR - Full Testnet Launch Orchestration
-# 
+#
 # This script launches a complete testnet with:
-# - 3 validators with Aura + GRANDPA consensus
-# - Indexer service for event capture  
+# - N validators with Aura + GRANDPA consensus
+# - Indexer service for event capture
 # - Settlement flow monitoring
 # - Health check system
 # - End-to-end settlement validation
 #
-# Usage: ./scripts/testnet-full-launch.sh [--validators N] [--clean]
+# Paths are derived from the repository root — no hardcoded developer paths.
+#
+# Usage:
+#   ./scripts/testnet-full-launch.sh [--validators N] [--clean]
+#
+# Environment variables:
+#   X3_NODE_BIN     — path to x3-chain-node binary (default: target/release/x3-chain-node)
+#   X3_CHAIN_SPEC   — path to chain spec JSON (default: chain-specs/x3-local3-current-raw.json)
+#   X3_BASE_PATH    — base data directory (default: /tmp/x3-testnet)
+#   X3_LOG_DIR      — log directory (default: /tmp/x3-testnet-logs)
+#   X3_SKIP_BUILD   — if set, skip the build step
 #############################################################################
 
 set -e
 
-# Color codes
+# ── Color codes ──────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
+# ── Derive paths from repository root ────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── Configuration (env-overridable) ──────────────────────────────────────────
 VALIDATORS=${1:-3}
-BINARY="/home/lojak/Desktop/X3_ATOMIC_STAR/target/release/x3-chain-node"
-CHAIN_SPEC="/home/lojak/Desktop/X3_ATOMIC_STAR/deployment/chain-specs/x3-testnet-raw.json"
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BASE_PATH="/tmp/x3-testnet"
-LOG_DIR="/tmp/x3-testnet-logs"
+BINARY="${X3_NODE_BIN:-$PROJECT_ROOT/target/release/x3-chain-node}"
+CHAIN_SPEC="${X3_CHAIN_SPEC:-$PROJECT_ROOT/chain-specs/x3-local3-current-raw.json}"
+BASE_PATH="${X3_BASE_PATH:-/tmp/x3-testnet}"
+LOG_DIR="${X3_LOG_DIR:-/tmp/x3-testnet-logs}"
+SKIP_BUILD="${X3_SKIP_BUILD:-}"
+
 PORT_BASE=30333
 RPC_PORT_BASE=9933
 METRICS_PORT_BASE=9616
 
-# Check if binary exists
+# ── Ensure binary exists ─────────────────────────────────────────────────────
 if [[ ! -f "$BINARY" ]]; then
-    echo -e "${RED}❌ Binary not found at $BINARY${NC}"
-    echo "   Please run: cargo build --release -p x3-chain-node"
-    exit 1
+    if [[ -z "$SKIP_BUILD" ]]; then
+        echo -e "${YELLOW}🔨 Building x3-chain-node (release)...${NC}"
+        cargo build --release -p x3-chain-node
+    else
+        echo -e "${RED}❌ Binary not found at $BINARY${NC}"
+        echo "   Build first: cargo build --release -p x3-chain-node"
+        echo "   Or set X3_NODE_BIN to an existing binary."
+        exit 1
+    fi
+fi
+
+# Ensure chain spec exists
+if [[ ! -f "$CHAIN_SPEC" ]]; then
+    echo -e "${YELLOW}⚠️  Chain spec not found at $CHAIN_SPEC${NC}"
+    echo "   Looking for alternatives in $PROJECT_ROOT/chain-specs/..."
+    # Fall back to any raw JSON spec in chain-specs/
+    ALT_SPEC=$(ls "$PROJECT_ROOT/chain-specs/"*-raw.json 2>/dev/null | head -1)
+    if [[ -n "$ALT_SPEC" ]]; then
+        CHAIN_SPEC="$ALT_SPEC"
+        echo -e "${GREEN}   Using: $CHAIN_SPEC${NC}"
+    else
+        echo -e "${RED}❌ No chain spec found in $PROJECT_ROOT/chain-specs/${NC}"
+        exit 1
+    fi
 fi
 
 # Create directories
@@ -49,17 +84,22 @@ echo -e "${BLUE}🚀 X3_ATOMIC_STAR - Full Testnet Launch${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Function to cleanup on exit
+# ── Cleanup handler ─────────────────────────────────────────────────────────
 cleanup() {
     echo -e "${YELLOW}🛑 Shutting down testnet...${NC}"
-    pkill -f "x3-chain-node" || true
+    # Use the stop script if available, otherwise pkill
+    if [[ -f "$SCRIPT_DIR/stop-testnet.sh" ]]; then
+        bash "$SCRIPT_DIR/stop-testnet.sh"
+    else
+        pkill -f "x3-chain-node" || true
+    fi
     sleep 2
     echo -e "${GREEN}✅ Testnet stopped${NC}"
 }
 
 trap cleanup EXIT
 
-# Function to start a validator
+# ── Start a single validator ─────────────────────────────────────────────────
 start_validator() {
     local VAL_NUM=$1
     local PORT=$((PORT_BASE + VAL_NUM - 1))
@@ -67,12 +107,12 @@ start_validator() {
     local METRICS_PORT=$((METRICS_PORT_BASE + VAL_NUM - 1))
     local VAL_PATH="$BASE_PATH/validator$VAL_NUM"
     local LOG_FILE="$LOG_DIR/validator$VAL_NUM.log"
-    
+
     mkdir -p "$VAL_PATH"
-    
+
     echo -e "${BLUE}📍 Starting Validator $VAL_NUM...${NC}"
     echo "   Port: $PORT | RPC: $RPC_PORT | Metrics: $METRICS_PORT"
-    
+
     local ARGS=(
         "--chain" "$CHAIN_SPEC"
         "--validator"
@@ -84,10 +124,9 @@ start_validator() {
         "--prometheus-port" "$METRICS_PORT"
         "--tmp"
     )
-    
+
     # Add bootnode for validators after first one
     if [[ $VAL_NUM -gt 1 ]]; then
-        # Try to get peer ID from first validator's log (will be captured on startup)
         sleep 2
         local PEER_ID=$(grep "Local node identity is:" "$LOG_DIR/validator1.log" | tail -1 | grep -oP 'is: \K[^ ]+' || echo "")
         if [[ -n "$PEER_ID" ]]; then
@@ -96,55 +135,54 @@ start_validator() {
             )
         fi
     fi
-    
+
     # Start validator in background
     "$BINARY" "${ARGS[@]}" >> "$LOG_FILE" 2>&1 &
     local PID=$!
-    
+
     echo -e "${GREEN}✅ Validator $VAL_NUM started (PID: $PID)${NC}"
     echo "   Log: $LOG_FILE"
-    
+
     sleep 3
 }
 
-# Function to wait for finality
+# ── Wait for consensus finality ──────────────────────────────────────────────
 wait_for_finality() {
     echo -e "${BLUE}⏳ Waiting for consensus finality...${NC}"
-    
+
     local MAX_ATTEMPTS=30
     local ATTEMPT=0
-    
+
     while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
         local FINALIZED=$(curl -s http://127.0.0.1:9933 \
             -X POST \
             -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","method":"chain_getFinalizedHead","params":[],"id":1}' \
             2>/dev/null | grep -o '"result":"0x[a-f0-9]*"' || echo "")
-        
+
         if [[ -n "$FINALIZED" ]]; then
             echo -e "${GREEN}✅ Consensus reached, blocks finalizing${NC}"
             return 0
         fi
-        
+
         ATTEMPT=$((ATTEMPT + 1))
         echo "   Attempt $ATTEMPT/$MAX_ATTEMPTS..."
         sleep 2
     done
-    
+
     echo -e "${YELLOW}⚠️  Finality check timeout (may still be syncing)${NC}"
 }
 
-# Function to validate chain state
+# ── Validate chain state ─────────────────────────────────────────────────────
 validate_chain_state() {
     echo -e "${BLUE}🔍 Validating chain state...${NC}"
-    
-    # Check block production
+
     local BLOCK_HEIGHT=$(curl -s http://127.0.0.1:9933 \
         -X POST \
         -H "Content-Type: application/json" \
         -d '{"jsonrpc":"2.0","method":"chain_getBlockNumber","params":[],"id":1}' \
         2>/dev/null | grep -oP '"result":"0x[a-f0-9]*' | grep -oP '0x[a-f0-9]*')
-    
+
     if [[ -n "$BLOCK_HEIGHT" ]]; then
         echo -e "${GREEN}✅ Chain producing blocks: Height = $BLOCK_HEIGHT${NC}"
         return 0
@@ -154,16 +192,16 @@ validate_chain_state() {
     fi
 }
 
-# MAIN EXECUTION
+# ── Main execution ───────────────────────────────────────────────────────────
 
 echo -e "${YELLOW}📋 Configuration:${NC}"
 echo "   Validators: $VALIDATORS"
+echo "   Binary: $BINARY"
 echo "   Chain Spec: $CHAIN_SPEC"
 echo "   Base Path: $BASE_PATH"
 echo "   Log Dir: $LOG_DIR"
 echo ""
 
-# Start validators
 echo -e "${YELLOW}🎯 Phase 1: Validator Startup${NC}"
 for ((i=1; i<=VALIDATORS; i++)); do
     start_validator $i
@@ -193,23 +231,17 @@ echo -e "${YELLOW}📊 Monitoring:${NC}"
 echo "   Settlement: ./scripts/settlement-timeout-monitor.sh"
 echo "   GPU Health: ./scripts/gpu-health-monitor.sh"
 echo "   Consensus: ./scripts/peer-consensus-tracker.sh"
+echo "   Stop:       ./scripts/stop-testnet.sh"
 echo ""
 
 echo -e "${YELLOW}🔄 Live Logs:${NC}"
 echo "   tail -f $LOG_DIR/validator1.log"
 echo ""
 
-# Keep running — comprehensive health check loop.
-# Checks every 30 seconds:
-#   1. RPC responds (JSON-RPC system_health)
-#   2. Block production is advancing (best block increases)
-#   3. GRANDPA finality is advancing (finalized block increases)
-#   4. Peer count is adequate (≥ VALIDATORS-1 per node)
-
+# ── Health check loop ────────────────────────────────────────────────────────
 echo -e "${BLUE}ℹ️  Testnet running. Press Ctrl+C to stop.${NC}"
 echo ""
 
-# Capture initial block state for advance tracking
 declare -A PREV_BEST
 declare -A PREV_FINALIZED
 for ((i=1; i<=VALIDATORS; i++)); do
@@ -238,7 +270,7 @@ while true; do
             continue
         fi
 
-        # 2. Peer count — substrate system_peers
+        # 2. Peer count
         PEERS=$(curl -sf --max-time 5 "$ENDPOINT" \
             -H 'Content-Type: application/json' \
             -d '{"jsonrpc":"2.0","method":"system_peers","params":[],"id":1}' 2>/dev/null \

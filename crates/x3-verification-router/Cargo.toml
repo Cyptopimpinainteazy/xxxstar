@@ -10,3 +10,12 @@ name = "x3_verification_router"
 path = "src/lib.rs"
 
 [dependencies]
+# Hex/RLP/keccak primitives used by the EVM receipt proof verifier.
+# `no_std`-compatible and already present in the workspace lockfile.
+rlp = { version = "0.5", default-features = false }
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+# `scale-info` is already re-exported by the rest of the workspace.
+scale-info = { version = "2.5", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+hex-literal = "0.4"

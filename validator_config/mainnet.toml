@@ -7,13 +7,34 @@ telemetry_enabled = false
 rpc_port = 9933
 ws_port = 9944
 
+# X3 Atomic Star runs Aura (block production) + GRANDPA (finality gadget).
+# This is the actual consensus model the node binary uses.
 [consensus]
-algorithm = "proof-of-stake"
-finality_target = "session_end"
-max_validators = 256
+algorithm = "aura-grandpa"
+block_production = "Aura (round-robin slot-based)"
+finality_gadget = "GRANDPA (GHOST-based recursive ancestral derivation)"
+finality_class = "Immediate ancestor beyond GRANDPA round timeout"
+finality_constraints = "2f+1 of validators must sign the finality target"
+max_validators_per_session = 4
+
+# Build: the binary is built via `cargo build --release -p x3-chain-node`
+# Runtime WASM is embedded at compile time (not at genesis).
+# Runtime upgrades are enacted via governance (Council + Technical Committee).
+[build]
+artifact = "target/release/x3-chain-node"
+wasm_embedding = "compile-time (SKIP_WASM_BUILD must NOT be set for production)"
+runtime_upgrade_mechanism = "Governance-enacted set_code() via Council + Technical Committee"
 
 [security]
 enable_tls = true
 enable_rate_limiting = true
 enable_dos_protection = true
 max_connections = 1000
+
+# Operational references
+[references]
+genesis_ceremony_script = "scripts/mainnet/genesis_ceremony.sh"
+testnet_launch_script = "scripts/testnet-full-launch.sh"
+testnet_stop_script = "scripts/stop-testnet.sh"
+release_gate_script = "scripts/mainnet_release_gate.py"
+ci_workflow = ".github/workflows/mainnet-readiness.yml"

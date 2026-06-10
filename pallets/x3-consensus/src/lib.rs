@@ -83,7 +83,19 @@ pub mod pallet {
     pub type ConsensusState<T: Config> =
         StorageValue<_, ConsensusInfo<BlockNumberFor<T>>, ValueQuery>;
 
+    /// Per-block proposer (block author) tracking.
+    ///
+    /// Maps block number → account that produced the block.
+    /// Populated during `on_initialize` from the Aura slot assignment.
+    /// Used by the fraud-proof pallet's `ProposerQuery` to look up the
+    /// proposer of a disputed block.
+    #[pallet::storage]
+    #[pallet::getter(fn block_proposer)]
+    pub type BlockProposer<T: Config> =
+        StorageMap<_, Blake2_128Concat, BlockNumberFor<T>, T::AccountId, OptionQuery>;
+
     /// Events
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -281,12 +293,18 @@ pub mod pallet {
                 }
             }
 
+            // Record the block proposer for this block.
+            // The proposer is determined by the Aura slot assignment:
+            // authorities[slot % authorities.len()]
+            Self::record_block_proposer(n);
+
             // Update consensus state
             Self::update_consensus_state(n);
 
             <T as Config>::WeightInfo::on_initialize()
         }
     }
+
 
     impl<T: Config> Pallet<T> {
         /// Activate the next validator set
@@ -319,6 +337,22 @@ pub mod pallet {
             });
         }
 
+        /// Record the block proposer for the given block number.
+        ///
+        /// The proposer is determined by the Aura slot assignment:
+        /// `authorities[slot % authorities.len()]`.
+        fn record_block_proposer(block_number: BlockNumberFor<T>) {
+            let authorities = pallet_aura::Authorities::<T>::get();
+            if authorities.is_empty() {
+                return;
+            }
+            let slot = pallet_aura::CurrentSlot::<T>::get();
+            let idx = (slot.0 as usize) % authorities.len();
+            if let Some(authority) = authorities.get(idx) {
+                BlockProposer::<T>::insert(block_number, authority.clone());
+            }
+        }
+
         /// Get current validator set
         pub fn current_validators() -> Vec<T::AccountId> {
             Validators::<T>::get().into_inner()
@@ -328,6 +362,7 @@ pub mod pallet {
         pub fn is_validator(who: &T::AccountId) -> bool {
             Validators::<T>::get().contains(who)
         }
+
 
         /// Slash a validator by a dynamic perbill fraction.
         pub fn slash_validator(

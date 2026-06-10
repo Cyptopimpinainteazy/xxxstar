@@ -59,6 +59,7 @@ use pallet_x3_atomic_kernel;
 use pallet_x3_auction;
 use pallet_x3_compute_market;
 use pallet_x3_cross_vm_router;
+use pallet_x3_crosschain_gateway;
 use pallet_x3_custody;
 use pallet_x3_dapp_hub;
 use pallet_x3_invariants;
@@ -72,6 +73,8 @@ use pallet_x3_rebalance;
 use pallet_x3_reconciliation;
 use pallet_x3_reservation;
 use pallet_x3_settlement_engine;
+use pallet_x3_agent_registry;
+use pallet_x3_proof_carrying_agent;
 use pallet_x3_slash;
 use pallet_x3_solvency;
 use pallet_x3_supply_ledger;
@@ -432,6 +435,7 @@ construct_runtime!(
         X3AssetRegistry: pallet_x3_asset_registry,
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
         X3TokenFactory: pallet_x3_token_factory,
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
@@ -449,6 +453,8 @@ construct_runtime!(
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
         X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
@@ -504,6 +510,7 @@ construct_runtime!(
         X3AssetRegistry: pallet_x3_asset_registry,
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
         X3TokenFactory: pallet_x3_token_factory,
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
@@ -521,6 +528,8 @@ construct_runtime!(
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
         X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
@@ -580,6 +589,7 @@ construct_runtime!(
         X3AssetRegistry: pallet_x3_asset_registry,
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
         X3TokenFactory: pallet_x3_token_factory,
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
@@ -597,6 +607,8 @@ construct_runtime!(
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
         X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
@@ -653,6 +665,7 @@ construct_runtime!(
         X3AssetRegistry: pallet_x3_asset_registry,
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
         X3AtomicKernel: pallet_x3_atomic_kernel,
         X3SettlementEngine: pallet_x3_settlement_engine,
         SvmRuntime: pallet_svm_runtime,
@@ -664,6 +677,8 @@ construct_runtime!(
         FraudProofs: crate::fraud_proofs::pallet::pallet,
         X3LpLocker: pallet_x3_lp_locker,
         X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
     }
 );
 
@@ -696,6 +711,7 @@ construct_runtime!(
         X3AssetRegistry: pallet_x3_asset_registry,
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
         X3AtomicKernel: pallet_x3_atomic_kernel,
         X3SettlementEngine: pallet_x3_settlement_engine,
         SvmRuntime: pallet_svm_runtime,
@@ -707,6 +723,8 @@ construct_runtime!(
         FraudProofs: crate::fraud_proofs::pallet::pallet,
         X3LpLocker: pallet_x3_lp_locker,
         X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
         // ── EVM stack ─────────────────────────────────────────────────────────
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
@@ -748,6 +766,7 @@ construct_runtime!(
         X3AssetRegistry: pallet_x3_asset_registry,
         X3SupplyLedger: pallet_x3_supply_ledger,
         X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
         X3TokenFactory: pallet_x3_token_factory,
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
@@ -765,6 +784,8 @@ construct_runtime!(
         X3Consensus: pallet_x3_consensus,
         X3AtomicKernel: pallet_x3_atomic_kernel,
         X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
         X3WalletPallet: pallet_x3_wallet_pallet,
         X3Inventory: pallet_x3_inventory,
         X3Reservation: pallet_x3_reservation,
@@ -2443,6 +2464,20 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type ProtocolTreasury = TreasuryAccountId;
 }
 
+// ===== X3 Crosschain Gateway Pallet Configuration =====
+parameter_types! {
+    /// 1-day rolling window expressed in 6-second blocks (~14400 blocks).
+    pub const X3CrosschainDailyWindow: u64 = 14_400;
+}
+
+impl pallet_x3_crosschain_gateway::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type GovernanceOrigin = pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
+    type RelayerOrigin = frame_system::EnsureSigned<AccountId>;
+    type OperationalOrigin = frame_system::EnsureSigned<AccountId>;
+    type DailyLimitWindowBlocks = X3CrosschainDailyWindow;
+}
+
 // ===== Swarm Pallet Configuration =====
 
 parameter_types! {
@@ -2475,6 +2510,21 @@ impl pallet_swarm::Config for Runtime {
     type MaxTasksPerContributor = MaxTasksPerContributor;
     type MaxJuryVoters = MaxJuryVoters;
     type WeightInfo = pallet_swarm::weights::SubstrateWeight<Runtime>;
+}
+
+// ===== Northern Swarm Pallet Configuration =====
+parameter_types! {
+    pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
+    pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~1 day at 200ms blocks
+    pub const NorthernSwarmMaxClaimedTasksPerExecutor: u32 = 10;
+}
+
+impl pallet_northern_swarm::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type MinExecutorStake = NorthernSwarmMinExecutorStake;
+    type DeregistrationCooldown = NorthernSwarmDeregistrationCooldown;
+    type MaxClaimedTasksPerExecutor = NorthernSwarmMaxClaimedTasksPerExecutor;
 }
 
 // ===== DePIN Marketplace Pallet Configuration =====
@@ -2548,7 +2598,29 @@ impl pallet_x3_sequencer::Config for Runtime {
     type BaseFee = SeqBaseFee;
 }
 
+// ── Fraud-proof trait implementations ─────────────────────────────────────────
+//
+// These wire the fraud-proof pallet's `SchedulerCommitmentQuery` and
+// `ProposerQuery` traits to the sequencer and consensus pallets respectively.
+
+use crate::fraud_proofs::types::{ProposerQuery, SchedulerCommitmentQuery};
+
+/// Reads the scheduler commitment from the sequencer pallet's per-block storage.
+impl SchedulerCommitmentQuery for Runtime {
+    fn get_scheduler_commitment(block_number: u32) -> Option<sp_core::H256> {
+        pallet_x3_sequencer::SchedulerCommitment::<Runtime>::get(block_number)
+    }
+}
+
+/// Reads the block proposer from the consensus pallet's per-block storage.
+impl ProposerQuery<AccountId> for Runtime {
+    fn get_proposer(block_number: u32) -> Option<AccountId> {
+        pallet_x3_consensus::BlockProposer::<Runtime>::get(block_number)
+    }
+}
+
 impl pallet_x3_da::Config for Runtime {
+
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxBlobSize = DaMaxBlobSize;
@@ -2620,6 +2692,65 @@ impl pallet_x3_slash::Config for Runtime {
     type ReputationDamageEnabled = SlashReputationDamageEnabled;
     type SlashRecipient = SlashTreasuryRecipient;
     type AccountingSpine = x3_accounting_events::NoOpSpine;
+}
+
+// ===== X3 Agent Registry Configuration =====
+parameter_types! {
+    pub const AgentRegistryMinBondAmount: u128 = 10_000_000_000_000; // 10 X3
+    pub const AgentRegistryFinalityWindow: u32 = 7200; // ~24h at 12s blocks
+    pub const AgentRegistryReputationThreshold: u64 = 50;
+    pub const AgentRegistryMaxTasksPerBlock: u32 = 50;
+    pub const AgentRegistryRateLimitMaxExtrinsicsPerEpoch: u32 = 1000;
+    pub const AgentRegistryReputationDamageEnabled: bool = true;
+}
+
+pub struct AgentRegistrySlashRecipient;
+impl Get<AccountId> for AgentRegistrySlashRecipient {
+    fn get() -> AccountId {
+        AccountId::new([0u8; 32])
+    }
+}
+
+impl pallet_x3_agent_registry::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type RegisterOrigin = EnsureRootOrHalfCouncil;
+    type AdminOrigin = EnsureRootOrHalfCouncil;
+    type MaxAgentsPerController = MaxAgentsPerController;
+    type RegistrationDeposit = RegistrationDeposit;
+    type MinBondAmount = AgentRegistryMinBondAmount;
+    type FinalityWindow = AgentRegistryFinalityWindow;
+    type DefaultGasPerBlock = DefaultGasPerBlock;
+    type DefaultComputePerBlock = DefaultComputePerBlock;
+    type DefaultGasPerEpoch = DefaultGasPerEpoch;
+    type DefaultComputePerEpoch = DefaultComputePerEpoch;
+    type BlocksPerEpoch = BlocksPerEpoch;
+    type ReputationThreshold = AgentRegistryReputationThreshold;
+    type MaxTasksPerBlock = AgentRegistryMaxTasksPerBlock;
+    type RateLimitMaxExtrinsicsPerEpoch = AgentRegistryRateLimitMaxExtrinsicsPerEpoch;
+    type ReputationDamageEnabled = AgentRegistryReputationDamageEnabled;
+    type SlashRecipient = AgentRegistrySlashRecipient;
+    type AccountingSpine = x3_accounting_events::NoOpSpine;
+    type WeightInfo = pallet_x3_agent_registry::weights::SubstrateWeight<Runtime>;
+}
+
+// ===== X3 Proof-Carrying Agent Configuration =====
+parameter_types! {
+    pub const ProofCarryingMaxActionPayloadSize: u32 = 4096;
+    pub const ProofCarryingMaxProofPayloadSize: u32 = 8192;
+    pub const ProofCarryingMaxPendingProofsPerAgent: u32 = 50;
+    pub const ProofCarryingMaxActiveChallenges: u32 = 100;
+}
+
+impl pallet_x3_proof_carrying_agent::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type AdminOrigin = EnsureRootOrHalfCouncil;
+    type MaxActionPayloadSize = ProofCarryingMaxActionPayloadSize;
+    type MaxProofPayloadSize = ProofCarryingMaxProofPayloadSize;
+    type MaxPendingProofsPerAgent = ProofCarryingMaxPendingProofsPerAgent;
+    type MaxActiveChallenges = ProofCarryingMaxActiveChallenges;
+    type WeightInfo = pallet_x3_proof_carrying_agent::weights::SubstrateWeight<Runtime>;
 }
 
 // ===== X3 Wallet Pallet Configuration =====

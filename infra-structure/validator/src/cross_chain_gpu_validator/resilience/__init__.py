@@ -55,6 +55,28 @@ from cross_chain_gpu_validator.resilience.degraded import (
 from cross_chain_gpu_validator.resilience.orchestrator import (
     ResilientOrchestrator,
 )
+from cross_chain_gpu_validator.resilience.watchdog import (
+    Watchdog,
+    WatchdogState,
+    RestartReason,
+    RestartEvent,
+    HealthCheck,
+    MemoryMonitor,
+)
+from cross_chain_gpu_validator.resilience.standby import (
+    StandbyManager,
+    StandbyConfig,
+    StandbyRole,
+    StandbyState,
+    StateSyncTracker,
+)
+from cross_chain_gpu_validator.resilience.cluster import (
+    ClusterCoordinator,
+    ClusterConfig,
+    ClusterRole,
+    ClusterState,
+    ClusterNode,
+)
 
 __all__ = [
     # Health
@@ -81,4 +103,23 @@ __all__ = [
     "OperatingMode",
     # Integration
     "ResilientOrchestrator",
+    # Watchdog
+    "Watchdog",
+    "WatchdogState",
+    "RestartReason",
+    "RestartEvent",
+    "HealthCheck",
+    "MemoryMonitor",
+    # Standby
+    "StandbyManager",
+    "StandbyConfig",
+    "StandbyRole",
+    "StandbyState",
+    "StateSyncTracker",
+    # Cluster
+    "ClusterCoordinator",
+    "ClusterConfig",
+    "ClusterRole",
+    "ClusterState",
+    "ClusterNode",
 ]

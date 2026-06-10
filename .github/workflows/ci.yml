@@ -254,6 +254,71 @@ jobs:
       - name: cargo test atomic-kernel
         run: cargo test -p pallet-x3-atomic-kernel --all-features -- --nocapture
 
+  # ──── SECRET SCANNING — prevent key material in repo ──────────────────
+  secret-scan:
+    name: "gate: secret scanning"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install trufflehog
+        run: |
+          curl -sSfL https://github.com/trufflesecurity/trufflehog/releases/download/v3.82.2/trufflehog_3.82.2_linux_amd64.tar.gz | tar xz -C /usr/local/bin trufflehog
+
+      - name: Scan for secrets
+        run: |
+          trufflehog filesystem --no-verification . 2>&1 | tee trufflehog-output.txt || true
+          if grep -q "Secret" trufflehog-output.txt 2>/dev/null; then
+            echo "❌ SECRETS DETECTED"
+            cat trufflehog-output.txt
+            exit 1
+          fi
+          echo "✅ No secrets detected"
+
+      - name: Verify key files are placeholders only
+        run: |
+          if grep -q "REPLACED_RUN_KEY_ROTATION_SCRIPT\|REPLACE_ME" deployment/keys/bootnode-keys.json deployment/keys/bootnode-node-key; then
+            echo "✅ Key files are placeholders only"
+          else
+            echo "❌ Key files may contain real material — check deployment/keys/"
+            exit 1
+          fi
+
+  # ──── CARGO AUDIT — dependency vulnerability check ──────────────────
+  cargo-audit:
+    name: "gate: cargo audit"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked -q
+
+      - name: Run cargo audit
+        run: cargo audit
+
+  # ──── CARGO DENY — license + ban check ────────────────────────────
+  cargo-deny:
+    name: "gate: cargo deny"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify deny.toml exists
+        run: test -f deny.toml && echo "✅ deny.toml exists"
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked -q
+
+      - name: Run cargo deny check
+        run: cargo deny check
+
   # ──────────────────────────────────────────────────────────────────────────
   # 8. CLIPPY — deny all warnings across full workspace
   # ──────────────────────────────────────────────────────────────────────────
@@ -560,6 +625,9 @@ jobs:
       - test-wallet
       - test-northern-swarm
       - test-lp-locker
+      - secret-scan
+      - cargo-audit
+      - cargo-deny
       - clippy
       - binary
     if: always()
@@ -584,6 +652,9 @@ jobs:
           echo "  ✅ test-wallet (account abstraction)"
           echo "  ✅ test-northern-swarm (swarm registry)"
           echo "  ✅ test-lp-locker (anti-rug LP lock)"
+          echo "  ✅ secret-scan (trufflehog + placeholder verification)"
+          echo "  ✅ cargo-audit (dependency vulnerability check)"
+          echo "  ✅ cargo-deny (license + ban + advisory)"
           echo "  ✅ clippy (workspace, deny warnings)"
           echo "  ✅ binary (release build x3-chain-node)"
 
@@ -593,7 +664,8 @@ jobs:
           for gate in test-dex test-launchpad test-token-factory test-dapp-hub \
                       test-auction test-wallet test-northern-swarm test-lp-locker \
                       format check-runtime check-node test-router test-ledger \
-                      test-settle test-kernel clippy binary; do
+                      test-settle test-kernel secret-scan cargo-audit cargo-deny \
+                      clippy binary; do
             if [ "${{ needs.${gate}.result }}" != "success" ]; then
               FAILED="${FAILED} ${gate}"
             fi

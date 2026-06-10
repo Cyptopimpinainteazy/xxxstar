@@ -1,0 +1,39 @@
+[Unit]
+Description=X3 Bootnode
+Documentation=https://github.com/Cyptopimpinainteazy/xxxstar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=x3
+Group=x3
+
+# Bootnodes run with --no-telemetry and --no-prometheus by design.
+# They are network-entry points — no RPC, no telemetry link-back.
+ExecStart=/usr/local/bin/x3-chain-node \
+  --chain /etc/x3/chain-spec.json \
+  --base-path /var/lib/x3-bootnode \
+  --name "x3-bootnode-$(hostname -s)" \
+  --port 30333 \
+  --no-telemetry \
+  --no-prometheus \
+  --log warn
+
+Restart=always
+RestartSec=10
+LimitNOFILE=1048576
+LimitNPROC=65536
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/x3-bootnode /var/log/x3
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

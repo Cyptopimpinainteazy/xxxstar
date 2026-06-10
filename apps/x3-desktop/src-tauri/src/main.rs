@@ -5,6 +5,9 @@ mod crm;
 mod admin_commands;
 mod wallet;
 mod wallet_core;
+mod combat_arena;
+mod chain_rpc;
+mod foundry;
 
 use chrono::Utc;
 use rand::Rng;
@@ -1222,11 +1225,29 @@ fn get_app_registry() -> Result<Vec<Application>, IpcError> {
 
 fn main() {
   let telemetry_state = TelemetryState::new();
+  let arena_state = combat_arena::CombatArenaState::new();
 
   Builder::default()
     .manage(telemetry_state.clone())
     .manage(SubstrateState::new())
+    .manage(arena_state)
+    .manage(foundry::FoundryState::new())
     .invoke_handler(generate_handler![
+      get_app_registry,
+      // ── Combat Arena ──
+      combat_arena::get_arena_agents,
+      combat_arena::get_arena_blocks,
+      combat_arena::start_arena_ai,
+      combat_arena::stop_arena_ai,
+      combat_arena::get_arena_status,
+      combat_arena::connect_chain,
+      combat_arena::disconnect_chain,
+      combat_arena::fetch_chain_status,
+      combat_arena::fetch_blocks,
+      combat_arena::fetch_mempool,
+      combat_arena::sign_and_send_tx,
+      combat_arena::get_balance,
+      // ── Existing Commands ──
       get_app_registry,
       launch_swarm_health,
       launch_network_control,
@@ -1396,6 +1417,18 @@ fn main() {
       wallet::submit_extrinsic,
       wallet::get_connection_status,
       wallet::clear_chain_cache,
+      // ── X3 Foundry (AI dApp Factory) ──
+      foundry::foundry_generate,
+      foundry::foundry_audit,
+      foundry::foundry_simulate,
+      foundry::foundry_deploy,
+      foundry::foundry_list_projects,
+      foundry::foundry_get_project,
+      foundry::foundry_delete_project,
+      foundry::foundry_create_listing,
+      foundry::foundry_list_listings,
+      foundry::foundry_revenue_summary,
+      foundry::foundry_list_templates,
       ])
     .setup(move |app| {
       // Initialize social database

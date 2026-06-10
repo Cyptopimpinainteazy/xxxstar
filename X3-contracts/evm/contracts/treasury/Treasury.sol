@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../contracts/AtlasSphereX3.sol";
+import "../AtlasSphereX3.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Treasury is Ownable {
