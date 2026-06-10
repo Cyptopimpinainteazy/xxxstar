@@ -134,7 +134,10 @@ Features disabled at RC-1 (require governance + audit to enable):
 
 ## Documentation
 
-- [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) — honest status report
+- [LAUNCH_SCOPE.md](./LAUNCH_SCOPE.md) — **single authoritative scope statement** (start here)
+- [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) — detailed subsystem scoreboard
 - [MAINNET_LAUNCH_CHECKLIST.md](./MAINNET_LAUNCH_CHECKLIST.md) — binary pass/fail gate tracker
 - [docs/X3_DEPLOYMENT_POLICY.md](./docs/X3_DEPLOYMENT_POLICY.md) — full node deployment policy and guide
-- [MAINNET_RC1_SCOPE.md](./MAINNET_RC1_SCOPE.md) — what is and is not in RC-1
+- [MAINNET_RC1_SCOPE.md](./MAINNET_RC1_SCOPE.md) — what is and is not in RC-1 (superseded by LAUNCH_SCOPE.md)
+- [docs/STAGING_TESTNET_SETUP.md](./docs/STAGING_TESTNET_SETUP.md) — 5-7 validator staging testnet guide
+- [scripts/create-rc1-release.sh](./scripts/create-rc1-release.sh) — one-command RC-1 release creation
