@@ -40,7 +40,6 @@ mainnet-rc1 = [
     "packet-standard",
     "liquidity-core",
     "kernel-invariants",
-    "external-gateway",
 ]
 
 # Internal modules that form the RC-1 critical path.

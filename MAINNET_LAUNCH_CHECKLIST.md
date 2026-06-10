@@ -18,14 +18,15 @@ All items must be green before public testnet.
 
 | # | Item | Status | Verified By |
 |---|---|---|---|
-| 1.1 | CI secret scanning gate | ⬜ TODO | `trufflehog` or `git-secrets` in CI |
+| 1.1 | CI secret scanning gate | ✅ DONE | TruffleHog + placeholder check in full-ci.yml |
 | 1.2 | Create signed GitHub release tag | ⬜ TODO | `gh release create v0.4.0-rc.1` |
-| 1.3 | Add artifact attestation + SBOM | ⬜ TODO | GitHub attestations + `cargo cyclonedx` |
-| 1.4 | Zombienet CI tests (3-node smoke) | ⬜ TODO | CI runs block production + finality tests |
-| 1.5 | try-runtime upgrade pipeline | ⬜ TODO | CI dry-runs runtime upgrade |
-| 1.6 | FRAME benchmarking CI | ⬜ TODO | CI generates + validates weights |
-| 1.7 | Multi-node staging testnet (5-7 nodes) | ⬜ TODO | Separate infra, regular tests |
-| 1.8 | Indexer + PostgreSQL deployment | ⬜ TODO | Health checks passing, block ingestion |
+| 1.3 | Artifact attestation + SBOM pipeline | ✅ DONE | release-provenance.yml + release-hardening.yml |
+| 1.4 | Zombienet CI tests (3-node smoke) | ✅ DONE | zombienet-integration.yml with 4-validator smoke |
+| 1.5 | try-runtime upgrade pipeline | ✅ DONE | try-runtime-upgrade.yml + release-candidate-rehearsal.yml |
+| 1.6 | CodeQL + Semgrep SAST gates | ✅ DONE | release-hardening.yml with CodeQL + Semgrep + SBOM |
+| 1.7 | FRAME benchmarking CI | ⬜ TODO | CI generates + validates weights |
+| 1.8 | Multi-node staging testnet (5-7 nodes) | ⬜ TODO | Separate infra, regular tests |
+| 1.9 | Indexer + PostgreSQL deployment | ⬜ TODO | Health checks passing, block ingestion |
 
 ## Phase 2 — Public Testnet Alpha
 

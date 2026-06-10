@@ -1,77 +1,141 @@
 # X3 Atomic Star — Code Ownership
+#
+# CRITICAL POLICY: Every domain requires at least TWO owners (primary + backup).
+# Single-ownership review model is not acceptable for staged-public-network operations.
+# All PRs require approval from at least one owner in the relevant domain.
+# Runtime, contracts, infrastructure, and security changes require at least TWO
+# reviewers from distinct domains.
 
-# Kernel & Foundation Layer
-pallets/x3-kernel/ @lojak
-pallets/atomic-trade-engine/ @lojak
-pallets/x3-settlement-engine/ @lojak
-crates/x3-common/ @lojak
+# =============================================================================
+# KERNEL & FOUNDATION LAYER — requires 2 reviewers for all changes
+# =============================================================================
+pallets/x3-kernel/ @lojak @x3-runtime-core
+pallets/atomic-trade-engine/ @lojak @x3-runtime-core
+pallets/x3-settlement-engine/ @lojak @x3-runtime-core
+crates/x3-common/ @lojak @x3-runtime-core
 
-# Runtime & Node
-runtime/ @lojak
-node/ @lojak
+# =============================================================================
+# RUNTIME & NODE — requires 2 reviewers
+# =============================================================================
+runtime/ @lojak @x3-runtime-core
+node/ @lojak @x3-runtime-core
 
-# VM Integration (EVM/SVM)
-crates/evm-integration/ @lojak
-crates/svm-integration/ @lojak
-crates/svm-counter/ @lojak
+# =============================================================================
+# VM INTEGRATION (EVM/SVM)
+# =============================================================================
+crates/evm-integration/ @lojak @x3-smart-contracts
+crates/svm-integration/ @lojak @x3-smart-contracts
+crates/svm-counter/ @lojak @x3-smart-contracts
 
-# Cross-VM & Bridge
-crates/cross-vm-bridge/ @lojak
-crates/external-chains/ @lojak
-crates/x3-bridge/ @lojak
+# =============================================================================
+# CROSS-VM & BRIDGE — requires 2 reviewers
+# =============================================================================
+crates/cross-vm-bridge/ @lojak @x3-bridge-core
+crates/external-chains/ @lojak @x3-bridge-core
+crates/x3-bridge/ @lojak @x3-bridge-core
 
-# Atomic Trading Engine
-crates/x3-atomic-trade/ @lojak
-pallets/atomic-trade-engine/ @lojak
+# =============================================================================
+# ATOMIC TRADING ENGINE
+# =============================================================================
+crates/x3-atomic-trade/ @lojak @x3-runtime-core
+pallets/atomic-trade-engine/ @lojak @x3-runtime-core
 
+# =============================================================================
 # SDK & CLI
-crates/x3-sdk/ @lojak
-crates/x3-cli/ @lojak
-crates/x3-wallet/ @lojak
+# =============================================================================
+crates/x3-sdk/ @lojak @x3-tooling
+crates/x3-cli/ @lojak @x3-tooling
+crates/x3-wallet/ @lojak @x3-tooling
 
-# Indexing & Gateway
-crates/x3-indexer/ @lojak
-crates/x3-gateway/ @lojak
+# =============================================================================
+# INDEXING & GATEWAY
+# =============================================================================
+crates/x3-indexer/ @lojak @x3-infrastructure
+crates/x3-gateway/ @lojak @x3-infrastructure
 
-# Language & Compilation
-crates/x3-lexer/ @lojak
-crates/x3-ast/ @lojak
-crates/x3-parser/ @lojak
-crates/x3-hir/ @lojak
-crates/x3-mir/ @lojak
-crates/x3-semantics/ @lojak
+# =============================================================================
+# LANGUAGE & COMPILATION — experimental path
+# =============================================================================
+crates/x3-lexer/ @lojak @x3-compiler-core
+crates/x3-ast/ @lojak @x3-compiler-core
+crates/x3-parser/ @lojak @x3-compiler-core
+crates/x3-hir/ @lojak @x3-compiler-core
+crates/x3-mir/ @lojak @x3-compiler-core
+crates/x3-semantics/ @lojak @x3-compiler-core
 
-# Advanced Features (GPU, Quantum)
-crates/x3-gpu-validator-swarm/ @lojak
-crates/quantum-crypto/ @lojak
-crates/quantum-swarm/ @lojak
+# =============================================================================
+# SMART CONTRACTS (EVM Foundry + SVM Anchor)
+# =============================================================================
+X3-contracts/ @lojak @x3-smart-contracts
+X3-contracts/evm/ @lojak @x3-smart-contracts
+X3-contracts/svm/ @lojak @x3-smart-contracts
+X3-contracts/shared/ @lojak @x3-smart-contracts
 
-# Experimental/Next-Gen
-pallets/agent-accounts/ @lojak
-pallets/agent-memory/ @lojak
-pallets/evolution-core/ @lojak
-pallets/meme-overlord/ @lojak
-pallets/swarm/ @lojak
-crates/voice-to-x3/ @lojak
-crates/dream-mining/ @lojak
+# =============================================================================
+# ADVANCED FEATURES (GPU, Quantum)
+# =============================================================================
+crates/x3-gpu-validator-swarm/ @lojak @x3-infrastructure
+crates/quantum-crypto/ @lojak @x3-research
+crates/quantum-swarm/ @lojak @x3-research
 
-# Performance & Monitoring
-crates/chronos-flash/ @lojak
-crates/tps-tracker/ @lojak
-crates/x3-integration/ @lojak
+# =============================================================================
+# EXPERIMENTAL / NEXT-GEN
+# =============================================================================
+pallets/agent-accounts/ @lojak @x3-research
+pallets/agent-memory/ @lojak @x3-research
+pallets/evolution-core/ @lojak @x3-research
+pallets/meme-overlord/ @lojak @x3-research
+pallets/swarm/ @lojak @x3-research
+crates/voice-to-x3/ @lojak @x3-research
+crates/dream-mining/ @lojak @x3-research
 
-# Testing & Governance
-pallets/governance/ @lojak
-pallets/treasury/ @lojak
-pallets/x3-verifier/ @lojak
-pallets/x3-domain-registry/ @lojak
-pallets/svm-runtime/ @lojak
+# =============================================================================
+# PERFORMANCE & MONITORING
+# =============================================================================
+crates/chronos-flash/ @lojak @x3-infrastructure
+crates/tps-tracker/ @lojak @x3-infrastructure
+crates/x3-integration/ @lojak @x3-infrastructure
 
-# CI/CD & Infrastructure
-.github/ @lojak
-Dockerfile* @lojak
-Makefile @lojak
+# =============================================================================
+# TESTING & GOVERNANCE
+# =============================================================================
+pallets/governance/ @lojak @x3-runtime-core
+pallets/treasury/ @lojak @x3-runtime-core
+pallets/x3-verifier/ @lojak @x3-security
+pallets/x3-domain-registry/ @lojak @x3-runtime-core
+pallets/svm-runtime/ @lojak @x3-runtime-core
 
-# Documentation
-*.md @lojak
-docs/ @lojak
+# =============================================================================
+# CI/CD & INFRASTRUCTURE
+# =============================================================================
+.github/ @lojak @x3-infrastructure
+.github/workflows/ @lojak @x3-infrastructure @x3-security
+Dockerfile* @lojak @x3-infrastructure
+Makefile @lojak @x3-infrastructure
+
+# =============================================================================
+# SECURITY-SENSITIVE FILES — requires 2 reviewers
+# =============================================================================
+deny.toml @lojak @x3-security
+SECURITY.md @lojak @x3-security
+LAUNCH_SCOPE.md @lojak @x3-security
+scripts/mainnet_release_gate.py @lojak @x3-security @x3-infrastructure
+validator_config/ @lojak @x3-infrastructure @x3-security
+packaging/ @lojak @x3-infrastructure
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+*.md @lojak @x3-docs
+docs/ @lojak @x3-docs
+CURRENT_MAINNET_STATUS.md @lojak @x3-docs @x3-security
+LAUNCH_SCOPE.md @lojak @x3-docs @x3-security
+
+# =============================================================================
+# DEPLOYMENT & OPERATIONS
+# =============================================================================
+deployment/ @lojak @x3-infrastructure
+chain-specs/ @lojak @x3-runtime-core
+scripts/ @lojak @x3-infrastructure
+monitoring/ @lojak @x3-infrastructure
+k8s/ @lojak @x3-infrastructure

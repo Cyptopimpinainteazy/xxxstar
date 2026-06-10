@@ -58,6 +58,12 @@ compile_error!(
      `mainnet-rc1` is enabled. It is feature-gated for post-RC-1 audit."
 );
 
+#[cfg(all(feature = "mainnet-rc1", feature = "external-gateway"))]
+compile_error!(
+    "MAINNET SCOPE VIOLATION: `external-gateway` must not be active when \
+     `mainnet-rc1` is enabled. External bridge gateway is gated for post-RC-1 audit."
+);
+
 #[cfg(all(feature = "mainnet-rc1", feature = "appzone-factory"))]
 compile_error!(
     "MAINNET SCOPE VIOLATION: `appzone-factory` must not be active when \

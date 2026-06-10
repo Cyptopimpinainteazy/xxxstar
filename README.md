@@ -3,7 +3,8 @@
 A Substrate-based blockchain with native cross-VM execution across X3Native, X3Evm, and X3Svm domains.
 
 > **Current Status:** v0.4 Internal Testnet Candidate
-> See [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) for an accurate, honest assessment.
+> ⚠️ **IMPORTANT:** See [LAUNCH_SCOPE.md](./LAUNCH_SCOPE.md) for the **single authoritative** scope statement. This supersedes all other status documents.
+> See [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) for the detailed subsystem scoreboard.
 > 
 > > **x3-lang status:** The X3 language (`x3-lang/`) is in **MVP status** — the Python/pipeline track under `x3-lang/` is the **current authoritative implementation**. The Rust compiler work in `crates/x3-compiler` is experimental and not production-ready.
 
@@ -135,5 +136,5 @@ Features disabled at RC-1 (require governance + audit to enable):
 
 - [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) — honest status report
 - [MAINNET_LAUNCH_CHECKLIST.md](./MAINNET_LAUNCH_CHECKLIST.md) — binary pass/fail gate tracker
-- [docs/deployment/X3_NODE_DEPLOYMENT.md](./docs/deployment/X3_NODE_DEPLOYMENT.md) — full node deployment guide
+- [docs/X3_DEPLOYMENT_POLICY.md](./docs/X3_DEPLOYMENT_POLICY.md) — full node deployment policy and guide
 - [MAINNET_RC1_SCOPE.md](./MAINNET_RC1_SCOPE.md) — what is and is not in RC-1
