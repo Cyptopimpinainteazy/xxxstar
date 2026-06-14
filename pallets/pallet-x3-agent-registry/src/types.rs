@@ -15,7 +15,17 @@ pub type AgentId = u32;
 
 /// Agent lifecycle status.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
 )]
 pub enum AgentStatus {
     /// Agent is active and can operate.
@@ -58,7 +68,17 @@ pub struct AgentRecord<AccountId, Balance, BlockNumber> {
 
 /// Classification of an agent account.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
 )]
 pub enum AgentKind {
     /// Standard AI agent.
@@ -80,7 +100,16 @@ pub enum AgentKind {
 
 /// Agent quota limits.
 #[derive(
-    Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    Default,
 )]
 pub struct AgentQuota<BlockNumber: Default> {
     /// Maximum gas per block.
@@ -135,7 +164,16 @@ impl Default for AgentPermissions {
 
 /// Permission type for checking.
 #[derive(
-    Clone, Copy, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
 )]
 pub enum PermissionType {
     Deploy,
@@ -186,7 +224,16 @@ pub struct AgentBond<AccountId, Balance> {
 
 /// Bond lifecycle status.
 #[derive(
-    Clone, Copy, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, PartialEq, Eq,
+    Clone,
+    Copy,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
+    Debug,
+    PartialEq,
+    Eq,
 )]
 pub enum BondStatus {
     /// Bond is active and locked.
@@ -221,9 +268,7 @@ pub struct SlashRecord<AccountId> {
 }
 
 /// Policy rules governing agent behavior.
-#[derive(
-    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub enum PolicyRule<AccountId> {
     /// Agent can only execute these capabilities.
     CapabilityAllowed(Vec<Vec<u8>>),
@@ -246,10 +291,13 @@ impl<AccountId: MaxEncodedLen> MaxEncodedLen for PolicyRule<AccountId> {
         // CapabilityAllowed: Vec<Vec<u8>> — 32 caps × (1+64) bytes each
         // NoCollusionWith: Vec<AccountId> — 32 × AccountId::max_encoded_len()
         // Others: fixed-size primitives
-        let cap_allowed = 1 + <u64 as MaxEncodedLen>::max_encoded_len() + 32 * (1 + <u64 as MaxEncodedLen>::max_encoded_len());
+        let cap_allowed = 1
+            + <u64 as MaxEncodedLen>::max_encoded_len()
+            + 32 * (1 + <u64 as MaxEncodedLen>::max_encoded_len());
         let rep_min = 1 + <u64 as MaxEncodedLen>::max_encoded_len();
         let max_tasks = 1 + <u32 as MaxEncodedLen>::max_encoded_len();
-        let no_collusion = 1 + <u64 as MaxEncodedLen>::max_encoded_len() + 32 * AccountId::max_encoded_len();
+        let no_collusion =
+            1 + <u64 as MaxEncodedLen>::max_encoded_len() + 32 * AccountId::max_encoded_len();
         let rate_limit = 1 + <u32 as MaxEncodedLen>::max_encoded_len();
         cap_allowed
             .max(rep_min)
@@ -260,7 +308,9 @@ impl<AccountId: MaxEncodedLen> MaxEncodedLen for PolicyRule<AccountId> {
 }
 
 /// Slashing reasons.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 pub enum SlashingReason {
     InvalidProof,
     TaskGriefing,
@@ -271,7 +321,9 @@ pub enum SlashingReason {
 }
 
 /// Violation type for policy enforcement events.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 pub enum ViolationType {
     CapabilityViolation,
     ReputationViolation,
@@ -283,7 +335,9 @@ pub enum ViolationType {
 }
 
 /// Action type for agent action events.
-#[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+)]
 pub enum ActionType {
     DeployContract,
     ExecuteTrade,
@@ -359,7 +413,9 @@ pub struct AgentStats {
 }
 
 /// Reward configuration for proof verification.
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default)]
+#[derive(
+    Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, Debug, Default,
+)]
 pub struct ProofRewardConfig<Balance> {
     /// Base reward for submitting a proof.
     pub base_reward: Balance,

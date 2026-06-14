@@ -30,7 +30,13 @@ mod benchmarks {
         T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
 
         #[extrinsic_call]
-        _(RawOrigin::Signed(caller.clone()), operator, name, metadata, AgentKind::AutonomousAgent);
+        _(
+            RawOrigin::Signed(caller.clone()),
+            operator,
+            name,
+            metadata,
+            AgentKind::AutonomousAgent,
+        );
     }
 
     #[benchmark]
@@ -122,7 +128,14 @@ mod benchmarks {
         ));
 
         #[extrinsic_call]
-        _(RawOrigin::Root, 0, 2_000_000u128, 1_000_000u128, 200_000_000u128, 100_000_000u128);
+        _(
+            RawOrigin::Root,
+            0,
+            2_000_000u128,
+            1_000_000u128,
+            200_000_000u128,
+            100_000_000u128,
+        );
     }
 
     #[benchmark]
@@ -367,5 +380,9 @@ mod benchmarks {
         _(RawOrigin::Signed(caller), 0, ActionType::ExecuteTrade, data);
     }
 
-    impl_benchmark_test_suite!(AgentRegistry, crate::mock::new_test_ext(), crate::mock::Test);
+    impl_benchmark_test_suite!(
+        AgentRegistry,
+        crate::mock::new_test_ext(),
+        crate::mock::Test
+    );
 }

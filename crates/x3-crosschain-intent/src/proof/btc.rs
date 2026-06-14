@@ -59,7 +59,7 @@ impl BtcBlockHeader {
 
         // SHA-256d: SHA-256(SHA-256(data))
         let hash1 = Sha256::digest(&data);
-        let hash2 = Sha256::digest(&hash1);
+        let hash2 = Sha256::digest(hash1);
 
         let mut result = [0u8; 32];
         result.copy_from_slice(&hash2);
@@ -177,7 +177,7 @@ fn serialize_header(header: &BtcBlockHeader) -> Vec<u8> {
 fn sha256d(data: &[u8]) -> [u8; 32] {
     use sha2::{Digest, Sha256};
     let hash1 = Sha256::digest(data);
-    let hash2 = Sha256::digest(&hash1);
+    let hash2 = Sha256::digest(hash1);
     let mut result = [0u8; 32];
     result.copy_from_slice(&hash2);
     result
@@ -204,7 +204,7 @@ fn verify_merkle_proof(
     let mut idx = index;
 
     for sibling in merkle_proof {
-        let combined = if idx % 2 == 0 {
+        let combined = if idx.is_multiple_of(2) {
             // Current is left, sibling is right
             let mut data = Vec::with_capacity(64);
             data.extend_from_slice(&current);

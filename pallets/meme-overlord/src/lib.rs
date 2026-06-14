@@ -42,7 +42,6 @@
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
 
@@ -70,7 +69,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// Event type
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Weight information for extrinsics
         type WeightInfo: WeightInfo;

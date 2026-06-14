@@ -411,11 +411,7 @@ pub mod mock {
             .unwrap();
 
         pallet_balances::GenesisConfig::<Test> {
-            balances: vec![
-                (1u64, 1_000_000),
-                (2u64, 1_000_000),
-                (99u64, 1_000_000),
-            ],
+            balances: vec![(1u64, 1_000_000), (2u64, 1_000_000), (99u64, 1_000_000)],
         }
         .assimilate_storage(&mut t)
         .unwrap();
@@ -599,11 +595,7 @@ mod tests {
             );
 
             assert_noop!(
-                FraudProofs::submit_fraud_proof(
-                    RuntimeOrigin::signed(1u64),
-                    proof,
-                    disputed,
-                ),
+                FraudProofs::submit_fraud_proof(RuntimeOrigin::signed(1u64), proof, disputed,),
                 Error::<Test>::ProofNotFraudulent
             );
 
@@ -661,9 +653,7 @@ mod tests {
             assert!(FraudProofs::is_frozen());
 
             // Governance unfreeze
-            assert_ok!(FraudProofs::governance_unfreeze(
-                RuntimeOrigin::root(),
-            ));
+            assert_ok!(FraudProofs::governance_unfreeze(RuntimeOrigin::root(),));
             assert!(!FraudProofs::is_frozen());
         });
     }

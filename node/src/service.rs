@@ -26,7 +26,6 @@ use sp_runtime::{
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
 use x3_bridge_adapters::{
     OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
@@ -40,7 +39,8 @@ use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
 use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
-    NonEmptyPayloadVerifier, ProofEnvelope, ProofKind, VerificationRouter,
+    ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, VerificationRouter,
+    VerificationStrategy,
 };
 
 #[cfg(feature = "gpu-validator")]
@@ -67,6 +67,7 @@ const GPU_SIDECAR_RESTART_THRESHOLD: u32 = 3;
 
 /// GPU Sidecar graceful shutdown timeout (seconds).
 /// Maximum time to wait for sidecar to shut down cleanly before forcing termination.
+#[allow(dead_code)]
 const GPU_SIDECAR_SHUTDOWN_TIMEOUT_SECS: u64 = 30;
 
 /// ───────────────────────────────────────────────────────────────
@@ -700,14 +701,7 @@ impl Default for CrossVmBridgeSafetyGate {
         );
 
         let mut verification_router = VerificationRouter::new();
-        verification_router
-            .register_verifier(ProofKind::EvmReceipt, Arc::new(NonEmptyPayloadVerifier));
-        verification_router.register_verifier(
-            ProofKind::SolanaCommitment,
-            Arc::new(NonEmptyPayloadVerifier),
-        );
-        verification_router
-            .register_verifier(ProofKind::Generic, Arc::new(NonEmptyPayloadVerifier));
+        verification_router.register_verifier(Arc::new(ProductionEvmReceiptVerifier::new(1)));
 
         Self {
             finality_oracle,
@@ -780,20 +774,25 @@ impl CrossVmBridgeSafetyGate {
             }
 
             successful_results = successful_results.saturating_add(1);
-            let kind = if result.output.starts_with(b"EVM") {
-                ProofKind::EvmReceipt
+            let strategy = if result.output.starts_with(b"EVM") {
+                VerificationStrategy::EvmReceiptProof
             } else if result.output.starts_with(b"SVM") {
-                ProofKind::SolanaCommitment
+                VerificationStrategy::SolanaFinalizedProof
             } else {
-                ProofKind::Generic
+                VerificationStrategy::EvmReceiptProof
             };
 
             self.verification_router
                 .route(&ProofEnvelope {
-                    kind,
+                    proof_id: [0u8; 32],
+                    strategy,
+                    source_chain: ChainKind::X3,
+                    destination_chain: ChainKind::X3,
                     payload: result.output.clone(),
-                    source_chain: 0,
-                    destination_chain: 0,
+                    expected_asset_id: [0u8; 32],
+                    expected_amount: 0,
+                    expected_sender: Vec::new(),
+                    expected_recipient: Vec::new(),
                 })
                 .map_err(|err| format!("verification_error: {err}"))?;
 

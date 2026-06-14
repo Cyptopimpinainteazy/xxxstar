@@ -20,7 +20,7 @@ sp-std = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 
 # Verification router provides the proof routing + verifier implementations.
-x3-verification-router = { path = "../../crates/x3-verification-router" }
+x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false }
 
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 log = { workspace = true, default-features = false }
@@ -40,6 +40,7 @@ std = [
   "sp-runtime/std",
   "serde/std",
   "log/std",
+  "x3-verification-router/std",
 ]
 runtime-benchmarks = [
   "frame-support/runtime-benchmarks",

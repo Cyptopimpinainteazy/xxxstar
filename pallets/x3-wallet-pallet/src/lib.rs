@@ -29,9 +29,7 @@ pub mod pallet {
     pub const MAX_CONTACTS: u32 = 1000;
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-    }
+    pub trait Config: frame_system::Config {}
 
     #[pallet::pallet]
     #[pallet::without_storage_info]

@@ -20,13 +20,13 @@ hex = "0.4"
 tracing = "0.1"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-codec = { package = "parity-scale-codec", version = "3", features = ["derive"] }
-scale-info = { version = "2", features = ["derive"] }
-sp-core = { version = "28", default-features = false, features = ["full_crypto"] }
-sp-runtime = { version = "31", default-features = false }
-frame-support = { version = "28", default-features = false }
-frame-system = { version = "28", default-features = false }
-pallet-balances = { version = "28", default-features = false }
+codec = { workspace = true }
+scale-info = { workspace = true }
+sp-core = { workspace = true, default-features = false, features = ["full_crypto"] }
+sp-runtime = { workspace = true, default-features = false }
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+pallet-balances = { workspace = true, default-features = false }
 
 [features]
 default = ["std"]

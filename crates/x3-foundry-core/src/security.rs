@@ -57,7 +57,9 @@ impl SecurityAuditor {
         // Principal safety
         let principal_safe = self.check_principal_safety(dapp_type, revenue_config);
         if !principal_safe {
-            report.critical_findings.push("Principal safety check failed: creator may lose funds".into());
+            report
+                .critical_findings
+                .push("Principal safety check failed: creator may lose funds".into());
         }
 
         // Calculate risk score
@@ -74,7 +76,10 @@ impl SecurityAuditor {
         report.test_coverage_pct = self.estimate_coverage(contracts);
 
         // Generate auditor signature
-        let sig_input = format!("{:?}{:?}{}{}", dapp_type, report.risk_score, report.passed, self.auditor_key);
+        let sig_input = format!(
+            "{:?}{:?}{}{}",
+            dapp_type, report.risk_score, report.passed, self.auditor_key
+        );
         let mut hasher = Sha256::new();
         hasher.update(sig_input.as_bytes());
         report.auditor_signature = hex::encode(hasher.finalize());
@@ -84,7 +89,10 @@ impl SecurityAuditor {
     }
 
     /// Runs static analysis on contract source code.
-    pub fn run_static_analysis(&self, contracts: &HashMap<String, String>) -> (u8, Vec<String>, Vec<String>) {
+    pub fn run_static_analysis(
+        &self,
+        contracts: &HashMap<String, String>,
+    ) -> (u8, Vec<String>, Vec<String>) {
         let mut warnings = Vec::new();
         let mut critical = Vec::new();
         let mut total_issues = 0u32;
@@ -96,47 +104,74 @@ impl SecurityAuditor {
                 total_issues += 1;
             }
             if source.contains("delegatecall") {
-                warnings.push(format!("{}: uses delegatecall - verify proxy pattern safety", name));
+                warnings.push(format!(
+                    "{}: uses delegatecall - verify proxy pattern safety",
+                    name
+                ));
                 total_issues += 1;
             }
             if source.contains("selfdestruct") || source.contains("suicide") {
-                warnings.push(format!("{}: contains selfdestruct - contract can be destroyed", name));
+                warnings.push(format!(
+                    "{}: contains selfdestruct - contract can be destroyed",
+                    name
+                ));
                 total_issues += 1;
             }
             if !source.contains("require") && !source.contains("revert") {
-                warnings.push(format!("{}: no require/revert statements found - missing input validation", name));
+                warnings.push(format!(
+                    "{}: no require/revert statements found - missing input validation",
+                    name
+                ));
                 total_issues += 1;
             }
             if source.contains("unchecked") {
-                warnings.push(format!("{}: uses unchecked blocks - verify overflow safety", name));
+                warnings.push(format!(
+                    "{}: uses unchecked blocks - verify overflow safety",
+                    name
+                ));
                 total_issues += 1;
             }
             if source.contains("assembly") {
-                warnings.push(format!("{}: uses inline assembly - requires manual audit", name));
+                warnings.push(format!(
+                    "{}: uses inline assembly - requires manual audit",
+                    name
+                ));
                 total_issues += 1;
             }
 
             // Check for reentrancy vulnerability patterns
             if source.contains(".call{value:") && !source.contains("ReentrancyGuard") {
-                critical.push(format!("{}: potential reentrancy - external call without reentrancy guard", name));
+                critical.push(format!(
+                    "{}: potential reentrancy - external call without reentrancy guard",
+                    name
+                ));
                 total_issues += 1;
             }
 
             // Check for timestamp dependency
             if source.contains("block.timestamp") || source.contains("block.number") {
-                warnings.push(format!("{}: uses block.timestamp/block.number - may be manipulated by miners", name));
+                warnings.push(format!(
+                    "{}: uses block.timestamp/block.number - may be manipulated by miners",
+                    name
+                ));
                 total_issues += 1;
             }
 
             // Check for missing events
             if !source.contains("event ") && source.contains("function") {
-                warnings.push(format!("{}: no events defined - consider adding events for transparency", name));
+                warnings.push(format!(
+                    "{}: no events defined - consider adding events for transparency",
+                    name
+                ));
                 total_issues += 1;
             }
 
             // Check for floating pragma
             if source.contains("pragma solidity ^") {
-                warnings.push(format!("{}: uses floating pragma - pin to exact version for production", name));
+                warnings.push(format!(
+                    "{}: uses floating pragma - pin to exact version for production",
+                    name
+                ));
                 total_issues += 1;
             }
         }
@@ -175,20 +210,34 @@ impl SecurityAuditor {
 
         // Validate total basis points
         let mut total = config.platform_fee_bps as u64 + config.creator_fee_bps as u64;
-        if let Some(ai) = config.ai_agent_fee_bps { total += ai as u64; }
-        if let Some(m) = config.maintenance_fee_bps { total += m as u64; }
-        if let Some(r) = config.referral_fee_bps { total += r as u64; }
+        if let Some(ai) = config.ai_agent_fee_bps {
+            total += ai as u64;
+        }
+        if let Some(m) = config.maintenance_fee_bps {
+            total += m as u64;
+        }
+        if let Some(r) = config.referral_fee_bps {
+            total += r as u64;
+        }
 
         if total != 10000 {
             findings.push(format!("Fee bps sum to {} but must equal 10000", total));
         }
 
         if config.platform_fee_bps > 1000 {
-            warnings.push(format!("Platform fee of {} bps ({}%) is high", config.platform_fee_bps, config.platform_fee_bps as f64 / 100.0));
+            warnings.push(format!(
+                "Platform fee of {} bps ({}%) is high",
+                config.platform_fee_bps,
+                config.platform_fee_bps as f64 / 100.0
+            ));
         }
 
         if config.creator_fee_bps < 8000 {
-            findings.push(format!("Creator fee of {} bps ({}%) is below minimum 80%", config.creator_fee_bps, config.creator_fee_bps as f64 / 100.0));
+            findings.push(format!(
+                "Creator fee of {} bps ({}%) is below minimum 80%",
+                config.creator_fee_bps,
+                config.creator_fee_bps as f64 / 100.0
+            ));
         }
 
         if config.treasury_wallet.is_empty() {
@@ -207,7 +256,11 @@ impl SecurityAuditor {
     }
 
     /// Checks permissions and ownership patterns.
-    pub fn check_permissions(&self, dapp_type: &DAppType, contracts: &HashMap<String, String>) -> (Vec<String>, Vec<String>) {
+    pub fn check_permissions(
+        &self,
+        dapp_type: &DAppType,
+        contracts: &HashMap<String, String>,
+    ) -> (Vec<String>, Vec<String>) {
         let mut warnings = Vec::new();
         let mut findings = Vec::new();
 
@@ -216,7 +269,10 @@ impl SecurityAuditor {
                 warnings.push(format!("{}: no ownership control pattern detected", name));
             }
             if source.contains("onlyOwner") && source.contains("public") {
-                warnings.push(format!("{}: public functions with onlyOwner - verify access control", name));
+                warnings.push(format!(
+                    "{}: public functions with onlyOwner - verify access control",
+                    name
+                ));
             }
             if source.contains("admin") && !source.contains("onlyAdmin") {
                 warnings.push(format!("{}: admin role referenced but not enforced", name));
@@ -229,7 +285,8 @@ impl SecurityAuditor {
                 warnings.push("Token launchpad should have timelock on admin functions".into());
             }
             DAppType::NFTMarketplace => {
-                warnings.push("Marketplace should have pausable functionality for emergencies".into());
+                warnings
+                    .push("Marketplace should have pausable functionality for emergencies".into());
             }
             DAppType::StakingPool => {
                 findings.push("Staking pool must have emergency withdrawal function".into());
@@ -259,11 +316,17 @@ impl SecurityAuditor {
         let prompt_lower = prompt.to_lowercase();
 
         let scam_indicators = [
-            ("guaranteed", "Guaranteed returns claims are often misleading"),
+            (
+                "guaranteed",
+                "Guaranteed returns claims are often misleading",
+            ),
             ("risk-free", "Risk-free investment claims are deceptive"),
             ("get rich", "Get rich quick schemes are likely scams"),
             ("no loss", "No-loss guarantees are impossible in DeFi"),
-            ("guaranteed profit", "Guaranteed profit claims are red flags"),
+            (
+                "guaranteed profit",
+                "Guaranteed profit claims are red flags",
+            ),
             ("100x", "Extreme return multiples are unrealistic"),
             ("limited time", "Urgency tactics may indicate scam"),
         ];
@@ -302,7 +365,8 @@ impl SecurityAuditor {
                     warnings.push("Extremely high creator fee - potential rug pull setup".into());
                 }
                 if config.platform_fee_bps < 50 {
-                    warnings.push("Very low platform fee - may indicate lack of sustainability".into());
+                    warnings
+                        .push("Very low platform fee - may indicate lack of sustainability".into());
                 }
             }
             DAppType::NFTMarketplace => {
@@ -361,7 +425,10 @@ impl SecurityAuditor {
             return 0.0;
         }
         // Simulate coverage based on code structure
-        let commented: usize = contracts.values().map(|s| s.lines().filter(|l| l.trim().starts_with("//")).count()).sum();
+        let commented: usize = contracts
+            .values()
+            .map(|s| s.lines().filter(|l| l.trim().starts_with("//")).count())
+            .sum();
         let coverage = (commented as f64 / total_lines as f64) * 100.0;
         coverage.min(100.0).max(10.0)
     }
@@ -382,7 +449,12 @@ mod tests {
     fn test_audit_empty_contracts() {
         let auditor = SecurityAuditor::new("test-key".into());
         let config = RevenueConfig::default();
-        let report = auditor.audit_project(&DAppType::TokenLaunchpad, &HashMap::new(), &config, "test prompt");
+        let report = auditor.audit_project(
+            &DAppType::TokenLaunchpad,
+            &HashMap::new(),
+            &config,
+            "test prompt",
+        );
         assert!(report.auditor_signature.len() == 64);
     }
 

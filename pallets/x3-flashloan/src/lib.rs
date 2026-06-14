@@ -27,7 +27,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         type Currency: Currency<Self::AccountId>;
         /// Flash loan fee in basis points (e.g. 9 = 0.09%).
         #[pallet::constant]

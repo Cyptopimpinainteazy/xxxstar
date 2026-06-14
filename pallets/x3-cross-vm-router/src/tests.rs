@@ -9,6 +9,7 @@
 // The **one** test that matters: `test_x3_native_evm_svm_roundtrip_preserves_supply`.
 
 use crate as pallet_x3_cross_vm_router;
+use crate::Error;
 use codec::Encode;
 use frame_support::{
     assert_noop, assert_ok, construct_runtime, derive_impl, parameter_types,
@@ -144,20 +145,17 @@ parameter_types! {
 }
 
 impl pallet_x3_asset_registry::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type RegistryOrigin = RootOrAny;
     type EmergencyPauseOrigin = RootOrAny;
     type MaxAssets = MaxAssets;
 }
 
 impl pallet_x3_supply_ledger::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type SupplyGovernance = RootOrAny;
     type Registry = Registry;
 }
 
 impl pallet_x3_cross_vm_router::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Registry = Registry;
     type Ledger = Ledger;
     type ExternalExecutorOrigin = RootOrAny;
@@ -2408,8 +2406,10 @@ impl XorShift {
     }
 }
 
-fn edge_asset_id(byte: u8) -> AssetId {
-    AssetId::from([byte; 32])
+fn edge_asset_id(_byte: u8) -> AssetId {
+    // The edge helper registers a single X3Native XUSD asset; all edge tests
+    // operate on that canonical asset id.
+    x3_asset_kernel_types::derive_asset_id(DomainId::X3Native, 0, b"native", b"XUSD", 6)
 }
 
 fn register_x3evm_route(
@@ -2483,10 +2483,8 @@ fn edge_native_to_native_rejected() {
     mint_supply(&mut ext, asset, 1, 1_000_000);
 
     ext.execute_with(|| {
-        // The xvm_transfer extrinsic's destination = X3Native should
-        // fail because no X3Native -> X3Native route is registered.
-        // The error is `RouteClosed` (returned by the storage route
-        // lookup returning None).
+        // The xvm_transfer extrinsic's destination = X3Native is a
+        // self-loop and is rejected before the route lookup.
         assert_noop!(
             Router::xvm_transfer(
                 RuntimeOrigin::signed(1),
@@ -2496,7 +2494,7 @@ fn edge_native_to_native_rejected() {
                 100,
                 100,
             ),
-            Error::<Test>::RouteClosed
+            Error::<Test>::SelfLoopRoute
         );
     });
 }
@@ -2623,7 +2621,7 @@ fn edge_randomized_valid_transfers_succeed() {
 
     let mut rng = XorShift::new(0xDEADBEEF);
     for i in 0..16u64 {
-        let amount: u128 = rng.next_range(1, 1_000_000);
+        let amount: u128 = rng.next_range(1, 1_000_000).into();
         let exp = 100u64 + (i % 10);
         ext.execute_with(|| {
             let r = Router::xvm_transfer(

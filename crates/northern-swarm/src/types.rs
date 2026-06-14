@@ -53,7 +53,7 @@ impl Config {
 // ---------------------------------------------------------------------------
 
 /// A task as read from the chain pending-task queue.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, codec::Decode)]
 pub struct NorthernTask {
     pub id: TaskId,
     /// IPFS CID or other content-addressable URI for the payload.
@@ -80,7 +80,7 @@ pub struct TaskPayload {
 }
 
 /// High-level task categories.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, codec::Decode)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskKind {
     /// Pure computation — no external I/O; must be fully deterministic.
@@ -96,7 +96,7 @@ pub enum TaskKind {
 }
 
 /// Task lifecycle state, mirrored from the RC2 on-chain pallet enum.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, codec::Decode)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     Pending,

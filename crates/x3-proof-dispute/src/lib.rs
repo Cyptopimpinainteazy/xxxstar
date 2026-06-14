@@ -32,6 +32,15 @@ pub struct DisputeResult {
     pub votes_reject: u64,
 }
 
+/// Immutable dispute-window description consumed by indexers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DisputeWindow {
+    pub proof_id: [u8; 32],
+    pub opens_at_block: u64,
+    pub closes_at_block: u64,
+    pub status: DisputeStatus,
+}
+
 pub struct DisputeTracker {
     dispute: ProofDispute,
     voters: HashSet<String>,

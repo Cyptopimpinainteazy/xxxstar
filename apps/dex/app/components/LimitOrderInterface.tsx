@@ -5,7 +5,6 @@ import { Clock, X } from 'lucide-react';
 
 interface LimitOrderInterfaceProps {
   walletConnected: boolean;
-  walletId: string;
 }
 
 const TOKENS = [
@@ -28,7 +27,7 @@ interface LimitOrder {
   expiresAt: Date;
 }
 
-export function LimitOrderInterface({ walletConnected, walletId }: LimitOrderInterfaceProps) {
+export function LimitOrderInterface({ walletConnected }: LimitOrderInterfaceProps) {
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
   const [tokenIn, setTokenIn] = useState(TOKENS[0]);
   const [tokenOut, setTokenOut] = useState(TOKENS[1]);

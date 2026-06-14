@@ -1,47 +1,60 @@
 import { useEffect, useState } from 'react'
-
-interface Transfer {
-  from: string
-  to: string
-  value: string
-  time: string
-}
-
-const ROUTES = ['EVM → SVM', 'SVM → MoveVM', 'MoveVM → EVM', 'EVM → WASM', 'WASM → SVM']
+import { useX3Intelligence, type CrossVmTransfer } from '../api/client'
 
 function CrossVmActivity() {
-  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [transfers, setTransfers] = useState<CrossVmTransfer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const client = useX3Intelligence()
 
   useEffect(() => {
-    const routes = ['EVM → SVM', 'SVM → MoveVM', 'MoveVM → EVM', 'EVM → WASM', 'WASM → SVM']
-    const generateTransfer = (): Transfer => {
-      const route = routes[Math.floor(Math.random() * routes.length)]
-      const [from, to] = route.split(' → ')
-      return {
-        from,
-        to,
-        value: (Math.random() * 5000 + 100).toFixed(2),
-        time: new Date().toLocaleTimeString(),
+    let mounted = true
+
+    const fetchTransfers = async () => {
+      try {
+        const data = await client.getCrossVmTransfers(15)
+        if (mounted) {
+          setTransfers(data)
+          setLoading(false)
+          setError(null)
+        }
+      } catch (err) {
+        if (mounted) {
+          console.error('Failed to fetch cross-VM transfers:', err)
+          setError('Failed to fetch real transfer data. Check RPC connection.')
+          setLoading(false)
+        }
       }
     }
 
-    // Seed with initial transfers
-    const initial: Transfer[] = []
-    for (let i = 0; i < 8; i++) {
-      initial.push(generateTransfer())
-    }
-    setTransfers(initial)
+    // Initial fetch
+    fetchTransfers()
 
+    // Refresh every 5 seconds
     const interval = setInterval(() => {
-      setTransfers((prev) => [generateTransfer(), ...prev].slice(0, 15))
-    }, 2500)
-    return () => clearInterval(interval)
-  }, [])
+      fetchTransfers()
+    }, 5000)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [client])
+
+  if (loading) {
+    return (
+      <div className="view">
+        <h2>Cross-VM Activity</h2>
+        <div className="loading">Loading real-time transfer data...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="view">
       <h2>Cross-VM Activity</h2>
-      <p className="view-subtitle">Recent transfers by route</p>
+      <p className="view-subtitle">Recent transfers by route (Live Data)</p>
+      {error && <div className="error-banner">{error}</div>}
       <div className="table-container">
         <table className="data-table">
           <thead>
@@ -50,19 +63,34 @@ function CrossVmActivity() {
               <th>To</th>
               <th>Value (tX3)</th>
               <th>Time</th>
+              <th>Block</th>
+              <th>TX Hash</th>
             </tr>
           </thead>
           <tbody>
-            {transfers.map((t, i) => (
-              <tr key={i}>
-                <td><span className="vm-badge">{t.from}</span></td>
-                <td><span className="vm-badge">{t.to}</span></td>
-                <td>{t.value}</td>
-                <td className="time-cell">{t.time}</td>
+            {transfers.length > 0 ? (
+              transfers.map((t, i) => (
+                <tr key={i}>
+                  <td><span className="vm-badge">{t.from}</span></td>
+                  <td><span className="vm-badge">{t.to}</span></td>
+                  <td>{t.value}</td>
+                  <td className="time-cell">{t.time}</td>
+                  <td className="mono">#{t.blockHeight}</td>
+                  <td className="mono tx-hash">{t.txHash.slice(0, 8)}...</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="no-data">
+                  No recent cross-VM transfers found
+                </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
+      </div>
+      <div className="refresh-info">
+        Last updated: {new Date().toLocaleTimeString()}
       </div>
     </div>
   )

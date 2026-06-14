@@ -11,14 +11,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
 
+extern crate alloc;
+
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
 #[cfg(test)]
 mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use codec::{Decode, Encode, MaxEncodedLen};
+    use alloc::format;
+    use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
     use frame_support::{
         pallet_prelude::*,
         traits::{Currency, ExistenceRequirement, Get},
@@ -26,13 +31,27 @@ pub mod pallet {
     };
     use frame_system::pallet_prelude::*;
     use scale_info::TypeInfo;
+    use sp_runtime::traits::Saturating;
     use sp_std::vec::Vec;
+
+    #[pallet::pallet]
+    pub struct Pallet<T>(_);
 
     // ── Types ───────────────────────────────────────────────────────────────
 
     pub type LaunchId = u32;
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+    #[derive(
+        Clone,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        MaxEncodedLen,
+        TypeInfo,
+        RuntimeDebug,
+    )]
     pub enum LaunchStatus {
         /// Fundraising in progress.
         Active,
@@ -98,10 +117,8 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Origin that can create and cancel launches.
-        type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+        type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
 
         /// Maximum number of simultaneously active launches.
         #[pallet::constant]
@@ -305,7 +322,6 @@ pub mod pallet {
             lp_lock_duration_blocks: BlockNumberFor<T>,
         ) -> DispatchResult {
             let creator = T::GovernanceOrigin::ensure_origin(origin)?;
-
             let now = frame_system::Pallet::<T>::block_number();
             ensure!(start_block >= now, Error::<T>::BadDuration);
             ensure!(end_block > start_block, Error::<T>::BadDuration);

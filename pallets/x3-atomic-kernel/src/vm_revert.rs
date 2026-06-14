@@ -141,6 +141,7 @@ pub trait VmReverter {
 ///
 /// Format: `twox_128(pallet) ++ twox_128(item) [++ key_hash]`
 /// where key_hash is `blake2_128_concat(map_key)` for storage maps.
+#[allow(dead_code)]
 fn storage_key(pallet: &[u8], item: &[u8], map_key: Option<&[u8]>) -> Vec<u8> {
     use sp_io::hashing::twox_128;
     let mut key = Vec::new();
@@ -177,6 +178,7 @@ fn evm_storage_slot_key(address: &[u8; 20], slot: &[u8; 32]) -> Vec<u8> {
 }
 
 /// Storage key for `pallet_evm::AccountCodes(address)` — StorageMap<blake2_128_concat(H160)>.
+#[allow(dead_code)]
 fn evm_account_code_key(address: &[u8; 20]) -> Vec<u8> {
     use sp_io::hashing::blake2_128;
     let mut key = Vec::new();
@@ -334,13 +336,7 @@ impl EvmReverter {
         let mut deleted_slots: u32 = 0;
 
         for change in &changes {
-            let contract = match change.contract {
-                Some(addr) => addr,
-                None => {
-                    // Fall back to zero address if no contract was encoded
-                    [0u8; 20]
-                }
-            };
+            let contract = change.contract.unwrap_or_default();
 
             if change.old_value.is_empty() {
                 // Slot did not exist before — delete it from EVM storage

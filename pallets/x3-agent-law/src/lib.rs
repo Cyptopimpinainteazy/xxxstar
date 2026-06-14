@@ -78,8 +78,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Currency for reputation and slashing
         type Currency: frame_support::traits::Currency<Self::AccountId>
             + frame_support::traits::ReservableCurrency<Self::AccountId>;

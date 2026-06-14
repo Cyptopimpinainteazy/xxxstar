@@ -80,7 +80,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Currency for staking and fees.
         type Currency: ReservableCurrency<Self::AccountId>;
@@ -294,18 +293,14 @@ pub mod pallet {
 
             // Generate unique action ID
             let action_nonce = ActionNonce::<T>::get();
-            let action_id = T::Hashing::hash_of(&(
-                &agent,
-                &action_payload,
-                &proof_payload,
-                action_nonce,
-            ))
-            .using_encoded(|b| {
-                let mut arr = [0u8; 32];
-                let len = b.len().min(32);
-                arr[..len].copy_from_slice(&b[..len]);
-                arr
-            });
+            let action_id =
+                T::Hashing::hash_of(&(&agent, &action_payload, &proof_payload, action_nonce))
+                    .using_encoded(|b| {
+                        let mut arr = [0u8; 32];
+                        let len = b.len().min(32);
+                        arr[..len].copy_from_slice(&b[..len]);
+                        arr
+                    });
 
             // Update nonces
             ActionNonce::<T>::put(action_nonce + 1);
@@ -369,10 +364,13 @@ pub mod pallet {
             // Allow any signed origin (in production, restrict to a specific executor)
             let _verifier = ensure_signed(origin)?;
 
-            let mut action = VerifiedActions::<T>::get(&action_id)
-                .ok_or(Error::<T>::ActionNotFound)?;
+            let mut action =
+                VerifiedActions::<T>::get(&action_id).ok_or(Error::<T>::ActionNotFound)?;
 
-            ensure!(action.status == types::ProofStatus::Pending, Error::<T>::VerificationFailed);
+            ensure!(
+                action.status == types::ProofStatus::Pending,
+                Error::<T>::VerificationFailed
+            );
 
             let now = frame_system::Pallet::<T>::block_number();
 
@@ -423,11 +421,13 @@ pub mod pallet {
         ) -> DispatchResult {
             let challenger = ensure_signed(origin)?;
 
-            let action = VerifiedActions::<T>::get(&action_id)
-                .ok_or(Error::<T>::ActionNotFound)?;
+            let action = VerifiedActions::<T>::get(&action_id).ok_or(Error::<T>::ActionNotFound)?;
 
             // Only verified actions can be challenged
-            ensure!(action.status == types::ProofStatus::Verified, Error::<T>::NotChallengeable);
+            ensure!(
+                action.status == types::ProofStatus::Verified,
+                Error::<T>::NotChallengeable
+            );
 
             // Check if challenge already exists
             ensure!(
@@ -493,16 +493,16 @@ pub mod pallet {
         ) -> DispatchResult {
             T::AdminOrigin::ensure_origin(origin)?;
 
-            let challenge = ActiveChallenges::<T>::get(&action_id)
-                .ok_or(Error::<T>::ChallengeNotFound)?;
+            let challenge =
+                ActiveChallenges::<T>::get(&action_id).ok_or(Error::<T>::ChallengeNotFound)?;
 
             ensure!(
                 challenge.resolution.is_none(),
                 Error::<T>::ChallengeAlreadyResolved
             );
 
-            let mut action = VerifiedActions::<T>::get(&action_id)
-                .ok_or(Error::<T>::ActionNotFound)?;
+            let mut action =
+                VerifiedActions::<T>::get(&action_id).ok_or(Error::<T>::ActionNotFound)?;
 
             // Resolve the challenge
             let mut challenge = challenge;
@@ -521,10 +521,7 @@ pub mod pallet {
                     let stake: BalanceOf<T> = challenge.challenge_stake.saturated_into();
                     // Unreserve first, then slash the freed balance
                     T::Currency::unreserve(&challenge.challenger, stake);
-                    let _imbalance = T::Currency::slash(
-                        &challenge.challenger,
-                        stake,
-                    );
+                    let _imbalance = T::Currency::slash(&challenge.challenger, stake);
                     // Slashed amount goes to treasury (handled by Currency::slash)
                     action.status = types::ProofStatus::Verified;
                 }
@@ -566,10 +563,7 @@ pub mod pallet {
         /// deadline as expired.
         #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::clean_expired_proofs())]
-        pub fn clean_expired_proofs(
-            origin: OriginFor<T>,
-            max_clean: u32,
-        ) -> DispatchResult {
+        pub fn clean_expired_proofs(origin: OriginFor<T>, max_clean: u32) -> DispatchResult {
             let _cleaner = ensure_signed(origin)?;
             let now = frame_system::Pallet::<T>::block_number();
             let config = ProofConfig::<T>::get();
@@ -607,10 +601,7 @@ pub mod pallet {
                 }
             }
 
-            log::info!(
-                "🧹 Cleaned {} expired proof-carrying actions",
-                cleaned
-            );
+            log::info!("🧹 Cleaned {} expired proof-carrying actions", cleaned);
 
             Ok(())
         }
@@ -655,10 +646,8 @@ pub mod pallet {
                         })
                 });
 
-            let _ = Self::clean_expired_proofs(
-                frame_system::RawOrigin::Signed(zero_account).into(),
-                5,
-            );
+            let _ =
+                Self::clean_expired_proofs(frame_system::RawOrigin::Signed(zero_account).into(), 5);
 
             T::WeightInfo::clean_expired_proofs()
         }

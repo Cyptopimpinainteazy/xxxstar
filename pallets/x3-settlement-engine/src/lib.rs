@@ -141,7 +141,6 @@ pub mod pallet {
         frame_system::Config + pallet_x3_kernel::Config + pallet_x3_atomic_kernel::Config
     {
         /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Weight information for extrinsics.
         type SettlementWeightInfo: crate::weights::WeightInfo;

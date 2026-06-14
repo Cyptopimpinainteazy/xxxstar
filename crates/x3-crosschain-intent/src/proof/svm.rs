@@ -11,6 +11,7 @@
 //! 3. Stake-weight the signatures and check minimum threshold (e.g. 5/7).
 //! 4. Produce a verified quorum proof.
 
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 

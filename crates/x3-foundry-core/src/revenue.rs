@@ -133,12 +133,18 @@ impl RevenueTracker {
         fee_token: &str,
         tx_hash: &str,
     ) -> Result<RevenueRecord, FoundryError> {
-        info!("Recording revenue: {} {} for app {} on {}", amount, fee_token, app_id, chain);
+        info!(
+            "Recording revenue: {} {} for app {} on {}",
+            amount, fee_token, app_id, chain
+        );
 
         let platform_fee = amount.saturating_mul(self.fee_config.platform_fee_bps as u128) / 10000;
-        let ai_agent_fee = amount.saturating_mul(self.fee_config.ai_agent_fee_bps.unwrap_or(0) as u128) / 10000;
-        let maintenance_fee = amount.saturating_mul(self.fee_config.maintenance_fee_bps.unwrap_or(0) as u128) / 10000;
-        let referral_fee = amount.saturating_mul(self.fee_config.referral_fee_bps.unwrap_or(0) as u128) / 10000;
+        let ai_agent_fee =
+            amount.saturating_mul(self.fee_config.ai_agent_fee_bps.unwrap_or(0) as u128) / 10000;
+        let maintenance_fee =
+            amount.saturating_mul(self.fee_config.maintenance_fee_bps.unwrap_or(0) as u128) / 10000;
+        let referral_fee =
+            amount.saturating_mul(self.fee_config.referral_fee_bps.unwrap_or(0) as u128) / 10000;
         let total_deductions = platform_fee + ai_agent_fee + maintenance_fee + referral_fee;
         let creator_revenue = amount.saturating_sub(total_deductions);
 
@@ -171,7 +177,10 @@ impl RevenueTracker {
 
     /// Gets all revenue records for a specific creator.
     pub fn get_revenue_by_creator(&self, creator_wallet: &str) -> Vec<&RevenueRecord> {
-        self.records.iter().filter(|r| r.creator_wallet == creator_wallet).collect()
+        self.records
+            .iter()
+            .filter(|r| r.creator_wallet == creator_wallet)
+            .collect()
     }
 
     /// Gets all revenue records for a specific chain.
@@ -186,7 +195,11 @@ impl RevenueTracker {
 
     /// Gets total unclaimed creator revenue.
     pub fn get_unclaimed_creator_revenue(&self) -> u128 {
-        self.records.iter().filter(|r| !r.claimed).map(|r| r.creator_revenue).sum()
+        self.records
+            .iter()
+            .filter(|r| !r.claimed)
+            .map(|r| r.creator_revenue)
+            .sum()
     }
 
     /// Gets unclaimed revenue for a specific creator.
@@ -200,7 +213,8 @@ impl RevenueTracker {
 
     /// Claims all unclaimed revenue for a creator.
     pub fn claim_creator_revenue(&mut self, creator_wallet: &str) -> Result<u128, FoundryError> {
-        let unclaimed: u128 = self.records
+        let unclaimed: u128 = self
+            .records
             .iter_mut()
             .filter(|r| r.creator_wallet == creator_wallet && !r.claimed)
             .map(|r| {
@@ -220,7 +234,8 @@ impl RevenueTracker {
 
     /// Claims referral revenue for a referrer.
     pub fn claim_referral_revenue(&mut self, referral_wallet: &str) -> Result<u128, FoundryError> {
-        let unclaimed: u128 = self.records
+        let unclaimed: u128 = self
+            .records
             .iter_mut()
             .filter(|r| !r.claimed) // In production, track referral wallet separately
             .map(|r| {
@@ -234,7 +249,10 @@ impl RevenueTracker {
             return Err(FoundryError::NoRevenueToClaim(referral_wallet.to_string()));
         }
 
-        info!("Claimed {} referral revenue for {}", unclaimed, referral_wallet);
+        info!(
+            "Claimed {} referral revenue for {}",
+            unclaimed, referral_wallet
+        );
         Ok(unclaimed)
     }
 
@@ -246,12 +264,30 @@ impl RevenueTracker {
         }
 
         let mut distribution = HashMap::new();
-        distribution.insert("Protocol Treasury".into(), (total_platform as f64 * self.treasury_split.protocol_treasury_pct / 100.0) as u128);
-        distribution.insert("GPU Swarm".into(), (total_platform as f64 * self.treasury_split.gpu_swarm_pct / 100.0) as u128);
-        distribution.insert("Dev Vault".into(), (total_platform as f64 * self.treasury_split.dev_vault_pct / 100.0) as u128);
-        distribution.insert("Maintenance".into(), (total_platform as f64 * self.treasury_split.maintenance_pct / 100.0) as u128);
-        distribution.insert("Liquidity".into(), (total_platform as f64 * self.treasury_split.liquidity_pct / 100.0) as u128);
-        distribution.insert("Grants".into(), (total_platform as f64 * self.treasury_split.grants_pct / 100.0) as u128);
+        distribution.insert(
+            "Protocol Treasury".into(),
+            (total_platform as f64 * self.treasury_split.protocol_treasury_pct / 100.0) as u128,
+        );
+        distribution.insert(
+            "GPU Swarm".into(),
+            (total_platform as f64 * self.treasury_split.gpu_swarm_pct / 100.0) as u128,
+        );
+        distribution.insert(
+            "Dev Vault".into(),
+            (total_platform as f64 * self.treasury_split.dev_vault_pct / 100.0) as u128,
+        );
+        distribution.insert(
+            "Maintenance".into(),
+            (total_platform as f64 * self.treasury_split.maintenance_pct / 100.0) as u128,
+        );
+        distribution.insert(
+            "Liquidity".into(),
+            (total_platform as f64 * self.treasury_split.liquidity_pct / 100.0) as u128,
+        );
+        distribution.insert(
+            "Grants".into(),
+            (total_platform as f64 * self.treasury_split.grants_pct / 100.0) as u128,
+        );
 
         info!("Distributed platform fees: {:?}", distribution);
         Ok(distribution)
@@ -259,12 +295,20 @@ impl RevenueTracker {
 
     /// Gets a revenue summary for a specific app.
     pub fn get_app_revenue_summary(&self, app_id: &str) -> RevenueSummary {
-        let app_records: Vec<&RevenueRecord> = self.records.iter().filter(|r| r.app_id == app_id).collect();
+        let app_records: Vec<&RevenueRecord> =
+            self.records.iter().filter(|r| r.app_id == app_id).collect();
         let total_volume: u128 = app_records.iter().map(|r| r.amount).sum();
-        let total_fees: u128 = app_records.iter().map(|r| r.platform_fee + r.ai_agent_fee + r.maintenance_fee + r.referral_fee).sum();
+        let total_fees: u128 = app_records
+            .iter()
+            .map(|r| r.platform_fee + r.ai_agent_fee + r.maintenance_fee + r.referral_fee)
+            .sum();
         let platform_revenue: u128 = app_records.iter().map(|r| r.platform_fee).sum();
         let creator_revenue: u128 = app_records.iter().map(|r| r.creator_revenue).sum();
-        let unclaimed_creator_revenue: u128 = app_records.iter().filter(|r| !r.claimed).map(|r| r.creator_revenue).sum();
+        let unclaimed_creator_revenue: u128 = app_records
+            .iter()
+            .filter(|r| !r.claimed)
+            .map(|r| r.creator_revenue)
+            .sum();
         let transaction_count = app_records.len() as u64;
 
         RevenueSummary {
@@ -314,7 +358,9 @@ mod tests {
     #[test]
     fn test_claim_revenue() {
         let mut tracker = RevenueTracker::default();
-        tracker.record_revenue("app-1", "0xCreator", "x3-mainnet", 1000, "X3", "0xtx").unwrap();
+        tracker
+            .record_revenue("app-1", "0xCreator", "x3-mainnet", 1000, "X3", "0xtx")
+            .unwrap();
         let claimed = tracker.claim_creator_revenue("0xCreator");
         assert!(claimed.is_ok());
         assert!(claimed.unwrap() > 0);
@@ -323,8 +369,12 @@ mod tests {
     #[test]
     fn test_platform_revenue() {
         let mut tracker = RevenueTracker::default();
-        tracker.record_revenue("app-1", "0xCreator", "x3-mainnet", 10000, "X3", "0xtx1").unwrap();
-        tracker.record_revenue("app-2", "0xCreator2", "x3-mainnet", 20000, "X3", "0xtx2").unwrap();
+        tracker
+            .record_revenue("app-1", "0xCreator", "x3-mainnet", 10000, "X3", "0xtx1")
+            .unwrap();
+        tracker
+            .record_revenue("app-2", "0xCreator2", "x3-mainnet", 20000, "X3", "0xtx2")
+            .unwrap();
         let platform = tracker.get_platform_revenue();
         assert!(platform > 0);
     }
@@ -344,7 +394,9 @@ mod tests {
     #[test]
     fn test_distribute_platform_fees() {
         let mut tracker = RevenueTracker::default();
-        tracker.record_revenue("app-1", "0xCreator", "x3-mainnet", 100000, "X3", "0xtx").unwrap();
+        tracker
+            .record_revenue("app-1", "0xCreator", "x3-mainnet", 100000, "X3", "0xtx")
+            .unwrap();
         let dist = tracker.distribute_platform_fees();
         assert!(dist.is_ok());
         let d = dist.unwrap();
@@ -354,7 +406,9 @@ mod tests {
     #[test]
     fn test_revenue_summary() {
         let mut tracker = RevenueTracker::default();
-        tracker.record_revenue("app-1", "0xCreator", "x3-mainnet", 5000, "X3", "0xtx").unwrap();
+        tracker
+            .record_revenue("app-1", "0xCreator", "x3-mainnet", 5000, "X3", "0xtx")
+            .unwrap();
         let summary = tracker.get_app_revenue_summary("app-1");
         assert_eq!(summary.total_volume, 5000);
         assert_eq!(summary.transaction_count, 1);

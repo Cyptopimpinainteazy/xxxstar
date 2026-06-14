@@ -197,7 +197,7 @@ impl GatewayIndexer {
                 verified: result.verified,
                 strategy: format!("{:?}", result.strategy),
                 confidence_bps: result.confidence_bps,
-                checked_block: result.verified_at_block,
+                checked_block: result.verified_at_block.unwrap_or(0),
                 failure_reason: result.failure_reason.clone(),
             },
         );
@@ -427,9 +427,10 @@ mod tests {
         indexer.index_verification_result(&VerificationResult {
             proof_id: [1; 32],
             strategy: VerificationStrategy::ValidatorQuorum,
+            chain: ExternalChainId::EthereumSepolia,
             verified: true,
             confidence_bps: 8_000,
-            verified_at_block: 5,
+            verified_at_block: Some(5),
             failure_reason: None,
         });
         indexer.index_dispute_window(&DisputeWindow {

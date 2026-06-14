@@ -32,6 +32,10 @@
 //! - Empty names/owners/receivers are rejected.
 //! - Zero amounts are rejected.
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
 use crate::adapter::{
     chain_kind_from_canonical, intent_spec_to_crosschain_intent, validate_intent_spec,
     AdapterError, IntentSpec,

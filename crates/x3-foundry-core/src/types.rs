@@ -1,11 +1,9 @@
 use chrono::{DateTime, Utc};
-use codec::{Decode, Encode};
-use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The type of dApp to generate.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum DAppType {
     TokenLaunchpad,
     NFTMarketplace,
@@ -52,7 +50,7 @@ impl std::fmt::Display for DAppType {
 }
 
 /// Fee distribution mode.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FeeMode {
     GrossRevenue,
     NetProtocolFees,
@@ -76,7 +74,7 @@ impl FeeMode {
 }
 
 /// Revenue configuration for a dApp.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevenueConfig {
     pub platform_fee_bps: u16,
     pub creator_fee_bps: u16,
@@ -112,7 +110,7 @@ impl Default for RevenueConfig {
 }
 
 /// Project state containing all metadata about a generated dApp.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectState {
     pub id: String,
     pub name: String,
@@ -166,7 +164,7 @@ impl ProjectState {
 }
 
 /// Project status enum.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProjectStatus {
     Draft,
     Generating,
@@ -179,7 +177,7 @@ pub enum ProjectStatus {
 }
 
 /// Security report from the audit pipeline.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityReport {
     pub risk_score: u8,
     pub passed: bool,
@@ -219,7 +217,7 @@ impl SecurityReport {
 }
 
 /// Break-even model from simulation.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BreakEvenModel {
     pub days_to_break_even: u64,
     pub total_dev_cost: u128,
@@ -229,7 +227,7 @@ pub struct BreakEvenModel {
 }
 
 /// Monthly revenue projection.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MonthlyProjection {
     pub month: u32,
     pub volume: u128,
@@ -238,7 +236,7 @@ pub struct MonthlyProjection {
 }
 
 /// Simulation result from the simulator.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationResult {
     pub expected_volume: u128,
     pub fee_revenue: u128,
@@ -251,7 +249,7 @@ pub struct SimulationResult {
 }
 
 /// Deployment receipt containing deployment details.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeploymentReceipt {
     pub app_id: String,
     pub app_name: String,
@@ -273,7 +271,13 @@ pub struct DeploymentReceipt {
 }
 
 impl DeploymentReceipt {
-    pub fn new(app_id: String, app_name: String, dapp_type: DAppType, chain: String, deployer_address: String) -> Self {
+    pub fn new(
+        app_id: String,
+        app_name: String,
+        dapp_type: DAppType,
+        chain: String,
+        deployer_address: String,
+    ) -> Self {
         Self {
             app_id,
             app_name,
@@ -297,7 +301,7 @@ impl DeploymentReceipt {
 }
 
 /// Marketplace listing for a dApp.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketplaceListing {
     pub id: String,
     pub app_id: String,
@@ -351,7 +355,7 @@ impl MarketplaceListing {
 }
 
 /// Revenue report for an app or creator.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevenueReport {
     pub app_id: String,
     pub app_name: String,
@@ -370,7 +374,7 @@ pub struct RevenueReport {
 }
 
 /// App health score for monitoring.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppHealthScore {
     pub app_id: String,
     pub overall_score: f64,
@@ -404,7 +408,7 @@ impl AppHealthScore {
 }
 
 /// Fork lineage for tracking template forks.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForkLineage {
     pub original_template_id: String,
     pub fork_id: String,
@@ -416,7 +420,7 @@ pub struct ForkLineage {
 }
 
 /// Pricing tier for dApps.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Encode, Decode, TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PricingTier {
     Free,
     Builder,
@@ -463,7 +467,11 @@ mod tests {
 
     #[test]
     fn test_project_state_new() {
-        let state = ProjectState::new("TestApp".into(), DAppType::NFTMarketplace, "0xCreator".into());
+        let state = ProjectState::new(
+            "TestApp".into(),
+            DAppType::NFTMarketplace,
+            "0xCreator".into(),
+        );
         assert_eq!(state.name, "TestApp");
         assert_eq!(state.status, ProjectStatus::Draft);
     }
@@ -476,14 +484,25 @@ mod tests {
 
     #[test]
     fn test_deployment_receipt_new() {
-        let receipt = DeploymentReceipt::new("app-1".into(), "Test".into(), DAppType::StakingPool, "x3-mainnet".into(), "0xDeployer".into());
+        let receipt = DeploymentReceipt::new(
+            "app-1".into(),
+            "Test".into(),
+            DAppType::StakingPool,
+            "x3-mainnet".into(),
+            "0xDeployer".into(),
+        );
         assert_eq!(receipt.app_name, "Test");
         assert!(receipt.contract_addresses.is_empty());
     }
 
     #[test]
     fn test_marketplace_listing_new() {
-        let listing = MarketplaceListing::new("MyApp".into(), "app-1".into(), DAppType::AiImageSaaS, "0xCreator".into());
+        let listing = MarketplaceListing::new(
+            "MyApp".into(),
+            "app-1".into(),
+            DAppType::AiImageSaaS,
+            "0xCreator".into(),
+        );
         assert_eq!(listing.title, "MyApp");
         assert_eq!(listing.rating, 0.0);
     }

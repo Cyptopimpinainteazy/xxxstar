@@ -9,7 +9,6 @@
 //! * **TICKET-4.5-009** — Post-submission tracking (pending obligations, evidence)
 //! * **TICKET-4.5-010** — Solvency snapshot registry with retention-window pruning
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
 pub mod types;
@@ -49,8 +48,6 @@ pub mod pallet {
         + pallet_x3_inventory::pallet::Config
         + pallet_x3_reservation::pallet::Config
     {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Maximum number of check-dimensions returned in a single SolvencyResult.
         #[pallet::constant]
         type MaxChecksPerResult: Get<u32> + Clone + core::fmt::Debug;

@@ -217,7 +217,10 @@ impl FoundryIndexer {
 
     /// Index a single block, processing all relevant events.
     pub async fn index_block(&self, block_number: u64) -> anyhow::Result<IndexResult> {
-        info!("Indexing block {} on chain_id={}", block_number, self.chain_id);
+        info!(
+            "Indexing block {} on chain_id={}",
+            block_number, self.chain_id
+        );
         let mut result = IndexResult {
             block_number,
             chain_id: self.chain_id,
@@ -226,8 +229,10 @@ impl FoundryIndexer {
             apps_created: 0,
             errors: Vec::new(),
         };
-        info!("Block {} indexed: {} dapps, {} revenue, {} apps",
-            block_number, result.dapps_registered, result.revenue_recorded, result.apps_created);
+        info!(
+            "Block {} indexed: {} dapps, {} revenue, {} apps",
+            block_number, result.dapps_registered, result.revenue_recorded, result.apps_created
+        );
         Ok(result)
     }
 
@@ -297,7 +302,10 @@ impl FoundryIndexer {
         block_number: u64,
         tx_hash: &str,
     ) -> anyhow::Result<RevenueRecord> {
-        info!("Processing RevenueRecorded: dapp_id={}, amount={}", dapp_id, amount);
+        info!(
+            "Processing RevenueRecorded: dapp_id={}, amount={}",
+            dapp_id, amount
+        );
         let record = RevenueRecord {
             id: Uuid::new_v4().to_string(),
             dapp_id: dapp_id.to_string(),
@@ -330,7 +338,10 @@ impl FoundryIndexer {
         .execute(&self.pool)
         .await?;
 
-        info!("Revenue recorded for dapp_id={}, amount={}", dapp_id, amount);
+        info!(
+            "Revenue recorded for dapp_id={}, amount={}",
+            dapp_id, amount
+        );
         Ok(record)
     }
 
@@ -344,7 +355,10 @@ impl FoundryIndexer {
         tx_hash: &str,
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<AppInstance> {
-        info!("Processing AppCreated: address={}, template={}", app_address, template_id);
+        info!(
+            "Processing AppCreated: address={}, template={}",
+            app_address, template_id
+        );
         let app = AppInstance {
             id: Uuid::new_v4().to_string(),
             app_address: app_address.to_string(),
@@ -542,7 +556,10 @@ impl EarningsRow {
             name: self.name,
             owner_address: self.owner_address,
             contract_address: self.contract_address,
-            total_revenue: self.total_revenue.map(|d| d.to_string()).unwrap_or_default(),
+            total_revenue: self
+                .total_revenue
+                .map(|d| d.to_string())
+                .unwrap_or_default(),
             revenue_count: self.revenue_count.unwrap_or(0),
         }
     }

@@ -3,109 +3,117 @@ import { invoke } from '../ipc/tauri';
 
 /**
  * Local dev chain adapter — connects to a local X3 chain node.
- * Used for development and testing without external RPCs.
+ * Uses real blockchain connections via Tauri IPC to Rust backend.
+ * NO MOCK DATA - all data comes from actual blockchain state.
  */
 export class LocalAdapter implements ChainAdapter {
   readonly name = 'X3 Local Dev';
-  readonly chainId = 1337; // local
+  readonly chainId = 1337; // local development chain ID
   private connected = false;
 
   async connect(): Promise<void> {
-    const result = await invoke<string>('connect_chain', { chain: 'local' });
-    this.connected = result === 'ok';
+    try {
+      const result = await invoke<string>('connect_chain', { chain: 'local' });
+      this.connected = result === 'ok';
+      console.log('Connected to local X3 chain via real blockchain connection');
+    } catch (error) {
+      console.error('Failed to connect to local chain:', error);
+      throw new Error(`Local chain connection failed: ${error}`);
+    }
   }
 
   async disconnect(): Promise<void> {
-    await invoke<string>('disconnect_chain', { chain: 'local' });
-    this.connected = false;
+    try {
+      await invoke<string>('disconnect_chain', { chain: 'local' });
+      this.connected = false;
+      console.log('Disconnected from local X3 chain');
+    } catch (error) {
+      console.error('Failed to disconnect from local chain:', error);
+    }
   }
 
   async getStatus(): Promise<ChainStatus> {
-    return invoke<ChainStatus>('fetch_chain_status', { chain: 'local' });
+    if (!this.connected) {
+      throw new Error('Not connected to local chain');
+    }
+
+    try {
+      return await invoke<ChainStatus>('fetch_chain_status', { chain: 'local' });
+    } catch (error) {
+      console.error('Failed to fetch chain status:', error);
+      throw new Error(`Failed to fetch status: ${error}`);
+    }
   }
 
   async getBlocks(limit = 10): Promise<Block[]> {
-    return invoke<Block[]>('fetch_blocks', { chain: 'local', limit });
+    if (!this.connected) {
+      throw new Error('Not connected to local chain');
+    }
+
+    try {
+      const blocks = await invoke<Block[]>('fetch_blocks', {
+        chain: 'local',
+        limit,
+      });
+
+      console.log(`Fetched ${blocks.length} real blocks from local chain`);
+      return blocks;
+    } catch (error) {
+      console.error('Failed to fetch blocks:', error);
+      throw new Error(`Failed to fetch blocks: ${error}`);
+    }
   }
 
   async getMempool(): Promise<Tx[]> {
-    return invoke<Tx[]>('fetch_mempool', { chain: 'local' });
+    if (!this.connected) {
+      throw new Error('Not connected to local chain');
+    }
+
+    try {
+      const mempool = await invoke<Tx[]>('fetch_mempool', { chain: 'local' });
+
+      console.log(`Fetched ${mempool.length} real transactions from mempool`);
+      return mempool;
+    } catch (error) {
+      console.error('Failed to fetch mempool:', error);
+      throw new Error(`Failed to fetch mempool: ${error}`);
+    }
   }
 
   async sendTx(tx: SignedTx): Promise<TxHash> {
-    return invoke<TxHash>('sign_and_send_tx', {
-      chain: 'local',
-      rawTx: tx.raw,
-    });
+    if (!this.connected) {
+      throw new Error('Not connected to local chain');
+    }
+
+    try {
+      const txHash = await invoke<TxHash>('sign_and_send_tx', {
+        chain: 'local',
+        rawTx: tx.raw,
+      });
+
+      console.log(`Transaction sent: ${txHash}`);
+      return txHash;
+    } catch (error) {
+      console.error('Failed to send transaction:', error);
+      throw new Error(`Failed to send transaction: ${error}`);
+    }
   }
 
   async getBalance(address: string): Promise<string> {
-    return invoke<string>('get_balance', { chain: 'local', address });
-  }
-}
-
-/**
- * Mock adapter for testing the arena without a running node.
- * Generates fake blocks, status, and mempool data.
- */
-export class MockAdapter implements ChainAdapter {
-  readonly name = 'Mock Chain';
-  readonly chainId = 9999;
-  private blockHeight = 1_284_391;
-
-  async connect(): Promise<void> {
-    // No-op for mock
-  }
-
-  async disconnect(): Promise<void> {
-    // No-op for mock
-  }
-
-  async getStatus(): Promise<ChainStatus> {
-    return {
-      chainId: 9999,
-      blockHeight: this.blockHeight,
-      peers: 3,
-      synced: true,
-      avgBlockTimeMs: 12000,
-    };
-  }
-
-  async getBlocks(limit = 10): Promise<Block[]> {
-    const blocks: Block[] = [];
-    for (let i = 0; i < limit; i++) {
-      blocks.push({
-        hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-        height: this.blockHeight - i,
-        timestamp: Date.now() - i * 12000,
-        txCount: Math.floor(Math.random() * 20),
-        stateRoot: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-      });
+    if (!this.connected) {
+      throw new Error('Not connected to local chain');
     }
-    return blocks;
-  }
 
-  async getMempool(): Promise<Tx[]> {
-    const txs: Tx[] = [];
-    for (let i = 0; i < 5; i++) {
-      txs.push({
-        hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-        blockHeight: 0,
-        from: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-        to: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-        value: `${(Math.random() * 100).toFixed(4)} ETH`,
-        status: 'pending',
-        timestamp: Date.now(),
+    try {
+      const balance = await invoke<string>('get_balance', {
+        chain: 'local',
+        address,
       });
+
+      return balance;
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+      throw new Error(`Failed to fetch balance: ${error}`);
     }
-    return txs;
-  }
-
-  async sendTx(tx: SignedTx): Promise<TxHash> {
-    return `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-  }
-
-  async getBalance(address: string): Promise<string> {
-    return `${(Math.random() * 1000).toFixed(4)} ETH`;
   }
 }

@@ -11,7 +11,7 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
   const [email, setEmail] = useState('');
   const [slaTier, setSlaTier] = useState('pro');
   const [loading, setLoading] = useState(false);
-  const [credentials, setCredentials] = useState<any>(null);
+  const [credentials, setCredentials] = useState<unknown>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +20,7 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
     try {
       const creds = await api.register(chain, email, slaTier);
       setCredentials(creds);
-    }  catch (error: any) {
+    }  catch (error: unknown) {
       alert(`Registration failed: ${error.message}`);
     } finally {
       setLoading(false);

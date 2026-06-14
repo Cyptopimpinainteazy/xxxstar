@@ -1,8 +1,19 @@
-import nextVitals from 'eslint-config-next/core-web-vitals';
+import tseslint from 'typescript-eslint';
+import react from 'eslint-plugin-react';
 
 export default [
-  ...nextVitals,
   {
     ignores: ['.next/**', 'node_modules/**', 'out/**', 'dist/**'],
+  },
+  ...tseslint.configs.recommended,
+  {
+    plugins: {
+      react,
+    },
+    languageOptions: {
+      parserOptions: {
+        ecmaVersion: 'latest',
+      },
+    },
   },
 ];

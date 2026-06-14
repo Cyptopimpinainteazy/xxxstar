@@ -115,7 +115,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The runtime event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         /// Origin allowed to submit chain supply reports, update canonical supply,
         /// update governance power, and lift mint halts.
         type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;

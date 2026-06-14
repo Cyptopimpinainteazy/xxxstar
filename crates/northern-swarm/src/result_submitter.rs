@@ -106,13 +106,13 @@ impl ResultSubmitter {
                 reason: e.to_string(),
             })?;
 
-        let json: Value = resp
-            .json()
-            .await
-            .map_err(|e| NorthernSwarmError::ChainConnection {
-                url: self.config.chain_rpc_url.clone(),
-                reason: format!("decode response: {e}"),
-            })?;
+        let mut json: Value =
+            resp.json()
+                .await
+                .map_err(|e| NorthernSwarmError::ChainConnection {
+                    url: self.config.chain_rpc_url.clone(),
+                    reason: format!("decode response: {e}"),
+                })?;
 
         if let Some(err) = json.get("error") {
             return Err(NorthernSwarmError::ChainConnection {

@@ -9,6 +9,7 @@ extern crate alloc;
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::option::Option;
 
 use crate::VerificationStrategy;
 
@@ -63,4 +64,5 @@ pub struct VerificationResult {
     pub chain: ExternalChainId,
     pub verified_at_block: Option<u64>,
     pub strategy: VerificationStrategy,
+    pub confidence_bps: u16,
 }

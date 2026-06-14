@@ -34,7 +34,7 @@ mod tests;
 pub mod pallet {
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-    use sp_std::vec::Vec;
+    use sp_runtime::traits::Saturating;
 
     // ── Types ───────────────────────────────────────────────────────────────
 
@@ -51,8 +51,6 @@ pub mod pallet {
         pub unlock_at_block: BlockNumber,
         /// Block number when the lock was created.
         pub locked_at_block: BlockNumber,
-        /// Optional lock description / reason (max 128 bytes).
-        pub description: Vec<u8>,
     }
 
     // ── Pallet ──────────────────────────────────────────────────────────────
@@ -60,15 +58,14 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Minimum lock duration in blocks (anti-rug floor).
         #[pallet::constant]
-        type MinLockDuration: Get<Self::BlockNumber>;
+        type MinLockDuration: Get<BlockNumberFor<Self>>;
 
         /// Maximum lock duration in blocks.
         #[pallet::constant]
-        type MaxLockDuration: Get<Self::BlockNumber>;
+        type MaxLockDuration: Get<BlockNumberFor<Self>>;
 
         /// Weight information for extrinsics.
         type WeightInfo: WeightInfo;
@@ -88,7 +85,7 @@ pub mod pallet {
         T::AccountId,
         Blake2_128Concat,
         u64,
-        LpLockRecord<T::AccountId, T::BlockNumber>,
+        LpLockRecord<T::AccountId, BlockNumberFor<T>>,
     >;
 
     // ── Events ──────────────────────────────────────────────────────────────
@@ -101,7 +98,7 @@ pub mod pallet {
             owner: T::AccountId,
             pool_id: u64,
             lp_amount: u128,
-            unlock_at_block: T::BlockNumber,
+            unlock_at_block: BlockNumberFor<T>,
         },
         /// LP tokens were unlocked and withdrawn.
         LpUnlocked {
@@ -113,7 +110,7 @@ pub mod pallet {
         LockExtended {
             owner: T::AccountId,
             pool_id: u64,
-            new_unlock_at_block: T::BlockNumber,
+            new_unlock_at_block: BlockNumberFor<T>,
         },
         /// An existing lock's amount was increased.
         LockIncreased {
@@ -160,8 +157,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             pool_id: u64,
             lp_amount: u128,
-            unlock_at_block: T::BlockNumber,
-            description: Vec<u8>,
+            unlock_at_block: BlockNumberFor<T>,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(lp_amount > 0, Error::<T>::ZeroAmount);
@@ -169,8 +165,6 @@ pub mod pallet {
                 !LpLocks::<T>::contains_key(&who, pool_id),
                 Error::<T>::AlreadyLocked
             );
-            ensure!(description.len() <= 128, Error::<T>::DescriptionTooLong);
-
             let current_block = frame_system::Pallet::<T>::block_number();
             let duration = unlock_at_block.saturating_sub(current_block);
             ensure!(
@@ -188,7 +182,6 @@ pub mod pallet {
                 lp_amount,
                 unlock_at_block,
                 locked_at_block: current_block,
-                description,
             };
 
             LpLocks::<T>::insert(&who, pool_id, record);
@@ -234,7 +227,7 @@ pub mod pallet {
         pub fn extend_lock(
             origin: OriginFor<T>,
             pool_id: u64,
-            new_unlock_at_block: T::BlockNumber,
+            new_unlock_at_block: BlockNumberFor<T>,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let mut record = LpLocks::<T>::get(&who, pool_id).ok_or(Error::<T>::NotFound)?;

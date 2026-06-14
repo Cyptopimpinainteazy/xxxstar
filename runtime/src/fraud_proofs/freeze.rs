@@ -16,7 +16,6 @@
 // INVARIANT: FREEZE-002 — once frozen, only a governance extrinsic
 // (verified via `FreezeReason::GovernanceUnfreeze`) can unfreeze.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;

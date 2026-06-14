@@ -95,7 +95,11 @@ fn cannot_exceed_max_agents_per_controller() {
 
         // Register 10 agents (max)
         for i in 0..10u64 {
-            let name: BoundedVec<_, _> = format!("Agent{}", i).as_bytes().to_vec().try_into().unwrap();
+            let name: BoundedVec<_, _> = format!("Agent{}", i)
+                .as_bytes()
+                .to_vec()
+                .try_into()
+                .unwrap();
             let operator = OPERATOR1 + i as u64;
             assert_ok!(AgentRegistry::register_agent(
                 RuntimeOrigin::signed(ALICE),
@@ -314,10 +318,7 @@ fn suspend_and_reactivate_agent_works() {
         assert_eq!(agent.status, AgentStatus::Suspended);
         assert_eq!(AgentRegistry::active_agents(), 0);
 
-        assert_ok!(AgentRegistry::reactivate_agent(
-            RuntimeOrigin::root(),
-            0,
-        ));
+        assert_ok!(AgentRegistry::reactivate_agent(RuntimeOrigin::root(), 0,));
 
         let agent = AgentRegistry::agents(0).unwrap();
         assert_eq!(agent.status, AgentStatus::Active);
@@ -451,10 +452,7 @@ fn release_bond_works() {
         let bonds = AgentRegistry::bonds_by_agent(ALICE);
         assert_eq!(bonds.len(), 1);
 
-        assert_ok!(AgentRegistry::release_bond(
-            RuntimeOrigin::root(),
-            bonds[0],
-        ));
+        assert_ok!(AgentRegistry::release_bond(RuntimeOrigin::root(), bonds[0],));
 
         let bond = AgentRegistry::bonds(bonds[0]).unwrap();
         assert_eq!(bond.status, BondStatus::Released);
@@ -548,12 +546,7 @@ fn record_consumption_rejects_quota_exceeded() {
 
         // Exceed default gas_per_block (1,000,000)
         assert_noop!(
-            AgentRegistry::record_consumption(
-                RuntimeOrigin::signed(ALICE),
-                0,
-                2_000_000,
-                0,
-            ),
+            AgentRegistry::record_consumption(RuntimeOrigin::signed(ALICE), 0, 2_000_000, 0,),
             Error::<Test>::QuotaExceeded
         );
     });
@@ -765,12 +758,30 @@ fn agent_id_for_account_works() {
 #[test]
 fn calculate_penalty_works() {
     new_test_ext().execute_with(|| {
-        assert_eq!(AgentRegistry::calculate_penalty(&SlashingReason::InvalidProof), 500);
-        assert_eq!(AgentRegistry::calculate_penalty(&SlashingReason::TaskGriefing), 200);
-        assert_eq!(AgentRegistry::calculate_penalty(&SlashingReason::CollusionDetected), 800);
-        assert_eq!(AgentRegistry::calculate_penalty(&SlashingReason::PolicyViolation), 350);
-        assert_eq!(AgentRegistry::calculate_penalty(&SlashingReason::RepeatOffender), 1200);
-        assert_eq!(AgentRegistry::calculate_penalty(&SlashingReason::BondExpired), 100);
+        assert_eq!(
+            AgentRegistry::calculate_penalty(&SlashingReason::InvalidProof),
+            500
+        );
+        assert_eq!(
+            AgentRegistry::calculate_penalty(&SlashingReason::TaskGriefing),
+            200
+        );
+        assert_eq!(
+            AgentRegistry::calculate_penalty(&SlashingReason::CollusionDetected),
+            800
+        );
+        assert_eq!(
+            AgentRegistry::calculate_penalty(&SlashingReason::PolicyViolation),
+            350
+        );
+        assert_eq!(
+            AgentRegistry::calculate_penalty(&SlashingReason::RepeatOffender),
+            1200
+        );
+        assert_eq!(
+            AgentRegistry::calculate_penalty(&SlashingReason::BondExpired),
+            100
+        );
     });
 }
 
@@ -868,12 +879,7 @@ fn cannot_slash_nonexistent_bond() {
     new_test_ext().execute_with(|| {
         let reason = b"test".to_vec();
         assert_noop!(
-            AgentRegistry::slash_bond(
-                RuntimeOrigin::root(),
-                H256::default(),
-                1,
-                reason,
-            ),
+            AgentRegistry::slash_bond(RuntimeOrigin::root(), H256::default(), 1, reason,),
             Error::<Test>::BondNotFound
         );
     });
@@ -968,9 +974,9 @@ fn set_proof_reward_works() {
         assert_eq!(stored.challenge_resolution_bonus, 250);
         assert!(stored.enabled);
 
-        System::assert_has_event(RuntimeEvent::AgentRegistry(Event::ProofRewardConfigUpdated {
-            config,
-        }));
+        System::assert_has_event(RuntimeEvent::AgentRegistry(
+            Event::ProofRewardConfigUpdated { config },
+        ));
     });
 }
 
@@ -985,10 +991,7 @@ fn set_proof_reward_requires_admin() {
         };
 
         assert_noop!(
-            AgentRegistry::set_proof_reward(
-                RuntimeOrigin::signed(ALICE),
-                config,
-            ),
+            AgentRegistry::set_proof_reward(RuntimeOrigin::signed(ALICE), config,),
             sp_runtime::DispatchError::BadOrigin
         );
     });

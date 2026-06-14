@@ -97,7 +97,11 @@ impl TemplateRegistry {
     pub fn list_by_chain(&self, chain: &str) -> Vec<&Template> {
         self.templates
             .values()
-            .filter(|t| t.chain_support.iter().any(|c| c.to_lowercase() == chain.to_lowercase()))
+            .filter(|t| {
+                t.chain_support
+                    .iter()
+                    .any(|c| c.to_lowercase() == chain.to_lowercase())
+            })
             .collect()
     }
 
@@ -105,7 +109,11 @@ impl TemplateRegistry {
     pub fn list_by_tag(&self, tag: &str) -> Vec<&Template> {
         self.templates
             .values()
-            .filter(|t| t.tags.iter().any(|tg| tg.to_lowercase() == tag.to_lowercase()))
+            .filter(|t| {
+                t.tags
+                    .iter()
+                    .any(|tg| tg.to_lowercase() == tag.to_lowercase())
+            })
             .collect()
     }
 
@@ -265,8 +273,18 @@ impl TemplateRegistry {
             "1.0.0",
             "X3 Foundry",
             "Apache-2.0",
-            vec!["domain".into(), "registry".into(), "dns".into(), "naming".into()],
-            vec!["DomainRegistry".into(), "DomainAuction".into(), "DNSResolver".into(), "DomainTreasury".into()],
+            vec![
+                "domain".into(),
+                "registry".into(),
+                "dns".into(),
+                "naming".into(),
+            ],
+            vec![
+                "DomainRegistry".into(),
+                "DomainAuction".into(),
+                "DNSResolver".into(),
+                "DomainTreasury".into(),
+            ],
             "React + TypeScript",
             vec!["x3-mainnet".into(), "x3-testnet".into(), "ethereum".into()],
         ));
@@ -382,7 +400,19 @@ mod tests {
     fn test_register_and_remove() {
         let mut registry = TemplateRegistry::new();
         assert_eq!(registry.count(), 0);
-        registry.register_template(Template::new("test", "Test", "Test template", DAppType::Custom("Test".into()), "1.0", "Test", "MIT", vec![], vec![], "React", vec!["x3".into()]));
+        registry.register_template(Template::new(
+            "test",
+            "Test",
+            "Test template",
+            DAppType::Custom("Test".into()),
+            "1.0",
+            "Test",
+            "MIT",
+            vec![],
+            vec![],
+            "React",
+            vec!["x3".into()],
+        ));
         assert_eq!(registry.count(), 1);
         let removed = registry.remove_template("test");
         assert!(removed.is_some());

@@ -171,7 +171,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       const job = await api.getAdminJobDetail(result.job_id);
       setSelectedJob(job);
       await loadCommands();
-    } catch (e) {
+    } catch {
       setError(`Failed: ${cmdId}`);
     } finally {
       setRunningCmds(prev => { const n = new Set(prev); n.delete(cmdId); return n; });
@@ -216,14 +216,14 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const agg = metrics?.aggregated;
   const services = metrics?.services || {};
   const gpuLanes = metrics?.gpu_lanes || [];
-  const chain = metrics?.chain as Record<string, any> | null | undefined;
+  const chain = metrics?.chain as Record<string, unknown> | null | undefined;
   const upstreams = metrics?.upstreams || [];
   const acceleratorBenchmark =
     metrics?.accelerator_benchmark || agg?.accelerator_benchmark || acceleratorConfig;
   // Filter history by time range
   const rangeSeconds = TIME_RANGES.find(r => r.key === timeRange)?.seconds || 300;
   const cutoff = Date.now() / 1000 - rangeSeconds;
-  const filteredHistory = metricsHistory.filter(p => (p as any).timestamp >= cutoff);
+  const filteredHistory = metricsHistory.filter(p => (p as unknown).timestamp >= cutoff);
 
   // ── Render helpers ──
 
@@ -304,7 +304,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
         <h3 className="text-sm font-bold text-white mb-3">TPS (last 5 minutes)</h3>
         <div className="h-32">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={filteredHistory.map(p => ({ time: tsToTime((p as any).timestamp), tps: p.current_tps }))}>
+            <AreaChart data={filteredHistory.map(p => ({ time: tsToTime((p as unknown).timestamp), tps: p.current_tps }))}>
               <defs>
                 <linearGradient id="tpsGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.4} />
@@ -327,7 +327,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             <h3 className="text-lg font-bold text-white">GPU Fleet</h3>
           </div>
           <div className="grid md:grid-cols-3 gap-3">
-            {gpuLanes.map((lane: any, i: number) => (
+            {gpuLanes.map((lane: unknown, i: number) => (
               <div key={i} className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-white text-sm font-semibold capitalize">
@@ -385,7 +385,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
         </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={filteredHistory.map(p => ({ time: tsToTime((p as any).timestamp), tps: p.current_tps, peak: p.peak_tps }))}>
+            <LineChart data={filteredHistory.map(p => ({ time: tsToTime((p as unknown).timestamp), tps: p.current_tps, peak: p.peak_tps }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="time" stroke="#9CA3AF" fontSize={11} />
               <YAxis stroke="#9CA3AF" fontSize={11} tickFormatter={fmtK} />
@@ -432,7 +432,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
           <h3 className="text-sm font-bold text-white mb-3">GPU Lane Distribution</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={gpuLanes.map((l: any) => ({
+              <BarChart data={gpuLanes.map((l: unknown) => ({
                 name: (l.service || '').replace('gpu-lane-', '').toUpperCase() || `GPU ${l.gpu?.id}`,
                 txns: l.stats?.total_txns || 0,
                 tps: Math.round(l.stats?.txns_per_second || 0),
@@ -468,49 +468,49 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               <Globe className="w-5 h-5 text-purple-400" />
               <h2 className="text-lg font-bold text-white">Solana Chain — Live</h2>
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              {(chain as any).version && (
+              {(chain as unknown).version && (
                 <span className="ml-auto text-xs text-gray-400 font-mono">
-                  Core {(chain as any).version['solana-core']}
+                  Core {(chain as unknown).version['solana-core']}
                 </span>
               )}
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                 <p className="text-xs text-gray-400 mb-1">Slot</p>
-                <p className="text-xl font-bold text-white font-mono">{fmt((chain as any).slot)}</p>
+                <p className="text-xl font-bold text-white font-mono">{fmt((chain as unknown).slot)}</p>
               </div>
               <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                 <p className="text-xs text-gray-400 mb-1">Epoch</p>
-                <p className="text-xl font-bold text-white font-mono">{fmt((chain as any).epoch?.epoch)}</p>
-                {(chain as any).epoch && (
+                <p className="text-xl font-bold text-white font-mono">{fmt((chain as unknown).epoch?.epoch)}</p>
+                {(chain as unknown).epoch && (
                   <div className="mt-2">
                     <div className="flex justify-between text-[10px] text-gray-400 mb-1">
-                      <span>{fmt((chain as any).epoch.slotIndex)}</span>
-                      <span>{fmt((chain as any).epoch.slotsInEpoch)}</span>
+                      <span>{fmt((chain as unknown).epoch.slotIndex)}</span>
+                      <span>{fmt((chain as unknown).epoch.slotsInEpoch)}</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-1.5">
-                      <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${((chain as any).epoch.slotIndex / (chain as any).epoch.slotsInEpoch * 100).toFixed(1)}%` }} />
+                      <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${((chain as unknown).epoch.slotIndex / (chain as unknown).epoch.slotsInEpoch * 100).toFixed(1)}%` }} />
                     </div>
                   </div>
                 )}
               </div>
               <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                 <p className="text-xs text-gray-400 mb-1">Block Height</p>
-                <p className="text-xl font-bold text-white font-mono">{fmt((chain as any).block_height)}</p>
+                <p className="text-xl font-bold text-white font-mono">{fmt((chain as unknown).block_height)}</p>
               </div>
               <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                 <p className="text-xs text-gray-400 mb-1">Network Txns</p>
                 <p className="text-xl font-bold text-white font-mono">
-                  {(chain as any).epoch?.transactionCount
-                    ? `${((chain as any).epoch.transactionCount / 1e9).toFixed(2)}B`
+                  {(chain as unknown).epoch?.transactionCount
+                    ? `${((chain as unknown).epoch.transactionCount / 1e9).toFixed(2)}B`
                     : '—'}
                 </p>
               </div>
             </div>
-            {(chain as any).latest_blockhash && (
+            {(chain as unknown).latest_blockhash && (
               <div className="bg-gray-900/50 rounded-lg p-3 font-mono text-xs">
                 <span className="text-gray-400 mr-2">Latest Blockhash:</span>
-                <span className="text-green-400 break-all">{(chain as any).latest_blockhash}</span>
+                <span className="text-green-400 break-all">{(chain as unknown).latest_blockhash}</span>
               </div>
             )}
           </div>
@@ -524,7 +524,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             <h3 className="text-sm font-semibold text-white">Upstream RPCs</h3>
           </div>
           <div className="space-y-2">
-            {upstreams.map((u: any) => (
+            {upstreams.map((u: unknown) => (
               <div key={u.name} className="flex items-center justify-between text-sm bg-gray-800/40 rounded-lg p-2">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${u.healthy ? 'bg-green-400' : 'bg-red-400'}`} />
@@ -679,7 +679,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
           <h3 className="text-sm font-bold text-white mb-3">Throughput Utilization Over Time</h3>
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={filteredHistory.map(p => ({ time: tsToTime((p as any).timestamp), util: p.throughput_utilization, dropped: p.dropped_tx_pct }))}>
+              <AreaChart data={filteredHistory.map(p => ({ time: tsToTime((p as unknown).timestamp), util: p.throughput_utilization, dropped: p.dropped_tx_pct }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="time" hide />
                 <YAxis stroke="#9CA3AF" fontSize={10} />

@@ -4,13 +4,23 @@
 //! for agents that submit proofs alongside their on-chain actions.
 
 use alloc::vec::Vec;
-use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use parity_scale_codec::DecodeWithMemTracking;
+use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 
 /// The kind of proof an agent can carry with an action.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+#[derive(
+    Encode,
+    Decode,
+    Clone,
+    PartialEq,
+    Eq,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    DecodeWithMemTracking,
+)]
 pub enum ProofKind {
     /// Zero-knowledge proof (e.g., Groth16, PLONK)
     ZkSnark,
@@ -29,7 +39,17 @@ pub enum ProofKind {
 }
 
 /// The status of a proof submission lifecycle.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+#[derive(
+    Encode,
+    Decode,
+    Clone,
+    PartialEq,
+    Eq,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    DecodeWithMemTracking,
+)]
 pub enum ProofStatus {
     /// Proof submitted, pending verification
     Pending,
@@ -102,7 +122,18 @@ pub struct VerifiedAction<AccountId, BlockNumber> {
 }
 
 /// Summary of an agent's proof submission statistics.
-#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+#[derive(
+    Default,
+    Encode,
+    Decode,
+    Clone,
+    PartialEq,
+    Eq,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    DecodeWithMemTracking,
+)]
 pub struct AgentProofStats {
     /// Total proofs submitted
     pub total_submitted: u64,
@@ -138,7 +169,17 @@ pub struct ProofChallenge<AccountId, BlockNumber> {
 }
 
 /// Resolution of a proof challenge.
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, DecodeWithMemTracking)]
+#[derive(
+    Encode,
+    Decode,
+    Clone,
+    PartialEq,
+    Eq,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    DecodeWithMemTracking,
+)]
 pub enum ChallengeResolution {
     /// Challenge upheld — original proof was invalid
     Upheld,
@@ -153,7 +194,9 @@ pub enum ChallengeResolution {
 /// NOTE: `MaxEncodedLen` is NOT derived because `min_challenge_stake` uses `u128`
 /// which doesn't implement it. The `#[pallet::without_storage_info]` attribute
 /// on the pallet struct removes the `MaxEncodedLen` requirement for storage items.
-#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, DecodeWithMemTracking)]
+#[derive(
+    Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, DecodeWithMemTracking,
+)]
 pub struct ProofConfig {
     /// Maximum blocks before a pending proof expires
     pub max_pending_blocks: u32,

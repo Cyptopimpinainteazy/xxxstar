@@ -32,7 +32,6 @@ pub mod pallet {
         frame_system::Config + pallet_aura::Config + pallet_grandpa::Config + pallet_session::Config
     {
         /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Maximum number of active validators
         #[pallet::constant]
@@ -305,7 +304,6 @@ pub mod pallet {
         }
     }
 
-
     impl<T: Config> Pallet<T> {
         /// Activate the next validator set
         fn activate_validator_set() {
@@ -339,17 +337,18 @@ pub mod pallet {
 
         /// Record the block proposer for the given block number.
         ///
-        /// The proposer is determined by the Aura slot assignment:
-        /// `authorities[slot % authorities.len()]`.
+        /// Uses the current validator set to determine the proposer based on
+        /// the Aura slot assignment: `validators[slot % validators.len()]`.
         fn record_block_proposer(block_number: BlockNumberFor<T>) {
-            let authorities = pallet_aura::Authorities::<T>::get();
-            if authorities.is_empty() {
+            let validators = Validators::<T>::get();
+            if validators.is_empty() {
                 return;
             }
             let slot = pallet_aura::CurrentSlot::<T>::get();
-            let idx = (slot.0 as usize) % authorities.len();
-            if let Some(authority) = authorities.get(idx) {
-                BlockProposer::<T>::insert(block_number, authority.clone());
+            let slot_value: u64 = slot.into();
+            let idx = (slot_value as usize) % validators.len();
+            if let Some(account_id) = validators.get(idx) {
+                BlockProposer::<T>::insert(block_number, account_id.clone());
             }
         }
 
@@ -362,7 +361,6 @@ pub mod pallet {
         pub fn is_validator(who: &T::AccountId) -> bool {
             Validators::<T>::get().contains(who)
         }
-
 
         /// Slash a validator by a dynamic perbill fraction.
         pub fn slash_validator(

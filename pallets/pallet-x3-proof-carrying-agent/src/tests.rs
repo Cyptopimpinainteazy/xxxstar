@@ -9,13 +9,11 @@
 //! - clean_expired_proofs (expired cleanup)
 
 use crate::mock::*;
-use crate::{
-    Error, Event,
-};
 use crate::types::{
     AgentProofStats, ChallengeResolution, ProofChallenge, ProofConfig, ProofKind, ProofStatus,
     VerifiedAction,
 };
+use crate::{Error, Event};
 use frame_support::{assert_noop, assert_ok, traits::Currency};
 
 // ── Helper ──────────────────────────────────────────────────────────────────
@@ -48,9 +46,7 @@ fn submit_default_action(agent: u64, nonce: u64) -> [u8; 32] {
 fn get_action_id_from_events() -> [u8; 32] {
     let events = frame_system::Pallet::<Test>::events();
     for event in events.iter().rev() {
-        if let Event::ActionSubmitted { action_id, .. } =
-            event.event.clone().try_into().unwrap()
-        {
+        if let Event::ActionSubmitted { action_id, .. } = event.event.clone().try_into().unwrap() {
             return action_id;
         }
     }
@@ -337,12 +333,7 @@ fn test_verify_action_not_found() {
         System::set_block_number(1);
 
         assert_noop!(
-            ProofCarryingAgent::verify_action(
-                RuntimeOrigin::signed(BOB),
-                [0u8; 32],
-                true,
-                vec![],
-            ),
+            ProofCarryingAgent::verify_action(RuntimeOrigin::signed(BOB), [0u8; 32], true, vec![],),
             Error::<Test>::ActionNotFound
         );
     });
@@ -364,12 +355,7 @@ fn test_verify_action_already_verified() {
 
         // Verify again should fail
         assert_noop!(
-            ProofCarryingAgent::verify_action(
-                RuntimeOrigin::signed(BOB),
-                action_id,
-                true,
-                vec![],
-            ),
+            ProofCarryingAgent::verify_action(RuntimeOrigin::signed(BOB), action_id, true, vec![],),
             Error::<Test>::VerificationFailed
         );
     });
@@ -391,12 +377,7 @@ fn test_verify_action_already_failed() {
 
         // Try to verify again should fail
         assert_noop!(
-            ProofCarryingAgent::verify_action(
-                RuntimeOrigin::signed(BOB),
-                action_id,
-                true,
-                vec![],
-            ),
+            ProofCarryingAgent::verify_action(RuntimeOrigin::signed(BOB), action_id, true, vec![],),
             Error::<Test>::VerificationFailed
         );
     });
@@ -465,11 +446,7 @@ fn test_challenge_proof_not_verified() {
 
         // Can't challenge a pending proof
         assert_noop!(
-            ProofCarryingAgent::challenge_proof(
-                RuntimeOrigin::signed(BOB),
-                action_id,
-                vec![],
-            ),
+            ProofCarryingAgent::challenge_proof(RuntimeOrigin::signed(BOB), action_id, vec![],),
             Error::<Test>::NotChallengeable
         );
     });
@@ -481,11 +458,7 @@ fn test_challenge_proof_not_found() {
         System::set_block_number(1);
 
         assert_noop!(
-            ProofCarryingAgent::challenge_proof(
-                RuntimeOrigin::signed(BOB),
-                [0u8; 32],
-                vec![],
-            ),
+            ProofCarryingAgent::challenge_proof(RuntimeOrigin::signed(BOB), [0u8; 32], vec![],),
             Error::<Test>::ActionNotFound
         );
     });
@@ -517,11 +490,7 @@ fn test_challenge_proof_duplicate() {
 
         // Second challenge should fail — action is already challenged, not challengeable
         assert_noop!(
-            ProofCarryingAgent::challenge_proof(
-                RuntimeOrigin::signed(CHARLIE),
-                action_id,
-                vec![],
-            ),
+            ProofCarryingAgent::challenge_proof(RuntimeOrigin::signed(CHARLIE), action_id, vec![],),
             Error::<Test>::NotChallengeable
         );
     });
@@ -547,11 +516,7 @@ fn test_challenge_proof_insufficient_balance() {
         // The reserve call returns a module error from pallet_balances
         // (InsufficientBalance), not our custom InsufficientChallengeStake error
         assert_noop!(
-            ProofCarryingAgent::challenge_proof(
-                RuntimeOrigin::signed(BOB),
-                action_id,
-                vec![],
-            ),
+            ProofCarryingAgent::challenge_proof(RuntimeOrigin::signed(BOB), action_id, vec![],),
             pallet_balances::Error::<Test>::InsufficientBalance
         );
     });
@@ -829,10 +794,7 @@ fn test_set_proof_config_not_admin() {
         };
 
         assert_noop!(
-            ProofCarryingAgent::set_proof_config(
-                RuntimeOrigin::signed(BOB),
-                new_config,
-            ),
+            ProofCarryingAgent::set_proof_config(RuntimeOrigin::signed(BOB), new_config,),
             sp_runtime::traits::BadOrigin
         );
     });
@@ -1136,11 +1098,7 @@ fn test_challenge_failed_action() {
 
         // Can't challenge a failed action
         assert_noop!(
-            ProofCarryingAgent::challenge_proof(
-                RuntimeOrigin::signed(BOB),
-                action_id,
-                vec![],
-            ),
+            ProofCarryingAgent::challenge_proof(RuntimeOrigin::signed(BOB), action_id, vec![],),
             Error::<Test>::NotChallengeable
         );
     });
@@ -1161,11 +1119,7 @@ fn test_challenge_expired_action() {
 
         // Can't challenge an expired action
         assert_noop!(
-            ProofCarryingAgent::challenge_proof(
-                RuntimeOrigin::signed(BOB),
-                action_id,
-                vec![],
-            ),
+            ProofCarryingAgent::challenge_proof(RuntimeOrigin::signed(BOB), action_id, vec![],),
             Error::<Test>::NotChallengeable
         );
     });

@@ -8,7 +8,7 @@ import { LimitOrderInterface } from './components/LimitOrderInterface';
 export default function HomePage() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletId, setWalletId] = useState('');
-  const [rpcEndpoint] = useState('ws://localhost:9944');
+  const [rpcEndpoint] = useState('wss://ws.x3star.net');
   const [activeTab, setActiveTab] = useState<'swap' | 'limit'>('swap');
 
   const handleConnect = (id: string) => {

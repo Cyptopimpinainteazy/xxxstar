@@ -19,6 +19,9 @@ use sp_runtime::DispatchError;
 /// Uses a two-phase commit (2PC) protocol: prepare → commit/abort.
 use sp_std::vec::Vec;
 
+/// Simplified type for Ethereum transaction parsing results
+type EthTransactionResult = Result<(Vec<u8>, Vec<u8>, u128, u64, Vec<u8>, u64, u128), Vec<u8>>;
+
 // Gap #3: Merkle proof validator for cross-VM bridge settlement
 pub mod merkle_proof_validator;
 // Gap #3: Merkle settlement integration for bridge commit phase
@@ -246,9 +249,7 @@ pub trait CrossVmDispatcher {
     }
 
     /// Parse raw Ethereum transaction metadata including gas and input fields.
-    fn parse_ethereum_transaction_with_gas(
-        _raw_tx: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>, u128, u64, Vec<u8>, u64, u128), Vec<u8>>
+    fn parse_ethereum_transaction_with_gas(_raw_tx: &[u8]) -> EthTransactionResult
     where
         Self: Sized,
     {

@@ -260,7 +260,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// Runtime event type
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Origin that can propose mutations (AI agents, authorized validators)
         type EvolutionAuthority: EnsureOrigin<Self::RuntimeOrigin>;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { RegisterPage } from './components/RegisterPage';
 import { LoginPage } from './components/LoginPage';
 import { Dashboard } from './components/Dashboard';
@@ -10,16 +10,10 @@ import { api } from './api';
 type Page = 'register' | 'login' | 'dashboard' | 'admin-login' | 'admin' | 'chains';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('register');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    // Check if user is already authenticated
-    if (api.isAuthenticated()) {
-      setIsAuthenticated(true);
-      setCurrentPage('dashboard');
-    }
-  }, []);
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    return api.isAuthenticated() ? 'dashboard' : 'register';
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(() => api.isAuthenticated());
 
   const handleRegisterSuccess = () => {
     setIsAuthenticated(true);

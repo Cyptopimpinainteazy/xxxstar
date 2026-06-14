@@ -23,7 +23,6 @@
 //    - Enable forensic analysis of supply anomalies
 //    - Support regulatory compliance requirements
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;

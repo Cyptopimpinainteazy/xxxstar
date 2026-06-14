@@ -21,20 +21,20 @@ export interface JsonRpcOptions {
 export interface JsonRpcRequest {
     jsonrpc: '2.0';
     method: string;
-    params?: any[];
+    params?: unknown[];
     id: number | string;
 }
 
 /**
  * JSON-RPC response
  */
-export interface JsonRpcResponse<T = any> {
+export interface JsonRpcResponse<T = unknown> {
     jsonrpc: '2.0';
     result?: T;
     error?: {
         code: number;
         message: string;
-        data?: any;
+        data?: unknown;
     };
     id: number | string;
 }
@@ -59,7 +59,7 @@ export class JsonRpcProvider {
     private url: string;
     private wsUrl: string;
     private ws: WebSocket | null = null;
-    private subscriptions: Map<string, SubscriptionCallback<any>> = new Map();
+    private subscriptions: Map<string, SubscriptionCallback<unknown>> = new Map();
     private nextId: number = 1;
     private timeout: number;
 
@@ -74,7 +74,7 @@ export class JsonRpcProvider {
      * @param method - RPC method name
      * @param params - Request parameters
      */
-    async request<T>(method: string, params: any[] = []): Promise<T> {
+    async request<T>(method: string, params: unknown[] = []): Promise<T> {
         const payload: JsonRpcRequest = {
             jsonrpc: '2.0',
             method,
@@ -108,7 +108,7 @@ export class JsonRpcProvider {
      * @param params - Subscription parameters
      * @param callback - Callback function for updates
      */
-    subscribe<T>(method: string, params: any[] = [], callback: SubscriptionCallback<T>): Promise<string> {
+    subscribe<T>(method: string, params: unknown[] = [], callback: SubscriptionCallback<T>): Promise<string> {
         return new Promise((resolve, reject) => {
             if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
                 this.connectWebSocket().then(() => {
@@ -144,7 +144,7 @@ export class JsonRpcProvider {
 
     private doSubscribe<T>(
         method: string,
-        params: any[],
+        params: unknown[],
         callback: SubscriptionCallback<T>,
         resolve: (id: string) => void,
         reject: (error: Error) => void
@@ -173,7 +173,7 @@ export class JsonRpcProvider {
 
     private handleWebSocketMessage(event: MessageEvent): void {
         try {
-            const data: JsonRpcResponse<any> = JSON.parse(event.data);
+            const data: JsonRpcResponse<unknown> = JSON.parse(event.data);
 
             // Handle subscription notification
             if (data.method && data.params && data.params.subscription) {

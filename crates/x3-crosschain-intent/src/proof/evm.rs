@@ -19,6 +19,7 @@
 //! - Does NOT trust the receipt index: the trie proof proves inclusion at the claimed index.
 //! - Fails closed on any decoding error, hash mismatch, or log mismatch.
 
+use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -264,6 +265,7 @@ fn rlp_encode_bytes(value: &[u8]) -> Vec<u8> {
 }
 
 /// RLP-encode a list of RLP-encoded items.
+#[allow(dead_code)]
 fn rlp_encode_list(items: &[Vec<u8>]) -> Vec<u8> {
     let payload: Vec<u8> = items.iter().flat_map(|i| i.clone()).collect();
     if payload.len() <= 55 {
@@ -354,11 +356,11 @@ fn extract_logs_from_receipt(receipt_rlp: &RlpItem) -> Result<Vec<EvmLog>, EvmPr
 /// Decode receipt status from RLP receipt.
 fn decode_receipt_status(receipt_rlp: &RlpItem) -> Result<u8, EvmProofError> {
     match receipt_rlp {
-        RlpItem::List(items) if items.len() >= 1 => match &items[0] {
+        RlpItem::List(items) if !items.is_empty() => match &items[0] {
             RlpItem::String(b) => {
                 if b.is_empty() {
                     Ok(0)
-                } else if b == &[0x01] || b == &[0x01u8] {
+                } else if b == &[0x01] {
                     Ok(1)
                 } else if b.len() == 1 {
                     Ok(b[0])

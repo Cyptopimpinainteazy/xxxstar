@@ -149,7 +149,7 @@ members = [
     "crates/x3-gateway-indexer",       # <- crosschain-gateway
     "crates/x3-gateway-insurance",     # <- crosschain-gateway
     "crates/x3-proof-envelope",        # <- crosschain-gateway, proof-attestation
-    "crates/x3-crosschain-gateway",    # <- pallet-x3-crosschain-gateway
+    # "crates/x3-crosschain-gateway",    # <- external-bridge crate; excluded from v0.4 internal testnet build per TESTNET_FEATURE_FLAGS.toml (atomic_gateway GUARDED_TESTNET)
     "pallets/x3-crosschain-gateway",   # <- crosschain-gateway pallet
     # P1-FIX: excluded crates referenced as path deps by workspace members (x3-gateway, x3-gpu-validator-swarm, x3-integration)
     # Direct imports (level-1):

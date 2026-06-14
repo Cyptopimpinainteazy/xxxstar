@@ -358,6 +358,7 @@ fn validate_live_json_chain_spec_file(path: &PathBuf) -> Result<(), String> {
     validate_live_json_chain_spec_value(&value)
 }
 
+#[allow(missing_docs)]
 pub fn load_json_spec(path: PathBuf) -> Result<ChainSpec, String> {
     validate_live_json_chain_spec_file(&path)?;
     ChainSpec::from_json_file(path).map_err(|e| e.to_string())

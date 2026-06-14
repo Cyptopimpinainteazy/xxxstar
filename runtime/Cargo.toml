@@ -88,6 +88,7 @@ pallet-x3-automation = { path = "../pallets/x3-automation", default-features = f
 pallet-x3-oracle = { path = "../pallets/x3-oracle", default-features = false }
 pallet-x3-vrf = { path = "../pallets/x3-vrf", default-features = false }
 pallet-x3-dex = { path = "../pallets/x3-dex", default-features = false }
+x3-dex = { path = "../crates/x3-dex", default-features = false }
 x3-svm-integration = { path = "../crates/svm-integration", default-features = false }
 pallet-meme-overlord = { path = "../pallets/meme-overlord", default-features = false }
 # IXL instruction-set and IBC-style packet standard (no_std, safe in WASM).
@@ -157,7 +158,8 @@ substrate-wasm-builder = { workspace = true }
 [dev-dependencies]
 
 [features]
-default = ["std"]
+default = ["std", "tuples-96"]
+tuples-96 = ["frame-support/tuples-96"]
 dev = ["pallet-sudo"]
 
 # Narrow pallet set for first public testnet / mainnet-rc1 release.
@@ -252,6 +254,7 @@ std = [
 	"pallet-x3-oracle/std",
 	"pallet-x3-vrf/std",
 	"pallet-x3-dex/std",
+	"x3-dex/std",
 	"x3-svm-integration/std",
 	"x3-ixl/std",
 	"x3-packet-standard/std",

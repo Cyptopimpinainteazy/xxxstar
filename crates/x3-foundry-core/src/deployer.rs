@@ -1,5 +1,5 @@
 use crate::error::FoundryError;
-use crate::types::{DeploymentReceipt, DAppType};
+use crate::types::{DAppType, DeploymentReceipt};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -43,7 +43,10 @@ pub struct Deployer {
 
 impl Deployer {
     pub fn new(deployer_key: String, default_chain: String) -> Self {
-        Self { deployer_key, default_chain }
+        Self {
+            deployer_key,
+            default_chain,
+        }
     }
 
     /// Deploys all smart contracts for the dApp.
@@ -53,12 +56,20 @@ impl Deployer {
         deployment_order: &[String],
         chain: &str,
     ) -> Result<Vec<DeployedContractInfo>, FoundryError> {
-        info!("Deployer: deploying {} contracts to {}", contracts.len(), chain);
+        info!(
+            "Deployer: deploying {} contracts to {}",
+            contracts.len(),
+            chain
+        );
         let mut deployed = Vec::new();
 
         for contract_name in deployment_order {
-            let source = contracts.get(contract_name)
-                .ok_or_else(|| FoundryError::DeploymentFailed(format!("Contract {} not found in source map", contract_name)))?;
+            let source = contracts.get(contract_name).ok_or_else(|| {
+                FoundryError::DeploymentFailed(format!(
+                    "Contract {} not found in source map",
+                    contract_name
+                ))
+            })?;
 
             // Simulate deployment
             let address = self.simulate_deploy(contract_name, source, chain);
@@ -69,13 +80,18 @@ impl Deployer {
             deployed.push(DeployedContractInfo {
                 name: contract_name.clone(),
                 address,
-                tx_hash,
+                tx_hash: tx_hash.clone(),
                 block_number,
                 gas_used,
                 verified: false,
             });
 
-            info!("Deployed {} at {} (tx: {})", contract_name, deployed.last().unwrap().address, tx_hash);
+            info!(
+                "Deployed {} at {} (tx: {})",
+                contract_name,
+                deployed.last().unwrap().address,
+                tx_hash
+            );
         }
 
         Ok(deployed)
@@ -89,8 +105,14 @@ impl Deployer {
         routes: &[String],
         api_endpoints: &[String],
     ) -> Result<String, FoundryError> {
-        info!("Deployer: deploying frontend for {} using {}", app_name, frontend_framework);
-        let url = format!("https://{}.x3-app.io", app_name.to_lowercase().replace(' ', "-"));
+        info!(
+            "Deployer: deploying frontend for {} using {}",
+            app_name, frontend_framework
+        );
+        let url = format!(
+            "https://{}.x3-app.io",
+            app_name.to_lowercase().replace(' ', "-")
+        );
         info!("Frontend deployed at: {}", url);
         Ok(url)
     }
@@ -111,8 +133,9 @@ impl Deployer {
             "deployed_at": Utc::now().to_rfc3339(),
             "deployer": self.deployer_key,
         });
-        let metadata_str = serde_json::to_string(&metadata)
-            .map_err(|e| FoundryError::DeploymentFailed(format!("Failed to serialize metadata: {}", e)))?;
+        let metadata_str = serde_json::to_string(&metadata).map_err(|e| {
+            FoundryError::DeploymentFailed(format!("Failed to serialize metadata: {}", e))
+        })?;
         let mut hasher = Sha256::new();
         hasher.update(metadata_str.as_bytes());
         let hash = hex::encode(hasher.finalize());
@@ -130,9 +153,16 @@ impl Deployer {
     ) -> Result<Vec<String>, FoundryError> {
         info!("Deployer: deploying treasury hooks for {}", treasury_wallet);
         let hooks = vec![
-            format!("FeeCollector: {} bps -> {}", platform_fee_bps, treasury_wallet),
+            format!(
+                "FeeCollector: {} bps -> {}",
+                platform_fee_bps, treasury_wallet
+            ),
             format!("RevenueDistributor: deployed on {}", chain),
-            format!("TreasuryHook: 0x{}...{}", &self.deployer_key[..8], &self.deployer_key[self.deployer_key.len().saturating_sub(8)..]),
+            format!(
+                "TreasuryHook: 0x{}...{}",
+                &self.deployer_key[..8],
+                &self.deployer_key[self.deployer_key.len().saturating_sub(8)..]
+            ),
         ];
         Ok(hooks)
     }
@@ -152,13 +182,15 @@ impl Deployer {
     }
 
     /// Deploys analytics tracking.
-    pub fn deploy_analytics(
-        &self,
-        app_name: &str,
-        chain: &str,
-    ) -> Result<String, FoundryError> {
-        info!("Deployer: deploying analytics for {} on {}", app_name, chain);
-        let endpoint = format!("https://analytics.x3-chain.io/api/v1/apps/{}/events", app_name.to_lowercase().replace(' ', "-"));
+    pub fn deploy_analytics(&self, app_name: &str, chain: &str) -> Result<String, FoundryError> {
+        info!(
+            "Deployer: deploying analytics for {} on {}",
+            app_name, chain
+        );
+        let endpoint = format!(
+            "https://analytics.x3-chain.io/api/v1/apps/{}/events",
+            app_name.to_lowercase().replace(' ', "-")
+        );
         info!("Analytics endpoint: {}", endpoint);
         Ok(endpoint)
     }
@@ -206,7 +238,10 @@ impl Deployer {
 
     /// Signs a deployment receipt.
     pub fn sign_receipt(&self, receipt: &mut DeploymentReceipt) {
-        let receipt_data = format!("{:?}{:?}{}", receipt.contract_addresses, receipt.tx_hashes, self.deployer_key);
+        let receipt_data = format!(
+            "{:?}{:?}{}",
+            receipt.contract_addresses, receipt.tx_hashes, self.deployer_key
+        );
         let mut hasher = Sha256::new();
         hasher.update(receipt_data.as_bytes());
         receipt.signature = hex::encode(hasher.finalize());
@@ -216,7 +251,13 @@ impl Deployer {
 
     /// Simulates contract deployment (generates a deterministic address).
     fn simulate_deploy(&self, contract_name: &str, source: &str, chain: &str) -> String {
-        let input = format!("{}{}{}{}", contract_name, source.len(), chain, self.deployer_key);
+        let input = format!(
+            "{}{}{}{}",
+            contract_name,
+            source.len(),
+            chain,
+            self.deployer_key
+        );
         let mut hasher = Sha256::new();
         hasher.update(input.as_bytes());
         let hash = hex::encode(hasher.finalize());
@@ -225,7 +266,12 @@ impl Deployer {
 
     /// Computes a deterministic transaction hash.
     fn compute_tx_hash(&self, contract_name: &str, chain: &str) -> String {
-        let input = format!("deploy-{}-{}-{}", contract_name, chain, Utc::now().timestamp());
+        let input = format!(
+            "deploy-{}-{}-{}",
+            contract_name,
+            chain,
+            Utc::now().timestamp()
+        );
         let mut hasher = Sha256::new();
         hasher.update(input.as_bytes());
         hex::encode(hasher.finalize())
@@ -271,8 +317,12 @@ impl CrossChainDeployer {
         let mut results = HashMap::new();
 
         for chain in chains {
-            let deployer = self.deployers.get(chain)
-                .ok_or_else(|| FoundryError::DeploymentFailed(format!("No deployer configured for chain {}", chain)))?;
+            let deployer = self.deployers.get(chain).ok_or_else(|| {
+                FoundryError::DeploymentFailed(format!(
+                    "No deployer configured for chain {}",
+                    chain
+                ))
+            })?;
             let deployed = deployer.deploy_contracts(contracts, deployment_order, chain)?;
             results.insert(chain.clone(), deployed);
         }
@@ -321,7 +371,10 @@ mod tests {
     fn test_deploy_contracts() {
         let deployer = Deployer::new("test-key".into(), "x3-testnet".into());
         let mut contracts = HashMap::new();
-        contracts.insert("TestToken".into(), "pragma solidity ^0.8.20;\ncontract TestToken {}".into());
+        contracts.insert(
+            "TestToken".into(),
+            "pragma solidity ^0.8.20;\ncontract TestToken {}".into(),
+        );
         let order = vec!["TestToken".into()];
         let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
         assert!(result.is_ok());
@@ -341,11 +394,21 @@ mod tests {
     #[test]
     fn test_cross_chain() {
         let mut cc = CrossChainDeployer::new();
-        cc.add_chain("x3-mainnet".into(), Deployer::new("key1".into(), "x3-mainnet".into()));
-        cc.add_chain("ethereum".into(), Deployer::new("key2".into(), "ethereum".into()));
+        cc.add_chain(
+            "x3-mainnet".into(),
+            Deployer::new("key1".into(), "x3-mainnet".into()),
+        );
+        cc.add_chain(
+            "ethereum".into(),
+            Deployer::new("key2".into(), "ethereum".into()),
+        );
         let mut contracts = HashMap::new();
         contracts.insert("Token".into(), "contract Token {}".into());
-        let result = cc.deploy_to_chains(&contracts, &["Token".into()], &["x3-mainnet".into(), "ethereum".into()]);
+        let result = cc.deploy_to_chains(
+            &contracts,
+            &["Token".into()],
+            &["x3-mainnet".into(), "ethereum".into()],
+        );
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 2);
     }

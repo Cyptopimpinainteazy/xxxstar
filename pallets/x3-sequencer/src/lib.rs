@@ -44,8 +44,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Currency for sequencing fees.
         type Currency: ReservableCurrency<Self::AccountId>;
 
@@ -103,7 +101,8 @@ pub mod pallet {
     /// pallet to verify scheduler commitment divergence claims.
     #[pallet::storage]
     #[pallet::getter(fn scheduler_commitment)]
-    pub type SchedulerCommitment<T: Config> = StorageMap<_, Blake2_128Concat, u32, H256, OptionQuery>;
+    pub type SchedulerCommitment<T: Config> =
+        StorageMap<_, Blake2_128Concat, u32, H256, OptionQuery>;
 
     // ── Types ──────────────────────────────────────────────────────────────
 
@@ -337,5 +336,4 @@ pub mod pallet {
             PendingTxs::<T>::get().len() as u32
         }
     }
-
 }

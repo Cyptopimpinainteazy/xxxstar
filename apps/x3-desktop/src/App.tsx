@@ -58,7 +58,7 @@ export function App() {
       {/* HUD toggle hint */}
       {!showOverlay && (
         <button
-          className="absolute top-4 left-4 z-10 px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white/70 rounded border border-white/10"
+          className="absolute top-4 left-4 z-50 px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 text-white/70 rounded border border-white/10"
           onClick={() => setShowOverlay(true)}
         >
           Show HUD

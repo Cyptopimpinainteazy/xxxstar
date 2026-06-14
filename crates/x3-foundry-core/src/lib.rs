@@ -24,8 +24,8 @@ use crate::security::SecurityAuditor;
 use crate::simulator::Simulator;
 use crate::templates::TemplateRegistry;
 use crate::types::{
-    AppHealthScore, DAppType, DeploymentReceipt, FeeMode, MarketplaceListing, PricingTier,
-    ProjectState, ProjectStatus, RevenueConfig, RevenueReport, SecurityReport, SimulationResult,
+    AppHealthScore, DAppType, DeploymentReceipt, MarketplaceListing, PricingTier, RevenueReport,
+    SecurityReport, SimulationResult,
 };
 use chrono::Utc;
 use std::collections::HashMap;
@@ -55,8 +55,14 @@ impl FoundryEngine {
         let revenue_tracker = RevenueTracker::new(FeeConfig::default(), TreasurySplit::default());
 
         let mut cross_chain_deployer = CrossChainDeployer::new();
-        cross_chain_deployer.add_chain("x3-testnet".to_string(), Deployer::new(deployer_key.clone(), "x3-testnet".to_string()));
-        cross_chain_deployer.add_chain("x3-mainnet".to_string(), Deployer::new(deployer_key, "x3-mainnet".to_string()));
+        cross_chain_deployer.add_chain(
+            "x3-testnet".to_string(),
+            Deployer::new(deployer_key.clone(), "x3-testnet".to_string()),
+        );
+        cross_chain_deployer.add_chain(
+            "x3-mainnet".to_string(),
+            Deployer::new(deployer_key, "x3-mainnet".to_string()),
+        );
 
         Self {
             generator: Generator::new(),
@@ -74,7 +80,10 @@ impl FoundryEngine {
     /// Takes a user prompt and creator wallet address, and returns the complete
     /// deployment receipt if successful.
     pub fn run(&self, prompt: &str, creator_wallet: &str) -> Result<PipelineResult, FoundryError> {
-        info!("FoundryEngine: starting full pipeline for prompt: {}", prompt);
+        info!(
+            "FoundryEngine: starting full pipeline for prompt: {}",
+            prompt
+        );
 
         // Step 1: Generate
         info!("Step 1/4: Generating dApp from prompt...");
@@ -89,7 +98,11 @@ impl FoundryEngine {
             )));
         }
 
-        info!("Generation complete: {} ({})", plan.name, plan.dapp_type.label());
+        info!(
+            "Generation complete: {} ({})",
+            plan.name,
+            plan.dapp_type.label()
+        );
 
         // Step 2: Audit
         info!("Step 2/4: Auditing dApp...");
@@ -101,14 +114,20 @@ impl FoundryEngine {
         );
 
         if !security_report.passed {
-            error!("Security audit failed with risk score: {}", security_report.risk_score);
+            error!(
+                "Security audit failed with risk score: {}",
+                security_report.risk_score
+            );
             return Err(FoundryError::SecurityAuditFailed(format!(
                 "Security audit failed. Risk score: {}. Critical findings: {:?}",
                 security_report.risk_score, security_report.critical_findings
             )));
         }
 
-        info!("Audit passed with risk score: {}", security_report.risk_score);
+        info!(
+            "Audit passed with risk score: {}",
+            security_report.risk_score
+        );
 
         // Step 3: Simulate
         info!("Step 3/4: Simulating dApp...");
@@ -127,7 +146,11 @@ impl FoundryEngine {
 
         // Step 4: Deploy
         info!("Step 4/4: Deploying dApp...");
-        let target_chain = plan.target_chains.first().cloned().unwrap_or_else(|| "x3-testnet".to_string());
+        let target_chain = plan
+            .target_chains
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "x3-testnet".to_string());
         let deployed_contracts = self.deployer.deploy_contracts(
             &contracts.contracts,
             &contracts.deployment_order,
@@ -141,11 +164,9 @@ impl FoundryEngine {
             &frontend.api_endpoints,
         )?;
 
-        let metadata_uri = self.deployer.deploy_metadata(
-            &plan.name,
-            &plan.description,
-            &plan.features,
-        )?;
+        let metadata_uri =
+            self.deployer
+                .deploy_metadata(&plan.name, &plan.description, &plan.features)?;
 
         let treasury_hooks = self.deployer.deploy_treasury_hooks(
             &tokenomics.revenue_config.treasury_wallet,
@@ -202,7 +223,10 @@ impl FoundryEngine {
             signature: String::new(),
             signed_at: Utc::now(),
             manifest_hash: manifest.manifest_hash.clone(),
-            block_number: deployed_contracts.first().map(|c| c.block_number).unwrap_or(0),
+            block_number: deployed_contracts
+                .first()
+                .map(|c| c.block_number)
+                .unwrap_or(0),
             gas_used: total_gas,
         };
 
@@ -263,7 +287,12 @@ impl FoundryEngine {
         creator_wallet: String,
         pricing_tier: PricingTier,
     ) -> MarketplaceListing {
-        let mut listing = MarketplaceListing::new(title, uuid::Uuid::new_v4().to_string(), dapp_type, creator_wallet);
+        let mut listing = MarketplaceListing::new(
+            title,
+            uuid::Uuid::new_v4().to_string(),
+            dapp_type,
+            creator_wallet,
+        );
         listing.description = description;
         listing.pricing_tier = pricing_tier;
         listing
@@ -345,7 +374,10 @@ mod tests {
     #[test]
     fn test_full_pipeline() {
         let engine = FoundryEngine::new("deployer-key".into(), "auditor-key".into());
-        let result = engine.run("Create a token launchpad called MyToken for DeFi", "0xCreatorWallet");
+        let result = engine.run(
+            "Create a token launchpad called MyToken for DeFi",
+            "0xCreatorWallet",
+        );
         assert!(result.is_ok());
         let pipeline = result.unwrap();
         assert!(pipeline.receipt.signature.len() == 64);

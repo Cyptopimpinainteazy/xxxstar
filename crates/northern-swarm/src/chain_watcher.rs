@@ -109,11 +109,11 @@ impl ChainWatcher {
     /// - `hex:<hex>`     → inline bytes, decoded immediately
     async fn fetch_payload(&self, task: &NorthernTask) -> Result<TaskPayload, NorthernSwarmError> {
         if let Some(cid) = task.payload_uri.strip_prefix("ipfs://") {
-            let gateway = self
-                .config
-                .ipfs_gateway
-                .as_deref()
-                .unwrap_or("https://ipfs.io");
+            let gateway = if self.config.ipfs_gateway.is_empty() {
+                "https://ipfs.io"
+            } else {
+                &self.config.ipfs_gateway
+            };
             let url = format!("{gateway}/ipfs/{cid}");
             let resp = self.http_client.get(&url).send().await.map_err(|e| {
                 NorthernSwarmError::PayloadFetch {
@@ -188,13 +188,13 @@ impl ChainWatcher {
                 reason: e.to_string(),
             })?;
 
-        let json: Value = resp
-            .json()
-            .await
-            .map_err(|e| NorthernSwarmError::ChainConnection {
-                url: self.config.chain_rpc_url.clone(),
-                reason: format!("decode response: {e}"),
-            })?;
+        let mut json: Value =
+            resp.json()
+                .await
+                .map_err(|e| NorthernSwarmError::ChainConnection {
+                    url: self.config.chain_rpc_url.clone(),
+                    reason: format!("decode response: {e}"),
+                })?;
 
         if let Some(err) = json.get("error") {
             return Err(NorthernSwarmError::ChainConnection {

@@ -83,7 +83,7 @@ pub use weights::WeightInfo;
 #[frame_support::pallet]
 pub mod pallet {
     use super::proof::{BundleLeg, PoaeProof, VmType};
-    use crate::vm_revert::{LegReceipt, StateDiff, VmReverter};
+    use crate::vm_revert::{StateDiff, VmReverter};
     use crate::weights::WeightInfo;
     use frame_support::{
         dispatch::DispatchResult,

@@ -16,10 +16,6 @@ use sp_blockchain::HeaderBackend;
 use sp_runtime::DigestItem;
 use std::sync::Arc;
 use x3_chain_runtime::{opaque::Block, AccountId, AssetId, Balance};
-use x3_common::{
-    signing::{Ed25519Signer, KeyType, Secp256k1Signer, Signer, Sr25519Signer},
-    weight_metering::{ComputeMeter, GasMeter, Operation, WeightConfig, WeightMeter},
-};
 
 /// Decode a SVM pubkey from either a 0x-prefixed hex string (32 bytes) or
 /// a base58-encoded Solana-style pubkey.

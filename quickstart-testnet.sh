@@ -5,11 +5,12 @@
 
 set -e
 
-PROJECT_DIR="/home/lojak/Desktop/X3_ATOMIC_STAR"
-BUILD_DIR="$PROJECT_DIR/target/release"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BUILD_DIR="$PROJECT_ROOT/target/release"
 NODE_BIN="$BUILD_DIR/x3-chain-node"
-TESTNET_DIR="$PROJECT_DIR/testnet"
-LOG_DIR="$PROJECT_DIR/logs"
+TESTNET_DIR="$PROJECT_ROOT/testnet"
+LOG_DIR="$PROJECT_ROOT/logs"
 VALIDATOR_COUNT=${1:-1}
 
 echo "🚀 X3_ATOMIC_STAR Testnet Quick-Start"

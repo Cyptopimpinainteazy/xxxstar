@@ -1,7 +1,5 @@
 use crate::error::FoundryError;
-use crate::types::{
-    BreakEvenModel, DAppType, MonthlyProjection, RevenueConfig, SimulationResult,
-};
+use crate::types::{BreakEvenModel, DAppType, MonthlyProjection, RevenueConfig, SimulationResult};
 use chrono::Utc;
 use tracing::info;
 
@@ -52,17 +50,21 @@ impl Simulator {
         config: &RevenueConfig,
         user_base_estimate: u64,
     ) -> Result<SimulationResult, FoundryError> {
-        info!("Simulator: simulating project for {:?} with {} users", dapp_type, user_base_estimate);
+        info!(
+            "Simulator: simulating project for {:?} with {} users",
+            dapp_type, user_base_estimate
+        );
 
         let volume = self.simulate_volume(dapp_type, user_base_estimate);
         let fees = self.simulate_fees(&volume, config);
         let gas = self.simulate_gas(dapp_type, user_base_estimate);
-        let break_even = self.simulate_break_even(dapp_type, &fees, &gas);
+        let break_even = self.simulate_break_even(dapp_type, config, &fees, &gas);
 
         let treasury_contribution = self.calculate_treasury_share(&fees, config);
         let creator_earnings = self.calculate_creator_share(&fees, config);
 
-        let monthly_projections = self.generate_monthly_projections(dapp_type, config, user_base_estimate);
+        let monthly_projections =
+            self.generate_monthly_projections(dapp_type, config, user_base_estimate);
 
         let confidence_score = self.calculate_confidence(dapp_type, user_base_estimate);
 
@@ -89,20 +91,20 @@ impl Simulator {
     /// Simulates expected transaction volume.
     pub fn simulate_volume(&self, dapp_type: &DAppType, user_base: u64) -> RevenueProjection {
         let (tx_per_user_per_day, avg_tx_value) = match dapp_type {
-            DAppType::TokenLaunchpad => (2, 100_000_000_000_000_000_000u128),    // 100 tokens
-            DAppType::NFTMarketplace => (0.5, 500_000_000_000_000_000_000u128),  // 500 tokens
-            DAppType::StakingPool => (0.2, 1_000_000_000_000_000_000_000u128),   // 1000 tokens
+            DAppType::TokenLaunchpad => (2.0, 100_000_000_000_000_000_000u128), // 100 tokens
+            DAppType::NFTMarketplace => (0.5, 500_000_000_000_000_000_000u128), // 500 tokens
+            DAppType::StakingPool => (0.2, 1_000_000_000_000_000_000_000u128),  // 1000 tokens
             DAppType::SubscriptionApp => (0.03, 50_000_000_000_000_000_000u128), // 50 tokens/month
-            DAppType::EscrowApp => (0.1, 1_000_000_000_000_000_000_000u128),     // 1000 tokens
-            DAppType::AiImageSaaS => (5, 10_000_000_000_000_000_000u128),        // 10 tokens
-            DAppType::TradingBotVault => (10, 100_000_000_000_000_000_000u128),  // 100 tokens
-            DAppType::YieldOptimizer => (1, 500_000_000_000_000_000_000u128),    // 500 tokens
+            DAppType::EscrowApp => (0.1, 1_000_000_000_000_000_000_000u128),    // 1000 tokens
+            DAppType::AiImageSaaS => (5.0, 10_000_000_000_000_000_000u128),     // 10 tokens
+            DAppType::TradingBotVault => (10.0, 100_000_000_000_000_000_000u128), // 100 tokens
+            DAppType::YieldOptimizer => (1.0, 500_000_000_000_000_000_000u128), // 500 tokens
             DAppType::CrossChainPayout => (0.5, 2_000_000_000_000_000_000_000u128), // 2000 tokens
-            DAppType::DomainRegistry => (0.1, 50_000_000_000_000_000_000u128),   // 50 tokens
-            DAppType::PredictionMarket => (3, 200_000_000_000_000_000_000u128),  // 200 tokens
-            DAppType::AffiliateApp => (0.5, 100_000_000_000_000_000_000u128),    // 100 tokens
-            DAppType::DataMarketplace => (1, 500_000_000_000_000_000_000u128),   // 500 tokens
-            DAppType::Custom(_) => (1, 100_000_000_000_000_000_000u128),         // 100 tokens
+            DAppType::DomainRegistry => (0.1, 50_000_000_000_000_000_000u128),  // 50 tokens
+            DAppType::PredictionMarket => (3.0, 200_000_000_000_000_000_000u128), // 200 tokens
+            DAppType::AffiliateApp => (0.5, 100_000_000_000_000_000_000u128),   // 100 tokens
+            DAppType::DataMarketplace => (1.0, 500_000_000_000_000_000_000u128), // 500 tokens
+            DAppType::Custom(_) => (1.0, 100_000_000_000_000_000_000u128),      // 100 tokens
         };
 
         let daily_tx_count = (user_base as f64 * tx_per_user_per_day) as u64;
@@ -120,7 +122,11 @@ impl Simulator {
     }
 
     /// Simulates fee revenue based on volume and config.
-    pub fn simulate_fees(&self, volume: &RevenueProjection, config: &RevenueConfig) -> RevenueProjection {
+    pub fn simulate_fees(
+        &self,
+        volume: &RevenueProjection,
+        config: &RevenueConfig,
+    ) -> RevenueProjection {
         let platform_fee_pct = config.platform_fee_bps as u128;
         let daily_fees = volume.daily_volume.saturating_mul(platform_fee_pct) / 10000;
 
@@ -176,22 +182,70 @@ impl Simulator {
     }
 
     /// Simulates break-even analysis.
-    pub fn simulate_break_even(&self, dapp_type: &DAppType, fees: &RevenueProjection, gas: &GasEstimate) -> BreakEvenAnalysis {
+    pub fn simulate_break_even(
+        &self,
+        dapp_type: &DAppType,
+        config: &RevenueConfig,
+        fees: &RevenueProjection,
+        gas: &GasEstimate,
+    ) -> BreakEvenAnalysis {
         let (dev_cost, monthly_op) = match dapp_type {
-            DAppType::TokenLaunchpad => (5_000_000_000_000_000_000_000u128, 500_000_000_000_000_000_000u128),
-            DAppType::NFTMarketplace => (10_000_000_000_000_000_000_000u128, 1_000_000_000_000_000_000_000u128),
-            DAppType::StakingPool => (3_000_000_000_000_000_000_000u128, 300_000_000_000_000_000_000u128),
-            DAppType::SubscriptionApp => (4_000_000_000_000_000_000_000u128, 400_000_000_000_000_000_000u128),
-            DAppType::EscrowApp => (5_000_000_000_000_000_000_000u128, 500_000_000_000_000_000_000u128),
-            DAppType::AiImageSaaS => (20_000_000_000_000_000_000_000u128, 5_000_000_000_000_000_000_000u128),
-            DAppType::TradingBotVault => (15_000_000_000_000_000_000_000u128, 2_000_000_000_000_000_000_000u128),
-            DAppType::YieldOptimizer => (8_000_000_000_000_000_000_000u128, 800_000_000_000_000_000_000u128),
-            DAppType::CrossChainPayout => (12_000_000_000_000_000_000_000u128, 1_500_000_000_000_000_000_000u128),
-            DAppType::DomainRegistry => (5_000_000_000_000_000_000_000u128, 500_000_000_000_000_000_000u128),
-            DAppType::PredictionMarket => (8_000_000_000_000_000_000_000u128, 1_000_000_000_000_000_000_000u128),
-            DAppType::AffiliateApp => (3_000_000_000_000_000_000_000u128, 300_000_000_000_000_000_000u128),
-            DAppType::DataMarketplace => (10_000_000_000_000_000_000_000u128, 1_000_000_000_000_000_000_000u128),
-            DAppType::Custom(_) => (5_000_000_000_000_000_000_000u128, 500_000_000_000_000_000_000u128),
+            DAppType::TokenLaunchpad => (
+                5_000_000_000_000_000_000_000u128,
+                500_000_000_000_000_000_000u128,
+            ),
+            DAppType::NFTMarketplace => (
+                10_000_000_000_000_000_000_000u128,
+                1_000_000_000_000_000_000_000u128,
+            ),
+            DAppType::StakingPool => (
+                3_000_000_000_000_000_000_000u128,
+                300_000_000_000_000_000_000u128,
+            ),
+            DAppType::SubscriptionApp => (
+                4_000_000_000_000_000_000_000u128,
+                400_000_000_000_000_000_000u128,
+            ),
+            DAppType::EscrowApp => (
+                5_000_000_000_000_000_000_000u128,
+                500_000_000_000_000_000_000u128,
+            ),
+            DAppType::AiImageSaaS => (
+                20_000_000_000_000_000_000_000u128,
+                5_000_000_000_000_000_000_000u128,
+            ),
+            DAppType::TradingBotVault => (
+                15_000_000_000_000_000_000_000u128,
+                2_000_000_000_000_000_000_000u128,
+            ),
+            DAppType::YieldOptimizer => (
+                8_000_000_000_000_000_000_000u128,
+                800_000_000_000_000_000_000u128,
+            ),
+            DAppType::CrossChainPayout => (
+                12_000_000_000_000_000_000_000u128,
+                1_500_000_000_000_000_000_000u128,
+            ),
+            DAppType::DomainRegistry => (
+                5_000_000_000_000_000_000_000u128,
+                500_000_000_000_000_000_000u128,
+            ),
+            DAppType::PredictionMarket => (
+                8_000_000_000_000_000_000_000u128,
+                1_000_000_000_000_000_000_000u128,
+            ),
+            DAppType::AffiliateApp => (
+                3_000_000_000_000_000_000_000u128,
+                300_000_000_000_000_000_000u128,
+            ),
+            DAppType::DataMarketplace => (
+                10_000_000_000_000_000_000_000u128,
+                1_000_000_000_000_000_000_000u128,
+            ),
+            DAppType::Custom(_) => (
+                5_000_000_000_000_000_000_000u128,
+                500_000_000_000_000_000_000u128,
+            ),
         };
 
         let daily_net = fees.daily_fees.saturating_sub(gas.daily_gas_cost);
@@ -224,19 +278,28 @@ impl Simulator {
 
     /// Calculates treasury share of fees.
     fn calculate_treasury_share(&self, fees: &RevenueProjection, config: &RevenueConfig) -> u128 {
-        fees.daily_fees.saturating_mul(config.platform_fee_bps as u128) / 10000
+        fees.daily_fees
+            .saturating_mul(config.platform_fee_bps as u128)
+            / 10000
     }
 
     /// Calculates creator share of fees.
     fn calculate_creator_share(&self, fees: &RevenueProjection, config: &RevenueConfig) -> u128 {
-        fees.daily_fees.saturating_mul(config.creator_fee_bps as u128) / 10000
+        fees.daily_fees
+            .saturating_mul(config.creator_fee_bps as u128)
+            / 10000
     }
 
     /// Generates 12-month revenue projections.
-    fn generate_monthly_projections(&self, dapp_type: &DAppType, config: &RevenueConfig, user_base: u64) -> Vec<MonthlyProjection> {
+    fn generate_monthly_projections(
+        &self,
+        dapp_type: &DAppType,
+        config: &RevenueConfig,
+        user_base: u64,
+    ) -> Vec<MonthlyProjection> {
         let mut projections = Vec::new();
         let growth_rate = match dapp_type {
-            DAppType::AiImageSaaS | DAppType::TradingBotVault => 1.15,  // 15% monthly growth
+            DAppType::AiImageSaaS | DAppType::TradingBotVault => 1.15, // 15% monthly growth
             DAppType::NFTMarketplace | DAppType::PredictionMarket => 1.10,
             DAppType::SubscriptionApp | DAppType::StakingPool => 1.05,
             _ => 1.08,
@@ -289,7 +352,8 @@ impl Simulator {
             0.6
         };
 
-        (base_confidence * user_factor).clamp(0.0, 1.0)
+        let confidence: f64 = base_confidence * user_factor;
+        confidence.clamp(0.0, 1.0)
     }
 }
 

@@ -467,7 +467,7 @@ pub enum ProofTier {
     RuntimeDebug,
 )]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct X3TransferMessage<BlockNumber: MaxEncodedLen> {
+pub struct X3TransferMessage<BlockNumber> {
     /// Wire-format version. Must equal [`MESSAGE_FORMAT_VERSION`].
     pub version: u16,
     /// Asset being transferred.

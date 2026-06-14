@@ -11,8 +11,6 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use tracing::info;
 
-pub use sha2::Sha256;
-
 pub const MAX_RISK_SCORE: u64 = 100;
 pub const MIN_RISK_SCORE: u64 = 0;
 pub const HIGH_RISK_THRESHOLD: u64 = 70;
@@ -31,12 +29,6 @@ pub enum AuditorError {
     RiskScoringError(String),
     #[error("License check failed: {0}")]
     LicenseCheckFailed(String),
-}
-
-impl From<AuditorError> for anyhow::Error {
-    fn from(e: AuditorError) -> Self {
-        anyhow::anyhow!("{}", e)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -256,10 +248,22 @@ impl PatternDetector {
     pub fn detect_reentrancy(source: &str) -> Vec<(usize, String)> {
         let mut findings = Vec::new();
         let patterns: [(&str, &str); 4] = [
-            (r"\.call\s*\{[^}]*\}\s*\([^)]*\)", "Low-level .call() detected - potential reentrancy vector"),
-            (r"\.delegatecall\s*\([^)]*\)", "delegatecall detected - potential reentrancy vector"),
-            (r"\.send\s*\([^)]*\)", ".send() detected - consider using pull-over-push pattern"),
-            (r"\.transfer\s*\([^)]*\)", ".transfer() detected - may be unsafe with gas changes"),
+            (
+                r"\.call\s*\{[^}]*\}\s*\([^)]*\)",
+                "Low-level .call() detected - potential reentrancy vector",
+            ),
+            (
+                r"\.delegatecall\s*\([^)]*\)",
+                "delegatecall detected - potential reentrancy vector",
+            ),
+            (
+                r"\.send\s*\([^)]*\)",
+                ".send() detected - consider using pull-over-push pattern",
+            ),
+            (
+                r"\.transfer\s*\([^)]*\)",
+                ".transfer() detected - may be unsafe with gas changes",
+            ),
         ];
         for (pattern, desc) in &patterns {
             if let Ok(re) = Regex::new(pattern) {
@@ -277,11 +281,20 @@ impl PatternDetector {
     pub fn detect_ownership_patterns(source: &str) -> Vec<(usize, String)> {
         let mut findings = Vec::new();
         let patterns: [(&str, &str); 6] = [
-            (r"onlyOwner", "onlyOwner modifier used - check for centralization risk"),
+            (
+                r"onlyOwner",
+                "onlyOwner modifier used - check for centralization risk",
+            ),
             (r"Ownable", "Ownable contract detected"),
             (r"transferOwnership", "transferOwnership function detected"),
-            (r"renounceOwnership", "renounceOwnership function detected - can permanently lock contract"),
-            (r"Ownable2Step", "Two-step ownership transfer detected (good practice)"),
+            (
+                r"renounceOwnership",
+                "renounceOwnership function detected - can permanently lock contract",
+            ),
+            (
+                r"Ownable2Step",
+                "Two-step ownership transfer detected (good practice)",
+            ),
             (r"OwnableUpgradeable", "Upgradeable Ownable detected"),
         ];
         for (pattern, desc) in &patterns {
@@ -300,12 +313,24 @@ impl PatternDetector {
     pub fn detect_fee_patterns(source: &str) -> Vec<(usize, String)> {
         let mut findings = Vec::new();
         let patterns: [(&str, &str); 6] = [
-            (r"fee\s*[=:]\s*\d{4,}", "Hardcoded fee value detected - verify transparency"),
+            (
+                r"fee\s*[=:]\s*\d{4,}",
+                "Hardcoded fee value detected - verify transparency",
+            ),
             (r"basis\s*points", "Basis points fee mechanism detected"),
-            (r"platformFee|platform_fee", "Platform fee variable detected"),
+            (
+                r"platformFee|platform_fee",
+                "Platform fee variable detected",
+            ),
             (r"creatorFee|creator_fee", "Creator fee variable detected"),
-            (r"referralFee|referral_fee", "Referral fee variable detected"),
-            (r"setFee|updateFee|changeFee", "Mutable fee function detected - check for owner-only access"),
+            (
+                r"referralFee|referral_fee",
+                "Referral fee variable detected",
+            ),
+            (
+                r"setFee|updateFee|changeFee",
+                "Mutable fee function detected - check for owner-only access",
+            ),
         ];
         for (pattern, desc) in &patterns {
             if let Ok(re) = Regex::new(pattern) {
@@ -326,13 +351,31 @@ impl PatternDetector {
             (r"honeypot", "Honeypot keyword detected in source"),
             (r"rug\s*pull", "Rug pull keyword detected"),
             (r"pump\s*and\s*dump", "Pump and dump keyword detected"),
-            (r"unlimited\s*approval", "Unlimited approval pattern detected - potential risk"),
-            (r"selfdestruct|self_destruct|suicide", "Selfdestruct detected - contract can be destroyed"),
-            (r"block\.timestamp\s*[=<>]", "Timestamp dependency detected - potential manipulation"),
+            (
+                r"unlimited\s*approval",
+                "Unlimited approval pattern detected - potential risk",
+            ),
+            (
+                r"selfdestruct|self_destruct|suicide",
+                "Selfdestruct detected - contract can be destroyed",
+            ),
+            (
+                r"block\.timestamp\s*[=<>]",
+                "Timestamp dependency detected - potential manipulation",
+            ),
             (r"tx\.origin", "tx.origin detected - use msg.sender instead"),
-            (r"gasleft\s*[<>=]", "Gasleft comparison detected - potential gas manipulation"),
-            (r"assembly\s*\{", "Inline assembly detected - review for safety"),
-            (r"delegatecall", "delegatecall detected - can lead to storage collisions"),
+            (
+                r"gasleft\s*[<>=]",
+                "Gasleft comparison detected - potential gas manipulation",
+            ),
+            (
+                r"assembly\s*\{",
+                "Inline assembly detected - review for safety",
+            ),
+            (
+                r"delegatecall",
+                "delegatecall detected - can lead to storage collisions",
+            ),
         ];
         for (pattern, desc) in &patterns {
             if let Ok(re) = Regex::new(pattern) {
@@ -352,10 +395,19 @@ impl PatternDetector {
         let patterns: [(&str, &str); 6] = [
             (r"SPDX-License-Identifier:\s*MIT", "MIT license detected"),
             (r"SPDX-License-Identifier:\s*GPL", "GPL license detected"),
-            (r"SPDX-License-Identifier:\s*Apache", "Apache license detected"),
+            (
+                r"SPDX-License-Identifier:\s*Apache",
+                "Apache license detected",
+            ),
             (r"SPDX-License-Identifier:\s*BSD", "BSD license detected"),
-            (r"SPDX-License-Identifier:\s*UNLICENSED", "UNLICENSED - no open source license"),
-            (r"SPDX-License-Identifier:\s*BUSL", "Business Source License detected"),
+            (
+                r"SPDX-License-Identifier:\s*UNLICENSED",
+                "UNLICENSED - no open source license",
+            ),
+            (
+                r"SPDX-License-Identifier:\s*BUSL",
+                "Business Source License detected",
+            ),
         ];
         for (pattern, desc) in &patterns {
             if let Ok(re) = Regex::new(pattern) {
@@ -376,8 +428,14 @@ impl PatternDetector {
     pub fn detect_unchecked_external_calls(source: &str) -> Vec<(usize, String)> {
         let mut findings = Vec::new();
         let patterns: [(&str, &str); 2] = [
-            (r"\.call\s*\{[^}]*\}\s*\([^)]*\)\s*;", "Unchecked external call - result not validated"),
-            (r"\.send\s*\([^)]*\)\s*;", "Unchecked .send() - returns bool that may be ignored"),
+            (
+                r"\.call\s*\{[^}]*\}\s*\([^)]*\)\s*;",
+                "Unchecked external call - result not validated",
+            ),
+            (
+                r"\.send\s*\([^)]*\)\s*;",
+                "Unchecked .send() - returns bool that may be ignored",
+            ),
         ];
         for (pattern, desc) in &patterns {
             if let Ok(re) = Regex::new(pattern) {
@@ -396,11 +454,26 @@ impl PatternDetector {
         let mut findings = Vec::new();
         let patterns: [(&str, &str); 6] = [
             (r"uint8\s", "uint8 detected - potential overflow below 256"),
-            (r"uint16\s", "uint16 detected - potential overflow below 256"),
-            (r"uint32\s", "uint32 detected - potential overflow below 256"),
-            (r"uint64\s", "uint64 detected - potential overflow below 256"),
-            (r"uint128\s", "uint128 detected - potential overflow below 256"),
-            (r"unchecked\s*\{", "unchecked block detected - overflow protection disabled"),
+            (
+                r"uint16\s",
+                "uint16 detected - potential overflow below 256",
+            ),
+            (
+                r"uint32\s",
+                "uint32 detected - potential overflow below 256",
+            ),
+            (
+                r"uint64\s",
+                "uint64 detected - potential overflow below 256",
+            ),
+            (
+                r"uint128\s",
+                "uint128 detected - potential overflow below 256",
+            ),
+            (
+                r"unchecked\s*\{",
+                "unchecked block detected - overflow protection disabled",
+            ),
         ];
         for (pattern, desc) in &patterns {
             if let Ok(re) = Regex::new(pattern) {
@@ -453,16 +526,24 @@ impl FeeTransparencyChecker {
         }
 
         if result.has_mutable_fees && !result.has_fee_cap {
-            result.issues.push("Mutable fees without a maximum cap".into());
+            result
+                .issues
+                .push("Mutable fees without a maximum cap".into());
         }
         if result.has_mutable_fees && !result.has_fee_events {
-            result.issues.push("Mutable fees without events for transparency".into());
+            result
+                .issues
+                .push("Mutable fees without events for transparency".into());
         }
         if result.has_mutable_fees && !result.has_owner_only_fee_changes {
-            result.issues.push("Mutable fees without owner-only access control".into());
+            result
+                .issues
+                .push("Mutable fees without owner-only access control".into());
         }
         if !result.has_fee_declaration {
-            result.issues.push("No fee declaration found in source".into());
+            result
+                .issues
+                .push("No fee declaration found in source".into());
         }
         result
     }
@@ -500,7 +581,9 @@ impl PrincipalSafetyChecker {
         if let Ok(re) = Regex::new(r"(?i)(Pausable|whenNotPaused|whenPaused|pause\s*\()") {
             result.has_pausable = re.is_match(source);
         }
-        if let Ok(re) = Regex::new(r"(?i)(emergencyStop|emergency_stop|emergencyPause|circuitBreaker)") {
+        if let Ok(re) =
+            Regex::new(r"(?i)(emergencyStop|emergency_stop|emergencyPause|circuitBreaker)")
+        {
             result.has_emergency_stop = re.is_match(source);
         }
         if let Ok(re) = Regex::new(r"(?i)(rateLimit|rate_limit|throttle|cooldown)") {
@@ -517,13 +600,17 @@ impl PrincipalSafetyChecker {
         }
 
         if !result.has_owner {
-            result.issues.push("No owner/ownership pattern detected".into());
+            result
+                .issues
+                .push("No owner/ownership pattern detected".into());
         }
         if !result.has_pausable {
             result.issues.push("No pausable mechanism detected".into());
         }
         if !result.has_emergency_stop {
-            result.issues.push("No emergency stop mechanism detected".into());
+            result
+                .issues
+                .push("No emergency stop mechanism detected".into());
         }
         if !result.has_withdrawal_guard {
             result.issues.push("No withdrawal guard detected".into());
@@ -605,9 +692,7 @@ impl FoundryAuditor {
                     column: None,
                     snippet: None,
                 }),
-                remediation: Some(
-                    "Use SafeMath or Solidity 0.8+ built-in overflow checks".into(),
-                ),
+                remediation: Some("Use SafeMath or Solidity 0.8+ built-in overflow checks".into()),
                 score,
                 raw_snippet: None,
             });
@@ -638,7 +723,11 @@ impl FoundryAuditor {
     pub fn check_reentrancy_patterns(&mut self) {
         info!("Checking reentrancy patterns...");
         for (line, desc) in PatternDetector::detect_reentrancy(&self.source_code) {
-            let score = if desc.contains("delegatecall") { 90 } else { 70 };
+            let score = if desc.contains("delegatecall") {
+                90
+            } else {
+                70
+            };
             self.findings.push(Finding {
                 id: format!("RE-{:04}", self.findings.len() + 1),
                 title: "Reentrancy vulnerability".into(),
@@ -702,9 +791,7 @@ impl FoundryAuditor {
                 severity: Severity::Medium,
                 category: FindingCategory::CentralizationRisk,
                 location: None,
-                remediation: Some(
-                    "Implement missing safety mechanisms as appropriate".into(),
-                ),
+                remediation: Some("Implement missing safety mechanisms as appropriate".into()),
                 score: 50,
                 raw_snippet: None,
             });
@@ -718,8 +805,8 @@ impl FoundryAuditor {
             self.findings.push(Finding {
                 id: format!("FT-{:04}", self.findings.len() + 1),
                 title: "Missing fee declaration".into(),
-                description:
-                    "No fee declaration or fee-related variables found in the source code".into(),
+                description: "No fee declaration or fee-related variables found in the source code"
+                    .into(),
                 severity: Severity::High,
                 category: FindingCategory::FeeTransparency,
                 location: None,
@@ -738,7 +825,9 @@ impl FoundryAuditor {
                 severity: Severity::High,
                 category: FindingCategory::FeeTransparency,
                 location: None,
-                remediation: Some("Add a MAX_FEE constant and enforce it in setter functions".into()),
+                remediation: Some(
+                    "Add a MAX_FEE constant and enforce it in setter functions".into(),
+                ),
                 score: 70,
                 raw_snippet: None,
             });
@@ -771,9 +860,7 @@ impl FoundryAuditor {
                     column: None,
                     snippet: None,
                 }),
-                remediation: Some(
-                    "Ensure fee changes are timelocked and emit events".into(),
-                ),
+                remediation: Some("Ensure fee changes are timelocked and emit events".into()),
                 score: 30,
                 raw_snippet: None,
             });
@@ -812,9 +899,7 @@ impl FoundryAuditor {
                         column: None,
                         snippet: None,
                     }),
-                    remediation: Some(
-                        "Consider using an open source license like MIT".into(),
-                    ),
+                    remediation: Some("Consider using an open source license like MIT".into()),
                     score: 20,
                     raw_snippet: None,
                 });
@@ -990,7 +1075,8 @@ mod tests {
 
     #[test]
     fn test_fee_transparency_checker() {
-        let source = "uint256 public platformFee = 500; function setFee(uint256 _fee) onlyOwner { }";
+        let source =
+            "uint256 public platformFee = 500; function setFee(uint256 _fee) onlyOwner { }";
         let result = FeeTransparencyChecker::verify(source);
         assert!(result.has_fee_declaration);
         assert!(result.has_mutable_fees);

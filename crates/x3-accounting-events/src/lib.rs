@@ -66,6 +66,12 @@
 // Allow the pedantic `module_name_repetitions` lint; the type names are intentionally
 // explicit so that downstream consumers can glob-import this crate unambiguously.
 #![allow(clippy::module_name_repetitions)]
+// Allow specific pedantic lints that are acceptable for this crate
+#![allow(
+    clippy::too_many_arguments,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation
+)]
 
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;

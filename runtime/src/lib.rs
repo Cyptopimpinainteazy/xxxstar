@@ -50,10 +50,12 @@ use pallet_sudo;
 use pallet_svm_runtime;
 use pallet_swarm;
 use pallet_timestamp;
+#[allow(deprecated)]
 use pallet_transaction_payment::CurrencyAdapter;
 use pallet_treasury;
 use pallet_x3_account_registry;
 use pallet_x3_agent_law;
+use pallet_x3_agent_registry;
 use pallet_x3_asset_registry;
 use pallet_x3_atomic_kernel;
 use pallet_x3_auction;
@@ -63,18 +65,17 @@ use pallet_x3_crosschain_gateway;
 use pallet_x3_custody;
 use pallet_x3_dapp_hub;
 use pallet_x3_invariants;
-use pallet_x3_lp_locker;
 use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
 use pallet_x3_kernel;
 use pallet_x3_launchpad;
+use pallet_x3_lp_locker;
 use pallet_x3_partner;
+use pallet_x3_proof_carrying_agent;
 use pallet_x3_rebalance;
 use pallet_x3_reconciliation;
 use pallet_x3_reservation;
 use pallet_x3_settlement_engine;
-use pallet_x3_agent_registry;
-use pallet_x3_proof_carrying_agent;
 use pallet_x3_slash;
 use pallet_x3_solvency;
 use pallet_x3_supply_ledger;
@@ -83,10 +84,10 @@ use pallet_x3_treasury_policy;
 use pallet_x3_verifier;
 use pallet_x3_wallet_pallet;
 use pallet_x3_wrapped;
-use pallet_northern_swarm;
 
 use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
+use frame_support::dispatch::DispatchResult;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
@@ -101,6 +102,8 @@ use sp_runtime::{
 use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
+use x3_asset_kernel_types::DomainId;
+use x3_dex::TokenId as DexTokenId;
 
 #[cfg(feature = "frontier")]
 mod precompiles;
@@ -675,6 +678,7 @@ construct_runtime!(
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
         FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Consensus: pallet_x3_consensus,
         X3LpLocker: pallet_x3_lp_locker,
         X3Slash: pallet_x3_slash,
         X3AgentRegistry: pallet_x3_agent_registry,
@@ -721,6 +725,7 @@ construct_runtime!(
         X3AccountRegistry: pallet_x3_account_registry,
         CrossChainValidator: pallet_cross_chain_validator,
         FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Consensus: pallet_x3_consensus,
         X3LpLocker: pallet_x3_lp_locker,
         X3Slash: pallet_x3_slash,
         X3AgentRegistry: pallet_x3_agent_registry,
@@ -876,7 +881,6 @@ parameter_types! {
 }
 
 impl pallet_x3_oracle::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxSubmissionsPerBlock = MaxSubmissionsPerBlock;
     type MaxAssets = MaxAssets;
     type MaxSubmissionsPerAsset = MaxSubmissionsPerAsset;
@@ -894,7 +898,6 @@ parameter_types! {
 }
 
 impl pallet_x3_vrf::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Balance = Balance;
     type MaxPendingRequests = MaxPendingRequests;
@@ -922,7 +925,6 @@ parameter_types! {
 }
 
 impl pallet_x3_automation::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxTasksPerAccount = MaxTasksPerAccount;
     type BaseRegistrationFee = BaseRegistrationFee;
@@ -941,7 +943,6 @@ parameter_types! {
 }
 
 impl pallet_x3_consensus::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxValidators = MaxValidators;
     type SlashFraction = ConsensusSlashFraction;
     type MinStakeAfterSlash = ConsensusMinStakeAfterSlash;
@@ -978,9 +979,9 @@ impl frame_system::Config for Runtime {
     type Hashing = BlakeTwo256;
     type AccountId = AccountId;
     type Lookup = AccountIdLookup<AccountId, ()>;
-    type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
     type Version = RuntimeVersion;
+    type RuntimeEvent = RuntimeEvent;
     type PalletInfo = PalletInfo;
     type AccountData = pallet_balances::AccountData<Balance>;
     type OnNewAccount = ();
@@ -1042,7 +1043,6 @@ impl pallet_session::Config for Runtime {
 }
 
 impl pallet_session::historical::Config for Runtime {
-    // X3 (stable2512): historical::Config now requires RuntimeEvent.
     type RuntimeEvent = RuntimeEvent;
     type FullIdentification = ();
     type FullIdentificationOf = ();
@@ -1055,9 +1055,9 @@ impl pallet_offences::Config for Runtime {
 }
 
 impl pallet_balances::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
     type DustRemoval = ();
-    type RuntimeEvent = RuntimeEvent;
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
     type MaxLocks = ConstU32<50>;
@@ -1084,7 +1084,6 @@ impl pallet_transaction_payment::Config for Runtime {
 
 #[cfg(feature = "dev")]
 impl pallet_sudo::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
@@ -1123,9 +1122,9 @@ pub type EnsureSettlementGateway =
 
 pub type CouncilCollective = pallet_collective::Instance1;
 impl pallet_collective::Config<CouncilCollective> for Runtime {
+    type RuntimeEvent = RuntimeEvent;
     type RuntimeOrigin = RuntimeOrigin;
     type Proposal = RuntimeCall;
-    type RuntimeEvent = RuntimeEvent;
     type MotionDuration = CouncilMotionDuration;
     type MaxProposals = CouncilMaxProposals;
     type MaxMembers = CouncilMaxMembers;
@@ -1488,7 +1487,6 @@ impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for SubstrateProofVeri
 }
 
 impl pallet_x3_invariants::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type UpdateOrigin = EnsureRootOrHalfCouncil;
     type DefaultMaxSupply = InvariantsDefaultMaxSupply;
     type DefaultMaxAgents = InvariantsDefaultMaxAgents;
@@ -1498,7 +1496,6 @@ impl pallet_x3_invariants::Config for Runtime {
 }
 
 impl pallet_x3_agent_law::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type ReputationThreshold = ConstU64<100>;
     type MaxTasksPerBlock = ConstU32<50>;
@@ -1518,7 +1515,6 @@ impl pallet_x3_kernel::EmergencyHaltController for RuntimeEmergencyHaltControlle
 }
 
 impl pallet_x3_kernel::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
     type AssetId = AssetId;
     type AtlasId = AtlasId;
@@ -1564,7 +1560,6 @@ impl pallet_x3_kernel::Config for Runtime {
 }
 
 impl pallet_x3_coin::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type UnixTime = Timestamp;
     type WeightInfo = pallet_x3_coin::weights::SubstrateWeight<Runtime>;
     type TreasuryAccount = TreasuryAccountId;
@@ -1631,7 +1626,6 @@ parameter_types! {
 }
 
 impl pallet_atomic_trade_engine::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = pallet_atomic_trade_engine::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // Use the same VM adapters as AtlasKernel
@@ -2088,14 +2082,13 @@ impl pallet_scheduler::Config for Runtime {
     type RuntimeOrigin = RuntimeOrigin;
     type PalletsOrigin = OriginCaller;
     type RuntimeCall = RuntimeCall;
-    // X3 (stable2512): scheduler now requires explicit BlockNumberProvider.
-    type BlockNumberProvider = frame_system::Pallet<Runtime>;
     type MaximumWeight = MaximumSchedulerWeight;
     type ScheduleOrigin = EnsureRootOrHalfCouncil;
     type MaxScheduledPerBlock = MaxScheduledPerBlock;
     type WeightInfo = ();
     type OriginPrivilegeCmp = frame_support::traits::EqualPrivilegeOnly;
     type Preimages = Preimage;
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 
 // ===== Preimage Pallet Configuration =====
@@ -2135,7 +2128,6 @@ parameter_types! {
 }
 
 impl pallet_governance::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type Currency = Balances;
     type SubmitOrigin = frame_system::EnsureSigned<AccountId>;
@@ -2181,7 +2173,6 @@ parameter_types! {
 }
 
 impl pallet_treasury::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type PalletId = TreasuryPalletId;
     type SmallSpendOrigin = EnsureRootOrHalfCouncil;
@@ -2215,7 +2206,6 @@ parameter_types! {
 }
 
 impl pallet_agent_accounts::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type RegisterOrigin = EnsureRootOrHalfCouncil;
     type AdminOrigin = EnsureRootOrHalfCouncil;
@@ -2240,7 +2230,6 @@ parameter_types! {
 }
 
 impl pallet_agent_memory::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxEntriesPerChunk = MaxEntriesPerChunk;
     type MaxChunksPerAgent = MaxChunksPerAgent;
@@ -2263,7 +2252,6 @@ parameter_types! {
 }
 
 impl pallet_evolution_core::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type EvolutionAuthority = EnsureRootOrHalfCouncil;
     type EmergencyOrigin = EnsureRootOrHalfCouncil;
     type MinApprovalQuorum = MinApprovalQuorum;
@@ -2290,7 +2278,6 @@ parameter_types! {
 }
 
 impl pallet_x3_verifier::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type ExecutorRegistrar = EnsureRootOrHalfCouncil;
     type MinExecutorStake = MinExecutorStake;
@@ -2307,7 +2294,6 @@ impl pallet_x3_verifier::Config for Runtime {
 }
 
 impl pallet_cross_chain_validator::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = pallet_cross_chain_validator::weights::SubstrateWeight<Runtime>;
 }
 
@@ -2325,14 +2311,12 @@ parameter_types! {
 }
 
 impl pallet_x3_asset_registry::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type RegistryOrigin = EnsureRootOrHalfCouncil;
     type EmergencyPauseOrigin = EnsureRootOrHalfCouncil;
     type MaxAssets = MaxRegistryAssets;
 }
 
 impl pallet_x3_supply_ledger::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type SupplyGovernance = EnsureRootOrHalfCouncil;
     type Registry = X3AssetRegistry;
 }
@@ -2350,7 +2334,6 @@ parameter_types! {
 }
 
 impl pallet_x3_cross_vm_router::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
@@ -2366,7 +2349,6 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
 }
 
 impl pallet_x3_token_factory::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type CreateTokenOrigin = frame_system::EnsureSigned<AccountId>;
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
@@ -2374,7 +2356,6 @@ impl pallet_x3_token_factory::Config for Runtime {
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type UpdateOrigin = EnsureRootOrHalfCouncil;
     type MaxDomainLen = MaxX3DomainLen;
     type MaxDomains = MaxX3Domains;
@@ -2389,7 +2370,6 @@ parameter_types! {
 }
 
 impl pallet_x3_account_registry::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type AtlasId = AtlasId;
     type MaxNameLength = MaxAccountNameLength;
 }
@@ -2448,7 +2428,6 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
 }
 
 impl pallet_x3_settlement_engine::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type SettlementWeightInfo = pallet_x3_settlement_engine::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     type UnixTime = Timestamp;
@@ -2471,11 +2450,11 @@ parameter_types! {
 }
 
 impl pallet_x3_crosschain_gateway::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type GovernanceOrigin = pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
+    type GovernanceOrigin =
+        pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
     type RelayerOrigin = frame_system::EnsureSigned<AccountId>;
     type OperationalOrigin = frame_system::EnsureSigned<AccountId>;
-    type DailyLimitWindowBlocks = X3CrosschainDailyWindow;
+    type DailyLimitWindowBlocks = ConstU32<14_400>;
 }
 
 // ===== Swarm Pallet Configuration =====
@@ -2512,13 +2491,15 @@ impl pallet_swarm::Config for Runtime {
     type WeightInfo = pallet_swarm::weights::SubstrateWeight<Runtime>;
 }
 
-// ===== Northern Swarm Pallet Configuration =====
+// ===== Northern Swarm Pallet Configuration (dev-only; guarded until RC2) =====
+#[cfg(feature = "dev")]
 parameter_types! {
     pub const NorthernSwarmMinExecutorStake: Balance = 1_000 * X3;
     pub const NorthernSwarmDeregistrationCooldown: BlockNumber = 14_400; // ~1 day at 200ms blocks
     pub const NorthernSwarmMaxClaimedTasksPerExecutor: u32 = 10;
 }
 
+#[cfg(feature = "dev")]
 impl pallet_northern_swarm::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
@@ -2541,7 +2522,6 @@ parameter_types! {
 }
 
 impl pallet_depin_marketplace::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type BurnDestination = ();
     type AdminOrigin = EnsureRootOrHalfCouncil;
@@ -2572,7 +2552,6 @@ parameter_types! {
 }
 
 impl pallet_private_execution::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type BurnDestination = ();
     type AdminOrigin = EnsureRootOrHalfCouncil;
@@ -2590,7 +2569,6 @@ impl pallet_private_execution::Config for Runtime {
 }
 
 impl pallet_x3_sequencer::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxTxsPerBatch = SeqMaxTxsPerBatch;
     type MaxPayloadSize = SeqMaxPayloadSize;
@@ -2620,8 +2598,6 @@ impl ProposerQuery<AccountId> for Runtime {
 }
 
 impl pallet_x3_da::Config for Runtime {
-
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxBlobSize = DaMaxBlobSize;
     type PerByteFee = DaPerByteFee;
@@ -2684,7 +2660,6 @@ impl Get<AccountId> for SlashTreasuryRecipient {
 }
 
 impl pallet_x3_slash::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type SlashWeightInfo = ();
     type Currency = Balances;
     type MinBondAmount = SlashMinBondAmount;
@@ -2712,7 +2687,6 @@ impl Get<AccountId> for AgentRegistrySlashRecipient {
 }
 
 impl pallet_x3_agent_registry::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type RegisterOrigin = EnsureRootOrHalfCouncil;
     type AdminOrigin = EnsureRootOrHalfCouncil;
@@ -2743,7 +2717,6 @@ parameter_types! {
 }
 
 impl pallet_x3_proof_carrying_agent::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type AdminOrigin = EnsureRootOrHalfCouncil;
     type MaxActionPayloadSize = ProofCarryingMaxActionPayloadSize;
@@ -2754,9 +2727,7 @@ impl pallet_x3_proof_carrying_agent::Config for Runtime {
 }
 
 // ===== X3 Wallet Pallet Configuration =====
-impl pallet_x3_wallet_pallet::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-}
+impl pallet_x3_wallet_pallet::Config for Runtime {}
 
 // ===== X3 Inventory Configuration =====
 parameter_types! {
@@ -2764,7 +2735,6 @@ parameter_types! {
 }
 
 impl pallet_x3_inventory::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
     type MaxLiquiditySources = InventoryMaxLiquiditySources;
     type WeightInfo = pallet_x3_inventory::weights::SubstrateWeight<Runtime>;
@@ -2777,7 +2747,6 @@ parameter_types! {
 }
 
 impl pallet_x3_reservation::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type ReservationTtlBlocks = ReservationTtlBlocks;
     type MaxExpirationsPerBlock = MaxExpirationsPerBlock;
 }
@@ -2790,7 +2759,6 @@ parameter_types! {
 }
 
 impl pallet_x3_solvency::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxChecksPerResult = ConstU32<32>;
     type QuoteStalenessBlocks = SolvencyQuoteStalenessBlocks;
     type ObligationTimeoutBlocks = SolvencyObligationTimeoutBlocks;
@@ -2805,7 +2773,6 @@ parameter_types! {
 }
 
 impl pallet_x3_rebalance::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxDailyRebalanceVolume = MaxDailyRebalanceVolume;
     type RebalanceCooldownBlocks = RebalanceCooldownBlocks;
     type MaxPendingRebalances = MaxPendingRebalances;
@@ -2818,7 +2785,6 @@ parameter_types! {
 }
 
 impl pallet_x3_partner::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxApprovedLanesPerPartner = MaxApprovedLanesPerPartner;
     type MaxPartnersPerLane = MaxPartnersPerLane;
 }
@@ -2842,7 +2808,6 @@ parameter_types! {
 }
 
 impl pallet_x3_custody::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type OperatorOrigin = EnsureRootOrHalfCouncil;
     type MaxSignersPerVault = CustodyMaxSignersPerVault;
@@ -2865,7 +2830,6 @@ parameter_types! {
 }
 
 impl pallet_x3_reconciliation::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxSupportedChains = ReconciliationMaxSupportedChains;
     type ReconciliationCycleBlocks = ReconciliationCycleBlocks;
@@ -2881,7 +2845,6 @@ parameter_types! {
 }
 
 impl pallet_x3_wrapped::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
     type BridgeAuthority = EnsureRootOrHalfCouncil;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
@@ -2898,7 +2861,6 @@ parameter_types! {
 }
 
 impl pallet_x3_auction::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxBidsPerAuction = AuctionMaxBidsPerAuction;
     type MaxActiveAuctions = AuctionMaxActiveAuctions;
@@ -2906,7 +2868,6 @@ impl pallet_x3_auction::Config for Runtime {
     type MinBidIncrementBps = AuctionMinBidIncrementBps;
     type WeightInfo = ();
 }
-
 
 // ===== X3 LP Locker Configuration =====
 parameter_types! {
@@ -2917,9 +2878,8 @@ parameter_types! {
 }
 
 impl pallet_x3_lp_locker::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type MinLockDuration = LpLockerMinDuration;
-    type MaxLockDuration = LpLockerMaxDuration;
+    type MinLockDuration = ConstU32<1_500>;
+    type MaxLockDuration = ConstU32<157_680_000>;
     type WeightInfo = ();
 }
 
@@ -2947,22 +2907,24 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
             .map_err(|_| DispatchError::Other("symbol too long"))?;
         let name_bounded = frame_support::BoundedVec::try_from(name)
             .map_err(|_| DispatchError::Other("name too long"))?;
-        let enabled = frame_support::BoundedVec::try_from(
-        ).map_err(|_| DispatchError::Other("too many domains"))?;
+        let enabled: frame_support::BoundedVec<DomainId, frame_support::traits::ConstU32<8>> =
+            frame_support::BoundedVec::try_from(vec![])
+                .map_err(|_| DispatchError::Other("too many domains"))?;
         let config = pallet_x3_token_factory::TokenFactoryConfig {
             symbol: symbol_bounded,
             name: name_bounded,
             canonical_decimals: decimals,
             initial_supply,
             max_supply: None,
-            class: x3_asset_kernel_types::TokenClass::Normal,
+            class: x3_asset_kernel_types::TokenClass::FixedSupply,
             enabled_domains: enabled,
         };
         // Use the extrinsic directly with a signed origin from the creator
         pallet_x3_token_factory::Pallet::<Runtime>::create_token(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
             config,
-        ).map(|_| {
+        )
+        .map(|_| {
             // The token was just created via the Factory + Registry; derive its asset_id
             // from the nonce. For simplicity, return the current nonce - 1 as the last
             // created asset id. In production, store this in a tracking map.
@@ -2975,19 +2937,22 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
 // Bridge trait impl: launchpad can call DEX to create AMM pools
 pub struct LaunchpadDexBridge;
 impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
-    fn create_pool(
-        creator: &AccountId,
-        token_a: u32,
-        token_b: u32,
-    ) -> Result<u64, DispatchError> {
+    fn create_pool(creator: &AccountId, token_a: u32, token_b: u32) -> Result<u64, DispatchError> {
         // Use the DEX create_pool extrinsic with standard 30 bps fee
         let fee_bps = 30u32;
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
-            token_a,
-            token_b,
+            DexTokenId {
+                chain_id: 0,
+                asset_id: token_a as u128,
+            },
+            DexTokenId {
+                chain_id: 0,
+                asset_id: token_b as u128,
+            },
             fee_bps,
-        ).map(|_| {
+        )
+        .map(|_| {
             // The pool was just created; derive pool_id from NextPoolId - 1
             pallet_x3_dex::NextPoolId::<Runtime>::get().saturating_sub(1)
         })
@@ -3003,13 +2968,11 @@ impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLo
         lp_amount: u128,
         unlock_at_block: BlockNumber,
     ) -> DispatchResult {
-        let description = b'graduation-lock'.to_vec();
         pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
             frame_system::RawOrigin::Signed(owner.clone()).into(),
             pool_id,
             lp_amount,
             unlock_at_block,
-            description,
         )
     }
 }
@@ -3020,8 +2983,7 @@ parameter_types! {
 }
 
 impl pallet_x3_launchpad::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type GovernanceOrigin = frame_system::EnsureSigned<AccountId>;
     type MaxActiveLaunches = LaunchpadMaxActiveLaunches;
     type MaxContributorsPerLaunch = LaunchpadMaxContributorsPerLaunch;
     type MinLaunchDurationBlocks = LaunchpadMinDurationBlocks;
@@ -3048,7 +3010,6 @@ parameter_types! {
 }
 
 impl pallet_x3_dapp_hub::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxDAppsPerDeveloper = DappHubMaxDAppsPerDeveloper;
     type MaxActiveDApps = DappHubMaxActiveDApps;
@@ -3070,7 +3031,6 @@ parameter_types! {
 }
 
 impl pallet_x3_compute_market::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxActiveListings = ComputeMarketMaxActiveListings;
     type MaxSessionsPerProvider = ComputeMarketMaxSessionsPerProvider;
@@ -3086,7 +3046,6 @@ parameter_types! {
 }
 
 impl pallet_x3_flashloan::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type FeeBasisPoints = FlashLoanFeeBasisPoints;
     type MaxLoanFraction = FlashLoanMaxLoanFraction;
@@ -3100,7 +3059,6 @@ parameter_types! {
 }
 
 impl pallet_svm_runtime::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxAccountDataSize = SvmMaxAccountDataSize;
     type MaxProgramSize = SvmMaxProgramSize;
@@ -3114,7 +3072,6 @@ parameter_types! {
 }
 
 impl pallet_x3_jury_anchor::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type MaxSessionIdLength = JuryMaxSessionIdLength;
 }
 
@@ -3128,7 +3085,6 @@ parameter_types! {
 }
 
 impl pallet_meme_overlord::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
     type MaxTemplateNameLength = MemeMaxTemplateNameLength;
     type MaxMemeDataLength = MemeMaxMemeDataLength;

@@ -427,9 +427,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_timestamp::Config {
-        /// Aggregated runtime event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Currency trait for fee deduction and balance management.
         type Currency: frame_support::traits::ReservableCurrency<Self::AccountId>;
 
@@ -3716,7 +3713,7 @@ pub mod pallet {
             // Query the SVM transaction count storage for the given pubkey
             if svm_pubkey.len() == 32 {
                 let pubkey: [u8; 32] = svm_pubkey.try_into().unwrap_or_default();
-                SvmTransactionCounts::<T>::get(&pubkey)
+                SvmTransactionCounts::<T>::get(pubkey)
             } else {
                 0u64
             }
@@ -3804,7 +3801,7 @@ pub mod pallet {
                 let addr = raw_tx[offset + 1..offset + 21].to_vec();
                 offset += 21;
                 addr
-            } else if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
+            } else if raw_tx[offset] == 0x80 && offset < raw_tx.len() {
                 // Empty address (contract creation)
                 offset += 1;
                 Vec::new()
@@ -3821,7 +3818,7 @@ pub mod pallet {
                     .to_vec());
             }
 
-            let value = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
+            let value = if raw_tx[offset] == 0x80 && offset < raw_tx.len() {
                 // Value is 0
                 let _ = offset; // not returned; silence unused_assignments
                 0u128
@@ -3940,7 +3937,7 @@ pub mod pallet {
                 let addr = raw_tx[offset + 1..offset + 21].to_vec();
                 offset += 21;
                 addr
-            } else if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
+            } else if raw_tx[offset] == 0x80 && offset < raw_tx.len() {
                 offset += 1;
                 Vec::new()
             } else {
@@ -3956,7 +3953,7 @@ pub mod pallet {
                     .to_vec());
             }
 
-            let value = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
+            let value = if raw_tx[offset] == 0x80 && offset < raw_tx.len() {
                 offset += 1;
                 0u128
             } else if raw_tx[offset] >= 0x80 && raw_tx[offset] <= 0xb7 {
@@ -3987,7 +3984,7 @@ pub mod pallet {
                     .to_vec());
             }
 
-            let input = if raw_tx[offset] == 0x80 && offset + 1 <= raw_tx.len() {
+            let input = if raw_tx[offset] == 0x80 && offset < raw_tx.len() {
                 let _ = offset; // not returned; silence unused_assignments
                 Vec::new()
             } else if raw_tx[offset] >= 0xb8 && raw_tx[offset] <= 0xbf {
@@ -4222,7 +4219,7 @@ pub mod pallet {
         MaxEncodedLen,
     )]
     #[scale_info(skip_type_params(Symbol))]
-    pub struct AssetMetadata<Symbol: MaxEncodedLen> {
+    pub struct AssetMetadata<Symbol> {
         pub symbol: Symbol,
         pub decimals: u8,
     }

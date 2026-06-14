@@ -31,13 +31,16 @@
 //! `NonEmptyPayloadVerifier` is retained for unit tests only and is
 //! feature-gated behind `test-verifier` in the router.
 
-#![cfg_attr(not(feature = "std"), no_std)]
-
 extern crate alloc;
 
-use alloc::vec;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
+use core::marker::{Send, Sync};
+use core::option::Option;
+use core::option::Option::{None, Some};
+use core::result::Result;
+use core::result::Result::{Err, Ok};
 
 use tiny_keccak::{Hasher, Keccak};
 
@@ -157,7 +160,7 @@ impl EvmBlockHeader {
     /// as a 15-element list; only the fields the verifier needs are
     /// decoded — the rest are skipped.
     pub fn decode(rlp: &[u8]) -> Result<Self, EvmReceiptError> {
-        let mut s = rlp::Rlp::new(rlp);
+        let s = rlp::Rlp::new(rlp);
         if !s.is_list() {
             return Err(EvmReceiptError::BadHeader);
         }
@@ -213,7 +216,7 @@ impl EvmReceipt {
     /// X3 gateway emits `DepositLocked` (success) and reverts on failure,
     /// so we never accept a pre-Byzantium root-form receipt.
     pub fn decode(rlp: &[u8]) -> Result<Self, EvmReceiptError> {
-        let mut s = rlp::Rlp::new(rlp);
+        let s = rlp::Rlp::new(rlp);
         if !s.is_list() {
             return Err(EvmReceiptError::BadReceipt);
         }
@@ -237,7 +240,7 @@ impl EvmReceipt {
 
 impl EvmLog {
     pub fn decode(rlp: &[u8]) -> Result<Self, EvmReceiptError> {
-        let mut s = rlp::Rlp::new(rlp);
+        let s = rlp::Rlp::new(rlp);
         if !s.is_list() {
             return Err(EvmReceiptError::BadReceipt);
         }

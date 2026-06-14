@@ -14,6 +14,16 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::marker::{Send, Sync};
+use core::option::Option;
+use core::option::Option::{None, Some};
+use core::result::Result;
+use core::result::Result::{Err, Ok};
+
 pub mod evm_receipt;
 pub mod gateway_types;
 
@@ -238,6 +248,7 @@ impl VerificationRouter {
                 chain: request.source_chain,
                 verified_at_block: outcome.verified_at_height,
                 strategy: request.strategy,
+                confidence_bps: if outcome.accepted { 10_000 } else { 0 },
             },
             Err(e) => VerificationResult {
                 proof_id: request.proof_id,
@@ -246,6 +257,7 @@ impl VerificationRouter {
                 chain: request.source_chain,
                 verified_at_block: None,
                 strategy: request.strategy,
+                confidence_bps: 0,
             },
         }
     }

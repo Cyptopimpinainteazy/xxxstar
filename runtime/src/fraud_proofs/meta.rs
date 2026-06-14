@@ -23,18 +23,17 @@
 // >(disputed_block_number);
 // ```
 
-use crate::fraud_proofs::types::{
-    DisputedBlockMeta, ProposerQuery, SchedulerCommitmentQuery,
-};
+use crate::fraud_proofs::types::{DisputedBlockMeta, ProposerQuery, SchedulerCommitmentQuery};
 use frame_support::traits::Get;
 use sp_core::H256;
+use sp_runtime::traits::BlockNumberProvider;
 
 /// Construct a `DisputedBlockMeta` from on-chain data sources.
 ///
 /// This is the canonical integration point between the fraud-proof pallet and
 /// the runtime's block production / sequencer layers.  It reads:
 ///
-/// - `block_hash` from the block header (via `frame_system::BlockHash`)
+/// - `block_hash` from the block header (via `frame_system::Pallet`)
 /// - `scheduler_commitment` from the sequencer's batch commitment for the block
 /// - `rules_version` from the runtime's current scheduler rules version
 /// - `proposer` from the block author (via Aura / Babe / authority lookup)
@@ -50,16 +49,21 @@ use sp_core::H256;
 /// # Returns
 /// `Some(DisputedBlockMeta)` if all data is available, `None` if the block
 /// is unknown or the scheduler commitment is not yet finalized.
-pub fn load_disputed_block_meta<AccountId, BlockNumberProvider, SchedulerCommitmentProvider, ProposerProvider>(
+pub fn load_disputed_block_meta<
+    AccountId,
+    BlockNumProvider,
+    SchedulerCommitmentProvider,
+    ProposerProvider,
+>(
     block_number: u32,
 ) -> Option<DisputedBlockMeta<AccountId>>
 where
-    BlockNumberProvider: frame_system::BlockNumberProvider<BlockNumber = u32>,
+    BlockNumProvider: BlockNumberProvider<BlockNumber = u32> + frame_system::Config,
     SchedulerCommitmentProvider: SchedulerCommitmentQuery,
     ProposerProvider: ProposerQuery<AccountId>,
 {
     // 1. Get block hash from the disputed block number
-    let block_hash = frame_system::BlockHash::<BlockNumberProvider>::get(block_number)?;
+    let block_hash = frame_system::BlockHash::<BlockNumProvider>::get(block_number)?;
 
     // 2. Get the scheduler commitment for this block
     let scheduler_commitment = SchedulerCommitmentProvider::get_scheduler_commitment(block_number)?;
@@ -116,7 +120,7 @@ mod tests {
     /// A mock `BlockNumberProvider` that returns a fixed block number.
     struct MockBlockNumberProvider;
 
-    impl frame_system::BlockNumberProvider for MockBlockNumberProvider {
+    impl BlockNumberProvider for MockBlockNumberProvider {
         type BlockNumber = u32;
 
         fn block_number() -> Self::BlockNumber {
@@ -131,10 +135,7 @@ mod tests {
     /// LOAD-META-001: SchedulerCommitmentQuery returns None for unknown blocks
     #[test]
     fn scheduler_commitment_none_for_unknown_block() {
-        assert_eq!(
-            NoSchedulerCommitment::get_scheduler_commitment(999),
-            None
-        );
+        assert_eq!(NoSchedulerCommitment::get_scheduler_commitment(999), None);
     }
 
     /// LOAD-META-002: ProposerQuery returns None for unknown blocks

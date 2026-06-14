@@ -26,6 +26,14 @@
 //! - `Disputed`   — proof mismatch, escalated to arbitration
 //! - `Slashed`    — malicious behavior detected, validator slashed
 
+extern crate alloc;
+
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::option::Option::{None, Some};
+use core::result::Result::{Err, Ok};
+
 use crate::instructions::X3Instruction;
 use crate::types::{AssetRef, ChainKind};
 use serde::{Deserialize, Serialize};
@@ -304,7 +312,7 @@ impl AtomicJournal {
                     before,
                     after,
                 } => {
-                    if *after > *before {
+                    if after > before {
                         // Credit → need to debit back
                         let diff = after - before;
                         plan.push(X3Instruction::ExecuteRefund {
@@ -315,7 +323,7 @@ impl AtomicJournal {
                                 to: owner.clone(),
                             },
                         });
-                    } else if *before > *after {
+                    } else if before > after {
                         // Debit → need to credit back
                         let diff = before - after;
                         plan.push(X3Instruction::ExecuteRefund {
@@ -333,7 +341,7 @@ impl AtomicJournal {
                     before,
                     after,
                 } => {
-                    if *after > *before {
+                    if after > before {
                         // Minted → need to burn
                         let diff = after - before;
                         plan.push(X3Instruction::BurnCanonical {
@@ -686,18 +694,16 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "begin")]
     fn journal_rejects_append_without_begin() {
         let mut journal = AtomicJournal::new(1);
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            journal.append(JournalEntry::BalanceDelta {
-                chain: ChainKind::X3,
-                asset: usdc_asset(),
-                owner: "test".to_string(),
-                before: 10,
-                after: 5,
-            });
-        }));
-        assert!(result.is_err(), "append without begin should panic");
+        journal.append(JournalEntry::BalanceDelta {
+            chain: ChainKind::X3,
+            asset: usdc_asset(),
+            owner: "test".to_string(),
+            before: 10,
+            after: 5,
+        });
     }
 
     #[test]

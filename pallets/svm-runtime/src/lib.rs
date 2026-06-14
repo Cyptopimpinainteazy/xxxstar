@@ -28,7 +28,6 @@
 //! - Programs can be upgraded by their upgrade authority
 //! - Program execution is metered by compute units
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
 pub mod weights;
@@ -228,7 +227,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Currency for native token operations
         type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;

@@ -50,12 +50,6 @@ pub enum RevenueError {
     DecimalError(String),
 }
 
-impl From<RevenueError> for anyhow::Error {
-    fn from(e: RevenueError) -> Self {
-        anyhow::anyhow!("{}", e)
-    }
-}
-
 /// Configuration for treasury fee splitting.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreasurySplitConfig {
@@ -263,11 +257,17 @@ impl RevenueCalculator {
     }
 
     /// Calculate the treasury split breakdown.
-    pub fn calculate_treasury_split(&self, treasury_amount: &Decimal) -> Result<TreasurySplit, RevenueError> {
+    pub fn calculate_treasury_split(
+        &self,
+        treasury_amount: &Decimal,
+    ) -> Result<TreasurySplit, RevenueError> {
         Ok(TreasurySplit {
             total: *treasury_amount,
             operations: Self::calculate_share(treasury_amount, self.treasury_split.operations_bps)?,
-            development: Self::calculate_share(treasury_amount, self.treasury_split.development_bps)?,
+            development: Self::calculate_share(
+                treasury_amount,
+                self.treasury_split.development_bps,
+            )?,
             marketing: Self::calculate_share(treasury_amount, self.treasury_split.marketing_bps)?,
             reserves: Self::calculate_share(treasury_amount, self.treasury_split.reserves_bps)?,
             community: Self::calculate_share(treasury_amount, self.treasury_split.community_bps)?,
@@ -324,11 +324,11 @@ impl RevenueCalculator {
         if bps > MAX_BASIS_POINTS {
             return Err(RevenueError::InvalidBasisPoints(bps));
         }
-        let bps_decimal = Decimal::from_u64(bps)
-            .ok_or(RevenueError::CalculationOverflow)?;
-        let max_bps = Decimal::from_u64(MAX_BASIS_POINTS)
-            .ok_or(RevenueError::CalculationOverflow)?;
-        let result = amount.checked_mul(bps_decimal)
+        let bps_decimal = Decimal::from_u64(bps).ok_or(RevenueError::CalculationOverflow)?;
+        let max_bps =
+            Decimal::from_u64(MAX_BASIS_POINTS).ok_or(RevenueError::CalculationOverflow)?;
+        let result = amount
+            .checked_mul(bps_decimal)
             .ok_or(RevenueError::CalculationOverflow)?
             .checked_div(max_bps)
             .ok_or(RevenueError::CalculationOverflow)?;
@@ -508,7 +508,9 @@ mod tests {
         let calc = RevenueCalculator::new();
         let start = Utc::now();
         let end = Utc::now();
-        let report = calc.generate_report("dapp-1", start, end, &dec!(5000), 10).unwrap();
+        let report = calc
+            .generate_report("dapp-1", start, end, &dec!(5000), 10)
+            .unwrap();
         assert_eq!(report.dapp_id, "dapp-1");
         assert_eq!(report.total_revenue, dec!(5000));
         assert_eq!(report.transaction_count, 10);

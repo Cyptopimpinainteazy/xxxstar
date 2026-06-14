@@ -10,21 +10,11 @@
 //!   - X3_RECONNECT_MAX  - Maximum reconnect attempts (default: '5')
 //!   - X3_RECONNECT_DELAY - Reconnect delay in ms (default: '1000')
 
-use parity_scale_codec::{Decode, Encode};
-use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::DispatchError;
 use sp_std::vec::Vec;
 
-use crate::{
-    CrossVmCall, CrossVmDispatcher, CrossVmReceipt, CrossVmResult, CrossVmStatus, VmId,
-    CROSS_VM_CALL_VERSION, MAX_CROSS_VM_PAYLOAD,
-};
-
-#[cfg(feature = "std")]
-use hex::FromHex;
-#[cfg(feature = "std")]
-use jsonrpsee::http_client::HttpClientBuilder;
+use crate::{CrossVmCall, CrossVmDispatcher, CrossVmReceipt, CrossVmResult, CrossVmStatus, VmId};
 
 /// Configuration for the live node connector
 #[derive(Clone, Debug)]
@@ -71,6 +61,12 @@ pub struct LiveNodeDispatcher {
     reconnect_attempts: u32,
 }
 
+impl Default for LiveNodeDispatcher {
+    fn default() -> Self {
+        Self::new(LiveNodeConfig::default())
+    }
+}
+
 impl LiveNodeDispatcher {
     /// Create a new dispatcher with the given configuration
     pub fn new(config: LiveNodeConfig) -> Self {
@@ -81,11 +77,6 @@ impl LiveNodeDispatcher {
         }
     }
 
-    /// Create a dispatcher with default configuration
-    pub fn default() -> Self {
-        Self::new(LiveNodeConfig::default())
-    }
-
     /// Create a dispatcher configured for a specific network
     pub fn for_network(network: &str) -> Self {
         let endpoint = match network {
@@ -93,7 +84,7 @@ impl LiveNodeDispatcher {
                 .unwrap_or_else(|_| "wss://rpc.x3chain.io:9944".to_string()),
             "testnet" => std::env::var("X3_RPC_ENDPOINT")
                 .unwrap_or_else(|_| "wss://testnet.x3chain.io:9944".to_string()),
-            "local" | _ => std::env::var("X3_RPC_ENDPOINT")
+            _ => std::env::var("X3_RPC_ENDPOINT")
                 .unwrap_or_else(|_| "ws://127.0.0.1:9944".to_string()),
         };
 
@@ -123,6 +114,7 @@ impl LiveNodeDispatcher {
     }
 
     /// Attempt to reconnect with exponential backoff
+    #[allow(dead_code)]
     fn reconnect(&mut self) -> Result<(), DispatchError> {
         if self.reconnect_attempts < self.config.reconnect_max_attempts {
             self.reconnect_attempts += 1;
@@ -145,10 +137,10 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
     #[cfg(feature = "std")]
     fn execute_evm_tx(
         &self,
-        caller: &[u8; 20],
-        target: &[u8; 20],
+        _caller: &[u8; 20],
+        _target: &[u8; 20],
         input: &[u8],
-        value: u128,
+        _value: u128,
     ) -> Result<CrossVmResult, DispatchError> {
         // Construct JSON-RPC eth_sendRawTransaction call
         // The raw transaction is expected to be provided in the input parameter

@@ -53,12 +53,12 @@ pub use weights::WeightInfo;
 
 use frame_support::{
     pallet_prelude::*,
-    traits::{Currency, ReservableCurrency, ExistenceRequirement},
+    traits::{Currency, ExistenceRequirement, ReservableCurrency},
     Blake2_128Concat,
 };
 use frame_system::pallet_prelude::*;
-use sp_runtime::traits::{Hash, SaturatedConversion, Saturating};
 use sp_core::H256;
+use sp_runtime::traits::{Hash, SaturatedConversion, Saturating};
 use sp_std::prelude::*;
 use x3_accounting_events::{AccountingEvent, AccountingSpine, FeeDestination, RevenueModule};
 
@@ -78,7 +78,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Currency for deposits, bonds, and fees.
         type Currency: ReservableCurrency<Self::AccountId>;
@@ -191,8 +190,7 @@ pub mod pallet {
     /// Atlas ID to agent mapping.
     #[pallet::storage]
     #[pallet::getter(fn atlas_to_agent)]
-    pub type AtlasToAgent<T: Config> =
-        StorageMap<_, Blake2_128Concat, u64, AgentId, OptionQuery>;
+    pub type AtlasToAgent<T: Config> = StorageMap<_, Blake2_128Concat, u64, AgentId, OptionQuery>;
 
     // ========================================================================
     // Storage — Quotas & Permissions
@@ -233,13 +231,8 @@ pub mod pallet {
     /// Bond ledger.
     #[pallet::storage]
     #[pallet::getter(fn bonds)]
-    pub type Bonds<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        H256,
-        AgentBond<T::AccountId, BalanceOf<T>>,
-        OptionQuery,
-    >;
+    pub type Bonds<T: Config> =
+        StorageMap<_, Blake2_128Concat, H256, AgentBond<T::AccountId, BalanceOf<T>>, OptionQuery>;
 
     /// Bonds by agent.
     #[pallet::storage]
@@ -325,13 +318,8 @@ pub mod pallet {
     /// Agent economics snapshots.
     #[pallet::storage]
     #[pallet::getter(fn agent_economics)]
-    pub type AgentEconomicsStore<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        AgentId,
-        AgentEconomics<BalanceOf<T>>,
-        ValueQuery,
-    >;
+    pub type AgentEconomicsStore<T: Config> =
+        StorageMap<_, Blake2_128Concat, AgentId, AgentEconomics<BalanceOf<T>>, ValueQuery>;
 
     /// Total agents counter.
     #[pallet::storage]
@@ -350,22 +338,14 @@ pub mod pallet {
     /// Reward configuration per proof type.
     #[pallet::storage]
     #[pallet::getter(fn proof_reward_config)]
-    pub type ProofRewardConfigStore<T: Config> = StorageValue<
-        _,
-        ProofRewardConfig<BalanceOf<T>>,
-        ValueQuery,
-    >;
+    pub type ProofRewardConfigStore<T: Config> =
+        StorageValue<_, ProofRewardConfig<BalanceOf<T>>, ValueQuery>;
 
     /// Accumulated unclaimed rewards per agent.
     #[pallet::storage]
     #[pallet::getter(fn agent_reward_pool)]
-    pub type AgentRewardPool<T: Config> = StorageMap<
-        _,
-        Blake2_128Concat,
-        AgentId,
-        BalanceOf<T>,
-        ValueQuery,
-    >;
+    pub type AgentRewardPool<T: Config> =
+        StorageMap<_, Blake2_128Concat, AgentId, BalanceOf<T>, ValueQuery>;
 
     /// Total balance in the reward pool (tracked for accounting).
     #[pallet::storage]
@@ -619,7 +599,9 @@ pub mod pallet {
                     bond_id,
                     severity: 3,
                     amount_slashed: bond_state.amount.saturated_into::<u128>(),
-                    reason: b"bond_expiry".to_vec().try_into()
+                    reason: b"bond_expiry"
+                        .to_vec()
+                        .try_into()
                         .expect("bond_expiry fits in bounded reason"),
                     slashed_at: now,
                 };
@@ -709,7 +691,8 @@ pub mod pallet {
             AgentEconomicsStore::<T>::insert(agent_id, economics);
             OperatorAgent::<T>::insert(&operator, agent_id);
 
-            controller_agents.try_push(agent_id)
+            controller_agents
+                .try_push(agent_id)
                 .map_err(|_| Error::<T>::TooManyAgents)?;
             ControllerAgents::<T>::insert(&controller, controller_agents);
 
@@ -749,10 +732,7 @@ pub mod pallet {
                 agent.atlas_id = Some(atlas_id);
                 AtlasToAgent::<T>::insert(&atlas_id, agent_id);
 
-                Self::deposit_event(Event::AtlasIdBound {
-                    agent_id,
-                    atlas_id,
-                });
+                Self::deposit_event(Event::AtlasIdBound { agent_id, atlas_id });
 
                 Ok(())
             })
@@ -771,7 +751,10 @@ pub mod pallet {
             Agents::<T>::try_mutate(agent_id, |maybe_agent| -> DispatchResult {
                 let agent = maybe_agent.as_mut().ok_or(Error::<T>::AgentNotFound)?;
                 ensure!(agent.controller == who, Error::<T>::NotController);
-                ensure!(agent.status == AgentStatus::Active, Error::<T>::AgentNotActive);
+                ensure!(
+                    agent.status == AgentStatus::Active,
+                    Error::<T>::AgentNotActive
+                );
                 ensure!(
                     !OperatorAgent::<T>::contains_key(&new_operator),
                     Error::<T>::NotAuthorized
@@ -825,7 +808,10 @@ pub mod pallet {
             compute_per_epoch: u128,
         ) -> DispatchResult {
             T::AdminOrigin::ensure_origin(origin)?;
-            ensure!(Agents::<T>::contains_key(agent_id), Error::<T>::AgentNotFound);
+            ensure!(
+                Agents::<T>::contains_key(agent_id),
+                Error::<T>::AgentNotFound
+            );
 
             let current_block = frame_system::Pallet::<T>::block_number();
             let quota = AgentQuota {
@@ -855,7 +841,10 @@ pub mod pallet {
             Agents::<T>::try_mutate(agent_id, |maybe_agent| -> DispatchResult {
                 let agent = maybe_agent.as_mut().ok_or(Error::<T>::AgentNotFound)?;
                 let old_status = agent.status;
-                ensure!(old_status == AgentStatus::Active, Error::<T>::InvalidStatusTransition);
+                ensure!(
+                    old_status == AgentStatus::Active,
+                    Error::<T>::InvalidStatusTransition
+                );
 
                 agent.status = AgentStatus::Suspended;
                 ActiveAgents::<T>::mutate(|n| *n = n.saturating_sub(1));
@@ -880,7 +869,10 @@ pub mod pallet {
             Agents::<T>::try_mutate(agent_id, |maybe_agent| -> DispatchResult {
                 let agent = maybe_agent.as_mut().ok_or(Error::<T>::AgentNotFound)?;
                 let old_status = agent.status;
-                ensure!(old_status == AgentStatus::Suspended, Error::<T>::InvalidStatusTransition);
+                ensure!(
+                    old_status == AgentStatus::Suspended,
+                    Error::<T>::InvalidStatusTransition
+                );
 
                 agent.status = AgentStatus::Active;
                 agent.last_active = frame_system::Pallet::<T>::block_number();
@@ -904,7 +896,10 @@ pub mod pallet {
 
             let agent = Agents::<T>::get(agent_id).ok_or(Error::<T>::AgentNotFound)?;
             ensure!(agent.controller == who, Error::<T>::NotController);
-            ensure!(agent.status != AgentStatus::Terminated, Error::<T>::AgentTerminated);
+            ensure!(
+                agent.status != AgentStatus::Terminated,
+                Error::<T>::AgentTerminated
+            );
 
             let was_active = agent.status == AgentStatus::Active;
 
@@ -949,8 +944,9 @@ pub mod pallet {
             ensure!(policies.len() <= 16, Error::<T>::TooManyPolicies);
 
             let policy_count = policies.len() as u32;
-            let bounded_policies: BoundedVec<PolicyRule<T::AccountId>, ConstU32<16>> =
-                policies.try_into().map_err(|_| Error::<T>::TooManyPolicies)?;
+            let bounded_policies: BoundedVec<PolicyRule<T::AccountId>, ConstU32<16>> = policies
+                .try_into()
+                .map_err(|_| Error::<T>::TooManyPolicies)?;
 
             ActivePolicies::<T>::insert(&agent, bounded_policies);
             ViolationCount::<T>::insert(&agent, 0);
@@ -1038,7 +1034,10 @@ pub mod pallet {
             ensure_root(origin)?;
 
             let bond_state = Bonds::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
-            ensure!(matches!(bond_state.status, BondStatus::Active), Error::<T>::InvalidBondState);
+            ensure!(
+                matches!(bond_state.status, BondStatus::Active),
+                Error::<T>::InvalidBondState
+            );
 
             T::Currency::unreserve(&bond_state.agent, bond_state.amount);
 
@@ -1193,7 +1192,10 @@ pub mod pallet {
             let _ = ensure_signed(origin)?;
 
             let agent = Agents::<T>::get(agent_id).ok_or(Error::<T>::AgentNotFound)?;
-            ensure!(agent.status == AgentStatus::Active, Error::<T>::AgentNotActive);
+            ensure!(
+                agent.status == AgentStatus::Active,
+                Error::<T>::AgentNotActive
+            );
 
             let mut activity = Activity::<T>::get(agent_id);
             activity.gas_used_block = activity.gas_used_block.saturating_add(gas_used);
@@ -1278,7 +1280,10 @@ pub mod pallet {
             T::AdminOrigin::ensure_origin(origin)?;
 
             let agent = Agents::<T>::get(agent_id).ok_or(Error::<T>::AgentNotFound)?;
-            ensure!(agent.status == AgentStatus::Active, Error::<T>::AgentNotActive);
+            ensure!(
+                agent.status == AgentStatus::Active,
+                Error::<T>::AgentNotActive
+            );
 
             // Transfer rewards from treasury to agent controller
             let treasury = T::SlashRecipient::get();
@@ -1347,27 +1352,25 @@ pub mod pallet {
         /// Fund the reward pool from any account.
         #[pallet::call_index(18)]
         #[pallet::weight(T::WeightInfo::fund_reward_pool())]
-        pub fn fund_reward_pool(
-            origin: OriginFor<T>,
-            amount: BalanceOf<T>,
-        ) -> DispatchResult {
+        pub fn fund_reward_pool(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let treasury = T::SlashRecipient::get();
             T::Currency::transfer(&who, &treasury, amount, ExistenceRequirement::AllowDeath)
                 .map_err(|_| Error::<T>::ArithmeticError)?;
             TotalRewardPool::<T>::mutate(|total| *total = total.saturating_add(amount));
             let new_total = TotalRewardPool::<T>::get();
-            Self::deposit_event(Event::RewardPoolFunded { from: who, amount, new_total });
+            Self::deposit_event(Event::RewardPoolFunded {
+                from: who,
+                amount,
+                new_total,
+            });
             Ok(())
         }
 
         /// Claim accumulated rewards for an agent.
         #[pallet::call_index(19)]
         #[pallet::weight(T::WeightInfo::claim_rewards())]
-        pub fn claim_rewards(
-            origin: OriginFor<T>,
-            agent_id: AgentId,
-        ) -> DispatchResult {
+        pub fn claim_rewards(origin: OriginFor<T>, agent_id: AgentId) -> DispatchResult {
             let who = ensure_signed(origin)?;
             let agent = Agents::<T>::get(agent_id).ok_or(Error::<T>::AgentNotFound)?;
             ensure!(agent.controller == who, Error::<T>::NotController);
@@ -1387,7 +1390,11 @@ pub mod pallet {
                 econ.total_rewards = econ.total_rewards.saturating_add(reward);
             });
 
-            Self::deposit_event(Event::RewardsClaimed { agent_id, recipient: who, amount: reward });
+            Self::deposit_event(Event::RewardsClaimed {
+                agent_id,
+                recipient: who,
+                amount: reward,
+            });
             Ok(())
         }
     }
@@ -1448,17 +1455,20 @@ pub mod pallet {
         }
 
         /// Get full agent state for runtime API.
-        pub fn get_agent_state(agent_id: AgentId) -> Option<AgentFullState<T::AccountId, BalanceOf<T>, BlockNumberFor<T>>> {
+        pub fn get_agent_state(
+            agent_id: AgentId,
+        ) -> Option<AgentFullState<T::AccountId, BalanceOf<T>, BlockNumberFor<T>>> {
             let record = Agents::<T>::get(agent_id)?;
             let quota = Quotas::<T>::get(agent_id).unwrap_or_default();
             let permissions = Permissions::<T>::get(agent_id);
             let activity = Activity::<T>::get(agent_id);
             let economics = AgentEconomicsStore::<T>::get(agent_id);
 
-            let bonds: Vec<AgentBond<T::AccountId, BalanceOf<T>>> = BondsByAgent::<T>::get(&record.controller)
-                .iter()
-                .filter_map(|bond_id| Bonds::<T>::get(bond_id))
-                .collect();
+            let bonds: Vec<AgentBond<T::AccountId, BalanceOf<T>>> =
+                BondsByAgent::<T>::get(&record.controller)
+                    .iter()
+                    .filter_map(|bond_id| Bonds::<T>::get(bond_id))
+                    .collect();
 
             let policies = ActivePolicies::<T>::get(&record.controller);
 
@@ -1491,36 +1501,24 @@ pub mod pallet {
                 match policy {
                     PolicyRule::ReputationMinimum(min) => {
                         let rep = ReputationScores::<T>::get(agent);
-                        ensure!(
-                            (rep as u64) >= *min,
-                            Error::<T>::ReputationBelowMinimum
-                        );
+                        ensure!((rep as u64) >= *min, Error::<T>::ReputationBelowMinimum);
                     }
                     PolicyRule::MaxTasksPerBlock(max_tasks) => {
                         let current_block = frame_system::Pallet::<T>::block_number();
                         let tasks = TasksThisBlock::<T>::get((current_block, agent.clone()));
-                        ensure!(
-                            tasks < *max_tasks,
-                            Error::<T>::MaxTasksPerBlockExceeded
-                        );
+                        ensure!(tasks < *max_tasks, Error::<T>::MaxTasksPerBlockExceeded);
                     }
                     PolicyRule::NoCollusionWith(blocked) => {
                         // Check if agent is interacting with any blocked account
                         // This is a simplified check — full implementation requires
                         // inspecting the call target
                         for blocked_account in blocked.iter() {
-                            ensure!(
-                                agent != blocked_account,
-                                Error::<T>::CollusionAttempted
-                            );
+                            ensure!(agent != blocked_account, Error::<T>::CollusionAttempted);
                         }
                     }
                     PolicyRule::RateLimit(max_extrinsics) => {
                         let count = ExtrinsicCountThisEpoch::<T>::get(agent);
-                        ensure!(
-                            count < *max_extrinsics,
-                            Error::<T>::RateLimitExceeded
-                        );
+                        ensure!(count < *max_extrinsics, Error::<T>::RateLimitExceeded);
                     }
                     PolicyRule::CapabilityAllowed(_) => {
                         // Capability check is done at the call level
@@ -1606,7 +1604,10 @@ pub mod pallet {
 
             let total_reward = config.base_reward.saturating_add(config.verification_bonus);
             let pool_balance = TotalRewardPool::<T>::get();
-            ensure!(pool_balance >= total_reward, Error::<T>::RewardPoolInsufficient);
+            ensure!(
+                pool_balance >= total_reward,
+                Error::<T>::RewardPoolInsufficient
+            );
 
             AgentRewardPool::<T>::mutate(agent_id, |balance| {
                 *balance = balance.saturating_add(total_reward);

@@ -4,13 +4,12 @@
 
 pub mod committee;
 pub mod freeze;
-pub mod meta;
+// pub mod meta; // excluded from v0.4 build: depends on generic frame_system::BlockHash binding not yet wired
 pub mod pallet;
 pub mod scheduler_v1;
 pub mod types;
 pub mod verifier;
 pub mod witness_v1;
-
 
 // startup_gate is std-only (runs before consensus join, not inside the WASM runtime).
 #[cfg(feature = "std")]
@@ -21,13 +20,12 @@ pub use committee::{
     MAX_COMMITTEE_SIZE,
 };
 pub use freeze::{engaged_state, freeze_summary, is_frozen_from_bytes, FreezeReason, FreezeState};
+// pub use meta::load_disputed_block_meta;
 pub use pallet::pallet as fraud_proof_pallet;
 pub use scheduler_v1::{recompute_from_bytes, scheduler_commitment_from_bytes};
-pub use meta::load_disputed_block_meta;
 pub use types::{
-    DisputedBlockMeta, FraudProofV1, HeaderRef, NoProposer,
-    NoSchedulerCommitment, ProposerQuery, SchedulerCommitmentQuery,
-    PROOF_TYPE_SCHED_MISMATCH_V1,
+    DisputedBlockMeta, FraudProofV1, HeaderRef, NoProposer, NoSchedulerCommitment, ProposerQuery,
+    SchedulerCommitmentQuery, PROOF_TYPE_SCHED_MISMATCH_V1,
 };
 
 pub use verifier::{compute_proof_id, verify_scheduler_mismatch_v1, VerifyError};

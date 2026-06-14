@@ -29,15 +29,27 @@ mod benchmarks {
         let deadline = 1000u64;
 
         #[extrinsic_call]
-        _(RawOrigin::Signed(caller.clone()), action_payload.clone(), proof_payload.clone(), ProofKind::ZkSnark, 1u8, 0u8, deadline, 1u64);
+        _(
+            RawOrigin::Signed(caller.clone()),
+            action_payload.clone(),
+            proof_payload.clone(),
+            ProofKind::ZkSnark,
+            1u8,
+            0u8,
+            deadline,
+            1u64,
+        );
 
-        assert_last_event::<T>(Event::ActionSubmitted {
-            agent: caller,
-            action_id: ProofCarryingAgent::<T>::action_nonce(),
-            proof_kind: ProofKind::ZkSnark,
-            target_pallet: 1,
-            target_call: 0,
-        }.into());
+        assert_last_event::<T>(
+            Event::ActionSubmitted {
+                agent: caller,
+                action_id: ProofCarryingAgent::<T>::action_nonce(),
+                proof_kind: ProofKind::ZkSnark,
+                target_pallet: 1,
+                target_call: 0,
+            }
+            .into(),
+        );
     }
 
     #[benchmark]
@@ -56,17 +68,26 @@ mod benchmarks {
             0u8,
             deadline,
             1u64,
-        ).unwrap();
+        )
+        .unwrap();
 
         let action_id = ProofCarryingAgent::<T>::action_nonce();
 
         #[extrinsic_call]
-        _(RawOrigin::Signed(caller.clone()), action_id, true, vec![3u8; 32]);
-
-        assert_last_event::<T>(Event::ActionVerified {
-            agent: caller,
+        _(
+            RawOrigin::Signed(caller.clone()),
             action_id,
-        }.into());
+            true,
+            vec![3u8; 32],
+        );
+
+        assert_last_event::<T>(
+            Event::ActionVerified {
+                agent: caller,
+                action_id,
+            }
+            .into(),
+        );
     }
 
     #[benchmark]
@@ -87,7 +108,8 @@ mod benchmarks {
             0u8,
             deadline,
             1u64,
-        ).unwrap();
+        )
+        .unwrap();
 
         let action_id = ProofCarryingAgent::<T>::action_nonce();
 
@@ -96,18 +118,26 @@ mod benchmarks {
             action_id,
             true,
             vec![],
-        ).unwrap();
+        )
+        .unwrap();
 
         // Fund challenger
         T::Currency::make_free_balance_be(&challenger, 1_000_000u32.into());
 
         #[extrinsic_call]
-        _(RawOrigin::Signed(challenger.clone()), action_id, vec![4u8; 16]);
-
-        assert_last_event::<T>(Event::ProofChallenged {
+        _(
+            RawOrigin::Signed(challenger.clone()),
             action_id,
-            challenger,
-        }.into());
+            vec![4u8; 16],
+        );
+
+        assert_last_event::<T>(
+            Event::ProofChallenged {
+                action_id,
+                challenger,
+            }
+            .into(),
+        );
     }
 
     #[benchmark]
@@ -128,7 +158,8 @@ mod benchmarks {
             0u8,
             deadline,
             1u64,
-        ).unwrap();
+        )
+        .unwrap();
 
         let action_id = ProofCarryingAgent::<T>::action_nonce();
 
@@ -137,7 +168,8 @@ mod benchmarks {
             action_id,
             true,
             vec![],
-        ).unwrap();
+        )
+        .unwrap();
 
         T::Currency::make_free_balance_be(&challenger, 1_000_000u32.into());
 
@@ -145,15 +177,19 @@ mod benchmarks {
             RawOrigin::Signed(challenger).into(),
             action_id,
             vec![],
-        ).unwrap();
+        )
+        .unwrap();
 
         #[extrinsic_call]
         _(RawOrigin::Root, action_id, ChallengeResolution::Upheld);
 
-        assert_last_event::<T>(Event::ChallengeResolved {
-            action_id,
-            resolution: ChallengeResolution::Upheld,
-        }.into());
+        assert_last_event::<T>(
+            Event::ChallengeResolved {
+                action_id,
+                resolution: ChallengeResolution::Upheld,
+            }
+            .into(),
+        );
     }
 
     #[benchmark]
@@ -187,7 +223,8 @@ mod benchmarks {
             0u8,
             deadline,
             1u64,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Advance past expiry
         frame_system::Pallet::<T>::set_block_number(200u32.into());
@@ -195,15 +232,18 @@ mod benchmarks {
         #[extrinsic_call]
         _(RawOrigin::Signed(caller.clone()), 10u32);
 
-        assert_last_event::<T>(Event::ActionExpired {
-            agent: caller,
-            action_id: 1u64.using_encoded(|b| {
-                let mut arr = [0u8; 32];
-                let len = b.len().min(32);
-                arr[..len].copy_from_slice(&b[..len]);
-                arr
-            }),
-        }.into());
+        assert_last_event::<T>(
+            Event::ActionExpired {
+                agent: caller,
+                action_id: 1u64.using_encoded(|b| {
+                    let mut arr = [0u8; 32];
+                    let len = b.len().min(32);
+                    arr[..len].copy_from_slice(&b[..len]);
+                    arr
+                }),
+            }
+            .into(),
+        );
     }
 
     impl_benchmark_test_suite!(

@@ -344,3 +344,21 @@ impl GatewayRiskEngine {
         }
     }
 }
+
+/// Per-route risk status exposed to the gateway indexer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GatewayRiskStatus {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+/// Per-route risk report consumed by the gateway indexer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GatewayRouteRiskReport {
+    pub route_id: [u8; 32],
+    pub status: GatewayRiskStatus,
+    pub allow_transfer: bool,
+    pub reasons: Vec<String>,
+}

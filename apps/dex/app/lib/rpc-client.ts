@@ -41,11 +41,11 @@ export class X3DexRpcClient {
   private ws: WebSocket | null = null;
   private requestId = 0;
   private pendingRequests = new Map<number, {
-    resolve: (value: any) => void;
-    reject: (error: any) => void;
+    resolve: (value: unknown) => void;
+    reject: (error: unknown) => void;
   }>();
 
-  constructor(private endpoint: string = 'ws://localhost:9944') {}
+  constructor(private endpoint: string = 'wss://ws.x3star.net') {}
 
   /**
    * Connect to X3 node WebSocket RPC endpoint
@@ -110,7 +110,7 @@ export class X3DexRpcClient {
   /**
    * Send JSON-RPC request
    */
-  private async request(method: string, params: any[]): Promise<any> {
+  private async request(method: string, params: unknown[]): Promise<unknown> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected');
     }

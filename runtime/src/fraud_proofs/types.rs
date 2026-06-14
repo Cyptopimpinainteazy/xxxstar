@@ -80,7 +80,6 @@ pub struct FraudProofAcceptedRecord<AccountId, Balance> {
 
 // ── Trait abstractions for dependency injection ───────────────────────────────
 
-
 /// Trait for querying the scheduler commitment for a given block.
 ///
 /// Implemented by the sequencer pallet or any other pallet that stores
@@ -157,10 +156,7 @@ mod tests {
     /// LOAD-META-001: SchedulerCommitmentQuery returns None for unknown blocks
     #[test]
     fn scheduler_commitment_none_for_unknown_block() {
-        assert_eq!(
-            NoSchedulerCommitment::get_scheduler_commitment(999),
-            None
-        );
+        assert_eq!(NoSchedulerCommitment::get_scheduler_commitment(999), None);
     }
 
     /// LOAD-META-002: ProposerQuery returns None for unknown blocks
@@ -186,5 +182,4 @@ mod tests {
         assert_eq!(p1, p2);
         assert_eq!(p1, Some(42u64));
     }
-
 }

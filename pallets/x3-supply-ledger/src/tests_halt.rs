@@ -90,7 +90,6 @@ impl AssetRegistryInspect for AlwaysActiveRegistry {
 }
 
 impl pallet_x3_supply_ledger::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type SupplyGovernance = RootOnly;
     type Registry = AlwaysActiveRegistry;
 }

@@ -60,7 +60,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_x3_inventory::pallet::Config {
         /// The runtime event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Maximum total balance (in native units) that may be rebalanced across all vaults
         /// within a single calendar day. Rejects steps that would exceed this threshold.

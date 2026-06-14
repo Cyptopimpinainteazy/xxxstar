@@ -157,9 +157,6 @@ pub mod pallet {
     pub trait Config:
         frame_system::Config + pallet_timestamp::Config + pallet_x3_kernel::Config
     {
-        /// The overarching event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Weight information for extrinsics.
         type WeightInfo: WeightInfo;
 
@@ -1318,7 +1315,7 @@ pub mod pallet {
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
             let block_num: u64 = block_number.saturated_into();
-            if block_num % 10 != 0 {
+            if !block_num.is_multiple_of(10) {
                 return Weight::zero();
             }
 
@@ -1335,7 +1332,7 @@ pub mod pallet {
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             // Run price aggregation every 10 blocks
             let block_num: u64 = block_number.saturated_into();
-            if block_num % 10 == 0 {
+            if block_num.is_multiple_of(10) {
                 if let Err(e) = Self::fetch_external_prices() {
                     log::warn!("Offchain worker price fetch failed: {:?}", e);
                 }

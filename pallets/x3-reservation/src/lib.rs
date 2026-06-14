@@ -14,7 +14,6 @@
 //! - Detect frozen lane before reserving (returns `LaneFrozen`).
 //! - Increment / decrement the unsettled-notional counters in `pallet-x3-inventory`.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
 
@@ -67,8 +66,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_x3_inventory::pallet::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// How many blocks a reservation lives before auto-expiry if not consumed.
         #[pallet::constant]
         type ReservationTtlBlocks: Get<BlockNumberFor<Self>>;
@@ -201,7 +198,7 @@ pub mod pallet {
                             );
 
                             // Decrement unsettled-notional counters.
-                            let _ = InventoryPallet::<T>::decrement_unsettled_notional(
+                            InventoryPallet::<T>::decrement_unsettled_notional(
                                 state.lane_id,
                                 state.amount,
                             );
@@ -351,7 +348,7 @@ pub mod pallet {
             pallet_x3_inventory::inventory::record_pending_out::<T>(state.vault_id, state.amount)?;
 
             // Decrement unsettled-notional.
-            let _ = InventoryPallet::<T>::decrement_unsettled_notional(state.lane_id, state.amount);
+            InventoryPallet::<T>::decrement_unsettled_notional(state.lane_id, state.amount);
 
             // Remove expiry entry (already consumed; no need to expire).
             ExpiryQueue::<T>::remove(state.expiry_block, reservation_id);
@@ -415,7 +412,7 @@ pub mod pallet {
             pallet_x3_inventory::inventory::release_inventory::<T>(state.vault_id, state.amount)?;
 
             // Decrement unsettled-notional.
-            let _ = InventoryPallet::<T>::decrement_unsettled_notional(state.lane_id, state.amount);
+            InventoryPallet::<T>::decrement_unsettled_notional(state.lane_id, state.amount);
 
             // Remove expiry entry.
             ExpiryQueue::<T>::remove(state.expiry_block, reservation_id);

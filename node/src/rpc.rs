@@ -7,7 +7,6 @@
 use flash_finality::FlashFinalityGadget;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 use sc_client_api::BlockBackend;
-use sc_rpc::chain::ChainApiServer;
 use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
@@ -17,10 +16,10 @@ use x3_atomic_trade::{AMMPool, SwapRPCServer};
 use x3_chain_runtime::{opaque::Block, AccountId, AssetId, Balance};
 use x3_common::{
     signing::{Ed25519Signer, KeyType, Secp256k1Signer, Signer, Sr25519Signer},
-    weight_metering::{ComputeMeter, GasMeter, Operation, WeightConfig, WeightMeter},
+    weight_metering::{WeightConfig, WeightMeter},
 };
 use x3_rpc::{
-    SwapRequest, ValidatorRpcApi, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc,
+    SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc,
 };
 
 use crate::rpc_middleware::RateLimiter;
@@ -74,7 +73,7 @@ pub fn create_full<P>(
     pool: Arc<P>,
     _gadget: Option<Arc<FlashFinalityGadget>>,
     _limiter: Arc<RateLimiter>,
-    subscription_executor: sc_rpc::SubscriptionTaskExecutor,
+    _subscription_executor: sc_rpc::SubscriptionTaskExecutor,
 ) -> Result<RpcModule<()>, RpcError>
 where
     P: TransactionPool + Sync + Send + 'static,

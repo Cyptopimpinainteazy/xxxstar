@@ -36,6 +36,7 @@ impl ProofEnvelope {
             ExternalChainId::EthereumMainnet => 4,
             ExternalChainId::BaseMainnet => 5,
             ExternalChainId::SolanaMainnet => 6,
+            ExternalChainId::Other(id) => (id % 256) as u8,
         };
         out[0] = chain_tag;
         for (idx, byte) in source_tx_hash.iter().enumerate() {

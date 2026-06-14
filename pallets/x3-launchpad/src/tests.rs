@@ -7,18 +7,18 @@ use frame_support::{assert_noop, assert_ok, traits::Hooks};
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 /// Create a standard launch via root governance. Creator is account 1.
-fn create_default_launch() -> u64 {
+fn create_default_launch() -> u32 {
     assert_ok!(Launchpad::create_launch(
-        RuntimeOrigin::root(),
-        1u64,  // creator account
+        RuntimeOrigin::signed(1),
         1,     // token_asset_id
         500,   // soft_cap
         1000,  // hard_cap
         10,    // price_per_token
         2u64,  // start_block
         12u64, // end_block  (duration = 10 blocks, within bounds 5..=1000)
+        5u64,  // lp_lock_duration_blocks
     ));
-    crate::NextLaunchId::<Test>::get() - 1
+    crate::NextLaunchId::<Test>::get().saturating_sub(1)
 }
 
 fn advance_to(block: u64) {
@@ -76,29 +76,29 @@ fn create_launch_fails_invalid_caps() {
     new_test_ext().execute_with(|| {
         assert_noop!(
             Launchpad::create_launch(
-                RuntimeOrigin::root(),
-                1u64,
+                RuntimeOrigin::signed(1),
                 1,
                 0,
                 1000,
                 10,
                 2u64,
-                12u64 // soft_cap == 0
+                12u64, // soft_cap == 0
+                5u64,
             ),
-            Error::<Test>::InvalidLaunchParams
+            Error::<Test>::SoftCapExceeded
         );
         assert_noop!(
             Launchpad::create_launch(
-                RuntimeOrigin::root(),
-                1u64,
+                RuntimeOrigin::signed(1),
                 1,
                 1000,
                 500,
                 10,
                 2u64,
-                12u64 // hard_cap < soft_cap
+                12u64, // hard_cap < soft_cap
+                5u64,
             ),
-            Error::<Test>::InvalidLaunchParams
+            Error::<Test>::SoftCapExceeded
         );
     });
 }
@@ -108,8 +108,8 @@ fn create_launch_fails_duration_out_of_bounds() {
     new_test_ext().execute_with(|| {
         // Duration = 3 < MinLaunchDurationBlocks (5)
         assert_noop!(
-            Launchpad::create_launch(RuntimeOrigin::root(), 1u64, 1, 500, 1000, 10, 2u64, 5u64),
-            Error::<Test>::DurationOutOfBounds
+            Launchpad::create_launch(RuntimeOrigin::signed(1), 1, 500, 1000, 10, 2u64, 5u64, 5u64,),
+            Error::<Test>::BadDuration
         );
     });
 }
@@ -117,39 +117,39 @@ fn create_launch_fails_duration_out_of_bounds() {
 #[test]
 fn create_launch_fails_when_cap_reached() {
     new_test_ext().execute_with(|| {
-        for i in 0..20u64 {
+        for _ in 0..10u32 {
             assert_ok!(Launchpad::create_launch(
-                RuntimeOrigin::root(),
-                i,
+                RuntimeOrigin::signed(1),
                 1,
                 500,
                 1000,
                 10,
                 2u64,
-                12u64
+                12u64,
+                5u64,
             ));
         }
         assert_noop!(
-            Launchpad::create_launch(RuntimeOrigin::root(), 99u64, 1, 500, 1000, 10, 2u64, 12u64),
-            Error::<Test>::MaxLaunchesReached
+            Launchpad::create_launch(
+                RuntimeOrigin::signed(1),
+                1,
+                500,
+                1000,
+                10,
+                2u64,
+                12u64,
+                5u64,
+            ),
+            Error::<Test>::MaxActiveLaunchesReached
         );
     });
 }
 
 #[test]
-fn create_launch_requires_governance_origin() {
+fn create_launch_requires_signed_origin() {
     new_test_ext().execute_with(|| {
         assert_noop!(
-            Launchpad::create_launch(
-                RuntimeOrigin::signed(1),
-                1u64,
-                1,
-                500,
-                1000,
-                10,
-                2u64,
-                12u64
-            ),
+            Launchpad::create_launch(RuntimeOrigin::none(), 1, 500, 1000, 10, 2u64, 12u64, 5u64,),
             frame_support::error::BadOrigin
         );
     });

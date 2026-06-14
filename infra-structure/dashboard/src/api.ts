@@ -28,28 +28,6 @@ const CREDS_STORE: Storage = (typeof window !== 'undefined' && window.sessionSto
       clear: () => undefined,
     } as unknown as Storage;
 
-// ── Credential storage ──────────────────────────────────────────────────────
-// SECURITY: API keys and JWTs MUST NOT be persisted in localStorage. localStorage
-// is readable by any JS that runs in this origin (XSS exfiltration risk).
-// sessionStorage limits the exposure window to the current tab.
-//
-// TODO(security): the proper fix is server-issued Set-Cookie with HttpOnly,
-// Secure, SameSite=Strict on the registry backend. Until that ships, these
-// tokens are still accessible to any script on this page. (CodeQL
-// js/clear-text-storage-of-sensitive-information #2105, #2106)
-const CREDS_STORE: Storage = (typeof window !== 'undefined' && window.sessionStorage)
-  ? window.sessionStorage
-  : {
-      // Minimal in-memory fallback so the dashboard still works in non-browser
-      // test harnesses without ever writing to localStorage.
-      getItem: () => null,
-      setItem: () => undefined,
-      removeItem: () => undefined,
-      key: () => null,
-      length: 0,
-      clear: () => undefined,
-    } as unknown as Storage;
-
 export interface ValidatorCredentials {
   validator_id: string;
   chain: string;

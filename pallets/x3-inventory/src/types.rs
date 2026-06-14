@@ -302,9 +302,7 @@ pub enum ChainHealthStatus {
     Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
 )]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct VaultState<
-    Balance: Encode + Decode + MaxEncodedLen + TypeInfo + Clone + core::fmt::Debug + PartialEq + Eq,
-> {
+pub struct VaultState<Balance> {
     pub vault_id: VaultId,
     pub vault_type: VaultType,
     pub owner_type: OwnerType,
@@ -328,10 +326,7 @@ pub struct VaultState<
 )]
 #[scale_info(skip_type_params(MaxSources))]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct LaneState<
-    Balance: Encode + Decode + MaxEncodedLen + TypeInfo + Clone + core::fmt::Debug + PartialEq + Eq,
-    MaxSources: frame_support::traits::Get<u32>,
-> {
+pub struct LaneState<Balance, MaxSources: frame_support::traits::Get<u32>> {
     pub lane_id: LaneId,
     pub source_chain: ChainId,
     pub dest_chain: ChainId,

@@ -12,7 +12,6 @@
 //! - Maintain a bidirectional partner ↔ lane approval index.
 //! - Expose `is_partner_eligible` for the reservation engine to gate route selection.
 
-#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(clippy::all, clippy::pedantic)]
 // Allow module-level re-exports and large function signatures common in FRAME pallets.
 #![allow(clippy::module_name_repetitions, clippy::too_many_arguments)]
@@ -93,7 +92,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_x3_inventory::pallet::Config {
         /// The overarching runtime event type.
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Maximum number of lanes a single partner may be approved on.
         #[pallet::constant]
