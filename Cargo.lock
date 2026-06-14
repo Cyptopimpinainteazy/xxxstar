@@ -452,6 +452,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "alloca"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5a7d05ea6aea7e9e64d25b9156ba2fee3fdd659e34e41063cd2fc7cd020d7f4"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2670,7 +2679,7 @@ name = "contention-predictor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "criterion",
+ "criterion 0.5.1",
  "once_cell",
  "rand 0.8.6",
  "serde",
@@ -2957,8 +2966,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap",
- "criterion-plot",
- "futures 0.3.32",
+ "criterion-plot 0.5.0",
  "is-terminal",
  "itertools 0.10.5",
  "num-traits",
@@ -2969,6 +2977,31 @@ dependencies = [
  "regex",
  "serde",
  "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "950046b2aa2492f9a536f5f4f9a3de7b9e2476e575e05bd6c333371add4d98f3"
+dependencies = [
+ "alloca",
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot 0.8.2",
+ "itertools 0.13.0",
+ "num-traits",
+ "oorandom",
+ "page_size",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
  "serde_json",
  "tinytemplate",
  "tokio",
@@ -2986,6 +3019,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "criterion-plot"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8d80a2f4f5b554395e47b5d8305bc3d27813bacb73493eb1001e8f76dae29ea"
+dependencies = [
+ "cast",
+ "itertools 0.13.0",
+]
+
+[[package]]
 name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2996,7 +3039,7 @@ name = "cross-chain-gpu-validator"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "criterion",
+ "criterion 0.5.1",
  "ecdsa",
  "hex",
  "k256",
@@ -10029,6 +10072,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "page_size"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "pallet-agent-accounts"
 version = "0.1.0"
 dependencies = [
@@ -12911,7 +12964,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "blake3",
- "criterion",
+ "criterion 0.8.2",
  "hex",
  "log",
  "rand 0.8.6",
@@ -23506,7 +23559,7 @@ dependencies = [
  "bs58",
  "clap",
  "contention-predictor",
- "criterion",
+ "criterion 0.8.2",
  "cross-chain-gpu-validator",
  "env_logger 0.10.2",
  "frame-benchmarking-cli",
@@ -24002,7 +24055,7 @@ dependencies = [
  "blake2 0.10.6",
  "blake3",
  "chrono",
- "criterion",
+ "criterion 0.8.2",
  "dashmap",
  "ed25519-dalek 2.2.0",
  "futures 0.3.32",
