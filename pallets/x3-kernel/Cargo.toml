@@ -24,7 +24,7 @@ pallet-timestamp = { workspace = true, default-features = false }
 pallet-x3-invariants = { path = "../x3-invariants", default-features = false }
 sp-api = { workspace = true, default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
-minicbor = { version = "0.24.0", default-features = false, features = ["derive", "alloc"] }
+minicbor = { version = "2.2.2", default-features = false, features = ["derive", "alloc"] }
 parity-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 serde = { workspace = true, features = ["alloc"] }
