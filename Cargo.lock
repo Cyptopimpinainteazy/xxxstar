@@ -547,7 +547,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -558,7 +558,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1217,7 +1217,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1e37c5532e4b686acf45e7162bc93da91fc2c702fb0d465efc2c20c8f973795"
 dependencies = [
  "async-graphql",
- "axum 0.8.9",
+ "axum",
  "bytes",
  "futures-util",
  "serde_json",
@@ -1448,45 +1448,11 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "axum"
-version = "0.7.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
-dependencies = [
- "async-trait",
- "axum-core 0.4.5",
- "bytes",
- "futures-util",
- "http 1.4.2",
- "http-body 1.0.1",
- "http-body-util",
- "hyper 1.10.1",
- "hyper-util",
- "itoa",
- "matchit 0.7.3",
- "memchr",
- "mime",
- "percent-encoding 2.3.2",
- "pin-project-lite",
- "rustversion",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "serde_urlencoded",
- "sync_wrapper 1.0.2",
- "tokio",
- "tower 0.5.3",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
 dependencies = [
- "axum-core 0.5.6",
+ "axum-core",
  "axum-macros",
  "base64 0.22.1",
  "bytes",
@@ -1498,7 +1464,7 @@ dependencies = [
  "hyper 1.10.1",
  "hyper-util",
  "itoa",
- "matchit 0.8.4",
+ "matchit",
  "memchr",
  "mime",
  "percent-encoding 2.3.2",
@@ -1512,27 +1478,6 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.29.0",
  "tower 0.5.3",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum-core"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09f2bd6146b97ae3359fa0cc6d6b376d9539582c7b4220f041a33ec24c226199"
-dependencies = [
- "async-trait",
- "bytes",
- "futures-util",
- "http 1.4.2",
- "http-body 1.0.1",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "rustversion",
- "sync_wrapper 1.0.2",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -3238,7 +3183,7 @@ dependencies = [
  "sc-client-api",
  "sc-consensus-babe",
  "sc-network-types",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-inherents",
  "sp-runtime 45.0.0",
  "sp-state-machine 0.49.0",
@@ -5438,7 +5383,7 @@ dependencies = [
  "proc-macro-warning",
  "proc-macro2",
  "quote",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "syn 2.0.117",
 ]
 
@@ -6698,7 +6643,7 @@ dependencies = [
  "libc",
  "percent-encoding 2.3.2",
  "pin-project-lite",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "system-configuration 0.7.0",
  "tokio",
  "tower-service",
@@ -7167,7 +7112,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi 0.5.2",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9068,12 +9013,6 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
 name = "matchit"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
-
-[[package]]
-name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
@@ -9752,7 +9691,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -13235,7 +13174,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.2",
  "rustls 0.23.40",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -13272,7 +13211,7 @@ dependencies = [
  "cfg_aliases 0.2.1",
  "libc",
  "once_cell",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -14151,7 +14090,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -14263,7 +14202,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs 1.0.7",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -14458,7 +14397,7 @@ dependencies = [
  "serde_json",
  "sp-blockchain",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-genesis-builder",
  "sp-io 44.0.0",
  "sp-runtime 45.0.0",
@@ -14654,7 +14593,7 @@ dependencies = [
  "sp-consensus-babe",
  "sp-consensus-slots",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-inherents",
  "sp-keystore 0.45.0",
  "sp-runtime 45.0.0",
@@ -14713,7 +14652,7 @@ dependencies = [
  "sp-consensus",
  "sp-consensus-grandpa",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-keystore 0.45.0",
  "sp-runtime 45.0.0",
  "substrate-prometheus-endpoint",
@@ -15163,7 +15102,7 @@ dependencies = [
  "sc-executor",
  "sc-executor-common",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-state-machine 0.49.0",
  "sp-wasm-interface 24.0.0",
  "thiserror 1.0.69",
@@ -15260,7 +15199,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-io 44.0.0",
 ]
 
@@ -15342,7 +15281,7 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-runtime 45.0.0",
  "sp-tracing 19.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-transaction-pool",
@@ -16322,7 +16261,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -19572,7 +19511,7 @@ dependencies = [
  "secrecy 0.8.0",
  "serde",
  "sha2 0.10.9",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-debug-derive 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-externalities 0.31.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-std 14.0.0",
@@ -19612,25 +19551,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "sp-crypto-hashing"
-version = "0.1.0"
-source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#ee31a93f2b080badb685218a77b8963c9435cfdd"
-dependencies = [
- "blake2b_simd",
- "byteorder",
- "digest 0.10.7",
- "sha2 0.10.9",
- "sha3",
- "twox-hash 1.6.3",
-]
-
-[[package]]
 name = "sp-crypto-hashing-proc-macro"
 version = "0.1.0"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#ee31a93f2b080badb685218a77b8963c9435cfdd"
 dependencies = [
  "quote",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "syn 2.0.117",
 ]
 
@@ -19759,7 +19685,7 @@ dependencies = [
  "rustversion",
  "secp256k1 0.28.2",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-externalities 0.31.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-keystore 0.45.0",
  "sp-runtime-interface 33.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
@@ -20145,7 +20071,7 @@ dependencies = [
  "sp-api",
  "sp-application-crypto 44.0.0",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
- "sp-crypto-hashing 0.1.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-crypto-hashing 0.1.0",
  "sp-externalities 0.31.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-runtime 45.0.0",
  "sp-runtime-interface 33.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
@@ -21373,7 +21299,7 @@ dependencies = [
  "getrandom 0.2.17",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -21392,7 +21318,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -23396,7 +23322,7 @@ dependencies = [
  "js-sys",
  "log",
  "naga",
- "parking_lot 0.12.5",
+ "parking_lot 0.11.2",
  "profiling",
  "raw-window-handle",
  "smallvec",
@@ -23425,7 +23351,7 @@ dependencies = [
  "log",
  "naga",
  "once_cell",
- "parking_lot 0.12.5",
+ "parking_lot 0.11.2",
  "profiling",
  "raw-window-handle",
  "rustc-hash 1.1.0",
@@ -23467,7 +23393,7 @@ dependencies = [
  "ndk-sys",
  "objc",
  "once_cell",
- "parking_lot 0.12.5",
+ "parking_lot 0.11.2",
  "profiling",
  "range-alloc",
  "raw-window-handle",
@@ -23541,7 +23467,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -24749,7 +24675,7 @@ dependencies = [
  "anyhow",
  "async-graphql",
  "async-graphql-axum",
- "axum 0.8.9",
+ "axum",
  "chrono",
  "clap",
  "config 0.14.1",
@@ -24819,7 +24745,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "axum 0.7.9",
+ "axum",
  "bincode",
  "blake2 0.10.6",
  "blake3",
@@ -24962,7 +24888,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "axum 0.7.9",
+ "axum",
  "clap",
  "reqwest 0.11.27",
  "serde",
