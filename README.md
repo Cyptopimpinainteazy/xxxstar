@@ -44,7 +44,13 @@ cargo build --release -p x3-chain-node
 ./target/release/x3-chain-node --chain dev --tmp --rpc-port 9933 --validator --alice
 ```
 
-### 4. Run a 3-validator local testnet
+### 4. Start a single validator (easy)
+
+```bash
+./scripts/start-validator-easy.sh --chain deployment/chain-specs/x3-testnet-raw.json
+```
+
+### 5. Run a 3-validator local testnet
 
 ```bash
 ./scripts/testnet-full-launch.sh

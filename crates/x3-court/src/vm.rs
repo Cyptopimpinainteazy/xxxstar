@@ -128,30 +128,189 @@ pub enum CourtVmError {
     InvalidEquivocationProof,
 }
 
-// Dummy hashes & execution logic
-fn hash<T>(_: &T) -> Hash {
-    [0u8; 32]
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet, VecDeque};
+
+fn hash<T: serde::Serialize>(value: &T) -> Hash {
+    let bytes = bincode::serialize(value).unwrap_or_default();
+    let mut h = Sha256::new();
+    h.update(&bytes);
+    let result = h.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&result);
+    out
 }
 
-struct DagStub {
-    root: Hash,
+/// A directed acyclic graph built from the action dependency matrix.
+struct ActionDag {
+    /// Adjacency list: action id → set of ids that depend on it.
+    edges: HashMap<u64, Vec<u64>>,
+    /// Reverse adjacency: action id → set of ids it depends on.
+    reverse: HashMap<u64, Vec<u64>>,
+    /// All action ids present in the DAG.
+    all_ids: Vec<u64>,
+    /// Actions keyed by id for constant-time lookup.
+    by_id: HashMap<u64, Action>,
 }
-impl DagStub {
+
+impl ActionDag {
+    /// Merkle root of the DAG topology. We hash the canonical serialization
+    /// of each action plus its dependency list, ordered by id.
     fn root_hash(&self) -> Hash {
-        self.root
+        let mut hasher = Sha256::new();
+        let mut sorted_ids: Vec<u64> = self.all_ids.clone();
+        sorted_ids.sort();
+        for id in &sorted_ids {
+            let action = &self.by_id[id];
+            hasher.update(&action.id.to_le_bytes());
+            hasher.update(&action.hash);
+            let mut deps = self.reverse.get(id).cloned().unwrap_or_default();
+            deps.sort();
+            for dep in deps {
+                hasher.update(&dep.to_le_bytes());
+            }
+        }
+        let result = hasher.finalize();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&result);
+        out
     }
 }
 
-fn derive_action_dag(_: &[Action]) -> Result<DagStub, CourtVmError> {
-    Ok(DagStub { root: [0u8; 32] })
+/// Build a DAG from a slice of actions.  Edge (A → B) exists if B's input
+/// references A's output (deduced by hash).  This is a simplified model —
+/// a full implementation would parse action payloads to extract explicit
+/// dependency annotations.
+fn derive_action_dag(actions: &[Action]) -> Result<ActionDag, CourtVmError> {
+    if actions.is_empty() {
+        return Err(CourtVmError::InvalidDag);
+    }
+
+    let by_id: HashMap<u64, Action> = actions.iter().map(|a| (a.id, a.clone())).collect();
+    let all_ids: Vec<u64> = actions.iter().map(|a| a.id).collect();
+
+    // Build edges based on hash dependencies.
+    // For each pair (a, b), if b.hash has a detectable dependency on a.hash,
+    // we add an edge a → b.
+    let mut edges: HashMap<u64, Vec<u64>> = HashMap::new();
+    let mut reverse: HashMap<u64, Vec<u64>> = HashMap::new();
+
+    for a in actions {
+        for b in actions {
+            if a.id == b.id {
+                continue;
+            }
+            // Simple dependency detection: if b.hash's first 8 bytes match
+            // a.id as little-endian, treat it as a dependency.
+            // Real impl would parse SEEN/READS/WRITES annotations.
+            let dep_pattern = a.id.to_le_bytes();
+            if b.hash[..8] == dep_pattern {
+                edges
+                    .entry(a.id)
+                    .or_insert_with(Vec::new)
+                    .push(b.id);
+                reverse
+                    .entry(b.id)
+                    .or_insert_with(Vec::new)
+                    .push(a.id);
+            }
+        }
+    }
+
+    // Detect cycles via Kahn's algorithm.  If a cycle exists, return error.
+    let mut in_degree: HashMap<u64, usize> = HashMap::new();
+    for id in &all_ids {
+        in_degree.insert(*id, reverse.get(id).map(|v| v.len()).unwrap_or(0));
+    }
+
+    let mut queue: VecDeque<u64> = all_ids
+        .iter()
+        .filter(|id| in_degree[id] == 0)
+        .copied()
+        .collect();
+
+    let mut seen = 0usize;
+    while let Some(node) = queue.pop_front() {
+        seen += 1;
+        if let Some(children) = edges.get(&node) {
+            for child in children {
+                if let Some(deg) = in_degree.get_mut(child) {
+                    *deg = deg.saturating_sub(1);
+                    if *deg == 0 {
+                        queue.push_back(*child);
+                    }
+                }
+            }
+        }
+    }
+
+    if seen != all_ids.len() {
+        return Err(CourtVmError::InvalidDag);
+    }
+
+    Ok(ActionDag {
+        edges,
+        reverse,
+        all_ids,
+        by_id,
+    })
 }
 
-fn derive_execution_order(_: &DagStub) -> Vec<Action> {
-    vec![]
+/// Topological sort (Kahn's algorithm) over the DAG to produce a
+/// deterministic execution order.
+fn derive_execution_order(dag: &ActionDag) -> Vec<Action> {
+    let mut in_degree: HashMap<u64, usize> = HashMap::new();
+    for id in &dag.all_ids {
+        in_degree.insert(*id, dag.reverse.get(id).map(|v| v.len()).unwrap_or(0));
+    }
+
+    // Use a BTreeSet for deterministic tie-breaking when multiple nodes
+    // have in-degree zero.
+    let mut ready: std::collections::BTreeSet<u64> = dag
+        .all_ids
+        .iter()
+        .filter(|id| in_degree[id] == 0)
+        .copied()
+        .collect();
+
+    let mut order = Vec::with_capacity(dag.all_ids.len());
+
+    while let Some(node) = ready.pop_first() {
+        order.push(dag.by_id[&node].clone());
+        if let Some(children) = dag.edges.get(&node) {
+            for child in children {
+                if let Some(deg) = in_degree.get_mut(child) {
+                    *deg = deg.saturating_sub(1);
+                    if *deg == 0 {
+                        ready.insert(*child);
+                    }
+                }
+            }
+        }
+    }
+
+    order
 }
 
-fn execute_action(_: &mut ChainState, _: &Action) -> Result<Receipt, CourtVmError> {
-    Ok(Receipt::default())
+/// Execute a single action against the chain state.
+/// Returns a receipt with a deterministic hash of the state delta.
+fn execute_action(state: &mut ChainState, action: &Action) -> Result<Receipt, CourtVmError> {
+    // Simulate execution: advance the dummy state counter by the action id.
+    let old_state = state.dummy_state;
+    state.dummy_state = state.dummy_state.wrapping_add(action.id);
+    let receipt_hash = {
+        let mut h = Sha256::new();
+        h.update(&old_state.to_le_bytes());
+        h.update(&action.id.to_le_bytes());
+        h.update(&state.dummy_state.to_le_bytes());
+        let result = h.finalize();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&result);
+        out
+    };
+    Ok(Receipt {
+        hash: receipt_hash,
+    })
 }
 
 fn slash_challenger(_state: &mut ChainState, _addr: &Address, _amount: u128) {}

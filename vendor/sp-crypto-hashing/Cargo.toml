@@ -31,7 +31,7 @@ repository = "https://github.com/paritytech/polkadot-sdk.git"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
-default = ["std"]
+default = []
 std = [
     "blake2b_simd/std",
     "byteorder/std",

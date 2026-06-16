@@ -66,8 +66,12 @@
 //! 5. Timeouts ALWAYS favor user funds
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![allow(unused_imports)]
-#![allow(
+
+// Prevent `dev-bypass` from being activated in release builds.
+#[cfg(all(feature = "dev-bypass", not(debug_assertions)))]
+compile_error!("dev-bypass feature is FORBIDDEN in release mode. Remove it from Cargo.toml features.");
+#[allow(unused_imports)]
+#[allow(
     clippy::clone_on_copy,
     clippy::collapsible_if,
     clippy::derivable_impls,

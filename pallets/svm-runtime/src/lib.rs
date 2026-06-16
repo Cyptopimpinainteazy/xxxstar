@@ -28,7 +28,6 @@
 //! - Programs can be upgraded by their upgrade authority
 //! - Program execution is metered by compute units
 
-
 pub use pallet::*;
 pub mod weights;
 pub use weights::WeightInfo;

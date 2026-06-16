@@ -73,7 +73,7 @@ path = "../sp-runtime-interface-proc-macro"
 default-features = true
 
 [dependencies.sp-std]
-path = "../sp-std"
+path = "../sp-std-8.0.0"
 default-features = false
 
 [dependencies.sp-storage]
@@ -98,9 +98,6 @@ version = "1.0.17"
 [dev-dependencies.sp-io]
 path = "../sp-io"
 default-features = true
-
-[dev-dependencies.sp-runtime-interface-test-wasm]
-path = "test-wasm"
 
 [dev-dependencies.sp-state-machine]
 path = "../sp-state-machine"

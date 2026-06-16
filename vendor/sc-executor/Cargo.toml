@@ -135,13 +135,6 @@ version = "1.13.1"
 version = "1.0.15"
 default-features = true
 
-[dev-dependencies.sc-runtime-test]
-path = "runtime-test"
-
-[dev-dependencies.sc-tracing]
-path = "../tracing"
-default-features = true
-
 [dev-dependencies.sp-crypto-hashing]
 path = "../sp-crypto-hashing"
 default-features = true
@@ -161,9 +154,6 @@ default-features = true
 [dev-dependencies.sp-tracing]
 path = "../sp-tracing"
 default-features = true
-
-[dev-dependencies.substrate-test-runtime]
-path = "../../test-utils/runtime"
 
 [dev-dependencies.tempfile]
 version = "3.8.1"

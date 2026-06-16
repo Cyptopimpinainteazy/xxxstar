@@ -8,7 +8,7 @@
 //! Standard Ethereum precompiles at addresses 0x01–0x09:
 //! - 0x01: ecrecover (secp256k1 signature recovery)
 //! - 0x02: SHA-256
-//! - 0x03: RIPEMD-160 (stub — returns error, no no-std crate available)
+//! - 0x03: RIPEMD-160 (real implementation using `ripemd` crate)
 //! - 0x04: identity (data copy)
 //! - 0x05: modexp (stub — returns error, requires bigint library)
 //! - 0x06: bn128Add (stub — returns error, requires bn128 library)
@@ -360,19 +360,34 @@ fn precompile_sha256(
 // ---------------------------------------------------------------------------
 // 0x03 — RIPEMD-160
 // ---------------------------------------------------------------------------
-/// RIPEMD-160 is not available in sp_io. Returns an error indicating the
-/// precompile is not implemented. Contracts calling this will revert.
 fn precompile_ripemd160(
-    _input: &[u8],
-    _target_gas: Option<u64>,
+    input: &[u8],
+    target_gas: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
-    Err(PrecompileFailure::Error {
-        exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
-            "ripemd160 not available in no-std",
-        )),
-    })
+    let gas = word_gas(input.len(), 600, 120);
+    if let Some(limit) = target_gas {
+        if limit < gas {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::OutOfGas,
+            });
+        }
+    }
+    use ripemd::{Digest, Ripemd160};
+    let mut hasher = Ripemd160::new();
+    hasher.update(input);
+    let hash = hasher.finalize();
+    // Per EIP: left-pad 20-byte hash to 32 bytes
+    let mut output = [0u8; 32];
+    output[12..].copy_from_slice(&hash);
+    Ok((
+        PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output: output.to_vec(),
+        },
+        gas,
+    ))
 }
 
 // ---------------------------------------------------------------------------

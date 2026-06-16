@@ -56,11 +56,6 @@ default-features = true
 version = "0.12.1"
 default-features = true
 
-[dependencies.prometheus-endpoint]
-path = "../../../utils/prometheus"
-default-features = true
-package = "substrate-prometheus-endpoint"
-
 [dependencies.sc-block-builder]
 path = "../sc-block-builder"
 default-features = true
@@ -131,13 +126,6 @@ version = "1.0.64"
 [dev-dependencies.sc-keystore]
 path = "../sc-keystore"
 default-features = true
-
-[dev-dependencies.sc-network]
-path = "../../network"
-default-features = true
-
-[dev-dependencies.sc-network-test]
-path = "../../network/test"
 
 [dev-dependencies.sp-keyring]
 path = "../sp-keyring"

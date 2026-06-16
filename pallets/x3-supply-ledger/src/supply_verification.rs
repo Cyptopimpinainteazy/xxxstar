@@ -23,7 +23,6 @@
 //    - Enable forensic analysis of supply anomalies
 //    - Support regulatory compliance requirements
 
-
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use scale_info::TypeInfo;
 use sp_core::H256;

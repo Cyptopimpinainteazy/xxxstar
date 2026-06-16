@@ -112,8 +112,6 @@ default-features = true
 path = "../mixnet"
 default-features = true
 
-[dependencies.sc-network]
-path = "../network"
 default-features = true
 
 [dependencies.sc-service]

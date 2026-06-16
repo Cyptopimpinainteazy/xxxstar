@@ -47,5 +47,10 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chro
 # Serialization helpers
 chrono = { version = "0.4", features = ["serde"] }
 
+# Metrics and analytics
+x3-metrics-tracker = { path = "../x3-metrics-tracker", features = ["std"] }
+x3-staking-analytics = { path = "../x3-staking-analytics" }
+tps-tracker = { path = "../tps-tracker" }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

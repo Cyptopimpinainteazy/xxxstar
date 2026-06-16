@@ -70,8 +70,6 @@ package = "parity-scale-codec"
 path = "../frame-support"
 default-features = false
 
-[dependencies.frame-support-procedural]
-path = "../support/procedural"
 default-features = false
 
 [dependencies.frame-system]

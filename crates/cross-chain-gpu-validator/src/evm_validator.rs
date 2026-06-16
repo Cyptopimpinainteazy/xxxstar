@@ -31,15 +31,12 @@ impl EvmHeaderValidator {
     /// Validate an EVM block header
     ///
     /// Validates:
-    /// - Block hash (Keccak256 of RLP-encoded header)
+    /// - Block hash (Keccak256 of serialized header fields)
     /// - Parent hash
     /// - State root
-    /// - Receipts root
-    /// - Difficulty (or prevrandao for EIP-4399)
     /// - Gas limit and gas used
     /// - Timestamp
     /// - Block number
-    /// - Coinbase
     ///
     /// Returns the validated block hash if successful.
     pub async fn validate_header(
@@ -63,8 +60,18 @@ impl EvmHeaderValidator {
             timestamp,
         )?;
 
-        // Validate block hash using GPU or CPU fallback
-        let computed_hash = self.validate_hash(block_number, block_hash)?;
+        // Build deterministic header serialization so the hash is computed
+        // from real header content, not from the asserted hash itself.
+        let mut header_bytes = Vec::with_capacity(120);
+        header_bytes.extend_from_slice(&block_number.to_le_bytes());
+        header_bytes.extend_from_slice(&gas_limit.to_le_bytes());
+        header_bytes.extend_from_slice(&gas_used.to_le_bytes());
+        header_bytes.extend_from_slice(&timestamp.to_le_bytes());
+        header_bytes.extend_from_slice(&state_root);
+        header_bytes.extend_from_slice(&parent_hash);
+
+        // Validate block hash using GPU or CPU fallback on real header bytes.
+        let computed_hash = self.validate_hash(block_number, &header_bytes, block_hash)?;
 
         Ok(computed_hash)
     }
@@ -110,18 +117,22 @@ impl EvmHeaderValidator {
         Ok(())
     }
 
-    /// Validate block hash using GPU or CPU fallback
+    /// Validate block hash using GPU or CPU fallback.
+    ///
+    /// `header_bytes` is the serialized block header content whose hash
+    /// must equal `expected_hash`.
     fn validate_hash(
         &self,
         block_number: u64,
+        header_bytes: &[u8],
         expected_hash: [u8; 32],
     ) -> Result<[u8; 32], ValidatorError> {
         match &self.gpu_kernel {
             Some(kernel) => {
-                // Use GPU for hash validation
-                let result = kernel.hash(&expected_hash)?;
-                if result == expected_hash {
-                    Ok(result)
+                // Hash the real serialized header bytes via GPU.
+                let computed = kernel.hash(header_bytes)?;
+                if computed == expected_hash {
+                    Ok(computed)
                 } else {
                     Err(ValidatorError::Validation(
                         "GPU hash validation failed - hash mismatch".to_string(),
@@ -129,8 +140,9 @@ impl EvmHeaderValidator {
                 }
             }
             None => {
-                // Fall back to CPU validation
-                self.cpu_fallback.validate_hash(block_number, expected_hash)
+                // CPU fallback hashes the real header bytes.
+                self.cpu_fallback
+                    .validate_hash(block_number, header_bytes, expected_hash)
             }
         }
     }
@@ -148,6 +160,20 @@ impl EvmHeaderValidator {
         }
 
         Ok(gpu_result == cpu_result)
+    }
+
+    /// Validate a raw block header: hash the provided header bytes and check
+    /// that the result matches `expected_hash`.
+    ///
+    /// This is the entry-point used by the orchestrator when it passes
+    /// serialized header bytes instead of decomposed fields.
+    pub fn validate_raw_header(
+        &self,
+        block_number: u64,
+        header_bytes: &[u8],
+        expected_hash: [u8; 32],
+    ) -> Result<[u8; 32], ValidatorError> {
+        self.validate_hash(block_number, header_bytes, expected_hash)
     }
 }
 
@@ -263,5 +289,70 @@ mod tests {
         assert!(validator
             .validate_basic_fields(1, [1u8; 32], [2u8; 32], [3u8; 32], 30_000_000, 20_000_000, 0,)
             .is_err());
+    }
+
+    /// Verify that the GPU path hashes real header bytes and detects a
+    /// mismatch against a different expected hash.
+    #[test]
+    fn test_validate_hash_on_real_header_bytes_detects_mismatch() {
+        let validator = EvmHeaderValidator::new();
+        // Build deterministic header bytes.
+        let mut header_bytes = Vec::new();
+        header_bytes.extend_from_slice(&1u64.to_le_bytes()); // block_number
+        header_bytes.extend_from_slice(&30_000_000u64.to_le_bytes()); // gas_limit
+        header_bytes.extend_from_slice(&20_000_000u64.to_le_bytes()); // gas_used
+        header_bytes.extend_from_slice(&1234567890u64.to_le_bytes()); // timestamp
+        header_bytes.extend_from_slice(&[0xAAu8; 32]); // state_root
+        header_bytes.extend_from_slice(&[0xBBu8; 32]); // parent_hash
+
+        // Compute the real hash of these bytes.
+        let kernel = Keccak256Kernel::new(32, false);
+        let real_hash = kernel.hash(&header_bytes).unwrap();
+
+        // validate_hash should succeed when expected_hash matches.
+        assert!(validator
+            .validate_hash(1, &header_bytes, real_hash)
+            .is_ok());
+
+        // validate_hash should fail when expected_hash is different.
+        assert!(validator
+            .validate_hash(1, &header_bytes, [0u8; 32])
+            .is_err());
+    }
+
+    /// Provenance test: `validate_raw_header` must verify a known
+    /// header → hash pair and reject a tampered header.
+    #[test]
+    fn test_validate_raw_header_positive_and_tampered() {
+        let validator = EvmHeaderValidator::new();
+
+        let mut header_bytes = Vec::new();
+        header_bytes.extend_from_slice(&42u64.to_le_bytes());
+        header_bytes.extend_from_slice(&30_000_000u64.to_le_bytes());
+        header_bytes.extend_from_slice(&10_000_000u64.to_le_bytes());
+        header_bytes.extend_from_slice(&999_999_999u64.to_le_bytes());
+        header_bytes.extend_from_slice(&[0x11u8; 32]);
+        header_bytes.extend_from_slice(&[0x22u8; 32]);
+
+        let kernel = Keccak256Kernel::new(32, false);
+        let good_hash = kernel.hash(&header_bytes).unwrap();
+
+        // Positive: real hash matches.
+        assert!(
+            validator
+                .validate_raw_header(42, &header_bytes, good_hash)
+                .is_ok(),
+            "real header must validate"
+        );
+
+        // Negative: tampered header (flip one byte) must be rejected.
+        let mut tampered = header_bytes.clone();
+        tampered[0] ^= 0x01;
+        assert!(
+            validator
+                .validate_raw_header(42, &tampered, good_hash)
+                .is_err(),
+            "tampered header must be rejected"
+        );
     }
 }

@@ -310,8 +310,11 @@ pub mod pallet {
             let mut current: sp_std::vec::Vec<H256> = hashes.to_vec();
             while current.len() > 1 {
                 if current.len() % 2 == 1 {
-                    let last = *current.last().unwrap();
-                    current.push(last);
+                    if let Some(last) = current.last() {
+                        current.push(*last);
+                    }
+                    // If the vector is somehow empty (shouldn't happen per the
+                    // `len() > 1` loop guard), this is a no-op and the loop exits.
                 }
                 current = current
                     .chunks(2)

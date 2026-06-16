@@ -465,7 +465,6 @@ sp-runtime-interface = { git = "https://github.com/paritytech/polkadot-sdk", bra
 sp-runtime-interface-proc-macro = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-externalities = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
-sp-crypto-hashing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
 sp-storage = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-tracing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
 sp-wasm-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
@@ -478,6 +477,7 @@ substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint"
 sc-executor-common = { path = "vendor/sc-executor-common" }
 sc-executor-wasmtime = { path = "vendor/sc-executor-wasmtime" }
 sp-wasm-interface = { path = "vendor/sp-wasm-interface" }
+sp-crypto-hashing = { path = "vendor/sp-crypto-hashing" }
 # X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
 # that the BuildGenesisConfig trait bound `MaybeSerializeDeserialize` is satisfied in no_std
 # wasm32 builds when sp-runtime/serde is enabled. Required for clean wasm runtime build under

@@ -135,30 +135,20 @@ default-features = false
 version = "0.1.37"
 default-features = false
 
-[dependencies.xcm]
-path = ".."
 default-features = false
 package = "staging-xcm"
 
-[dependencies.xcm-executor]
-path = "../xcm-executor"
 default-features = false
 package = "staging-xcm-executor"
 
-[dev-dependencies.pallet-assets]
-path = "../../../substrate/frame/assets"
 default-features = true
 
 [dev-dependencies.pallet-balances]
 path = "../pallet-balances"
 default-features = true
 
-[dev-dependencies.pallet-salary]
-path = "../../../substrate/frame/salary"
 default-features = true
 
-[dev-dependencies.pallet-xcm]
-path = "../pallet-xcm"
 default-features = true
 
 [dev-dependencies.polkadot-primitives]
@@ -168,9 +158,6 @@ default-features = true
 [dev-dependencies.polkadot-runtime-parachains]
 path = "../polkadot-runtime-parachains"
 default-features = true
-
-[dev-dependencies.polkadot-test-runtime]
-path = "../../runtime/test-runtime"
 
 [dev-dependencies.primitive-types]
 version = "0.13.1"
@@ -186,8 +173,6 @@ default-features = false
 path = "../sp-tracing"
 default-features = true
 
-[dev-dependencies.xcm-simulator]
-path = "../xcm-simulator"
 default-features = true
 
 [lints.clippy.all]

@@ -315,7 +315,8 @@ where
 						canonicalize_nans: false,
 						parallel_compilation: true,
 						wasm_multi_value: false,
-						wasm_bulk_memory: false,
+						// Enable bulk-memory support for LLVM-generated memory.fill/copy sequences.
+                                                wasm_bulk_memory: true,
 						wasm_reference_types: false,
 						wasm_simd: false,
 					},

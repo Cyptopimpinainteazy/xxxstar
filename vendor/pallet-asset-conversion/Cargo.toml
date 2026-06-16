@@ -112,8 +112,6 @@ default-features = false
 path = "../sp-runtime"
 default-features = false
 
-[dev-dependencies.pallet-assets]
-path = "../assets"
 default-features = true
 
 [dev-dependencies.pallet-balances]

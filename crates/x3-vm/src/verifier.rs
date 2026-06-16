@@ -111,6 +111,35 @@ impl Verifier {
             VerifierError::without_offset(VerifierErrorKind::ParseError(format!("{}", e)))
         })?;
 
+        // Validate CRC32 checksum: read from header bytes 12-15, compute over
+        // body (bytes 24..), reject on mismatch. Bit-rot or truncated modules
+        // are caught here before any further verification runs.
+        if bytes.len() >= 24 {
+            let header_checksum = u32::from_le_bytes([
+                bytes[12], bytes[13], bytes[14], bytes[15],
+            ]);
+            if header_checksum != 0 {
+                // Only validate if the header carries a non-zero checksum.
+                let mut crc: u32 = 0xFFFFFFFF;
+                for &byte in &bytes[24..] {
+                    crc ^= byte as u32;
+                    for _ in 0..8 {
+                        if crc & 1 != 0 {
+                            crc = (crc >> 1) ^ 0xEDB88320;
+                        } else {
+                            crc >>= 1;
+                        }
+                    }
+                }
+                let computed = !crc;
+                if header_checksum != computed {
+                    return Err(VerifierError::without_offset(
+                        VerifierErrorKind::ChecksumMismatch,
+                    ));
+                }
+            }
+        }
+
         // Run verification passes
         Self::verify_module(&module, options)?;
 

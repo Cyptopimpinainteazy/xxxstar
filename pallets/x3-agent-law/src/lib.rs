@@ -82,6 +82,11 @@ pub mod pallet {
         type Currency: frame_support::traits::Currency<Self::AccountId>
             + frame_support::traits::ReservableCurrency<Self::AccountId>;
 
+        /// Origin that can execute privileged governance functions
+        /// (register_policy, slash_agent, remove_blacklist).
+        /// Typically EnsureRoot or a council-based origin.
+        type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
         /// Reputation threshold below which capability is auto-revoked
         #[pallet::constant]
         type ReputationThreshold: Get<u64>;
@@ -244,8 +249,7 @@ pub mod pallet {
             agent: T::AccountId,
             policies: Vec<PolicyRule<T::AccountId>>,
         ) -> DispatchResult {
-            // TODO: Use EnsureRoot or governance origin check
-            let _ = ensure_signed(origin)?;
+            T::GovernanceOrigin::ensure_origin(origin)?;
 
             ensure!(policies.len() <= 16, Error::<T>::TooManyPolicies);
 
@@ -272,7 +276,7 @@ pub mod pallet {
             agent: T::AccountId,
             reason: SlashingReason,
         ) -> DispatchResult {
-            let _ = ensure_signed(origin)?;
+            T::GovernanceOrigin::ensure_origin(origin)?;
 
             let penalty = Self::calculate_penalty(&reason);
 
@@ -301,7 +305,7 @@ pub mod pallet {
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::remove_blacklist())]
         pub fn remove_blacklist(origin: OriginFor<T>, agent: T::AccountId) -> DispatchResult {
-            let _ = ensure_signed(origin)?;
+            T::GovernanceOrigin::ensure_origin(origin)?;
             Blacklist::<T>::remove(&agent);
             Ok(())
         }

@@ -102,15 +102,12 @@ fn minimal_intent_bytecode_runs_on_verified_executor() {
 
     let mut vm = VM::new(bytecode, VMConfig::default(), 100_000u128);
     let result = vm.execute();
+    let msg = format!("{:?}", result);
     assert!(
-        result.is_ok(),
-        "verified VM execution should succeed, got {:?}",
+        msg.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
+        "verified VM execution must fail closed on atomic scopes until reservation is wired, got {:?}",
         result
     );
-    assert_eq!(vm.state.bridge_ops.len(), 1);
-    assert_eq!(vm.state.bridge_ops[0].amount, 100);
-    assert!(String::from_utf8_lossy(&vm.state.bridge_receipts[0])
-        .contains("dry-run-bridge_transfer:X3:ethereum.USDC->solana.USDC:100"));
 }
 
 #[test]

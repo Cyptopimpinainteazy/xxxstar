@@ -18,9 +18,7 @@ use x3_common::{
     signing::{Ed25519Signer, KeyType, Secp256k1Signer, Signer, Sr25519Signer},
     weight_metering::{WeightConfig, WeightMeter},
 };
-use x3_rpc::{
-    SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc,
-};
+use x3_rpc::{SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc};
 
 use crate::rpc_middleware::RateLimiter;
 use crate::service::FullClient;
@@ -543,8 +541,9 @@ where
         },
     )?;
 
-    // Initialize Validator RPC
-    let validator_rpc = x3_rpc::create_validator_rpc(std::sync::Arc::new(()))?;
+    // Initialize Validator RPC — wired to the Substrate client for live
+    // authority set queries instead of returning hardcoded stubs.
+    let validator_rpc = x3_rpc::create_validator_rpc(client.clone())?;
     module.merge(validator_rpc)?;
 
     Ok(module)

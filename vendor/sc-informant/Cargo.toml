@@ -50,12 +50,8 @@ default-features = true
 path = "../sc-client-api"
 default-features = true
 
-[dependencies.sc-network]
-path = "../network"
 default-features = true
 
-[dependencies.sc-network-sync]
-path = "../network/sync"
 default-features = true
 
 [dependencies.sp-blockchain]

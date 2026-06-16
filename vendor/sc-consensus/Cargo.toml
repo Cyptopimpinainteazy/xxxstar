@@ -51,11 +51,6 @@ version = "0.13.1"
 version = "0.12.1"
 default-features = true
 
-[dependencies.prometheus-endpoint]
-path = "../../../utils/prometheus"
-default-features = true
-package = "substrate-prometheus-endpoint"
-
 [dependencies.sc-client-api]
 path = "../sc-client-api"
 default-features = true
@@ -95,9 +90,6 @@ default-features = true
 
 [dependencies.thiserror]
 version = "1.0.64"
-
-[dev-dependencies.sp-test-primitives]
-path = "../../../primitives/test-primitives"
 
 [lints.clippy.all]
 level = "allow"

@@ -285,13 +285,19 @@ pub trait CrossVmDispatcher {
     }
 }
 
-/// Default no-op dispatcher (used when no runtime dispatcher is configured).
-/// Produces synthetic results for testing and genesis initialization.
+/// Test-only synthetic dispatcher.
+///
+/// Produces deterministic, structurally valid results for unit and
+/// integration tests. It is **not** available in production builds
+/// (`#[cfg(test)]`) so a misconfigured runtime cannot accidentally route
+/// real cross-VM traffic through a fake-success adapter.
+#[cfg(test)]
 pub struct NoOpDispatcher {
     evm_escrow: [u8; 20],
     svm_escrow: [u8; 32],
 }
 
+#[cfg(test)]
 impl NoOpDispatcher {
     /// Create a new NoOpDispatcher with configurable escrow addresses
     pub fn new(evm_escrow: [u8; 20], svm_escrow: [u8; 32]) -> Self {
@@ -317,6 +323,7 @@ impl NoOpDispatcher {
     }
 }
 
+#[cfg(test)]
 impl CrossVmDispatcher for NoOpDispatcher {
     fn execute_evm_tx(
         &self,
@@ -1163,15 +1170,6 @@ impl CrossVmBridge {
         }
     }
 
-    /// Execute pending operations (Legacy stub for tests. Do NOT use in production.)
-    /// Delegates to `execute_pending_with_dispatcher(&NoOpDispatcher)`.
-    #[deprecated(
-        note = "Uses NoOpDispatcher which returns fake results. Use execute_pending_with_dispatcher() with a real dispatcher in production."
-    )]
-    pub fn execute_pending(&mut self) -> Result<Vec<CrossVmResult>, DispatchError> {
-        self.execute_pending_with_dispatcher(&NoOpDispatcher::testnet())
-    }
-
     /// Execute pending operations using the provided VM dispatcher.
     ///
     /// This is the production entry point that actually executes operations
@@ -1206,395 +1204,6 @@ impl CrossVmBridge {
             }
             Err(e) => Err(e),
         }
-    }
-
-    /// Execute a single cross-VM operation using the supplied dispatcher.
-    ///
-    /// # Production vs. Test
-    /// Callers should pass a real `CrossVmDispatcher` implementation that
-    /// routes EVM/SVM calls to the actual VM adapters.  For unit tests,
-    /// pass `&NoOpDispatcher` to get synthetic (but structurally valid) results.
-    ///
-    /// Transfer and message operations are handled directly here; contract
-    /// calls (`CallEvm` / `CallSvm`) are forwarded to the dispatcher.
-    fn execute_operation_with_dispatcher<D: CrossVmDispatcher>(
-        &self,
-        operation: &CrossVmOperation,
-        dispatcher: &D,
-    ) -> Result<CrossVmResult, DispatchError> {
-        match operation {
-            CrossVmOperation::TransferToEvm {
-                source,
-                destination,
-                amount,
-            } => {
-                // SVM withdrawal + EVM deposit — canonical ledger update.
-                let mut output: Vec<u8> = Vec::new();
-                output.extend_from_slice(b"SVM:withdraw:");
-                output.extend_from_slice(source);
-                output.extend_from_slice(b":");
-                output.extend_from_slice(&amount.to_le_bytes());
-                output.extend_from_slice(b"EVM:deposit:");
-                output.extend_from_slice(destination);
-                output.extend_from_slice(b":");
-                output.extend_from_slice(&amount.to_le_bytes());
-                Ok(CrossVmResult::success(output, 25_000))
-            }
-            CrossVmOperation::TransferToSvm {
-                source,
-                destination,
-                amount,
-            } => {
-                // EVM withdrawal + SVM deposit — canonical ledger update.
-                let mut output: Vec<u8> = Vec::new();
-                output.extend_from_slice(b"EVM:withdraw:");
-                output.extend_from_slice(source);
-                output.extend_from_slice(b":");
-                output.extend_from_slice(&amount.to_le_bytes());
-                output.extend_from_slice(b"SVM:deposit:");
-                output.extend_from_slice(destination);
-                output.extend_from_slice(b":");
-                output.extend_from_slice(&amount.to_le_bytes());
-                Ok(CrossVmResult::success(output, 25_000))
-            }
-            CrossVmOperation::CallEvm {
-                caller,
-                contract,
-                input,
-                value,
-            } => {
-                // Route to the real EVM adapter via the dispatcher.
-                // The dispatcher is responsible for:
-                //   1. Encoding the calldata for the EVM
-                //   2. Deducting gas and reverting on failure
-                //   3. Returning receipt bytes on success
-                let mut caller_arr = [0u8; 32];
-                let len = caller.len().min(32);
-                caller_arr[..len].copy_from_slice(&caller[..len]);
-                // Derive a 20-byte EVM caller address from the 32-byte SVM pubkey
-                let mut evm_caller = [0u8; 20];
-                evm_caller.copy_from_slice(&caller_arr[12..]);
-
-                let mut contract_arr = [0u8; 20];
-                let clen = contract.len().min(20);
-                contract_arr[..clen].copy_from_slice(&contract[..clen]);
-
-                dispatcher.execute_evm_tx(&evm_caller, &contract_arr, input, *value)
-            }
-            CrossVmOperation::CallSvm {
-                caller,
-                pallet_index,
-                call_index,
-                input,
-            } => {
-                // Route to the real SVM adapter via the dispatcher.
-                // Encodes a cross-program invocation (CPI) instruction:
-                //   pallet_index (1B) || call_index (1B) || input bytes
-                let mut program_id = [0u8; 32];
-                program_id[0] = *pallet_index;
-                program_id[1] = *call_index;
-
-                let mut caller_arr = [0u8; 32];
-                let len = caller.len().min(20);
-                // Pad EVM address into 32-byte SVM pubkey slot (left-pad with zeros)
-                caller_arr[12..12 + len].copy_from_slice(&caller[..len]);
-
-                dispatcher.execute_svm_tx(&caller_arr, &program_id, input)
-            }
-            CrossVmOperation::AtomicSwap {
-                evm_party,
-                svm_party,
-                evm_asset,
-                svm_asset,
-                evm_amount,
-                svm_amount,
-            } => {
-                // Dual-VM atomic swap using true 2PC execution.
-                // Both legs must succeed atomically or all are rolled back.
-
-                let mut total_gas = 0u64;
-                let mut output: Vec<u8> = Vec::new();
-
-                // Derive EVM caller (20 bytes)
-                let mut evm_caller = [0u8; 20];
-                let evm_len = evm_party.len().min(20);
-                evm_caller[20 - evm_len..].copy_from_slice(&evm_party[..evm_len]);
-
-                // Derive SVM caller (32 bytes)
-                let mut svm_caller = [0u8; 32];
-                let svm_len = svm_party.len().min(32);
-                svm_caller[..svm_len].copy_from_slice(&svm_party[..svm_len]);
-
-                // === STEP 1: EVM Withdraw ===
-                let mut evm_withdraw_data = Vec::with_capacity(68);
-                evm_withdraw_data.extend_from_slice(&[0xa9, 0x05, 0x9c, 0xbb]);
-                evm_withdraw_data.extend_from_slice(&[0u8; 12]);
-                let evm_escrow = dispatcher.get_evm_bridge_escrow();
-                evm_withdraw_data.extend_from_slice(&evm_escrow);
-                let mut amount_be = [0u8; 32];
-                amount_be[16..].copy_from_slice(&evm_amount.to_be_bytes());
-                evm_withdraw_data.extend_from_slice(&amount_be);
-
-                let evm_asset_arr: [u8; 20] = evm_asset[..20].try_into().unwrap_or([0u8; 20]);
-                let evm_withdraw_result = dispatcher.execute_evm_tx(
-                    &evm_caller,
-                    &evm_asset_arr,
-                    &evm_withdraw_data,
-                    0,
-                )?;
-                total_gas += evm_withdraw_result.gas_used;
-                output.extend_from_slice(b"EVM_WITHDRAW:");
-                output.extend_from_slice(&evm_withdraw_result.output);
-                output.push(b'|');
-
-                // === STEP 2: SVM Withdraw ===
-                let mut svm_withdraw_data = Vec::with_capacity(40);
-                svm_withdraw_data.push(0x03);
-                svm_withdraw_data.extend_from_slice(&svm_amount.to_le_bytes());
-
-                let mut svm_program = [0u8; 32];
-                let sp_len = svm_asset.len().min(32);
-                svm_program[..sp_len].copy_from_slice(&svm_asset[..sp_len]);
-
-                let svm_withdraw_result =
-                    dispatcher.execute_svm_tx(&svm_caller, &svm_program, &svm_withdraw_data)?;
-                total_gas += svm_withdraw_result.gas_used;
-                output.extend_from_slice(b"SVM_WITHDRAW:");
-                output.extend_from_slice(&svm_withdraw_result.output);
-                output.push(b'|');
-
-                // === STEP 3: EVM Deposit ===
-                let mut evm_deposit_data = Vec::with_capacity(68);
-                evm_deposit_data.extend_from_slice(&[0xa9, 0x05, 0x9c, 0xbb]);
-                evm_deposit_data.extend_from_slice(&[0u8; 12]);
-                let evm_recipient = evm_address_from_slice(svm_party);
-                evm_deposit_data.extend_from_slice(&evm_recipient);
-                let mut svm_amt_be = [0u8; 32];
-                svm_amt_be[16..].copy_from_slice(&svm_amount.to_be_bytes());
-                evm_deposit_data.extend_from_slice(&svm_amt_be);
-
-                let evm_deposit_result =
-                    dispatcher.execute_evm_tx(&evm_escrow, &evm_asset_arr, &evm_deposit_data, 0)?;
-                total_gas += evm_deposit_result.gas_used;
-                output.extend_from_slice(b"EVM_DEPOSIT:");
-                output.extend_from_slice(&evm_deposit_result.output);
-                output.push(b'|');
-
-                // === STEP 4: SVM Deposit ===
-                let mut svm_deposit_data = Vec::with_capacity(40);
-                svm_deposit_data.push(0x03);
-                svm_deposit_data.extend_from_slice(&evm_amount.to_le_bytes());
-
-                let svm_escrow = dispatcher.get_svm_bridge_escrow();
-                let svm_deposit_result =
-                    dispatcher.execute_svm_tx(&svm_escrow, &svm_program, &svm_deposit_data)?;
-                total_gas += svm_deposit_result.gas_used;
-                output.extend_from_slice(b"SVM_DEPOSIT:");
-                output.extend_from_slice(&svm_deposit_result.output);
-
-                Ok(CrossVmResult::success(output, total_gas))
-            }
-            CrossVmOperation::AtomicTriSwap {
-                evm_party,
-                svm_party,
-                x3vm_caller,
-                evm_asset,
-                svm_asset,
-                evm_amount,
-                svm_amount,
-                x3vm_call,
-            } => {
-                // Tri-VM atomic swap: extends the 4-step AtomicSwap flow with
-                // an x3VM canonical call as the third leg. Failure on the
-                // x3VM leg aborts via `?` — best-effort compensation matches
-                // the 2-party variant here; Patch 5.1 adds full 3-way 2PC.
-                let mut total_gas = 0u64;
-                let mut output: Vec<u8> = Vec::new();
-
-                // Derive EVM caller (20 bytes)
-                let mut evm_caller = [0u8; 20];
-                let evm_len = evm_party.len().min(20);
-                evm_caller[20 - evm_len..].copy_from_slice(&evm_party[..evm_len]);
-
-                // Derive SVM caller (32 bytes)
-                let mut svm_caller = [0u8; 32];
-                let svm_len = svm_party.len().min(32);
-                svm_caller[..svm_len].copy_from_slice(&svm_party[..svm_len]);
-
-                // === STEP 1: EVM Withdraw ===
-                let mut evm_withdraw_data = Vec::with_capacity(68);
-                evm_withdraw_data.extend_from_slice(&[0xa9, 0x05, 0x9c, 0xbb]);
-                evm_withdraw_data.extend_from_slice(&[0u8; 12]);
-                let evm_escrow = dispatcher.get_evm_bridge_escrow();
-                evm_withdraw_data.extend_from_slice(&evm_escrow);
-                let mut amount_be = [0u8; 32];
-                amount_be[16..].copy_from_slice(&evm_amount.to_be_bytes());
-                evm_withdraw_data.extend_from_slice(&amount_be);
-
-                let evm_asset_arr: [u8; 20] = evm_asset[..20].try_into().unwrap_or([0u8; 20]);
-                let evm_withdraw_result = dispatcher.execute_evm_tx(
-                    &evm_caller,
-                    &evm_asset_arr,
-                    &evm_withdraw_data,
-                    0,
-                )?;
-                total_gas += evm_withdraw_result.gas_used;
-                output.extend_from_slice(b"EVM_WITHDRAW:");
-                output.extend_from_slice(&evm_withdraw_result.output);
-                output.push(b'|');
-
-                // === STEP 2: SVM Withdraw ===
-                let mut svm_withdraw_data = Vec::with_capacity(40);
-                svm_withdraw_data.push(0x03);
-                svm_withdraw_data.extend_from_slice(&svm_amount.to_le_bytes());
-
-                let mut svm_program = [0u8; 32];
-                let sp_len = svm_asset.len().min(32);
-                svm_program[..sp_len].copy_from_slice(&svm_asset[..sp_len]);
-
-                let svm_withdraw_result =
-                    dispatcher.execute_svm_tx(&svm_caller, &svm_program, &svm_withdraw_data)?;
-                total_gas += svm_withdraw_result.gas_used;
-                output.extend_from_slice(b"SVM_WITHDRAW:");
-                output.extend_from_slice(&svm_withdraw_result.output);
-                output.push(b'|');
-
-                // === STEP 3: x3VM Canonical Call ===
-                // Admission-check + dispatch. The call_hash already binds
-                // replay protection at the pallet layer.
-                if x3vm_call.target != VmId::X3Vm {
-                    return Err(DispatchError::Other(
-                        "AtomicTriSwap: x3vm_call.target must be VmId::X3Vm",
-                    ));
-                }
-                x3vm_call.ensure_current_version()?;
-                let x3_receipt = dispatcher.execute_x3vm_tx(x3vm_caller, x3vm_call)?;
-                total_gas = total_gas.saturating_add(x3_receipt.gas_used);
-                output.extend_from_slice(b"X3VM_CALL:");
-                output.extend_from_slice(x3_receipt.call_hash.as_bytes());
-                output.push(b'|');
-
-                // === STEP 4: EVM Deposit ===
-                let mut evm_deposit_data = Vec::with_capacity(68);
-                evm_deposit_data.extend_from_slice(&[0xa9, 0x05, 0x9c, 0xbb]);
-                evm_deposit_data.extend_from_slice(&[0u8; 12]);
-                let evm_recipient = evm_address_from_slice(svm_party);
-                evm_deposit_data.extend_from_slice(&evm_recipient);
-                let mut svm_amt_be = [0u8; 32];
-                svm_amt_be[16..].copy_from_slice(&svm_amount.to_be_bytes());
-                evm_deposit_data.extend_from_slice(&svm_amt_be);
-
-                let evm_deposit_result =
-                    dispatcher.execute_evm_tx(&evm_escrow, &evm_asset_arr, &evm_deposit_data, 0)?;
-                total_gas += evm_deposit_result.gas_used;
-                output.extend_from_slice(b"EVM_DEPOSIT:");
-                output.extend_from_slice(&evm_deposit_result.output);
-                output.push(b'|');
-
-                // === STEP 5: SVM Deposit ===
-                let mut svm_deposit_data = Vec::with_capacity(40);
-                svm_deposit_data.push(0x03);
-                svm_deposit_data.extend_from_slice(&evm_amount.to_le_bytes());
-
-                let svm_escrow = dispatcher.get_svm_bridge_escrow();
-                let svm_deposit_result =
-                    dispatcher.execute_svm_tx(&svm_escrow, &svm_program, &svm_deposit_data)?;
-                total_gas += svm_deposit_result.gas_used;
-                output.extend_from_slice(b"SVM_DEPOSIT:");
-                output.extend_from_slice(&svm_deposit_result.output);
-
-                Ok(CrossVmResult::success(output, total_gas))
-            }
-            CrossVmOperation::MessageToEvm {
-                sender,
-                target_contract,
-                message,
-                nonce,
-            } => {
-                const MAX_MSG: usize = 1024;
-                if message.len() > MAX_MSG {
-                    return Err(DispatchError::Other(
-                        "MessageToEvm: payload exceeds 1024 bytes",
-                    ));
-                }
-                let mut output: Vec<u8> = Vec::new();
-                output.extend_from_slice(b"SVM:msg:");
-                output.extend_from_slice(sender);
-                output.extend_from_slice(b"->EVM:");
-                output.extend_from_slice(target_contract);
-                output.extend_from_slice(b":nonce=");
-                output.extend_from_slice(&nonce.to_le_bytes());
-                output.extend_from_slice(b":payload=");
-                output.extend_from_slice(message);
-                Ok(CrossVmResult::success(output, 50_000))
-            }
-            CrossVmOperation::MessageToSvm {
-                sender,
-                target_program,
-                message,
-                nonce,
-            } => {
-                const MAX_MSG: usize = 1024;
-                if message.len() > MAX_MSG {
-                    return Err(DispatchError::Other(
-                        "MessageToSvm: payload exceeds 1024 bytes",
-                    ));
-                }
-                let mut output: Vec<u8> = Vec::new();
-                output.extend_from_slice(b"EVM:msg:");
-                output.extend_from_slice(sender);
-                output.extend_from_slice(b"->SVM:");
-                output.extend_from_slice(target_program);
-                output.extend_from_slice(b":nonce=");
-                output.extend_from_slice(&nonce.to_le_bytes());
-                output.extend_from_slice(b":payload=");
-                output.extend_from_slice(message);
-                Ok(CrossVmResult::success(output, 50_000))
-            }
-            CrossVmOperation::CallX3Vm { caller, call } => {
-                // Route through the canonical x3VM dispatcher. See the
-                // matching arm in `dispatch_operation` for the full
-                // CrossVmReceipt ↔ CrossVmResult mapping contract — we
-                // mirror it exactly here so legacy execute-path callers
-                // see identical behavior.
-                if call.target != VmId::X3Vm {
-                    return Err(DispatchError::Other(
-                        "CallX3Vm: call.target must be VmId::X3Vm",
-                    ));
-                }
-                call.ensure_current_version()?;
-                let receipt = dispatcher.execute_x3vm_tx(caller, call)?;
-                let mut out = Vec::with_capacity(32);
-                out.extend_from_slice(receipt.call_hash.as_bytes());
-                match receipt.status {
-                    CrossVmStatus::Success => Ok(CrossVmResult::success(out, receipt.gas_used)),
-                    other => {
-                        let mut err = Vec::with_capacity(48);
-                        err.extend_from_slice(b"x3vm:");
-                        err.push(other as u8);
-                        err.push(b':');
-                        err.extend_from_slice(receipt.call_hash.as_bytes());
-                        Ok(CrossVmResult::failed(err, receipt.gas_used))
-                    }
-                }
-            }
-        }
-    }
-
-    /// Legacy stub kept for backwards compat with existing tests.
-    /// Delegates to `execute_pending_with_dispatcher(&NoOpDispatcher)`.
-    ///
-    /// # Production
-    /// **Do NOT call this in production.** `CallEvm` and `CallSvm` operations
-    /// will be dispatched to the `NoOpDispatcher` which returns synthetic results.
-    /// Use `execute_pending_with_dispatcher(your_real_dispatcher)` instead.
-    #[allow(dead_code)]
-    #[deprecated(note = "Non-atomic. Use execute_pending_with_dispatcher for cross-VM atomicity.")]
-    fn execute_operation(
-        &self,
-        operation: &CrossVmOperation,
-    ) -> Result<CrossVmResult, DispatchError> {
-        self.execute_operation_with_dispatcher(operation, &NoOpDispatcher::testnet())
     }
 
     // =========================================================================
@@ -2632,19 +2241,6 @@ impl CrossVmBridge {
     }
 }
 
-fn evm_address_from_slice(source: &[u8]) -> [u8; 20] {
-    let mut out = [0u8; 20];
-    if source.is_empty() {
-        return out;
-    }
-    if source.len() >= 20 {
-        out.copy_from_slice(&source[source.len() - 20..]);
-    } else {
-        out[20 - source.len()..].copy_from_slice(source);
-    }
-    out
-}
-
 #[cfg(test)]
 fn assert_ok<T, E: std::fmt::Debug>(res: Result<T, E>, msg: &str) -> T {
     match res {
@@ -2695,7 +2291,10 @@ mod tests {
         };
 
         assert_ok(bridge.queue_operation(op), "queue_operation failed");
-        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
+        let results = assert_ok(
+            bridge.execute_pending_with_dispatcher(&NoOpDispatcher::testnet()),
+            "execute_pending failed",
+        );
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
@@ -3021,7 +2620,9 @@ mod tests {
         assert!(bridge.queue_operation(op).is_err());
 
         // Execute should fail when paused
-        assert!(bridge.execute_pending().is_err());
+        assert!(bridge
+            .execute_pending_with_dispatcher(&NoOpDispatcher::testnet())
+            .is_err());
 
         bridge.resume();
         assert!(!bridge.is_paused());
@@ -3654,7 +3255,10 @@ mod message_passing_tests {
         let queued_nonce = assert_ok(bridge.queue_operation(op), "queue_operation failed");
         assert_eq!(bridge.pending_count(), 1);
 
-        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
+        let results = assert_ok(
+            bridge.execute_pending_with_dispatcher(&NoOpDispatcher::testnet()),
+            "execute_pending failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert_eq!(bridge.completed_count(), 1);
@@ -3687,7 +3291,10 @@ mod message_passing_tests {
         };
 
         assert_ok(bridge.queue_operation(op), "queue_operation failed");
-        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
+        let results = assert_ok(
+            bridge.execute_pending_with_dispatcher(&NoOpDispatcher::testnet()),
+            "execute_pending failed",
+        );
 
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
@@ -3757,7 +3364,10 @@ mod message_passing_tests {
             nonce: 3,
         };
         assert_ok(bridge.queue_operation(op), "queue_operation failed");
-        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
+        let results = assert_ok(
+            bridge.execute_pending_with_dispatcher(&NoOpDispatcher::testnet()),
+            "execute_pending failed",
+        );
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
     }
@@ -3803,7 +3413,10 @@ mod message_passing_tests {
         assert!(n2 < n3, "nonce ordering violated: n2={n2} n3={n3}");
 
         // All three execute in order
-        let results = assert_ok(bridge.execute_pending(), "execute_pending failed");
+        let results = assert_ok(
+            bridge.execute_pending_with_dispatcher(&NoOpDispatcher::testnet()),
+            "execute_pending failed",
+        );
         assert_eq!(results.len(), 3);
         assert!(results.iter().all(|r| r.success));
     }
@@ -3823,7 +3436,10 @@ mod message_passing_tests {
             }),
             "queue_operation failed",
         );
-        assert_ok(bridge.execute_pending(), "execute_pending failed");
+        assert_ok(
+            bridge.execute_pending_with_dispatcher(&NoOpDispatcher::testnet()),
+            "execute_pending failed",
+        );
 
         // Internal nonces tracked: trying to queue with a *bridge-assigned* nonce
         // that was already used should be rejected by the nonce deduplication.
@@ -4945,5 +4561,79 @@ mod x3vm_2pc_integration_tests {
         // not be in the store.
         assert!(!bridge.is_x3vm_call_replayed(&key));
         assert_eq!(bridge.x3vm_replay_map_len(), 0);
+    }
+
+    // Integration tests that were previously in tests/integration.rs.
+    // They live inside the lib test module so they can use the
+    // test-only `NoOpDispatcher` helper.
+    mod integration {
+        use super::*;
+
+        #[test]
+        fn integration_execute_transfers_and_atomic_swap() {
+            let mut bridge = CrossVmBridge::new();
+
+            // Transfer SVM -> EVM
+            let t1 = CrossVmOperation::TransferToEvm {
+                source: vec![0x11; 32],
+                destination: [0x22; 20],
+                amount: 1_000u128,
+            };
+
+            // Transfer EVM -> SVM
+            let t2 = CrossVmOperation::TransferToSvm {
+                source: [0xAA; 20],
+                destination: vec![0xBB; 32],
+                amount: 2_000u128,
+            };
+
+            // Atomic swap between EVM and SVM parties
+            let swap = CrossVmOperation::AtomicSwap {
+                evm_party: [0xCC; 20],
+                svm_party: vec![0xDD; 32],
+                evm_asset: [0xEE; 20],
+                svm_asset: vec![0xFF; 32],
+                evm_amount: 500u128,
+                svm_amount: 700u128,
+            };
+
+            bridge.queue_operation(t1).expect("queue t1");
+            bridge.queue_operation(t2).expect("queue t2");
+            bridge.queue_operation(swap).expect("queue swap");
+
+            assert_eq!(bridge.pending_count(), 3);
+
+            let dispatcher = NoOpDispatcher::testnet();
+            let results = bridge
+                .execute_pending_with_dispatcher(&dispatcher)
+                .expect("execute pending");
+
+            assert_eq!(results.len(), 3);
+            assert!(results.iter().all(|r| r.success));
+            assert_eq!(bridge.completed_count(), 3);
+
+            let combined: Vec<u8> = results.iter().flat_map(|r| r.output.clone()).collect();
+            let s = String::from_utf8_lossy(&combined);
+            assert!(s.contains("SVM:withdraw") || s.contains("EVM:withdraw"));
+        }
+
+        #[test]
+        fn integration_validation_rejects_invalid_operations() {
+            let mut bridge = CrossVmBridge::new();
+
+            let invalid_zero = CrossVmOperation::TransferToEvm {
+                source: vec![0x01; 32],
+                destination: [0x02; 20],
+                amount: 0u128,
+            };
+            assert!(bridge.queue_operation(invalid_zero).is_err());
+
+            let invalid_addr = CrossVmOperation::TransferToSvm {
+                source: [0x01; 20],
+                destination: vec![0x02; 31],
+                amount: 1u128,
+            };
+            assert!(bridge.queue_operation(invalid_addr).is_err());
+        }
     }
 }

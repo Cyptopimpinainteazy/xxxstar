@@ -64,8 +64,6 @@ default-features = true
 path = "../polkadot-statement-table"
 default-features = true
 
-[dependencies.prometheus-endpoint]
-path = "../../../substrate/utils/prometheus"
 default-features = true
 package = "substrate-prometheus-endpoint"
 
@@ -73,8 +71,6 @@ package = "substrate-prometheus-endpoint"
 path = "../sc-client-api"
 default-features = true
 
-[dependencies.sc-network]
-path = "../../../substrate/client/network"
 default-features = true
 
 [dependencies.sc-network-types]

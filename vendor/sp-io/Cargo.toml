@@ -115,7 +115,7 @@ optional = true
 default-features = false
 
 [dependencies.sp-tracing]
-path = "../tracing"
+path = "../sp-tracing"
 default-features = false
 
 [dependencies.sp-trie]

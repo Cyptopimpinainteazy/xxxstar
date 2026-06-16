@@ -50,5 +50,3 @@ version = "0.4.3"
 features = ["alloc"]
 default-features = false
 
-[dev-dependencies.pallet-evm-test-vector-support]
-path = "../../test-vector-support"

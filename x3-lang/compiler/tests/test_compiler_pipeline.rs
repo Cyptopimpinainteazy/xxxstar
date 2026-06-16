@@ -350,8 +350,8 @@ fn test_swap_min_output_survives_ir_to_bytecode_roundtrip() {
         dex: Some("uniswap".to_string()),
     });
 
-    let bytecode = x3_lang_compiler::emitter::emit_x3ir(&ir)
-        .expect("swap IR should emit to bytecode");
+    let bytecode =
+        x3_lang_compiler::emitter::emit_x3ir(&ir).expect("swap IR should emit to bytecode");
 
     // Disassemble and confirm min_output appears in the human-readable trace
     let trace = x3_lang_compiler::emitter::disassemble(&bytecode)

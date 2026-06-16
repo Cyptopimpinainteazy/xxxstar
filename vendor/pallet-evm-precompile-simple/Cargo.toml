@@ -49,5 +49,3 @@ git = "https://github.com/paritytech/polkadot-sdk"
 branch = "stable2512"
 default-features = false
 
-[dev-dependencies.pallet-evm-test-vector-support]
-path = "../../test-vector-support"

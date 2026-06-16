@@ -32,7 +32,37 @@ pub mod pallet {
     use sp_core::H256;
     use sp_runtime::traits::{SaturatedConversion, Saturating};
     use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId, TaskStatus};
-    // Note: Would integrate with oracle pallet for price data
+
+    /// Trait for querying asset prices from an oracle.
+    /// Wired at runtime to the concrete price feed (e.g. Chainlink-style pallet).
+    pub trait OracleProvider {
+        /// Returns the current price of `asset_id` scaled to a fixed-point
+        /// representation (e.g. 1e18), or `None` if unavailable.
+        fn get_price(asset_id: &[u8]) -> Option<u128>;
+    }
+
+    /// Trait for evaluating custom conditions defined by keepers or governance.
+    pub trait CustomConditionEvaluator {
+        /// Return true if the condition data holds at the current chain state.
+        fn evaluate(data: &[u8; 64]) -> bool;
+    }
+
+    /// Default evaluator that always returns false — safe no-op.
+    pub struct NoopCustomEvaluator;
+    impl CustomConditionEvaluator for NoopCustomEvaluator {
+        fn evaluate(_data: &[u8; 64]) -> bool {
+            false
+        }
+    }
+
+    /// No-op oracle that always returns `None` — safe default when no oracle
+    /// is configured.  Policy conditions depending on price will never trigger.
+    pub struct NoopOracle;
+    impl OracleProvider for NoopOracle {
+        fn get_price(_asset_id: &[u8]) -> Option<u128> {
+            None
+        }
+    }
 
     /// Balance type alias
     pub type BalanceOf<T> =
@@ -65,6 +95,11 @@ pub mod pallet {
 
         /// Weight information for extrinsics
         type WeightInfo: WeightInfo;
+
+        /// Oracle provider for price-feed conditions.
+        type Oracle: OracleProvider;
+        /// Custom condition evaluator (default: NoopCustomEvaluator).
+        type CustomEvaluator: CustomConditionEvaluator;
     }
 
     #[pallet::pallet]
@@ -374,17 +409,23 @@ impl<T: pallet::Config> pallet::Pallet<T> {
                 current_block >= *target_block
             }
             Condition::PriceThreshold {
-                asset_id: _,
-                threshold: _,
-                above: _,
+                asset_id,
+                threshold,
+                above,
             } => {
-                // TODO: Integrate with oracle pallet for price conditions
-                false
+                // Convert the u32 asset_id to a byte slice representation
+                // the oracle can interpret.
+                let asset_key = asset_id.to_le_bytes();
+                let current_price =
+                    T::Oracle::get_price(&asset_key).unwrap_or(0);
+
+                if *above {
+                    current_price >= (*threshold as u128)
+                } else {
+                    current_price < (*threshold as u128)
+                }
             }
-            Condition::Custom(_) => {
-                // Custom conditions would need custom logic
-                false
-            }
+            Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
         }
     }
 

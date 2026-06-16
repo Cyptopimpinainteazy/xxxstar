@@ -68,8 +68,6 @@ default-features = false
 version = "1.0.103"
 features = ["diff"]
 
-[dev-dependencies.xcm]
-path = ".."
 features = ["std"]
 default-features = true
 package = "staging-xcm"

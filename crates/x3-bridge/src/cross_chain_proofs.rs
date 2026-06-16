@@ -218,12 +218,24 @@ impl ProofVerifier {
         Ok(true)
     }
 
-    /// Verify ZK proof (placeholder - requires ZK verifier library)
+    /// Verify ZK proof (feature-gated — requires a ZK verifier library).
+    ///
+    /// Without the `zk-proofs` feature, this returns an explicit error so
+    /// production builds cannot accidentally route ZK proofs through an
+    /// unverified path. With the feature enabled, a Groth16 / PLONK verifier
+    /// is expected to be wired here by the consuming runtime.
     fn verify_zk_proof(_proof_data: &[u8], _proof: &CrossChainProof) -> Result<bool, &'static str> {
-        // TODO: Implement ZK proof verification
-        // This requires integration with a ZK proof system (e.g., Groth16, PLONK)
-        // For now, reject ZK proofs until verification is implemented
-        Err("ZK proof verification not yet implemented")
+        #[cfg(feature = "zk-proofs")]
+        {
+            // TODO: Wire Groth16 or PLONK verifier here.
+            // Call the ZK circuit verifier with proof_data and the canonical
+            // message hash from compute_finality_message_hash.
+            Err("ZK proof verification not yet implemented — feature-gated; wire a Groth16/PLONK verifier")
+        }
+        #[cfg(not(feature = "zk-proofs"))]
+        {
+            Err("ZK proof verification not yet implemented — feature-gated; enable the `zk-proofs` feature after wiring a ZK verifier")
+        }
     }
 
     /// Compute validator set hash for verification
@@ -652,12 +664,19 @@ mod tests {
             proof_data: vec![1, 2, 3, 4],
         });
 
-        // Should reject ZK proof (not yet implemented)
+        // Should reject ZK proof (not yet implemented — feature-gated)
         let result = ProofVerifier::verify(&proof, &validators);
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "ZK proof verification not yet implemented"
+        let err_msg = result.unwrap_err();
+        assert!(
+            err_msg.contains("ZK proof verification not yet implemented"),
+            "Expected feature-gated ZK error, got: {}",
+            err_msg
+        );
+        assert!(
+            err_msg.contains("feature-gated"),
+            "Error should mention feature gate, got: {}",
+            err_msg
         );
     }
 

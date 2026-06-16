@@ -55,7 +55,7 @@ version = "0.12.1"
 default-features = true
 
 [dependencies.prometheus-endpoint]
-path = "../../utils/prometheus"
+path = "../../patches/substrate-prometheus-endpoint"
 default-features = true
 package = "substrate-prometheus-endpoint"
 
@@ -110,9 +110,6 @@ default-features = true
 [dependencies.sp-trie]
 path = "../sp-trie"
 default-features = true
-
-[dev-dependencies.substrate-test-runtime]
-path = "../../test-utils/runtime"
 
 [lints.clippy.all]
 level = "allow"

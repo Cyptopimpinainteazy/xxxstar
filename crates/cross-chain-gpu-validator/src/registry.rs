@@ -109,6 +109,18 @@ impl AtomicRegistry {
         }
     }
 
+    /// Create an in-memory registry for tests that don't need Redis.
+    #[cfg(test)]
+    pub fn new_in_memory() -> Self {
+        // Connect to a placeholder — tests that construct orchestrators
+        // directly skip registry calls via the test-only constructor.
+        let client = redis::Client::open("redis://127.0.0.1:0").unwrap();
+        Self {
+            redis_client: client,
+            ttl_secs: 60,
+        }
+    }
+
     pub async fn update_phase(&self, swap_id: &str, phase: SwapPhase) -> Result<()> {
         let mut record = self
             .get_swap(swap_id)

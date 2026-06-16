@@ -31,23 +31,30 @@ impl Secp256k1Kernel {
     ) -> Result<(usize, u64)> {
         let start = Instant::now();
 
-        // Simulate GPU batch verification (in production, use cuBLAS or similar)
-        if !self.use_gpu {
-            return self.verify_batch_cpu(messages, signatures, public_keys);
-        }
-
-        let mut valid_count = 0;
-
-        for i in 0..messages.len().min(self.batch_size) {
-            match self.verify_single(messages[i], signatures[i], public_keys[i]) {
-                Ok(true) => valid_count += 1,
-                Ok(false) => {}
-                Err(_) => {}
+        // Feature-gated GPU dispatch.
+        #[cfg(feature = "cuda")]
+        {
+            if self.use_gpu {
+                // Real CUDA dispatch: call into the CUDA kernel via FFI.
+                // The CUDA kernel loads the batch of (msg, sig, pubkey) tuples
+                // into GPU memory, runs parallel secp256k1 verification, and
+                // returns the count of valid signatures + wall-clock time.
+                return crate::cuda::secp256k1_verify_batch(
+                    messages, signatures, public_keys, self.batch_size,
+                );
             }
         }
 
-        let elapsed = start.elapsed().as_millis() as u64;
-        Ok((valid_count, elapsed))
+        // No CUDA feature: fall through to CPU.  If the caller expected
+        // GPU acceleration, warn once to avoid silent performance surprises.
+        if self.use_gpu {
+            log::warn!(
+                target: "x3-gpu-validator",
+                "GPU kernel requested but CUDA feature not compiled in — falling back to CPU"
+            );
+        }
+
+        self.verify_batch_cpu(messages, signatures, public_keys)
     }
 
     /// Fallback CPU verification for comparison

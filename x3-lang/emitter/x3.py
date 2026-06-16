@@ -54,30 +54,32 @@ def emit(plan: Dict[str, Any], step: Dict[str, Any], *, proof_bundle: Dict[str, 
         'dry_run': dry_run,
     }
     if dry_run:
+        # Dry-run mode records the payload hash but never fabricates
+        # signatures, settlement roots, or finality confirmations.
         tx['proof_bundle'] = {
             'bundle_version': '0.1',
             'dry_run': True,
-            'verifier': {'status': 'simulated', 'id': 'x3-validator-dryrun'},
-            'finality': {'confirmed': False, 'checkpoint': 0, 'source_chain': payload.get('source_chain'), 'target_chain': payload.get('target_chain')},
+            'verifier': {'status': 'pending', 'id': None},
+            'finality': {
+                'confirmed': False,
+                'checkpoint': 0,
+                'source_chain': payload.get('source_chain'),
+                'target_chain': payload.get('target_chain'),
+            },
             'checkpoint': 0,
-            'settlement_root': '0x' + ('0' * 64),
+            'settlement_root': None,
             'payload_hash': '0x' + __import__('hashlib').sha256(_serialize_x3_payload(payload).encode()).hexdigest(),
-            'signatures': [
-                {
-                    'validator': 'x3-validator-1',
-                    'pubkey': '0x' + ('0' * 96),
-                    'signature': '0x' + ('0' * 130),
-                    'finality_proof': 'simulated-dry-run',
-                }
-            ],
+            'signatures': [],
+            'error': 'dry-run cannot produce a production proof bundle',
+            'error_code': 'X3_PROOF_REQUIRED',
         }
         return tx
+
     if not verify_proof_bundle(payload, proof_bundle or {}):
-        # Always attach a structured proof bundle describing the verifier boundary.
-        # The bundle fields below are the production contract; downstream code
-        # must reject `verified != true` and `finality.confirmed != true` before
-        # treating this as final settlement. Callers that want a dry-run bundle
-        # should pass `dry_run=True`.
+        # Production settlement requires a real backend-produced proof
+        # bundle. The emitter never manufactures signatures, roots, or
+        # finality confirmations. Return a structured rejection so
+        # downstream callers fail closed.
         import hashlib as _hashlib
         tx['proof_bundle'] = {
             'bundle_version': '0.1',
@@ -90,19 +92,13 @@ def emit(plan: Dict[str, Any], step: Dict[str, Any], *, proof_bundle: Dict[str, 
                 'target_chain': payload.get('target_chain'),
             },
             'checkpoint': 0,
-            'settlement_root': '0x' + ('0' * 64),
+            'settlement_root': None,
             'payload_hash': '0x' + _hashlib.sha256(_serialize_x3_payload(payload).encode()).hexdigest(),
-            'signatures': [
-                {
-                    'validator': 'x3-validator-1',
-                    'pubkey': '0x' + ('0' * 96),
-                    'signature': '0x' + ('0' * 130),
-                    'finality_proof': 'pending-verifier',
-                }
-            ],
+            'signatures': [],
             'error': 'missing or invalid verifier proof/finality/settlement bundle',
             'error_code': 'X3_PROOF_REQUIRED',
         }
         return tx
+
     tx['proof_bundle'] = proof_bundle
     return tx

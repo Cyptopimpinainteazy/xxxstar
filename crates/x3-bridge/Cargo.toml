@@ -23,3 +23,8 @@ std = [
     "sp-core/std",
     "serde/std",
 ]
+# Enable the `zk-proofs` feature only when a ZK verifier (Groth16 / PLONK)
+# is wired in. Without this feature, `verify_zk_proof` returns an explicit
+# feature-gated error so production builds cannot accidentally route ZK
+# proofs through an unverified path.
+zk-proofs = []

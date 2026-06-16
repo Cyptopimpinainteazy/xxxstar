@@ -87,7 +87,7 @@ version = "0.12.1"
 default-features = true
 
 [dependencies.prometheus-endpoint]
-path = "../../utils/prometheus"
+path = "../../patches/substrate-prometheus-endpoint"
 default-features = true
 package = "substrate-prometheus-endpoint"
 
@@ -140,9 +140,6 @@ default-features = true
 [dev-dependencies.criterion]
 version = "0.5.1"
 default-features = true
-
-[dev-dependencies.kitchensink-runtime]
-path = "../../bin/node/runtime"
 
 [dev-dependencies.kvdb-rocksdb]
 version = "0.21.0"

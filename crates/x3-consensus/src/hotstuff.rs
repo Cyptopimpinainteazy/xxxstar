@@ -328,13 +328,12 @@ pub fn verify_block_signature(
         .find(|v| v.address == *proposer)
         .ok_or(ConsensusError::UnknownProposer)?;
 
-    // In production: use actual signature verification (BLS/Ed25519/Schnorr)
-    // Here: check placeholder
-    if signature.is_empty() {
-        return Err(ConsensusError::InvalidQC);
-    }
-    // Signature verification logic would go here using proposer's public key
-    Ok(())
+    // Real signature verification requires the proposer's public key in the
+    // validator set. Until Validator carries a public key and this function
+    // is wired to ed25519-dalek (or BLS), fail closed rather than accept any
+    // non-empty byte string as a valid signature.
+    let _ = (block_hash, signature, proposer, validators);
+    Err(ConsensusError::InvalidQC)
 }
 
 /// Core Block verification (independent of execution)
@@ -386,11 +385,17 @@ fn derive_action_dag(actions: &[ActionCommitment]) -> Result<ActionDag, Consensu
 }
 
 /// Deterministic execution order from DAG (topological sort, ties broken by ID)
-fn derive_execution_order(dag: &ActionDAG) -> Vec<ActionCommitment> {
+fn derive_execution_order(
+    dag: &ActionDAG,
+    _actions: &[ActionCommitment],
+) -> Result<Vec<ActionCommitment>, ConsensusError> {
     let order_ids = dag.topological_order();
-    // In real implementation, look up actions by ID
-    // Here we just return as-is ( stub: actions already in order)
-    Vec::new()
+    // The ActionDAG only stores node ids and hashes, not the full
+    // ActionCommitment. Reconstructing the ordered commitment list from
+    // the original actions is not yet implemented; fail closed rather
+    // than return an empty list that would silently skip execution.
+    let _ = order_ids;
+    Err(ConsensusError::InvalidDag)
 }
 
 /// Compute hash of any serializable type
@@ -512,15 +517,17 @@ fn compute_merkle_root(hashes: &[Hash]) -> Hash {
     level[0]
 }
 
-/// Execute a single action (stub - integrates with X3 VM)
+/// Execute a single action.
+///
+/// In full implementation this dispatches to the X3 VM adapter or agent
+/// execution and returns a real receipt hash. Until that integration is
+/// wired, fail closed so blocks cannot silently "execute" without actually
+// running their payload.
 fn execute_action(
-    state: &mut ChainState,
-    action: &ActionCommitment,
+    _state: &mut ChainState,
+    _action: &ActionCommitment,
 ) -> Result<Hash, ConsensusError> {
-    // In full implementation: dispatch to VM adapter or agent execution
-    // Produces a receipt whose hash is returned
-    let receipt_hash = hash(&action)?;
-    Ok(receipt_hash)
+    Err(ConsensusError::ExecutionFailure)
 }
 
 /// Apply slashing events to state
@@ -558,7 +565,7 @@ pub fn apply_block(
     if dag.root_hash() != block.action_dag_root {
         return Err(ConsensusError::InvalidDag);
     }
-    let order = derive_execution_order(&dag);
+    let order = derive_execution_order(&dag, &block.actions)?;
     let order_hash = hash(&order)?;
     if order_hash != block.execution_order_hash {
         return Err(ConsensusError::InvalidOrder);

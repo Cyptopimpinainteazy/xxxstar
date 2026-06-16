@@ -9,7 +9,6 @@
 //! * **TICKET-4.5-009** — Post-submission tracking (pending obligations, evidence)
 //! * **TICKET-4.5-010** — Solvency snapshot registry with retention-window pruning
 
-
 pub use pallet::*;
 pub mod types;
 

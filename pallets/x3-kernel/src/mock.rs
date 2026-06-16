@@ -281,7 +281,6 @@ impl pallet_x3_kernel::X3ExecutorAdapter for TestX3Adapter {
 }
 
 impl pallet_x3_kernel::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Balance = Balance;
     type AssetId = AssetId;

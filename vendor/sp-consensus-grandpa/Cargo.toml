@@ -103,7 +103,7 @@ optional = true
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../runtime"
+path = "../sp-runtime"
 default-features = false
 
 [lints.clippy.all]

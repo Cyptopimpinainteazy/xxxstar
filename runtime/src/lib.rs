@@ -904,6 +904,7 @@ impl pallet_x3_vrf::Config for Runtime {
     type BaseFee = BaseFee;
     type FeePerByte = FeePerByte;
     type MaxSeedLength = MaxSeedLength;
+    type FulfillerOrigin = EnsureRootOrHalfCouncil;
     type WeightInfo = ();
 }
 
@@ -931,6 +932,8 @@ impl pallet_x3_automation::Config for Runtime {
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
     type WeightInfo = ();
+    type Oracle = pallet_x3_automation::NoopOracle;
+    type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
 }
 
 parameter_types! {
@@ -1084,6 +1087,7 @@ impl pallet_transaction_payment::Config for Runtime {
 
 #[cfg(feature = "dev")]
 impl pallet_sudo::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
@@ -1497,6 +1501,7 @@ impl pallet_x3_invariants::Config for Runtime {
 
 impl pallet_x3_agent_law::Config for Runtime {
     type Currency = Balances;
+    type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type ReputationThreshold = ConstU64<100>;
     type MaxTasksPerBlock = ConstU32<50>;
     type CheckpointGracePeriod = ConstU32<14400>; // ~24 hours @ 6s blocks
@@ -2660,6 +2665,7 @@ impl Get<AccountId> for SlashTreasuryRecipient {
 }
 
 impl pallet_x3_slash::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
     type SlashWeightInfo = ();
     type Currency = Balances;
     type MinBondAmount = SlashMinBondAmount;

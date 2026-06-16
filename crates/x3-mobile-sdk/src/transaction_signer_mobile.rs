@@ -294,28 +294,41 @@ impl MobileTransactionSigner {
 // ============================================================================
 
 fn sign_ed25519(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError> {
-    // In production: use ed25519-zebra or similar
-    // For now: hash and return as placeholder
-    let mut hasher = sha2::Sha512::new();
-    hasher.update(private_key);
-    hasher.update(payload);
-    Ok(hasher.finalize().to_vec())
+    let seed: [u8; 32] = private_key
+        .try_into()
+        .map_err(|_| SdkError::Crypto("ed25519 private key must be 32 bytes".to_string()))?;
+    let signing_key = ed25519_zebra::SigningKey::from(seed);
+    let signature = signing_key.sign(payload);
+    Ok(signature.to_bytes().to_vec())
 }
 
 fn sign_ecdsa(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError> {
-    // In production: use k256 or similar
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(private_key);
-    hasher.update(payload);
-    Ok(hasher.finalize().to_vec())
+    use k256::ecdsa::{signature::Signer, SigningKey};
+    let signing_key =
+        SigningKey::from_slice(private_key).map_err(|e| SdkError::Crypto(e.to_string()))?;
+    let sig: k256::ecdsa::Signature = signing_key
+        .try_sign(payload)
+        .map_err(|e| SdkError::Crypto(e.to_string()))?;
+    Ok(sig.to_vec())
 }
 
 fn derive_public_key(algorithm: &SignatureAlgorithm, private_key: &[u8]) -> Result<Vec<u8>, SdkError> {
-    // In production: proper key derivation
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(private_key);
-    hasher.update(algorithm.to_string().as_bytes());
-    Ok(hasher.finalize().to_vec())
+    match algorithm {
+        SignatureAlgorithm::Ed25519 => {
+            let seed: [u8; 32] = private_key
+                .try_into()
+                .map_err(|_| SdkError::Crypto("ed25519 private key must be 32 bytes".to_string()))?;
+            let signing_key = ed25519_zebra::SigningKey::from(seed);
+            let verification_key = ed25519_zebra::VerificationKey::from(&signing_key);
+            Ok(verification_key.as_bytes().to_vec())
+        }
+        SignatureAlgorithm::EcdsaSecp256k1 => {
+            use k256::ecdsa::SigningKey;
+            let signing_key = SigningKey::from_slice(private_key)
+                .map_err(|e| SdkError::Crypto(e.to_string()))?;
+            Ok(signing_key.verifying_key().to_sec1_bytes().to_vec())
+        }
+    }
 }
 
 fn verify_ed25519_sig(payload: &[u8], signature: &[u8], public_key: &[u8]) -> Result<bool, SdkError> {

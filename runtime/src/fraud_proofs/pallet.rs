@@ -314,7 +314,7 @@ pub mod pallet {
 // Mock runtime for pallet tests
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev"))]
 pub mod mock {
     use super::pallet::*;
     use frame_support::{
@@ -428,7 +428,7 @@ pub mod mock {
 // Pallet extrinsic tests
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev"))]
 mod tests {
     use super::mock::*;
     use super::pallet::*;

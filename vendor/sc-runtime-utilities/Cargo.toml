@@ -70,9 +70,6 @@ version = "1.0.64"
 path = "../cumulus-primitives-proof-size-hostfunction"
 default-features = true
 
-[dev-dependencies.cumulus-test-runtime]
-path = "../../../cumulus/test/runtime"
-
 [dev-dependencies.sp-io]
 path = "../sp-io"
 default-features = true

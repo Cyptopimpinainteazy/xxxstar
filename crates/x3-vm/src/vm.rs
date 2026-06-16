@@ -553,9 +553,11 @@ impl VM {
                 let func_id = func_idx as u32;
                 self.jit.record_execution(func_id);
                 if self.jit.should_compile(func_id) && self.jit.get_compiled(func_id).is_none() {
-                    self.jit
-                        .compile(func_id, &self.module.code)
-                        .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    if self.jit.backend_available() {
+                        self.jit
+                            .compile(func_id, &self.module.code)
+                            .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    }
                 }
 
                 self.isolation.enter_call().map_err(|err| {

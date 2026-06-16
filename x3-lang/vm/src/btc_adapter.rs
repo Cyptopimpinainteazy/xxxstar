@@ -145,16 +145,14 @@ pub fn verify_btc_finality(proof: &[u8]) -> Result<(), BtcBridgeError> {
     #[cfg(feature = "bitcoin-adapter")]
     {
         let _ = real::BitcoinLightClient::new();
-        // Real header-chain validation belongs in the consuming crate;
-        // we only assert the proof prefix here.
-        if proof.starts_with(b"btc-header-v1") {
-            Ok(())
-        } else {
-            Err(BtcBridgeError {
-                code: "X3_BTC_PROOF_PREFIX",
-                message: "BTC finality proof missing btc-header-v1 prefix".to_string(),
-            })
-        }
+        // Real PoW header-chain validation is not implemented in this
+        // repository. The `bitcoin-adapter` feature only selects the
+        // real surface; it must not silently accept a magic-byte prefix
+        // as a valid finality proof.
+        Err(BtcBridgeError {
+            code: "X3_BTC_FINALITY_NOT_IMPLEMENTED",
+            message: "BTC PoW finality validation is not implemented".to_string(),
+        })
     }
     #[cfg(not(feature = "bitcoin-adapter"))]
     {
@@ -247,7 +245,9 @@ mod tests {
         // acceptable proof that production BTC cannot silently
         // succeed; the adapter fails closed in both configurations.
         assert!(
-            err.code == BTC_DISABLED_CODE || err.code == "X3_BTC_PROOF_EMPTY",
+            err.code == BTC_DISABLED_CODE
+                || err.code == "X3_BTC_PROOF_EMPTY"
+                || err.code == "X3_BTC_FINALITY_NOT_IMPLEMENTED",
             "expected production BTC to fail closed, got code={}",
             err.code
         );
@@ -272,8 +272,11 @@ mod tests {
 
     #[cfg(feature = "bitcoin-adapter")]
     #[test]
-    fn feature_enabled_verifies_prefix() {
-        assert!(verify_btc_finality(b"btc-header-v1:abc").is_ok());
+    fn feature_enabled_fails_closed_until_pow_validation_wired() {
+        // The feature only selects the real adapter surface; it must not
+        // accept a magic-byte prefix as a valid finality proof.
+        let err = verify_btc_finality(b"btc-header-v1:abc").unwrap_err();
+        assert_eq!(err.code, "X3_BTC_FINALITY_NOT_IMPLEMENTED");
         assert!(verify_btc_finality(b"something-else").is_err());
     }
 

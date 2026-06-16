@@ -37,6 +37,45 @@ use crate::opcode::Opcode;
 ///   Ret       r2         ; return 49
 ///   ```
 ///
+/// Compute a CRC32 checksum over the bytecode body (everything after the
+/// 24-byte header). The checksum is validated on VM load to detect bit-rot
+/// and malformed modules.
+fn compute_bytecode_checksum(body: &[u8]) -> u32 {
+    // Simple CRC32 using polynomial 0xEDB88320 (standard IEEE 802.3)
+    let mut crc: u32 = 0xFFFFFFFF;
+    for &byte in body {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            if crc & 1 != 0 {
+                crc = (crc >> 1) ^ 0xEDB88320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    !crc
+}
+
+/// Write the 24-byte X3BC header (magic + version + flags + checksum_placeholder + min_version + features).
+fn write_header(out: &mut Vec<u8>) {
+    out.extend_from_slice(MAGIC);
+    out.extend_from_slice(&VERSION.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes()); // flags
+    out.extend_from_slice(&0u32.to_le_bytes()); // checksum placeholder
+    out.extend_from_slice(&VERSION.to_le_bytes()); // min_version
+    out.extend_from_slice(&0u32.to_le_bytes()); // features
+}
+
+/// Patch the checksum field (bytes 12-15) with the CRC32 of the body.
+fn patch_checksum(module: &mut [u8]) {
+    if module.len() < 24 {
+        return;
+    }
+    let body = &module[24..];
+    let checksum = compute_bytecode_checksum(body);
+    module[12..16].copy_from_slice(&checksum.to_le_bytes());
+}
+
 /// # Returns
 ///
 /// `Vec<u8>` - Valid X3BC module bytes ready for `BytecodeModule::from_bytes()`.
@@ -44,18 +83,7 @@ pub fn assemble_simple_module() -> Vec<u8> {
     let mut out: Vec<u8> = Vec::new();
 
     // === Header (24 bytes) ===
-    // Magic: "X3BC"
-    out.extend_from_slice(MAGIC);
-    // Version: u32
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    // Flags: u32 (none)
-    out.extend_from_slice(&0u32.to_le_bytes());
-    // Checksum: u32 (placeholder, not validated yet)
-    out.extend_from_slice(&0u32.to_le_bytes());
-    // Min version: u32
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    // Features: u32 (none)
-    out.extend_from_slice(&0u32.to_le_bytes());
+    write_header(&mut out);
 
     // === Constant Pool ===
     // Two integer constants: 42 and 7
@@ -152,6 +180,9 @@ pub fn assemble_simple_module() -> Vec<u8> {
     // Metadata: not present (marker byte 0)
     out.push(0u8);
 
+    // Patch the CRC32 checksum over the body (bytes 24..end).
+    patch_checksum(&mut out);
+
     out
 }
 
@@ -167,12 +198,7 @@ pub fn assemble_param_module() -> Vec<u8> {
     let mut out: Vec<u8> = Vec::new();
 
     // Header (24 bytes)
-    out.extend_from_slice(MAGIC);
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes()); // flags
-    out.extend_from_slice(&0u32.to_le_bytes()); // checksum
-    out.extend_from_slice(&VERSION.to_le_bytes()); // min_version
-    out.extend_from_slice(&0u32.to_le_bytes()); // features
+    write_header(&mut out);
 
     // Empty const pool
     out.extend_from_slice(&0u32.to_le_bytes());
@@ -211,6 +237,9 @@ pub fn assemble_param_module() -> Vec<u8> {
     // Metadata: not present
     out.push(0u8);
 
+    // Patch the CRC32 checksum over the body.
+    patch_checksum(&mut out);
+
     out
 }
 
@@ -229,12 +258,7 @@ pub fn assemble_branch_module() -> Vec<u8> {
     let mut out: Vec<u8> = Vec::new();
 
     // Header (24 bytes)
-    out.extend_from_slice(MAGIC);
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes()); // flags
-    out.extend_from_slice(&0u32.to_le_bytes()); // checksum
-    out.extend_from_slice(&VERSION.to_le_bytes()); // min_version
-    out.extend_from_slice(&0u32.to_le_bytes()); // features
+    write_header(&mut out);
 
     // Empty const pool
     out.extend_from_slice(&0u32.to_le_bytes());
@@ -292,6 +316,9 @@ pub fn assemble_branch_module() -> Vec<u8> {
     // Metadata: not present
     out.push(0u8);
 
+    // Patch the CRC32 checksum over the body.
+    patch_checksum(&mut out);
+
     out
 }
 
@@ -300,12 +327,7 @@ pub fn assemble_halt_module() -> Vec<u8> {
     let mut out: Vec<u8> = Vec::new();
 
     // Header (24 bytes)
-    out.extend_from_slice(MAGIC);
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes()); // flags
-    out.extend_from_slice(&0u32.to_le_bytes()); // checksum
-    out.extend_from_slice(&VERSION.to_le_bytes()); // min_version
-    out.extend_from_slice(&0u32.to_le_bytes()); // features
+    write_header(&mut out);
 
     // Empty const pool
     out.extend_from_slice(&0u32.to_le_bytes());
@@ -335,6 +357,9 @@ pub fn assemble_halt_module() -> Vec<u8> {
     out.push(0u8);
     // Metadata: not present
     out.push(0u8);
+
+    // Patch the CRC32 checksum over the body.
+    patch_checksum(&mut out);
 
     out
 }

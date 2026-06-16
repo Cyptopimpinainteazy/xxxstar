@@ -64,7 +64,7 @@ echo ""
 exec "$NODE_BIN" \
     --chain dev \
     --tmp \
-    --rpc-methods Unsafe \
+    --rpc-methods Safe \
     --rpc-external \
     --ws-external \
     --ws-port 9944 \

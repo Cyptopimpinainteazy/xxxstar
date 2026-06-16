@@ -623,33 +623,46 @@ pub mod pallet {
                 return T::WeightInfo::clean_expired_proofs();
             }
 
-            // Clean up to 5 expired proofs per block
-            // Use Root origin since this is a system-level maintenance operation.
-            // The extrinsic uses ensure_signed, so we need to provide a valid account.
-            // We use the zero-encoded AccountId as a system signer.
-            let zero_account = T::AccountId::decode(&mut &[0u8; 32][..])
-                .unwrap_or_else(|_| {
-                    // For non-32-byte AccountIds (e.g., u64), try decoding from 8 zero bytes
-                    T::AccountId::decode(&mut &[0u8; 8][..])
-                        .unwrap_or_else(|_| {
-                            // Last resort: use the default account ID
-                            // This is safe because on_initialize is infallible
-                            frame_system::Pallet::<T>::block_number()
-                                .using_encoded(|b| {
-                                    T::AccountId::decode(&mut &b[..])
-                                        .unwrap_or_else(|_| {
-                                            // Absolute fallback — this should never happen
-                                            // for any reasonable AccountId type
-                                            panic!("Cannot create system account for on_initialize cleanup; this is a configuration error")
-                                        })
-                                })
-                        })
-                });
-
-            let _ =
-                Self::clean_expired_proofs(frame_system::RawOrigin::Signed(zero_account).into(), 5);
+            // Clean up to 5 expired proofs per block.
+            // We construct a system account for the signed extrinsic; if
+            // decoding fails we skip cleanup rather than panicking because
+            // `on_initialize` is infallible.
+            let zero_account = Self::try_decode_zero_account();
+            if let Some(account) = zero_account {
+                let _ = Self::clean_expired_proofs(
+                    frame_system::RawOrigin::Signed(account).into(),
+                    5,
+                );
+            } else {
+                log::error!(
+                    target: "runtime::proof-carrying-agent",
+                    "Cannot decode system account for on_initialize cleanup; \
+                     skipping expired proof cleanup this block. \
+                     This is a configuration error that must be fixed."
+                );
+            }
 
             T::WeightInfo::clean_expired_proofs()
+        }
+    }
+
+    // ── Internal Helpers ────────────────────────────────────────────────────
+
+    impl<T: Config> Pallet<T> {
+        /// Try to decode a zero-encoded AccountId for system-level maintenance.
+        /// Returns `None` if all decoding strategies fail (configuration error).
+        fn try_decode_zero_account() -> Option<T::AccountId> {
+            // Strategy 1: 32-byte AccountId (sr25519/ed25519)
+            if let Ok(account) = T::AccountId::decode(&mut &[0u8; 32][..]) {
+                return Some(account);
+            }
+            // Strategy 2: 8-byte AccountId (u64)
+            if let Ok(account) = T::AccountId::decode(&mut &[0u8; 8][..]) {
+                return Some(account);
+            }
+            // Strategy 3: last resort — decode from block_number encoding
+            frame_system::Pallet::<T>::block_number()
+                .using_encoded(|b| T::AccountId::decode(&mut &b[..]).ok())
         }
     }
 }

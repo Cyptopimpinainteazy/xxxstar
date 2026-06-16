@@ -56,8 +56,6 @@ default-features = true
 path = "../sc-client-api"
 default-features = true
 
-[dependencies.sc-network]
-path = "../../../substrate/client/network"
 default-features = true
 
 [dependencies.sp-api]

@@ -69,6 +69,7 @@ struct RuntimeBuilder {
 	canonicalize_nans: bool,
 	deterministic_stack: bool,
 	heap_pages: HeapAllocStrategy,
+	wasm_bulk_memory: bool,
 	precompile_runtime: bool,
 	tmpdir: Option<tempfile::TempDir>,
 }
@@ -81,6 +82,7 @@ impl RuntimeBuilder {
 			canonicalize_nans: false,
 			deterministic_stack: false,
 			heap_pages: DEFAULT_HEAP_ALLOC_STRATEGY,
+			wasm_bulk_memory: false,
 			precompile_runtime: false,
 			tmpdir: None,
 		}
@@ -108,6 +110,11 @@ impl RuntimeBuilder {
 
 	fn heap_alloc_strategy(mut self, heap_pages: HeapAllocStrategy) -> Self {
 		self.heap_pages = heap_pages;
+		self
+	}
+
+	fn wasm_bulk_memory(mut self, wasm_bulk_memory: bool) -> Self {
+		self.wasm_bulk_memory = wasm_bulk_memory;
 		self
 	}
 
@@ -143,7 +150,7 @@ impl RuntimeBuilder {
 				parallel_compilation: true,
 				heap_alloc_strategy: self.heap_pages,
 				wasm_multi_value: false,
-				wasm_bulk_memory: false,
+				wasm_bulk_memory: self.wasm_bulk_memory,
 				wasm_reference_types: false,
 				wasm_simd: false,
 			},
@@ -245,14 +252,33 @@ fn test_consume_over_1mb_of_stack_does_trap(instantiation_strategy: Instantiatio
 	}
 }
 
-test_wasm_execution!(test_nan_canonicalization);
-fn test_nan_canonicalization(instantiation_strategy: InstantiationStrategy) {
-	let mut builder = RuntimeBuilder::new(instantiation_strategy).canonicalize_nans(true);
-	let runtime = builder.build();
+test_wasm_execution!(test_wasm_bulk_memory_feature_enabled);
+fn test_wasm_bulk_memory_feature_enabled(instantiation_strategy: InstantiationStrategy) {
+    let wat = r#"
+        (module
+            (memory (export \"memory\") 1)
+            (func (export \"main\") (result i32)
+                i32.const 0
+                i32.const 0
+                i32.const 4
+                memory.fill
+                i32.const 0
+                i32.load
+            )
+        )
+    "#;
 
-	let mut instance = runtime.new_instance().expect("failed to instantiate a runtime");
+    let runtime = RuntimeBuilder::new(instantiation_strategy)
+        .use_wat(wat.to_string())
+        .wasm_bulk_memory(true)
+        .build();
 
-	/// A NaN with canonical payload bits.
+    let mut instance = runtime.new_instance().expect("failed to instantiate runtime");
+    let result = instance
+        .call_export("main", &[])
+        .expect("bulk memory instructions should be supported");
+    assert_eq!(0, u32::decode(&mut &result[..]).unwrap());
+}
 	const CANONICAL_NAN_BITS: u32 = 0x7fc00000;
 	/// A NaN value with an arbitrary payload.
 	const ARBITRARY_NAN_BITS: u32 = 0x7f812345;

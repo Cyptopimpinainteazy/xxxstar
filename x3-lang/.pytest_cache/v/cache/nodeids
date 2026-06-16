@@ -1,1 +1,17 @@
-[]
+[
+  "tests/test_e2e_mocked.py::test_runner_dry_run_is_explicit_and_not_production_settlement",
+  "tests/test_e2e_mocked.py::test_runner_production_without_backend_rolls_back",
+  "tests/test_emitter.py::test_emitter_generates_chain_payloads",
+  "tests/test_emitter.py::test_evm_emitter_uses_uniswap_selector_and_target_contract",
+  "tests/test_emitter.py::test_svm_emitter_encodes_ray_dium_swap_with_base58_data",
+  "tests/test_emitter.py::test_x3_emitter_builds_settlement_payload_and_proof_bundle",
+  "tests/test_parser.py::test_cli_parses_production_intent_example",
+  "tests/test_parser.py::test_cli_rejects_malformed_route",
+  "tests/test_runner.py::test_runner_defaults_to_fail_closed_without_backend",
+  "tests/test_runner.py::test_runner_dry_run_end_to_end",
+  "tests/test_runner.py::test_runner_end_to_end",
+  "tests/test_simulator.py::test_simulator_produces_estimates",
+  "tests/test_typechecker.py::test_planner_outputs_cross_chain_steps",
+  "tests/test_typechecker.py::test_typechecker_accepts_valid_production_intent",
+  "tests/test_typechecker.py::test_typechecker_rejects_invalid_chain_asset_receiver"
+]

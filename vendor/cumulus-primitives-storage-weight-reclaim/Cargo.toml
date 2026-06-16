@@ -89,9 +89,6 @@ default-features = false
 path = "../sp-runtime"
 default-features = false
 
-[dev-dependencies.cumulus-test-runtime]
-path = "../../test/runtime"
-
 [dev-dependencies.sp-io]
 path = "../sp-io"
 default-features = false

@@ -47,17 +47,17 @@ pub enum TaskStatus {
 
 /// Pending task
 #[derive(Debug, Clone)]
-struct PendingTask {
+pub struct PendingTask {
     /// Task
-    task: DeterministicTask,
+    pub task: DeterministicTask,
     /// Assigned validator
-    assigned_to: Option<String>,
+    pub assigned_to: Option<String>,
     /// Status
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// Created at
-    _created_at: Instant,
+    pub _created_at: Instant,
     /// Assigned at
-    assigned_at: Option<Instant>,
+    pub assigned_at: Option<Instant>,
 }
 
 /// Swarm Orchestrator
@@ -365,6 +365,11 @@ impl SwarmOrchestrator {
     /// Get pending task count
     pub fn pending_task_count(&self) -> usize {
         self.pending_tasks.read().len()
+    }
+
+    /// Return a snapshot of all currently pending tasks.
+    pub fn pending_tasks_snapshot(&self) -> Vec<PendingTask> {
+        self.pending_tasks.read().iter().cloned().collect()
     }
 
     /// Get completed task count

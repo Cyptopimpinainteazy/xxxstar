@@ -119,8 +119,6 @@ features = [
 ]
 default-features = false
 
-[dependencies.frame-support-procedural]
-path = "procedural"
 default-features = false
 
 [dependencies.impl-trait-for-tuples]

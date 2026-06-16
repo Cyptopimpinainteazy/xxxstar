@@ -196,6 +196,7 @@ impl JitCompiler {
 
     /// Compile a function to native code
     /// In production, this would use Cranelift to lower X3 bytecode to native machine code
+    #[allow(unused_variables)]
     pub fn compile(&self, func_id: u32, bytecode: &[u8]) -> Result<CompiledFunction, String> {
         let start = std::time::Instant::now();
 
@@ -220,54 +221,77 @@ impl JitCompiler {
             }
         }
 
-        // In a real implementation, this would:
-        // 1. Parse X3 bytecode
-        // 2. Build Cranelift IR
-        // 3. Compile to native machine code
-        // 4. Link and verify
-        //
-        // For now, we simulate the compilation process
-        let native_code = Self::mock_compile_to_native(bytecode);
-        let compilation_time_ms = start.elapsed().as_millis() as u64;
+        // In production (non-test) builds, JIT native compilation is not yet
+        // available.  Return an explicit unsupported error so callers know
+        // this path is not wired, rather than failing to compile.
+        #[cfg(not(test))]
+        {
+            warn!(
+                "[JIT] Native compilation requested for function {} but JIT backend is not available",
+                func_id
+            );
+            return Err("JIT native compilation not yet available outside test builds".to_string());
+        }
 
-        // Estimate speedup (3-5x typical for JIT)
+        // Test-only mock path: simulates compilation so the JIT pipeline
+        // scaffolding can be exercised.
+        #[cfg(test)]
+        let native_code = Self::mock_compile_to_native(bytecode);
+        #[cfg(test)]
+        let compilation_time_ms = start.elapsed().as_millis() as u64;
+        #[cfg(test)]
         let estimated_speedup = 3.5;
 
-        let compiled = CompiledFunction {
-            func_id,
-            native_code,
-            compilation_time_ms,
-            estimated_speedup,
-        };
-
-        // Cache the compiled function
+        #[cfg(test)]
         {
-            let mut cache = self.compiled_cache.write();
-            cache.insert(func_id, compiled.clone());
+            let compiled = CompiledFunction {
+                func_id,
+                native_code,
+                compilation_time_ms,
+                estimated_speedup,
+            };
+
+            // Cache the compiled function
+            {
+                let mut cache = self.compiled_cache.write();
+                cache.insert(func_id, compiled.clone());
+            }
+
+            // Update stats
+            {
+                let mut stats = self.stats.write();
+                stats.total_compilations += 1;
+                stats.successful_compilations += 1;
+                stats.total_compilation_time_ms += compilation_time_ms;
+                stats.cached_functions = self.compiled_cache.read().len() as u32;
+                stats.avg_speedup = (stats.avg_speedup + estimated_speedup) / 2.0;
+            }
+
+            info!(
+                "[JIT] Compiled function {} in {}ms (estimated speedup: {:.1}×)",
+                func_id, compilation_time_ms, estimated_speedup
+            );
+
+            Ok(compiled)
         }
-
-        // Update stats
-        {
-            let mut stats = self.stats.write();
-            stats.total_compilations += 1;
-            stats.successful_compilations += 1;
-            stats.total_compilation_time_ms += compilation_time_ms;
-            stats.cached_functions = self.compiled_cache.read().len() as u32;
-            stats.avg_speedup = (stats.avg_speedup + estimated_speedup) / 2.0;
-        }
-
-        info!(
-            "[JIT] Compiled function {} in {}ms (estimated speedup: {:.1}×)",
-            func_id, compilation_time_ms, estimated_speedup
-        );
-
-        Ok(compiled)
     }
 
     /// Get a compiled function from cache (if available)
     pub fn get_compiled(&self, func_id: u32) -> Option<CompiledFunction> {
         let cache = self.compiled_cache.read();
         cache.get(&func_id).cloned()
+    }
+
+    /// Check if the JIT backend is available for native compilation.
+    ///
+    /// In production (non-test) builds, the JIT backend is not wired,
+    /// so compilation is skipped entirely.  In test builds, mock
+    /// compilation exists for pipeline validation.
+    pub fn backend_available(&self) -> bool {
+        #[cfg(not(test))]
+        return false;
+        #[cfg(test)]
+        true
     }
 
     /// Clear the compilation cache
@@ -310,17 +334,18 @@ impl JitCompiler {
         )
     }
 
-    /// Mock compilation: converts bytecode to a simulated native code blob
-    /// In reality, this would use Cranelift to lower to machine code
+    /// Mock compilation: converts bytecode to a simulated native code blob.
+    ///
+    /// **WARNING**: This is NOT real native code — it is a byte-for-byte copy
+    /// of the input prefixed with a magic header.  It exists ONLY for testing
+    /// and benchmarking the JIT pipeline scaffolding.  The `#[cfg(test)]` gate
+    /// ensures production code never calls this fake compilation path.
+    #[cfg(test)]
     fn mock_compile_to_native(bytecode: &[u8]) -> Vec<u8> {
-        // Simulate native code generation (in reality, would be actual binary)
         let mut native = Vec::with_capacity(bytecode.len() * 2);
-
-        // Add a mock native code header
-        native.extend_from_slice(b"X3JIT"); // Magic number
+        native.extend_from_slice(b"X3JIT");
         native.extend_from_slice(&(bytecode.len() as u32).to_le_bytes());
         native.extend_from_slice(bytecode);
-
         native
     }
 }

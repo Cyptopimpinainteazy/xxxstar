@@ -202,21 +202,14 @@ default-features = false
 version = "0.30.0"
 default-features = false
 
-[dependencies.xcm]
-path = "../../../polkadot/xcm"
 default-features = false
 package = "staging-xcm"
 
-[dependencies.xcm-builder]
-path = "../../../polkadot/xcm/xcm-builder"
 default-features = false
 package = "staging-xcm-builder"
 
 [dev-dependencies.assert_matches]
 version = "1.5.0"
-
-[dev-dependencies.cumulus-test-client]
-path = "../../test/client"
 
 [dev-dependencies.cumulus-test-relay-sproof-builder]
 path = "../cumulus-test-relay-sproof-builder"

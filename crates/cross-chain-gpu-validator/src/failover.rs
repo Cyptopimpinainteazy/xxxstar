@@ -24,8 +24,27 @@ impl CpuFallback {
         }
     }
 
-    pub fn validate_hash(&self, _height: u64, expected_hash: [u8; 32]) -> Result<[u8; 32]> {
-        self.kernel.hash(&expected_hash)
+    /// Validate a block hash by hashing the actual block header bytes and
+    /// comparing against the expected hash.
+    ///
+    /// `header_bytes`: raw block header bytes at the given height.
+    /// `expected_hash`: the hash this block is expected to equal.
+    ///
+    /// Returns the computed hash if it matches; returns an error otherwise.
+    pub fn validate_hash(
+        &self,
+        _height: u64,
+        header_bytes: &[u8],
+        expected_hash: [u8; 32],
+    ) -> Result<[u8; 32]> {
+        let computed = self.kernel.hash(header_bytes)?;
+        if computed != expected_hash {
+            return Err(crate::error::ValidatorError::HashMismatch {
+                expected: expected_hash,
+                actual: computed,
+            });
+        }
+        Ok(computed)
     }
 }
 

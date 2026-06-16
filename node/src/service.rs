@@ -1459,7 +1459,7 @@ pub fn new_full<
         {
             use cross_chain_gpu_validator::CrossChainValidator;
 
-            let cross_chain_validator = CrossChainValidator::new(orchestrator.clone(), 1);
+            let cross_chain_validator = CrossChainValidator::new(None, 1);
 
             task_manager.spawn_handle().spawn(
                 "cross-chain-gpu-validator",

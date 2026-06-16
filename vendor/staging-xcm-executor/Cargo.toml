@@ -107,8 +107,6 @@ default-features = false
 version = "0.1.37"
 default-features = false
 
-[dependencies.xcm]
-path = ".."
 default-features = false
 package = "staging-xcm"
 

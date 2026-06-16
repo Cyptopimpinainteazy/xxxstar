@@ -238,7 +238,11 @@ pub fn decode_evm_state_diff(diff: &StateDiff) -> Result<Vec<EvmStorageChange>, 
     if bytes.len() < 4 {
         return Err(RevertError::InvalidStateDiff);
     }
-    let entry_count = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+    let entry_count = u32::from_le_bytes(
+        bytes[..4]
+            .try_into()
+            .map_err(|_| RevertError::InvalidStateDiff)?,
+    );
     if entry_count > MAX_EVM_DIFF_ENTRIES {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -255,7 +259,11 @@ pub fn decode_evm_state_diff(diff: &StateDiff) -> Result<Vec<EvmStorageChange>, 
         if offset + 4 > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
         }
-        let old_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let old_len = u32::from_le_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .map_err(|_| RevertError::InvalidStateDiff)?,
+        ) as usize;
         offset += 4;
         if offset + old_len > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
@@ -266,7 +274,11 @@ pub fn decode_evm_state_diff(diff: &StateDiff) -> Result<Vec<EvmStorageChange>, 
         if offset + 4 > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
         }
-        let new_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let new_len = u32::from_le_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .map_err(|_| RevertError::InvalidStateDiff)?,
+        ) as usize;
         offset += 4;
         if offset + new_len > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
@@ -392,7 +404,11 @@ pub fn decode_svm_state_diff(diff: &StateDiff) -> Result<Vec<SvmStorageChange>, 
     if bytes.len() < 4 {
         return Err(RevertError::InvalidStateDiff);
     }
-    let entry_count = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+    let entry_count = u32::from_le_bytes(
+        bytes[..4]
+            .try_into()
+            .map_err(|_| RevertError::InvalidStateDiff)?,
+    );
     if entry_count > MAX_SVM_DIFF_ENTRIES {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -409,7 +425,11 @@ pub fn decode_svm_state_diff(diff: &StateDiff) -> Result<Vec<SvmStorageChange>, 
         if offset + 4 > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
         }
-        let key_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let key_len = u32::from_le_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .map_err(|_| RevertError::InvalidStateDiff)?,
+        ) as usize;
         offset += 4;
         if offset + key_len > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
@@ -420,7 +440,11 @@ pub fn decode_svm_state_diff(diff: &StateDiff) -> Result<Vec<SvmStorageChange>, 
         if offset + 4 > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
         }
-        let old_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let old_len = u32::from_le_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .map_err(|_| RevertError::InvalidStateDiff)?,
+        ) as usize;
         offset += 4;
         if offset + old_len > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
@@ -522,7 +546,11 @@ pub fn decode_x3vm_state_diff(diff: &StateDiff) -> Result<Vec<X3VmStorageChange>
     if bytes.len() < 4 {
         return Err(RevertError::InvalidStateDiff);
     }
-    let entry_count = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+    let entry_count = u32::from_le_bytes(
+        bytes[..4]
+            .try_into()
+            .map_err(|_| RevertError::InvalidStateDiff)?,
+    );
     if entry_count > MAX_X3VM_DIFF_ENTRIES {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -539,7 +567,11 @@ pub fn decode_x3vm_state_diff(diff: &StateDiff) -> Result<Vec<X3VmStorageChange>
         if offset + 4 > bytes.len() {
             return Err(RevertError::InvalidStateDiff);
         }
-        let old_len = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        let old_len = u32::from_le_bytes(
+            bytes[offset..offset + 4]
+                .try_into()
+                .map_err(|_| RevertError::InvalidStateDiff)?,
+        ) as usize;
         offset += 4;
         if old_len > 32 {
             return Err(RevertError::InvalidStateDiff);

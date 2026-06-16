@@ -94,7 +94,7 @@ version = "0.12.1"
 default-features = true
 
 [dependencies.prometheus-endpoint]
-path = "../../utils/prometheus"
+path = "../../patches/substrate-prometheus-endpoint"
 default-features = true
 package = "substrate-prometheus-endpoint"
 
@@ -180,10 +180,6 @@ version = "0.4.31"
 version = "0.5.1"
 default-features = true
 
-[dev-dependencies.cumulus-zombienet-sdk-helpers]
-path = "../../../cumulus/zombienet/zombienet-sdk-helpers"
-default-features = false
-
 [dev-dependencies.env_logger]
 version = "0.11.2"
 
@@ -206,14 +202,8 @@ default-features = false
 path = "../sp-consensus"
 default-features = true
 
-[dev-dependencies.substrate-test-runtime]
-path = "../../test-utils/runtime"
-
 [dev-dependencies.substrate-test-runtime-client]
 path = "../../test-utils/runtime/client"
-
-[dev-dependencies.substrate-test-runtime-transaction-pool]
-path = "../../test-utils/runtime/transaction-pool"
 
 [dev-dependencies.tokio]
 version = "1.45.0"

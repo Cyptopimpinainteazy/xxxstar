@@ -56,8 +56,6 @@ version = "0.1.1"
 [dependencies.futures]
 version = "0.3.31"
 
-[dependencies.gum]
-path = "../../gum"
 default-features = true
 package = "tracing-gum"
 
@@ -81,8 +79,6 @@ default-features = true
 path = "../sc-authority-discovery"
 default-features = true
 
-[dependencies.sc-network]
-path = "../../../../substrate/client/network"
 default-features = true
 
 [dependencies.sc-network-types]

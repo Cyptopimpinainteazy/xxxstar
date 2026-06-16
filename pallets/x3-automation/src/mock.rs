@@ -9,6 +9,52 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
+use std::collections::HashMap;
+
+/// Test oracle that returns a static price map.
+/// Use `set_price` to configure expected values before each test.
+pub struct TestOracle {
+    prices: HashMap<u32, u128>,
+}
+
+impl TestOracle {
+    pub fn new() -> Self {
+        Self {
+            prices: HashMap::new(),
+        }
+    }
+    pub fn set_price(&mut self, asset_id: u32, price: u128) {
+        self.prices.insert(asset_id, price);
+    }
+}
+
+impl pallet::OracleProvider for TestOracle {
+    fn get_price(asset_id: &[u8]) -> Option<u128> {
+        // Decode 4 LE bytes → u32 asset id
+        let id = u32::from_le_bytes(asset_id.try_into().ok()?);
+        // Lookup is done via a thread-local — see `with_test_oracle` below.
+        TEST_ORACLE.with(|cell| cell.borrow().prices.get(&id).copied())
+    }
+}
+
+/// Thread-local so that `OracleProvider::get_price` (a static call) can
+/// reach test-configured prices.
+std::thread_local! {
+    static TEST_ORACLE: std::cell::RefCell<TestOracle> =
+        std::cell::RefCell::new(TestOracle::new());
+}
+
+/// Run a closure with the given oracle price map.
+pub fn with_test_oracle<R>(prices: &[(u32, u128)], f: impl FnOnce() -> R) -> R {
+    let mut oracle = TestOracle::new();
+    for (id, price) in prices {
+        oracle.set_price(*id, *price);
+    }
+    TEST_ORACLE.with(|cell| {
+        *cell.borrow_mut() = oracle;
+    });
+    f()
+}
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -82,6 +128,8 @@ impl Config for Test {
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
     type WeightInfo = ();
+    type Oracle = TestOracle;
+    type CustomEvaluator = NoopCustomEvaluator;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

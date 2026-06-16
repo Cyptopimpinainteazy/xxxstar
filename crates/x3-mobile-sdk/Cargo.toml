@@ -13,7 +13,10 @@ sp-core = { workspace = true }
 sp-runtime = { workspace = true }
 substrate-api-client = "0.20"
 ed25519-zebra = "3.1"
+k256 = { version = "0.13", features = ["ecdsa"] }
 sha2 = "0.10"
+bip32 = "0.5"
+bip39 = "2.0"
 blake2 = "0.10"
 rand = "0.8"
 chrono = "0.4"

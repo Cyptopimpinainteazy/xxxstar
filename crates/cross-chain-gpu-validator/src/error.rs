@@ -19,8 +19,8 @@ pub enum ValidatorError {
     #[error("Signature verification failed")]
     SignatureVerificationFailed,
 
-    #[error("Hash mismatch: expected {expected}, got {actual}")]
-    HashMismatch { expected: String, actual: String },
+    #[error("Hash mismatch")]
+    HashMismatch { expected: [u8; 32], actual: [u8; 32] },
 
     #[error("Atomic registry error: {0}")]
     RegistryError(String),

@@ -21,7 +21,13 @@ sudo systemctl restart x3-testnet-validator
 sudo systemctl status x3-testnet-validator --no-pager
 ```
 
-Manual:
+Manual (easy):
+
+```bash
+./scripts/start-validator-easy.sh --chain deployment/chain-specs/x3-testnet-raw.json
+```
+
+Manual (legacy):
 
 ```bash
 ./quickstart-testnet.sh

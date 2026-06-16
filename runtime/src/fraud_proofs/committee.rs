@@ -23,7 +23,6 @@
 // INVARIANT: COMMITTEE-SELECT-001 — same (eligible, seed, k) always yields
 // the same output (see tests below and tests/invariants/registry.toml).
 
-
 use sp_core::H256;
 use sp_io::hashing::blake2_256;
 use sp_std::vec::Vec;

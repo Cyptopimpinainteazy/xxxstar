@@ -29,6 +29,11 @@ scale-info = { workspace = true, default-features = false }
 # Logging
 log = { workspace = true, default-features = false }
 
+# Crypto
+sha2 = { workspace = true, default-features = false }
+sha3 = { workspace = true, default-features = false }
+ripemd = { version = "0.1", default-features = false }
+
 [dev-dependencies]
 sp-io = { workspace = true }
 
@@ -43,6 +48,8 @@ std = [
     "scale-info/std",
     "log/std",
     "evm/std",
+    "sha2/std",
+    "sha3/std",
     # Frontier std propagation only when frontier feature is on
     "pallet-evm?/std",
     "fp-evm?/std",

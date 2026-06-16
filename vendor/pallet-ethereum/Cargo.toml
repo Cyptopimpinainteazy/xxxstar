@@ -140,8 +140,6 @@ git = "https://github.com/paritytech/polkadot-sdk"
 branch = "stable2512"
 default-features = false
 
-[dev-dependencies.fp-self-contained]
-path = "../../primitives/self-contained"
 features = ["default"]
 default-features = false
 

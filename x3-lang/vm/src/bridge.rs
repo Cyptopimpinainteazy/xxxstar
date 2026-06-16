@@ -2750,6 +2750,13 @@ impl BridgeAdapter for UnconfiguredBridge {
 }
 
 pub struct DryRunBridge;
+
+impl Default for DryRunBridge {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl BridgeAdapter for DryRunBridge {
     fn evm_call(&self, data: &[u8]) -> BridgeResult {
         Ok([b"dry-run-evm:".as_slice(), data].concat())
@@ -2904,6 +2911,47 @@ impl BridgeAdapter for DryRunBridge {
     note = "Use DryRunBridge explicitly for simulations or a real verifier-backed adapter for production"
 )]
 pub type MockBridge = DryRunBridge;
+
+/// Select the bridge backend based on the `X3_BACKEND` environment variable.
+///
+/// # Backend selection
+/// - `X3_BACKEND=prod` → requires a wired production adapter. Fails closed
+///   (returns an error) when no production adapter is configured, rather
+///   than silently falling back to dry-run simulation.
+/// - `X3_BACKEND=dry` (or unset) → use `DryRunBridge` for simulations.
+///
+/// Production callers must configure a backend via
+/// `resolve_bridge_backend_with()`.
+pub fn resolve_bridge_backend() -> Result<Box<dyn BridgeAdapter>, BridgeError> {
+    match std::env::var("X3_BACKEND").as_deref() {
+        Ok("prod") => Err(BridgeError {
+            code: "X3_BACKEND_PROD_NOT_CONFIGURED",
+            message: concat!(
+                "X3_BACKEND=prod requires a wired production adapter. ",
+                "No production backend is registered. ",
+                "Call resolve_bridge_backend_with() to wire a real backend, ",
+                "or set X3_BACKEND=dry for simulation."
+            )
+            .to_string(),
+        }),
+        _ => Ok(Box::new(DryRunBridge::default())),
+    }
+}
+
+/// Wire a specific production bridge backend.
+///
+/// When `X3_BACKEND=prod`, returns `Some(backend)`. Otherwise returns `None`
+/// (caller should fall back to `resolve_bridge_backend()` for the dry-run
+/// path).
+pub fn resolve_bridge_backend_with(
+    backend: Box<dyn BridgeAdapter>,
+) -> Option<Box<dyn BridgeAdapter>> {
+    if std::env::var("X3_BACKEND").as_deref() == Ok("prod") {
+        Some(backend)
+    } else {
+        None
+    }
+}
 
 fn backend_required(name: &str) -> BridgeResult {
     Err(Box::new(BridgeError {

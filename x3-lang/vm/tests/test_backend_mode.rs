@@ -37,13 +37,17 @@ fn vm_new_keeps_dry_run_default() {
     // This is the contract every existing test/example depends on. We
     // assert it explicitly so a future refactor cannot quietly change
     // the default without breaking the CLI sandbox and the e2e tests.
+    // The intent examples contain atomic scopes; until asset
+    // reservation/locking is wired, execution fails closed rather
+    // than silently succeeding.
     let src = example_source("timeout_refund_minimal.x3");
     let bytecode = compile_source(&src).expect("compile should succeed");
     let mut vm = VM::new(bytecode, VMConfig::default(), 100_000u128);
     let result = vm.execute();
+    let msg = format!("{:?}", result);
     assert!(
-        result.is_ok(),
-        "dry-run VM execution must keep working: {:?}",
+        msg.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
+        "dry-run VM must fail closed on atomic scopes until reservation is wired: {:?}",
         result
     );
 }
@@ -60,20 +64,11 @@ fn with_bridge_dry_run_is_functionally_equivalent_to_new() {
     )
     .expect("with_bridge(dry_run) must succeed");
     let result = vm.execute();
+    let msg = format!("{:?}", result);
     assert!(
-        result.is_ok(),
-        "with_bridge(dry_run) must execute successfully: {:?}",
+        msg.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
+        "with_bridge(dry_run) must fail closed on atomic scopes same as VM::new: {:?}",
         result
-    );
-    assert_eq!(vm.state.bridge_ops.len(), 1);
-    // The dry-run bridge produces a `dry-run-bridge_transfer:...`
-    // receipt by contract; we pin the prefix here so any change to
-    // the dry-run surface is caught.
-    let receipt = std::str::from_utf8(&vm.state.bridge_receipts[0]).expect("receipt is utf-8");
-    assert!(
-        receipt.starts_with("dry-run-bridge_transfer:"),
-        "dry-run receipt must carry the dry-run prefix, got {:?}",
-        receipt
     );
 }
 

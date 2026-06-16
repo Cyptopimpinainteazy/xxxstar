@@ -43,6 +43,65 @@ pub enum BridgeError {
 
     #[error("Timeout error")]
     Timeout,
+
+    #[error("Invalid header: {0}")]
+    InvalidHeader(String),
+
+    #[error("RPC error: {0}")]
+    RpcError(String),
+
+    #[error("Empty response")]
+    EmptyResponse,
+
+    #[error("BTC adapter disabled")]
+    BtcAdapterDisabled,
+}
+
+/// Make a JSON-RPC call to a chain node using the reqwest HTTP client.
+///
+/// Returns the `result` field of the JSON-RPC response, or a `BridgeError`.
+pub fn make_json_rpc_call(
+    rpc_url: &str,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, BridgeError> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| BridgeError::Network(format!("Failed to create HTTP client: {e}")))?;
+
+    let request_body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": params,
+        "id": 1
+    });
+
+    let response = client
+        .post(rpc_url)
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .map_err(|e| BridgeError::RpcError(format!("RPC request failed: {e}")))?;
+
+    let rpc_response: serde_json::Value = response
+        .json()
+        .map_err(|e| BridgeError::Serialization(format!("Invalid JSON response: {e}")))?;
+
+    if let Some(error) = rpc_response.get("error") {
+        return Err(BridgeError::RpcError(format!(
+            "RPC error: {}",
+            error
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown error")
+        )));
+    }
+
+    rpc_response
+        .get("result")
+        .cloned()
+        .ok_or(BridgeError::EmptyResponse)
 }
 
 // ── Substrate-backed adapters (SubstrateClientBalanceAdapter, PalletEscrowAdapter,

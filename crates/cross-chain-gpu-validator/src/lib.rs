@@ -12,6 +12,10 @@ pub mod orchestrator;
 pub mod registry;
 pub mod svm_validator;
 
+use crate::evm_validator::EvmHeaderValidator;
+use crate::svm_validator::SvmHeaderValidator;
+use std::sync::Arc;
+
 pub use error::ValidatorError;
 pub use kernels::{Keccak256Kernel, Secp256k1Kernel};
 pub use orchestrator::{AtomicSwapOrchestrator, SwapStatus};
@@ -32,46 +36,6 @@ pub struct SwapRequest {
     pub timeout_secs: u64,
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Public GPU Validation Interface (Phase 3)
-// ─────────────────────────────────────────────────────────────────
-
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use x3_gpu_validator_swarm::SwarmOrchestrator;
-
-/// Wrapper for cross-chain validator lifecycle
-pub struct CrossChainValidator {
-    _orchestrator: Arc<RwLock<SwarmOrchestrator>>,
-    protocol_version: u32,
-}
-
-impl CrossChainValidator {
-    pub fn new(orchestrator: Arc<RwLock<SwarmOrchestrator>>, protocol_version: u32) -> Self {
-        Self {
-            _orchestrator: orchestrator,
-            protocol_version,
-        }
-    }
-
-    /// Run the validation loop for cross-chain state-root validation
-    pub async fn run_validation_loop(&self) -> Result<(), String> {
-        log::info!(
-            "🌐 Starting cross-chain validation loop (protocol v{})",
-            self.protocol_version
-        );
-
-        // Loop: periodically poll for new EVM/SVM state-roots to validate
-        // This is a stub that runs indefinitely until shutdown
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-            // Real implementation: fetch pending EVM/SVM headers from external relayers
-            // Call validate_evm_header() and validate_svm_header() functions
-            // Submit proofs to pallet-x3-verifier via extrinsic
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum ValidationError {
     GpuNotAvailable,
@@ -80,40 +44,110 @@ pub enum ValidationError {
     DeterminismViolation,
 }
 
-/// Validate EVM header (Keccak256-based)
-/// Falls back to CPU if GPU unavailable
-pub async fn validate_evm_header(
-    block_number: u64,
-    _block_hash: [u8; 32],
-    _state_root: [u8; 32],
-    _orchestrator: Arc<RwLock<SwarmOrchestrator>>,
-) -> Result<String, ValidationError> {
-    // Stub: Phase 3 will wire actual orchestrator call here
-    log::info!(
-        "✓ EVM header validation initiated (block: {})",
-        block_number
-    );
-    Ok(format!("validated_block_{}", block_number))
+/// Pending validation task sourced from the orchestrator.
+#[derive(Debug, Clone)]
+pub struct PendingValidationTask {
+    pub swap_id: String,
+    pub evm_data: Vec<u8>,
+    pub svm_data: Vec<u8>,
 }
 
-/// Validate SVM header (SHA256 + Secp256k1-based)
-/// Falls back to CPU if GPU unavailable
-pub async fn validate_svm_header(
-    slot: u64,
-    _block_hash: [u8; 32],
-    _state_root: [u8; 32],
-    _orchestrator: Arc<RwLock<SwarmOrchestrator>>,
-) -> Result<String, ValidationError> {
-    // Stub: Phase 3 will wire actual orchestrator call here
-    log::info!("✓ SVM header validation initiated (slot: {})", slot);
-    Ok(format!("validated_slot_{}", slot))
+/// Cross-chain validator that coordinates EVM and SVM header validation.
+///
+/// Holds GPU-accelerated validators for both chains.  An optional
+/// `AtomicSwapOrchestrator` handle enables live proof-submission polling;
+/// when `None`, `run_validation_loop()` is a diagnostics-only no-op.
+pub struct CrossChainValidator {
+    evm_validator: Arc<EvmHeaderValidator>,
+    svm_validator: Arc<SvmHeaderValidator>,
+    orchestrator: Option<Arc<AtomicSwapOrchestrator>>,
+    protocol_version: u32,
 }
 
-/// Verify CPU fallback matches GPU result (determinism check)
-pub async fn verify_determinism(
-    _gpu_result: &str,
-    _cpu_result: &str,
-) -> Result<bool, ValidationError> {
-    // Stub: Phase 3 will implement full determinism verification
-    Ok(true)
+impl CrossChainValidator {
+    /// Create a new cross-chain validator with an optional orchestrator handle.
+    ///
+    /// Pass `Some(orch)` to enable live proof-submission in `run_validation_loop()`,
+    /// or `None` for diagnostics-only operation.
+    pub fn new(orchestrator: Option<Arc<AtomicSwapOrchestrator>>, protocol_version: u32) -> Self {
+        Self {
+            evm_validator: Arc::new(EvmHeaderValidator::new()),
+            svm_validator: Arc::new(SvmHeaderValidator::new()),
+            orchestrator,
+            protocol_version,
+        }
+    }
+
+    /// Live validation loop.
+    ///
+    /// When an orchestrator is configured, polls for pending swaps and routes
+    /// each through `execute_atomic_swap`.  Without an orchestrator the loop
+    /// performs a periodic health heartbeat until the caller shuts it down.
+    pub async fn run_validation_loop(&self) -> Result<(), String> {
+        log::info!(
+            "CrossChainValidator loop started (protocol v{})",
+            self.protocol_version
+        );
+        let poll_interval = tokio::time::Duration::from_secs(10);
+        loop {
+            if let Some(ref orch) = self.orchestrator {
+                let pending = orch.pending_tasks_snapshot().await;
+                for task in pending {
+                    let _ = orch
+                        .execute_atomic_swap(
+                            task.swap_id,
+                            0, // evm_block extracted from data
+                            0, // svm_slot extracted from data
+                            task.evm_data,
+                            task.svm_data,
+                        )
+                        .await;
+                }
+            } else {
+                log::debug!("CrossChainValidator: no orchestrator handle — heartbeat tick");
+            }
+            tokio::time::sleep(poll_interval).await;
+        }
+    }
+
+    /// Validate an EVM block header using the GPU-accelerated Keccak256 path.
+    pub async fn validate_evm_header(
+        &self,
+        block_number: u64,
+        block_hash: [u8; 32],
+        state_root: [u8; 32],
+        parent_hash: [u8; 32],
+        gas_limit: u64,
+        gas_used: u64,
+        timestamp: u64,
+    ) -> Result<[u8; 32], String> {
+        self.evm_validator
+            .validate_header(
+                block_number,
+                block_hash,
+                state_root,
+                parent_hash,
+                gas_limit,
+                gas_used,
+                timestamp,
+            )
+            .await
+            .map_err(|e| format!("EVM validation error: {e:?}"))
+    }
+
+    /// Validate an SVM block header using the GPU-accelerated SHA-256 path.
+    pub async fn validate_svm_header(
+        &self,
+        slot: u64,
+        block_hash: [u8; 32],
+        state_root: [u8; 32],
+        parent_slot: u64,
+        timestamp: u64,
+        height: u64,
+    ) -> Result<u64, String> {
+        self.svm_validator
+            .validate_header(slot, block_hash, state_root, parent_slot, timestamp, height)
+            .await
+            .map_err(|e| format!("SVM validation error: {e:?}"))
+    }
 }

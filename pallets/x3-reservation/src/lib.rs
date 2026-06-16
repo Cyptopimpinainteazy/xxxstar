@@ -14,7 +14,6 @@
 //! - Detect frozen lane before reserving (returns `LaneFrozen`).
 //! - Increment / decrement the unsettled-notional counters in `pallet-x3-inventory`.
 
-
 pub use pallet::*;
 
 #[cfg(test)]

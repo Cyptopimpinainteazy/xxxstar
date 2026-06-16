@@ -101,7 +101,7 @@ path = "../sp-inherents"
 default-features = false
 
 [dependencies.sp-runtime]
-path = "../../runtime"
+path = "../sp-runtime"
 default-features = false
 
 [dependencies.sp-timestamp]

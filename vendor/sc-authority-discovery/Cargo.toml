@@ -58,7 +58,7 @@ version = "0.4.22"
 default-features = true
 
 [dependencies.prometheus-endpoint]
-path = "../../utils/prometheus"
+path = "../../patches/substrate-prometheus-endpoint"
 default-features = true
 package = "substrate-prometheus-endpoint"
 
@@ -73,8 +73,6 @@ default-features = true
 path = "../sc-client-api"
 default-features = true
 
-[dependencies.sc-network]
-path = "../network"
 default-features = true
 
 [dependencies.sc-network-types]

@@ -72,6 +72,10 @@ pub mod pallet {
         #[pallet::constant]
         type MaxSeedLength: Get<u32>;
 
+        /// Origin that can fulfill randomness requests.
+        /// Typically a designated off-chain worker or governance origin.
+        type FulfillerOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
         /// Weight information for extrinsics
         type WeightInfo: WeightInfo;
     }
@@ -239,7 +243,7 @@ pub mod pallet {
         #[pallet::call_index(1)]
         #[pallet::weight(T::WeightInfo::fulfill_randomness())]
         pub fn fulfill_randomness(origin: OriginFor<T>, request_id: H256) -> DispatchResult {
-            let _ = ensure_signed(origin)?; // In production, check if authorized fulfiller
+            T::FulfillerOrigin::ensure_origin(origin)?;
 
             // Check not already fulfilled (do this first, before checking pending)
             ensure!(

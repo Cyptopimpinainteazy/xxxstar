@@ -46,7 +46,7 @@ version = "0.4.22"
 default-features = true
 
 [dependencies.prometheus-endpoint]
-path = "../../utils/prometheus"
+path = "../../patches/substrate-prometheus-endpoint"
 default-features = true
 package = "substrate-prometheus-endpoint"
 

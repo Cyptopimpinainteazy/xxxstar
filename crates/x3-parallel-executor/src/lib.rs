@@ -170,10 +170,7 @@ impl ParallelExecutor {
                     });
                 }
                 _ => {
-                    events.push(Event {
-                        topic: b"noop".to_vec(),
-                        data: instruction.operands.clone(),
-                    });
+                    return Err(ExecutionError::TransactionFailed);
                 }
             }
         }

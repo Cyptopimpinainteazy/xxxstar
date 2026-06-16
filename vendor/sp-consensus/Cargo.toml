@@ -53,7 +53,7 @@ path = "../sp-inherents"
 default-features = true
 
 [dependencies.sp-runtime]
-path = "../../runtime"
+path = "../sp-runtime"
 default-features = true
 
 [dependencies.sp-state-machine]

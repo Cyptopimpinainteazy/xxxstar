@@ -123,7 +123,7 @@ fn cli_build_produces_aligned_bytecode() {
 }
 
 #[test]
-fn cli_run_executes_bytecode() {
+fn cli_run_rejects_atomic_bytecode_until_reservation_wired() {
     let src = write_fixture("cli_run.x3", GOOD_SOURCE);
     let bytecode = std::env::temp_dir().join("cli_run.x3b");
     let _ = x3c()
@@ -133,8 +133,16 @@ fn cli_run_executes_bytecode() {
         .arg(&bytecode)
         .status()
         .expect("build");
-    let status = x3c().arg("run").arg(&bytecode).status().expect("x3c run");
-    assert!(status.success(), "run must succeed on good bytecode");
+    let out = x3c().arg("run").arg(&bytecode).output().expect("x3c run");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !out.status.success(),
+        "run must fail closed on atomic bytecode until reservation/locking is wired"
+    );
+    assert!(
+        stderr.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
+        "run error must mention atomic begin, got stderr: {stderr}"
+    );
 }
 
 #[test]

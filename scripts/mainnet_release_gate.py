@@ -135,23 +135,25 @@ def check_chain_spec_artifacts() -> None:
 # ── 4. Critical runtime & pallet test suites ─────────────────────────────────
 
 TEST_PACKAGES = [
-    "-p x3-chain-runtime",
-    "-p x3-supply-ledger",
-    "-p x3-packet-standard",
-    "-p x3-bridge",
-    "-p x3-fees",
-    "-p x3-slash",
+    # Each entry: (cargo-flag, pkg-name, features-list)
+    ("-p", "x3-chain-runtime", ["--features", "try-runtime"]),
+    ("-p", "pallet-x3-supply-ledger", []),
+    ("-p", "x3-packet-standard", []),
+    ("-p", "x3-bridge", []),
+    ("-p", "x3-fees", []),
+    ("-p", "pallet-x3-slash", []),
 ]
 
 
 def check_test_suites() -> None:
     print("\n── 4. Critical runtime & pallet test suites ──")
-    # Only unit tests (no --test flag for integration) to keep gate fast
-    for pkg_spec in TEST_PACKAGES:
-        pkg_name = pkg_spec.replace("-p ", "")
+    for _flag, pkg_name, features in TEST_PACKAGES:
         print(f"  running tests for {pkg_name}...")
-        result = run(["cargo", "test", pkg_spec, "--lib", "--no-fail-fast", "-q", "--",
-                       "--nocapture"])
+        cmd = ["cargo", "test", "-p", pkg_name, "--lib", "--no-fail-fast", "-q"]
+        if features:
+            cmd.extend(features)
+        cmd.extend(["--", "--nocapture"])
+        result = run(cmd)
         if result.returncode != 0:
             # Show last 20 lines of test output on failure
             lines = result.stdout.splitlines()[-20:]

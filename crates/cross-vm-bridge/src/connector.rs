@@ -356,8 +356,9 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
 
     #[cfg(not(feature = "std"))]
     fn get_evm_balance(&self, _address: &[u8; 20]) -> u128 {
-        // In no_std mode, return a default value
-        u128::MAX
+        // no_std builds have no RPC access; report zero balance so callers
+        // cannot believe an account has unlimited funds.
+        0u128
     }
 
     #[cfg(feature = "std")]
@@ -393,8 +394,9 @@ impl CrossVmDispatcher for LiveNodeDispatcher {
 
     #[cfg(not(feature = "std"))]
     fn get_svm_balance(&self, _pubkey: &[u8; 32]) -> u64 {
-        // In no_std mode, return a default value
-        u64::MAX
+        // no_std builds have no RPC access; report zero balance so callers
+        // cannot believe an account has unlimited funds.
+        0u64
     }
 
     fn get_evm_bridge_escrow(&self) -> [u8; 20] {

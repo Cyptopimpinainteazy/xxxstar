@@ -109,9 +109,6 @@ default-features = true
 path = "../sp-core"
 default-features = true
 
-[dev-dependencies.substrate-test-utils]
-path = "../../test-utils"
-
 [lints.clippy.all]
 level = "allow"
 priority = 0

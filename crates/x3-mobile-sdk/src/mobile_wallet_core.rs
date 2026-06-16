@@ -135,13 +135,16 @@ impl MobileWallet {
             return Err(SdkError::InvalidAddress);
         }
 
-        // In production, use BIP32 library to derive actual keys
-        // For now, use seed hash as placeholder
-        let mut seed_hash = sha2::Sha256::digest(seed_phrase.as_bytes()).to_vec();
-        let public_key = seed_hash.clone();
-        
-        // Clear sensitive data
-        seed_hash.zeroize();
+        // BIP-39 mnemonic -> seed -> BIP-32 derived keypair
+        let mnemonic = bip39::Mnemonic::from_phrase(seed_phrase, bip39::Language::English)
+            .map_err(|_| SdkError::InvalidAddress)?;
+        let seed = bip39::Seed::new(&mnemonic, "");
+        let xpriv = bip32::XPrv::derive_from_path(
+            seed.as_bytes(),
+            &derivation_path.parse().map_err(|_| SdkError::InvalidAddress)?,
+        )
+        .map_err(|_| SdkError::InvalidAddress)?;
+        let public_key = xpriv.public_key().to_bytes();
 
         let address = format!("x3:{}", hex::encode(&public_key[0..20]));
         let now = chrono::Utc::now().timestamp();

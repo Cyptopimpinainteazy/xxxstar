@@ -16,7 +16,6 @@
 // INVARIANT: FREEZE-002 — once frozen, only a governance extrinsic
 // (verified via `FreezeReason::GovernanceUnfreeze`) can unfreeze.
 
-
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_std::vec::Vec;

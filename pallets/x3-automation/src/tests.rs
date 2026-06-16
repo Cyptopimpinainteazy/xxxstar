@@ -144,3 +144,72 @@ fn execute_task_condition_not_met() {
         );
     });
 }
+
+#[test]
+fn price_threshold_task_triggers_when_oracle_crosses_threshold() {
+    let asset_id = 1u32;
+    // Set oracle price to 1500 (above threshold of 1000, direction: above=true).
+    with_test_oracle(&[(asset_id, 1500)], || {
+        new_test_ext().execute_with(|| {
+            let condition = Condition::PriceThreshold {
+                asset_id,
+                threshold: 1000,
+                above: true,
+            };
+            let action = Action::Custom({
+                let mut a = [0u8; 64];
+                a[..3].copy_from_slice(&[9, 8, 7]);
+                a
+            });
+
+            assert_ok!(Automation::register_task(
+                RuntimeOrigin::signed(1),
+                condition,
+                action,
+                1000
+            ));
+
+            let task_id = Automation::account_tasks(1)[0];
+
+            // Price is above threshold → condition should be satisfied.
+            assert_ok!(
+                Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            );
+        });
+    });
+}
+
+#[test]
+fn price_threshold_task_blocked_when_oracle_below_threshold() {
+    let asset_id = 2u32;
+    // Set oracle price to 500 (below threshold of 1000, direction: above=true).
+    with_test_oracle(&[(asset_id, 500)], || {
+        new_test_ext().execute_with(|| {
+            let condition = Condition::PriceThreshold {
+                asset_id,
+                threshold: 1000,
+                above: true,
+            };
+            let action = Action::Custom({
+                let mut a = [0u8; 64];
+                a[..3].copy_from_slice(&[5, 5, 5]);
+                a
+            });
+
+            assert_ok!(Automation::register_task(
+                RuntimeOrigin::signed(1),
+                condition,
+                action,
+                1000
+            ));
+
+            let task_id = Automation::account_tasks(1)[0];
+
+            // Price is below threshold → condition not met.
+            assert_noop!(
+                Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+                Error::<Test>::ConditionNotMet
+            );
+        });
+    });
+}

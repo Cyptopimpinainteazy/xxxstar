@@ -18,6 +18,10 @@ parity-scale-codec = { workspace = true, default-features = false }
 scale-info = { workspace = true, default-features = false }
 ed25519-dalek = { version = "2.1", default-features = false, features = ["alloc"] }
 
+# Hashing for syscall implementations
+sha2 = { workspace = true, default-features = false }
+sha3 = { workspace = true, default-features = false }
+
 # Logging
 log = { workspace = true, default-features = false }
 
@@ -42,6 +46,8 @@ std = [
     "sp-io/std",
     "parity-scale-codec/std",
     "scale-info/std",
+    "sha2/std",
+    "sha3/std",
     "log/std",
     "solana_rbpf",
 ]

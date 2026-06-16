@@ -65,8 +65,6 @@ package = "prioritized-metered-channel"
 path = "../polkadot-primitives"
 default-features = true
 
-[dependencies.prometheus-endpoint]
-path = "../../../substrate/utils/prometheus"
 default-features = true
 package = "substrate-prometheus-endpoint"
 
@@ -98,8 +96,6 @@ features = [
 ]
 default-features = false
 
-[dev-dependencies.polkadot-test-service]
-path = "../test/service"
 features = ["runtime-metrics"]
 
 [dev-dependencies.prometheus-parse]

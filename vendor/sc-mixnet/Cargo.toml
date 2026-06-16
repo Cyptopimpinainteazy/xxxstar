@@ -75,8 +75,6 @@ default-features = true
 path = "../sc-client-api"
 default-features = true
 
-[dependencies.sc-network]
-path = "../network"
 default-features = true
 
 [dependencies.sc-network-types]

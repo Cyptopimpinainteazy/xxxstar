@@ -100,4 +100,6 @@ def test_x3_emitter_builds_settlement_payload_and_proof_bundle():
     assert x3['transaction_bytes'].startswith('0x')
     assert x3['proof_bundle']['bundle_version'] == '0.1'
     assert isinstance(x3['proof_bundle']['signatures'], list)
-    assert x3['proof_bundle']['signatures'][0]['validator'] == 'x3-validator-1'
+    # The emitter must never fabricate validator signatures/signing keys.
+    assert x3['proof_bundle']['signatures'] == []
+    assert x3['proof_bundle'].get('error_code') == 'X3_PROOF_REQUIRED'

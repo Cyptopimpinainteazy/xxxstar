@@ -157,11 +157,54 @@ impl<T: Config + Send + Sync + 'static> AgentLawCheck<T> {
     fn extract_requested_capability(
         call: &<T as frame_system::Config>::RuntimeCall,
     ) -> Option<Vec<u8>> {
-        // TODO: map runtime calls to agent capability labels.
-        // This currently returns `None` for generic calls and should be extended
-        // as the capability model is integrated with X3 call routing.
-        let _ = call;
-        None
+        // Map RuntimeCall prefix bytes to capability labels.
+        // FRAME encodes each call as [pallet_index: u8][call_index: u8][args...].
+        let encoded = call.encode();
+        if encoded.len() < 2 {
+            return None;
+        }
+        let pallet_idx = encoded[0];
+        let call_idx = encoded[1];
+
+        // Known pallet index → capability mapping.
+        // These indices MUST be kept in sync with the runtime's `construct_runtime!`
+        // ordering.  The runtime at the time of writing is:
+        //
+        //   System:0  Timestamp:1  Balances:2  AgentLaw:10  X3Automation:11
+        //   X3Vrf:12  X3Kernel:20  X3Sequencer:21  X3Coin:22
+        //   X3AtomicKernel:23  SvmRuntime:30  Evm:31  Governance:40
+        //   X3Court:41
+        let label: &[u8] = match (pallet_idx, call_idx) {
+            // Balances: transfer
+            (2, 0) => b"balances.transfer",
+            (2, 1) => b"balances.transfer_keep_alive",
+            // Agent Law: register/modify policies
+            (10, _) => b"x3_agent_law.manage",
+            // X3 Automation: schedule/execute tasks
+            (11, _) => b"x3_automation.task",
+            // X3 VRF: request randomness
+            (12, _) => b"x3_vrf.request",
+            // X3 Kernel: cross-VM settlement
+            (20, _) => b"x3_kernel.settle",
+            // X3 Sequencer: bundle sequencing
+            (21, _) => b"x3_sequencer.sequence",
+            // X3 Coin: mint/burn
+            (22, _) => b"x3_coin.supply",
+            // X3 Atomic Kernel: atomic bundles
+            (23, _) => b"x3_atomic_kernel.bundle",
+            // SVM Runtime: deploy/execute SVM programs
+            (30, _) => b"svm_runtime.execute",
+            // EVM: call/create
+            (31, 0) => b"evm.call",
+            (31, 1) => b"evm.create",
+            // Governance: propose/vote
+            (40, _) => b"governance.vote",
+            // X3 Court: file/decide cases
+            (41, _) => b"x3_court.adjudicate",
+            // Default: use generic pallet label
+            _ => return None,
+        };
+        Some(label.to_vec())
     }
 }
 

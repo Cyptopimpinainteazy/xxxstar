@@ -132,18 +132,20 @@ def run(input_path, no_schema=False, mock_rpc=False, dry_run=False, proof_bundle
     planner = load_module(os.path.join(root, 'planner.py'))
     simulator = load_module(os.path.join(root, 'simulator.py'))
     emitter = load_module(os.path.join(root, 'emitter', '__init__.py'))
+    # Mode selection:
+    #   --dry-run / --mock-rpc / X3_LANG_DRY_RUN=1  -> explicit simulation
+    #   --production / X3_LANG_PRODUCTION=1 / X3_LANG_LEGACY=1 -> explicit opt-in to legacy failure path
+    #   default                                     -> production (fail closed)
+    # The old default silently routed production traffic through the dry-run
+    # adapter; that is now forbidden to avoid silent partial settlement.
     mock_rpc_module = None
-    # Without --dry-run/--mock-rpc the runner refuses to claim production settlement.
-    # The default 'safe mode' executes through the dry-run adapter so that callers
-    # always receive a structured execution trace instead of an X3_BACKEND_REQUIRED
-    # rejection. The legacy semantics can be restored by passing --production
-    # (which explicitly opts into the no-backend failure path).
-    production_mode = False
-    if mock_rpc or dry_run:
-        dry_run = True
-        mock_rpc_module = load_module(os.path.join(root, 'mock_rpc.py'))
-    elif os.environ.get('X3_LANG_PRODUCTION') == '1':
-        production_mode = True
+    explicit_dry_run = bool(mock_rpc or dry_run or os.environ.get('X3_LANG_DRY_RUN') == '1')
+    explicit_production = bool(
+        os.environ.get('X3_LANG_PRODUCTION') == '1'
+        or os.environ.get('X3_LANG_LEGACY') == '1'
+    )
+    dry_run = explicit_dry_run
+    production_mode = not dry_run
 
     intent = cli.parse_file(input_path)
     if not no_schema:
@@ -168,39 +170,24 @@ def run(input_path, no_schema=False, mock_rpc=False, dry_run=False, proof_bundle
     execution = []
     failed = False
     rollback_payloads = []
-    if mock_rpc_module:
-        execution = mock_rpc_module.execute_dry_run(emitted.get('emitted', []))
-        failed = any(not e.get('ok', False) for e in execution)
-        for e in execution:
-            if not e.get('ok', False) and 'reason' not in e:
-                e['reason'] = 'mock rpc failure'
-    elif os.environ.get('X3_LANG_LEGACY') == '1' or os.environ.get('X3_LANG_PRODUCTION') == '1':
-        # Legacy test path: explicit production failure when no backend is
-        # configured. Selected via X3_LANG_PRODUCTION=1 or X3_LANG_LEGACY=1.
-        production_mode = True
-        for out in emitted.get('emitted', []):
-            if out.get('error'):
-                execution.append({'ok': False, 'reason': out.get('error'), 'step': out})
-                failed = True
-                break
-            execution.append({'ok': False, 'reason': 'production backend not configured', 'code': 'X3_BACKEND_REQUIRED', 'step': out}); failed = True; break
-    elif not production_mode:
-        # Safe default: route through the dry-run adapter so callers get a
-        # structured trace without forcing a backend connection.
+    if dry_run:
         mock_rpc_module = load_module(os.path.join(root, 'mock_rpc.py'))
         execution = mock_rpc_module.execute_dry_run(emitted.get('emitted', []))
         failed = any(not e.get('ok', False) for e in execution)
         for e in execution:
             if not e.get('ok', False) and 'reason' not in e:
                 e['reason'] = 'mock rpc failure'
-    else:
+    elif explicit_production or production_mode:
+        # Production settlement requires a wired backend. Fail closed; do not
+        # silently downgrade to the dry-run adapter.
         for out in emitted.get('emitted', []):
-            # simple rule: if emitted contains 'error' field, mark failure
             if out.get('error'):
                 execution.append({'ok': False, 'reason': out.get('error'), 'step': out})
                 failed = True
                 break
-            execution.append({'ok': False, 'reason': 'production backend not configured', 'code': 'X3_BACKEND_REQUIRED', 'step': out}); failed = True; break
+            execution.append({'ok': False, 'reason': 'production backend not configured', 'code': 'X3_BACKEND_REQUIRED', 'step': out})
+            failed = True
+            break
 
     if failed:
         # produce rollback payloads: naive inverse of emitted steps

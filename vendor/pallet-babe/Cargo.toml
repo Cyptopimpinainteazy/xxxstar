@@ -171,8 +171,6 @@ default-features = true
 path = "../pallet-staking"
 default-features = true
 
-[dev-dependencies.pallet-staking-reward-curve]
-path = "../staking/reward-curve"
 default-features = true
 
 [dev-dependencies.sp-core]

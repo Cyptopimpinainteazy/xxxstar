@@ -66,12 +66,10 @@ impl Precompile for Sha256Precompile {
     }
 
     fn call(&self, input: &[u8]) -> PrecompileResult {
-        // Deterministic stub: XOR-fold into 32 bytes (real impl uses sha2 crate)
-        let mut out = [0u8; 32];
-        for (i, &b) in input.iter().enumerate() {
-            out[i % 32] ^= b;
-        }
-        Ok(out.to_vec())
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(input);
+        Ok(hasher.finalize().to_vec())
     }
 }
 
@@ -90,14 +88,10 @@ impl Precompile for Keccak256Precompile {
     }
 
     fn call(&self, input: &[u8]) -> PrecompileResult {
-        // Stub: djb2 hash into 32 bytes
-        let mut hash: u64 = 5381;
-        for &b in input {
-            hash = hash.wrapping_mul(33).wrapping_add(b as u64);
-        }
-        let mut out = [0u8; 32];
-        out[24..32].copy_from_slice(&hash.to_le_bytes());
-        Ok(out.to_vec())
+        use sha3::{Digest, Keccak256};
+        let mut hasher = Keccak256::new();
+        hasher.update(input);
+        Ok(hasher.finalize().to_vec())
     }
 }
 

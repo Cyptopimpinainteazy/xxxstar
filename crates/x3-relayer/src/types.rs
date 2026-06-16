@@ -94,12 +94,24 @@ pub struct EvmProof {
     pub proof_nonce: u32,
 }
 
+/// A single validator attestation: identity key and its Ed25519 signature
+/// over the SVM proof payload (BLAKE2b-256 hash of `slot || blockhash`).
+#[derive(Clone, Debug)]
+pub struct ValidatorSignature {
+    /// Compressed Ed25519 public key of the signing validator (32 bytes).
+    pub validator_pubkey: [u8; 32],
+    /// Ed25519 signature over the proof payload (64 bytes).
+    pub signature: [u8; 64],
+}
+
 #[derive(Clone, Debug)]
 pub struct SvmProof {
     pub source_domain: u32,
     pub slot: u64,
     pub blockhash: [u8; 32],
-    pub validator_signatures: Vec<[u8; 32]>,
+    /// Individual validator attestations (each carries a real 64-byte Ed25519 sig).
+    pub validator_signatures: Vec<ValidatorSignature>,
+    /// Number of distinct validators required for quorum (derived from runtime config).
     pub required_signatures: u32,
 }
 

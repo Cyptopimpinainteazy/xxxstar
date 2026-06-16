@@ -67,7 +67,7 @@ path = "../sc-executor"
 default-features = true
 
 [dependencies.sc-network]
-path = "../network"
+workspace = true
 default-features = true
 
 [dependencies.sc-telemetry]
@@ -136,7 +136,8 @@ path = "../sp-keyring"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime]
-path = "../../test-utils/runtime"
+git = "https://github.com/paritytech/polkadot-sdk"
+branch = "stable2512"
 
 [lints.clippy.all]
 level = "allow"

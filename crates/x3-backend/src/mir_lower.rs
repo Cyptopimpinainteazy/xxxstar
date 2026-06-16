@@ -365,9 +365,12 @@ impl MirBytecodeCompiler {
             BinaryOp::LogicalAnd => self.emitter.emit_land(dst, left, right),
             BinaryOp::LogicalOr => self.emitter.emit_lor(dst, left, right),
             BinaryOp::Pow => {
-                // Pow is not a single opcode - would need a runtime call
-                // For now, emit a placeholder (mul for x^2 patterns could be optimized)
-                self.emitter.emit_mul_i(dst, left, right); // Placeholder
+                // Emit a runtime call to the built-in `Pow` handler.
+                // The VM executor dispatches `CallBuiltin(Pow)` as a hostcall
+                // with the base (left) and exponent (right) as arguments.
+                self.emitter.emit_call(dst, FuncIdx(0xFFFF), &[left, right]);
+                // TODO: Define a dedicated Pow opcode (e.g. 0x60) and wire
+                // the VM executor to handle it via a pow_i64 hostcall.
             }
         }
         Ok(())

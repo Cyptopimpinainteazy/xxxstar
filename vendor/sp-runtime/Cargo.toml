@@ -196,7 +196,7 @@ path = "../sp-state-machine"
 default-features = true
 
 [dev-dependencies.sp-tracing]
-path = "../tracing"
+path = "../sp-tracing"
 default-features = true
 
 [dev-dependencies.substrate-test-runtime-client]

@@ -101,9 +101,6 @@ package = "parity-scale-codec"
 version = "1.0.15"
 default-features = true
 
-[dev-dependencies.sc-runtime-test]
-path = "../runtime-test"
-
 [dev-dependencies.sp-io]
 path = "../sp-io"
 default-features = true

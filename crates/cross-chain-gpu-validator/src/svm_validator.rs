@@ -32,15 +32,11 @@ impl SvmHeaderValidator {
     ///
     /// Validates:
     /// - Slot number
-    /// - Block hash (SHA256 of header)
+    /// - Block hash (SHA256 of serialized header fields)
     /// - State root
     /// - Parent slot
     /// - Timestamp
-    /// - Hash (block hash)
     /// - Height
-    /// - Transactions root
-    /// - rewards
-    /// - block_height
     ///
     /// Returns the validated slot number if successful.
     pub async fn validate_header(
@@ -55,8 +51,17 @@ impl SvmHeaderValidator {
         // Validate basic header fields
         self.validate_basic_fields(slot, block_hash, state_root, parent_slot, timestamp, height)?;
 
-        // Validate block hash using GPU or CPU fallback
-        self.validate_hash(slot, block_hash)?;
+        // Build deterministic header serialization so the hash is computed
+        // from real header content, not from the asserted hash itself.
+        let mut header_bytes = Vec::with_capacity(104);
+        header_bytes.extend_from_slice(&slot.to_le_bytes());
+        header_bytes.extend_from_slice(&parent_slot.to_le_bytes());
+        header_bytes.extend_from_slice(&timestamp.to_le_bytes());
+        header_bytes.extend_from_slice(&height.to_le_bytes());
+        header_bytes.extend_from_slice(&state_root);
+
+        // Validate block hash using GPU or CPU fallback on real header bytes.
+        self.validate_hash(slot, &header_bytes, block_hash)?;
 
         Ok(slot)
     }
@@ -84,11 +89,6 @@ impl SvmHeaderValidator {
             ));
         }
 
-        if height == 0 && slot != 0 {
-            // Genesis block has height 0, other blocks should have height > 0
-            // This is a simplified check - real implementation would verify block height
-        }
-
         // State root must be non-zero for non-genesis blocks
         if slot > 0 && state_root == [0u8; 32] {
             return Err(ValidatorError::Validation(
@@ -106,13 +106,21 @@ impl SvmHeaderValidator {
         Ok(())
     }
 
-    /// Validate block hash using GPU or CPU fallback
-    fn validate_hash(&self, slot: u64, expected_hash: [u8; 32]) -> Result<(), ValidatorError> {
+    /// Validate block hash using GPU or CPU fallback.
+    ///
+    /// `header_bytes` is the serialized block header content whose hash
+    /// must equal `expected_hash`.
+    fn validate_hash(
+        &self,
+        slot: u64,
+        header_bytes: &[u8],
+        expected_hash: [u8; 32],
+    ) -> Result<(), ValidatorError> {
         match &self.gpu_kernel {
             Some(kernel) => {
-                // Use GPU for hash validation
-                let result = kernel.hash(&expected_hash)?;
-                if result == expected_hash {
+                // Hash the real serialized header bytes via GPU.
+                let computed = kernel.hash(header_bytes)?;
+                if computed == expected_hash {
                     Ok(())
                 } else {
                     Err(ValidatorError::Validation(
@@ -121,12 +129,43 @@ impl SvmHeaderValidator {
                 }
             }
             None => {
-                // Fall back to CPU validation
+                // CPU fallback hashes the real header bytes.
                 self.cpu_fallback
-                    .validate_hash(slot, expected_hash)
+                    .validate_hash(slot, header_bytes, expected_hash)
                     .map(|_| ())
             }
         }
+    }
+
+    /// Validate an SVM slot against expected blockhash and prev blockhash.
+    ///
+    /// This is the method used by the orchestrator's `validate_svm_side`.
+    /// It builds deterministic header bytes from the supplied fields and
+    /// verifies that the hash matches the expected `blockhash`.
+    pub fn validate_slot(
+        &self,
+        slot: u64,
+        blockhash: [u8; 32],
+        prev_blockhash: [u8; 32],
+    ) -> Result<bool, ValidatorError> {
+        // Reject zero/invalid slots
+        if slot == 0 {
+            return Err(ValidatorError::Validation(
+                "slot cannot be zero".to_string(),
+            ));
+        }
+        if blockhash == [0u8; 32] || prev_blockhash == [0u8; 32] {
+            return Err(ValidatorError::Validation(
+                "blockhash or prev_blockhash cannot be zero".to_string(),
+            ));
+        }
+
+        // Build serialized header bytes so the hash is computed from real data.
+        let mut header_bytes = Vec::with_capacity(72);
+        header_bytes.extend_from_slice(&slot.to_le_bytes());
+        header_bytes.extend_from_slice(&prev_blockhash);
+        self.validate_hash(slot, &header_bytes, blockhash)?;
+        Ok(true)
     }
 
     /// Verify determinism between GPU and CPU results
@@ -142,6 +181,17 @@ impl SvmHeaderValidator {
         }
 
         Ok(gpu_result == cpu_result)
+    }
+
+    /// Validate raw header bytes: hash the provided bytes and check that the
+    /// result matches `expected_hash`.
+    pub fn validate_raw_header(
+        &self,
+        slot: u64,
+        header_bytes: &[u8],
+        expected_hash: [u8; 32],
+    ) -> Result<(), ValidatorError> {
+        self.validate_hash(slot, header_bytes, expected_hash)
     }
 }
 
@@ -253,5 +303,63 @@ mod tests {
         assert!(validator
             .validate_basic_fields(100, [1u8; 32], [0u8; 32], 99, 1234567890, 100,)
             .is_err());
+    }
+
+    /// Verify that the GPU path hashes real header bytes and detects a
+    /// mismatch against a different expected hash.
+    #[test]
+    fn test_validate_hash_on_real_header_bytes_detects_mismatch() {
+        let validator = SvmHeaderValidator::new();
+        // Build deterministic header bytes (same layout as validate_header).
+        let mut header_bytes = Vec::new();
+        header_bytes.extend_from_slice(&100u64.to_le_bytes()); // slot
+        header_bytes.extend_from_slice(&99u64.to_le_bytes()); // parent_slot
+        header_bytes.extend_from_slice(&1234567890u64.to_le_bytes()); // timestamp
+        header_bytes.extend_from_slice(&100u64.to_le_bytes()); // height
+        header_bytes.extend_from_slice(&[0xCDu8; 32]); // state_root
+
+        let kernel = Keccak256Kernel::new(32, false);
+        let real_hash = kernel.hash(&header_bytes).unwrap();
+
+        // validate_hash should succeed when expected_hash matches.
+        assert!(validator.validate_hash(100, &header_bytes, real_hash).is_ok());
+
+        // validate_hash should fail when expected_hash is different.
+        assert!(validator.validate_hash(100, &header_bytes, [0u8; 32]).is_err());
+    }
+
+    /// Provenance test: `validate_raw_header` must verify a known
+    /// header → hash pair and reject a tampered header.
+    #[test]
+    fn test_validate_raw_header_positive_and_tampered() {
+        let validator = SvmHeaderValidator::new();
+
+        let mut header_bytes = Vec::new();
+        header_bytes.extend_from_slice(&42u64.to_le_bytes());
+        header_bytes.extend_from_slice(&41u64.to_le_bytes());
+        header_bytes.extend_from_slice(&888_888_888u64.to_le_bytes());
+        header_bytes.extend_from_slice(&42u64.to_le_bytes());
+        header_bytes.extend_from_slice(&[0x33u8; 32]);
+
+        let kernel = Keccak256Kernel::new(32, false);
+        let good_hash = kernel.hash(&header_bytes).unwrap();
+
+        // Positive: real hash matches.
+        assert!(
+            validator
+                .validate_raw_header(42, &header_bytes, good_hash)
+                .is_ok(),
+            "real SVM header must validate"
+        );
+
+        // Negative: tampered header (flip one byte) must be rejected.
+        let mut tampered = header_bytes.clone();
+        tampered[4] ^= 0x01;
+        assert!(
+            validator
+                .validate_raw_header(42, &tampered, good_hash)
+                .is_err(),
+            "tampered SVM header must be rejected"
+        );
     }
 }

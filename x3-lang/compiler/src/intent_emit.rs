@@ -160,14 +160,8 @@ impl IntentSpecDraft {
 pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
     let name = intent.name.as_str().to_string();
     let mut draft = IntentSpecDraft::new(
-        &name,
-        "x3",   // default source chain
-        "UNKNOWN",
-        0,
-        "unknown",
-        "x3",
-        "UNKNOWN",
-        "unknown",
+        &name, "x3", // default source chain
+        "UNKNOWN", 0, "unknown", "x3", "UNKNOWN", "unknown",
     );
 
     // Walk constraints (from `require` guards) and body statements.
@@ -183,11 +177,15 @@ pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
     for stmt in &intent.body.stmts {
         match stmt {
             x3_lang_ast::ast::Statement::Lock {
-                chain, asset, amount, from, ..
+                chain,
+                asset,
+                amount,
+                from,
+                ..
             } => {
                 let chain_str = chain.0.as_str().to_string();
                 let asset_str = asset.name.as_str().to_string();
-                let amt = match &amount.node {
+                let amt = match amount {
                     Expression::Literal(LiteralExpr::Int { value, .. }) => *value,
                     _ => 0,
                 };
@@ -197,10 +195,12 @@ pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
                 draft.source_amount = amt;
                 draft.source_owner = from_str;
             }
-            x3_lang_ast::ast::Statement::Mint { asset, amount, to, .. } => {
+            x3_lang_ast::ast::Statement::Mint {
+                asset, amount, to, ..
+            } => {
                 let chain_str = asset.chain.as_str().to_string();
                 let asset_str = asset.name.as_str().to_string();
-                let amt = match &amount.node {
+                let amt = match amount {
                     Expression::Literal(LiteralExpr::Int { value, .. }) => Some(*value),
                     _ => None,
                 };
@@ -220,32 +220,30 @@ pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
                             .map(|s| s.as_str().to_string())
                             .unwrap_or_else(|| "x3".to_string());
                         let val_str = value_string_from_expr(value);
-                        draft = draft.with_constraint("finality", format!("{chain_str} >= {val_str}"));
+                        draft =
+                            draft.with_constraint("finality", format!("{chain_str} >= {val_str}"));
                         continue;
                     }
-                    AstRequireKind::Slippage => {
-                        "slippage"
-                    }
+                    AstRequireKind::Slippage => "slippage",
                     AstRequireKind::CanonicalSupply => {
                         draft = draft.with_constraint("require_canonical_supply", "");
                         continue;
                     }
-                    AstRequireKind::Nonce => {
-                        "require_receiver_owner"
-                    }
+                    AstRequireKind::Nonce => "require_receiver_owner",
                     _ => continue,
                 };
                 let val_str = value_string_from_expr(value);
                 draft = draft.with_constraint(constraint_str, val_str);
             }
-            x3_lang_ast::ast::Statement::Atomic(x3_lang_ast::ast::AtomicBlock { meta, body: _ }) => {
+            x3_lang_ast::ast::Statement::Atomic(x3_lang_ast::ast::AtomicBlock {
+                meta: Some(expr),
+                body: _,
+            }) => {
                 // The `atomic` block inside an intent likely contains
                 // the route specification. We record this as a hint
                 // for the adapter.
-                if let Some(expr) = meta {
-                    if let Some(kv) = expression_to_keyword_value(expr) {
-                        draft = draft.with_constraint(kv.0, kv.1);
-                    }
+                if let Some(kv) = expression_to_keyword_value(expr) {
+                    draft = draft.with_constraint(kv.0, kv.1);
                 }
             }
             _ => {}
@@ -258,7 +256,7 @@ pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
 /// Attempt to extract a (kind, value) pair from an expression
 /// that might be a `require` guard expression.
 fn expression_to_keyword_value(expr: &Expression) -> Option<(String, String)> {
-    match &expr.node {
+    match expr {
         // String literals like "finality eth >= 12"
         Expression::Literal(LiteralExpr::String(s)) => {
             let text = s.as_str();
@@ -271,8 +269,8 @@ fn expression_to_keyword_value(expr: &Expression) -> Option<(String, String)> {
         }
         // Binary expressions like finality(eth) >= 12
         Expression::Binary { op: _, lhs, rhs } => {
-            let lhs_str = string_from_expr(lhs);
-            let rhs_str = string_from_expr(rhs);
+            let lhs_str = string_from_expr(lhs.as_ref());
+            let rhs_str = string_from_expr(rhs.as_ref());
             Some((lhs_str, rhs_str))
         }
         _ => None,
@@ -281,26 +279,26 @@ fn expression_to_keyword_value(expr: &Expression) -> Option<(String, String)> {
 
 /// Extract a string value from an expression (likely a literal or identifier).
 fn value_string_from_expr(expr: &Expression) -> String {
-    match &expr.node {
+    match expr {
         Expression::Literal(LiteralExpr::Int { value, .. }) => value.to_string(),
         Expression::Literal(LiteralExpr::String(s)) => s.as_str().to_string(),
         Expression::Literal(LiteralExpr::Percentage { value }) => format!("{value}%"),
         Expression::Literal(LiteralExpr::Duration { value, unit: _ }) => value.to_string(),
         Expression::Ident(s) => s.as_str().to_string(),
-        _ => format!("{:?}", expr.node),
+        _ => format!("{:?}", expr),
     }
 }
 
 /// Extract a string from an expression that is a path/identifier/string literal.
 fn string_from_expr(expr: &Expression) -> String {
-    match &expr.node {
+    match expr {
         Expression::Literal(LiteralExpr::String(s)) => s.as_str().to_string(),
         Expression::Literal(LiteralExpr::Address(s)) => s.as_str().to_string(),
         Expression::Ident(s) => s.as_str().to_string(),
         Expression::FieldAccess { target, field } => {
-            format!("{}.{}", string_from_expr(target), field.as_str())
+            format!("{}.{}", string_from_expr(target.as_ref()), field.as_str())
         }
-        _ => format!("{:?}", expr.node),
+        _ => format!("{:?}", expr),
     }
 }
 

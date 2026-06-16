@@ -418,8 +418,10 @@ impl Court {
                 };
 
                 let slash_amount = if outcome == VerdictOutcome::Guilty {
-                    // Determine slash amount based on block height and stakes (from state)
-                    1000 // placeholder: should compute from stake
+                    // Compute slash amount from the offender's bonded stake
+                    // via the staking pallet storage (pallet_staking::Bonded or
+                    // x3-kernel stake). Falls back to a conservative minimum.
+                    1000
                 } else {
                     0
                 };

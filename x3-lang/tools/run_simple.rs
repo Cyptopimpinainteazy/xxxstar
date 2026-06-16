@@ -30,7 +30,7 @@ fn main() {
     )]);
 
     let lowered = lowering::lower_program(&program).expect("lower failed");
-    let code = emitter::emit(&lowered);
+    let code = emitter::emit_x3ir(&lowered).expect("emit failed");
 
     let mut vm = VM::new(code, VMConfig::default(), 1000u128);
     let result = vm.execute();

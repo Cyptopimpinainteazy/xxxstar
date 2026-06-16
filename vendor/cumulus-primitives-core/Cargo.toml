@@ -90,8 +90,6 @@ default-features = false
 version = "0.1.37"
 default-features = false
 
-[dependencies.xcm]
-path = "../../../polkadot/xcm"
 default-features = false
 package = "staging-xcm"
 

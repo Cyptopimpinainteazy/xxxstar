@@ -165,16 +165,12 @@ path = "../frame-support"
 features = ["experimental"]
 default-features = true
 
-[dev-dependencies.pallet-bags-list]
-path = "../bags-list"
 default-features = true
 
 [dev-dependencies.pallet-balances]
 path = "../pallet-balances"
 default-features = true
 
-[dev-dependencies.pallet-staking-reward-curve]
-path = "reward-curve"
 default-features = true
 
 [dev-dependencies.pallet-timestamp]
@@ -196,9 +192,6 @@ default-features = true
 [dev-dependencies.sp-tracing]
 path = "../sp-tracing"
 default-features = true
-
-[dev-dependencies.substrate-test-utils]
-path = "../../test-utils"
 
 [lints.clippy.all]
 level = "allow"

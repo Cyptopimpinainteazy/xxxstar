@@ -58,6 +58,15 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
         vm.state.gas -= cost;
 
         match opcode {
+            0x0A => {
+                // POW_RRR - power: ra = rb ^ rc (saturating)
+                let (ra, rb, rc) = decode_regtriplet(operand);
+                let base = vm.state.registers[rb as usize];
+                let exp = vm.state.registers[rc as usize];
+                // Saturating pow: produce u128::MAX on overflow
+                let result = base.saturating_pow(exp as u32);
+                vm.state.registers[ra as usize] = result;
+            }
             0x01 => {
                 // ADD_RRR - REG-REG-REG: operand encodes registers
                 // flags: REG3
@@ -135,12 +144,21 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
                 continue;
             }
             IF => {
-                vm.state.pc = skip_structured_if(vm.code.as_slice(), vm.state.pc)?;
-                continue;
+                // The current bytecode encoding stores the condition as a
+                // non-executable debug string. Until the compiler emits an
+                // evaluable condition, executing an `if` would silently skip
+                // user guards. Fail closed instead of partial execution.
+                return Err(ExecError::Panic(
+                    "X3_IF_NOT_EXECUTABLE: condition evaluation is not yet implemented".to_string(),
+                ));
             }
             LOOP => {
-                vm.state.pc = skip_structured_loop(vm.code.as_slice(), vm.state.pc)?;
-                continue;
+                // As with `if`, loop iteration conditions are not encoded as
+                // executable bytecode. Fail closed to prevent infinite or
+                // silently skipped loops.
+                return Err(ExecError::Panic(
+                    "X3_LOOP_NOT_EXECUTABLE: loop iteration is not yet implemented".to_string(),
+                ));
             }
             CALL => {
                 // CALL - push return and jump
@@ -160,28 +178,48 @@ pub fn execute(vm: &mut VM) -> ExecResult<()> {
                 continue;
             }
             REQUIRE => {
-                record_fixed_semantic_opcode(vm, REQUIRE);
+                // `require` guards must evaluate their condition and abort when
+                // it is false. The current encoding only records the opcode;
+                // fail closed until real guard evaluation is wired.
+                return Err(ExecError::Panic(
+                    "X3_REQUIRE_NOT_ENFORCED: require guards are not yet evaluated".to_string(),
+                ));
             }
             ON_FAIL => {
-                record_fixed_semantic_opcode(vm, ON_FAIL);
+                // Failure-action registration needs rollback handler wiring.
+                return Err(ExecError::Panic(
+                    "X3_ON_FAIL_NOT_ENFORCED: failure actions are not yet implemented".to_string(),
+                ));
             }
             ON_TIMEOUT => {
-                record_fixed_semantic_opcode(vm, ON_TIMEOUT);
+                // Timeout scheduling needs a real deadline mechanism.
+                return Err(ExecError::Panic(
+                    "X3_ON_TIMEOUT_NOT_ENFORCED: timeout guards are not yet implemented"
+                        .to_string(),
+                ));
             }
             ATOMIC_BEGIN => {
-                // ATOMIC_BEGIN - push current pc onto atomic stack
-                vm.state.atomic_stack.push(vm.state.pc + 4);
+                // Asset reservation / locking is required before an atomic
+                // scope can be safely executed. Without it, rollback cannot
+                // revert state. Fail closed.
+                return Err(ExecError::Panic(
+                    "X3_ATOMIC_BEGIN_NOT_IMPLEMENTED: asset reservation/locking is not wired"
+                        .to_string(),
+                ));
             }
             ATOMIC_END => {
-                // ATOMIC_COMMIT - pop atomic stack
-                vm.state.atomic_stack.pop();
+                // Commit without prior reservation is unsafe.
+                return Err(ExecError::Panic(
+                    "X3_ATOMIC_END_NOT_IMPLEMENTED: atomic commit without reservation is unsafe"
+                        .to_string(),
+                ));
             }
             ATOMIC_ROLLBACK => {
-                // ATOMIC_ROLLBACK - pop and jump to begin
-                if let Some(begin_pc) = vm.state.atomic_stack.pop() {
-                    vm.state.pc = begin_pc;
-                    continue;
-                }
+                // State reversion is not implemented; jumping back to the
+                // start of the atomic block would re-execute corrupted state.
+                return Err(ExecError::Panic(
+                    "X3_ATOMIC_ROLLBACK_NOT_IMPLEMENTED: state reversion is not wired".to_string(),
+                ));
             }
             EMIT => {
                 let data = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
@@ -249,8 +287,12 @@ fn align4(value: usize) -> usize {
 
 fn execute_asset_opcode(vm: &mut VM, opcode: u8, compiler_stream: bool) -> ExecResult<()> {
     if !compiler_stream {
-        record_fixed_semantic_opcode(vm, opcode);
-        return Ok(());
+        // Raw bytecode streams lack the structured asset payload needed to
+        // identify chain, asset, amount, and receiver. Executing the opcode
+        // would be a silent no-op. Fail closed.
+        return Err(ExecError::Panic(format!(
+            "X3_ASSET_OP_NOT_EXECUTABLE: opcode 0x{opcode:02x} requires a compiler-stream payload"
+        )));
     }
 
     let payload = read_len_payload(vm.code.as_slice(), vm.state.pc)?.to_vec();
@@ -305,43 +347,9 @@ fn apply_asset_payload(vm: &mut VM, payload: AssetOpPayload) {
     vm.state.asset_ops.push(payload);
 }
 
-fn record_fixed_semantic_opcode(vm: &mut VM, opcode: u8) {
-    vm.state.registers[0] = opcode as u128;
-}
-
-fn skip_structured_if(bytes: &[u8], pc: usize) -> ExecResult<usize> {
-    let cond_len = read_u16_le(bytes, pc + 1).ok_or(ExecError::InvalidOperand)? as usize;
-    let then_len_pos = pc
-        .checked_add(3 + cond_len)
-        .ok_or(ExecError::InvalidOperand)?;
-    let then_len = read_u32_le(bytes, then_len_pos).ok_or(ExecError::InvalidOperand)? as usize;
-    let else_len_pos = then_len_pos
-        .checked_add(4 + then_len)
-        .ok_or(ExecError::InvalidOperand)?;
-    let else_len = read_u32_le(bytes, else_len_pos).ok_or(ExecError::InvalidOperand)? as usize;
-    let end = else_len_pos
-        .checked_add(4 + else_len)
-        .ok_or(ExecError::InvalidOperand)?;
-    if end > bytes.len() {
-        return Err(ExecError::InvalidOperand);
-    }
-    Ok(align4(end))
-}
-
-fn skip_structured_loop(bytes: &[u8], pc: usize) -> ExecResult<usize> {
-    let body_len_pos = pc.checked_add(5).ok_or(ExecError::InvalidOperand)?;
-    let body_len = read_u32_le(bytes, body_len_pos).ok_or(ExecError::InvalidOperand)? as usize;
-    let end = body_len_pos
-        .checked_add(4 + body_len)
-        .ok_or(ExecError::InvalidOperand)?;
-    if end > bytes.len() {
-        return Err(ExecError::InvalidOperand);
-    }
-    Ok(align4(end))
-}
-
 fn gas_cost_for_opcode(opcode: u8) -> u128 {
     match opcode {
+        0x0A => 50,
         0x01 | 0x02 => 1,
         0x10 | 0x11 => 5,
         0x20 | 0x21 => 1,
@@ -516,18 +524,6 @@ fn read_u16_le(bytes: &[u8], idx: usize) -> Option<u16> {
     Some((bytes[idx] as u16) | ((bytes[idx + 1] as u16) << 8))
 }
 
-fn read_u32_le(bytes: &[u8], idx: usize) -> Option<u32> {
-    if idx + 3 >= bytes.len() {
-        return None;
-    }
-    Some(u32::from_le_bytes([
-        bytes[idx],
-        bytes[idx + 1],
-        bytes[idx + 2],
-        bytes[idx + 3],
-    ]))
-}
-
 fn decode_regtriplet(operand: u16) -> (u8, u8, u8) {
     // operand packs three 5-bit registers: r0[0..4], r1[5..9], r2[10..14]
     let ra = (operand & 0x1F) as u8;
@@ -542,4 +538,116 @@ fn decode_reg_reg_imm(operand: u16) -> (u8, u8, u16) {
     let rb = ((operand >> 5) & 0x1F) as u8;
     let imm = (operand >> 10) & 0x3F;
     (ra, rb, imm)
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::x3_lang_vm::{VM, VMConfig};
+
+    /// Encode a register-triplet operand: ra in bits 0-4, rb in 5-9, rc in 10-14.
+    fn enc_tt(ra: u8, rb: u8, rc: u8) -> u16 {
+        (ra as u16) | ((rb as u16) << 5) | ((rc as u16) << 10)
+    }
+
+    /// Run bytecode and return r0.
+    fn run(bytecode: &[u8], r0_init: u128, r1_init: u128, r2_init: u128, gas: u128) -> u128 {
+        let mut vm = VM::new(bytecode.to_vec(), VMConfig::default(), gas);
+        vm.state.registers[0] = r0_init;
+        vm.state.registers[1] = r1_init;
+        vm.state.registers[2] = r2_init;
+        execute(&mut vm).unwrap();
+        vm.state.registers[0]
+    }
+
+    #[test]
+    fn pow_2_pow_3_eq_8() {
+        // POW r0, r1, r2  (0x0A) then HALT (0xFF)
+        let code = &[0x0A, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let result = run(code, 0, 2, 3, 1_000_000);
+        assert_eq!(result, 8, "2 ^ 3");
+    }
+
+    #[test]
+    fn pow_5_pow_0_eq_1() {
+        let code = &[0x0A, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let result = run(code, 0, 5, 0, 1_000_000);
+        assert_eq!(result, 1, "5 ^ 0");
+    }
+
+    #[test]
+    fn pow_0_pow_5_eq_0() {
+        let code = &[0x0A, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let result = run(code, 0, 0, 5, 1_000_000);
+        assert_eq!(result, 0, "0 ^ 5");
+    }
+
+    #[test]
+    fn pow_overflow_saturates() {
+        // 2 ^ 128 overflows u128 — saturating_pow returns u128::MAX
+        let code = &[0x0A, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let result = run(code, 0, 2, 128, 1_000_000);
+        assert_eq!(result, u128::MAX, "2 ^ 128 saturates to MAX");
+    }
+
+    #[test]
+    fn add_rrr_works() {
+        // ADD r0, r1, r2  (0x01) then HALT (0xFF)
+        let code = &[0x01, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let result = run(code, 0, 10, 20, 1_000_000);
+        assert_eq!(result, 30, "10 + 20");
+    }
+
+    #[test]
+    fn sub_rrr_works() {
+        let code = &[0x02, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let result = run(code, 0, 100, 7, 1_000_000);
+        assert_eq!(result, 93, "100 - 7");
+    }
+
+    #[test]
+    fn chained_add_pow() {
+        // ADD r0, r1, r2  -> r0 = 2 + 1 = 3
+        // POW r0, r0, r2 -> r0 = 3 ^ 1 = 3,  wait, need to adjust regs.
+        // Let's do: r1=2, r2=1. ADD r0,r1,r2 -> r0=3. Then POW r0,r0,r2 -> 3^1=3.
+        // Better: r1=2, r2=3. ADD r0,r1,r2 -> r0=5. POW r3,r0,r2 -> r3=5^3. But our run() only checks r0.
+        // Let's do: r1=2, r2=3. ADD r0,r1,r2=5. Then POW r0,r0,r1 -> 5^2=25.
+        let op_add = enc_tt(0, 1, 2);  // ADD r0, r1, r2
+        let op_pow = enc_tt(0, 0, 1);  // POW r0, r0, r1
+        let code: &[u8] = &[
+            0x01, 0, (op_add & 0xFF) as u8, (op_add >> 8) as u8,
+            0x0A, 0, (op_pow & 0xFF) as u8, (op_pow >> 8) as u8,
+            0xFF, 0, 0, 0,
+        ];
+        let result = run(code, 0, 2, 3, 1_000_000);
+        assert_eq!(result, 25, "(2+3)^2 = 25");
+    }
+
+    #[test]
+    fn pow_gas_is_consumed() {
+        let code = &[0x0A, 0, (enc_tt(0, 1, 2) & 0xFF) as u8, (enc_tt(0, 1, 2) >> 8) as u8,
+                     0xFF, 0, 0, 0];
+        let mut vm = VM::new(code.to_vec(), VMConfig::default(), 100);
+        vm.state.registers[1] = 2;
+        vm.state.registers[2] = 3;
+        execute(&mut vm).unwrap();
+        assert_eq!(vm.state.gas, 100 - 50, "Pow costs 50 gas");
+        assert_eq!(vm.state.registers[0], 8);
+    }
+
+    #[test]
+    fn e2e_halt_stops_vm() {
+        let code = &[0xFF, 0, 0, 0];
+        let mut vm = VM::new(code.to_vec(), VMConfig::default(), 100);
+        execute(&mut vm).unwrap();
+        // HALT returns Ok so we just verify it completed
+    }
 }

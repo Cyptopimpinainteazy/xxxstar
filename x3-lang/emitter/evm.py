@@ -21,11 +21,15 @@ def _keccak_selector(signature: str) -> bytes:
     try:
         from eth_utils import keccak
         return keccak(text=signature)[:4]
-    except Exception:
+    except Exception as exc:
         known = {
             'swapExactTokensForTokens(uint256,uint256,address[],address,uint256)': bytes.fromhex('38ed1739')
         }
-        return known.get(signature, b'\x00' * 4)
+        if signature not in known:
+            raise RuntimeError(
+                f"Cannot compute EVM selector for {signature!r}: eth_utils not available"
+            ) from exc
+        return known[signature]
 
 
 def _encode_uint256(value: int) -> bytes:

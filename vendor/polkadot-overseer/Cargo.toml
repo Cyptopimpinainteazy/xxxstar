@@ -49,8 +49,6 @@ version = "0.3.31"
 [dependencies.futures-timer]
 version = "3.0.2"
 
-[dependencies.gum]
-path = "../gum"
 default-features = true
 package = "tracing-gum"
 
@@ -107,12 +105,6 @@ version = "0.6.1"
 features = ["futures_channel"]
 default-features = false
 package = "prioritized-metered-channel"
-
-[dev-dependencies.polkadot-node-subsystem-test-helpers]
-path = "../subsystem-test-helpers"
-
-[dev-dependencies.polkadot-primitives-test-helpers]
-path = "../../primitives/test-helpers"
 
 [target.'cfg(target_os = "linux")'.dependencies.tikv-jemalloc-ctl]
 version = "0.6.0"

@@ -2,35 +2,41 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::too_many_arguments)]
 
-//! # X3 Kernel Pallet
-//!
-//! The core orchestration layer for X3 Chain's dual-VM execution architecture.
-//! Enables atomic cross-VM transactions (Comits) that execute on both EVM and SVM.
-//!
-//! ## Security Design Decisions
-//!
-//! ### H-1: prepare_root Verification (Input Commitment Design)
-//!
-//! The `prepare_root` field is a cryptographic commitment to the **input parameters** of a Comit,
-//! NOT the execution outputs. This is intentional:
-//!
-//! - **Rationale**: Clients must compute `prepare_root` before submission. If it committed to
-//!   outputs, clients couldn't know the hash until after execution (circular dependency).
-//! - **Security**: The prepare_root ensures the submitted Comit matches what the client intended.
-//!   It prevents parameter tampering but does NOT guarantee execution results.
-//! - **Enhancement**: For high-value transactions requiring output verification, consider adding
-//!   an optional `expected_output_hash` field in future versions.
-//!
-//! ### H-5: VM Adapter Production Status
-//!
-//! The pallet uses pluggable VM adapters (`T::EvmAdapter`, `T::SvmAdapter`) configured at runtime:
-//!
-//! - **Test Runtime**: Uses `MockEvmAdapter` and `MockSvmAdapter` for deterministic testing
-//! - **Production Runtime**: Should use `FrontierEvmAdapter` and `RbpfSvmAdapter`
-//!
-//! **IMPORTANT**: Before mainnet deployment, verify runtime configuration uses real adapters.
-//! The `adapters.rs` module includes `FrontierEvmAdapter` which wraps pallet-evm, but runtime
-//! must be properly configured to use it instead of mocks.
+// Prevent `dev-bypass` from being activated in release builds.
+// This is a hard guard — you must remove `dev-bypass` from Cargo.toml
+// features before building any production or release artifact.
+#[cfg(all(feature = "dev-bypass", not(debug_assertions)))]
+compile_error!("dev-bypass feature is FORBIDDEN in release mode. Remove it from Cargo.toml features.");
+
+/// # X3 Kernel Pallet
+///
+/// The core orchestration layer for X3 Chain's dual-VM execution architecture.
+/// Enables atomic cross-VM transactions (Comits) that execute on both EVM and SVM.
+///
+/// ## Security Design Decisions
+///
+/// ### H-1: prepare_root Verification (Input Commitment Design)
+///
+/// The `prepare_root` field is a cryptographic commitment to the **input parameters** of a Comit,
+/// NOT the execution outputs. This is intentional:
+///
+/// - **Rationale**: Clients must compute `prepare_root` before submission. If it committed to
+///   outputs, clients couldn't know the hash until after execution (circular dependency).
+/// - **Security**: The prepare_root ensures the submitted Comit matches what the client intended.
+///   It prevents parameter tampering but does NOT guarantee execution results.
+/// - **Enhancement**: For high-value transactions requiring output verification, consider adding
+///   an optional `expected_output_hash` field in future versions.
+///
+/// ### H-5: VM Adapter Production Status
+///
+/// The pallet uses pluggable VM adapters (`T::EvmAdapter`, `T::SvmAdapter`) configured at runtime:
+///
+/// - **Test Runtime**: Uses `MockEvmAdapter` and `MockSvmAdapter` for deterministic testing
+/// - **Production Runtime**: Should use `FrontierEvmAdapter` and `RbpfSvmAdapter`
+///
+/// **IMPORTANT**: Before mainnet deployment, verify runtime configuration uses real adapters.
+/// The `adapters.rs` module includes `FrontierEvmAdapter` which wraps pallet-evm, but runtime
+/// must be properly configured to use it instead of mocks.
 
 pub use pallet::*;
 
@@ -4197,7 +4203,7 @@ pub mod pallet {
 
             // Retrieve stored settlement root
             let stored_root = StoredSettlementRoots::<T>::get(tx_id)
-                .expect("BUG: Settlement root MUST exist for this transaction ID");
+                .ok_or(Error::<T>::SettlementMismatch)?;
 
             // Hard-fail if atomicity invariant violated
             ensure!(combined_hash == stored_root, Error::<T>::SettlementMismatch);

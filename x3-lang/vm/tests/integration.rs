@@ -3,17 +3,20 @@ fn run_simple_add() {
     use x3_lang_vm::VMConfig;
     use x3_lang_vm::VM;
 
-    // Program: PUSH_IMM 1, PUSH_IMM 2, ADD_RRR (use regs), HALT
+    // ADD_RRR: r0 = r1 + r2. Initialize the source registers directly
+    // because the VM has no immediate-load opcode in the raw bytecode path.
+    // Operand encodes three 5-bit registers: r0 | (r1 << 5) | (r2 << 10)
+    // = 0 | (1 << 5) | (2 << 10) = 2080 = 0x0820 (little-endian bytes 0x20, 0x08).
     let code = vec![
-        0x20u8, 0x00, 0x01, 0x00, // PUSH_IMM 1
-        0x20u8, 0x00, 0x02, 0x00, // PUSH_IMM 2
-        0x01u8, 0x00, 0x00, 0x00, // ADD_RRR - noop for stack values (we'll use add logic)
+        0x01u8, 0x00, 0x20, 0x08, // ADD_RRR r0, r1, r2
         0xFFu8, 0x00, 0x00, 0x00, // HALT
     ];
 
     let mut vm = VM::new(code, VMConfig::default(), 1000);
-    let res = vm.execute();
-    assert!(res.is_ok());
+    vm.state.registers[1] = 1;
+    vm.state.registers[2] = 2;
+    vm.execute().expect("ADD_RRR should execute");
+    assert_eq!(vm.state.registers[0], 3, "1 + 2 should equal 3");
 }
 
 #[test]
@@ -21,21 +24,30 @@ fn nested_calls_use_real_call_stack_through_verified_execute() {
     use x3_lang_vm::VMConfig;
     use x3_lang_vm::VM;
 
+    // CALL and RET use absolute addresses. Execution flow:
+    //   pc=0: CALL 8   -> push 4, jump to 8
+    //   pc=8: CALL 16  -> push 12, jump to 16
+    //   pc=16: RET     -> pop 12, return to 12
+    //   pc=12: RET     -> pop 4, return to 4
+    //   pc=4: HALT
     let code = vec![
         0x32u8, 0x00, 0x08, 0x00, // CALL 8
         0xFFu8, 0x00, 0x00, 0x00, // HALT
         0x32u8, 0x00, 0x10, 0x00, // CALL 16
         0x33u8, 0x00, 0x00, 0x00, // RET
-        0x20u8, 0x00, 0x2A, 0x00, // PUSH_IMM 42
         0x33u8, 0x00, 0x00, 0x00, // RET
     ];
 
     let mut vm = VM::new(code, VMConfig::default(), 1000);
     vm.execute().expect("verified nested calls should execute");
 
-    assert_eq!(vm.state.registers[0], 0x20);
-    assert!(vm.state.call_stack.is_empty());
-    assert_eq!(vm.state.pc, 4);
+    assert!(
+        vm.state.call_stack.is_empty(),
+        "call stack must be empty after RET"
+    );
+    // HALT returns immediately, leaving pc at the instruction after the
+    // outermost CALL's return address (i.e. the HALT position + 4).
+    assert_eq!(vm.state.pc, 4, "pc must be at the position after HALT");
 }
 
 #[test]

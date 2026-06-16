@@ -89,6 +89,7 @@ impl RelayerService {
             config.x3.rpc_url.clone(),
             config.x3.relayer_account.clone(),
             config.x3.relayer_custody_key_id.clone(),
+            config.x3.relayer_seed_phrase.as_deref(),
             config.submission.max_retries,
             config.submission.retry_backoff_ms,
         )
@@ -711,7 +712,8 @@ impl RelayerSafetyPipeline {
 
         let mut payload = proof.blockhash.to_vec();
         for signature in &proof.validator_signatures {
-            payload.extend_from_slice(signature);
+            payload.extend_from_slice(&signature.validator_pubkey);
+            payload.extend_from_slice(&signature.signature);
         }
         if let Err(reason) = self.evaluate_verification(
             VerificationStrategy::SolanaFinalizedProof,
@@ -726,7 +728,12 @@ impl RelayerSafetyPipeline {
             let attestation = Attestation {
                 validator: ValidatorId(format!("svm-validator-{idx}")),
                 statement_hash: proof_id,
-                signature: signature.to_vec(),
+                signature: {
+                    let mut combined = Vec::with_capacity(96);
+                    combined.extend_from_slice(&signature.validator_pubkey);
+                    combined.extend_from_slice(&signature.signature);
+                    combined
+                },
                 weight: 1,
             };
             if let Err(err) = attestations.add_attestation(attestation) {
@@ -1119,7 +1126,7 @@ mod tests {
             source_domain: 200,
             slot: 42,
             blockhash: [8u8; 32],
-            validator_signatures: vec![[1u8; 32]],
+            validator_signatures: vec![],
             required_signatures: 2,
         };
 

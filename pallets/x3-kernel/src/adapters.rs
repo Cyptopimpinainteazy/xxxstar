@@ -91,13 +91,15 @@ impl EvmExecutorAdapter for MockEvmAdapter {
     }
 }
 
+// Unit-type adapters are gated behind test/benchmarks only — production
+// runtimes must wire real adapters (FrontierEvmAdapter, RbpfSvmAdapter, etc.).
+#[cfg(any(test, feature = "runtime-benchmarks"))]
 impl EvmExecutorAdapter for () {
     fn execute(_payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
-        // Unit type returns mock receipt (for backwards compatibility)
         Ok(ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,
             success: true,
-            gas_used: 21000,
+            gas_used: 1000,
             return_data: Vec::new(),
             logs: Vec::new(),
             state_changes: Vec::new(),
@@ -110,12 +112,12 @@ impl EvmExecutorAdapter for () {
         })
     }
 
-    fn estimate_gas(_payload: &[u8]) -> Result<u64, DispatchError> {
-        Ok(21000)
-    }
-
     fn validate(_payload: &[u8]) -> Result<(), DispatchError> {
         Ok(())
+    }
+
+    fn estimate_gas(_payload: &[u8]) -> Result<u64, DispatchError> {
+        Ok(1000)
     }
 }
 

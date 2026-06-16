@@ -3,6 +3,19 @@
 ## Purpose
 This ledger tracks every verified claim about the X3 Atomic Star system. Each claim has an evidence trail: source files, test results, CI gates, and runtime wiring.
 
+## Recent: Verification Comment Remediation (2026-06-15)
+
+Six security/correctness review comments remediated across 10 files.
+
+| Comment | What | Files | Proof |
+|---|---|---|---|
+| 1 | Quorum dedup in SecurityReview | `policy.rs` | Regression test `security_review_rejects_duplicate_signer_replay` |
+| 2 | GPU validator type alignment | `orchestrator.rs`, `evm_validator.rs`, `svm_validator.rs` | `cargo check -p cross-chain-gpu-validator` passes |
+| 3 | Stubbed validation loop removal | `lib.rs` | Removed dead stubs; validators usable as building blocks |
+| 4 | JIT compile() cfg fix | `jit_compiler.rs` | Prod returns unsupported error; test uses mock |
+| 5 | SVM proof real signatures | `submitter.rs`, `types.rs` | BLAKE2b-256 + Ed25519 wired; `ValidatorSignature` struct |
+| 6 | Automation oracle wiring | `lib.rs`, `mock.rs`, `tests.rs` | `type Oracle: OracleProvider` in Config; PriceThreshold tests |
+
 ## Claims
 
 ### CLAIM-001: Internal cross-VM routing works (Native ↔ Evm ↔ Svm)
