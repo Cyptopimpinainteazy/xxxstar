@@ -75,7 +75,6 @@ parameter_types! {
 }
 
 impl pallet_agent_accounts::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type RegisterOrigin = EnsureRoot<u64>;
     type AdminOrigin = EnsureRoot<u64>;

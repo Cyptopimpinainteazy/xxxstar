@@ -15,6 +15,9 @@ scale-info = { workspace = true, default-features = false, features = ["derive"]
 sp-std = { workspace = true, default-features = false }
 serde = { workspace = true, optional = true, features = ["derive"] }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [features]
 default = ["std"]
 std = [

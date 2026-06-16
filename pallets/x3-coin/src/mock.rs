@@ -129,7 +129,6 @@ parameter_types! {
 }
 
 impl pallet_x3_kernel::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Balance = Balance;
     type AssetId = AssetId;
@@ -172,7 +171,6 @@ parameter_types! {
 }
 
 impl pallet_x3_coin::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type UnixTime = Timestamp;
     type WeightInfo = ();
     type TreasuryAccount = TreasuryAccount;

@@ -50,7 +50,6 @@ impl frame_system::Config for Test {
 }
 
 impl pallet_x3_wallet::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
 }
 
 /// Build genesis storage for tests with ALICE pre-authorized as a minter.

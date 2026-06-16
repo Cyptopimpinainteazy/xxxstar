@@ -55,6 +55,5 @@ impl system::Config for MockRuntime {
 }
 
 impl crate::Config for MockRuntime {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = crate::weights::SubstrateWeight<MockRuntime>;
 }

@@ -285,7 +285,6 @@ impl frame_support::traits::Get<[u8; 32]> for BridgeSvmEscrowValue {
 }
 
 impl pallet_x3_kernel::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Balance = u128;
     type AssetId = u32;
@@ -330,7 +329,6 @@ parameter_types! {
 }
 
 impl pallet_atomic_trade_engine::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type EvmAdapter = TradeEngineEvmAdapter;
     type SvmAdapter = TradeEngineSvmAdapter;

@@ -123,7 +123,6 @@ parameter_types! {
 }
 
 impl pallet_governance::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type Currency = Balances;
     type SubmitOrigin = frame_system::EnsureSigned<u64>;

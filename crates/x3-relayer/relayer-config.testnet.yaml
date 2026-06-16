@@ -1,26 +1,40 @@
-# X3 Relayer Configuration for Testnet Deployment
+# X3 Relayer Configuration for Bridge-Enabled Public Testnet
 # Targets: Sepolia EVM testnet + Solana testnet
+#
+# ALL secrets and provider URLs are injected via environment variables.
+# No dev accounts, zero addresses, or placeholder API keys in this file.
+# For local staging, set the env vars to staging values.
+# For public testnet, set the env vars to real testnet values.
+#
+# Required env vars:
+#   X3_RPC_URL              — X3 node RPC endpoint
+#   X3_RELAYER_ACCOUNT      — Relayer account address (not dev/Alice)
+#   X3_RELAYER_SEED_PHRASE  — Relayer account seed phrase (or X3_RELAYER_CUSTODY_KEY_ID)
+#   EVM_SEPOLIA_RPC         — Sepolia RPC endpoint (e.g. Infura, Alchemy, self-hosted)
+#   EVM_STATE_ROOT_CONTRACT — Deployed X3ExternalGateway contract address on Sepolia
+#   SVM_RPC_ENDPOINT        — Solana testnet RPC endpoint
 
 # X3 Runtime Configuration
 x3:
   # X3 RPC endpoint (must be accessible and fully synced)
-  rpc_url: "http://localhost:9933"
+  rpc_url: "${X3_RPC_URL}"
   
-  # Relayer account (sudo account recommended for testnet, full account path required)
-  relayer_account: "5GrwvaEF5zXb26Fz9rcQkEvVkd7FcWI4twpBD6CFPhxGwwQ"
+  # Relayer account — MUST be a real testnet custody account, NOT a well-known dev key.
+  # Set via X3_RELAYER_ACCOUNT env var.
+  relayer_account: "${X3_RELAYER_ACCOUNT}"
   
-  # Optional: Seed phrase for relayer account (store securely, use env vars in production)
-  # relayer_seed_phrase: "twelve word seed phrase here..."
-  # Optional: custody key ID for staging rehearsals
-  # relayer_custody_key_id: "custody://x3-testnet/relayer"
+  # Seed phrase (store securely, never commit). Alternative: custody key ID.
+  # Set via X3_RELAYER_SEED_PHRASE or X3_RELAYER_CUSTODY_KEY_ID env var.
+  # relayer_seed_phrase: "${X3_RELAYER_SEED_PHRASE}"
+  # relayer_custody_key_id: "${X3_RELAYER_CUSTODY_KEY_ID}"
 
 # EVM Chains Configuration
 evm_chains:
   - name: "Sepolia Testnet"
     chain_id: 11155111
     x3_domain_id: 200
-    rpc_endpoint: "https://sepolia.infura.io/v3/YOUR_INFURA_KEY"
-    state_root_contract: "0x0000000000000000000000000000000000000000"
+    rpc_endpoint: "${EVM_SEPOLIA_RPC}"
+    state_root_contract: "${EVM_STATE_ROOT_CONTRACT}"
     finality_threshold: 12        # 12 blocks ≈ 3 minutes on Sepolia (12s blocks)
     block_poll_interval_ms: 13000  # Poll every 13 seconds
     max_concurrent_requests: 5
@@ -30,7 +44,7 @@ svm_clusters:
   - name: "Solana Testnet"
     cluster_name: "testnet"
     x3_domain_id: 501
-    rpc_endpoint: "https://api.testnet.solana.com"
+    rpc_endpoint: "${SVM_RPC_ENDPOINT}"
     finality_threshold: 32        # 32 slots ≈ 12.8 seconds (400ms per slot)
     slot_poll_interval_ms: 15000  # Poll every 15 seconds
     max_concurrent_requests: 5

@@ -69,7 +69,6 @@ impl system::Config for Test {
 }
 
 impl pallet_x3_crosschain_gateway::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = frame_system::EnsureRoot<AccountId>;
     type RelayerOrigin = frame_system::EnsureSigned<AccountId>;
     type OperationalOrigin = frame_system::EnsureSigned<AccountId>;

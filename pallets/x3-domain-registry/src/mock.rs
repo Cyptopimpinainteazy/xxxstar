@@ -70,7 +70,6 @@ impl system::Config for Test {
 }
 
 impl pallet_x3_domain_registry::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type UpdateOrigin = frame_system::EnsureRoot<AccountId>;
     type MaxDomainLen = MaxDomainLen;
     type MaxDomains = MaxDomains;

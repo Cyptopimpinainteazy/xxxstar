@@ -73,7 +73,6 @@ parameter_types! {
 }
 
 impl pallet_agent_memory::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxEntriesPerChunk = MaxEntriesPerChunk;
     type MaxChunksPerAgent = MaxChunksPerAgent;

@@ -80,7 +80,6 @@ impl pallet_timestamp::Config for Test {
 }
 
 impl Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type MaxSubmissionsPerBlock = MaxSubmissionsPerBlock;
     type MaxAssets = MaxAssets;
     type MaxSubmissionsPerAsset = MaxSubmissionsPerAsset;

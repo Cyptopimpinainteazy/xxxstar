@@ -47,7 +47,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<T> std::io::Read for XofReaderCoreWrapper<T>
 where

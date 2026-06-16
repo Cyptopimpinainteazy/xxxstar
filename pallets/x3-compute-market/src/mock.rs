@@ -57,7 +57,6 @@ parameter_types! {
 }
 
 impl pallet_x3_compute_market::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type MaxActiveListings = MaxActiveListings;
     type MaxSessionsPerProvider = MaxSessionsPerProvider;

@@ -259,11 +259,12 @@ fn initiate_recovery_works() {
 
         // Pre-seed a guardian record for ALICE so recovery can succeed.
         let guardian = x3_wallet::GuardianAccount {
+            id: [0u8; 32],
             owner: [0u8; 32],
             guardians: vec![[1u8; 32]],
-            threshold: 1,
+            required_guardians: 1,
             recovery_delay_blocks: 100,
-            initiated_block: 0,
+            is_active: true,
         };
         crate::RecoveryAccounts::<Test>::insert(ALICE, guardian);
 

@@ -4,7 +4,8 @@
 //! RPC endpoints for executing cross-VM operations (EVM, SVM, X3VM).
 //!
 //! Configuration via environment variables:
-//!   - X3_RPC_ENDPOINT   - HTTP endpoint for X3 Chain node (e.g., http://127.0.0.1:9944)
+//!   - X3_RPC_ENDPOINT   - HTTP JSON-RPC endpoint for X3 Chain node
+//!                         (e.g., http://127.0.0.1:9944 — NOT ws:// or wss://)
 //!   - X3_NETWORK        - Network: 'mainnet' | 'testnet' | 'local' (default: 'local')
 //!   - X3_TIMEOUT        - Request timeout in ms (default: '30000')
 //!   - X3_RECONNECT_MAX  - Maximum reconnect attempts (default: '5')
@@ -33,7 +34,7 @@ impl Default for LiveNodeConfig {
     fn default() -> Self {
         Self {
             endpoint: std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "wss://rpc.x3chain.io:9944".to_string()),
+                .unwrap_or_else(|_| "https://rpc.x3chain.io:9944".to_string()),
             timeout_ms: std::env::var("X3_TIMEOUT")
                 .unwrap_or_else(|_| "30000".to_string())
                 .parse()
@@ -77,15 +78,16 @@ impl LiveNodeDispatcher {
         }
     }
 
-    /// Create a dispatcher configured for a specific network
+    /// Create a dispatcher configured for a specific network.
+    /// All endpoints are HTTP JSON-RPC URLs — reqwest does not speak ws:// or wss://.
     pub fn for_network(network: &str) -> Self {
         let endpoint = match network {
             "mainnet" => std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "wss://rpc.x3chain.io:9944".to_string()),
+                .unwrap_or_else(|_| "https://rpc.x3chain.io:9944".to_string()),
             "testnet" => std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "wss://testnet.x3chain.io:9944".to_string()),
+                .unwrap_or_else(|_| "https://testnet.x3chain.io:9944".to_string()),
             _ => std::env::var("X3_RPC_ENDPOINT")
-                .unwrap_or_else(|_| "ws://127.0.0.1:9944".to_string()),
+                .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string()),
         };
 
         Self::new(LiveNodeConfig {
@@ -94,13 +96,45 @@ impl LiveNodeDispatcher {
         })
     }
 
-    /// Connect to the live node
+    /// Connect to the live node with a health-check handshake.
+    ///
+    /// Sends a `system_health` JSON-RPC call to verify the endpoint is live
+    /// and accepting connections before marking the dispatcher as connected.
     pub fn connect(&mut self) -> Result<(), DispatchError> {
-        // In a real implementation, this would establish a WebSocket connection
-        // For now, we mark as connected and use RPC calls through the runtime
-        self.connected = true;
-        self.reconnect_attempts = 0;
-        Ok(())
+        // RPC health-check: call system_health to confirm the endpoint is live.
+        match reqwest::blocking::Client::new()
+            .post(&self.config.endpoint)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "system_health",
+                "params": [],
+                "id": 1,
+            }))
+            .timeout(std::time::Duration::from_millis(
+                self.config.timeout_ms.min(5000),
+            ))
+            .send()
+        {
+            Ok(resp) if resp.status().is_success() => {
+                self.connected = true;
+                self.reconnect_attempts = 0;
+                Ok(())
+            }
+            Ok(resp) => {
+                self.connected = false;
+                self.reconnect_attempts += 1;
+                Err(DispatchError::Other(
+                    "live node health check returned non-2xx status",
+                ))
+            }
+            Err(e) => {
+                self.connected = false;
+                self.reconnect_attempts += 1;
+                Err(DispatchError::Other(
+                    "live node health check failed — endpoint unreachable",
+                ))
+            }
+        }
     }
 
     /// Disconnect from the live node

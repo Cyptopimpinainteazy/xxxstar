@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
 
-const API_BASE = "http://127.0.0.1:8787";
-const REQUEST_TIMEOUT_MS = 5_000;
+// Use @tauri-apps/api invoke directly (same pattern as apps/x3-desktop/src/ipc/tauri.ts)
+// @ts-ignore
+import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } finally {
-    window.clearTimeout(timeout);
+    return await tauriInvoke<T>(cmd, args);
+  } catch (error) {
+    console.error(`[IPC] invoke('${cmd}') failed:`, error);
+    throw error;
   }
 }
 
@@ -42,16 +42,24 @@ export function SwarmCommand() {
     setLoading(true);
     try {
       setError(null);
-      const statusResp = await fetchWithTimeout(`${API_BASE}/health`);
-      if (!statusResp.ok) throw new Error("Health endpoint unavailable");
-      setHealth(await statusResp.json());
 
-      const tasksResp = await fetchWithTimeout(`${API_BASE}/tasks`);
-      if (!tasksResp.ok) throw new Error("Tasks endpoint unavailable");
-      setTasks(await tasksResp.json());
+      // Fetch health + tasks via Tauri invoke (proxies to :8787, Rust-to-Rust, no CORS)
+      const [healthResult, tasksResult] = await Promise.all([
+        invoke<HealthStatus>('swarm_get_health').catch(() => null),
+        invoke<TaskRecord[]>('swarm_get_tasks').catch(() => [] as TaskRecord[]),
+      ]);
+
+      if (healthResult) {
+        setHealth(healthResult);
+      }
+
+      if (Array.isArray(tasksResult) && tasksResult.length > 0) {
+        setTasks(tasksResult as TaskRecord[]);
+      }
+
       setError(null);
     } catch (err) {
-      setError(err instanceof DOMException && err.name === "AbortError" ? "Request timed out" : (err as Error).message);
+      setError(err instanceof Error ? err.message : String(err));
       setHealth(null);
       setTasks([]);
     } finally {
@@ -61,8 +69,7 @@ export function SwarmCommand() {
 
   async function approveTask(taskId: string) {
     try {
-      const resp = await fetchWithTimeout(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/approve`, { method: "POST" });
-      if (!resp.ok) throw new Error("Approve failed");
+      await invoke<string>('swarm_approve_task', { taskId });
       await refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -71,8 +78,7 @@ export function SwarmCommand() {
 
   async function rejectTask(taskId: string) {
     try {
-      const resp = await fetchWithTimeout(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/reject`, { method: "POST" });
-      if (!resp.ok) throw new Error("Reject failed");
+      await invoke<string>('swarm_reject_task', { taskId });
       await refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -107,12 +113,12 @@ export function SwarmCommand() {
   return (
     <div style={{ padding: 24, fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}>
       <h1>X3 Swarm Command</h1>
-      <p>The SwarmCommand panel shows swarm status, tasks, approvals, and health for the local build.</p>
+      <p>The SwarmCommand panel shows swarm status, tasks, approvals, and health — wired via Tauri invoke (Rust-to-Rust proxy to :8787).</p>
 
       <section style={{ marginBottom: 24 }}>
         <h2>Backend Status</h2>
         {loading ? (
-          <p>Loading swarm status...</p>
+          <p>Loading swarm status via Tauri backend...</p>
         ) : backendConnected ? (
           <div>
             <p>Service: {health?.service}</p>
@@ -130,6 +136,7 @@ export function SwarmCommand() {
             <p>Backend: not connected</p>
             <p>Blocker: x3-swarm-api unavailable</p>
             <p>Next action: run scripts/swarm/swarm_up.sh</p>
+            <p>Data path: Tauri invoke → src-tauri/src/main.rs → http://127.0.0.1:8787</p>
             {error ? <p style={{ color: "#c00" }}>Error: {error}</p> : null}
           </div>
         )}
@@ -185,10 +192,10 @@ export function SwarmCommand() {
               <div>{task.feature} · {task.agent}</div>
               <div style={{ marginTop: 8 }}>
                 <button onClick={() => approveTask(task.id)} style={{ marginRight: 8, padding: "6px 10px" }}>
-                  Approve
+                  ✅ Approve
                 </button>
                 <button onClick={() => rejectTask(task.id)} style={{ padding: "6px 10px" }}>
-                  Reject
+                  ❌ Reject
                 </button>
               </div>
             </div>
@@ -219,7 +226,7 @@ export function SwarmCommand() {
 
         <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
           <h3>Swarm Health</h3>
-          <p>{backendConnected ? "Backend reachable" : "Backend unreachable"}</p>
+          <p>{backendConnected ? "Backend reachable (via Tauri invoke)" : "Backend unreachable"}</p>
           <p>Report file: reports/swarm_health_report.md</p>
           <PanelMeta />
         </div>
@@ -234,4 +241,3 @@ export function SwarmCommand() {
     </div>
   );
 }
-

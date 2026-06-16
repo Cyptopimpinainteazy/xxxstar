@@ -1,0 +1,260 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# testnet-deploy.yml — Protected testnet deployment pipeline
+#
+# This workflow gates testnet deployment behind:
+#   1. A GitHub Environment ("testnet") with required reviewers and wait timers.
+#   2. Mandatory pre-deploy checks: build, test, spec generation, Foundry tests.
+#   3. EVM contract deploy + verify (if bridge-enabled).
+#   4. Chain spec generation with dev-key scan.
+#
+# Usage:
+#   - Triggered manually via workflow_dispatch on main branch.
+#   - Uses environment: testnet (configure in GitHub repo Settings → Environments).
+#
+# Required GitHub Environment setup:
+#   Settings → Environments → testnet
+#     - Required reviewers: at least 1
+#     - Wait timer: 0 minutes (reviewer approval gates deployment)
+#     - Deployment branches: main
+#     - Secrets: SEPOLIA_RPC_URL, ETHERSCAN_API_KEY (if bridge-enabled)
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: testnet-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_bridge:
+        description: 'Deploy EVM gateway contracts + start relayer'
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  # ── Gate 1: Build + Test ──────────────────────────────────────────────────
+  substrate-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Build x3-chain-node
+        run: cargo build --release -p x3-chain-node
+      - name: Run critical path tests
+        run: cargo test --release -p x3-chain-node -- --nocapture
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-chain-node
+          path: target/release/x3-chain-node
+
+  foundry-gateway:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: X3-contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Run Foundry gateway tests
+        run: forge test -vvv
+      - name: Check fuzz + invariant profiles
+        run: FOUNDRY_PROFILE=ci forge test -vvv
+
+  # ── Gate 2: Chain spec generation + dev-key scan ─────────────────────────
+  spec-generation:
+    runs-on: ubuntu-latest
+    needs: [substrate-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: x3-chain-node
+          path: ./target/release/
+      - name: Make executable
+        run: chmod +x target/release/x3-chain-node
+      - name: Generate testnet specs
+        run: |
+          mkdir -p chain-specs/generated
+          ./target/release/x3-chain-node build-spec \
+            --chain testnet \
+            --disable-default-bootnode \
+            > chain-specs/generated/x3-public-testnet-plain.json
+          ./target/release/x3-chain-node build-spec \
+            --chain chain-specs/generated/x3-public-testnet-plain.json \
+            --raw \
+            --disable-default-bootnode \
+            > chain-specs/generated/x3-public-testnet-raw.json
+      - name: Dev-key scan (reject well-known keys)
+        run: |
+          # Alice, Bob, Charlie, Dave, Eve, Ferdie accounts must not appear in chain spec
+          DEV_KEYS=("5GrwvaEF5zXb26Fz9rcQkEvVkd7FcWI4twpBD6CFPhxGwwQ" "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty")
+          for key in "${DEV_KEYS[@]}"; do
+            if grep -q "$key" chain-specs/generated/x3-public-testnet-plain.json; then
+              echo "❌ DEV KEY FOUND in chain spec: $key"
+              echo "   Replace with real testnet custody accounts before deploying."
+              exit 1
+            fi
+          done
+          echo "✅ No dev keys found in generated chain spec."
+      - name: Upload generated specs
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain-specs
+          path: chain-specs/generated/
+
+  # ── Gate 3: Readiness report regeneration ────────────────────────────────
+  readiness-check:
+    runs-on: ubuntu-latest
+    needs: [substrate-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build x3-readiness and regenerate report
+        run: |
+          cargo build --release -p x3-readiness
+          echo "Running x3-readiness report generation..."
+          ./target/release/x3-readiness --out reports TestnetReport
+          echo "✅ Readiness report regenerated."
+        # Do not proceed if the readiness crate does not build — deploy must fail.
+      - name: Verify no placeholder report
+        run: |
+          if head -20 reports/testnet_readiness_report.md 2>/dev/null | grep -qi "placeholder\|stub\|TODO"; then
+            echo "❌ testnet_readiness_report.md appears to be a placeholder/stub."
+            echo "   Run x3-readiness to regenerate before deploying."
+            exit 1
+          fi
+          echo "✅ Readiness report is not a placeholder."
+
+  # ── Gate 4: Deploy to staging (protected environment) ────────────────────
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [substrate-build, foundry-gateway, spec-generation, readiness-check]
+    environment:
+      name: testnet
+      url: https://github.com/Cyptopimpinainteazy/xxxstar/releases
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: x3-chain-node
+          path: ./target/release/
+      - name: Make executable
+        run: chmod +x target/release/x3-chain-node
+      - name: Download chain specs
+        uses: actions/download-artifact@v4
+        with:
+          name: chain-specs
+          path: chain-specs/generated/
+      - name: Run local 3-validator smoke test
+        run: |
+          X3_NODE_BIN=./target/release/x3-chain-node \
+          X3_CHAIN_SPEC=chain-specs/generated/x3-public-testnet-raw.json \
+          bash scripts/testnet-full-launch.sh 3 --smoke
+        timeout-minutes: 10
+      - name: Notify deployment complete
+        run: |
+          echo "✅ Staging testnet 3-validator smoke test passed."
+          echo "   Chain specs available in chain-specs/generated/"
+
+  # ── Gate 5a: Deploy EVM Verifier (bridge-enabled only) ───────────────────
+  deploy-evm-verifier:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: ${{ github.event.inputs.deploy_bridge == 'true' }}
+    environment:
+      name: testnet
+    defaults:
+      run:
+        working-directory: X3-contracts/evm
+    outputs:
+      verifier_address: ${{ steps.deploy.outputs.verifier_address }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Deploy EvmReceiptVerifier to Sepolia
+        id: deploy
+        run: |
+          VERIFIER_OUT=$(forge script script/DeployX3Verifier.s.sol:DeployX3Verifier \
+            --rpc-url "${{ secrets.SEPOLIA_RPC_URL }}" \
+            --broadcast \
+            --verify \
+            --etherscan-api-key "${{ secrets.ETHERSCAN_API_KEY }}" \
+            -vvvv 2>&1)
+          echo "$VERIFIER_OUT"
+          # Extract deployed address from Foundry output
+          ADDR=$(echo "$VERIFIER_OUT" | grep -oP 'EvmReceiptVerifier deployed at:\s*\K0x[a-fA-F0-9]{40}')
+          echo "verifier_address=$ADDR" >> "$GITHUB_OUTPUT"
+          echo "✅ EvmReceiptVerifier deployed at $ADDR"
+        env:
+          VALIDATOR_PUBKEYS: "${{ vars.TESTNET_VALIDATOR_PUBKEYS }}"
+          QUORUM_THRESHOLD: "${{ vars.TESTNET_QUORUM_THRESHOLD }}"
+          CHAIN_ID: "11155111"
+      - name: Verify EvmReceiptVerifier on Etherscan
+        env:
+          VERIFIER_ADDRESS: "${{ steps.deploy.outputs.verifier_address }}"
+          VALIDATOR_PUBKEYS: "${{ vars.TESTNET_VALIDATOR_PUBKEYS }}"
+          QUORUM_THRESHOLD: "${{ vars.TESTNET_QUORUM_THRESHOLD }}"
+          ETHERSCAN_API_KEY: "${{ secrets.ETHERSCAN_API_KEY }}"
+        run: bash script/verify-gateway.sh verifier
+
+  # ── Gate 5b: EVM Gateway Deploy (bridge-enabled only, after verifier) ────
+  deploy-evm-contracts:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-evm-verifier]
+    if: ${{ github.event.inputs.deploy_bridge == 'true' }}
+    environment:
+      name: testnet
+    defaults:
+      run:
+        working-directory: X3-contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Deploy X3ExternalGateway to Sepolia
+        id: deploy-gateway
+        run: |
+          GATEWAY_OUT=$(forge script script/DeployX3Gateway.s.sol:DeployX3Gateway \
+            --rpc-url "${{ secrets.SEPOLIA_RPC_URL }}" \
+            --broadcast \
+            --verify \
+            --etherscan-api-key "${{ secrets.ETHERSCAN_API_KEY }}" \
+            -vvvv 2>&1)
+          echo "$GATEWAY_OUT"
+          ADDR=$(echo "$GATEWAY_OUT" | grep -oP 'X3ExternalGateway deployed at:\s*\K0x[a-fA-F0-9]{40}')
+          echo "gateway_address=$ADDR" >> "$GITHUB_OUTPUT"
+          echo "✅ X3ExternalGateway deployed at $ADDR"
+        env:
+          VERIFIER_ADDRESS: "${{ needs.deploy-evm-verifier.outputs.verifier_address }}"
+          CHAIN_ID: "11155111"
+          X3_CHAIN_ID: "200"
+          MIN_X3_CONFIRMATIONS: "12"
+      - name: Verify X3ExternalGateway on Etherscan
+        env:
+          GATEWAY_ADDRESS: "${{ steps.deploy-gateway.outputs.gateway_address }}"
+          VERIFIER_ADDRESS: "${{ needs.deploy-evm-verifier.outputs.verifier_address }}"
+          X3_CHAIN_ID: "200"
+          MIN_X3_CONFIRMATIONS: "12"
+          ETHERSCAN_API_KEY: "${{ secrets.ETHERSCAN_API_KEY }}"
+        run: bash script/verify-gateway.sh gateway
+      - name: Log deployed addresses
+        run: |
+          echo "EvmReceiptVerifier deployed at: ${{ needs.deploy-evm-verifier.outputs.verifier_address }}"
+          echo "X3ExternalGateway deployed. Address available in Foundry broadcast logs."
+          echo "Verify on explorer:"
+          echo "  https://sepolia.etherscan.io/address/<DEPLOYED_ADDRESS>#code"

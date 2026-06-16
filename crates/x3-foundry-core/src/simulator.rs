@@ -391,7 +391,7 @@ mod tests {
         let config = RevenueConfig::default();
         let fees = sim.simulate_fees(&vol, &config);
         let gas = sim.simulate_gas(&DAppType::StakingPool, 5000);
-        let be = sim.simulate_break_even(&DAppType::StakingPool, &fees, &gas);
+        let be = sim.simulate_break_even(&DAppType::StakingPool, &config, &fees, &gas);
         assert!(be.total_dev_cost > 0);
     }
 

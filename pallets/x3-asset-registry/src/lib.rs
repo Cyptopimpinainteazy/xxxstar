@@ -558,7 +558,6 @@ mod tests {
     }
 
     impl Config for Test {
-        type RuntimeEvent = RuntimeEvent;
         type RegistryOrigin = RootOrigin;
         type EmergencyPauseOrigin = RootOrigin;
         type MaxAssets = MaxAssets;

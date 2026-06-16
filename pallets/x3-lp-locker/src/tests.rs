@@ -2,7 +2,7 @@
 //
 // Tests for pallet-x3-lp-locker.
 
-use crate::{mock::*, Error, Event, LpLockRecord, LpLocks};
+use crate::{mock::*, Error, Event, LpLocks};
 use frame_support::{assert_noop, assert_ok};
 
 #[test]
@@ -15,7 +15,6 @@ fn lock_lp_creates_lock() {
             42,     // pool_id
             1000,   // lp_amount
             200,    // unlock_at_block (duration = 199 blocks, >= 100 min)
-            vec![], // description
         ));
 
         let record = LpLocks::<Test>::get(1, 42).unwrap();
@@ -44,7 +43,7 @@ fn lock_lp_rejects_zero_amount() {
         frame_system::Pallet::<Test>::set_block_number(1);
 
         assert_noop!(
-            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 0, 200, vec![]),
+            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 0, 200),
             Error::<Test>::ZeroAmount
         );
     });
@@ -60,11 +59,10 @@ fn lock_lp_rejects_duplicate() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         assert_noop!(
-            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 2000, 300, vec![]),
+            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 2000, 300),
             Error::<Test>::AlreadyLocked
         );
     });
@@ -77,7 +75,7 @@ fn lock_lp_rejects_short_duration() {
 
         // Duration = 50 blocks < MinLockDuration (100)
         assert_noop!(
-            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 51, vec![]),
+            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 51),
             Error::<Test>::DurationBelowMinimum
         );
     });
@@ -90,7 +88,7 @@ fn lock_lp_rejects_long_duration() {
 
         // Duration = 200_000 blocks > MaxLockDuration (100_000)
         assert_noop!(
-            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200_001, vec![]),
+            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200_001),
             Error::<Test>::DurationAboveMaximum
         );
     });
@@ -100,12 +98,8 @@ fn lock_lp_rejects_long_duration() {
 fn lock_lp_rejects_long_description() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        let long_desc = vec![0u8; 129]; // > 128 bytes
 
-        assert_noop!(
-            LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200, long_desc),
-            Error::<Test>::DescriptionTooLong
-        );
+        // Description length check is removed; lock_lp now takes 4 args
     });
 }
 
@@ -118,7 +112,6 @@ fn unlock_lp_removes_lock_after_expiry() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         // Advance past unlock block
@@ -147,7 +140,6 @@ fn unlock_lp_rejects_before_expiry() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         // At block 150, lock has not expired
@@ -179,7 +171,6 @@ fn extend_lock_increases_duration() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         assert_ok!(LpLocker::extend_lock(RuntimeOrigin::signed(1), 42, 500));
@@ -198,7 +189,6 @@ fn extend_lock_rejects_shorten() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         assert_noop!(
@@ -227,7 +217,6 @@ fn increase_lock_adds_amount() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         assert_ok!(LpLocker::increase_lock(RuntimeOrigin::signed(1), 42, 500));
@@ -256,7 +245,6 @@ fn increase_lock_rejects_zero_amount() {
             42,
             1000,
             200,
-            vec![]
         ));
 
         assert_noop!(
@@ -277,7 +265,6 @@ fn is_locked_returns_correct_state() {
             42,
             1000,
             200,
-            vec![]
         ));
         assert!(LpLocker::is_locked(&1, 42)); // lock active
 
@@ -297,21 +284,18 @@ fn total_locked_for_pool_aggregates() {
             42,
             1000,
             200,
-            vec![]
         ));
         assert_ok!(LpLocker::lock_lp(
             RuntimeOrigin::signed(2),
             42,
             500,
             300,
-            vec![]
         ));
         assert_ok!(LpLocker::lock_lp(
             RuntimeOrigin::signed(1),
             7,
             2000,
-            200,
-            vec![] // different pool
+            200, // different pool
         ));
 
         assert_eq!(LpLocker::total_locked_for_pool(42), 1500);

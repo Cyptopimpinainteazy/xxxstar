@@ -58,7 +58,6 @@ parameter_types! {
 }
 
 impl crate::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type UpdateOrigin = frame_system::EnsureRoot<u64>;
     type DefaultMaxSupply = DefaultMaxSupply;
     type DefaultMaxAgents = DefaultMaxAgents;

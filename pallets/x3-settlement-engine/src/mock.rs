@@ -137,7 +137,6 @@ impl EnsureOrigin<RuntimeOrigin> for RootOnlySettlement {
 }
 
 impl pallet_x3_kernel::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Balance = u128;
     type AssetId = u32;
@@ -155,9 +154,9 @@ impl pallet_x3_kernel::Config for Test {
     type DefaultSvmComputeLimit = ConstU64<200_000>;
     type DefaultX3GasLimit = ConstU64<5_000_000>;
     type WeightInfo = ();
-    type EvmAdapter = ();
-    type SvmAdapter = ();
-    type X3Adapter = ();
+    type EvmAdapter = pallet_x3_kernel::MockEvmAdapter;
+    type SvmAdapter = pallet_x3_kernel::MockSvmAdapter;
+    type X3Adapter = pallet_x3_kernel::MockX3Adapter;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type CrossVmPrepareTtl = ConstU64<10>;
     type MaxPreparedCrossVmOps = ConstU32<16>;
@@ -183,7 +182,6 @@ impl pallet_x3_atomic_kernel::Config for Test {
 }
 
 impl pallet_x3_settlement_engine::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type SettlementWeightInfo = ();
     type Currency = Balances;
     type UnixTime = pallet_timestamp::Pallet<Test>;

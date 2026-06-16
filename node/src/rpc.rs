@@ -546,5 +546,74 @@ where
     let validator_rpc = x3_rpc::create_validator_rpc(client.clone())?;
     module.merge(validator_rpc)?;
 
+    // ── crossVm_getRecentTransfers ──────────────────────
+    // Returns recent cross-VM asset transfers from the bridge pallet.
+    // Currently unimplemented — returns a JSON-RPC error.
+    module.register_method(
+        "crossVm_getRecentTransfers",
+        move |_params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            Err(custom_error(
+                "crossVm_getRecentTransfers is not yet wired to bridge pallet runtime data — method unavailable",
+            ))
+        },
+    )?;
+
+    // ── token_getSupply ──────────────────────────────────
+    // Returns the total token supply (circulating + locked).
+    // Currently unimplemented — returns a JSON-RPC error.
+    module.register_method(
+        "token_getSupply",
+        move |_params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            Err(custom_error(
+                "token_getSupply is not yet wired to balances pallet runtime data — method unavailable",
+            ))
+        },
+    )?;
+
+    // ── swarm_getMetrics ─────────────────────────────────
+    // Proxies to x3-swarm-api at :8787 for swarm telemetry.
+    // Currently unimplemented — returns a JSON-RPC error.
+    module.register_method(
+        "swarm_getMetrics",
+        move |_params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            Err(custom_error(
+                "swarm_getMetrics is not yet wired to swarm API — method unavailable",
+            ))
+        },
+    )?;
+
+    // ── swarm_getRecentTasks ──────────────────────────────
+    // Proxies to x3-swarm-api :8787/tasks for recent task list.
+    // Currently unimplemented — returns a JSON-RPC error.
+    module.register_method(
+        "swarm_getRecentTasks",
+        move |_params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            Err(custom_error(
+                "swarm_getRecentTasks is not yet wired to swarm API — method unavailable",
+            ))
+        },
+    )?;
+
+    // ── network_subscribeMetrics (subscription) ───────────
+    // Subscribes to live network metrics via WebSocket.
+    // Currently unimplemented — returns a JSON-RPC error.
+    module.register_subscription(
+        "network_subscribeMetrics",
+        "network_subscribeMetrics",
+        "network_unsubscribeMetrics",
+        move |_params, pending, _ctx, _ext| async move {
+            if let Ok(sink) = pending.accept().await {
+                if let Ok(msg) = jsonrpsee::server::SubscriptionMessage::from_json(&serde_json::json!({
+                    "error": {
+                        "code": -32601,
+                        "message": "network_subscribeMetrics subscription is not yet wired to live network data — method unavailable"
+                    }
+                })) {
+                    let _ = sink.send(msg).await;
+                }
+            }
+        },
+    )?;
+
     Ok(module)
 }

@@ -76,7 +76,6 @@ parameter_types! {
 }
 
 impl pallet_treasury::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type SmallSpendOrigin = EnsureRoot<u64>;
     type MediumSpendOrigin = EnsureRoot<u64>;

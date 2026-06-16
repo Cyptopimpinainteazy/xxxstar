@@ -84,7 +84,6 @@ parameter_types! {
 }
 
 impl pallet_x3_sequencer::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxTxsPerBatch = MaxTxsPerBatch;
     type MaxPayloadSize = MaxPayloadSize;

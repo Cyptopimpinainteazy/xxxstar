@@ -64,7 +64,6 @@ frame_support::parameter_types! {
 }
 
 impl pallet_x3_reconciliation::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type MaxSupportedChains = MaxSupportedChains;
     type ReconciliationCycleBlocks = ReconciliationCycleBlocks;

@@ -50,7 +50,6 @@ parameter_types! {
 }
 
 impl pallet_x3_inventory::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Balance = u128;
     type MaxLiquiditySources = MaxLiquiditySources;
     type WeightInfo = pallet_x3_inventory::weights::SubstrateWeight<Test>;
@@ -62,7 +61,6 @@ parameter_types! {
 }
 
 impl pallet_x3_reservation::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type ReservationTtlBlocks = ReservationTtlBlocks;
     type MaxExpirationsPerBlock = MaxExpirationsPerBlock;
 }

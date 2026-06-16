@@ -358,9 +358,11 @@ journalctl -u x3-validator -f --since "5 minutes ago"
 | 7.10 | Restore from snapshot passes | DevOps |
 | 7.11 | Incident drill passes (kill + restart) | DevOps |
 | 7.12 | Secret rotation drill passes | Security |
-| 7.13 | External bridges verified DISABLED at genesis | Security |
-| 7.14 | Governance can enable external bridges (test-only) | QA |
-
+| 7.13 | Bridge relayer health passes (if bridge-enabled) | DevOps |
+| 7.14 | EVM gateway contract verified on explorer | DevOps |
+| 7.15 | Snapshot backup + restore drill passes | DevOps |
+| 7.16 | Incident drill passes (kill + restart) | DevOps |
+| 7.17 | Secret rotation drill passes | Security |
 ---
 
 ## Troubleshooting

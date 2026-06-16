@@ -79,7 +79,6 @@ parameter_types! {
 }
 
 impl pallet_x3_invariants::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type UpdateOrigin = frame_system::EnsureRoot<u64>;
     type DefaultMaxSupply = DefaultMaxSupply;
     type DefaultMaxAgents = DefaultMaxAgents;

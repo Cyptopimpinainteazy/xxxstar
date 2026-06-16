@@ -112,20 +112,17 @@ parameter_types! {
 }
 
 impl pallet_x3_asset_registry::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type RegistryOrigin = RootOrAny;
     type EmergencyPauseOrigin = RootOrAny;
     type MaxAssets = MaxAssets;
 }
 
 impl pallet_x3_supply_ledger::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type SupplyGovernance = RootOrAny;
     type Registry = Registry;
 }
 
 impl pallet_x3_cross_vm_router::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Registry = Registry;
     type Ledger = Ledger;
     type Currency = ();
@@ -139,7 +136,6 @@ impl pallet_x3_cross_vm_router::Config for Test {
 }
 
 impl pallet_x3_token_factory::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type CreateTokenOrigin = EnsureSigned<u64>;
     type Registry = Registry;
     type Ledger = Ledger;

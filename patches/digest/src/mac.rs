@@ -301,5 +301,5 @@ impl fmt::Display for MacError {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 impl std::error::Error for MacError {}

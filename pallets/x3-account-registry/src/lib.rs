@@ -300,7 +300,6 @@ mod tests {
     }
 
     impl Config for Test {
-        type RuntimeEvent = RuntimeEvent;
         type AtlasId = AtlasId;
         type MaxNameLength = MaxNameLength;
     }

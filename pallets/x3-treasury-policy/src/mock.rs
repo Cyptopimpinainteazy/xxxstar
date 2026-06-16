@@ -61,7 +61,6 @@ parameter_types! {
 }
 
 impl pallet_x3_inventory::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     /// `u128` satisfies all arithmetic bounds required by the inventory pallet
     /// and matches `crate::Balance` so no conversions are needed in helpers.
     type Balance = u128;

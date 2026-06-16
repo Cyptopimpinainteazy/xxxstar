@@ -327,6 +327,24 @@ export type {
   SubscriptionHandlers,
 } from './subscriptions';
 
+// =============================================================================
+// Shared RPC Client (lightweight JSON-RPC helpers for all frontends)
+// =============================================================================
+
+export {
+  createJsonRpcClient,
+  createWsClient,
+  createX3RpcClient,
+  RpcClientError,
+} from './rpc-client';
+
+export type {
+  JsonRpcRequest,
+  JsonRpcResponse,
+  JsonRpcClientOptions,
+  WsClientOptions,
+} from './rpc-client';
+
 export {
   X3SettlementClient,
   X3AtomicTradeClient,

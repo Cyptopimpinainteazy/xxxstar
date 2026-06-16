@@ -9,8 +9,12 @@
 //! - Submitter: sends proofs to X3/external gateway via RPC
 //!
 //! # Configuration
-//! Set via environment variables (see config section below) or config file.
+//! Config file path can be set via X3_RELAYER_CONFIG env var.
+//! Default: crates/x3-relayer/relayer-config.testnet.yaml
+//! Env vars in the config (${X3_RPC_URL}, ${EVM_SEPOLIA_RPC}, etc.) are
+//! expanded at load time.
 
+use crate::types::RelayerConfig as TypedRelayerConfig;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -40,6 +44,59 @@ struct RelayerConfig {
 
 impl RelayerConfig {
     fn from_env() -> Self {
+        // Try loading the typed config from YAML first; fall back to env vars.
+        if let Ok(cfg) = Self::from_yaml() {
+            return cfg;
+        }
+        Self::from_env_vars()
+    }
+
+    fn from_yaml() -> Result<Self, Box<dyn std::error::Error>> {
+        let config_path = std::env::var("X3_RELAYER_CONFIG")
+            .unwrap_or_else(|_| "crates/x3-relayer/relayer-config.testnet.yaml".into());
+        let content = std::fs::read_to_string(&config_path)?;
+
+        // Expand ${VAR} / $VAR in raw YAML before parsing
+        let expanded = Self::expand_env_vars(&content);
+        let typed: TypedRelayerConfig =
+            serde_yaml::from_str(&expanded)?;
+
+        let mut evm_rpcs = HashMap::new();
+        let mut gateway_addresses = HashMap::new();
+        let mut confirmations = HashMap::new();
+
+        for chain in &typed.evm_chains {
+            evm_rpcs.insert(chain.chain_id as u64, chain.rpc_endpoint.clone());
+            gateway_addresses.insert(
+                chain.chain_id as u64,
+                chain.state_root_contract.clone(),
+            );
+            confirmations.insert(
+                chain.chain_id as u64,
+                chain.finality_threshold as u64,
+            );
+        }
+
+        let relayer_private_key = typed
+            .x3
+            .relayer_seed_phrase
+            .or(typed.x3.relayer_custody_key_id)
+            .unwrap_or_default();
+
+        Ok(Self {
+            x3_rpc: typed.x3.rpc_url,
+            evm_rpcs,
+            gateway_addresses,
+            x3_bridge_address: std::env::var("X3_BRIDGE").unwrap_or_default(),
+            confirmations,
+            poll_interval_secs: typed.submission.timeout_secs.min(u64::MAX as u64),
+            max_retries: typed.submission.max_retries,
+            relayer_private_key,
+            db_path: std::env::var("DB_PATH").unwrap_or_else(|_| "/tmp/x3-relayer.db".into()),
+        })
+    }
+
+    fn from_env_vars() -> Self {
         Self {
             x3_rpc: std::env::var("X3_RPC").unwrap_or_else(|_| "ws://127.0.0.1:9944".into()),
             evm_rpcs: {
@@ -71,9 +128,9 @@ impl RelayerConfig {
             x3_bridge_address: std::env::var("X3_BRIDGE").unwrap_or_default(),
             confirmations: {
                 let mut m = HashMap::new();
-                m.insert(1, 64); // Ethereum: 64 confirmations
-                m.insert(8453, 32); // Base: 32 confirmations
-                m.insert(42161, 32); // Arbitrum: 32 confirmations
+                m.insert(1, 64);
+                m.insert(8453, 32);
+                m.insert(42161, 32);
                 m
             },
             poll_interval_secs: std::env::var("POLL_INTERVAL")
@@ -87,6 +144,46 @@ impl RelayerConfig {
             relayer_private_key: std::env::var("RELAYER_KEY").unwrap_or_default(),
             db_path: std::env::var("DB_PATH").unwrap_or_else(|_| "/tmp/x3-relayer.db".into()),
         }
+    }
+
+    /// Expand ${VAR} and $VAR shell-style references in the raw YAML string.
+    fn expand_env_vars(raw: &str) -> String {
+        let mut result = String::with_capacity(raw.len());
+        let mut chars = raw.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '$' {
+                if chars.peek() == Some(&'{') {
+                    chars.next(); // consume '{'
+                    let mut var = String::new();
+                    while let Some(&nc) = chars.peek() {
+                        if nc == '}' {
+                            chars.next(); // consume '}'
+                            break;
+                        }
+                        var.push(nc);
+                        chars.next();
+                    }
+                    let val = std::env::var(&var).unwrap_or_default();
+                    result.push_str(&val);
+                } else {
+                    let mut var = String::new();
+                    while let Some(&nc) = chars.peek() {
+                        if nc.is_alphanumeric() || nc == '_' {
+                            var.push(nc);
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+                    let val = std::env::var(&var).unwrap_or_default();
+                    result.push_str(&val);
+                }
+            } else {
+                result.push(c);
+            }
+        }
+        result
     }
 }
 

@@ -81,7 +81,6 @@ parameter_types! {
 }
 
 impl pallet_x3_da::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxBlobSize = MaxBlobSize;
     type PerByteFee = DaPerByteFee;

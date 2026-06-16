@@ -145,7 +145,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<T> std::io::Write for RtVariableCoreWrapper<T>
 where

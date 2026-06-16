@@ -894,7 +894,6 @@ mod tests {
     }
 
     impl pallet::Config for Test {
-        type RuntimeEvent = RuntimeEvent;
         type Currency = Balances;
         type MaxAccountDataSize = ConstU32<{ 10 * 1024 * 1024 }>;
         type MaxProgramSize = ConstU32<{ 10 * 1024 * 1024 }>;

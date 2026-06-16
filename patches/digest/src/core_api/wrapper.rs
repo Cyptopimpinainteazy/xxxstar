@@ -240,7 +240,7 @@ where
     const OID: ObjectIdentifier = T::OID;
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<T> std::io::Write for CoreWrapper<T>
 where

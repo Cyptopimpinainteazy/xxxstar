@@ -936,11 +936,32 @@ fn seed_ide_telemetry() -> IdeTelemetryData {
 
 /// Background telemetry stream: refreshes system metrics, updates in-memory
 /// swarm/network/storage/IDE state from live RPC when the node is reachable,
-/// and falls back to jitter-based simulation when it is not.
+/// emits `block:new` events for the SceneManager BlockStore, and falls back
+/// to jitter-based simulation when the node is not reachable.
 fn start_telemetry_stream(app: AppHandle, state: TelemetryState) {
   tauri::async_runtime::spawn(async move {
     loop {
       sleep(Duration::from_millis(3000)).await;
+
+      // ── Emit real block data for SceneManager BlockStore ──
+      if let Some(block_result) = rpc_call("chain_getBlock", serde_json::json!([])).await {
+        let block_num = block_result
+          .get("block")
+          .and_then(|b| b.get("header"))
+          .and_then(|h| h.get("number"))
+          .and_then(|n| n.as_str())
+          .and_then(|s| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok())
+          .unwrap_or(0);
+        let _ = app.emit("block:new", serde_json::json!({
+          "number": block_num,
+          "timestamp": block_result
+            .get("block")
+            .and_then(|b| b.get("header"))
+            .and_then(|h| h.get("timestamp"))
+            .unwrap_or(&serde_json::Value::Null)
+        }));
+      }
+
       let mut rng = rand::thread_rng();
       update_swarm(&state, &mut rng);
       update_network(&state, &mut rng);
@@ -1206,6 +1227,89 @@ fn clamp_u8_signed(value: i16, min: u8, max: u8) -> u8 {
   value.max(min as i16).min(max as i16) as u8
 }
 
+/* ─── Panel Absorption Commands ─────────────────── */
+// These commands proxy x3-intelligence / validators / phase5_panel data
+// through Tauri invoke() instead of direct browser API calls.
+
+#[tauri::command]
+async fn get_validators() -> Result<serde_json::Value, IpcError> {
+  let result = rpc_call("validator_getValidators", serde_json::json!([])).await;
+  Ok(result.unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+async fn get_network_overview() -> Result<serde_json::Value, IpcError> {
+  // Combines system_chain + system_health + system_peers for the
+  // x3-intelligence NetworkOverview panel.
+  let chain_info = rpc_call("system_chain", serde_json::json!([]))
+    .await
+    .unwrap_or(serde_json::json!({}));
+  let health = rpc_call("system_health", serde_json::json!([]))
+    .await
+    .unwrap_or(serde_json::json!({}));
+  let peers = rpc_call("system_peers", serde_json::json!([]))
+    .await
+    .unwrap_or(serde_json::json!([]));
+  Ok(serde_json::json!({
+    "chain": chain_info,
+    "health": health,
+    "peers": peers,
+  }))
+}
+
+#[tauri::command]
+async fn get_swarm_activity() -> Result<serde_json::Value, IpcError> {
+  // Proxies x3-swarm-api :8787/tasks via Tauri (Rust-to-Rust, no CORS).
+  let client = reqwest::Client::builder()
+    .timeout(Duration::from_millis(1500))
+    .build()
+    .map_err(|e| IpcError::new("HTTP_CLIENT", &format!("{e}"), None))?;
+  match client.get("http://127.0.0.1:8787/tasks").send().await {
+    Ok(resp) => Ok(resp.json().await.unwrap_or(serde_json::json!({ "tasks": [] }))),
+    Err(e) => Ok(serde_json::json!({
+      "tasks": [],
+      "error": format!("Swarm API unreachable: {e}"),
+      "swarm_api": "http://127.0.0.1:8787",
+    })),
+  }
+}
+
+#[tauri::command]
+async fn get_supply_data() -> Result<serde_json::Value, IpcError> {
+  let result = rpc_call("token_getSupply", serde_json::json!([])).await;
+  Ok(result.unwrap_or(serde_json::json!({
+    "total_supply": "0",
+    "circulating_supply": "0",
+    "locked_supply": "0",
+  })))
+}
+
+#[tauri::command]
+async fn get_cross_vm_activity() -> Result<serde_json::Value, IpcError> {
+  let result = rpc_call("crossVm_getRecentTransfers", serde_json::json!([{ "limit": 20 }])).await;
+  Ok(result.unwrap_or(serde_json::json!({
+    "transfers": [],
+    "total": 0,
+  })))
+}
+
+#[tauri::command]
+async fn get_validator_leaderboard() -> Result<serde_json::Value, IpcError> {
+  let result = rpc_call("validator_getLeaderboard", serde_json::json!([])).await;
+  Ok(result.unwrap_or(serde_json::json!([])))
+}
+
+#[tauri::command]
+async fn get_validator_metrics() -> Result<serde_json::Value, IpcError> {
+  let result = rpc_call("validator_getMetrics", serde_json::json!([])).await;
+  Ok(result.unwrap_or(serde_json::json!({
+    "active": 0,
+    "total": 0,
+    "era": 0,
+    "next_era": 0,
+  })))
+}
+
 /* ─── Application Registry ──────────────────────── */
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1250,6 +1354,14 @@ fn main() {
       // ── Existing Commands ──
       get_app_registry,
       launch_swarm_health,
+      // ── Panel Absorption (x3-intelligence / validators / phase5) ──
+      get_validators,
+      get_network_overview,
+      get_swarm_activity,
+      get_supply_data,
+      get_cross_vm_activity,
+      get_validator_leaderboard,
+      get_validator_metrics,
       launch_network_control,
       launch_storage_monitor,
       launch_ide_ipc,

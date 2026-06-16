@@ -20,6 +20,9 @@ serde_json = "1"
 # Redis for atomic registry - Phase 2 upgrade
 redis = { version = "0.32.7", features = ["aio", "tokio-comp"] }
 
+# Async trait support
+async-trait = "0.1"
+
 # Logging
 log = "0.4"
 tracing = "0.1"

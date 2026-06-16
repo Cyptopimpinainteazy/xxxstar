@@ -54,7 +54,6 @@ parameter_types! {
 }
 
 impl pallet_x3_custody::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     /// Governance: root only (simulates on-chain council supermajority).
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     /// Operator: any signed account.

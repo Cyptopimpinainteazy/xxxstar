@@ -29,7 +29,6 @@ parameter_types! {
 }
 
 impl pallet_x3_flashloan::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type FeeBasisPoints = FeeBasisPoints;
     type MaxLoanFraction = MaxLoanFraction;

@@ -311,26 +311,6 @@ mod tests {
     use crate::error::Result;
     use std::sync::Arc;
 
-    struct MockRegistry;
-    #[async_trait::async_trait]
-    impl crate::registry::AtomicRegistryTrait for MockRegistry {
-        async fn register_swap(&self, _record: &AtomicSwapRecord) -> Result<()> {
-            Ok(())
-        }
-        async fn update_phase(&self, _swap_id: &str, _phase: SwapPhase) -> Result<()> {
-            Ok(())
-        }
-        async fn mark_evm_validated(&self, _swap_id: &str, _valid: bool) -> Result<()> {
-            Ok(())
-        }
-        async fn mark_svm_validated(&self, _swap_id: &str, _valid: bool) -> Result<()> {
-            Ok(())
-        }
-        async fn get_swap(&self, _swap_id: &str) -> Result<Option<AtomicSwapRecord>> {
-            Ok(None)
-        }
-    }
-
     #[test]
     fn evm_side_rejects_empty_data() {
         let orchestrator = AtomicSwapOrchestrator {

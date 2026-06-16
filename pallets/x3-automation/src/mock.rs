@@ -121,7 +121,6 @@ impl pallet_balances::Config for Test {
 }
 
 impl Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxTasksPerAccount = MaxTasksPerAccount;
     type BaseRegistrationFee = BaseRegistrationFee;

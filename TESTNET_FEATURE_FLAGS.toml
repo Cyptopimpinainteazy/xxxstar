@@ -1,16 +1,31 @@
+# X3 Atomic Star — Testnet Feature Flags
+# Updated: 2026-06-16 — Bridge-Enabled Public Testnet target
+# This file is the authoritative runtime feature-gate configuration.
+# All CI, deployment, and documentation MUST align with this file.
+# Contradictions in other repo documents are superseded by these flags.
+
+# === Live & Active ===
 atomic_kernel = "LIVE_TESTNET"
 atomic_router = "LIVE_TESTNET"
-atomic_gateway = "GUARDED_TESTNET"
-btc_fortress_gateway = "SIM_TESTNET"
-axe = "GUARDED_TESTNET"
-x3_forge = "GUARDED_TESTNET"
 atomic_lock = "LIVE_TESTNET"
-x3_sentinel = "GUARDED_TESTNET"
-x3_swarm = "GUARDED_TESTNET"
 x3_reactor = "LIVE_TESTNET"
 x3_broadcast = "LIVE_TESTNET"
 x3_grantsmith = "LIVE_TESTNET"
+
+# === Guarded Testnet (enabled with safety constraints) ===
+atomic_gateway = "GUARDED_TESTNET"
+axe = "GUARDED_TESTNET"
+x3_forge = "GUARDED_TESTNET"
+x3_sentinel = "GUARDED_TESTNET"
+x3_swarm = "GUARDED_TESTNET"
+
+# === Bridge-Enabled Public Testnet ===
+# external_bridges_mainnet is DISABLED_BLOCKED until a real Ed25519 verifier
+# and cryptographic proof checks are deployed on-chain (see EvmReceiptVerifier.sol).
+# GUARDED_TESTNET was reverted because the verifier accepted arbitrary proof bytes.
+external_bridges_mainnet = "DISABLED_BLOCKED"
+btc_mainnet_gateway = "SIM_TESTNET"
+
+# === Still Blocked (post-audit phase) ===
 ai_consensus = "DISABLED_BLOCKED"
 auto_mainnet_deploy = "DISABLED_BLOCKED"
-btc_mainnet_gateway = "DISABLED_BLOCKED"
-external_bridges_mainnet = "DISABLED_BLOCKED"

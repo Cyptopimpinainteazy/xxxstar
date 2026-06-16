@@ -87,7 +87,6 @@ parameter_types! {
 }
 
 impl pallet_private_execution::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type BurnDestination = ();
     type AdminOrigin = frame_system::EnsureRoot<u64>;

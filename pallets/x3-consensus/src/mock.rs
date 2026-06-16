@@ -165,7 +165,6 @@ impl crate::weights::WeightInfo for MockWeightInfo {
 }
 
 impl Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type MaxValidators = MaxValidators;
     type SlashFraction = SlashFraction;
     type MinStakeAfterSlash = MinStakeAfterSlash;

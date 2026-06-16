@@ -232,7 +232,6 @@ mod tests {
     }
 
     impl Config for Test {
-        type RuntimeEvent = RuntimeEvent;
         type MaxSessionIdLength = ConstU32<256>;
     }
 

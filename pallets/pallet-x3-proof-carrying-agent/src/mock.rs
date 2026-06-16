@@ -108,7 +108,6 @@ impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for MockAdminOrigin {
 }
 
 impl pallet_x3_proof_carrying_agent::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type AdminOrigin = MockAdminOrigin;
     type MaxActionPayloadSize = MaxActionPayloadSize;

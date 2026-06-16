@@ -237,9 +237,11 @@ impl SvmExecutorAdapter for FailingMockSvmAdapter {
     }
 }
 
+/// The unit-type adapter exists ONLY for test support and backwards compatibility
+/// in non-production contexts.
+#[cfg(any(test, feature = "dev-mock"))]
 impl SvmExecutorAdapter for () {
     fn execute(_payload: &[u8], _compute_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
-        // Unit type returns mock receipt (for backwards compatibility)
         Ok(ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,
             success: true,
@@ -353,9 +355,13 @@ impl X3ExecutorAdapter for FailingMockX3Adapter {
     }
 }
 
+/// The unit-type adapter exists ONLY for test support and backwards compatibility
+/// in non-production contexts.  Production code MUST use a concrete adapter
+/// (e.g. `FrontierEvmAdapter`, `SolanaBpfAdapter`, or a custom `X3ExecutorAdapter` impl)
+/// and MUST NOT allow `()` to silently produce mock receipts.
+#[cfg(any(test, feature = "dev-mock"))]
 impl X3ExecutorAdapter for () {
     fn execute(_payload: &[u8], _gas_limit: u64) -> Result<ExecutionReceipt, DispatchError> {
-        // Unit type returns mock receipt (for backwards compatibility)
         Ok(ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,
             success: true,

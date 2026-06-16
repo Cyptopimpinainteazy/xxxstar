@@ -177,14 +177,17 @@ wait_for_finality() {
 validate_chain_state() {
     echo -e "${BLUE}🔍 Validating chain state...${NC}"
 
+    # Use chain_getHeader (valid Substrate RPC) to get current best block number.
+    # chain_getBlockNumber is not a valid Substrate RPC method.
     local BLOCK_HEIGHT=$(curl -s http://127.0.0.1:9933 \
         -X POST \
         -H "Content-Type: application/json" \
-        -d '{"jsonrpc":"2.0","method":"chain_getBlockNumber","params":[],"id":1}' \
-        2>/dev/null | grep -oP '"result":"0x[a-f0-9]*' | grep -oP '0x[a-f0-9]*')
+        -d '{"jsonrpc":"2.0","method":"chain_getHeader","params":[],"id":1}' \
+        2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result']['number'])" 2>/dev/null || echo "")
 
     if [[ -n "$BLOCK_HEIGHT" ]]; then
-        echo -e "${GREEN}✅ Chain producing blocks: Height = $BLOCK_HEIGHT${NC}"
+        local BLOCK_DEC=$(python3 -c "print(int('$BLOCK_HEIGHT',16))" 2>/dev/null || echo "0")
+        echo -e "${GREEN}✅ Chain producing blocks: Height = $BLOCK_HEIGHT ($BLOCK_DEC decimal)${NC}"
         return 0
     else
         echo -e "${YELLOW}⚠️  Could not verify block production${NC}"
@@ -222,8 +225,8 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 echo -e "${YELLOW}🌐 RPC Endpoints:${NC}"
 for ((i=1; i<=VALIDATORS; i++)); do
-    local RPC_PORT=$((RPC_PORT_BASE + i - 1))
-    echo "   Validator $i: http://127.0.0.1:$RPC_PORT"
+    RPCPORT=$((RPC_PORT_BASE + i - 1))
+    echo "   Validator $i: http://127.0.0.1:$RPCPORT"
 done
 
 echo ""
@@ -238,34 +241,32 @@ echo -e "${YELLOW}🔄 Live Logs:${NC}"
 echo "   tail -f $LOG_DIR/validator1.log"
 echo ""
 
+# ── Parse mode ───────────────────────────────────────────────────────────────
+# Usage: bash scripts/testnet-full-launch.sh [N] [--smoke]
+#   --smoke: exit after readiness checks instead of running the health loop.
+MODE="interactive"
+SMOKE_EXIT_CODE=0
+
+if [[ "${2:-}" == "--smoke" ]]; then
+    MODE="smoke"
+fi
+
 # ── Health check loop ────────────────────────────────────────────────────────
-echo -e "${BLUE}ℹ️  Testnet running. Press Ctrl+C to stop.${NC}"
-echo ""
-
-declare -A PREV_BEST
-declare -A PREV_FINALIZED
-for ((i=1; i<=VALIDATORS; i++)); do
-    PREV_BEST[$i]=0
-    PREV_FINALIZED[$i]=0
-done
-
-while true; do
-    sleep 30
-
+run_health_checks() {
     echo -e "${BLUE}── Health check $(date '+%H:%M:%S') ──────────────────────────────${NC}"
 
     ALL_OK=true
 
-    for ((i=1; i<=VALIDATORS; i++)); do
-        local PORT=$((RPC_PORT_BASE + i - 1))
-        local ENDPOINT="http://127.0.0.1:$PORT"
+    for ((vi=1; vi<=VALIDATORS; vi++)); do
+        PORT=$((RPC_PORT_BASE + vi - 1))
+        ENDPOINT="http://127.0.0.1:$PORT"
 
         # 1. RPC responsiveness
         HEALTH=$(curl -sf --max-time 5 "$ENDPOINT" \
             -H 'Content-Type: application/json' \
             -d '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' 2>/dev/null)
         if [[ -z "$HEALTH" ]]; then
-            echo -e "  ${RED}❌ Validator $i (port $PORT): RPC not responding${NC}"
+            echo -e "  ${RED}❌ Validator $vi (port $PORT): RPC not responding${NC}"
             ALL_OK=false
             continue
         fi
@@ -277,7 +278,7 @@ while true; do
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('result',[])))" 2>/dev/null || echo "0")
         REQUIRED_PEERS=$((VALIDATORS - 1))
         if [[ "$PEERS" -lt "$REQUIRED_PEERS" ]]; then
-            echo -e "  ${YELLOW}⚠️  Validator $i: only $PEERS/$REQUIRED_PEERS required peers${NC}"
+            echo -e "  ${YELLOW}⚠️  Validator $vi: only $PEERS/$REQUIRED_PEERS required peers${NC}"
             ALL_OK=false
         fi
 
@@ -288,11 +289,11 @@ while true; do
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result']['number'])" 2>/dev/null || echo "0x0")
         BEST_DEC=$(python3 -c "print(int('$BEST_HEX',16))" 2>/dev/null || echo "0")
 
-        if [[ "$BEST_DEC" -le "${PREV_BEST[$i]}" ]]; then
-            echo -e "  ${RED}❌ Validator $i: block production stalled (best=$BEST_DEC)${NC}"
+        if [[ "$BEST_DEC" -le "${PREV_BEST[$vi]}" ]]; then
+            echo -e "  ${RED}❌ Validator $vi: block production stalled (best=$BEST_DEC)${NC}"
             ALL_OK=false
         fi
-        PREV_BEST[$i]=$BEST_DEC
+        PREV_BEST[$vi]=$BEST_DEC
 
         # 4. Finality advancing
         FIN_HASH=$(curl -sf --max-time 5 "$ENDPOINT" \
@@ -305,12 +306,12 @@ while true; do
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result']['number'])" 2>/dev/null || echo "0x0")
         FIN_DEC=$(python3 -c "print(int('$FIN_HDR',16))" 2>/dev/null || echo "0")
 
-        if [[ "$FIN_DEC" -le "${PREV_FINALIZED[$i]}" ]] && [[ "${PREV_FINALIZED[$i]}" -gt 0 ]]; then
-            echo -e "  ${YELLOW}⚠️  Validator $i: finality stalled (finalized=$FIN_DEC, prev=${PREV_FINALIZED[$i]})${NC}"
+        if [[ "$FIN_DEC" -le "${PREV_FINALIZED[$vi]}" ]] && [[ "${PREV_FINALIZED[$vi]}" -gt 0 ]]; then
+            echo -e "  ${YELLOW}⚠️  Validator $vi: finality stalled (finalized=$FIN_DEC, prev=${PREV_FINALIZED[$vi]})${NC}"
         fi
-        PREV_FINALIZED[$i]=$FIN_DEC
+        PREV_FINALIZED[$vi]=$FIN_DEC
 
-        echo -e "  ${GREEN}✅ Validator $i (port $PORT): best=$BEST_DEC finalized=$FIN_DEC peers=$PEERS${NC}"
+        echo -e "  ${GREEN}✅ Validator $vi (port $PORT): best=$BEST_DEC finalized=$FIN_DEC peers=$PEERS${NC}"
     done
 
     if [[ "$ALL_OK" == "true" ]]; then
@@ -319,4 +320,29 @@ while true; do
         echo -e "  ${YELLOW}⚠️  Issues detected — check logs in $LOG_DIR${NC}"
     fi
     echo ""
+}
+
+# the `local` declarations were previously inside the while loop body
+# (not inside a function) which is illegal in Bash.  They are now removed.
+declare -A PREV_BEST
+declare -A PREV_FINALIZED
+for ((i=1; i<=VALIDATORS; i++)); do
+    PREV_BEST[$i]=0
+    PREV_FINALIZED[$i]=0
+done
+
+if [[ "$MODE" == "smoke" ]]; then
+    echo -e "${BLUE}ℹ️  Smoke-test mode: running one health check, then exiting.${NC}"
+    echo ""
+    run_health_checks
+    echo -e "${GREEN}✅ Smoke test complete — readiness checks passed.${NC}"
+    exit $SMOKE_EXIT_CODE
+fi
+
+echo -e "${BLUE}ℹ️  Testnet running. Press Ctrl+C to stop.${NC}"
+echo ""
+
+while true; do
+    sleep 30
+    run_health_checks
 done

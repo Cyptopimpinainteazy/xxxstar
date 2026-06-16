@@ -123,6 +123,9 @@ fn generate_testnet_report(registry: &FeatureRegistry, flags: &Flags) -> String 
         "".to_string(),
     ];
 
+    let mut blocker_count_total = 0u32;
+    let mut blocked_features: Vec<&str> = Vec::new();
+
     for (feature, record) in sorted_registry_entries(registry) {
         let mode = flags
             .get(feature)
@@ -143,12 +146,74 @@ fn generate_testnet_report(registry: &FeatureRegistry, flags: &Flags) -> String 
             .as_ref()
             .map_or_else(|| "none".to_string(), |paths| paths.join(", "));
         lines.push(format!("- **{}**: mode={}, tests={}, proof={}, health={}, readiness_score={}, blockers={}, dangerous_paths={}", feature, mode, record.required_tests.len(), proof_report, health_endpoint, readiness_score, blocker_count, dangerous_paths));
+
+        if mode == "DISABLED_BLOCKED" {
+            blocked_features.push(feature);
+        }
+        if blocker_count > 0 {
+            blocker_count_total += blocker_count as u32;
+        }
     }
 
+    // Compute pass/fail from real criteria rather than a hardcoded GO verdict.
+    let external_bridges_mode = flags
+        .get("external_bridges_mainnet")
+        .map(|s| s.as_str())
+        .unwrap_or("DISABLED_BLOCKED");
+    let bridge_blocked = external_bridges_mode == "DISABLED_BLOCKED";
+
+    let any_blocked = !blocked_features.is_empty();
+
+    // A feature not in LIVE_TESTNET or GUARDED_TESTNET counts as not-ready.
+    let unready_count = registry
+        .iter()
+        .filter(|(feature, record)| {
+            let mode = flags
+                .get(*feature)
+                .cloned()
+                .unwrap_or_else(|| record.mode.clone());
+            mode != "LIVE_TESTNET" && mode != "GUARDED_TESTNET"
+        })
+        .count();
+
+    let go = !any_blocked && unready_count == 0 && blocker_count_total == 0;
+
+    lines.push("".to_string());
+    lines.push("## Computed Pass/Fail Criteria".to_string());
+    lines.push(format!("- blocked_features: {:?}", blocked_features));
+    lines.push(format!("- unready_count: {}", unready_count));
+    lines.push(format!("- blocker_count_total: {}", blocker_count_total));
+    lines.push(format!("- bridge_blocked: {}", bridge_blocked));
+    lines.push(format!("- go: {}", go));
     lines.push("".to_string());
     lines.push("## Verdict".to_string());
-    lines.push("- TESTNET GO: NO".to_string());
-    lines.push("- Notes: This report is auto-generated from the feature registry and requires explicit proof report generation for GO status.".to_string());
+    if go {
+        lines.push("- TESTNET GO: YES".to_string());
+    } else {
+        lines.push("- TESTNET GO: NO".to_string());
+        if bridge_blocked {
+            lines.push("- Reason: external_bridges_mainnet is DISABLED_BLOCKED (real on-chain Ed25519 verification not available).");
+        }
+        if any_blocked {
+            lines.push(format!(
+                "- Reason: {} feature(s) still DISABLED_BLOCKED.",
+                blocked_features.len()
+            ));
+        }
+        if unready_count > 0 {
+            lines.push(format!(
+                "- Reason: {} feature(s) not in LIVE_TESTNET or GUARDED_TESTNET.",
+                unready_count
+            ));
+        }
+        if blocker_count_total > 0 {
+            lines.push(format!(
+                "- Reason: {} total blocker(s) across features.",
+                blocker_count_total
+            ));
+        }
+    }
+    lines.push("- Notes: Readiness verdict is computed from FEATURE_REGISTRY.toml and TESTNET_FEATURE_FLAGS.toml. Deploy gate requires `go: true`.".to_string());
     lines.join("\n")
 }
 

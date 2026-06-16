@@ -60,7 +60,6 @@ parameter_types! {
 }
 
 impl pallet_x3_dapp_hub::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type GovernanceOrigin = frame_system::EnsureRoot<u64>;
     type MaxDAppsPerDeveloper = MaxDAppsPerDeveloper;
     type MaxActiveDApps = MaxActiveDApps;

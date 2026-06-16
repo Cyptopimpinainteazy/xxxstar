@@ -1,9 +1,10 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{Method, StatusCode},
     routing::{get, post},
     Json, Router,
 };
+use tower_http::cors::{Any, CorsLayer};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, VecDeque};
@@ -60,6 +61,12 @@ async fn main() {
     }
 
     let state: SharedState = Arc::new(Mutex::new(initial));
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any);
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/status", get(status))
@@ -75,6 +82,7 @@ async fn main() {
         .route("/memory", get(list_memory).post(create_memory))
         .route("/events", get(list_events))
         .route("/kill-switch", post(kill_switch))
+        .layer(cors)
         .with_state(state);
 
     let listener = TcpListener::bind("127.0.0.1:8787")

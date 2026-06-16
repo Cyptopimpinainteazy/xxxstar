@@ -75,13 +75,13 @@ impl pallet_balances::Config for Test {
 }
 
 impl Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type Balance = u128;
     type MaxPendingRequests = MaxPendingRequests;
     type BaseFee = BaseFee;
     type FeePerByte = FeePerByte;
     type MaxSeedLength = MaxSeedLength;
+    type FulfillerOrigin = frame_system::EnsureRoot<Self::AccountId>;
     type WeightInfo = ();
 }
 

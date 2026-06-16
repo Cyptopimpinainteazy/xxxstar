@@ -5,7 +5,7 @@
 use crate as pallet_x3_lp_locker;
 use frame_support::{
     construct_runtime, derive_impl, parameter_types,
-    traits::{ConstU32, ConstU64},
+    traits::{ConstU16, ConstU64},
 };
 use sp_core::H256;
 use sp_runtime::{
@@ -25,6 +25,7 @@ construct_runtime!(
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl frame_system::Config for Test {
+    type Block = Block;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
@@ -44,7 +45,7 @@ impl frame_system::Config for Test {
     type OnNewAccount = ();
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
-    type SS58Prefix = ConstU32<42>;
+    type SS58Prefix = ConstU16<42>;
     type OnSetCode = ();
     type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
@@ -55,7 +56,6 @@ parameter_types! {
 }
 
 impl pallet_x3_lp_locker::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type MinLockDuration = MinLockDuration;
     type MaxLockDuration = MaxLockDuration;
     type WeightInfo = ();
