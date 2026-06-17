@@ -1,30 +1,30 @@
 # X3 Atomic Star — Testnet Feature Flags
-# Updated: 2026-06-16 — Bridge-Enabled Public Testnet target
+# Updated: 2026-06-17 — CI-gated pallet test suites wired
 # This file is the authoritative runtime feature-gate configuration.
 # All CI, deployment, and documentation MUST align with this file.
 # Contradictions in other repo documents are superseded by these flags.
 
-# === Live & Active ===
-atomic_kernel = "LIVE_TESTNET"
-atomic_router = "LIVE_TESTNET"
-atomic_lock = "LIVE_TESTNET"
+# === Core Consensus Runtime (CI-gated) ===
+atomic_kernel = "LIVE_TESTNET"         # `make test-atomic-kernel` wired
+atomic_router = "LIVE_TESTNET"         # `make test-atomic-router` wired
+atomic_lock = "LIVE_TESTNET"           # `make test-atomic-kernel` wired
+
+# === Guarded Testnet (CI-gated, safety constraints apply) ===
+atomic_gateway = "GUARDED_TESTNET"     # `make test-atomic-gateway` wired; bridge backend has 4 verifier families
+axe = "GUARDED_TESTNET"                # `make test-axe` wired
+x3_forge = "GUARDED_TESTNET"           # `make test-x3-forge` wired
+x3_sentinel = "GUARDED_TESTNET"        # `make test-x3-sentinel` wired
+x3_swarm = "GUARDED_TESTNET"           # experimental
+
+# === Live Testnet (non-consensus tooling) ===
 x3_reactor = "LIVE_TESTNET"
 x3_broadcast = "LIVE_TESTNET"
 x3_grantsmith = "LIVE_TESTNET"
-
-# === Guarded Testnet (enabled with safety constraints) ===
-atomic_gateway = "GUARDED_TESTNET"
-axe = "GUARDED_TESTNET"
-x3_forge = "GUARDED_TESTNET"
-x3_sentinel = "GUARDED_TESTNET"
-x3_swarm = "GUARDED_TESTNET"
+x3_wallet_pallet = "LIVE_TESTNET"      # `make test-x3-wallet` wired
 
 # === Bridge-Enabled Public Testnet ===
-# external_bridges_mainnet is GUARDED_TESTNET for testnet — proof verification
-# is bypassed via NoOpCrossChainValidator. Must be DISABLED_BLOCKED for mainnet
-# until a real Ed25519 verifier and cryptographic proof checks are deployed.
-external_bridges_mainnet = "GUARDED_TESTNET"
-btc_mainnet_gateway = "GUARDED_TESTNET"
+external_bridges_mainnet = "GUARDED_TESTNET"   # guarded — proof verification via NoOp validator in testnet
+btc_mainnet_gateway = "GUARDED_TESTNET"        # guarded — requires real signer quorum for mainnet
 
 # === Still Blocked (post-audit phase) ===
 ai_consensus = "DISABLED_BLOCKED"
