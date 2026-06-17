@@ -38,6 +38,19 @@ impl Default for VMConfig {
     }
 }
 
+/// A snapshot of VM state taken at ATOMIC_BEGIN, used to restore state
+/// on ATOMIC_ROLLBACK.
+#[derive(Clone, Debug)]
+pub struct VmSnapshot {
+    pub registers: Vec<Register>,
+    pub memory: Vec<u8>,
+    pub asset_ops_len: usize,
+    pub bridge_receipts_len: usize,
+    pub pc: usize,
+    pub call_stack: Vec<usize>,
+    pub instruction_count: u128,
+}
+
 #[derive(Clone, Debug)]
 pub struct VMState {
     pub registers: Vec<Register>,
@@ -53,6 +66,14 @@ pub struct VMState {
     pub bridge_ops: Vec<BridgePayload>,
     pub bridge_receipts: Vec<Vec<u8>>,
     pub paused: bool,
+    /// Atomic scope rollback snapshot (set by ATOMIC_BEGIN, consumed by ATOMIC_ROLLBACK).
+    pub atomic_snapshot: Option<VmSnapshot>,
+    /// Failure handler PC targets registered by ON_FAIL.
+    pub failure_handlers: Vec<usize>,
+    /// If set, instruction_count exceeding this causes a timeout panic.
+    pub timeout_deadline: Option<u128>,
+    /// Monotonically increasing instruction counter for timeout enforcement.
+    pub instruction_count: u128,
 }
 
 impl VMState {
@@ -71,6 +92,10 @@ impl VMState {
             bridge_ops: Vec::new(),
             bridge_receipts: Vec::new(),
             paused: false,
+            atomic_snapshot: None,
+            failure_handlers: Vec::new(),
+            timeout_deadline: None,
+            instruction_count: 0,
         }
     }
 }

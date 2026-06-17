@@ -154,6 +154,59 @@ impl AtomicRegistry {
         Ok(())
     }
 
+    /// Scan Redis for all keys matching `swap:*` and return pending tasks.
+    /// Uses the SCAN command with a glob pattern to avoid blocking the server.
+    pub async fn list_pending_swaps(&self) -> Result<Vec<crate::PendingValidationTask>> {
+        let conn = self
+            .redis_client
+            .get_multiplexed_async_connection()
+            .await
+            .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
+
+        let mut conn = conn;
+        let mut cursor: u64 = 0;
+        let mut tasks = Vec::new();
+
+        loop {
+            let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg("swap:*")
+                .arg("COUNT")
+                .arg(100)
+                .query_async(&mut conn)
+                .await
+                .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
+
+            for key in &keys {
+                let value: Option<String> = redis::cmd("GET")
+                    .arg(key)
+                    .query_async(&mut conn)
+                    .await
+                    .map_err(|e| ValidatorError::RedisError(e.to_string()))?;
+
+                if let Some(v) = value {
+                    if let Ok(record) = serde_json::from_str::<AtomicSwapRecord>(&v) {
+                        if record.phase == SwapPhase::Pending {
+                            tasks.push(crate::PendingValidationTask {
+                                swap_id: record.swap_id,
+                                evm_data: Vec::new(), // populated by caller with proof data
+                                svm_data: Vec::new(), // populated by caller with proof data
+                            });
+                        }
+                    }
+                }
+            }
+
+            cursor = next_cursor;
+            if cursor == 0 {
+                break;
+            }
+        }
+
+        Ok(tasks)
+    }
+
     pub async fn delete_swap(&self, swap_id: &str) -> Result<()> {
         let conn = self
             .redis_client

@@ -2953,6 +2953,139 @@ pub fn resolve_bridge_backend_with(
     }
 }
 
+/// Initialize a production bridge backend from environment configuration.
+///
+/// Reads `X3_BRIDGE_VERIFIER` to select the verifier family and sources
+/// verifier-specific parameters from environment variables. Returns a
+/// `ProductionBridgeAdapter` wrapping the configured verifier and a
+/// `FileReceiptStore` for persistent receipt storage.
+///
+/// # Verifier families
+/// - `evm-light-client` → `EthereumLightClientVerifier`
+///   - `X3_EVM_TRUSTED_HEADER_HASH` (required)
+///   - `X3_EVM_MIN_BLOCK_NUMBER` (optional)
+///   - `X3_EVM_ERC20_CHECK_ADDRESS` (optional, enables ERC20 transfer event verification)
+/// - `svm-light-client` → `SolanaLightClientVerifier`
+///   - `X3_SVM_TRUSTED_BANK_HASH` (required)
+///   - `X3_SVM_VALIDATOR_PUBKEYS` (comma-separated, optional)
+///   - `X3_SVM_MIN_SIGNATURES` (optional, default 1)
+///   - `X3_SVM_MIN_STAKE_BPS` (optional, default 6667)
+/// - `evm-rpc` → `EthereumRpcFinalityVerifier`
+///   - `X3_EVM_RPC_URL` (required)
+///   - `X3_EVM_MIN_CONFIRMATIONS` (optional, default 12)
+/// - `svm-rpc` → `SolanaRpcFinalityVerifier`
+///   - `X3_SVM_RPC_URL` (required)
+///   - `X3_SVM_EXPECTED_PROGRAM_ID` (optional)
+///
+/// # Receipt store
+/// Uses `X3_RECEIPT_STORE_PATH` for the `FileReceiptStore` location.
+/// Defaults to `.autoclaw/bridge-receipts.jsonl` in the current directory.
+///
+/// # Failure modes
+/// Returns `BridgeError` with code `X3_BRIDGE_INIT_FAILED` when required
+/// environment variables are missing or when the verifier family is unrecognized.
+/// Never silently falls back to `DryRunBridge`. Callers that don't set
+/// `X3_BRIDGE_VERIFIER` should explicitly pass `None` and use
+/// `resolve_bridge_backend()` for the dry-run path.
+pub fn init_production_backend() -> Result<Option<Box<dyn BridgeAdapter>>, BridgeError> {
+    let verifier = match std::env::var("X3_BRIDGE_VERIFIER").as_deref() {
+        Ok("evm-light-client") => {
+            let trusted_hash = std::env::var("X3_EVM_TRUSTED_HEADER_HASH").map_err(|_| {
+                BridgeError {
+                    code: "X3_BRIDGE_INIT_FAILED",
+                    message: "X3_BRIDGE_VERIFIER=evm-light-client requires X3_EVM_TRUSTED_HEADER_HASH"
+                        .to_string(),
+                }
+            })?;
+            let mut verifier = EthereumLightClientVerifier::new(&trusted_hash);
+            if let Ok(min_block) = std::env::var("X3_EVM_MIN_BLOCK_NUMBER") {
+                if let Ok(n) = min_block.parse::<u64>() {
+                    verifier = verifier.with_min_block_number(n);
+                }
+            }
+            if let Ok(token_addr) = std::env::var("X3_EVM_ERC20_CHECK_ADDRESS") {
+                verifier = verifier.with_erc20_transfer_event(token_addr);
+            }
+            let store_path = std::env::var("X3_RECEIPT_STORE_PATH")
+                .unwrap_or_else(|_| ".autoclaw/bridge-receipts.jsonl".to_string());
+            let store = FileReceiptStore::new(&store_path);
+            ProductionBridgeAdapter::new(EvmProductionBridgeBackend::new(verifier, store))
+        }
+        Ok("svm-light-client") => {
+            let trusted_hash = std::env::var("X3_SVM_TRUSTED_BANK_HASH").map_err(|_| {
+                BridgeError {
+                    code: "X3_BRIDGE_INIT_FAILED",
+                    message: "X3_BRIDGE_VERIFIER=svm-light-client requires X3_SVM_TRUSTED_BANK_HASH"
+                        .to_string(),
+                }
+            })?;
+            let mut verifier = SolanaLightClientVerifier::new(&trusted_hash);
+            if let Ok(pubkeys) = std::env::var("X3_SVM_VALIDATOR_PUBKEYS") {
+                verifier = verifier
+                    .with_validator_pubkeys(pubkeys.split(',').map(|s| s.trim().to_string()).collect());
+            }
+            if let Ok(min_sigs) = std::env::var("X3_SVM_MIN_SIGNATURES") {
+                if let Ok(n) = min_sigs.parse::<usize>() {
+                    verifier = verifier.with_min_signatures(n);
+                }
+            }
+            if let Ok(stake_bps) = std::env::var("X3_SVM_MIN_STAKE_BPS") {
+                if let Ok(n) = stake_bps.parse::<u64>() {
+                    verifier = verifier.with_min_stake_threshold_bps(n);
+                }
+            }
+            let store_path = std::env::var("X3_RECEIPT_STORE_PATH")
+                .unwrap_or_else(|_| ".autoclaw/bridge-receipts.jsonl".to_string());
+            let store = FileReceiptStore::new(&store_path);
+            ProductionBridgeAdapter::new(SvmProductionBridgeBackend::new(verifier, store))
+        }
+        Ok("evm-rpc") => {
+            let rpc_url = std::env::var("X3_EVM_RPC_URL").unwrap_or_else(|_| {
+                "http://localhost:8545".to_string()
+            });
+            let min_confirmations = std::env::var("X3_EVM_MIN_CONFIRMATIONS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(12);
+            let verifier = EthereumRpcFinalityVerifier::new(&rpc_url, "")
+                .with_min_confirmations(min_confirmations);
+            let store_path = std::env::var("X3_RECEIPT_STORE_PATH")
+                .unwrap_or_else(|_| ".autoclaw/bridge-receipts.jsonl".to_string());
+            let store = FileReceiptStore::new(&store_path);
+            ProductionBridgeAdapter::new(EvmProductionBridgeBackend::new(verifier, store))
+        }
+        Ok("svm-rpc") => {
+            let rpc_url = std::env::var("X3_SVM_RPC_URL").unwrap_or_else(|_| {
+                "http://localhost:8899".to_string()
+            });
+            let mut verifier = SolanaRpcFinalityVerifier::new(&rpc_url, "");
+            if let Ok(program_id) = std::env::var("X3_SVM_EXPECTED_PROGRAM_ID") {
+                verifier = verifier.with_expected_program_id(program_id);
+            }
+            let store_path = std::env::var("X3_RECEIPT_STORE_PATH")
+                .unwrap_or_else(|_| ".autoclaw/bridge-receipts.jsonl".to_string());
+            let store = FileReceiptStore::new(&store_path);
+            ProductionBridgeAdapter::new(SvmProductionBridgeBackend::new(verifier, store))
+        }
+        Ok(other) => {
+            return Err(BridgeError {
+                code: "X3_BRIDGE_INIT_FAILED",
+                message: format!(
+                    "Unrecognized X3_BRIDGE_VERIFIER value: '{}'. \
+                     Supported values: evm-light-client, svm-light-client, evm-rpc, svm-rpc",
+                    other
+                ),
+            });
+        }
+        Err(_) => {
+            // X3_BRIDGE_VERIFIER not set — caller should decide whether to
+            // use dry-run or fail. Return None to signal "no verifier configured".
+            return Ok(None);
+        }
+    };
+    Ok(Some(Box::new(verifier)))
+}
+
 fn backend_required(name: &str) -> BridgeResult {
     Err(Box::new(BridgeError {
         code: "X3_BACKEND_REQUIRED",

@@ -19,7 +19,7 @@ All items must be green before public testnet.
 | # | Item | Status | Verified By |
 |---|---|---|---|
 | 1.1 | CI secret scanning gate | ✅ DONE | TruffleHog + placeholder check in full-ci.yml |
-| 1.2 | Create signed GitHub release tag | ✅ DONE | `gh release create v0.4.0-rc.1` — https://github.com/Cyptopimpinainteazy/xxxstar/releases/tag/v0.4.0-rc.1 |
+| 1.2 | Create signed GitHub release tag | ✅ DONE | `gh release create v0.4.0-rc.1` |
 | 1.3 | Artifact attestation + SBOM pipeline | ✅ DONE | release-provenance.yml + release-hardening.yml |
 | 1.4 | Zombienet CI tests (3-node smoke) | ✅ DONE | zombienet-integration.yml with 4-validator smoke |
 | 1.5 | try-runtime upgrade pipeline | ✅ DONE | try-runtime-upgrade.yml + release-candidate-rehearsal.yml |

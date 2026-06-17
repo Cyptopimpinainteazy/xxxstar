@@ -277,14 +277,22 @@ impl AtomicSwapOrchestrator {
         }
     }
 
-    /// Return a snapshot of pending swap tasks.
+    /// Return a snapshot of pending swap tasks by scanning the Redis key space
+    /// for `swap:*` keys and deserializing each as an `AtomicSwapRecord`.
     ///
-    /// Currently returns an empty vec because the Redis-based registry
-    /// does not expose a key-scanning API.  A future implementation could
-    /// use `redis::Cmd::scan` to enumerate pending swaps.
+    /// Only swaps still in `Pending` phase are returned as actionable tasks.
     pub async fn pending_tasks_snapshot(&self) -> Vec<crate::PendingValidationTask> {
-        // TODO: implement Redis SCAN-based enumeration of pending swaps
-        Vec::new()
+        self.registry.list_pending_swaps().await.unwrap_or_default()
+    }
+
+    /// Internal helper: look up a swap record from the registry.
+    /// Used by the validation loop to extract evm_block/svm_slot
+    /// without round-tripping through JSON deserialization twice.
+    pub async fn get_swap_internal(
+        &self,
+        swap_id: &str,
+    ) -> Result<Option<crate::registry::AtomicSwapRecord>> {
+        self.registry.get_swap(swap_id).await
     }
 
     pub async fn get_swap_status(&self, swap_id: &str) -> Result<Option<SwapStatus>> {

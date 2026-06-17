@@ -93,11 +93,30 @@ impl CrossChainValidator {
             if let Some(ref orch) = self.orchestrator {
                 let pending = orch.pending_tasks_snapshot().await;
                 for task in pending {
+                    // Parse evm_block and svm_slot from the task's data payloads.
+                    // EVM data: [block_hash: 32B][state_root: 32B][parent_hash: 32B]
+                    //           [gas_limit: 8B LE][gas_used: 8B LE][timestamp: 8B LE]
+                    // The evm_block is derived from the data or passed separately.
+                    // SVM data: [blockhash: 32B][prev_blockhash: 32B] — svm_slot is separate.
+                    //
+                    // The record's evm_block/svm_slot fields from the registry are the
+                    // authoritative block/slot numbers. We read them back from the registry
+                    // rather than hard-coding zeros.
+                    let evm_block = if let Ok(Some(record)) = orch.get_swap_internal(&task.swap_id).await {
+                        record.evm_block
+                    } else {
+                        0
+                    };
+                    let svm_slot = if let Ok(Some(record)) = orch.get_swap_internal(&task.swap_id).await {
+                        record.svm_slot
+                    } else {
+                        0
+                    };
                     let _ = orch
                         .execute_atomic_swap(
                             task.swap_id,
-                            0, // evm_block extracted from data
-                            0, // svm_slot extracted from data
+                            evm_block,
+                            svm_slot,
                             task.evm_data,
                             task.svm_data,
                         )
