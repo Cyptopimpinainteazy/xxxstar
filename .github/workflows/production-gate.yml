@@ -16,5 +16,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Guard
         run: make guard
-      - name: Test
-        run: make test
+      - name: Test (core + pallets)
+        run: make test-all-pallets
+      - name: Audit (invariants + readiness + consistency)
+        run: make audit
+      - name: Mainnet Check
+        run: make mainnet-check
