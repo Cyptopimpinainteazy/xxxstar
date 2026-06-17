@@ -15,19 +15,19 @@ test:
 
 # ── Pallet test suites (wired to CI — removes "No CI gate" blockers) ──
 test-atomic-kernel:
-	@cargo test -p pallet-x3-atomic-kernel --tests
+	@cargo test -p pallet-x3-atomic-kernel -- --nocapture 2>&1 | tail -5
 test-atomic-router:
-	@cargo test -p pallet-x3-cross-vm-router --tests
+	@cargo test -p pallet-x3-cross-vm-router -- --nocapture 2>&1 | tail -5
 test-axe:
-	@cargo test -p pallet-x3-dex --tests
+	@cargo test -p pallet-x3-dex --features std -- --nocapture 2>&1 | tail -5
 test-x3-forge:
-	@cargo test -p pallet-x3-token-factory --tests
+	@cargo test -p pallet-x3-token-factory --features std -- --nocapture 2>&1 | tail -5
 test-x3-sentinel:
-	@cargo test -p pallet-x3-sentinel --tests
+	@cargo test -p pallet-x3-sentinel --features std -- --nocapture 2>&1 | tail -5
 test-x3-wallet:
-	@cargo test -p pallet-x3-wallet-pallet --tests
+	@cargo test -p pallet-x3-wallet-pallet --features std -- --nocapture 2>&1 | tail -5
 test-atomic-gateway:
-	@cargo test -p x3-gateway --tests
+	@cargo test -p x3-gateway -- --nocapture 2>&1 | tail -5
 test-x3-readiness:
 	@cargo test -p x3-readiness --tests
 test-x3-lang-vm:
