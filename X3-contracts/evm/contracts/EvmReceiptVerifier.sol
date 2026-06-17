@@ -60,7 +60,7 @@ contract EvmReceiptVerifier is IX3Verification, Ownable {
 
     /// @param initialValidators Array of Ed25519 validator public keys
     /// @param _quorumThreshold Minimum signatures required (must be ≥ 2/3 of validators)
-    constructor(bytes32[] memory initialValidators, uint256 _quorumThreshold) Ownable(msg.sender) {
+    constructor(bytes32[] memory initialValidators, uint256 _quorumThreshold) Ownable() {
         require(initialValidators.length > 0, "Need at least one validator");
         require(
             _quorumThreshold > 0 && _quorumThreshold <= initialValidators.length,
@@ -196,7 +196,7 @@ contract EvmReceiptVerifier is IX3Verification, Ownable {
         // not wired on EVM.  Accepting any proof bytes as valid quorum
         // would allow an attacker to forge withdrawal proofs and drain
         // bridge funds.
-        revert("EvmReceiptVerifier: on-chain Ed25519 verification not available — bridge blocked");
+        revert("EvmReceiptVerifier: on-chain Ed25519 verification not available - bridge blocked");
     }
 
     /// @dev Read a big-endian uint32 from bytes at `start`

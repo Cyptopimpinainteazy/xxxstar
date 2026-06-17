@@ -1,12 +1,12 @@
 //! Staking Ledger — Core position tracking
-//! 
+//!
 //! Maintains comprehensive staking positions with unbonding support,
 //! reward accumulation, and lifecycle management.
 
-use std::collections::HashMap;
+use crate::{Result, StakingError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::{Result, StakingError};
+use std::collections::HashMap;
 
 /// Staking position status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -53,7 +53,8 @@ pub struct StakingPosition {
 impl StakingPosition {
     /// Total balance including active and locked
     pub fn total_balance(&self) -> u128 {
-        let unbonding_total: u128 = self.unbonding_phases
+        let unbonding_total: u128 = self
+            .unbonding_phases
             .iter()
             .filter(|p| !p.claimed)
             .map(|p| p.amount)
@@ -77,7 +78,8 @@ impl StakingPosition {
         if self.total_balance() == 0 {
             return 0.0;
         }
-        let unbonding: u128 = self.unbonding_phases
+        let unbonding: u128 = self
+            .unbonding_phases
             .iter()
             .filter(|p| !p.claimed)
             .map(|p| p.amount)
@@ -92,7 +94,10 @@ impl StakingPosition {
 
     /// Can claim unbonded funds
     pub fn claimable_unbonded(&self) -> Vec<&UnbondingPhase> {
-        self.unbonding_phases.iter().filter(|p| p.claimed == false).collect()
+        self.unbonding_phases
+            .iter()
+            .filter(|p| p.claimed == false)
+            .collect()
     }
 }
 
@@ -412,7 +417,9 @@ mod tests {
     #[test]
     fn test_delegator_positions() {
         let mut ledger = StakingLedger::new();
-        ledger.stake("alice", "validator1", 1000, 10.0, 0.5).unwrap();
+        ledger
+            .stake("alice", "validator1", 1000, 10.0, 0.5)
+            .unwrap();
         ledger.stake("alice", "validator2", 500, 10.0, 0.5).unwrap();
         ledger.stake("bob", "validator1", 2000, 10.0, 0.5).unwrap();
 
@@ -427,9 +434,13 @@ mod tests {
     #[test]
     fn test_multiple_stakers() {
         let mut ledger = StakingLedger::new();
-        ledger.stake("alice", "validator1", 1000, 10.0, 0.5).unwrap();
+        ledger
+            .stake("alice", "validator1", 1000, 10.0, 0.5)
+            .unwrap();
         ledger.stake("bob", "validator1", 2000, 10.0, 0.5).unwrap();
-        ledger.stake("charlie", "validator2", 1500, 10.0, 0.5).unwrap();
+        ledger
+            .stake("charlie", "validator2", 1500, 10.0, 0.5)
+            .unwrap();
 
         assert_eq!(ledger.total_staked(), 4500);
         assert_eq!(ledger.active_count(), 3);
@@ -445,9 +456,7 @@ mod tests {
     #[test]
     fn test_unbond_insufficient_balance() {
         let mut ledger = StakingLedger::new();
-        let pos_id = ledger
-            .stake("alice", "validator1", 100, 10.0, 0.5)
-            .unwrap();
+        let pos_id = ledger.stake("alice", "validator1", 100, 10.0, 0.5).unwrap();
 
         let result = ledger.unbond(&pos_id, 200);
         assert!(result.is_err());
@@ -496,9 +505,7 @@ mod tests {
         let pos1 = ledger
             .stake("alice", "validator1", 1000, 10.0, 0.5)
             .unwrap();
-        let pos2 = ledger
-            .stake("alice", "validator2", 500, 10.0, 0.5)
-            .unwrap();
+        let pos2 = ledger.stake("alice", "validator2", 500, 10.0, 0.5).unwrap();
 
         ledger.accrue_rewards(&pos1, 100).unwrap();
         ledger.accrue_rewards(&pos2, 50).unwrap();

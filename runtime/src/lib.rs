@@ -2390,8 +2390,17 @@ parameter_types! {
     pub const ChallengePeriod: BlockNumber = 600;   // ~1 hour for dispute period
 }
 
+/// Testnet: use NoOpCrossChainValidator (accepts all proofs) to bypass
+/// proof verification until the cross-chain-validator pallet is fully wired.
+#[cfg(feature = "testnet")]
+pub type RuntimeCrossChainValidator =
+    pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator;
+
+/// Mainnet/RC1: use the real cross-chain-validator pallet for proof verification.
+#[cfg(not(feature = "testnet"))]
 pub struct RuntimeCrossChainValidator;
 
+#[cfg(not(feature = "testnet"))]
 impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
     for RuntimeCrossChainValidator
 {

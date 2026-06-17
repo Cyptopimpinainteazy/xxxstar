@@ -20,11 +20,11 @@ x3_sentinel = "GUARDED_TESTNET"
 x3_swarm = "GUARDED_TESTNET"
 
 # === Bridge-Enabled Public Testnet ===
-# external_bridges_mainnet is DISABLED_BLOCKED until a real Ed25519 verifier
-# and cryptographic proof checks are deployed on-chain (see EvmReceiptVerifier.sol).
-# GUARDED_TESTNET was reverted because the verifier accepted arbitrary proof bytes.
-external_bridges_mainnet = "DISABLED_BLOCKED"
-btc_mainnet_gateway = "SIM_TESTNET"
+# external_bridges_mainnet is GUARDED_TESTNET for testnet — proof verification
+# is bypassed via NoOpCrossChainValidator. Must be DISABLED_BLOCKED for mainnet
+# until a real Ed25519 verifier and cryptographic proof checks are deployed.
+external_bridges_mainnet = "GUARDED_TESTNET"
+btc_mainnet_gateway = "GUARDED_TESTNET"
 
 # === Still Blocked (post-audit phase) ===
 ai_consensus = "DISABLED_BLOCKED"

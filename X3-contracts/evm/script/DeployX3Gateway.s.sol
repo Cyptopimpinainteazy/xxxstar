@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
+import "forge-std/console.sol";
 import "../contracts/X3ExternalGateway.sol";
 
 /// @title DeployX3Gateway — Foundry deploy script for X3ExternalGateway
@@ -49,19 +50,11 @@ contract DeployX3Gateway is Script {
         vm.stopBroadcast();
 
         // Log for CI / verification scripts to capture
-        console.log("X3ExternalGateway deployed at:", address(gateway));
-        console.log("  Chain ID:", chainId);
-        console.log("  X3 Chain ID:", x3ChainId);
-        console.log("  Verifier:", verifier);
-        console.log("  Min X3 Confirmations:", minConfirmations);
-        console.log("");
-        console.log("Verify with:");
-        console.log("  forge verify-contract \\");
-        console.log("    --watch \\");
-        console.log("    --chain", chainId);
-        console.log("   ", address(gateway), "contracts/X3ExternalGateway.sol:X3ExternalGateway \\");
-        console.log("    --verifier etherscan \\");
-        console.log("    --etherscan-api-key \"$ETHERSCAN_API_KEY\" \\");
-        console.log("    --constructor-args $(cast abi-encode \"constructor(address,uint256,uint256,uint256)\"", verifier, chainId, x3ChainId, minConfirmations, ")");
+        console.log("=== X3ExternalGateway Deployed ===");
+        console.log(string(abi.encodePacked("Gateway: ", vm.toString(address(gateway)))));
+        console.log(string(abi.encodePacked("Chain ID: ", vm.toString(chainId))));
+        console.log(string(abi.encodePacked("X3 Chain ID: ", vm.toString(x3ChainId))));
+        console.log(string(abi.encodePacked("Verifier: ", vm.toString(verifier))));
+        console.log(string(abi.encodePacked("Min Confirmations: ", vm.toString(minConfirmations))));
     }
 }

@@ -416,8 +416,7 @@ impl<T: pallet::Config> pallet::Pallet<T> {
                 // Convert the u32 asset_id to a byte slice representation
                 // the oracle can interpret.
                 let asset_key = asset_id.to_le_bytes();
-                let current_price =
-                    T::Oracle::get_price(&asset_key).unwrap_or(0);
+                let current_price = T::Oracle::get_price(&asset_key).unwrap_or(0);
 
                 if *above {
                     current_price >= (*threshold as u128)

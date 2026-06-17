@@ -24,9 +24,9 @@ pub enum SwapStatus {
 /// Main orchestrator for atomic cross-chain swaps
 pub struct AtomicSwapOrchestrator {
     registry: Arc<AtomicRegistry>,
-            evm_validator: Arc<EvmHeaderValidator>,
-            svm_validator: Arc<SvmHeaderValidator>,
-            failover: Arc<FailoverManager>,
+    evm_validator: Arc<EvmHeaderValidator>,
+    svm_validator: Arc<SvmHeaderValidator>,
+    failover: Arc<FailoverManager>,
     default_timeout: Duration,
 }
 
@@ -161,14 +161,12 @@ impl AtomicSwapOrchestrator {
         Ok(SwapStatus::Committed)
     }
 
-    async fn validate_evm_side(
-        &self,
-        swap_id: &str,
-        block: u64,
-        data: Vec<u8>,
-    ) -> Result<bool> {
+    async fn validate_evm_side(&self, swap_id: &str, block: u64, data: Vec<u8>) -> Result<bool> {
         if data.is_empty() || block == 0 {
-            warn!("Swap {}: EVM validation rejected — empty data or zero block", swap_id);
+            warn!(
+                "Swap {}: EVM validation rejected — empty data or zero block",
+                swap_id
+            );
             return Ok(false);
         }
 
@@ -202,16 +200,18 @@ impl AtomicSwapOrchestrator {
         // Delegate to the EVM header validator for Keccak256-based block-hash check.
         // The CpuFailback inside EvmValidator provides CPU fallthrough when GPU is
         // unavailable, so we always get a real hash comparison.
-        match self.evm_validator.validate_header(
-            block,
-            block_hash,
-            state_root,
-            parent_hash,
-            gas_limit,
-            gas_used,
-            timestamp,
-        )
-        .await
+        match self
+            .evm_validator
+            .validate_header(
+                block,
+                block_hash,
+                state_root,
+                parent_hash,
+                gas_limit,
+                gas_used,
+                timestamp,
+            )
+            .await
         {
             Ok(computed) => {
                 let valid = computed == block_hash;
@@ -232,14 +232,12 @@ impl AtomicSwapOrchestrator {
         }
     }
 
-    async fn validate_svm_side(
-        &self,
-        swap_id: &str,
-        slot: u64,
-        data: Vec<u8>,
-    ) -> Result<bool> {
+    async fn validate_svm_side(&self, swap_id: &str, slot: u64, data: Vec<u8>) -> Result<bool> {
         if data.is_empty() || slot == 0 {
-            warn!("Swap {}: SVM validation rejected — empty data or zero slot", swap_id);
+            warn!(
+                "Swap {}: SVM validation rejected — empty data or zero slot",
+                swap_id
+            );
             return Ok(false);
         }
 
@@ -257,7 +255,10 @@ impl AtomicSwapOrchestrator {
         let prev_blockhash: [u8; 32] = data[32..64].try_into().unwrap_or_default();
 
         // Delegate to the SVM slot validator for SHA-256 / secp256k1 verification.
-        match self.svm_validator.validate_slot(slot, blockhash, prev_blockhash) {
+        match self
+            .svm_validator
+            .validate_slot(slot, blockhash, prev_blockhash)
+        {
             Ok(valid) => {
                 if !valid {
                     warn!(

@@ -322,10 +322,14 @@ mod tests {
         let real_hash = kernel.hash(&header_bytes).unwrap();
 
         // validate_hash should succeed when expected_hash matches.
-        assert!(validator.validate_hash(100, &header_bytes, real_hash).is_ok());
+        assert!(validator
+            .validate_hash(100, &header_bytes, real_hash)
+            .is_ok());
 
         // validate_hash should fail when expected_hash is different.
-        assert!(validator.validate_hash(100, &header_bytes, [0u8; 32]).is_err());
+        assert!(validator
+            .validate_hash(100, &header_bytes, [0u8; 32])
+            .is_err());
     }
 
     /// Provenance test: `validate_raw_header` must verify a known

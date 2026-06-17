@@ -12,9 +12,9 @@ fn lock_lp_creates_lock() {
 
         assert_ok!(LpLocker::lock_lp(
             RuntimeOrigin::signed(1),
-            42,     // pool_id
-            1000,   // lp_amount
-            200,    // unlock_at_block (duration = 199 blocks, >= 100 min)
+            42,   // pool_id
+            1000, // lp_amount
+            200,  // unlock_at_block (duration = 199 blocks, >= 100 min)
         ));
 
         let record = LpLocks::<Test>::get(1, 42).unwrap();
@@ -54,12 +54,7 @@ fn lock_lp_rejects_duplicate() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
 
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         assert_noop!(
             LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 2000, 300),
@@ -107,12 +102,7 @@ fn lock_lp_rejects_long_description() {
 fn unlock_lp_removes_lock_after_expiry() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         // Advance past unlock block
         frame_system::Pallet::<Test>::set_block_number(200);
@@ -135,12 +125,7 @@ fn unlock_lp_removes_lock_after_expiry() {
 fn unlock_lp_rejects_before_expiry() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         // At block 150, lock has not expired
         frame_system::Pallet::<Test>::set_block_number(150);
@@ -166,12 +151,7 @@ fn unlock_lp_rejects_nonexistent() {
 fn extend_lock_increases_duration() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         assert_ok!(LpLocker::extend_lock(RuntimeOrigin::signed(1), 42, 500));
 
@@ -184,12 +164,7 @@ fn extend_lock_increases_duration() {
 fn extend_lock_rejects_shorten() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         assert_noop!(
             LpLocker::extend_lock(RuntimeOrigin::signed(1), 42, 150),
@@ -212,12 +187,7 @@ fn extend_lock_rejects_nonexistent() {
 fn increase_lock_adds_amount() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         assert_ok!(LpLocker::increase_lock(RuntimeOrigin::signed(1), 42, 500));
 
@@ -240,12 +210,7 @@ fn increase_lock_rejects_nonexistent() {
 fn increase_lock_rejects_zero_amount() {
     new_test_ext().execute_with(|| {
         frame_system::Pallet::<Test>::set_block_number(1);
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
 
         assert_noop!(
             LpLocker::increase_lock(RuntimeOrigin::signed(1), 42, 0),
@@ -260,12 +225,7 @@ fn is_locked_returns_correct_state() {
         frame_system::Pallet::<Test>::set_block_number(1);
         assert!(!LpLocker::is_locked(&1, 42)); // no lock yet
 
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
         assert!(LpLocker::is_locked(&1, 42)); // lock active
 
         frame_system::Pallet::<Test>::set_block_number(200);
@@ -279,18 +239,8 @@ fn total_locked_for_pool_aggregates() {
         frame_system::Pallet::<Test>::set_block_number(1);
 
         // Multiple users lock LP in same pool
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(1),
-            42,
-            1000,
-            200,
-        ));
-        assert_ok!(LpLocker::lock_lp(
-            RuntimeOrigin::signed(2),
-            42,
-            500,
-            300,
-        ));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(1), 42, 1000, 200,));
+        assert_ok!(LpLocker::lock_lp(RuntimeOrigin::signed(2), 42, 500, 300,));
         assert_ok!(LpLocker::lock_lp(
             RuntimeOrigin::signed(1),
             7,

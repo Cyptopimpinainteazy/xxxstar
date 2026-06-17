@@ -20,6 +20,12 @@ pub struct FlashFinalityGossipValidator<Block: BlockT> {
     _phantom: std::marker::PhantomData<Block>,
 }
 
+impl<Block: BlockT> Default for FlashFinalityGossipValidator<Block> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Block: BlockT> FlashFinalityGossipValidator<Block> {
     /// Create a new gossip validator for Flash Finality messages.
     pub fn new() -> Self {
@@ -152,7 +158,7 @@ where
 
                                 // Sign a vote if we are a validator
                                 let public_keys = self.keystore.sr25519_public_keys(KeyTypeId(*b"flsh"));
-                                if let Some(pubkey) = public_keys.get(0) {
+                                if let Some(pubkey) = public_keys.first() {
                                     let msg = p.message_hash();
                                     if let Ok(Some(sig)) = self.keystore.sr25519_sign(KeyTypeId(*b"flsh"), pubkey, &msg) {
                                         let vote = flash_finality::Vote {

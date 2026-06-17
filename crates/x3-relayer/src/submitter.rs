@@ -223,9 +223,7 @@ impl RpcSubmitter {
 
     /// BLAKE2b-256 hash of the input data.
     fn blake2b_256(data: &[u8]) -> [u8; 32] {
-        let hash = blake2b_simd::Params::new()
-            .hash_length(32)
-            .hash(data);
+        let hash = blake2b_simd::Params::new().hash_length(32).hash(data);
         let mut out = [0u8; 32];
         out.copy_from_slice(hash.as_bytes());
         out

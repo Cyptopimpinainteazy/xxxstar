@@ -49,8 +49,7 @@ impl frame_system::Config for Test {
     type MaxConsumers = ConstU32<16>;
 }
 
-impl pallet_x3_wallet::Config for Test {
-}
+impl pallet_x3_wallet::Config for Test {}
 
 /// Build genesis storage for tests with ALICE pre-authorized as a minter.
 pub fn new_test_ext() -> sp_io::TestExternalities {

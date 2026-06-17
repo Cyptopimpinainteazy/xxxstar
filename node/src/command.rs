@@ -871,7 +871,7 @@ pub fn run() -> CliResult<()> {
             };
 
             runner.run_node_until_exit(|config| async move {
-                let role = config.role.clone();
+                let role = config.role;
                 info!("Starting X3 Chain node as {:?}", role);
                 service::new_full::<sc_network::NetworkWorker<_, _>>(config, feature_flags).map_err(
                     |e| {

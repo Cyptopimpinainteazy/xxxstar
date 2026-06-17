@@ -40,7 +40,10 @@ impl Secp256k1Kernel {
                 // into GPU memory, runs parallel secp256k1 verification, and
                 // returns the count of valid signatures + wall-clock time.
                 return crate::cuda::secp256k1_verify_batch(
-                    messages, signatures, public_keys, self.batch_size,
+                    messages,
+                    signatures,
+                    public_keys,
+                    self.batch_size,
                 );
             }
         }

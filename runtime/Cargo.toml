@@ -162,6 +162,11 @@ default = ["std", "tuples-96"]
 tuples-96 = ["frame-support/tuples-96"]
 dev = ["pallet-sudo"]
 
+# Testnet feature: enables NoOpCrossChainValidator (accepts all proofs),
+# ExternalBridgesEnabled=true in genesis, and other testnet-only config.
+# Use `--features testnet` to build the bridge-enabled testnet runtime WASM.
+testnet = []
+
 # Narrow pallet set for first public testnet / mainnet-rc1 release.
 # Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
 # swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,

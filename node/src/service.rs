@@ -577,7 +577,7 @@ pub fn new_partial(
     // Build partial components
     let (client, backend, keystore_container, task_manager) =
         sc_service::new_full_parts::<Block, RuntimeApi, _>(
-            &config,
+            config,
             telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
             executor,
         )?;
@@ -938,13 +938,13 @@ pub fn new_full<
             metrics,
         })?;
 
-    let role = config.role.clone();
+    let role = config.role;
     let force_authoring = config.force_authoring;
     let backoff_authoring_blocks: Option<()> = None;
     let name = config.network.node_name.clone();
     let chain_name = config.chain_spec.name().to_string();
     let prometheus_registry = config.prometheus_registry().cloned();
-    let role_for_grandpa = role.clone();
+    let role_for_grandpa = role;
 
     // Register X3-specific Prometheus metrics alongside Substrate's built-in metrics.
     // These counters track block production, comit lifecycle, and dual-VM execution
@@ -1015,8 +1015,7 @@ pub fn new_full<
     let flash_finality_gadget = if feature_flags.enable_flash_finality {
         let keystore = keystore_container.keystore();
         let my_id = keystore
-            .sr25519_public_keys(KeyTypeId(*b"flsh"))
-            .get(0)
+            .sr25519_public_keys(KeyTypeId(*b"flsh")).first()
             .map(|k| k.0);
 
         if let Some(my_id) = my_id {

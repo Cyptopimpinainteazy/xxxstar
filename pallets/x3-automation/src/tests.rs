@@ -172,9 +172,7 @@ fn price_threshold_task_triggers_when_oracle_crosses_threshold() {
             let task_id = Automation::account_tasks(1)[0];
 
             // Price is above threshold → condition should be satisfied.
-            assert_ok!(
-                Automation::execute_task(RuntimeOrigin::signed(2), task_id),
-            );
+            assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id),);
         });
     });
 }

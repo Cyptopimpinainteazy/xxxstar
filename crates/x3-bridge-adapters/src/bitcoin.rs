@@ -73,9 +73,7 @@ impl BridgeAdapter for BitcoinBridgeAdapter {
         }
 
         // Decode the nBits compact target.
-        let bits = u32::from_le_bytes([
-            header[72], header[73], header[74], header[75],
-        ]);
+        let bits = u32::from_le_bytes([header[72], header[73], header[74], header[75]]);
         let exponent = (bits >> 24) as usize;
         let mantissa = bits & 0x00FF_FFFF;
         if exponent == 0 || exponent > 34 {
@@ -145,9 +143,7 @@ impl BridgeAdapter for BitcoinBridgeAdapter {
 
         let block_hash = block_hash_result
             .as_str()
-            .ok_or_else(|| {
-                BridgeError::RpcError("getblockhash returned non-string".to_string())
-            })?;
+            .ok_or_else(|| BridgeError::RpcError("getblockhash returned non-string".to_string()))?;
 
         if block_hash.is_empty() {
             return Err(BridgeError::RpcError(format!(
@@ -195,11 +191,7 @@ impl BridgeAdapter for BitcoinBridgeAdapter {
     fn get_latest_block_number(&self) -> Result<u64, BridgeError> {
         self.check_gate()?;
 
-        let result = make_json_rpc_call(
-            &self.rpc_url,
-            "getblockcount",
-            serde_json::json!([]),
-        )?;
+        let result = make_json_rpc_call(&self.rpc_url, "getblockcount", serde_json::json!([]))?;
 
         result
             .as_u64()

@@ -629,10 +629,8 @@ pub mod pallet {
             // `on_initialize` is infallible.
             let zero_account = Self::try_decode_zero_account();
             if let Some(account) = zero_account {
-                let _ = Self::clean_expired_proofs(
-                    frame_system::RawOrigin::Signed(account).into(),
-                    5,
-                );
+                let _ =
+                    Self::clean_expired_proofs(frame_system::RawOrigin::Signed(account).into(), 5);
             } else {
                 log::error!(
                     target: "runtime::proof-carrying-agent",

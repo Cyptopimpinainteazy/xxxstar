@@ -310,9 +310,7 @@ mod tests {
         let real_hash = kernel.hash(&header_bytes).unwrap();
 
         // validate_hash should succeed when expected_hash matches.
-        assert!(validator
-            .validate_hash(1, &header_bytes, real_hash)
-            .is_ok());
+        assert!(validator.validate_hash(1, &header_bytes, real_hash).is_ok());
 
         // validate_hash should fail when expected_hash is different.
         assert!(validator

@@ -103,6 +103,10 @@ frame-benchmarking-cli = { workspace = true, optional = true, default-features =
 default = ["cli"]
 cli = []
 
+# Testnet feature: enables NoOpCrossChainValidator, ExternalBridgesEnabled=true,
+# and other testnet-only config in the runtime. Passes through to x3-chain-runtime.
+testnet = ["x3-chain-runtime/testnet"]
+
 # GPU validator orchestrator feature (requires x3-gpu-validator-swarm crate).
 # Enable to spawn the GPU validator swarm orchestrator during node startup.
 gpu-validator = [

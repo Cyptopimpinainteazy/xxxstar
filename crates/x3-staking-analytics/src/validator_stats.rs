@@ -1,12 +1,12 @@
 //! Validator Stats — Performance tracking and metrics
-//! 
+//!
 //! Maintains validator performance data including uptime, commission,
 //! backing, and performance scoring.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::Result;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Validator performance tier
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -260,10 +260,7 @@ impl ValidatorStatsManager {
 
     /// Get top N validators by score
     pub fn top_validators(&self, count: usize) -> Vec<ValidatorStats> {
-        self.validators_by_score()
-            .into_iter()
-            .take(count)
-            .collect()
+        self.validators_by_score().into_iter().take(count).collect()
     }
 
     /// Get performance history for validator

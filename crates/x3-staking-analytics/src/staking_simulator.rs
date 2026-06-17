@@ -1,10 +1,10 @@
 //! Staking Simulator — Projection engine for staking scenarios
-//! 
+//!
 //! Models staking returns under various conditions and timeframes,
 //! with support for fee impact analysis and delegation scenarios.
 
-use serde::{Deserialize, Serialize};
 use crate::Result;
+use serde::{Deserialize, Serialize};
 
 /// Projection timeframe
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -124,11 +124,9 @@ impl StakingSimulator {
             // Add monthly deposit
             current_balance += monthly_deposits as f64;
 
-            let gross_rewards = (current_balance as u128).saturating_sub(
-                initial_balance + (monthly_deposits as u128 * month as u128)
-            );
-            let commission_cost =
-                (gross_rewards as f64 * (validator_commission / 100.0)) as u128;
+            let gross_rewards = (current_balance as u128)
+                .saturating_sub(initial_balance + (monthly_deposits as u128 * month as u128));
+            let commission_cost = (gross_rewards as f64 * (validator_commission / 100.0)) as u128;
             let net_rewards = gross_rewards.saturating_sub(commission_cost);
             let total_invested = initial_balance + (monthly_deposits as u128 * month as u128);
             let roi = if total_invested > 0 {

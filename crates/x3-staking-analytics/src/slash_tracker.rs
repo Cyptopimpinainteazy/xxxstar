@@ -1,12 +1,12 @@
 //! Slash Tracker — Slashing history and risk assessment
-//! 
+//!
 //! Maintains comprehensive slashing event records and calculates
 //! risk metrics for validators.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::Result;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Slashing event types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -169,11 +169,8 @@ impl SlashTracker {
         }
 
         // Severity score (weight: 30%)
-        let avg_severity = history
-            .iter()
-            .map(|e| e.percentage_slashed)
-            .sum::<f64>()
-            / history.len() as f64;
+        let avg_severity =
+            history.iter().map(|e| e.percentage_slashed).sum::<f64>() / history.len() as f64;
         score += (avg_severity.min(100.0)) * 0.3;
 
         score.min(100.0)
@@ -266,13 +263,7 @@ mod tests {
     #[test]
     fn test_record_slash() {
         let mut tracker = SlashTracker::new();
-        let event_id = tracker.record_slash(
-            "val1",
-            SlashingReason::Offline,
-            10,
-            1000,
-            5.0,
-        );
+        let event_id = tracker.record_slash("val1", SlashingReason::Offline, 10, 1000, 5.0);
 
         let event = tracker.get_event(&event_id);
         assert!(event.is_some());

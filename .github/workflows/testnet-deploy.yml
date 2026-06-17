@@ -43,10 +43,10 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Build x3-chain-node
-        run: cargo build --release -p x3-chain-node
+      - name: Build x3-chain-node (testnet features)
+        run: cargo build --release -p x3-chain-node --features testnet
       - name: Run critical path tests
-        run: cargo test --release -p x3-chain-node -- --nocapture
+        run: cargo test --release -p x3-chain-node --features testnet -- --nocapture
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:

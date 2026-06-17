@@ -668,7 +668,7 @@ where
     // eth_getLogs — returns EVM logs matching a filter
     let c = client.clone();
     module.register_method("eth_getLogs", move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-        let filter: serde_json::Value = params.one().unwrap_or_else(|_| serde_json::Value::Null);
+        let filter: serde_json::Value = params.one().unwrap_or(serde_json::Value::Null);
         let latest_block = c.info().best_number as u64;
         let from_block = filter.get("fromBlock")
             .and_then(|v| v.as_str())
@@ -829,7 +829,7 @@ where
         "x3_getEvmLogs",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             let filter: serde_json::Value =
-                params.one().unwrap_or_else(|_| serde_json::Value::Null);
+                params.one().unwrap_or(serde_json::Value::Null);
             let from_block = filter
                 .get("fromBlock")
                 .and_then(|v| v.as_str())
@@ -1105,7 +1105,7 @@ where
 
             let block = c
                 .block(
-                    c.hash((block_number as u32).into())
+                    c.hash(block_number as u32)
                         .map_err(|e| {
                             jsonrpsee::types::ErrorObjectOwned::owned(
                                 -32603,

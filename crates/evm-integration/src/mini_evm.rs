@@ -10,10 +10,10 @@
 //! - 0x02: SHA-256
 //! - 0x03: RIPEMD-160 (real implementation using `ripemd` crate)
 //! - 0x04: identity (data copy)
-//! - 0x05: modexp (stub — returns error, requires bigint library)
-//! - 0x06: bn128Add (stub — returns error, requires bn128 library)
-//! - 0x07: bn128Mul (stub — returns error, requires bn128 library)
-//! - 0x08: bn128Pairing (stub — returns error, requires bn128 library)
+//! - 0x05: modexp (modular exponentiation using binary exponentiation)
+//! - 0x06: bn128Add (BN254 G1 point addition via ark-bls12-381)
+//! - 0x07: bn128Mul (BN254 G1 scalar multiplication via ark-bls12-381)
+//! - 0x08: bn128Pairing (BN254 pairing check via ark-bls12-381)
 //! - 0x09: blake2f (Blake2b compression function F)
 
 use crate::{EvmError, EvmExecutionResult, EvmResult};
@@ -29,6 +29,10 @@ use evm::{
 use primitive_types::{H160 as EvmH160, U256 as EvmU256};
 use sp_core::{H160 as SpH160, U256 as SpU256};
 use sp_std::collections::btree_map::BTreeMap;
+
+// Arkworks — BN254 (alt_bn128) curve operations for EVM precompiles
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+use ark_ff::{BigInteger, Field, PrimeField, Zero};
 
 fn to_evm_u256(value: SpU256) -> EvmU256 {
     let buf = value.to_big_endian();
@@ -417,69 +421,641 @@ fn precompile_identity(
 }
 
 // ---------------------------------------------------------------------------
-// 0x05 — modexp
+// 0x05 — modexp (modular exponentiation)
 // ---------------------------------------------------------------------------
-/// Big-integer modular exponentiation. Not implemented in the no-std mini_evm
-/// path — requires a bigint math library. Contracts calling this will revert.
+/// Big-integer modular exponentiation (EIP-198).
+///
+/// Input: 96 bytes of header (base_len, exp_len, mod_len as big-endian u32s)
+/// followed by base, exponent, and modulus byte strings.
+///
+/// Uses binary exponentiation with modular reduction via `sp_core::U256`
+/// for operands up to 32 bytes. For larger operands, falls back to a
+/// byte-level binary exponentiation with long-division-style reduction.
 fn precompile_modexp(
-    _input: &[u8],
-    _target_gas: Option<u64>,
+    input: &[u8],
+    target_gas: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
-    Err(PrecompileFailure::Error {
-        exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
-            "modexp not available in no-std mini_evm",
-        )),
-    })
+    if input.len() < 96 {
+        return Err(PrecompileFailure::Error {
+            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                "modexp: input too short",
+            )),
+        });
+    }
+
+    let base_len = u32::from_be_bytes([input[0], input[1], input[2], input[3]]) as usize;
+    let exp_len = u32::from_be_bytes([input[4], input[5], input[6], input[7]]) as usize;
+    let mod_len = u32::from_be_bytes([input[8], input[9], input[10], input[11]]) as usize;
+
+    let expected = 96 + base_len + exp_len + mod_len;
+    if input.len() < expected {
+        return Err(PrecompileFailure::Error {
+            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                "modexp: input too short for declared lengths",
+            )),
+        });
+    }
+
+    // Gas calculation per EIP-198
+    let gas = if mod_len == 0 {
+        0
+    } else {
+        let max_len = core::cmp::max(base_len, mod_len);
+        let words = (max_len + 7) / 8;
+        let mult_complexity = match words {
+            0..=1 => 1,
+            2..=3 => 2,
+            4..=7 => 4,
+            8..=15 => 8,
+            16..=31 => 16,
+            32..=63 => 32,
+            64..=127 => 64,
+            128..=255 => 128,
+            256..=511 => 256,
+            _ => 512,
+        };
+        let exp_header = if exp_len <= 32 {
+            let mut exp_buf = [0u8; 32];
+            let start = 96 + base_len;
+            let copy_len = core::cmp::min(exp_len, 32);
+            exp_buf[32 - copy_len..].copy_from_slice(&input[start..start + copy_len]);
+            u256_from_be_slice(&exp_buf)
+        } else {
+            let start = 96 + base_len + exp_len - 32;
+            u256_from_be_slice(&input[start..start + 32])
+        };
+        let exp_bits = if exp_len <= 32 {
+            bit_length(&exp_header, exp_len)
+        } else {
+            let leading = u256_from_be_slice(&input[96 + base_len..96 + base_len + 32]);
+            let leading_bits = bit_length(&leading, 32);
+            if leading_bits == 0 {
+                // If the high 32 bytes are zero, count bits from the rest
+                let start = 96 + base_len + 32;
+                let remaining = exp_len - 32;
+                let mut buf = [0u8; 32];
+                let copy_len = core::cmp::min(remaining, 32);
+                buf[32 - copy_len..].copy_from_slice(&input[start..start + copy_len]);
+                let rem_val = u256_from_be_slice(&buf);
+                bit_length(&rem_val, remaining)
+            } else {
+                leading_bits + 8 * (exp_len - 32)
+            }
+        };
+        let adjusted = core::cmp::max(mult_complexity, 1);
+        adjusted * exp_bits as u64 / 8
+    };
+
+    if let Some(limit) = target_gas {
+        if limit < gas {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::OutOfGas,
+            });
+        }
+    }
+
+    if mod_len == 0 {
+        return Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: vec![],
+            },
+            gas,
+        ));
+    }
+
+    let base_start = 96;
+    let exp_start = 96 + base_len;
+    let mod_start = 96 + base_len + exp_len;
+
+    // Strip leading zeros from base and modulus
+    let base_trimmed = trim_leading_zeros(&input[base_start..base_start + base_len]);
+    let exp_trimmed = trim_leading_zeros(&input[exp_start..exp_start + exp_len]);
+    let modulus_trimmed = trim_leading_zeros(&input[mod_start..mod_start + mod_len]);
+
+    // If modulus is 0 or 1, result is 0
+    if modulus_trimmed.is_empty() || (modulus_trimmed.len() == 1 && modulus_trimmed[0] == 1) {
+        let mut result = vec![0u8; mod_len];
+        if mod_len > 0 {
+            result[mod_len - 1] = 0;
+        }
+        return Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: result,
+            },
+            gas,
+        ));
+    }
+
+    // For small operands (<= 32 bytes), use U256 arithmetic
+    if base_trimmed.len() <= 32 && modulus_trimmed.len() <= 32 {
+        let base_val = bigint_from_be_bytes(&base_trimmed);
+        let mod_val = bigint_from_be_bytes(&modulus_trimmed);
+        let result = if exp_trimmed.len() <= 32 {
+            let exp_val = bigint_from_be_bytes(&exp_trimmed);
+            mod_pow_u256(base_val, exp_val, mod_val)
+        } else {
+            // Large exponent — use binary method byte-by-byte
+            mod_pow_binary(base_trimmed, exp_trimmed, mod_val)
+        };
+        let mut output = vec![0u8; mod_len];
+        let result_bytes = result.to_big_endian();
+        let copy_len = core::cmp::min(mod_len, 32);
+        output[mod_len - copy_len..].copy_from_slice(&result_bytes[32 - copy_len..]);
+        return Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output,
+            },
+            gas,
+        ));
+    }
+
+    // Large operands — use byte-level binary exponentiation
+    let result = mod_pow_binary_large(&base_trimmed, &exp_trimmed, &modulus_trimmed);
+    let mut output = vec![0u8; mod_len];
+    let copy_len = core::cmp::min(result.len(), mod_len);
+    output[mod_len - copy_len..].copy_from_slice(&result[..copy_len]);
+    Ok((
+        PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output,
+        },
+        gas,
+    ))
+}
+
+/// Convert a big-endian byte slice to U256.
+fn u256_from_be_slice(slice: &[u8]) -> sp_core::U256 {
+    let mut buf = [0u8; 32];
+    let len = core::cmp::min(slice.len(), 32);
+    buf[32 - len..].copy_from_slice(&slice[..len]);
+    sp_core::U256::from_big_endian(&buf)
+}
+
+/// Count the number of bits in a U256 value, clamped to max_bytes.
+fn bit_length(val: &sp_core::U256, max_bytes: usize) -> usize {
+    let be = val.to_big_endian();
+    let start = 32 - core::cmp::min(max_bytes, 32);
+    for i in start..32 {
+        if be[i] != 0 {
+            return (32 - i) * 8 - be[i].leading_zeros() as usize;
+        }
+    }
+    0
+}
+
+/// Trim leading zero bytes from a slice.
+fn trim_leading_zeros(bytes: &[u8]) -> &[u8] {
+    let mut i = 0;
+    while i < bytes.len() && bytes[i] == 0 {
+        i += 1;
+    }
+    &bytes[i..]
+}
+
+/// Convert big-endian bytes to U256 (padded to 32 bytes).
+fn bigint_from_be_bytes(bytes: &[u8]) -> sp_core::U256 {
+    let mut buf = [0u8; 32];
+    let len = core::cmp::min(bytes.len(), 32);
+    buf[32 - len..].copy_from_slice(bytes);
+    sp_core::U256::from_big_endian(&buf)
+}
+
+/// Modular exponentiation using U256 arithmetic (small operands).
+fn mod_pow_u256(base: sp_core::U256, exp: sp_core::U256, modulus: sp_core::U256) -> sp_core::U256 {
+    if modulus.is_zero() {
+        return sp_core::U256::zero();
+    }
+    let one = sp_core::U256::one();
+    if modulus == one {
+        return sp_core::U256::zero();
+    }
+    let mut result = one;
+    let mut b = base % modulus;
+    let mut e = exp;
+    while !e.is_zero() {
+        if e.bit(0) {
+            result = (result * b) % modulus;
+        }
+        e >>= 1;
+        b = (b * b) % modulus;
+    }
+    result
+}
+
+/// Modular exponentiation with byte-level exponent (for exp > 32 bytes).
+fn mod_pow_binary(base: &[u8], exp: &[u8], modulus: sp_core::U256) -> sp_core::U256 {
+    let one = sp_core::U256::one();
+    let mut result = one;
+    let b = bigint_from_be_bytes(base) % modulus;
+    let mut base_val = b;
+    for &byte in exp {
+        for bit in (0..8).rev() {
+            if byte & (1 << bit) != 0 {
+                result = (result * base_val) % modulus;
+            }
+            base_val = (base_val * base_val) % modulus;
+        }
+    }
+    result
+}
+
+/// Modular exponentiation for large operands using byte-level arithmetic.
+fn mod_pow_binary_large(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
+    let one = vec![1u8];
+    let mut result = one.clone();
+    let mut b = base.to_vec();
+    // Reduce base modulo modulus first
+    b = long_division_remainder(&b, modulus);
+    for &byte in exp {
+        for bit in (0..8).rev() {
+            if byte & (1 << bit) != 0 {
+                result = long_multiplication_mod(&result, &b, modulus);
+            }
+            b = long_multiplication_mod(&b, &b, modulus);
+        }
+    }
+    result
+}
+
+/// Long multiplication followed by modular reduction.
+fn long_multiplication_mod(a: &[u8], b: &[u8], modulus: &[u8]) -> Vec<u8> {
+    let product = long_multiplication(a, b);
+    long_division_remainder(&product, modulus)
+}
+
+/// Long multiplication of two big-endian byte arrays.
+fn long_multiplication(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let len = a.len() + b.len();
+    let mut result = vec![0u8; len];
+    for (i, &ai) in a.iter().enumerate().rev() {
+        let mut carry = 0u16;
+        for (j, &bj) in b.iter().enumerate().rev() {
+            let idx = i + j + 1;
+            let sum = result[idx] as u16 + (ai as u16) * (bj as u16) + carry;
+            result[idx] = (sum & 0xFF) as u8;
+            carry = sum >> 8;
+        }
+        result[i] += carry as u8;
+    }
+    trim_leading_zeros(&result).to_vec()
+}
+
+/// Long division: return remainder of dividing `a` by `modulus`.
+fn long_division_remainder(a: &[u8], modulus: &[u8]) -> Vec<u8> {
+    if modulus.is_empty() || (modulus.len() == 1 && modulus[0] == 1) {
+        return vec![0u8];
+    }
+    if a.len() < modulus.len() {
+        return a.to_vec();
+    }
+    if a.len() == modulus.len() && a <= modulus {
+        return if a < modulus {
+            a.to_vec()
+        } else {
+            vec![0u8]
+        };
+    }
+    // Binary long division
+    let mut remainder = a.to_vec();
+    let mod_len = modulus.len();
+    while remainder.len() >= mod_len {
+        if remainder.len() > mod_len || &remainder[..mod_len] >= modulus {
+            // Subtract modulus aligned to the MSB
+            let shift = remainder.len() - mod_len;
+            let mut borrow = 0i16;
+            for i in (0..mod_len).rev() {
+                let diff = remainder[shift + i] as i16 - modulus[i] as i16 - borrow;
+                if diff < 0 {
+                    remainder[shift + i] = (diff + 256) as u8;
+                    borrow = 1;
+                } else {
+                    remainder[shift + i] = diff as u8;
+                    borrow = 0;
+                }
+            }
+            // Trim leading zeros
+            let trimmed = trim_leading_zeros(&remainder);
+            remainder = trimmed.to_vec();
+        } else {
+            break;
+        }
+    }
+    if remainder.is_empty() {
+        vec![0u8]
+    } else {
+        remainder
+    }
 }
 
 // ---------------------------------------------------------------------------
-// 0x06 — bn128Add
+// 0x06 — bn128Add (BN254 G1 point addition)
 // ---------------------------------------------------------------------------
+/// BN254 G1 point addition (EIP-196).
+///
+/// Input: 128 bytes — two G1 points (x: 32, y: 32 each) in affine coordinates.
+/// Output: 64 bytes — the resulting G1 point (x: 32, y: 32).
+///
+/// Points are encoded as big-endian field elements. The point at infinity
+/// is represented as (0, 0).
 fn precompile_bn128_add(
-    _input: &[u8],
-    _target_gas: Option<u64>,
+    input: &[u8],
+    target_gas: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
-    Err(PrecompileFailure::Error {
-        exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
-            "bn128add not available in no-std mini_evm",
-        )),
-    })
+    if input.len() < 128 {
+        return Err(PrecompileFailure::Error {
+            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                "bn128add: input must be exactly 128 bytes",
+            )),
+        });
+    }
+
+    // Gas: 150 (EIP-196)
+    const GAS_COST: u64 = 150;
+    if let Some(limit) = target_gas {
+        if limit < GAS_COST {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::OutOfGas,
+            });
+        }
+    }
+
+    let p1 = decode_g1(&input[..64]);
+    let p2 = decode_g1(&input[64..128]);
+
+    // If either point is invalid (not on curve), return error
+    let p1_affine = match p1 {
+        Some(p) => p,
+        None => {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                    "bn128add: invalid point 1",
+                )),
+            });
+        }
+    };
+    let p2_affine = match p2 {
+        Some(p) => p,
+        None => {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                    "bn128add: invalid point 2",
+                )),
+            });
+        }
+    };
+
+    // Convert to projective, add, convert back
+    let p1_proj = ark_bn254::G1Projective::from(p1_affine);
+    let p2_proj = ark_bn254::G1Projective::from(p2_affine);
+    let result_proj = p1_proj + p2_proj;
+    let result_affine = result_proj.into_affine();
+
+    let output = encode_g1(&result_affine);
+    Ok((
+        PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output,
+        },
+        GAS_COST,
+    ))
 }
 
 // ---------------------------------------------------------------------------
-// 0x07 — bn128Mul
+// 0x07 — bn128Mul (BN254 G1 scalar multiplication)
 // ---------------------------------------------------------------------------
+/// BN254 G1 scalar multiplication (EIP-196).
+///
+/// Input: 96 bytes — G1 point (x: 32, y: 32) + scalar (32 bytes big-endian).
+/// Output: 64 bytes — the resulting G1 point (x: 32, y: 32).
 fn precompile_bn128_mul(
-    _input: &[u8],
-    _target_gas: Option<u64>,
+    input: &[u8],
+    target_gas: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
-    Err(PrecompileFailure::Error {
-        exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
-            "bn128mul not available in no-std mini_evm",
-        )),
-    })
+    if input.len() < 96 {
+        return Err(PrecompileFailure::Error {
+            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                "bn128mul: input must be exactly 96 bytes",
+            )),
+        });
+    }
+
+    // Gas: 6,000 (EIP-196)
+    const GAS_COST: u64 = 6_000;
+    if let Some(limit) = target_gas {
+        if limit < GAS_COST {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::OutOfGas,
+            });
+        }
+    }
+
+    let point = decode_g1(&input[..64]);
+    let point_affine = match point {
+        Some(p) => p,
+        None => {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                    "bn128mul: invalid point",
+                )),
+            });
+        }
+    };
+
+    // Decode scalar (big-endian 32 bytes)
+    let scalar = ark_bn254::Fr::from_be_bytes_mod_order(&input[64..96]);
+
+    // Multiply
+    let result_proj = ark_bn254::G1Projective::from(point_affine) * scalar;
+    let result_affine = result_proj.into_affine();
+
+    let output = encode_g1(&result_affine);
+    Ok((
+        PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output,
+        },
+        GAS_COST,
+    ))
 }
 
 // ---------------------------------------------------------------------------
-// 0x08 — bn128Pairing
+// 0x08 — bn128Pairing (BN254 pairing check)
 // ---------------------------------------------------------------------------
+/// BN254 pairing check (EIP-197).
+///
+/// Input: pairs of (128 bytes G2 point + 64 bytes G1 point), repeated.
+/// Output: 32 bytes — 0x00...01 if the pairing product equals 1, else 0x00...00.
+///
+/// G2 points are encoded as 128 bytes: (x_imaginary, x_real, y_imaginary, y_real),
+/// each as 32-byte big-endian field elements in Fp2.
+/// G1 points are encoded as 64 bytes: (x, y), each as 32-byte big-endian.
 fn precompile_bn128_pairing(
-    _input: &[u8],
-    _target_gas: Option<u64>,
+    input: &[u8],
+    target_gas: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
-    Err(PrecompileFailure::Error {
-        exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
-            "bn128pairing not available in no-std mini_evm",
-        )),
-    })
+    // Each pair is 192 bytes (128 G2 + 64 G1)
+    if input.len() % 192 != 0 {
+        return Err(PrecompileFailure::Error {
+            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                "bn128pairing: input length must be multiple of 192",
+            )),
+        });
+    }
+
+    let num_pairs = input.len() / 192;
+    if num_pairs == 0 {
+        // Empty input — pairing of no elements is 1 by convention
+        let mut output = vec![0u8; 32];
+        output[31] = 1;
+        return Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output,
+            },
+            0,
+        ));
+    }
+
+    // Gas: base 45,000 + 34,000 per pair (EIP-197)
+    let gas = 45_000 + 34_000 * num_pairs as u64;
+    if let Some(limit) = target_gas {
+        if limit < gas {
+            return Err(PrecompileFailure::Error {
+                exit_status: ExitError::OutOfGas,
+            });
+        }
+    }
+
+    // Use ark-bn254's multi-pairing check
+    let mut pairs = Vec::with_capacity(num_pairs);
+    for i in 0..num_pairs {
+        let offset = i * 192;
+        let g2_bytes = &input[offset..offset + 128];
+        let g1_bytes = &input[offset + 128..offset + 192];
+
+        let g1 = match decode_g1(g1_bytes) {
+            Some(p) => p,
+            None => {
+                return Err(PrecompileFailure::Error {
+                    exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                        "bn128pairing: invalid G1 point",
+                    )),
+                });
+            }
+        };
+
+        let g2 = match decode_g2(g2_bytes) {
+            Some(p) => p,
+            None => {
+                return Err(PrecompileFailure::Error {
+                    exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
+                        "bn128pairing: invalid G2 point",
+                    )),
+                });
+            }
+        };
+
+        pairs.push((g1, g2));
+    }
+
+    // Perform the multi-pairing check
+    let result = ark_bn254::Bn254::multi_pairing(
+        pairs.iter().map(|(g1, _)| g1),
+        pairs.iter().map(|(_, g2)| g2),
+    );
+
+    let is_one = result.0 == ark_bn254::Fq12::ONE;
+
+    let mut output = vec![0u8; 32];
+    if is_one {
+        output[31] = 1;
+    }
+    Ok((
+        PrecompileOutput {
+            exit_status: ExitSucceed::Returned,
+            output,
+        },
+        gas,
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// BN254 helper functions
+// ---------------------------------------------------------------------------
+
+/// Decode a G1 point from 64 bytes (x: 32, y: 32 big-endian).
+/// Returns None if the point is invalid (not on curve or both coordinates zero).
+fn decode_g1(bytes: &[u8]) -> Option<ark_bn254::G1Affine> {
+    debug_assert!(bytes.len() >= 64);
+    let x = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[..32]);
+    let y = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[32..64]);
+
+    // Point at infinity: (0, 0)
+    if x.is_zero() && y.is_zero() {
+        return Some(ark_bn254::G1Affine::identity());
+    }
+
+    let point = ark_bn254::G1Affine::new_unchecked(x, y);
+    // Verify the point is on the curve
+    if !point.is_on_curve() {
+        return None;
+    }
+    Some(point)
+}
+
+/// Encode a G1 point to 64 bytes (x: 32, y: 32 big-endian).
+fn encode_g1(point: &ark_bn254::G1Affine) -> Vec<u8> {
+    if point.is_zero() {
+        return vec![0u8; 64];
+    }
+    let mut output = vec![0u8; 64];
+    // x() and y() return Option<&Fq> — safe to unwrap since we checked !is_zero()
+    if let (Some(x), Some(y)) = (point.x(), point.y()) {
+        let x_bigint = x.into_bigint();
+        let y_bigint = y.into_bigint();
+        let x_bytes = x_bigint.to_bytes_be();
+        let y_bytes = y_bigint.to_bytes_be();
+        output[..32].copy_from_slice(&x_bytes);
+        output[32..64].copy_from_slice(&y_bytes);
+    }
+    output
+}
+/// Decode a G2 point from 128 bytes
+/// (x_imaginary: 32, x_real: 32, y_imaginary: 32, y_real: 32 big-endian).
+/// Returns None if the point is invalid.
+fn decode_g2(bytes: &[u8]) -> Option<ark_bn254::G2Affine> {
+    debug_assert!(bytes.len() >= 128);
+    // Fp2 element: c0 + c1 * u, where u^2 = -1
+    // EVM encoding: (c1, c0) = (imaginary, real)
+    let x_c1 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[..32]);   // imaginary
+    let x_c0 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[32..64]); // real
+    let y_c1 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[64..96]);   // imaginary
+    let y_c0 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[96..128]);  // real
+
+    let x = ark_bn254::Fq2::new(x_c0, x_c1);
+    let y = ark_bn254::Fq2::new(y_c0, y_c1);
+
+    // Point at infinity
+    if x.is_zero() && y.is_zero() {
+        return Some(ark_bn254::G2Affine::identity());
+    }
+
+    let point = ark_bn254::G2Affine::new_unchecked(x, y);
+    if !point.is_on_curve() {
+        return None;
+    }
+    Some(point)
 }
 
 // ---------------------------------------------------------------------------

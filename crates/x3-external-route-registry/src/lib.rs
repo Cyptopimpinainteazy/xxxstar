@@ -204,7 +204,10 @@ mod tests {
             daily_limit: 10_000,
             pending_limit: 10,
             finality_requirement: 32,
-            verification_level: VerificationStrategy::ValidatorQuorum { threshold: 2, total: 3 },
+            verification_level: VerificationStrategy::ValidatorQuorum {
+                threshold: 2,
+                total: 3,
+            },
             fee_bps: 10,
             mode,
             require_dispute_window: false,

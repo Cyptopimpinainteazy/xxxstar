@@ -385,7 +385,10 @@ mod tests {
             daily_limit: 10_000,
             pending_limit: 10,
             finality_requirement: 32,
-            verification_level: VerificationStrategy::ValidatorQuorum { threshold: 1, total: 1 },
+            verification_level: VerificationStrategy::ValidatorQuorum {
+                threshold: 1,
+                total: 1,
+            },
             fee_bps: 10,
             mode: GatewayMode::TestnetLive,
             require_dispute_window: false,
@@ -426,7 +429,10 @@ mod tests {
         let mut indexer = GatewayIndexer::new();
         indexer.index_verification_result(&VerificationResult {
             proof_id: [1; 32],
-            strategy: VerificationStrategy::ValidatorQuorum { threshold: 1, total: 1 },
+            strategy: VerificationStrategy::ValidatorQuorum {
+                threshold: 1,
+                total: 1,
+            },
             chain: ExternalChainId::EthereumSepolia,
             verified: true,
             confidence_bps: 8_000,

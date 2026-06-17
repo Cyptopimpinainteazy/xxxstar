@@ -17,6 +17,7 @@
 
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 type JsonRpseeError = ErrorObjectOwned;
+use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::BlockBackend;
 use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
@@ -26,7 +27,6 @@ use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_runtime::traits::UniqueSaturatedInto;
 use std::sync::{Arc, Mutex};
 use x3_chain_runtime::{opaque::Block, AccountId, AssetId, Balance};
-use pallet_x3_kernel::AtlasKernelRuntimeApi;
 
 /// Validator status enum
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -153,15 +153,13 @@ where
     fn get_authorized_executors(&self) -> Result<Vec<AccountId>, JsonRpseeError> {
         let at = self.client.info().best_hash;
         let api = self.client.runtime_api();
-        let authorized = api
-            .get_authorized_accounts(at)
-            .map_err(|e| {
-                ErrorObjectOwned::owned(
-                    -32603,
-                    format!("Failed to query authorized accounts: {e}"),
-                    None::<()>,
-                )
-            })?;
+        let authorized = api.get_authorized_accounts(at).map_err(|e| {
+            ErrorObjectOwned::owned(
+                -32603,
+                format!("Failed to query authorized accounts: {e}"),
+                None::<()>,
+            )
+        })?;
 
         if authorized.is_empty() {
             // Fall back to the consensus authority set
@@ -344,7 +342,12 @@ pub fn create_validator_rpc<C, BlockT>(
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
     BlockT: sp_runtime::traits::Block + 'static,
-    C: ProvideRuntimeApi<BlockT> + HeaderBackend<BlockT> + BlockBackend<BlockT> + Send + Sync + 'static,
+    C: ProvideRuntimeApi<BlockT>
+        + HeaderBackend<BlockT>
+        + BlockBackend<BlockT>
+        + Send
+        + Sync
+        + 'static,
     C::Api: AtlasKernelRuntimeApi<BlockT, AccountId, Balance, AssetId>,
 {
     let mut module = RpcModule::new(());

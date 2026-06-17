@@ -115,9 +115,7 @@ impl Verifier {
         // body (bytes 24..), reject on mismatch. Bit-rot or truncated modules
         // are caught here before any further verification runs.
         if bytes.len() >= 24 {
-            let header_checksum = u32::from_le_bytes([
-                bytes[12], bytes[13], bytes[14], bytes[15],
-            ]);
+            let header_checksum = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
             if header_checksum != 0 {
                 // Only validate if the header carries a non-zero checksum.
                 let mut crc: u32 = 0xFFFFFFFF;

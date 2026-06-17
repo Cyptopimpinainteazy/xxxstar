@@ -1,18 +1,18 @@
 //! X3 Staking Analytics
-//! 
+//!
 //! Comprehensive staking metrics, APY calculations, and validator performance tracking
 
-pub mod staking_ledger;
 pub mod reward_calculator;
-pub mod validator_stats;
 pub mod slash_tracker;
+pub mod staking_ledger;
 pub mod staking_simulator;
+pub mod validator_stats;
 
+pub use reward_calculator::{APYCalculation, RewardCalculator};
+pub use slash_tracker::{SlashEvent, SlashTracker};
 pub use staking_ledger::{StakingLedger, StakingPosition};
-pub use reward_calculator::{RewardCalculator, APYCalculation};
-pub use validator_stats::{ValidatorStats, ValidatorPerformance};
-pub use slash_tracker::{SlashTracker, SlashEvent};
 pub use staking_simulator::StakingSimulator;
+pub use validator_stats::{ValidatorPerformance, ValidatorStats};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,16 +21,16 @@ use serde::{Deserialize, Serialize};
 pub enum StakingError {
     #[error("Validator not found")]
     ValidatorNotFound,
-    
+
     #[error("Position not found")]
     PositionNotFound,
-    
+
     #[error("Insufficient balance")]
     InsufficientBalance,
-    
+
     #[error("Invalid calculation: {0}")]
     InvalidCalculation(String),
-    
+
     #[error("Unbonding in progress")]
     UnbondingInProgress,
 }

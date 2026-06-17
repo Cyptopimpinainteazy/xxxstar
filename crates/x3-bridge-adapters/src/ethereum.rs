@@ -70,9 +70,9 @@ impl BridgeAdapter for EthereumBridgeAdapter {
         }
 
         // Field 7: number (big-endian integer)
-        let block_number_bytes = decoded.get(7).ok_or_else(|| {
-            BridgeError::InvalidHeader("Missing block number field".to_string())
-        })?;
+        let block_number_bytes = decoded
+            .get(7)
+            .ok_or_else(|| BridgeError::InvalidHeader("Missing block number field".to_string()))?;
         let block_number = rlp_bytes_to_u64(block_number_bytes);
         if block_number == 0 && !block_number_bytes.is_empty() && block_number_bytes[0] == 0x80 {
             // 0x80 is the RLP encoding of zero; block 0 is genesis which is valid
@@ -120,8 +120,7 @@ impl BridgeAdapter for EthereumBridgeAdapter {
             .unwrap_or("0x0");
 
         if block_hash.len() < 66
-            || block_hash
-                == "0x0000000000000000000000000000000000000000000000000000000000000000"
+            || block_hash == "0x0000000000000000000000000000000000000000000000000000000000000000"
         {
             return Err(BridgeError::RpcError(format!(
                 "Retrieved block {} has invalid hash: {}",
@@ -161,10 +160,13 @@ impl BridgeAdapter for EthereumBridgeAdapter {
             vec![]
         };
 
-        let block_header_rlp =
-            make_json_rpc_call(&self.rpc_url, "debug_getRawHeader", serde_json::json!([block_hex]))
-                .ok()
-                .and_then(|v| v.as_str().map(|s| s.to_string()));
+        let block_header_rlp = make_json_rpc_call(
+            &self.rpc_url,
+            "debug_getRawHeader",
+            serde_json::json!([block_hex]),
+        )
+        .ok()
+        .and_then(|v| v.as_str().map(|s| s.to_string()));
 
         // Build a verifiable proof envelope with block header, state root,
         // and Merkle-Patricia trie proofs for downstream verification.
@@ -181,23 +183,18 @@ impl BridgeAdapter for EthereumBridgeAdapter {
             "storage_proofs": []
         });
 
-        let proof_bytes = serde_json::to_vec(&proof_envelope).map_err(|e| {
-            BridgeError::Serialization(format!("Failed to serialize proof: {e}"))
-        })?;
+        let proof_bytes = serde_json::to_vec(&proof_envelope)
+            .map_err(|e| BridgeError::Serialization(format!("Failed to serialize proof: {e}")))?;
 
         Ok(proof_bytes)
     }
 
     fn get_latest_block_number(&self) -> Result<u64, BridgeError> {
-        let result = make_json_rpc_call(
-            &self.rpc_url,
-            "eth_blockNumber",
-            serde_json::json!([]),
-        )?;
+        let result = make_json_rpc_call(&self.rpc_url, "eth_blockNumber", serde_json::json!([]))?;
 
-        let hex_str = result
-            .as_str()
-            .ok_or_else(|| BridgeError::RpcError("eth_blockNumber returned non-string".to_string()))?;
+        let hex_str = result.as_str().ok_or_else(|| {
+            BridgeError::RpcError("eth_blockNumber returned non-string".to_string())
+        })?;
 
         let hex_str = hex_str.trim_start_matches("0x");
         if hex_str.is_empty() {
@@ -238,7 +235,10 @@ fn rlp_decode_item(data: &[u8], offset: usize) -> Result<(Vec<u8>, usize), Strin
         if offset + 1 + len > data.len() {
             return Err("RLP short string length exceeds data".to_string());
         }
-        Ok((data[offset + 1..offset + 1 + len].to_vec(), offset + 1 + len))
+        Ok((
+            data[offset + 1..offset + 1 + len].to_vec(),
+            offset + 1 + len,
+        ))
     } else if prefix <= 0xbf {
         // Long string: length of length = prefix - 0xb7
         let len_of_len = (prefix - 0xb7) as usize;
@@ -253,14 +253,20 @@ fn rlp_decode_item(data: &[u8], offset: usize) -> Result<(Vec<u8>, usize), Strin
         if start + payload_len > data.len() {
             return Err("RLP long string payload exceeds data".to_string());
         }
-        Ok((data[start..start + payload_len].to_vec(), start + payload_len))
+        Ok((
+            data[start..start + payload_len].to_vec(),
+            start + payload_len,
+        ))
     } else if prefix <= 0xf7 {
         // Short list: length = prefix - 0xc0
         let len = (prefix - 0xc0) as usize;
         if offset + 1 + len > data.len() {
             return Err("RLP short list length exceeds data".to_string());
         }
-        Ok((data[offset + 1..offset + 1 + len].to_vec(), offset + 1 + len))
+        Ok((
+            data[offset + 1..offset + 1 + len].to_vec(),
+            offset + 1 + len,
+        ))
     } else {
         // Long list: length of length = prefix - 0xf7
         let len_of_len = (prefix - 0xf7) as usize;
@@ -275,7 +281,10 @@ fn rlp_decode_item(data: &[u8], offset: usize) -> Result<(Vec<u8>, usize), Strin
         if start + payload_len > data.len() {
             return Err("RLP long list payload exceeds data".to_string());
         }
-        Ok((data[start..start + payload_len].to_vec(), start + payload_len))
+        Ok((
+            data[start..start + payload_len].to_vec(),
+            start + payload_len,
+        ))
     }
 }
 
@@ -386,7 +395,11 @@ mod tests {
         rlp_data.extend_from_slice(&body);
 
         let result = adapter.validate_header(&rlp_data);
-        assert!(result.is_ok(), "Expected valid header, got: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Expected valid header, got: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -401,8 +414,12 @@ mod tests {
         body.extend_from_slice(&rlp_encode_bytes(&[0x05; 32]));
         body.extend_from_slice(&rlp_encode_bytes(&[0x06; 32]));
         body.extend_from_slice(&rlp_encode_bytes(&[0x07; 256]));
-        body.push(0x01); body.push(0x01); body.push(0x01);
-        body.push(0x01); body.push(0x01); body.push(0x80);
+        body.push(0x01);
+        body.push(0x01);
+        body.push(0x01);
+        body.push(0x01);
+        body.push(0x01);
+        body.push(0x80);
         body.extend_from_slice(&rlp_encode_bytes(&[0x0b; 32]));
         body.extend_from_slice(&rlp_encode_bytes(&[0x0c; 8]));
         body.extend_from_slice(&rlp_encode_u64(30_000_000_000u64));

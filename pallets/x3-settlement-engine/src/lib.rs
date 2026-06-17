@@ -69,7 +69,9 @@
 
 // Prevent `dev-bypass` from being activated in release builds.
 #[cfg(all(feature = "dev-bypass", not(debug_assertions)))]
-compile_error!("dev-bypass feature is FORBIDDEN in release mode. Remove it from Cargo.toml features.");
+compile_error!(
+    "dev-bypass feature is FORBIDDEN in release mode. Remove it from Cargo.toml features."
+);
 #[allow(unused_imports)]
 #[allow(
     clippy::clone_on_copy,
@@ -79,7 +81,6 @@ compile_error!("dev-bypass feature is FORBIDDEN in release mode. Remove it from 
     clippy::new_without_default,
     clippy::too_many_arguments
 )]
-
 pub mod atomic_lock;
 pub mod bridge_integration;
 pub mod bridge_tests;

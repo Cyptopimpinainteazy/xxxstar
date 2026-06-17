@@ -108,10 +108,7 @@ unsafe fn read_guest_mem(
     if n == 0 {
         return Some(vec![]);
     }
-    let host_addr = match vm_ref
-        .memory_mapping
-        .map(AccessType::Load, src_addr, n)
-    {
+    let host_addr = match vm_ref.memory_mapping.map(AccessType::Load, src_addr, n) {
         ProgramResult::Ok(addr) => addr,
         ProgramResult::Err(_) => return None,
     };
@@ -435,10 +432,7 @@ fn syscall_sol_try_find_program_address(
             // Off-curve → valid PDA
             let _ = unsafe { write_guest_mem(vm_ref, address, &derived) };
             // bump_seed expects a u64 pointer; write the bump as u64
-            let bump_u64 = vec![
-                bump,
-                0, 0, 0, 0, 0, 0, 0,
-            ];
+            let bump_u64 = vec![bump, 0, 0, 0, 0, 0, 0, 0];
             let _ = unsafe { write_guest_mem(vm_ref, bump_seed, &bump_u64) };
             return;
         }

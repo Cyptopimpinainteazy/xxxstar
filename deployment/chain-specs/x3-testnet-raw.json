@@ -8,7 +8,7 @@
   "properties": {
     "ss58Format": 42,
     "tokenDecimals": 18,
-    "tokenSymbol": "x3★"
+    "tokenSymbol": "x3\u2605"
   },
   "codeSubstitutes": {},
   "genesis": {
@@ -74,7 +74,9 @@
         "0xf2696c8635edbf465a846bdac90721bf4e7b9012096b41c4eb3aaf947f6ea429": "0x0100",
         "0xf2696c8635edbf465a846bdac90721bf9e3cc77f6bc99e2b03ee70edb039f87d": "0x00",
         "0xf55838a07af45bac9e597250553473774e7b9012096b41c4eb3aaf947f6ea429": "0x0100",
-        "0xfdfe81c9d40d7e6c8fc8daaefc93e6884e7b9012096b41c4eb3aaf947f6ea429": "0x0100"
+        "0xfdfe81c9d40d7e6c8fc8daaefc93e6884e7b9012096b41c4eb3aaf947f6ea429": "0x0100",
+        "0x1ea3c00b772dc6623f323eb3179639f18997eadf5206160f7717460ca1aec5a8": "0x01",
+        "0x1ea3c00b772dc6623f323eb3179639f1ed891578bb9b4ab1aa468cd3f5af7e79": "0x01"
       },
       "childrenDefault": {}
     }

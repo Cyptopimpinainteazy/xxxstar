@@ -120,14 +120,14 @@ impl LiveNodeDispatcher {
                 self.reconnect_attempts = 0;
                 Ok(())
             }
-            Ok(resp) => {
+            Ok(_resp) => {
                 self.connected = false;
                 self.reconnect_attempts += 1;
                 Err(DispatchError::Other(
                     "live node health check returned non-2xx status",
                 ))
             }
-            Err(e) => {
+            Err(_e) => {
                 self.connected = false;
                 self.reconnect_attempts += 1;
                 Err(DispatchError::Other(

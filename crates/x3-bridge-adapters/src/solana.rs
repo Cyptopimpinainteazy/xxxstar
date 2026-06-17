@@ -135,9 +135,7 @@ impl BridgeAdapter for SolanaBridgeAdapter {
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
 
-        let block_height = result
-            .get("blockHeight")
-            .and_then(|v| v.as_u64());
+        let block_height = result.get("blockHeight").and_then(|v| v.as_u64());
 
         // Build a verifiable proof envelope with blockhash, slot,
         // parent slot, and block height so downstream verifiers can
@@ -162,11 +160,7 @@ impl BridgeAdapter for SolanaBridgeAdapter {
     }
 
     fn get_latest_block_number(&self) -> Result<u64, BridgeError> {
-        let result = make_json_rpc_call(
-            &self.rpc_url,
-            "getSlot",
-            serde_json::json!([]),
-        )?;
+        let result = make_json_rpc_call(&self.rpc_url, "getSlot", serde_json::json!([]))?;
 
         result
             .as_u64()
@@ -266,7 +260,11 @@ mod tests {
             "blockHeight": 50
         });
         let result = adapter.validate_header(header.to_string().as_bytes());
-        assert!(result.is_ok(), "Expected valid header, got: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Expected valid header, got: {:?}",
+            result.err()
+        );
     }
 
     #[test]

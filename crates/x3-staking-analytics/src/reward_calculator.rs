@@ -1,9 +1,9 @@
 //! Reward Calculator — APY and reward estimation engine
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc, Duration};
 use crate::Result;
+use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// APY calculation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,9 +69,9 @@ impl RewardCalculator {
         for era in (self.current_era.saturating_sub(10))..=self.current_era {
             if let Some(reward_info) = self.era_rewards.get(&era) {
                 if reward_info.total_staked > 0 {
-                    let era_individual_reward =
-                        (position_balance as f64 / reward_info.total_staked as f64)
-                            * reward_info.total_reward as f64;
+                    let era_individual_reward = (position_balance as f64
+                        / reward_info.total_staked as f64)
+                        * reward_info.total_reward as f64;
                     total_rewards += era_individual_reward as u128;
                     era_count += 1;
                 }
@@ -88,12 +88,7 @@ impl RewardCalculator {
     }
 
     /// Calculate reward for specific balance and timeframe
-    pub fn estimate_reward(
-        &self,
-        balance: u128,
-        apy: f64,
-        days: u32,
-    ) -> u128 {
+    pub fn estimate_reward(&self, balance: u128, apy: f64, days: u32) -> u128 {
         if balance == 0 || apy == 0.0 {
             return 0;
         }
@@ -103,12 +98,7 @@ impl RewardCalculator {
     }
 
     /// Calculate compounded balance over time
-    pub fn compound_balance(
-        &self,
-        initial_balance: u128,
-        apy: f64,
-        months: u32,
-    ) -> u128 {
+    pub fn compound_balance(&self, initial_balance: u128, apy: f64, months: u32) -> u128 {
         if initial_balance == 0 || apy == 0.0 {
             return initial_balance;
         }
@@ -207,11 +197,7 @@ impl RewardCalculator {
         }
 
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance = recent
-            .iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>()
-            / recent.len() as f64;
+        let variance = recent.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         variance.sqrt()
     }

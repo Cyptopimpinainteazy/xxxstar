@@ -124,8 +124,11 @@ jobs:
         with:
           shared-key: gate-node
 
-      - name: cargo check node
+      - name: cargo check node (default)
         run: cargo check -p x3-chain-node
+
+      - name: cargo check node (testnet features)
+        run: cargo check -p x3-chain-node --features testnet
 
   # ──────────────────────────────────────────────────────────────────────────
   # 4. TEST: cross-vm-router — 6-route matrix + invariants + replay protection

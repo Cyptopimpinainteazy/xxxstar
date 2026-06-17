@@ -6,7 +6,9 @@
 // This is a hard guard — you must remove `dev-bypass` from Cargo.toml
 // features before building any production or release artifact.
 #[cfg(all(feature = "dev-bypass", not(debug_assertions)))]
-compile_error!("dev-bypass feature is FORBIDDEN in release mode. Remove it from Cargo.toml features.");
+compile_error!(
+    "dev-bypass feature is FORBIDDEN in release mode. Remove it from Cargo.toml features."
+);
 
 /// # X3 Kernel Pallet
 ///
@@ -37,7 +39,6 @@ compile_error!("dev-bypass feature is FORBIDDEN in release mode. Remove it from 
 /// **IMPORTANT**: Before mainnet deployment, verify runtime configuration uses real adapters.
 /// The `adapters.rs` module includes `FrontierEvmAdapter` which wraps pallet-evm, but runtime
 /// must be properly configured to use it instead of mocks.
-
 pub use pallet::*;
 
 /// Phase 1: Full Consensus Implementation
@@ -4202,8 +4203,8 @@ pub mod pallet {
             let combined_hash = blake2_256(&combined);
 
             // Retrieve stored settlement root
-            let stored_root = StoredSettlementRoots::<T>::get(tx_id)
-                .ok_or(Error::<T>::SettlementMismatch)?;
+            let stored_root =
+                StoredSettlementRoots::<T>::get(tx_id).ok_or(Error::<T>::SettlementMismatch)?;
 
             // Hard-fail if atomicity invariant violated
             ensure!(combined_hash == stored_root, Error::<T>::SettlementMismatch);

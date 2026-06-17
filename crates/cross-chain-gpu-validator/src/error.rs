@@ -20,7 +20,10 @@ pub enum ValidatorError {
     SignatureVerificationFailed,
 
     #[error("Hash mismatch")]
-    HashMismatch { expected: [u8; 32], actual: [u8; 32] },
+    HashMismatch {
+        expected: [u8; 32],
+        actual: [u8; 32],
+    },
 
     #[error("Atomic registry error: {0}")]
     RegistryError(String),
