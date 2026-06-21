@@ -24146,7 +24146,7 @@ dependencies = [
  "hex",
  "k256",
  "rand 0.8.6",
- "rlp 0.5.2",
+ "rlp 0.6.1",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -25219,7 +25219,7 @@ name = "x3-verification-router"
 version = "0.1.0"
 dependencies = [
  "hex-literal",
- "rlp 0.5.2",
+ "rlp 0.6.1",
  "scale-info",
  "serde",
  "sha2 0.10.9",
