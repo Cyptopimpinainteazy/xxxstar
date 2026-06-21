@@ -168,8 +168,9 @@ impl Simulator {
         };
 
         let daily_tx_gas = daily_tx_count.saturating_mul(gas_per_tx);
-        let daily_gas_cost_wei = (daily_tx_gas as u128).saturating_mul(gas_price_gwei as u128);
-        let daily_gas_cost = daily_gas_cost_wei / 1_000_000_000_000_000_000; // Convert to token units
+        let gas_price_wei = (gas_price_gwei as u128).saturating_mul(1_000_000_000);
+        let daily_gas_cost_wei = (daily_tx_gas as u128).saturating_mul(gas_price_wei);
+        let daily_gas_cost = daily_gas_cost_wei / 1_000_000_000_000_000_000; // Convert wei to token units
 
         GasEstimate {
             deploy_gas,
