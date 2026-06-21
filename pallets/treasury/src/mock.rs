@@ -102,7 +102,7 @@ pub const BOB: u64 = 2;
 pub const CHARLIE: u64 = 3;
 pub const DAVE: u64 = 4;
 pub const EVE: u64 = 5;
-pub const TREASURY: u64 = 6;
+pub const _TREASURY: u64 = 6;
 
 /// Build test externalities.
 pub fn new_test_ext() -> sp_io::TestExternalities {

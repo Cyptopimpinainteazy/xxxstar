@@ -88,6 +88,7 @@ impl<MaxChecks: frame_support::traits::Get<u32> + Clone> SolvencyResult<MaxCheck
 
 /// Context supplied by callers of `check_pre_quote`.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[allow(clippy::multiple_bound_locations)]
 pub struct QuoteContext<Balance: Parameter + MaxEncodedLen> {
     pub lane_id: LaneId,
     pub vault_id: VaultId,
@@ -97,6 +98,7 @@ pub struct QuoteContext<Balance: Parameter + MaxEncodedLen> {
 
 /// Context supplied by callers of `check_pre_reservation`.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[allow(clippy::multiple_bound_locations)]
 pub struct ReservationContext<Balance: Parameter + MaxEncodedLen> {
     pub lane_id: LaneId,
     pub vault_id: VaultId,
@@ -106,6 +108,7 @@ pub struct ReservationContext<Balance: Parameter + MaxEncodedLen> {
 
 /// Context supplied by callers of `check_pre_submission`.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[allow(clippy::multiple_bound_locations)]
 pub struct SubmissionContext<
     Balance: Parameter + MaxEncodedLen,
     BlockNumber: Parameter + MaxEncodedLen,
@@ -124,6 +127,7 @@ pub struct SubmissionContext<
 #[derive(
     Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug,
 )]
+#[allow(clippy::multiple_bound_locations)]
 pub struct PostSubmissionContext<
     Balance: Parameter + MaxEncodedLen,
     BlockNumber: Parameter + MaxEncodedLen,
@@ -144,6 +148,7 @@ pub struct PostSubmissionContext<
 /// Sealed record of a solvency gate evaluation stored on-chain.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
 #[scale_info(skip_type_params(MaxChecks))]
+#[allow(clippy::multiple_bound_locations)]
 pub struct SolvencySnapshotRecord<
     BlockNumber: Parameter + MaxEncodedLen,
     MaxChecks: frame_support::traits::Get<u32> + Clone,
@@ -163,6 +168,7 @@ pub struct SolvencySnapshotRecord<
 // ──────────────────────────────────────────────
 
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+#[allow(clippy::multiple_bound_locations)]
 pub struct PendingObligation<
     Balance: Parameter + MaxEncodedLen,
     BlockNumber: Parameter + MaxEncodedLen,

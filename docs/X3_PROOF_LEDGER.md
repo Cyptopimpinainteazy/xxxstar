@@ -1,133 +1,79 @@
-# X3 Proof Ledger
+# X3 Proof Ledger — 2026-06-21 (Rust Correctness Run)
 
-## Purpose
-This ledger tracks every verified claim about the X3 Atomic Star system. Each claim has an evidence trail: source files, test results, CI gates, and runtime wiring.
+## Proof Commands Run
 
-## Recent: Verification Comment Remediation (2026-06-15)
+| # | Command | Result | Details |
+|---|---------|--------|---------|
+| 1 | `cargo nextest run --workspace --no-fail-fast` | PARTIAL | 4758 tests: 4718 passed, 40 failed, 9 skipped |
+| 2 | `cargo llvm-cov nextest --workspace --lcov --output-path lcov.info` | SKIPPED | Disk full (target/llvm-cov-target consumed all space). Deleted to recover 33G. |
+| 3 | `cargo +nightly miri test -p x3-asset-kernel` | SKIPPED | Nightly toolchain mismatch + disk constraints |
+| 4 | `cargo audit` | FAIL | 46 vulnerabilities (2 critical wasmtime sandbox escapes), 18 unmaintained/unsound warnings |
+| 5 | `cargo deny check licenses advisories` | FAIL | advisories FAILED (wasmtime criticals), licenses FAILED (yaml-rust unmaintained). Fixed broken deny.toml config. |
+| 6 | `cargo geiger` | SKIPPED | Incompatible with virtual workspace + Polkadot SDK git dependencies |
+| 7 | `cargo mutants` | SKIPPED | Tool not installed / unavailable |
+| 8 | `cargo fuzz` | SKIPPED | Disk space insufficient for fuzz corpus builds |
+| 9 | `cargo kani` | SKIPPED | Requires nightly-specific Kani toolchain not installed |
+| 10 | `forge test --fuzz-runs 5000` (X3-contracts/evm) | PASS | 169 tests passed, 0 failed, 15000 fuzz runs across 3 fuzz tests, 12 test suites green |
+| 11 | `echidna .` | TIMEOUT | 300s timeout on full project |
+| 12 | `slither .` | TIMEOUT | 120s timeout (disk I/O starvation) |
+| 13 | `k6` / `toxiproxy-cli` | SKIPPED | k6 binary found at /home/x3star/.cargo/bin/k6. toxiproxy-cli not installed. Disk I/O prevents meaningful run. |
 
-Six security/correctness review comments remediated across 10 files.
+## Code Fixes Applied During This Run
 
-| Comment | What | Files | Proof |
-|---|---|---|---|
-| 1 | Quorum dedup in SecurityReview | `policy.rs` | Regression test `security_review_rejects_duplicate_signer_replay` |
-| 2 | GPU validator type alignment | `orchestrator.rs`, `evm_validator.rs`, `svm_validator.rs` | `cargo check -p cross-chain-gpu-validator` passes |
-| 3 | Stubbed validation loop removal | `lib.rs` | Removed dead stubs; validators usable as building blocks |
-| 4 | JIT compile() cfg fix | `jit_compiler.rs` | Prod returns unsupported error; test uses mock |
-| 5 | SVM proof real signatures | `submitter.rs`, `types.rs` | BLAKE2b-256 + Ed25519 wired; `ValidatorSignature` struct |
-| 6 | Automation oracle wiring | `lib.rs`, `mock.rs`, `tests.rs` | `type Oracle: OracleProvider` in Config; PriceThreshold tests |
+1. **crates/x3-relayer/src/main.rs:1550**: `_tx_hash` → `tx_hash` — struct field name mismatch causing compile failure.
+2. **pallets/atomic-trade-engine/src/mock.rs**: Added missing `MaxSlippageBps` and `MinSlippageBps` trait constants (required by updated `Config` trait).
+3. **deny.toml**: Rewritten for current `cargo-deny` API — removed deprecated keys (`vulnerability`, `notice`, `unlicensed`, `default`, `unmaintained`, `allow-osi-fsi`, `skip`, `skip-tree`, `version-git`).
 
-## Claims
+## Top Blockers
 
-### CLAIM-001: Internal cross-VM routing works (Native ↔ Evm ↔ Svm)
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `pallets/pallet-x3-cross-vm-router/src/lib.rs` |
-| **Tests** | 74+ unit tests + fuzz tests in CI |
-| **Wiring** | Wired into all 6 runtime variants |
-| **Proof** | `cargo test -p pallet-x3-cross-vm-router --features mainnet-rc1` |
-| **Last verified** | 2026-06-09 |
+1. **Disk 100% full** — 436G volume, 34G available after deleting llvm-cov-target. The Rust workspace with dual target dirs exceeds available space. Needs external storage or aggressive target pruning.
+2. **wasmtime 8.0.1 / 35.0.0** — Multiple CRITICAL sandbox escape vulnerabilities (RUSTSEC-2026-0095, RUSTSEC-2026-0096). Must upgrade, but blocked by Polkadot SDK pin (stable2512 requires sp-wasm-interface 20.0.0 which pins wasmtime 8.0.1).
+3. **40 test failures** across 20+ crates — root causes range from missing test infrastructure (e2e nodes not running), trait mismatches in mocks, to stale test expectations.
 
-### CLAIM-002: Supply invariant is enforced
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `pallets/pallet-x3-supply-ledger/src/lib.rs` |
-| **Tests** | Supply invariant tests + fuzzing |
-| **Wiring** | Active in all runtime variants |
-| **Proof** | `cargo test -p pallet-x3-supply-ledger` |
-| **Last verified** | 2026-06-09 |
+## Test Failure Breakdown
 
-### CLAIM-003: Settlement engine with OCW finalization exists
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `pallets/pallet-x3-settlement-engine/src/` |
-| **Tests** | OCW tests, on_idle tests |
-| **Wiring** | offchain_worker + on_idle + sidecar |
-| **Proof** | `cargo test -p pallet-x3-settlement-engine` |
-| **Last verified** | 2026-06-09 |
+### Requires live node (8 failures — no dev node running)
+- `e2e_tests::cross_vm_real_chain_test` (5 tests): RPC/WS/block production
+- `e2e_tests::live_internal_mainnet_e2e` (4 tests): bridge proof, timeout expiry, reordered delivery, node progress
+- Note: `live_internal_mainnet_e2e` also had 1 pass (`live_supply_invariant_happy_path`), so the test binary works but requires a running dev chain.
 
-### CLAIM-004: Aura + GRANDPA consensus is real
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `runtime/src/lib.rs` (construct_runtime includes Aura + Grandpa) |
-| **Tests** | 3-validator local testnet runs |
-| **Wiring** | Node binary builds with both consensus engines |
-| **Proof** | `cargo build --release -p x3-chain-node` |
-| **Last verified** | 2026-06-09 |
+### Trait / mock mismatches (14 failures)
+- `pallet-atomic-trade-engine`: `create_batch_fails_with_invalid_slippage`
+- `pallet-x3-vrf`: 5 tests (randomness lifecycle)
+- `pallet-x3-kernel`: 3 tests (authority mgmt, adapter compat)
+- `x3-cross-vm-bridge`: 7 tests (2PC lifecycle, tri-swap, integration)
+- `x3-chain-node`: cross_vm_safety_postflight
+- `pallet-x3-cross-vm-router`: wallet_daily_volume_limit
 
-### CLAIM-005: External bridges disabled at genesis
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | Feature gate `mainnet-rc1` in `pallets/pallet-x3-cross-vm-router/Cargo.toml` |
-| **Tests** | Gate 1 in Dockerfile.mainnet-check validates compile-time exclusion |
-| **Wiring** | Faulty features cause compile-time #[cfg] error |
-| **Proof** | `cargo check -p pallet-x3-cross-vm-router --features mainnet-rc1 --no-default-features` |
-| **Last verified** | 2026-06-09 |
+### Stale / missing impl failures (12 failures)
+- `northern-swarm`: 3 executor tests
+- `x3-staking-analytics`: 4 tests
+- `x3-foundry-core`: simulate_gas
+- `x3-foundry-revenue`: 2 fee config tests
+- `x3-gateway-risk-engine`: risk_classification_low
+- `x3-crosschain-intent`: simulation_runs_on_valid_intent
+- `x3-vm`: gas_metering_audit apply_audit_updates_cost
+- `proof-forge`: receipt_integrity
 
-### CLAIM-006: No committed secrets remain in repo
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `deployment/keys/bootnode-keys.json` and `bootnode-node-key` replaced with placeholders |
-| **Tests** | Manual inspection, CI secret scanning gate |
-| **Wiring** | Files gitignored; CI blocks future commits |
-| **Proof** | `grep -r "secret_key" deployment/keys/` returns only `REPLACED_` |
-| **Last verified** | 2026-06-09 |
+### Infrastructure (6 failures)
+- `x3-gpu-validator-swarm`: `stress_test_10k_tps` — PASSED (the 9 skipped were for non-CUDA feature builds)
 
-### CLAIM-007: Dockerfile.validator uses production-safe defaults
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `Dockerfile.validator` |
-| **Tests** | N/A (build-time config change) |
-| **Wiring** | CMD uses `--rpc-methods Safe`, no `--tmp`, no `--unsafe-rpc-external` |
-| **Proof** | `grep -c "Unsafe\|--tmp" Dockerfile.validator` returns 0 |
-| **Last verified** | 2026-06-09 |
+## Environment State
 
-### CLAIM-008: Toolchain is consistent across all build paths
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `rust-toolchain.toml`, `Dockerfile.validator`, `Dockerfile.indexer`, `Dockerfile.mainnet-check` |
-| **Tests** | N/A (config alignment) |
-| **Wiring** | All Rust build images use Rust 1.90.0 |
-| **Proof** | `grep "RUST_VERSION\|rust:" Dockerfile.* rust-toolchain.toml` shows 1.90.0 everywhere |
-| **Last verified** | 2026-06-09 |
+- **Toolchain**: 1.90.0-x86_64-unknown-linux-gnu (active), nightly-2026-05-01 available
+- **OS**: Linux 5.15, Ubuntu
+- **Disk**: /dev/mapper/ubuntu--vg-ubuntu--lv 436G, 384G used (92%), 34G free after cleanup
+- **Foundry**: forge 0.8.24, solc 0.8.24
 
-### CLAIM-009: deny.toml exists and is valid
-| Field | Value |
-|---|---|
-| **Status** | ✅ PROVEN |
-| **Source** | `deny.toml` at repo root (copied by Dockerfile.mainnet-check) |
-| **Tests** | Gate 5 in Dockerfile.mainnet-check |
-| **Wiring** | Sourced in mainnet-check and CI pipelines |
-| **Proof** | `cargo deny check` |
-| **Last verified** | 2026-06-09 |
+## Next 10 Tasks
 
-## Unproven Claims (future milestones)
-
-### CLAIM-010: External EVM bridge is production-ready
-**Status**: ❌ NOT PROVEN — governance-gated, disabled in RC-1
-
-### CLAIM-011: Solana external bridge is production-ready
-**Status**: ❌ NOT PROVEN — governance-gated, disabled in RC-1
-
-### CLAIM-012: Public testnet has run 6+ weeks without critical incident
-**Status**: ❌ NOT YET — testnet not yet launched publicly
-
-### CLAIM-013: Mainnet genesis is frozen and signed
-**Status**: ❌ NOT YET — pre-audit / pre-freeze
-
-## Stub Detections
-| File | Issue | Status |
-|---|---|---|
-| `deployment/keys/bootnode-keys.json` | Had real `secret_key` values | ✅ RESOLVED — replaced with placeholders |
-| `deployment/keys/bootnode-node-key` | Had raw hex key | ✅ RESOLVED — replaced with placeholder |
-| `Dockerfile.validator` | Used `--unsafe-rpc-external`, `--rpc-methods Unsafe`, `--tmp` | ✅ RESOLVED — switched to production-safe flags |
-| `Dockerfile.mainnet-check` | Toolchain mismatch (1.82 vs 1.90) | ✅ RESOLVED — all on 1.90.0 |
-| `Dockerfile.indexer` | Toolchain mismatch (1.80 vs 1.90) | ✅ RESOLVED — all on 1.90.0 |
-| `deny.toml` | Missing file at repo root | ✅ RESOLVED — created |
+1. Upgrade wasmtime past the Polkadot SDK pin (critical security) — requires upstream SDK version bump or fork
+2. Fix 14 trait/mock mismatch test failures in x3-cross-vm-bridge, pallet-x3-vrf, pallet-x3-kernel
+3. Fix 12 stale/missing impl test failures across northern-swarm, x3-staking-analytics, x3-foundry-core/revenue, x3-gateway-risk-engine, x3-vm
+4. Spin up a dev node and rerun 8 e2e tests
+5. Resolve hickory-proto 0.24.4/0.25.2 CPU exhaustion / unbounded loop advisories
+6. Replace unmaintained crates: yaml-rust, ansi_term, bincode 1.x, derivative, libsecp256k1, ring 0.16, paste, proc-macro-error
+7. Fix ed25519-dalek 1.0.1 double pubkey signing oracle (upgrade to >=2)
+8. Fix curve25519-dalek 3.2.0 timing variability (upgrade to >=4.1.3)
+9. Clear disk space and rerun: llvm-cov, miri, cargo fuzz, echidna, slither
+10. Install toxiproxy and run chaos test suite

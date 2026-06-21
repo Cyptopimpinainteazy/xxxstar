@@ -100,7 +100,7 @@ fn cannot_exceed_max_agents_per_controller() {
                 .to_vec()
                 .try_into()
                 .unwrap();
-            let operator = OPERATOR1 + i as u64;
+            let operator = OPERATOR1 + i;
             assert_ok!(AgentRegistry::register_agent(
                 RuntimeOrigin::signed(ALICE),
                 operator,
@@ -249,8 +249,8 @@ fn update_permissions_works() {
         ));
 
         let stored_perms = AgentRegistry::permissions(0);
-        assert_eq!(stored_perms.can_deploy, true);
-        assert_eq!(stored_perms.can_validate, true);
+        assert!(stored_perms.can_deploy);
+        assert!(stored_perms.can_validate);
     });
 }
 

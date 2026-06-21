@@ -10,7 +10,6 @@ use crate::kernels::Keccak256Kernel;
 ///
 /// Validates Ethereum block headers using GPU-accelerated Keccak256 hashing.
 /// Falls back to CPU validation if GPU is unavailable.
-
 pub struct EvmHeaderValidator {
     gpu_kernel: Option<Keccak256Kernel>,
     cpu_fallback: CpuFallback,
@@ -39,6 +38,7 @@ impl EvmHeaderValidator {
     /// - Block number
     ///
     /// Returns the validated block hash if successful.
+    #[allow(clippy::too_many_arguments)]
     pub async fn validate_header(
         &self,
         block_number: u64,
@@ -77,6 +77,7 @@ impl EvmHeaderValidator {
     }
 
     /// Validate basic header fields
+    #[allow(clippy::too_many_arguments)]
     fn validate_basic_fields(
         &self,
         block_number: u64,

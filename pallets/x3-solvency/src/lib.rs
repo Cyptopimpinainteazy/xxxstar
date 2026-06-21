@@ -1,5 +1,18 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
 //! # X3 Solvency Pallet
 //!
 //! Implements the solvency gate pipeline:
@@ -26,7 +39,7 @@ use types::{
 
 use pallet_x3_inventory::{
     pallet::{Lanes, Pallet as InventoryPallet, Vaults},
-    types::{LaneId, LaneStatus, ReservationId, RouteId, VaultId, VaultStatus},
+    types::{LaneStatus, ReservationId, RouteId, VaultStatus},
 };
 use pallet_x3_reservation::pallet::Pallet as ReservationPallet;
 
@@ -160,7 +173,7 @@ pub mod pallet {
 
             // Remove all snapshots in blocks [0, prune_before) that are not referenced.
             let mut pruned: u32 = 0;
-            let _ = SnapshotsByBlock::<T>::iter_prefix(prune_before)
+            SnapshotsByBlock::<T>::iter_prefix(prune_before)
                 .drain()
                 .for_each(|(hash, ())| {
                     if let Some(record) = SolvencySnapshots::<T>::get(hash) {

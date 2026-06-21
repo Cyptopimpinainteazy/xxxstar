@@ -1,9 +1,18 @@
 /// HSM (Hardware Security Module) integration layer
-/// Handles key management, signing, and cryptographic operations
+/// Handles key management, signing, and cryptographic operations.
+///
+/// # Backend selection
+///
+/// - `#[cfg(any(test, feature = "dev"))]`: `MockHSM` provides an in-memory
+///   shim that uses deterministic SHA-256 digests instead of real signatures.
+///   **Never use in production.**
+/// - `#[cfg(not(any(test, feature = "dev")))]`: `NoHsmBackend` refuses every
+///   signing / verification request with an explicit `HsmNotAvailable` error.
+///   Integrate with a real PKCS#11 provider (e.g. SoftHSM, NitroHSM) before
+///   enabling production vault signing.
 use crate::error::{CustodyError, Result};
 use crate::types::{HSMKeyReference, VaultOperationCommand};
 use chrono::Utc;
-use sha2::{Digest, Sha256};
 
 /// HSM backend abstraction
 #[async_trait::async_trait]
@@ -24,17 +33,56 @@ pub trait HSMBackend: Send + Sync {
     async fn rotate_key(&self, key_id: &str) -> Result<HSMKeyReference>;
 }
 
-/// Mock HSM backend for testing (never use in production)
+// ── Production backend: no HSM available ───────────────────────────────────
+
+/// HSM backend used when no hardware security module is attached.
+///
+/// Every signing or verification call returns an explicit
+/// `HsmNotAvailable` error so that no caller can accidentally obtain
+/// a fake (deterministic) signature.
+#[cfg(not(any(test, feature = "dev")))]
+pub struct NoHsmBackend;
+
+#[cfg(not(any(test, feature = "dev")))]
+#[async_trait::async_trait]
+impl HSMBackend for NoHsmBackend {
+    async fn sign(&self, _key_id: &str, _data: &[u8]) -> Result<Vec<u8>> {
+        Err(CustodyError::HsmNotAvailable)
+    }
+
+    async fn verify(&self, _key_id: &str, _data: &[u8], _signature: &[u8]) -> Result<bool> {
+        Err(CustodyError::HsmNotAvailable)
+    }
+
+    async fn generate_key(&self, _key_id: &str, _algorithm: &str) -> Result<HSMKeyReference> {
+        Err(CustodyError::HsmNotAvailable)
+    }
+
+    async fn list_keys(&self) -> Result<Vec<HSMKeyReference>> {
+        Err(CustodyError::HsmNotAvailable)
+    }
+
+    async fn rotate_key(&self, _key_id: &str) -> Result<HSMKeyReference> {
+        Err(CustodyError::HsmNotAvailable)
+    }
+}
+
+// ── Test / dev-only mock backend ───────────────────────────────────────────
+
+/// Mock HSM backend for testing (never use in production).
+#[cfg(any(test, feature = "dev"))]
 pub struct MockHSM {
     keys: parking_lot::RwLock<std::collections::HashMap<String, HSMKeyReference>>,
 }
 
+#[cfg(any(test, feature = "dev"))]
 impl Default for MockHSM {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(any(test, feature = "dev"))]
 impl MockHSM {
     pub fn new() -> Self {
         Self {
@@ -43,6 +91,7 @@ impl MockHSM {
     }
 }
 
+#[cfg(any(test, feature = "dev"))]
 #[async_trait::async_trait]
 impl HSMBackend for MockHSM {
     async fn sign(&self, key_id: &str, data: &[u8]) -> Result<Vec<u8>> {
@@ -50,8 +99,7 @@ impl HSMBackend for MockHSM {
         if !keys.contains_key(key_id) {
             return Err(CustodyError::KeyNotFound(key_id.to_string()));
         }
-        // In mock, just return HMAC-like signature
-        let mut hasher = Sha256::new();
+        let mut hasher = sha2::Sha256::new();
         hasher.update(key_id.as_bytes());
         hasher.update(data);
         Ok(hasher.finalize().to_vec())
@@ -90,10 +138,12 @@ impl HSMBackend for MockHSM {
     }
 }
 
+#[cfg(any(test, feature = "dev"))]
 trait ErrMapped<T> {
     fn ok_err_mapped(self) -> Result<T>;
 }
 
+#[cfg(any(test, feature = "dev"))]
 impl<T> ErrMapped<T> for Option<T> {
     fn ok_err_mapped(self) -> Result<T> {
         self.ok_or_else(|| CustodyError::Internal("option unwrap failed".to_string()))

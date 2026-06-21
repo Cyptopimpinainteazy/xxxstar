@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace * with + in FeeCurve::flashloan_premium
+@@ -106,17 +106,17 @@
+     pub fn external_bot_penalty(&self, gross_fee: Amount) -> Amount {
+         let penalty_bps = self.config.external_bot_penalty_bps.saturating_sub(10000);
+         (gross_fee * penalty_bps as u128) / 10000
+     }
+ 
+     /// Apply flashloan premium.
+     pub fn flashloan_premium(&self, gross_fee: Amount) -> Amount {
+         let premium_bps = self.config.flashloan_premium_bps.saturating_sub(10000);
+-        (gross_fee * premium_bps as u128) / 10000
++        (gross_fee + /* ~ changed by cargo-mutants ~ */ premium_bps as u128) / 10000
+     }
+ 
+     /// Calculate cross-chain surcharge.
+     pub fn cross_chain_surcharge(&self, hops: u32) -> Amount {
+         self.config
+             .cross_chain_surcharge
+             .saturating_mul(hops as u128)
+     }

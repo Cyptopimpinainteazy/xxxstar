@@ -54,6 +54,8 @@ pub enum RiskFactor {
     UnusualPattern,
     /// High price volatility
     HighVolatility,
+    /// Volatility scoring not configured (oracle data unavailable)
+    VolatilityNotConfigured,
     /// Cross-chain operation with insufficient finality
     InsufficientFinality,
 }
@@ -134,12 +136,10 @@ impl RiskClassifier for AiRiskClassifier {
             recommendations.push(RiskRecommendation::ReduceMaxAmount);
         }
 
-        // Check price volatility
-        if Self::has_high_volatility(tx.asset_id) {
-            factors.push(RiskFactor::HighVolatility);
-            score += 2000; // +20.00%
-            recommendations.push(RiskRecommendation::RequireManualApproval);
-        }
+        // Volatility scoring: always flag that the oracle is not configured.
+        // No volatility-based score adjustment is applied until real oracle data is
+        // available (has_high_volatility returns false when unconfigured).
+        factors.push(RiskFactor::VolatilityNotConfigured);
 
         // Check for unusual patterns
         if Self::is_unusual_pattern(tx) {
@@ -148,12 +148,10 @@ impl RiskClassifier for AiRiskClassifier {
         }
 
         // Cross-chain specific checks
-        if tx.source_chain != tx.dest_chain {
-            if Self::has_insufficient_finality(tx) {
-                factors.push(RiskFactor::InsufficientFinality);
-                score += 4000; // +40.00%
-                recommendations.push(RiskRecommendation::BlockOperation);
-            }
+        if tx.source_chain != tx.dest_chain && Self::has_insufficient_finality(tx) {
+            factors.push(RiskFactor::InsufficientFinality);
+            score += 4000; // +40.00%
+            recommendations.push(RiskRecommendation::BlockOperation);
         }
 
         // Determine risk level based on score
@@ -198,18 +196,16 @@ impl AiRiskClassifier {
         asset_id > 999
     }
 
-    /// Check if asset has high volatility.
+    /// Check if volatility scoring is configured.
     ///
-    /// Uses a simple volatility check based on the asset ID parity as a
-    /// deterministic stand-in for actual price observations. In production
-    /// this queries the x3-oracle pallet for recent prices and computes
-    /// a rolling 24-block standard deviation.
-    fn has_high_volatility(asset_id: u32) -> bool {
-        // Deterministic volatility: assets with odd IDs are considered
-        // more volatile (this is a placeholder for oracle price stddev).
-        // In production: compute rolling stddev from oracle prices,
-        // flag if stddev > 10% of mean.
-        asset_id % 2 == 1
+    /// Returns `true` only when the x3-oracle pallet provides live price data
+    /// for the given asset and a rolling 24-block standard deviation can be
+    /// computed. Until the oracle is wired, volatility is conservatively assumed
+    /// unavailable (the asset is **not** scored as high-volatility, but the
+    /// `VolatilityNotConfigured` factor is appended to every assessment).
+    #[allow(dead_code)]
+    fn has_high_volatility(_asset_id: u32) -> bool {
+        false
     }
 
     /// Check for unusual transaction patterns (simplified)

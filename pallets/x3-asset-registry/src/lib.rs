@@ -19,6 +19,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+#![allow(unexpected_cfgs)]
 
 //! X3 Asset Registry pallet.
 
@@ -390,6 +391,10 @@ pub mod pallet {
                 ensure!(config.limits.max_amount > 0, Error::<T>::InvalidRouteLimits);
                 ensure!(
                     config.limits.daily_limit >= config.limits.max_amount,
+                    Error::<T>::InvalidRouteLimits
+                );
+                ensure!(
+                    config.limits.per_wallet_daily_limit >= config.limits.max_amount,
                     Error::<T>::InvalidRouteLimits
                 );
             }
@@ -937,6 +942,37 @@ mod tests {
                     daily_limit: 0,
                     per_wallet_daily_limit: 0,
                     pending_limit: 0,
+                },
+                fee_bps: 0,
+                expiry_blocks: 100,
+                proof_tier: x3_asset_kernel_types::ProofTier::TrustedInternal,
+            };
+            assert_noop!(
+                Pallet::<Test>::do_configure_route(
+                    &id,
+                    DomainId::X3Native,
+                    DomainId::X3Evm,
+                    bad_cfg,
+                ),
+                Error::<Test>::InvalidRouteLimits
+            );
+        });
+    }
+
+    #[test]
+    fn configure_route_fails_when_per_wallet_daily_limit_less_than_max() {
+        new_test_ext().execute_with(|| {
+            let (sym, name, dec, dom, chain, addr, policy) = usdc_eth();
+            let id = Pallet::<Test>::do_register_asset(sym, name, dec, dom, chain, addr, policy)
+                .unwrap();
+            let bad_cfg = RouteConfig {
+                enabled: true,
+                limits: RouteLimits {
+                    min_amount: 0,
+                    max_amount: 1_000,
+                    daily_limit: 2_000,
+                    per_wallet_daily_limit: 500, // less than max_amount → invalid
+                    pending_limit: 10,
                 },
                 fee_bps: 0,
                 expiry_blocks: 100,

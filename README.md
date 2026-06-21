@@ -3,6 +3,8 @@
 A Substrate-based blockchain with native cross-VM execution across X3Native, X3Evm, and X3Svm domains.
 
 > **Current Status:** v0.4 Internal Testnet Candidate
+> **Current docs:** Start with [`docs/current/README.md`](./docs/current/README.md).
+> **Failure/TODO ledger:** See [`docs/current/FAILURES_AND_TODOS.md`](./docs/current/FAILURES_AND_TODOS.md).
 > ⚠️ **IMPORTANT:** See [LAUNCH_SCOPE.md](./LAUNCH_SCOPE.md) for the **single authoritative** scope statement. This supersedes all other status documents.
 > See [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) for the detailed subsystem scoreboard.
 > 

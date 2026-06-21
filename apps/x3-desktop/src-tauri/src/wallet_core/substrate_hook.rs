@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn test_substrate_hook_handler_creation() {
         let config = SubstrateHookConfig {
-            rpc_url: "ws://127.0.0.1:9944".to_string(),
+            rpc_url: "ws://rpc.testnet.x3-chain.io:9944".to_string(),
             subscription_timeout_ms: 30000,
             reconnect_delay_ms: 5000,
             max_retries: 3,
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_substrate_hook_manager() {
-        let mut manager = SubstrateHookManager::new("ws://127.0.0.1:9944");
+        let mut manager = SubstrateHookManager::new("ws://rpc.testnet.x3-chain.io:9944");
 
         let handler1 = manager.get_handler("handler1");
         assert!(handler1.is_connected());

@@ -88,19 +88,24 @@ pub enum VrfError {
     GenerationFailed,
     /// Invalid seed data
     InvalidSeed,
+    /// VRF provider not configured (no real schnorrkel node key available)
+    NotConfigured,
 }
 
-// Note: Real Schnorrkel VRF implementation would go here
-// For now, using mock provider for all environments
+// ── Dev / test-only mock VRF provider ──────────────────────────────────────
 
-/// Mock VRF provider for testing (no_std compatible)
+/// Mock VRF provider for testing (no_std compatible).
+///
+/// Produces **deterministic** output from `blake2_256(seed)` — not a real VRF.
+/// Only available with `#[cfg(any(test, feature = "dev"))]`.
+#[cfg(any(test, feature = "dev"))]
 pub struct MockVrfProvider;
 
+#[cfg(any(test, feature = "dev"))]
 impl VrfProvider for MockVrfProvider {
     fn prove(&self, seed: &[u8; 32]) -> Result<VrfProof, VrfError> {
         use sp_io::hashing::blake2_256;
 
-        // Generate deterministic "randomness" from seed
         let output = blake2_256(seed);
 
         let mut proof = [0u8; 64];
@@ -109,21 +114,53 @@ impl VrfProvider for MockVrfProvider {
     }
 
     fn verify(&self, proof: &VrfProof, seed: &[u8; 32], _public_key: &VrfPublicKey) -> bool {
-        // Mock verification: check that proof starts with seed
         proof.proof[..32] == *seed
     }
 
     fn derive_public_key(&self, secret_key: &VrfSecretKey) -> VrfPublicKey {
-        // Mock public key derivation: hash the secret key
         use sp_io::hashing::blake2_256;
         let hash = blake2_256(&secret_key.0);
         VrfPublicKey(hash)
     }
 }
 
-/// Get the global VRF provider
+// ── Production VRF provider (not yet configured) ───────────────────────────
+
+/// VRF provider used when no real VRF key material is supplied.
+///
+/// Every `prove` call returns `VrfError::NotConfigured` so that callers
+/// cannot accidentally consume deterministic mock randomness in production.
+#[cfg(not(any(test, feature = "dev")))]
+pub struct VrfNotConfigured;
+
+#[cfg(not(any(test, feature = "dev")))]
+impl VrfProvider for VrfNotConfigured {
+    fn prove(&self, _seed: &[u8; 32]) -> Result<VrfProof, VrfError> {
+        Err(VrfError::NotConfigured)
+    }
+
+    fn verify(&self, _proof: &VrfProof, _seed: &[u8; 32], _public_key: &VrfPublicKey) -> bool {
+        false
+    }
+
+    fn derive_public_key(&self, _secret_key: &VrfSecretKey) -> VrfPublicKey {
+        VrfPublicKey([0u8; 32])
+    }
+}
+
+/// Get the global VRF provider.
+///
+/// Returns `VrfNotConfigured` (errors hard) unless the `dev` feature or
+/// `#[cfg(test)]` is active, in which case `MockVrfProvider` is used.
 pub fn get_vrf_provider() -> &'static dyn VrfProvider {
-    &MockVrfProvider
+    #[cfg(any(test, feature = "dev"))]
+    {
+        &MockVrfProvider
+    }
+    #[cfg(not(any(test, feature = "dev")))]
+    {
+        &VrfNotConfigured
+    }
 }
 
 /// Generate randomness with proof

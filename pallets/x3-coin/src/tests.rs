@@ -7,8 +7,6 @@
 //! - Deterministic serialization and invariants
 //! - Integration tests with X3 Kernel
 
-#![cfg(test)]
-
 use super::*;
 use crate::mock::{new_test_ext, RuntimeOrigin, Test};
 use frame_support::{assert_noop, assert_ok};

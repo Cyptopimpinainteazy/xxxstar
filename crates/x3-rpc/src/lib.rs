@@ -17,6 +17,7 @@
 
 pub mod benchmark;
 pub mod gas_estimation;
+pub mod gateway_rpc;
 pub mod validator_rpc;
 pub mod wallet_dex_rpc;
 pub mod wallet_service_rpc;
@@ -27,6 +28,10 @@ pub use benchmark::{
     BenchmarkReportSummary, BenchmarkRpcApi, BenchmarkService, X3BenchmarkRpc,
 };
 pub use gas_estimation::{ExecutionStatus, GasEstimation, GasEstimationRPC, RPCTransaction};
+pub use gateway_rpc::{
+    create_gateway_rpc, GatewayRpc, GatewayRpcApi, RouteConfigResponse, StorageKeysFn,
+    StorageReadFn, TransferSummaryResponse, WithdrawalSummaryResponse,
+};
 pub use validator_rpc::{
     create_validator_rpc, LeaderboardEntry, MetricsSnapshot, ValidatorInfo, ValidatorRpc,
     ValidatorRpcApi, ValidatorStatus,

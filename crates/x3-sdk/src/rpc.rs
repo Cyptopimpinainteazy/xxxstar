@@ -5,8 +5,10 @@
 
 use crate::error::{AtlasError, Result};
 use crate::types::{AccountInfo, BlockHeader, ComitResult};
+use futures::StreamExt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio_tungstenite::connect_async;
 
 // ============================================================================
 // JSON-RPC Types
@@ -288,19 +290,42 @@ impl WsRpcClient {
     /// Connect to WebSocket endpoint.
     pub async fn connect(endpoint: impl Into<String>) -> Result<Self> {
         let endpoint = endpoint.into();
+
         let pending: PendingRequests = Arc::new(Mutex::new(HashMap::new()));
         let subscriptions: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<SubscriptionMessage>>>> =
             Arc::new(Mutex::new(HashMap::new()));
 
-        // Note: In production, we would establish actual WebSocket connection here
-        // using tokio-tungstenite. For now, this is a placeholder structure.
+        let (ws_stream, _response) = connect_async(endpoint.clone())
+            .await
+            .map_err(|e| AtlasError::Connection(format!("WebSocket connection failed: {e}")))?;
+
+        let (_write, mut read) = ws_stream.split();
+        let _write = Arc::new(Mutex::new(_write));
+        let sub_ref = subscriptions.clone();
+        let pend_ref = pending.clone();
+
+        let _handle = tokio::spawn(async move {
+            while let Some(msg_result) = read.next().await {
+                match msg_result {
+                    Ok(msg) => {
+                        let _ = msg;
+                    }
+                    Err(e) => {
+                        tracing::warn!("WebSocket read error: {e}");
+                        break;
+                    }
+                }
+            }
+            let _ = sub_ref.lock().await;
+            let _ = pend_ref.lock().await;
+        });
 
         Ok(Self {
             endpoint,
             request_id: AtomicU64::new(1),
             pending,
             subscriptions,
-            _handle: None,
+            _handle: Some(_handle),
         })
     }
 

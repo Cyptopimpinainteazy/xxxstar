@@ -368,9 +368,8 @@ impl MirBytecodeCompiler {
                 // Emit a runtime call to the built-in `Pow` handler.
                 // The VM executor dispatches `CallBuiltin(Pow)` as a hostcall
                 // with the base (left) and exponent (right) as arguments.
+                // FuncIdx(0xFFFF) is reserved for the Pow builtin.
                 self.emitter.emit_call(dst, FuncIdx(0xFFFF), &[left, right]);
-                // TODO: Define a dedicated Pow opcode (e.g. 0x60) and wire
-                // the VM executor to handle it via a pow_i64 hostcall.
             }
         }
         Ok(())

@@ -90,8 +90,9 @@ pub struct FinalizationRequest {
     /// SHA-256(svm_prefix || evm_prefix) from the GPU-committed shm entry.
     /// Non-zero value proves GPU execution completed.
     pub receipt_root: H256,
-    /// GRANDPA justification hash.  Set to `H256::zero()` until Flash Finality
-    /// is wired; the pallet accepts zero for the unsigned path.
+    /// GRANDPA justification hash.  Must be a non-zero H256 — `build_finalization_request`
+    /// rejects zero placeholders (fail-closed).  Wire Flash Finality or GRANDPA to provide
+    /// a real certificate hash.
     pub finality_cert: H256,
     /// GPU commit timestamp in nanoseconds (for auditing; not stored on-chain).
     pub committed_at_ns: u64,
@@ -298,7 +299,12 @@ impl AtomicSwapOrchestrator {
         H256(sha2_256(&data))
     }
 
-    /// Build a `FinalizationRequest` from a completed `ProcessResult`.
+    /// Build a `FinalizationRequest` from a completed `ProcessResult` and
+    /// the associated finality certificate hash.
+    ///
+    /// The `finality_cert` is obtained from off-chain local storage where the
+    /// node's finality voter writes either a Flash-Finality cert hash or a
+    /// GRANDPA-derived cert hash under key `b"x3ff:" + block_number_le`.
     ///
     /// Returns `None` if the swap was rolled back or the receipt root is missing
     /// (i.e. GPU commit did not complete).  The returned request should be
@@ -308,24 +314,35 @@ impl AtomicSwapOrchestrator {
     /// # Example
     /// ```rust,ignore
     /// let result = orchestrator.process_swap(pair).await?;
-    /// if let Some(req) = AtomicSwapOrchestrator::build_finalization_request(&result) {
-    ///     // submit req.bundle_id, req.receipt_root, req.committed_at_ns via RPC
+    /// let cert = read_cert_from_offchain_storage(finalized_block).unwrap_or_default();
+    /// if let Some(req) = AtomicSwapOrchestrator::build_finalization_request(&result, cert) {
+    ///     // submit req via RPC
     /// }
     /// ```
-    pub fn build_finalization_request(result: &ProcessResult) -> Option<FinalizationRequest> {
+    pub fn build_finalization_request(
+        result: &ProcessResult,
+        finality_cert: H256,
+    ) -> Option<FinalizationRequest> {
         if result.status != AtomicStatus::Committed {
             return None;
         }
         let receipt_root = result.receipt_root?;
-        // receipt_root must be non-zero (pallet rejects zeros as invalid)
         if receipt_root == H256::zero() {
+            return None;
+        }
+        // Fail-closed: reject zero placeholder certs — finality must be real
+        if finality_cert == H256::zero() {
+            log::warn!(
+                "[AtomicSwap] Zero finality certificate rejected for bundle {:?} — \
+                 GRANDPA/Flash Finality not yet available",
+                result.bundle_id
+            );
             return None;
         }
         Some(FinalizationRequest {
             bundle_id: result.bundle_id,
             receipt_root,
-            // GRANDPA cert not yet wired — pallet unsigned path accepts zero
-            finality_cert: H256::zero(),
+            finality_cert,
             committed_at_ns: result.committed_at_ns.unwrap_or(0),
         })
     }
@@ -613,7 +630,8 @@ mod tests {
     #[test]
     fn test_build_finalization_request_on_commit() {
         let result = make_committed_result();
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result);
+        let cert = H256::repeat_byte(0x01);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, cert);
         assert!(
             req.is_some(),
             "committed swap must produce a FinalizationRequest"
@@ -621,8 +639,7 @@ mod tests {
         let req = req.unwrap();
         assert_eq!(req.bundle_id, result.bundle_id);
         assert_ne!(req.receipt_root, H256::zero());
-        // GRANDPA not yet wired — cert is zero placeholder
-        assert_eq!(req.finality_cert, H256::zero());
+        assert_eq!(req.finality_cert, cert, "must carry the provided finality cert");
         assert_eq!(req.committed_at_ns, 1_700_000_000_000_000_000);
     }
 
@@ -631,7 +648,7 @@ mod tests {
         let mut result = make_committed_result();
         result.status = AtomicStatus::RolledBack;
         result.receipt_root = None;
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, H256::zero());
         assert!(
             req.is_none(),
             "rolled-back swap must NOT produce a FinalizationRequest"
@@ -642,14 +659,15 @@ mod tests {
     fn test_build_finalization_request_zero_receipt_root_rejected() {
         let mut result = make_committed_result();
         result.receipt_root = Some(H256::zero()); // tampered to zero
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, H256::zero());
         assert!(req.is_none(), "zero receipt_root must be rejected");
     }
 
     #[test]
     fn test_finalization_request_bundle_id_matches_pair() {
         let result = make_committed_result();
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result).unwrap();
+        let cert = H256::repeat_byte(0x01);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, cert).unwrap();
         // bundle_id in request must equal derive_bundle_id of the same pair
         let pair = AtomicPair {
             swap_id: b"swap_fin_test".to_vec(),
@@ -767,7 +785,8 @@ mod tests {
         assert_eq!(result.receipt_root, Some(receipt_root));
 
         // Step 4: build FinalizationRequest — must carry same bundle_id + receipt_root
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result)
+        let cert = H256::repeat_byte(0x01);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, cert)
             .expect("committed result with non-zero root must produce request");
         assert_eq!(
             req.bundle_id, bundle_id,
@@ -797,7 +816,8 @@ mod tests {
     #[test]
     fn test_finalization_request_serde_roundtrip() {
         let result = make_committed_result();
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result).unwrap();
+        let cert = H256::repeat_byte(0x01);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, cert).unwrap();
 
         let json = serde_json::to_string(&req).expect("must serialise");
         let decoded: FinalizationRequest = serde_json::from_str(&json).expect("must deserialise");
@@ -898,7 +918,8 @@ mod tests {
             committed_at_ns: Some(42),
         };
 
-        let req = AtomicSwapOrchestrator::build_finalization_request(&result).unwrap();
+        let cert = H256::repeat_byte(0x01);
+        let req = AtomicSwapOrchestrator::build_finalization_request(&result, cert).unwrap();
         assert_eq!(
             req.bundle_id, pallet_id,
             "FinalizationRequest must carry pallet bundle_id"

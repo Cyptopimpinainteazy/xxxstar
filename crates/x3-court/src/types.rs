@@ -187,6 +187,23 @@ pub struct VerdictRecord {
     pub verdict_hash: Hash256,
 }
 
+/// Strategy for rendering verdicts when hard evidence is ambiguous.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VerdictStrategy {
+    /// Always find the defendant guilty for serious offense types.
+    Strict,
+    /// Default to not guilty unless hard evidence exists.
+    Lenient,
+    /// Use deterministic pseudorandom probability weighted by severity.
+    Probabilistic,
+}
+
+impl Default for VerdictStrategy {
+    fn default() -> Self {
+        Self::Strict
+    }
+}
+
 /// Court configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CourtConfig {
@@ -196,6 +213,8 @@ pub struct CourtConfig {
     pub dispute_bond: u128,
     /// Whether auto-slashing is enabled on guilty verdicts.
     pub auto_slash: bool,
+    /// Verdict strategy for ambiguous cases.
+    pub verdict_strategy: VerdictStrategy,
 }
 
 impl Default for CourtConfig {
@@ -204,6 +223,7 @@ impl Default for CourtConfig {
             finality_window: 100,
             dispute_bond: 100_000,
             auto_slash: true,
+            verdict_strategy: VerdictStrategy::Strict,
         }
     }
 }

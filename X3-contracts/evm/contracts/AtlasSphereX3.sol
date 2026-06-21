@@ -17,17 +17,19 @@ contract AtlasSphereX3 is ERC20, ERC20Burnable, ERC20Pausable, Ownable {
     event FeeUpdated(string feeType, uint256 newBps);
     event FeeExempt(address indexed user, bool exempt);
 
-    constructor(address _treasury) ERC20("Atlas Sphere X3", "X3") {
-        treasury = _treasury;
+    constructor(address treasuryAddr) ERC20("Atlas Sphere X3", "X3") {
+        require(treasuryAddr != address(0), "ZERO_TREASURY");
+        treasury = treasuryAddr;
         transferFeeBps = 50;
         stakingFeeBps = 100;
         swapFeeBps = 25;
-        _mint(_treasury, 1_000_000_000 ether);
+        _mint(treasuryAddr, 1_000_000_000 ether);
     }
 
-    function setTreasury(address _treasury) external onlyOwner {
-        treasury = _treasury;
-        emit TreasuryChanged(_treasury);
+    function setTreasury(address newTreasury) external onlyOwner {
+        require(newTreasury != address(0), "ZERO_TREASURY");
+        treasury = newTreasury;
+        emit TreasuryChanged(newTreasury);
     }
 
     function setFee(string memory feeType, uint256 bps) external onlyOwner {

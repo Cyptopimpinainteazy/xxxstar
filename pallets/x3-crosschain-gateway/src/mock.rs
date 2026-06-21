@@ -1,5 +1,4 @@
-#![cfg(test)]
-
+#![allow(deprecated)]
 use crate as pallet_x3_crosschain_gateway;
 use crate::*;
 
@@ -13,9 +12,9 @@ use sp_runtime::{
 
 pub type AccountId = u64;
 pub type Balance = u128;
-pub type BlockNumber = u64;
+pub type _BlockNumber = u64;
 
-pub type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+pub type _UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = system::mocking::MockBlock<Test>;
 
 construct_runtime!(
@@ -119,24 +118,115 @@ pub fn route() -> RouteConfig {
         mode: GatewayMode::TestnetLive,
         require_dispute_window: false,
         dispute_window_blocks: 0,
+        contract_address: bounded("0xGATEWAY"),
     }
 }
 
 pub fn deposit_proof(proof_id: ProofId, amount: Balance) -> DepositProof {
+    deposit_proof_with(
+        proof_id,
+        amount,
+        ExternalChainId::BaseSepolia,
+        asset(),
+        1,
+        bounded_payload("valid_payload"),
+    )
+}
+
+pub fn deposit_proof_with(
+    proof_id: ProofId,
+    amount: Balance,
+    chain: ExternalChainId,
+    external_asset: ExternalAssetRef,
+    nonce: u64,
+    proof_payload: BoundedVec<u8, ConstU32<4096>>,
+) -> DepositProof {
     DepositProof {
         version: 1,
         proof_id,
-        source_chain: ExternalChainId::BaseSepolia,
+        source_chain: chain,
         source_block: 100,
         source_tx_hash: [7u8; 32],
         event_index: 0,
-        external_asset: asset(),
+        external_asset,
         sender: bounded("0xSENDER"),
         recipient: bounded("0xRECIPIENT"),
         amount,
-        nonce: 1,
+        nonce,
         observed_at_block: 110,
         finalized_at_block: 120,
-        proof_payload: bounded_payload("valid_payload"),
+        proof_payload,
     }
+}
+
+pub fn bounded20(data: [u8; 20]) -> BoundedVec<u8, ConstU32<128>> {
+    BoundedVec::try_from(data.to_vec()).unwrap()
+}
+
+// ── Asset helpers ─────────────────────────────────────────────────────────
+
+pub fn solana_asset() -> ExternalAssetRef {
+    ExternalAssetRef {
+        chain_id: ExternalChainId::SolanaDevnet,
+        token_address_or_mint: bounded("0xSOLTOKEN"),
+    }
+}
+
+pub fn bitcoin_asset() -> ExternalAssetRef {
+    ExternalAssetRef {
+        chain_id: ExternalChainId::BitcoinTestnet,
+        token_address_or_mint: bounded("0xBTCTOKEN"),
+    }
+}
+
+// ── Route helpers ─────────────────────────────────────────────────────────
+
+pub fn validator_route() -> RouteConfig {
+    RouteConfig {
+        route_id: [2u8; 32],
+        x3_asset_id: [9u8; 32],
+        verification_level: RouteVerificationLevel::ValidatorQuorum {
+            threshold: 2,
+            total: 3,
+        },
+        ..route()
+    }
+}
+
+pub fn solana_route() -> RouteConfig {
+    RouteConfig {
+        route_id: [3u8; 32],
+        external_chain_id: ExternalChainId::SolanaDevnet,
+        external_asset: solana_asset(),
+        x3_asset_id: [10u8; 32],
+        verification_level: RouteVerificationLevel::SolanaFinalizedProof,
+        ..route()
+    }
+}
+
+pub fn _bitcoin_route() -> RouteConfig {
+    RouteConfig {
+        route_id: [4u8; 32],
+        external_chain_id: ExternalChainId::BitcoinTestnet,
+        external_asset: bitcoin_asset(),
+        x3_asset_id: [11u8; 32],
+        verification_level: RouteVerificationLevel::BitcoinSpvProof,
+        ..route()
+    }
+}
+
+pub fn evm_route() -> RouteConfig {
+    RouteConfig {
+        route_id: [5u8; 32],
+        x3_asset_id: [9u8; 32],
+        verification_level: RouteVerificationLevel::EvmReceiptProof,
+        contract_address: bounded20([0xaa; 20]),
+        ..route()
+    }
+}
+
+// ── Proof payload helpers ─────────────────────────────────────────────────
+
+pub fn valid_proof_payload() -> BoundedVec<u8, ConstU32<4096>> {
+    bounded_payload("some_valid_payload_data_1234567890")
 }

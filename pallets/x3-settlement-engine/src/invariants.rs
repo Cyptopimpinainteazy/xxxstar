@@ -13,7 +13,7 @@
 //! - Slash operators (testnet)
 //! - Block governance upgrades (if invariant checks fail)
 
-use crate::types::{IntentState, InvariantViolationType, RefundReason};
+use crate::types::{IntentState, InvariantViolationType};
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use core::fmt::Debug;
 use scale_info::TypeInfo;
@@ -77,10 +77,8 @@ impl InvariantEnforcer {
         legs_claimed: u32,
         state: IntentState,
     ) -> InvariantCheckResult {
-        if matches!(state, IntentState::Finalized) {
-            if legs_claimed < legs_total {
-                return InvariantCheckResult::Fail(InvariantViolationType::PartialExecution);
-            }
+        if matches!(state, IntentState::Finalized) && legs_claimed < legs_total {
+            return InvariantCheckResult::Fail(InvariantViolationType::PartialExecution);
         }
         InvariantCheckResult::Pass
     }
@@ -158,18 +156,18 @@ impl InvariantEnforcer {
         current_time: u64,
     ) -> InvariantCheckResult {
         // If past timeout and not resolved, violation
-        if current_time > timeout {
-            if !matches!(state, IntentState::Finalized | IntentState::Refunded) {
-                // Intent should have been auto-refunded
-                return InvariantCheckResult::Fail(InvariantViolationType::TimeoutBypass);
-            }
+        if current_time > timeout
+            && !matches!(state, IntentState::Finalized | IntentState::Refunded)
+        {
+            // Intent should have been auto-refunded
+            return InvariantCheckResult::Fail(InvariantViolationType::TimeoutBypass);
         }
 
         // If way past max time and still pending, something is wrong
-        if current_time > created_at + self.config.max_settlement_time {
-            if !matches!(state, IntentState::Finalized | IntentState::Refunded) {
-                return InvariantCheckResult::Fail(InvariantViolationType::TimeoutBypass);
-            }
+        if current_time > created_at + self.config.max_settlement_time
+            && !matches!(state, IntentState::Finalized | IntentState::Refunded)
+        {
+            return InvariantCheckResult::Fail(InvariantViolationType::TimeoutBypass);
         }
 
         InvariantCheckResult::Pass
@@ -187,11 +185,9 @@ impl InvariantEnforcer {
         maker_refundable: bool,
         taker_refundable: bool,
     ) -> InvariantCheckResult {
-        if timed_out {
-            if !maker_refundable || !taker_refundable {
-                // Funds stuck - violation
-                return InvariantCheckResult::Fail(InvariantViolationType::TimeoutBypass);
-            }
+        if timed_out && (!maker_refundable || !taker_refundable) {
+            // Funds stuck - violation
+            return InvariantCheckResult::Fail(InvariantViolationType::TimeoutBypass);
         }
         InvariantCheckResult::Pass
     }

@@ -17,10 +17,7 @@ fn must_parse(src: &str) {
 }
 
 fn must_reject(src: &str) {
-    assert!(
-        parse_source(src).is_err(),
-        "expected parser to reject {src:?}"
-    );
+    assert!(parse_source(src).is_err(), "expected parser to reject {src:?}");
 }
 
 // ---------------- top-level items ----------------

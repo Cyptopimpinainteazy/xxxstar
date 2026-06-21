@@ -372,11 +372,11 @@ impl CrossVmDispatcher for NoOpDispatcher {
     }
 
     fn get_evm_balance(&self, _address: &[u8; 20]) -> u128 {
-        u128::MAX
+        0
     }
 
     fn get_svm_balance(&self, _pubkey: &[u8; 32]) -> u64 {
-        u64::MAX
+        0
     }
 
     fn get_evm_bridge_escrow(&self) -> [u8; 20] {
@@ -2864,8 +2864,8 @@ mod tests {
         // Verify that CallEvm uses last 20 bytes of the 32-byte SVM caller
         let mut caller = vec![0u8; 32];
         // Set distinctive bytes in the last 20 positions
-        for i in 12..32 {
-            caller[i] = (i - 12) as u8 + 0xA0;
+        for (i, byte) in caller.iter_mut().enumerate().skip(12) {
+            *byte = (i - 12) as u8 + 0xA0;
         }
 
         let mut bridge = CrossVmBridge::new();

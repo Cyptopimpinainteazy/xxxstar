@@ -1015,9 +1015,7 @@ pub mod pallet {
                 if let Some(ref payer) = fee_payer {
                     let fee_bps = T::RoutingFeeBps::get() as u128;
                     if fee_bps > 0 {
-                        let fee_raw = (amount as u128)
-                            .saturating_mul(fee_bps)
-                            .saturating_div(10_000);
+                        let fee_raw = amount.saturating_mul(fee_bps).saturating_div(10_000);
                         if fee_raw > 0 {
                             let fee: BalanceOf<T> = fee_raw.saturated_into();
                             T::Currency::transfer(
@@ -1280,6 +1278,7 @@ pub mod pallet {
             Self::fixed_id(b"x3-cross-vm-router")
         }
 
+        #[allow(dead_code)]
         fn default_gateway_asset_id() -> AssetId {
             x3_asset_kernel_types::derive_asset_id(DomainId::X3Native, 0, b"native", b"X3", 12)
         }

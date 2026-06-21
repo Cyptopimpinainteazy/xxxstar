@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -95,6 +95,9 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
         uint256 timestamp
     );
 
+    /// @notice Emitted when platform fee is updated
+    event PlatformFeeUpdated(uint256 oldFee, uint256 newFee, uint256 timestamp);
+
     /// @notice Emitted when a sale occurs
     event AppSold(
         uint256 indexed listingId,
@@ -116,10 +119,10 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
-    constructor(uint256 _platformFeeBps) {
+    constructor(uint256 feeBps) {
         _transferOwnership(msg.sender);
-        if (_platformFeeBps > MAX_BPS) revert InvalidFee();
-        platformFeeBps = _platformFeeBps;
+        if (feeBps > MAX_BPS) revert InvalidFee();
+        platformFeeBps = feeBps;
     }
 
     // ── Admin Functions ──────────────────────────────────────────────────────
@@ -128,7 +131,9 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
     /// @param newFeeBps The new fee in basis points
     function setPlatformFeeBps(uint256 newFeeBps) external onlyOwner {
         if (newFeeBps > MAX_BPS) revert InvalidFee();
+        uint256 oldFee = platformFeeBps;
         platformFeeBps = newFeeBps;
+        emit PlatformFeeUpdated(oldFee, newFeeBps, block.timestamp);
     }
 
     /// @notice Toggle featured status for a listing
@@ -344,7 +349,7 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
         }
 
         // Count matches
-        uint256 matchCount;
+        uint256 matchCount = 0;
         bytes32 queryLower = _toLower(keccak256(bytes(query)));
 
         // We do a simple scan - in production you'd use an index
@@ -361,8 +366,8 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
         uint256 resultCount = end - offset;
 
         listings = new Listing[](resultCount);
-        uint256 idx;
-        uint256 found;
+        uint256 idx = 0;
+        uint256 found = 0;
         for (uint256 i = 1; i <= _listingCount && found < end; i++) {
             if (_matchesQuery(_listings[i], query, queryLower)) {
                 found++;
@@ -467,8 +472,9 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
     /// @return listings Array of featured Listing structs
     function getFeaturedApps() external view returns (Listing[] memory listings) {
         // Filter out expired featured listings
-        uint256 activeFeatured;
-        for (uint256 i = 0; i < _featuredListings.length; i++) {
+        uint256 activeFeatured = 0;
+        uint256 featuredLen = _featuredListings.length;
+        for (uint256 i = 0; i < featuredLen; i++) {
             Listing storage l = _listings[_featuredListings[i]];
             if (l.isFeatured && (l.featuredUntil >= block.timestamp || l.featuredUntil == type(uint256).max)) {
                 activeFeatured++;
@@ -476,8 +482,8 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
         }
 
         listings = new Listing[](activeFeatured);
-        uint256 idx;
-        for (uint256 i = 0; i < _featuredListings.length; i++) {
+        uint256 idx = 0;
+        for (uint256 i = 0; i < featuredLen; i++) {
             Listing storage l = _listings[_featuredListings[i]];
             if (l.isFeatured && (l.featuredUntil >= block.timestamp || l.featuredUntil == type(uint256).max)) {
                 listings[idx] = l;
@@ -490,12 +496,12 @@ contract FoundryMarketplace is Ownable, ReentrancyGuard {
     /// @param seller The seller address
     /// @return listings Array of Listing structs
     function getListingsBySeller(address seller) external view returns (Listing[] memory listings) {
-        uint256 count;
+        uint256 count = 0;
         for (uint256 i = 1; i <= _listingCount; i++) {
             if (_listings[i].seller == seller) count++;
         }
         listings = new Listing[](count);
-        uint256 idx;
+        uint256 idx = 0;
         for (uint256 i = 1; i <= _listingCount; i++) {
             if (_listings[i].seller == seller) {
                 listings[idx] = _listings[i];

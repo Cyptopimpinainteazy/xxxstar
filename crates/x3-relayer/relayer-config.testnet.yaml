@@ -49,6 +49,15 @@ svm_clusters:
     slot_poll_interval_ms: 15000  # Poll every 15 seconds
     max_concurrent_requests: 5
 
+  - name: "Solana Devnet"
+    cluster_name: "solana-devnet"
+    x3_domain_id: 502
+    rpc_endpoint: "${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
+    finality_threshold: 32
+    slot_poll_interval_ms: 15000
+    max_concurrent_requests: 10
+    htlc_program_id: "${SOLANA_HTLC_PROGRAM_ID}"
+
 # Submission Configuration
 submission:
   batch_size: 1                # Submit proofs one at a time (avoid batching for testnet)

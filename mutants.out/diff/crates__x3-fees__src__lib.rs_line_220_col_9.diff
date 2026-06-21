@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/lib.rs
++++ replace EconomicEngine::slash_validator with ()
+@@ -212,17 +212,17 @@
+         self.total_burned = self.total_burned.saturating_add(burned);
+         self.total_staked_rewards = self.total_staked_rewards.saturating_add(validator_reward);
+ 
+         (burned, validator_reward)
+     }
+ 
+     /// Slash validator and contribute to insurance
+     pub fn slash_validator(&mut self, amount: u128) {
+-        self.insurance_fund.contribute_from_slash(amount);
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ #[cfg(test)]
+ mod resource_accounting_tests {
+     use super::*;
+ 
+     #[test]

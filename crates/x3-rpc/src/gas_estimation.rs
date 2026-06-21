@@ -8,6 +8,7 @@
 //! All public RPC entry-points enforce hard limits on input sizes to prevent
 //! DoS via oversized calldata or excessive batch sizes.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -25,27 +26,34 @@ pub const MAX_BATCH_SIZE: usize = 50;
 pub const MAX_ADDRESS_LEN: usize = 128;
 
 /// Transaction representation for RPC
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct RPCTransaction {
     pub from: String,
+    #[serde(default)]
     pub to: Option<String>,
+    #[serde(default)]
     pub value: u128,
+    #[serde(default)]
     pub data: Vec<u8>,
+    #[serde(default)]
     pub gas_price: u64,
+    #[serde(default)]
     pub max_fee_per_gas: Option<u64>,
 }
 
 /// Estimation result
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct GasEstimation {
     pub gas_used: u64,
     pub gas_limit: u64,
     pub execution_time_ms: u64,
     pub status: ExecutionStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revert_reason: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
     Success,
     Reverted,

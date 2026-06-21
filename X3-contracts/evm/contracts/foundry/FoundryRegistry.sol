@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -200,12 +200,12 @@ contract FoundryRegistry is Ownable, ReentrancyGuard {
     /// @param creator The creator address
     /// @return dapps Array of DappInfo
     function getDappsByCreator(address creator) external view returns (DappInfo[] memory dapps) {
-        uint256 count;
+        uint256 count = 0;
         for (uint256 i = 1; i <= _dappCount; i++) {
             if (_dapps[i].creator == creator) count++;
         }
         dapps = new DappInfo[](count);
-        uint256 idx;
+        uint256 idx = 0;
         for (uint256 i = 1; i <= _dappCount; i++) {
             if (_dapps[i].creator == creator) {
                 dapps[idx] = _dapps[i];

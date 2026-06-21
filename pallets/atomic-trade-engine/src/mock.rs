@@ -326,6 +326,8 @@ parameter_types! {
     pub const DefaultTradeX3GasLimit: u64 = 500_000;
     pub const ProtocolFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 999;
+    pub const MaxSlippageBps: u32 = 500; // 5% default max slippage
+    pub const MinSlippageBps: u32 = 0;
 }
 
 impl pallet_atomic_trade_engine::Config for Test {
@@ -345,6 +347,8 @@ impl pallet_atomic_trade_engine::Config for Test {
     type SecurityHook = x3_security_events::NoOpHook;
     type ProtocolFeeBps = ProtocolFeeBps;
     type ProtocolTreasury = ProtocolTreasury;
+    type MaxSlippageBps = MaxSlippageBps;
+    type MinSlippageBps = MinSlippageBps;
 }
 
 /// Build genesis storage for testing

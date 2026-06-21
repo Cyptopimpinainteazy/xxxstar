@@ -1,118 +1,131 @@
-import { useEffect, useState } from 'react'
-import { invoke } from '../../ipc/tauri'
+import { useEffect, useState, useCallback } from 'react';
+import { invoke } from '../../ipc/tauri';
 
-interface NetworkMetrics {
-  blockHeight: number
-  tps: number
-  validatorCount: number
-  timestamp: number
+interface ChainInfo {
+  chain?: string;
+  name?: string;
+  version?: string;
+  chainName?: string;
 }
 
-interface NetworkOverviewResult {
-  chain?: { blockHeight?: string | number }
-  health?: { peers?: number; isSyncing?: boolean }
-  peers?: Array<unknown>
+interface HealthInfo {
+  peers: number;
+  is_syncing?: boolean;
+  isSyncing?: boolean;
+}
+
+interface PeerInfo {
+  peerId: string;
+  roles?: string;
+  bestHash?: string;
+  bestNumber?: number;
+}
+
+interface NetworkOverview {
+  chain: ChainInfo;
+  health: HealthInfo;
+  peers: PeerInfo[];
 }
 
 function NetworkOverviewPanel() {
-  const [data, setData] = useState<NetworkMetrics>({
-    blockHeight: 18923456,
-    tps: 4520,
-    validatorCount: 128,
-    timestamp: Date.now(),
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<NetworkOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchOverview = useCallback(async () => {
+    try {
+      const result = await invoke<NetworkOverview>('get_network_overview');
+      if (result) {
+        setData(result);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch network overview:', err);
+      setError('Node RPC unreachable');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true
-
-    const fetchData = async () => {
-      try {
-        // Fetch network overview from node + validators in parallel
-        const [overview, validators] = await Promise.all([
-          invoke<NetworkOverviewResult>('get_network_overview'),
-          invoke<unknown[]>('get_validators'),
-        ])
-
-        if (!mounted) return
-
-        const blockHeight =
-          typeof overview.chain?.blockHeight === 'number'
-            ? overview.chain.blockHeight
-            : typeof overview.chain?.blockHeight === 'string'
-              ? parseInt(overview.chain.blockHeight, 10) || 18923456
-              : 18923456
-
-        const tps = 4520 // TPS not directly from system_chain; use cached heuristic
-        const validatorCount = Array.isArray(validators) ? validators.length : 128
-
-        setData({
-          blockHeight,
-          tps,
-          validatorCount,
-          timestamp: Date.now(),
-        })
-        setLoading(false)
-        setError(null)
-      } catch (err) {
-        if (mounted) {
-          console.error('Failed to fetch network metrics via Tauri:', err)
-          setError('Failed to fetch real-time data. Using cached values.')
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchData()
-
-    // Poll every 5 seconds (no WebSocket subscription needed — Tauri handles that)
-    const interval = setInterval(fetchData, 5000)
-
-    return () => {
-      mounted = false
-      clearInterval(interval)
-    }
-  }, [])
+    fetchOverview();
+    const interval = setInterval(fetchOverview, 8000);
+    return () => clearInterval(interval);
+  }, [fetchOverview]);
 
   if (loading) {
     return (
-      <div className="view">
-        <h2>Network Overview</h2>
-        <div className="loading">Loading real-time network data via Tauri backend...</div>
+      <div className="view p-6">
+        <h2 className="text-xl font-bold text-white mb-2">Network Overview</h2>
+        <div className="text-gray-400">Loading chain + peer data via Tauri RPC...</div>
       </div>
-    )
+    );
   }
 
+  const chainName = data?.chain?.chain || data?.chain?.chainName || data?.chain?.name || 'Unknown';
+  const peerCount = data?.health?.peers ?? 0;
+  const isSyncing = data?.health?.is_syncing ?? data?.health?.isSyncing ?? false;
+  const peerList = Array.isArray(data?.peers) ? data.peers : [];
+
   return (
-    <div className="view">
-      <h2>Network Overview</h2>
-      {error && <div className="error-banner">{error}</div>}
-      <div className="card-grid">
-        <div className="card">
-          <span className="card-label">Block Height</span>
-          <span className="card-value">{data.blockHeight.toLocaleString()}</span>
-          <span className="card-timestamp">
-            Updated: {new Date(data.timestamp).toLocaleTimeString()}
-          </span>
+    <div className="view p-6">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-white">Network Overview</h2>
+        <p className="text-gray-400 text-sm">Chain state + live peers from system RPC</p>
+      </div>
+
+      {error && <div className="bg-red-900/30 border border-red-600/30 rounded-lg p-3 mb-4 text-red-300 text-sm">{error}</div>}
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-gray-800/40 rounded-lg p-4 border border-gray-700/50">
+          <div className="text-gray-400 text-xs mb-1">Chain</div>
+          <div className="text-cyan-400 font-mono font-bold text-lg">{chainName}</div>
         </div>
-        <div className="card">
-          <span className="card-label">TPS</span>
-          <span className="card-value">{data.tps.toLocaleString()}</span>
-          <span className="card-indicator">
-            {data.tps > 4000 ? '🟢 High' : data.tps > 2000 ? '🟡 Medium' : '🔴 Low'}
-          </span>
+        <div className="bg-gray-800/40 rounded-lg p-4 border border-gray-700/50">
+          <div className="text-gray-400 text-xs mb-1">Peers</div>
+          <div className="text-green-400 font-mono font-bold text-lg">{peerCount}</div>
         </div>
-        <div className="card">
-          <span className="card-label">Validator Count</span>
-          <span className="card-value">{data.validatorCount}</span>
-          <span className="card-indicator">
-            {data.validatorCount > 100 ? '✅ Healthy' : '⚠️ Low'}
-          </span>
+        <div className="bg-gray-800/40 rounded-lg p-4 border border-gray-700/50">
+          <div className="text-gray-400 text-xs mb-1">Sync Status</div>
+          <div className={`font-mono font-bold text-lg ${isSyncing ? 'text-yellow-400' : 'text-green-400'}`}>
+            {isSyncing ? 'Syncing' : 'Synced'}
+          </div>
         </div>
       </div>
+
+      <h3 className="text-sm font-bold text-white mb-3">Connected Peers ({peerList.length})</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-gray-400 border-b border-gray-700">
+              <th className="py-2 px-3">Peer ID</th>
+              <th className="py-2 px-3">Roles</th>
+              <th className="py-2 px-3">Best Block</th>
+            </tr>
+          </thead>
+          <tbody>
+            {peerList.length > 0 ? peerList.map((peer, i) => (
+              <tr key={peer.peerId || i} className="border-b border-gray-800 hover:bg-gray-800/30">
+                <td className="py-2 px-3 font-mono text-xs text-gray-300">{peer.peerId?.slice(0, 20) || `#${i}`}...</td>
+                <td className="py-2 px-3 font-mono text-xs text-gray-400">{peer.roles || '-'}</td>
+                <td className="py-2 px-3 font-mono text-xs text-cyan-400">#{peer.bestNumber || '?'}</td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={3} className="py-8 text-center text-gray-500">
+                  No peers connected. Start the node to begin P2P discovery.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 text-xs text-gray-600">
+        Query: invoke('get_network_overview') → system_chain + system_health + system_peers
+      </div>
     </div>
-  )
+  );
 }
 
-export default NetworkOverviewPanel
+export default NetworkOverviewPanel;

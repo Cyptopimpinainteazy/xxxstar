@@ -32,7 +32,6 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::option::Option::{None, Some};
-use core::result::Result::{Err, Ok};
 
 use crate::instructions::X3Instruction;
 use crate::types::{AssetRef, ChainKind};

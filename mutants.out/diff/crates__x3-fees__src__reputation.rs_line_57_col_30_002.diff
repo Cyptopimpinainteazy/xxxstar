@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/reputation.rs
++++ replace > with >= in ReputationScore::qualifies_for_discount
+@@ -49,17 +49,17 @@
+             age_factor,
+             slash_penalty,
+             composite_score,
+         }
+     }
+ 
+     /// Whether this agent qualifies for any discount.
+     pub fn qualifies_for_discount(&self) -> bool {
+-        self.composite_score > 5000 && self.age_factor >= 50
++        self.composite_score >= /* ~ changed by cargo-mutants ~ */ 5000 && self.age_factor >= 50
+     }
+ 
+     /// Get the discount percentage in basis points.
+     pub fn discount_bps(&self, max_discount_bps: u32) -> u32 {
+         if !self.qualifies_for_discount() {
+             return 0;
+         }
+         // Scale composite score to max discount

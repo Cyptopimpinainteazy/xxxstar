@@ -102,8 +102,8 @@ impl Deployer {
         &self,
         app_name: &str,
         frontend_framework: &str,
-        routes: &[String],
-        api_endpoints: &[String],
+        _routes: &[String],
+        _api_endpoints: &[String],
     ) -> Result<String, FoundryError> {
         info!(
             "Deployer: deploying frontend for {} using {}",
@@ -171,8 +171,8 @@ impl Deployer {
     pub fn deploy_marketplace_listing(
         &self,
         title: &str,
-        description: &str,
-        tags: &[String],
+        _description: &str,
+        _tags: &[String],
         chain: &str,
     ) -> Result<String, FoundryError> {
         info!("Deployer: creating marketplace listing for {}", title);
@@ -196,6 +196,7 @@ impl Deployer {
     }
 
     /// Generates a deployment manifest.
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_manifest(
         &self,
         app_name: &str,

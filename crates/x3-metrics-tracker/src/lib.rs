@@ -3,6 +3,8 @@
 //! This crate defines the **canonical hard-metric types** used by the Phase 12
 //! A-tier progress tracking system. All monetary values are stored in **USD
 //! cents** (`u64`) to avoid floating-point arithmetic inside WASM runtimes or
+#![allow(clippy::inconsistent_digit_grouping, clippy::doc_markdown)]
+#![cfg_attr(test, allow(clippy::inconsistent_digit_grouping, clippy::doc_markdown))]
 //! low-level sidecar services.
 //!
 //! ## A-Tier Threshold Summary
@@ -177,8 +179,8 @@ impl ATierSnapshot {
     #[must_use]
     pub fn meets_a_tier_threshold(&self) -> bool {
         self.throughput.tps_avg >= 100
-            && self.treasury.tvl_usd_cents >= 10_000_000_00 // $10 M in cents
-            && self.routes.route_volume_usd_cents_daily >= 1_000_000_00 // $1 M/day in cents
+            && self.treasury.tvl_usd_cents >= 1_000_000_000 // $10 M in cents
+            && self.routes.route_volume_usd_cents_daily >= 100_000_000 // $1 M/day in cents
             && self.users.dau >= 1_000
             && self.incidents.p1_incidents_monthly == 0
     }

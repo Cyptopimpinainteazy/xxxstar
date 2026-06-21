@@ -3,6 +3,7 @@
 //! This crate provides integration points for executing SVM transactions
 //! as part of dual-VM operations on X3 Chain.
 //! Uses solana-rbpf for actual BPF program execution.
+#![allow(clippy::items_after_test_module)]
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

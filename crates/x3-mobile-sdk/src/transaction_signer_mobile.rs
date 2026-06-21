@@ -314,7 +314,7 @@ fn sign_ecdsa(private_key: &[u8], payload: &[u8]) -> Result<Vec<u8>, SdkError> {
 
 fn derive_public_key(algorithm: &SignatureAlgorithm, private_key: &[u8]) -> Result<Vec<u8>, SdkError> {
     match algorithm {
-        SignatureAlgorithm::Ed25519 => {
+        SignatureAlgorithm::ED25519 => {
             let seed: [u8; 32] = private_key
                 .try_into()
                 .map_err(|_| SdkError::Crypto("ed25519 private key must be 32 bytes".to_string()))?;
@@ -322,7 +322,7 @@ fn derive_public_key(algorithm: &SignatureAlgorithm, private_key: &[u8]) -> Resu
             let verification_key = ed25519_zebra::VerificationKey::from(&signing_key);
             Ok(verification_key.as_bytes().to_vec())
         }
-        SignatureAlgorithm::EcdsaSecp256k1 => {
+        SignatureAlgorithm::ECDSA => {
             use k256::ecdsa::SigningKey;
             let signing_key = SigningKey::from_slice(private_key)
                 .map_err(|e| SdkError::Crypto(e.to_string()))?;
@@ -332,19 +332,24 @@ fn derive_public_key(algorithm: &SignatureAlgorithm, private_key: &[u8]) -> Resu
 }
 
 fn verify_ed25519_sig(payload: &[u8], signature: &[u8], public_key: &[u8]) -> Result<bool, SdkError> {
-    // Placeholder: verify hash matches
-    let mut hasher = sha2::Sha512::new();
-    hasher.update(public_key);
-    hasher.update(payload);
-    Ok(hasher.finalize().to_vec() == signature)
+    let pk_bytes: [u8; 32] = public_key
+        .try_into()
+        .map_err(|_| SdkError::Crypto("ed25519 public key must be 32 bytes".to_string()))?;
+    let sig_bytes: [u8; 64] = signature
+        .try_into()
+        .map_err(|_| SdkError::Crypto("ed25519 signature must be 64 bytes".to_string()))?;
+    let pk = ed25519_zebra::VerificationKey::from(pk_bytes);
+    let sig = ed25519_zebra::Signature::from(sig_bytes);
+    Ok(pk.verify(payload, &sig).is_ok())
 }
 
 fn verify_ecdsa_sig(payload: &[u8], signature: &[u8], public_key: &[u8]) -> Result<bool, SdkError> {
-    // Placeholder: verify hash matches
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(public_key);
-    hasher.update(payload);
-    Ok(hasher.finalize().to_vec() == signature)
+    use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+    let sig = Signature::from_slice(signature)
+        .map_err(|e| SdkError::Crypto(e.to_string()))?;
+    let vk = VerifyingKey::from_sec1_bytes(public_key)
+        .map_err(|e| SdkError::Crypto(e.to_string()))?;
+    Ok(vk.verify(payload, &sig).is_ok())
 }
 
 #[cfg(test)]

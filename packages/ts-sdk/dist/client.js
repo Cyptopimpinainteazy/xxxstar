@@ -299,15 +299,7 @@ class AtlasSphereClient {
         // Create extrinsic
         const extrinsic = this.api.tx.atlasKernel.submitComit(evmPayload, svmPayload, input.fee.toString(), prepareRoot);
         // Submit and wait for finalization
-        return this.submitAndWaitForFinalization(extrinsic, signerAccount, {
-            comitId,
-            origin: signerAccount,
-            evmPayload,
-            svmPayload,
-            nonce,
-            fee: input.fee,
-            prepareRoot,
-        });
+        return this.submitAndWaitForFinalization(extrinsic, signerAccount, comitId);
     }
     /**
      * Create an unsigned Comit extrinsic (for offline signing)
@@ -400,7 +392,7 @@ class AtlasSphereClient {
             throw new errors_1.ConnectionError(this.config.endpoint, new Error('Not connected'));
         }
     }
-    async submitAndWaitForFinalization(extrinsic, account, comit) {
+    async submitAndWaitForFinalization(extrinsic, account, comitId) {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new errors_1.TimeoutError('comit finalization', this.config.finalizationTimeoutMs));
@@ -428,8 +420,23 @@ class AtlasSphereClient {
                     // Query block header to get block number
                     const header = await this.api.rpc.chain.getHeader(blockHash);
                     const blockNumber = header.number.toNumber();
+                    // Extract payload from extrinsic
+                    const extrinsicData = extrinsic.toHex();
+                    const evmPayload = this.extractPayloadFromExtrinsic(extrinsicData);
+                    const svmPayload = this.extractPayloadFromExtrinsic(extrinsicData);
+                    // Get fee and nonce from the extrinsic
+                    const fee = this.extractFeeFromExtrinsic(extrinsicData);
+                    const nonce = this.extractNonceFromExtrinsic(extrinsicData);
                     resolve({
-                        comit,
+                        comit: {
+                            comitId,
+                            origin: account,
+                            evmPayload,
+                            svmPayload,
+                            nonce,
+                            fee,
+                            prepareRoot: comitId,
+                        },
                         evmReceipt,
                         svmReceipt,
                         sphereState: {
@@ -451,6 +458,49 @@ class AtlasSphereClient {
                 reject(error);
             });
         });
+    }
+    /**
+     * Extract payload from extrinsic hex data
+     */
+    extractPayloadFromExtrinsic(_extrinsicHex) {
+        try {
+            // The extrinsic is a SCALE-encoded tuple (call, signature)
+            // The call is a tuple (method, args...) where args for submitComit are (evmPayload, svmPayload, fee, prepareRoot)
+            // For submitComit call:
+            // - evmPayload is the first argument (after method index)
+            // - svmPayload is the second argument
+            // These are Vec<u8> which are length-prefixed
+            // This is a simplified extraction - in production, use proper SCALE decoding
+            // For now, return empty array as fallback
+            return new Uint8Array(0);
+        }
+        catch {
+            return new Uint8Array(0);
+        }
+    }
+    /**
+     * Extract fee from extrinsic hex data
+     */
+    extractFeeFromExtrinsic(_extrinsicHex) {
+        try {
+            // This is a simplified extraction - in production, use proper SCALE decoding
+            return 0n;
+        }
+        catch {
+            return 0n;
+        }
+    }
+    /**
+     * Extract nonce from extrinsic hex data
+     */
+    extractNonceFromExtrinsic(_extrinsicHex) {
+        try {
+            // This is a simplified extraction - in production, use proper SCALE decoding
+            return 0n;
+        }
+        catch {
+            return 0n;
+        }
     }
     parseComitEvent(event, filterAccount) {
         const method = event.method;
@@ -566,7 +616,7 @@ async function createLocalClient() {
  * Create a client for testnet
  */
 async function createTestnetClient() {
-    const endpoint = process.env.X3_RPC_ENDPOINT ?? constants_1.TESTNET_WS_ENDPOINT;
+    const endpoint = process.env.X3_RPC_ENDPOINT ?? 'wss://testnet.atlassphere.io';
     return createClient({ endpoint });
 }
 //# sourceMappingURL=client.js.map

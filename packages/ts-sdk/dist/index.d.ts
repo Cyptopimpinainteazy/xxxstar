@@ -40,6 +40,8 @@ export { hexToBytes, bytesToHex, stringToBytes, toBytes, toHex, blake2_256, blak
 export { DEFAULT_WS_ENDPOINT, DEFAULT_HTTP_ENDPOINT, MAINNET_WS_ENDPOINT, TESTNET_WS_ENDPOINT, MAX_EVM_PAYLOAD_SIZE, MAX_SVM_PAYLOAD_SIZE, MAX_COMBINED_PAYLOAD_SIZE, DEFAULT_EVM_GAS_LIMIT, MAX_EVM_GAS_LIMIT, DEFAULT_SVM_COMPUTE_UNITS, MAX_SVM_COMPUTE_UNITS, GAS_PRICE, COMPUTE_UNIT_PRICE, BASE_COMIT_FEE, GAS_FEE_DIVISOR, COMPUTE_FEE_DIVISOR, BLOCK_TIME_MS, DEFAULT_RPC_TIMEOUT_MS, DEFAULT_FINALIZATION_TIMEOUT_MS, FINALIZATION_BLOCKS, NATIVE_ASSET_ID, NATIVE_ASSET_SYMBOL, NATIVE_ASSET_DECIMALS, ONE_ATLAS, ONE_MILLI_ATLAS, ONE_MICRO_ATLAS, ACCOUNT_ID_LENGTH, EVM_ADDRESS_LENGTH, SOLANA_PUBKEY_LENGTH, H256_LENGTH, ZERO_HASH, RPC_METHODS, EVENTS, STORAGE_PREFIXES, EVM_SELECTORS, } from './constants';
 export { X3SubscriptionManager, } from './subscriptions';
 export type { BlockNotification, ComitNotification, EvmLogNotification, SubscriptionHandlers, } from './subscriptions';
+export { createJsonRpcClient, createWsClient, createX3RpcClient, RpcClientError, } from './rpc-client';
+export type { JsonRpcRequest, JsonRpcResponse, JsonRpcClientOptions, WsClientOptions, } from './rpc-client';
 export { X3SettlementClient, X3AtomicTradeClient, X3DomainClient, X3VerifierClient, createX3SettlementClient, createX3TradeClient, createX3DomainClient, createX3VerifierClient, } from './x3';
 export type { X3VmType, X3AmmProtocol, X3TradeLeg, X3SettlementOptions, } from './x3';
 export { AtlasSphereError, ConnectionError, RpcError, ComitSubmissionError, InvalidNonceError, InsufficientBalanceError, UnauthorizedError, RateLimitError, EvmExecutionError, SvmExecutionError, VerificationError, PayloadSizeError, TimeoutError, SubscriptionError, ValidationError, reasonToError, } from './errors';

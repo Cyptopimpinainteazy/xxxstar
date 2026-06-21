@@ -4,10 +4,29 @@
 //! produced by the x3-ixl planner and estimates gas consumption,
 //! fee costs, and slippage for cross-chain operations.
 
-use crate::ixl::ExecutionPlan; // Use x3-ixl ExecutionPlan
+use crate::ixl::ExecutionPlan;
 use crate::ixl::Instruction;
 use crate::ixl::AssetKind;
 use crate::ixl::AssetId;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimulatorError {
+    NotConfigured,
+    MissingGasSchedule,
+    UnsupportedInstruction(&'static str),
+}
+
+impl core::fmt::Display for SimulatorError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SimulatorError::NotConfigured => write!(f, "simulator not configured"),
+            SimulatorError::MissingGasSchedule => write!(f, "no gas schedule loaded"),
+            SimulatorError::UnsupportedInstruction(name) => {
+                write!(f, "unsupported instruction: {name}")
+            }
+        }
+    }
+}
 
 /// Result of a simulation run.
 #[derive(Debug, Clone, PartialEq)]
@@ -45,14 +64,7 @@ impl Simulator {
     }
 
     /// Run the simulation on a given execution plan.
-    ///
-    /// This is a stub implementation that provides placeholder values.
-    /// Real implementation should:
-    ///   1. Walk each instruction in the plan
-    ///   2. Calculate gas based on instruction type
-    ///   3. Estimate fees based on chain-specific fee schedules
-    ///   4. Calculate slippage based on swap liquidity
-    pub fn simulate(&self, plan: &ExecutionPlan) -> SimulationResult {
+    pub fn simulate(&self, plan: &ExecutionPlan) -> Result<SimulationResult, SimulatorError> {
         let mut gas = 0u64;
         let mut fee = 0u128;
         let mut slippage = 0.0f64;
@@ -60,62 +72,52 @@ impl Simulator {
 
         for instruction in &plan.instructions {
             instructions_processed += 1;
-            
+
             match instruction {
                 Instruction::Lock { amount, .. } => {
-                    // Lock operation: 21,000 gas + amount-dependent
                     gas += 21_000 + (amount / 1_000_000) as u64;
-                    fee += 1_000_000_000; // 1 Gwei per lock
-                },
-                Instruction::Mint { amount, .. } => {
-                    // Mint operation: 15,000 gas
+                    fee += 1_000_000_000;
+                }
+                Instruction::Mint { amount: _, .. } => {
                     gas += 15_000;
-                    fee += 800_000_000; // 0.8 Gwei per mint
-                },
-                Instruction::Swap { amount_in, min_out, asset_in, asset_out, .. } => {
-                    // Swap operation: base gas + 2 * 50,000 for swap + min_out estimation
+                    fee += 800_000_000;
+                }
+                Instruction::Swap { amount_in, min_out, asset_in: _, asset_out: _, .. } => {
                     let swap_gas = 50_000;
                     gas += swap_gas * 2 + (amount_in / 1_000_000) as u64;
-                    fee += 2_000_000_000; // 2 Gwei per swap
-                    
-                    // Slippage estimation: simple heuristic
+                    fee += 2_000_000_000;
                     if *min_out < *amount_in {
                         slippage += (amount_in - *min_out) as f64 / *amount_in as f64 * 100.0;
                     }
-                },
+                }
                 Instruction::Settle { .. } => {
-                    // Settle operation: 30,000 gas
                     gas += 30_000;
-                    fee += 1_500_000_000; // 1.5 Gwei per settle
-                },
+                    fee += 1_500_000_000;
+                }
                 Instruction::Burn { .. } => {
-                    // Burn operation: 10,000 gas
                     gas += 10_000;
-                    fee += 500_000_000; // 0.5 Gwei per burn
-                },
+                    fee += 500_000_000;
+                }
                 Instruction::Refund { .. } => {
-                    // Refund operation: 25,000 gas
                     gas += 25_000;
-                    fee += 1_200_000_000; // 1.2 Gwei per refund
-                },
+                    fee += 1_200_000_000;
+                }
                 Instruction::EmitProof { .. } => {
-                    // Proof emission: 40,000 gas
                     gas += 40_000;
-                    fee += 2_000_000_000; // 2 Gwei per proof
-                },
+                    fee += 2_000_000_000;
+                }
                 Instruction::Abort => {
-                    // Abort: minimal cost
                     gas += 5_000;
-                },
+                }
             }
         }
 
-        SimulationResult {
+        Ok(SimulationResult {
             gas,
             fee,
             slippage_percent: slippage,
             instructions_processed,
-        }
+        })
     }
 }
 
@@ -145,7 +147,7 @@ mod tests {
         let empty_plan = ExecutionPlan {
             instructions: vec![],
         };
-        let result = simulator.simulate(&empty_plan);
+        let result = simulator.simulate(&empty_plan).unwrap();
         assert_eq!(result.gas, 0);
         assert_eq!(result.fee, 0);
         assert_eq!(result.slippage_percent, 0.0);
@@ -171,7 +173,7 @@ mod tests {
                 },
             ],
         };
-        let result = simulator.simulate(&plan);
+        let result = simulator.simulate(&plan).unwrap();
         assert!(result.gas > 0);
         assert!(result.fee > 0);
         assert_eq!(result.instructions_processed, 2);
@@ -204,7 +206,7 @@ mod tests {
                 },
             ],
         };
-        let result = simulator.simulate(&plan);
+        let result = simulator.simulate(&plan).unwrap();
         // Slippage should be (1,000,000 - 990,000) / 1,000,000 * 100 = 1%
         assert_eq!(result.slippage_percent, 1.0);
         assert_eq!(result.instructions_processed, 3);

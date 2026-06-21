@@ -1,5 +1,18 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
 
 pub use pallet::*;
 
@@ -18,7 +31,7 @@ pub mod pallet {
     use sp_std::vec::Vec;
     use x3_wallet::{
         AddressBook, BiometricProfile, GuardianAccount, HardwareWallet, MultisigWallet,
-        TokenBalance, TransactionApproval, UnlockSession,
+        TransactionApproval, UnlockSession,
     };
 
     /// Max wallets per account

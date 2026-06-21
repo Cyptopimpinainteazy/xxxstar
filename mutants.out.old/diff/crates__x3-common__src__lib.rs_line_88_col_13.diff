@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "else" in Keyword::parse
+@@ -80,17 +80,17 @@
+ 
+ impl Keyword {
+     pub fn parse(src: &str) -> Option<Self> {
+         match src {
+             "fn" => Some(Self::Fn),
+             "let" => Some(Self::Let),
+             "mut" => Some(Self::Mut),
+             "if" => Some(Self::If),
+-            "else" => Some(Self::Else),
++             /* ~ changed by cargo-mutants ~ */
+             "while" => Some(Self::While),
+             "loop" => Some(Self::Loop),
+             "for" => Some(Self::For),
+             "return" => Some(Self::Return),
+             "break" => Some(Self::Break),
+             "continue" => Some(Self::Continue),
+             "struct" => Some(Self::Struct),
+             "enum" => Some(Self::Enum),

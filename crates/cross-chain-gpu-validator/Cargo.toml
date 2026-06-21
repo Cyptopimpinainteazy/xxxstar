@@ -49,6 +49,9 @@ x3-gpu-validator-swarm = { path = "../x3-gpu-validator-swarm" }
 # Random for testing
 rand = "0.8"
 
+[features]
+cuda = []
+
 [dev-dependencies]
 criterion = "0.5"
 tokio-test = "0.4"

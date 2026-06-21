@@ -1,5 +1,20 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::unnecessary_map_or)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
 
 //! # X3 Oracle Pallet
 //!
@@ -69,7 +84,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_timestamp::Config {
         /// The overarching event type.
-
         /// Maximum number of price submissions per block per oracle
         #[pallet::constant]
         type MaxSubmissionsPerBlock: Get<u32>;
@@ -99,6 +113,21 @@ pub mod pallet {
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        pub authorized_oracles: Vec<T::AccountId>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            for oracle in &self.authorized_oracles {
+                AuthorizedOracles::<T>::insert(oracle, true);
+            }
+        }
+    }
 
     /// Storage for authorized oracle accounts
     #[pallet::storage]

@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn sha256_padding_handles_single_block_messages() {
         let mut words = Vec::new();
-        append_padded_sha256_blocks(&vec![1u8; 55], &mut words).unwrap();
+        append_padded_sha256_blocks(&[1u8; 55], &mut words).unwrap();
 
         assert_eq!(words.len(), 16);
     }
@@ -569,7 +569,7 @@ mod tests {
     #[test]
     fn sha256_padding_handles_multi_block_messages() {
         let mut words = Vec::new();
-        append_padded_sha256_blocks(&vec![1u8; 120], &mut words).unwrap();
+        append_padded_sha256_blocks(&[1u8; 120], &mut words).unwrap();
 
         assert_eq!(words.len(), 48);
     }

@@ -3,6 +3,20 @@ import binascii
 import importlib.util
 import os
 
+try:
+    from Crypto.Hash import keccak
+
+    def _keccak_256(data: bytes) -> bytes:
+        return keccak.new(digest_bits=256, data=data).digest()
+except ImportError:
+    try:
+        from eth_hash.auto import keccak as _keccak_256
+    except ImportError:
+        def _keccak_256(data: bytes) -> bytes:
+            raise RuntimeError(
+                "no keccak implementation available; install pycryptodome or eth-hash"
+            )
+
 
 def _load_registry():
     path = os.path.join(os.path.dirname(__file__), 'registry.py')
@@ -18,18 +32,7 @@ registry = _load_registry()
 
 
 def _keccak_selector(signature: str) -> bytes:
-    try:
-        from eth_utils import keccak
-        return keccak(text=signature)[:4]
-    except Exception as exc:
-        known = {
-            'swapExactTokensForTokens(uint256,uint256,address[],address,uint256)': bytes.fromhex('38ed1739')
-        }
-        if signature not in known:
-            raise RuntimeError(
-                f"Cannot compute EVM selector for {signature!r}: eth_utils not available"
-            ) from exc
-        return known[signature]
+    return _keccak_256(signature.encode())[:4]
 
 
 def _encode_uint256(value: int) -> bytes:
@@ -63,8 +66,65 @@ def _encode_swap_exact_tokens_for_tokens(amount_in: int, amount_out_min: int, pa
     return selector + head + dynamic
 
 
+def _encode_deposit_to_x3(token: str, amount: int, recipient: str) -> bytes:
+    selector = _keccak_selector('depositToX3(address,uint256,bytes)')
+    head = b''
+    head += _encode_address(token)
+    head += _encode_uint256(amount)
+    head += _encode_uint256(0x60)
+    dynamic = _encode_uint256(len(bytes.fromhex(recipient[2:]))) if recipient.startswith('0x') else b''
+    if not dynamic:
+        dynamic = _encode_uint256(len(recipient))
+    dynamic += recipient.encode() if not recipient.startswith('0x') else bytes.fromhex(recipient[2:])
+    return selector + head + dynamic
+
+
+def _encode_release_from_x3(token: str, amount: int, recipient: str) -> bytes:
+    selector = _keccak_selector('releaseFromX3(address,uint256,bytes)')
+    head = b''
+    head += _encode_address(token)
+    head += _encode_uint256(amount)
+    head += _encode_uint256(0x60)
+    dynamic = _encode_uint256(len(bytes.fromhex(recipient[2:]))) if recipient.startswith('0x') else b''
+    if not dynamic:
+        dynamic = _encode_uint256(len(recipient))
+    dynamic += recipient.encode() if not recipient.startswith('0x') else bytes.fromhex(recipient[2:])
+    return selector + head + dynamic
+
+
 def emit(plan: Dict[str, Any], step: Dict[str, Any]) -> Dict[str, Any]:
+    action = step.get('action', 'swap')
     amount = int(float(step.get('amount') or 0)) if step.get('amount') else 0
+    gateway = registry.CONTRACT_ADDRESSES.get('x3_external_gateway', '0xX3ExternalGateway00000000000000000000000000')
+
+    if action == 'lock':
+        token = step.get('token') or step.get('from', '')
+        recipient = step.get('recipient') or getattr(registry, 'DEFAULT_RECIPIENT', '0x0000000000000000000000000000000000000000')
+        calldata_bytes = _encode_deposit_to_x3(token, amount, recipient)
+        calldata = '0x' + binascii.hexlify(calldata_bytes).decode()
+        return {
+            'type': 'lock',
+            'chain': 'ethereum',
+            'token': token,
+            'amount': amount,
+            'calldata': calldata,
+            'target_contract': gateway,
+        }
+
+    if action == 'release':
+        token = step.get('token') or step.get('to', '')
+        recipient = step.get('recipient') or getattr(registry, 'DEFAULT_RECIPIENT', '0x0000000000000000000000000000000000000000')
+        calldata_bytes = _encode_release_from_x3(token, amount, recipient)
+        calldata = '0x' + binascii.hexlify(calldata_bytes).decode()
+        return {
+            'type': 'release',
+            'chain': 'ethereum',
+            'token': token,
+            'amount': amount,
+            'calldata': calldata,
+            'target_contract': gateway,
+        }
+
     to_token = step.get('to')
     from_token = step.get('from')
     router = registry.CONTRACT_ADDRESSES.get('uniswap_v2_router', registry.CONTRACT_ADDRESSES.get('uniswap', '0xUniswapRouter000000000000000000000000'))

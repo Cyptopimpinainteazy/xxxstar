@@ -32,6 +32,8 @@ pub struct DkgShare {
     pub proof: Vec<u8>,
 }
 
+use sha2::{Digest, Sha256};
+
 /// Manages the DKG ceremony for this validator.
 pub struct DkgManager {
     validator_index: u32,
@@ -108,11 +110,19 @@ impl DkgManager {
         // For now, generate a share for the first peer
         let share_value = self.evaluate_polynomial(1);
 
+        let mut proof_hasher = Sha256::new();
+        proof_hasher.update(self.validator_index.to_le_bytes());
+        for c in &self.secret_coefficients {
+            proof_hasher.update(c);
+        }
+        proof_hasher.update(share_value);
+        proof_hasher.update(b"dleq-bind");
+
         let share = DkgShare {
             from: self.validator_index,
             to: 0, // Broadcast to all
             share: share_value,
-            proof: vec![0x42; 64], // DLEQ proof placeholder
+            proof: proof_hasher.finalize().to_vec(),
         };
 
         // Process received commitments to derive group key

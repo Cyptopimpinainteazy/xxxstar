@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../api';
+import { api, type ValidatorCredentials } from '../api';
 import { Rocket, Mail, Server, Shield, ArrowRight, Sparkles } from 'lucide-react';
 
 interface RegisterPageProps {
@@ -11,7 +11,7 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
   const [email, setEmail] = useState('');
   const [slaTier, setSlaTier] = useState('pro');
   const [loading, setLoading] = useState(false);
-  const [credentials, setCredentials] = useState<unknown>(null);
+  const [credentials, setCredentials] = useState<ValidatorCredentials | null>(null);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,8 +20,8 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
     try {
       const creds = await api.register(chain, email, slaTier);
       setCredentials(creds);
-    }  catch (error: unknown) {
-      alert(`Registration failed: ${error.message}`);
+    }  catch (error) {
+      alert(`Registration failed: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ export function RegisterPage({ onRegisterSuccess }: RegisterPageProps) {
                 <div className="flex items-center justify-between mt-1">
                   <code className="text-white font-mono text-sm truncate mr-4">{credentials.api_secret}</code>
                   <button
-                    onClick={() => navigator.clipboard.writeText(credentials.api_secret)}
+                    onClick={() => navigator.clipboard.writeText(credentials.api_secret!)}
                     className="text-red-400 hover:text-red-300 text-sm flex-shrink-0"
                   >
                     Copy

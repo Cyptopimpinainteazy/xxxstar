@@ -14,8 +14,8 @@ fn create_default_launch() -> u32 {
         500,   // soft_cap
         1000,  // hard_cap
         10,    // price_per_token
-        2u64,  // start_block
-        12u64, // end_block  (duration = 10 blocks, within bounds 5..=1000)
+        1u64,  // start_block
+        12u64, // end_block  (duration = 11 blocks, within bounds 5..=1000)
         5u64,  // lp_lock_duration_blocks
     ));
     crate::NextLaunchId::<Test>::get().saturating_sub(1)
@@ -56,7 +56,7 @@ fn create_launch_emits_event() {
             token_asset_id: 1,
             soft_cap: 500,
             hard_cap: 1000,
-            start_block: 2,
+            start_block: 1,
             end_block: 12,
         }));
     });
@@ -307,7 +307,7 @@ fn claim_allocation_double_claim_fails() {
 fn cancel_launch_by_governance_transitions_to_failed() {
     new_test_ext().execute_with(|| {
         let id = create_default_launch();
-        assert_ok!(Launchpad::cancel_launch(RuntimeOrigin::root(), id));
+        assert_ok!(Launchpad::cancel_launch(RuntimeOrigin::signed(1), id));
         let state = Launches::<Test>::get(id).unwrap();
         assert_eq!(state.status, LaunchStatus::Failed);
         assert_eq!(Launchpad::active_launch_count(), 0);

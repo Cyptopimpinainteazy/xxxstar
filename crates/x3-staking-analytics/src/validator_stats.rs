@@ -175,7 +175,7 @@ impl ValidatorStatsManager {
             // Track history
             self.performance_history
                 .entry(validator.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(stats.performance.clone());
 
             Ok(())

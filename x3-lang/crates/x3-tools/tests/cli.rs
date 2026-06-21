@@ -63,10 +63,7 @@ fn cli_parse_writes_json() {
         .expect("x3c parse invocation");
     assert!(status.success(), "x3c parse should succeed: {status:?}");
     let body = std::fs::read_to_string(&out).expect("output read");
-    assert!(
-        body.contains("\"items\""),
-        "parse output must include items"
-    );
+    assert!(body.contains("\"items\""), "parse output must include items");
 }
 
 #[test]
@@ -98,10 +95,7 @@ fn cli_lower_writes_ir_file() {
         .expect("x3c lower");
     assert!(status.success(), "lower must succeed: {status:?}");
     let body = std::fs::read_to_string(&out).expect("ir read");
-    assert!(
-        body.contains("\"operations\""),
-        "IR must contain operations field"
-    );
+    assert!(body.contains("\"operations\""), "IR must contain operations field");
 }
 
 #[test]
@@ -123,7 +117,7 @@ fn cli_build_produces_aligned_bytecode() {
 }
 
 #[test]
-fn cli_run_rejects_atomic_bytecode_until_reservation_wired() {
+fn cli_run_executes_atomic_bytecode_successfully() {
     let src = write_fixture("cli_run.x3", GOOD_SOURCE);
     let bytecode = std::env::temp_dir().join("cli_run.x3b");
     let _ = x3c()
@@ -134,14 +128,16 @@ fn cli_run_rejects_atomic_bytecode_until_reservation_wired() {
         .status()
         .expect("build");
     let out = x3c().arg("run").arg(&bytecode).output().expect("x3c run");
-    let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        !out.status.success(),
-        "run must fail closed on atomic bytecode until reservation/locking is wired"
+        out.status.success(),
+        "run must succeed — AtomicBegin/AtomicEnd are wired, got stdout: {}, stderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
     );
+    let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stderr.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
-        "run error must mention atomic begin, got stderr: {stderr}"
+        stdout.contains("x3c run: ok"),
+        "stdout must report success, got: {stdout}"
     );
 }
 
@@ -156,11 +152,7 @@ fn cli_explain_produces_disassembly() {
         .arg(&bytecode)
         .status()
         .expect("build");
-    let out = x3c()
-        .arg("explain")
-        .arg(&bytecode)
-        .output()
-        .expect("x3c explain");
+    let out = x3c().arg("explain").arg(&bytecode).output().expect("x3c explain");
     assert!(out.status.success(), "explain must succeed");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("x3-lang bytecode"), "header line");
@@ -199,11 +191,7 @@ fn cli_check_rejects_unsafe_program() {
 }
 "#;
     let src = write_fixture("cli_check_bad.x3", bad);
-    let status = x3c()
-        .arg("check")
-        .arg(&src)
-        .status()
-        .expect("x3c check bad");
+    let status = x3c().arg("check").arg(&src).status().expect("x3c check bad");
     // The unknown chain should be flagged.
     assert!(
         !status.success(),

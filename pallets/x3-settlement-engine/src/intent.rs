@@ -148,7 +148,7 @@ impl IntentPlanner {
             // Leg 0: Slow chain funds first
             SettlementLeg {
                 index: 0,
-                chain: slow_chain.chain.clone(),
+                chain: slow_chain.chain,
                 asset: slow_chain.clone(),
                 timeout: slow_timeout,
                 confirmations_required: Self::required_confirmations(&slow_chain.chain),
@@ -156,7 +156,7 @@ impl IntentPlanner {
             // Leg 1: Fast chain funds second
             SettlementLeg {
                 index: 1,
-                chain: fast_chain.chain.clone(),
+                chain: fast_chain.chain,
                 asset: fast_chain.clone(),
                 timeout: fast_timeout,
                 confirmations_required: Self::required_confirmations(&fast_chain.chain),
@@ -341,7 +341,7 @@ pub fn external_chain_from_kind(kind: ChainKind) -> Result<ExternalChainId, From
 /// (the canonical 32-byte symbol hash). Native assets use
 /// `TokenId::Native` so the planner can skip ERC-20/SPL lookup.
 pub fn asset_spec_from_ref(asset: &AssetRef, amount: u128) -> Result<AssetSpec, FromIntentError> {
-    let chain = external_chain_from_kind(asset.chain.clone())?;
+    let chain = external_chain_from_kind(asset.chain)?;
     // We treat the symbol as a string token contract id. If the
     // symbol is empty we fail closed. Native-style tickers ("ETH",
     // "BTC", "SOL", "X3") map to `TokenId::Native`.

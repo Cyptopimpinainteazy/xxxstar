@@ -1,4 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 #![deny(unsafe_code)]
 
 //! # X3 Agent Law Pallet
@@ -69,9 +73,10 @@ pub mod pallet {
     use super::*;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-    use sp_runtime::DispatchError;
+
     use sp_std::prelude::*;
 
+    #[allow(dead_code)]
     type BalanceOf<T> = <<T as Config>::Currency as frame_support::traits::Currency<
         <T as frame_system::Config>::AccountId,
     >>::Balance;
@@ -317,7 +322,7 @@ pub mod pallet {
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn on_initialize(block: BlockNumberFor<T>) -> Weight {
+        fn on_initialize(_block: BlockNumberFor<T>) -> Weight {
             // Clean up old TasksThisBlock entries (previous block)
             // In production, use a circular buffer or off-chain indexing
             Weight::zero()
@@ -335,29 +340,36 @@ pub mod pallet {
 
     impl<T: Config> Pallet<T> {
         /// Slash agent reputation
-        pub fn internal_slash(
+        fn internal_slash(
             agent: &T::AccountId,
             penalty: u64,
             reason: &SlashingReason,
         ) -> DispatchResult {
-            // Reduce agent reputation in x3-invariants registry (will be linked in formal spec)
-            // For now, this is a placeholder for the invariant registry call
+            let current_violations = ViolationCount::<T>::get(agent);
+            let new_violations = current_violations.saturating_add(1);
+            ViolationCount::<T>::insert(agent, new_violations);
 
-            // Log the slash
-            log::warn!(
-                target: "x3-agent-law",
-                "Agent {:?} slashed for {:?} (penalty: {})",
-                agent, reason, penalty
-            );
+            Self::deposit_event(Event::AgentSlashed {
+                agent: agent.clone(),
+                reason: reason.clone(),
+                penalty,
+            });
+
+            if new_violations as u64 >= T::ReputationThreshold::get() {
+                let duration = T::CheckpointGracePeriod::get();
+                let expires_at = frame_system::Pallet::<T>::block_number() + duration;
+                Blacklist::<T>::insert(agent, expires_at);
+                Self::deposit_event(Event::AgentBlacklisted {
+                    agent: agent.clone(),
+                    expires_at,
+                });
+            }
 
             Ok(())
         }
 
         /// Temporarily blacklist agent
-        pub fn blacklist_agent(
-            agent: &T::AccountId,
-            duration: BlockNumberFor<T>,
-        ) -> DispatchResult {
+        fn blacklist_agent(agent: &T::AccountId, duration: BlockNumberFor<T>) -> DispatchResult {
             let current_block = frame_system::Pallet::<T>::block_number();
             let expires_at = current_block + duration;
             Blacklist::<T>::insert(agent, expires_at);

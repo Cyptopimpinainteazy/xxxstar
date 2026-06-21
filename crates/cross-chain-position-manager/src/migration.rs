@@ -519,9 +519,10 @@ impl MigrationEngine {
 
     /// Get chain liquidity score
     async fn get_chain_liquidity(&self, chain_id: u64) -> Result<f64> {
-        // In a real implementation, this would query DEX liquidity
-        // For now, return a placeholder value
-        Ok(0.8) // 80% liquidity score
+        Err(PositionManagerError::InsufficientLiquidity {
+            asset_address: H160::zero(),
+            chain_id,
+        })
     }
 
     /// Estimate migration duration

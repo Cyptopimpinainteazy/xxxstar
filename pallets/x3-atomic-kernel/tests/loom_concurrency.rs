@@ -34,7 +34,7 @@ mod loom_tests {
 
                 // Rollback MUST be atomic: all changes reverted or none
                 // Simulating LIFO (Last-In-First-Out) reversal
-                while let Some(_) = log.pop() {
+                while log.pop().is_some() {
                     // Each revert is a critical section
                 }
 

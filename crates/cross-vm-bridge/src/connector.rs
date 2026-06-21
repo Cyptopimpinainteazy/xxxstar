@@ -5,7 +5,7 @@
 //!
 //! Configuration via environment variables:
 //!   - X3_RPC_ENDPOINT   - HTTP JSON-RPC endpoint for X3 Chain node
-//!                         (e.g., http://127.0.0.1:9944 — NOT ws:// or wss://)
+//!     (e.g., http://127.0.0.1:9944 — NOT ws:// or wss://)
 //!   - X3_NETWORK        - Network: 'mainnet' | 'testnet' | 'local' (default: 'local')
 //!   - X3_TIMEOUT        - Request timeout in ms (default: '30000')
 //!   - X3_RECONNECT_MAX  - Maximum reconnect attempts (default: '5')

@@ -5,13 +5,41 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::single_component_path_imports)]
 
+#[cfg(feature = "runtime-benchmarks")]
+use frame_benchmarking;
+
+/// Fail-closed SecurityHook: logs at ERROR level instead of silently dropping.
+/// Replace with a live SwarmEventBroadcaster once the security spine is operational.
+pub struct FailClosedSecurityHook;
+impl<B: core::fmt::Debug> SecurityEventHook<B> for FailClosedSecurityHook {
+    fn emit(event: SecurityEvent<B>) {
+        log::error!(
+            target: "runtime::security",
+            "SECURITY EVENT DROPPED — no live subscriber: kind={:?}, severity={}",
+            event.kind, event.severity,
+        );
+    }
+}
+
+/// Fail-closed AccountingSpine: logs at ERROR level instead of silently dropping.
+/// Replace with a live accounting spine once the revenue spine is operational.
+pub struct FailClosedSpine;
+impl<B: core::fmt::Debug, C: core::fmt::Debug> AccountingSpine<B, C> for FailClosedSpine {
+    fn emit(event: AccountingEvent<B, C>) {
+        log::error!(
+            target: "runtime::accounting",
+            "ACCOUNTING EVENT DROPPED — no live spine: module={:?}, kind={:?}",
+            event.module, event.kind,
+        );
+    }
+}
+
 // SCOPE FREEZE (v0.4 internal-only mainnet RC):
 // - Only internal cross-VM routes enabled (X3Native/X3Evm/X3Svm)
 // - External liquidity gateway disabled at genesis
 // - Governance must explicitly enable external bridges after audit
 
 // Required for impl_runtime_apis! macro in no_std
-#[cfg(not(feature = "std"))]
 extern crate alloc;
 
 use codec::{Decode, DecodeWithMemTracking, Encode};
@@ -84,6 +112,8 @@ use pallet_x3_treasury_policy;
 use pallet_x3_verifier;
 use pallet_x3_wallet_pallet;
 use pallet_x3_wrapped;
+use x3_accounting_events::{AccountingEvent, AccountingSpine};
+use x3_security_events::{SecurityEvent, SecurityEventHook};
 
 use scale_info::TypeInfo;
 // IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
@@ -558,10 +588,75 @@ construct_runtime!(
     }
 );
 
+// ── mainnet-rc1: narrowed pallet set ─────────────────────────────────────────
+// Excludes experimental pallets (DEX, flashloan, launchpad, auction, meme,
+// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
+// DePIN marketplace, private execution).
 #[cfg(all(
     not(feature = "dev"),
     not(feature = "frontier"),
-    not(feature = "mainnet-rc1")
+    feature = "mainnet-rc1",
+))]
+construct_runtime!(
+    pub enum Runtime {
+        System: frame_system,
+        Timestamp: pallet_timestamp,
+        Aura: pallet_aura,
+        Grandpa: pallet_grandpa,
+        Session: pallet_session,
+        Historical: pallet_session::historical,
+        Offences: pallet_offences,
+        Balances: pallet_balances,
+        TransactionPayment: pallet_transaction_payment,
+        Scheduler: pallet_scheduler,
+        Preimage: pallet_preimage,
+        AtlasKernel: pallet_x3_kernel,
+        X3Invariants: pallet_x3_invariants,
+        X3AgentLaw: pallet_x3_agent_law,
+        X3Coin: pallet_x3_coin,
+        AtomicTradeEngine: pallet_atomic_trade_engine,
+        Council: pallet_collective::<Instance1>,
+        Governance: pallet_governance,
+        Treasury: pallet_treasury,
+        AgentAccounts: pallet_agent_accounts,
+        AgentMemory: pallet_agent_memory,
+        X3Verifier: pallet_x3_verifier,
+        X3DomainRegistry: pallet_x3_domain_registry,
+        X3AssetRegistry: pallet_x3_asset_registry,
+        X3SupplyLedger: pallet_x3_supply_ledger,
+        X3CrossVmRouter: pallet_x3_cross_vm_router,
+        X3CrosschainGateway: pallet_x3_crosschain_gateway,
+        X3TokenFactory: pallet_x3_token_factory,
+        X3AccountRegistry: pallet_x3_account_registry,
+        CrossChainValidator: pallet_cross_chain_validator,
+        X3SettlementEngine: pallet_x3_settlement_engine,
+        FraudProofs: crate::fraud_proofs::pallet::pallet,
+        X3Consensus: pallet_x3_consensus,
+        X3AtomicKernel: pallet_x3_atomic_kernel,
+        X3Slash: pallet_x3_slash,
+        X3AgentRegistry: pallet_x3_agent_registry,
+        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
+        X3WalletPallet: pallet_x3_wallet_pallet,
+        X3Inventory: pallet_x3_inventory,
+        X3Reservation: pallet_x3_reservation,
+        X3Solvency: pallet_x3_solvency,
+        X3Rebalance: pallet_x3_rebalance,
+        X3Partner: pallet_x3_partner,
+        X3TreasuryPolicy: pallet_x3_treasury_policy,
+        X3Custody: pallet_x3_custody,
+        X3Reconciliation: pallet_x3_reconciliation,
+        X3Wrapped: pallet_x3_wrapped,
+        SvmRuntime: pallet_svm_runtime,
+        X3JuryAnchor: pallet_x3_jury_anchor,
+        X3LpLocker: pallet_x3_lp_locker,
+    }
+);
+
+// ── default (no dev, no frontier, no mainnet-rc1): full experimental pallet set ─
+#[cfg(all(
+    not(feature = "dev"),
+    not(feature = "frontier"),
+    not(feature = "mainnet-rc1"),
 ))]
 construct_runtime!(
     pub enum Runtime {
@@ -631,108 +726,6 @@ construct_runtime!(
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
         X3FlashLoan: pallet_x3_flashloan,
-    }
-);
-
-// ── mainnet-rc1 + no-frontier ─────────────────────────────────────────────────
-// Narrow pallet set for the first public testnet / mainnet release candidate.
-// Excludes all experimental pallets (DEX, flashloan, launchpad, auction, meme,
-// swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
-// DePIN marketplace, private execution). Build with:
-//   cargo build -p x3-runtime --features mainnet-rc1 --release
-#[cfg(all(feature = "mainnet-rc1", not(feature = "frontier")))]
-construct_runtime!(
-    pub enum Runtime {
-        // ── Consensus / system ──────────────────────────────────────────────
-        System: frame_system,
-        Timestamp: pallet_timestamp,
-        Aura: pallet_aura,
-        Grandpa: pallet_grandpa,
-        Session: pallet_session,
-        Historical: pallet_session::historical,
-        Offences: pallet_offences,
-        // ── Economy ─────────────────────────────────────────────────────────
-        Balances: pallet_balances,
-        TransactionPayment: pallet_transaction_payment,
-        Scheduler: pallet_scheduler,
-        Preimage: pallet_preimage,
-        // ── X3 security core ─────────────────────────────────────────────────
-        AtlasKernel: pallet_x3_kernel,
-        X3Invariants: pallet_x3_invariants,
-        X3AgentLaw: pallet_x3_agent_law,
-        // ── Governance ───────────────────────────────────────────────────────
-        Council: pallet_collective::<Instance1>,
-        Governance: pallet_governance,
-        Treasury: pallet_treasury,
-        // ── Cross-VM settlement stack ─────────────────────────────────────────
-        X3AssetRegistry: pallet_x3_asset_registry,
-        X3SupplyLedger: pallet_x3_supply_ledger,
-        X3CrossVmRouter: pallet_x3_cross_vm_router,
-        X3CrosschainGateway: pallet_x3_crosschain_gateway,
-        X3AtomicKernel: pallet_x3_atomic_kernel,
-        X3SettlementEngine: pallet_x3_settlement_engine,
-        SvmRuntime: pallet_svm_runtime,
-        // ── Supporting infrastructure ─────────────────────────────────────────
-        X3Verifier: pallet_x3_verifier,
-        X3DomainRegistry: pallet_x3_domain_registry,
-        X3AccountRegistry: pallet_x3_account_registry,
-        CrossChainValidator: pallet_cross_chain_validator,
-        FraudProofs: crate::fraud_proofs::pallet::pallet,
-        X3Consensus: pallet_x3_consensus,
-        X3LpLocker: pallet_x3_lp_locker,
-        X3Slash: pallet_x3_slash,
-        X3AgentRegistry: pallet_x3_agent_registry,
-        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
-    }
-);
-
-// ── mainnet-rc1 + frontier (EVM support enabled) ──────────────────────────────
-#[cfg(all(feature = "mainnet-rc1", feature = "frontier"))]
-construct_runtime!(
-    pub enum Runtime {
-        // ── Consensus / system ──────────────────────────────────────────────
-        System: frame_system,
-        Timestamp: pallet_timestamp,
-        Aura: pallet_aura,
-        Grandpa: pallet_grandpa,
-        Session: pallet_session,
-        Historical: pallet_session::historical,
-        Offences: pallet_offences,
-        // ── Economy ─────────────────────────────────────────────────────────
-        Balances: pallet_balances,
-        TransactionPayment: pallet_transaction_payment,
-        Scheduler: pallet_scheduler,
-        Preimage: pallet_preimage,
-        // ── X3 security core ─────────────────────────────────────────────────
-        AtlasKernel: pallet_x3_kernel,
-        X3Invariants: pallet_x3_invariants,
-        X3AgentLaw: pallet_x3_agent_law,
-        // ── Governance ───────────────────────────────────────────────────────
-        Council: pallet_collective::<Instance1>,
-        Governance: pallet_governance,
-        Treasury: pallet_treasury,
-        // ── Cross-VM settlement stack ─────────────────────────────────────────
-        X3AssetRegistry: pallet_x3_asset_registry,
-        X3SupplyLedger: pallet_x3_supply_ledger,
-        X3CrossVmRouter: pallet_x3_cross_vm_router,
-        X3CrosschainGateway: pallet_x3_crosschain_gateway,
-        X3AtomicKernel: pallet_x3_atomic_kernel,
-        X3SettlementEngine: pallet_x3_settlement_engine,
-        SvmRuntime: pallet_svm_runtime,
-        // ── Supporting infrastructure ─────────────────────────────────────────
-        X3Verifier: pallet_x3_verifier,
-        X3DomainRegistry: pallet_x3_domain_registry,
-        X3AccountRegistry: pallet_x3_account_registry,
-        CrossChainValidator: pallet_cross_chain_validator,
-        FraudProofs: crate::fraud_proofs::pallet::pallet,
-        X3Consensus: pallet_x3_consensus,
-        X3LpLocker: pallet_x3_lp_locker,
-        X3Slash: pallet_x3_slash,
-        X3AgentRegistry: pallet_x3_agent_registry,
-        X3ProofCarryingAgent: pallet_x3_proof_carrying_agent,
-        // ── EVM stack ─────────────────────────────────────────────────────────
-        Evm: pallet_evm,
-        Ethereum: pallet_ethereum,
     }
 );
 
@@ -862,10 +855,9 @@ pub type SignedExtra = (
     pallet_x3_invariants::InvariantCheck<Runtime>,
     // 2. POLICY ENFORCEMENT (Agent Law)
     pallet_x3_agent_law::AgentLawCheck<Runtime>,
-    // 3-5. CROSS-VM SECURITY GATES — reserved for RC+1 when kernel extensions are complete
-    // pallet_x3_kernel::CapabilityEnvelopeCheck,  // TODO RC+1
-    // pallet_x3_kernel::AtomicSettlementCheck,    // TODO RC+1
-    // pallet_x3_kernel::FlashFinalityExtension,   // TODO RC+1
+    // Cross-VM security gates remain available in pallet-x3-kernel but are not
+    // part of SignedExtra until they enforce real checks instead of rejecting
+    // every transaction.
 );
 
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
@@ -880,6 +872,7 @@ parameter_types! {
     pub const MaxSubmissionAge: u64 = 3600;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_oracle::Config for Runtime {
     type MaxSubmissionsPerBlock = MaxSubmissionsPerBlock;
     type MaxAssets = MaxAssets;
@@ -897,6 +890,7 @@ parameter_types! {
     pub const MaxSeedLength: u32 = 100;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_vrf::Config for Runtime {
     type Currency = Balances;
     type Balance = Balance;
@@ -912,6 +906,7 @@ parameter_types! {
     pub const MaxPools: u32 = 100;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_dex::Config for Runtime {
     type MaxPools = MaxPools;
     type WeightInfo = ();
@@ -925,6 +920,7 @@ parameter_types! {
     pub const MaxTaskExpiryBlocks: u32 = 2_628_000; // ~1 year at 12s blocks
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_automation::Config for Runtime {
     type Currency = Balances;
     type MaxTasksPerAccount = MaxTasksPerAccount;
@@ -1496,7 +1492,7 @@ impl pallet_x3_invariants::Config for Runtime {
     type DefaultMaxAgents = InvariantsDefaultMaxAgents;
     type DefaultMaxProposalDepth = InvariantsDefaultMaxProposalDepth;
     type WeightInfo = pallet_x3_invariants::weights::SubstrateWeight<Runtime>;
-    type SecurityHook = x3_security_events::NoOpHook;
+    type SecurityHook = FailClosedSecurityHook;
 }
 
 impl pallet_x3_agent_law::Config for Runtime {
@@ -1572,6 +1568,9 @@ impl pallet_x3_coin::Config for Runtime {
     type TeamVestingBlocks = ConstU64<15768000>;
     type TeamVestingCliff = ConstU64<7884000>;
     type BonusClaimPeriod = ConstU64<3942000>;
+    type MinEvmConfirmations = ConstU32<12>;
+    type MinSvmConfirmations = ConstU32<32>;
+    type MinBtcConfirmations = ConstU32<6>;
 }
 
 // ===== AtomicTradeEngine Configuration =====
@@ -1655,11 +1654,12 @@ impl pallet_atomic_trade_engine::Config for Runtime {
     type MaxTradeLegs = MaxTradeLegs;
     type MaxCheckpoints = MaxCheckpoints;
     type MaxPendingBatchesPerAccount = MaxPendingBatchesPerAccount;
-    // TODO: wire to SwarmEventBroadcaster once the security swarm subscriber is live.
-    type SecurityHook = x3_security_events::NoOpHook;
+    type SecurityHook = FailClosedSecurityHook;
     // ── Protocol fee wiring ──────────────────────────────────────────────
     type ProtocolFeeBps = TradeProtocolFeeBps;
     type ProtocolTreasury = TreasuryAccountId;
+    type MaxSlippageBps = ConstU32<5000>;
+    type MinSlippageBps = ConstU32<1>;
 }
 
 #[cfg(all(feature = "std", feature = "frontier"))]
@@ -2157,8 +2157,8 @@ impl pallet_governance::Config for Runtime {
     // ============================================================================
 
     type MaxAIProposalPayload = MaxAIProposalPayload;
-    type AISubmitOrigin = frame_system::EnsureSigned<AccountId>;
-    type AIReviewOrigin = frame_system::EnsureSigned<AccountId>;
+    type AISubmitOrigin = EnsureCouncilMember;
+    type AIReviewOrigin = EnsureCouncilMember;
     type EmergencyOrigin = EnsureCouncilMember;
 }
 
@@ -2256,6 +2256,7 @@ parameter_types! {
     pub const AutoEvolutionBounds: (u32, u32) = (80, 120); // min 80%, max 120%
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_evolution_core::Config for Runtime {
     type EvolutionAuthority = EnsureRootOrHalfCouncil;
     type EmergencyOrigin = EnsureRootOrHalfCouncil;
@@ -2390,17 +2391,11 @@ parameter_types! {
     pub const ChallengePeriod: BlockNumber = 600;   // ~1 hour for dispute period
 }
 
-/// Testnet: use NoOpCrossChainValidator (accepts all proofs) to bypass
-/// proof verification until the cross-chain-validator pallet is fully wired.
-#[cfg(feature = "testnet")]
-pub type RuntimeCrossChainValidator =
-    pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator;
-
-/// Mainnet/RC1: use the real cross-chain-validator pallet for proof verification.
-#[cfg(not(feature = "testnet"))]
+/// Runtime cross-chain validator — always uses the real cross-chain-validator
+/// pallet for proof verification.  Proofs are never silently accepted; a
+/// verification failure returns `false` and the settlement is rejected.
 pub struct RuntimeCrossChainValidator;
 
-#[cfg(not(feature = "testnet"))]
 impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
     for RuntimeCrossChainValidator
 {
@@ -2466,8 +2461,8 @@ parameter_types! {
 impl pallet_x3_crosschain_gateway::Config for Runtime {
     type GovernanceOrigin =
         pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
-    type RelayerOrigin = frame_system::EnsureSigned<AccountId>;
-    type OperationalOrigin = frame_system::EnsureSigned<AccountId>;
+    type RelayerOrigin = EnsureRootOrHalfCouncil;
+    type OperationalOrigin = EnsureRootOrHalfCouncil;
     type DailyLimitWindowBlocks = ConstU32<14_400>;
 }
 
@@ -2487,6 +2482,7 @@ parameter_types! {
     pub const MaxJuryVoters: u32 = 50;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_swarm::Config for Runtime {
     type Currency = Balances;
     type AdminOrigin = EnsureRootOrHalfCouncil;
@@ -2535,6 +2531,7 @@ parameter_types! {
     pub const DepinSlashFraction: Perbill = Perbill::from_percent(10);
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_depin_marketplace::Config for Runtime {
     type Currency = Balances;
     type BurnDestination = ();
@@ -2565,6 +2562,7 @@ parameter_types! {
     pub const PrivateStakerShareBps: u16 = 1500;          // 15% to stakers
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_private_execution::Config for Runtime {
     type Currency = Balances;
     type BurnDestination = ();
@@ -2582,6 +2580,7 @@ impl pallet_private_execution::Config for Runtime {
     type WeightInfo = ();
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_sequencer::Config for Runtime {
     type Currency = Balances;
     type MaxTxsPerBatch = SeqMaxTxsPerBatch;
@@ -2598,6 +2597,7 @@ impl pallet_x3_sequencer::Config for Runtime {
 use crate::fraud_proofs::types::{ProposerQuery, SchedulerCommitmentQuery};
 
 /// Reads the scheduler commitment from the sequencer pallet's per-block storage.
+#[cfg(not(feature = "mainnet-rc1"))]
 impl SchedulerCommitmentQuery for Runtime {
     fn get_scheduler_commitment(block_number: u32) -> Option<sp_core::H256> {
         pallet_x3_sequencer::SchedulerCommitment::<Runtime>::get(block_number)
@@ -2611,6 +2611,7 @@ impl ProposerQuery<AccountId> for Runtime {
     }
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_da::Config for Runtime {
     type Currency = Balances;
     type MaxBlobSize = DaMaxBlobSize;
@@ -2681,7 +2682,7 @@ impl pallet_x3_slash::Config for Runtime {
     type FinalityWindow = SlashFinalityWindow;
     type ReputationDamageEnabled = SlashReputationDamageEnabled;
     type SlashRecipient = SlashTreasuryRecipient;
-    type AccountingSpine = x3_accounting_events::NoOpSpine;
+    type AccountingSpine = FailClosedSpine;
 }
 
 // ===== X3 Agent Registry Configuration =====
@@ -2719,7 +2720,7 @@ impl pallet_x3_agent_registry::Config for Runtime {
     type RateLimitMaxExtrinsicsPerEpoch = AgentRegistryRateLimitMaxExtrinsicsPerEpoch;
     type ReputationDamageEnabled = AgentRegistryReputationDamageEnabled;
     type SlashRecipient = AgentRegistrySlashRecipient;
-    type AccountingSpine = x3_accounting_events::NoOpSpine;
+    type AccountingSpine = FailClosedSpine;
     type WeightInfo = pallet_x3_agent_registry::weights::SubstrateWeight<Runtime>;
 }
 
@@ -2875,6 +2876,7 @@ parameter_types! {
     pub const AuctionMinBidIncrementBps: u32 = 100; // 1 %
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_auction::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxBidsPerAuction = AuctionMaxBidsPerAuction;
@@ -2923,7 +2925,7 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
         let name_bounded = frame_support::BoundedVec::try_from(name)
             .map_err(|_| DispatchError::Other("name too long"))?;
         let enabled: frame_support::BoundedVec<DomainId, frame_support::traits::ConstU32<8>> =
-            frame_support::BoundedVec::try_from(vec![])
+            frame_support::BoundedVec::try_from(vec![DomainId::X3Native, DomainId::X3Evm])
                 .map_err(|_| DispatchError::Other("too many domains"))?;
         let config = pallet_x3_token_factory::TokenFactoryConfig {
             symbol: symbol_bounded,
@@ -2950,7 +2952,9 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
 }
 
 // Bridge trait impl: launchpad can call DEX to create AMM pools
+#[cfg(not(feature = "mainnet-rc1"))]
 pub struct LaunchpadDexBridge;
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
     fn create_pool(creator: &AccountId, token_a: u32, token_b: u32) -> Result<u64, DispatchError> {
         // Use the DEX create_pool extrinsic with standard 30 bps fee
@@ -2975,7 +2979,9 @@ impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
 }
 
 // Bridge trait impl: launchpad can call LP Locker to lock tokens
+#[cfg(not(feature = "mainnet-rc1"))]
 pub struct LaunchpadLpLockerBridge;
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLockerBridge {
     fn lock_lp_for(
         owner: &AccountId,
@@ -2997,6 +3003,7 @@ parameter_types! {
     pub const LaunchpadQuoteAssetId: u32 = 0;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_launchpad::Config for Runtime {
     type GovernanceOrigin = frame_system::EnsureSigned<AccountId>;
     type MaxActiveLaunches = LaunchpadMaxActiveLaunches;
@@ -3024,6 +3031,7 @@ parameter_types! {
     pub const DappHubPremiumPlacementFee: u128 = 5_000 * DOLLARS;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_dapp_hub::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxDAppsPerDeveloper = DappHubMaxDAppsPerDeveloper;
@@ -3045,6 +3053,7 @@ parameter_types! {
     pub const ComputeMarketMinStakeForProvider: u128 = 1_000_000_000_000;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_compute_market::Config for Runtime {
     type GovernanceOrigin = EnsureRootOrHalfCouncil;
     type MaxActiveListings = ComputeMarketMaxActiveListings;
@@ -3060,6 +3069,7 @@ parameter_types! {
     pub const FlashLoanMaxLoanFraction: u32 = 50; // max 50% of pool per loan
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_flashloan::Config for Runtime {
     type Currency = Balances;
     type FeeBasisPoints = FlashLoanFeeBasisPoints;
@@ -3099,6 +3109,7 @@ parameter_types! {
     pub const MemeViralThreshold: u32 = 1000;
 }
 
+#[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_meme_overlord::Config for Runtime {
     type WeightInfo = ();
     type MaxTemplateNameLength = MemeMaxTemplateNameLength;
@@ -3135,6 +3146,22 @@ impl GetSessionNumber for SessionHandler {
 // impl sp_session::Config for Runtime {}
 
 // sp_session::SessionKeys trait implementation for session key generation/decoding
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benches {
+    use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
+    use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
+    use pallet_cross_chain_validator::Pallet as CrossChainValidator;
+    use pallet_x3_slash::Pallet as X3Slash;
+
+    frame_benchmarking::define_benchmarks!(
+        [pallet_x3_atomic_kernel, X3AtomicKernel]
+        [pallet_x3_settlement_engine, X3SettlementEngine]
+        [pallet_cross_chain_validator, CrossChainValidator]
+        [pallet_x3_slash, X3Slash]
+    );
+}
+
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
         fn version() -> sp_version::RuntimeVersion {
@@ -3170,11 +3197,29 @@ impl_runtime_apis! {
         }
 
         fn get_preset(id: &Option<sp_genesis_builder::PresetId>) -> Option<Vec<u8>> {
-            frame_support::genesis_builder_helper::get_preset::<RuntimeGenesisConfig>(id, |_| None)
+            frame_support::genesis_builder_helper::get_preset::<RuntimeGenesisConfig>(
+                id,
+                |preset_id| -> Option<Vec<u8>> {
+                    match preset_id.as_str() {
+                        "dev" => Some(include_bytes!("../genesis-presets/dev.json").to_vec()),
+                        "testnet" => {
+                            Some(include_bytes!("../genesis-presets/testnet.json").to_vec())
+                        }
+                        "production" => {
+                            Some(include_bytes!("../genesis-presets/production.json").to_vec())
+                        }
+                        _ => None,
+                    }
+                },
+            )
         }
 
         fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
-            Vec::new()
+            vec![
+                "dev".into(),
+                "testnet".into(),
+                "production".into(),
+            ]
         }
     }
 
@@ -3953,10 +3998,35 @@ impl_runtime_apis! {
         }
 
         fn get_svm_recent_blockhashes(limit: u32) -> Vec<H256> {
-            // Get the SVM recent blockhashes, capped to avoid unbounded response.
             const MAX_RECENT_BLOCKHASHES: u32 = 150;
             let cap = limit.min(MAX_RECENT_BLOCKHASHES) as usize;
             pallet_x3_kernel::SvmBlockhashes::<Runtime>::iter().map(|(_, h)| h).take(cap).collect()
+        }
+
+        fn get_wrapped_balance(account: AccountId, chain_id: u32, wrapped_asset_id: [u8; 32]) -> Balance {
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((chain_id, wrapped_asset_id, &account))
+        }
+
+        fn get_wrapped_supply(chain_id: u32, wrapped_asset_id: [u8; 32]) -> Balance {
+            pallet_x3_wrapped::WrappedSupply::<Runtime>::get(chain_id, wrapped_asset_id)
+        }
+
+        fn get_total_wrapped_supply() -> Balance {
+            pallet_x3_wrapped::TotalWrappedSupply::<Runtime>::get()
+        }
+
+        fn get_cross_vm_transfers() -> Vec<u8> {
+            use codec::Encode;
+            let transfers: Vec<_> = pallet_x3_cross_vm_router::Transfers::<Runtime>::iter().collect();
+            transfers.encode()
+        }
+
+        fn get_total_issuance() -> Balance {
+            pallet_balances::TotalIssuance::<Runtime>::get()
+        }
+
+        fn get_peer_count() -> u32 {
+            0
         }
     }
 
@@ -4250,6 +4320,7 @@ impl_runtime_apis! {
         }
     }
 
+    #[cfg(not(feature = "mainnet-rc1"))]
     impl pallet_evolution_core::runtime_api::EvolutionCoreApi<Block, AccountId, BlockNumber> for Runtime {
         fn get_params() -> pallet_evolution_core::runtime_api::EvolvableParamsResponse {
             let params = pallet_evolution_core::Pallet::<Runtime>::get_params();
@@ -4457,6 +4528,33 @@ impl_runtime_apis! {
 
         fn list_domains() -> Vec<Vec<u8>> {
             pallet_x3_domain_registry::Pallet::<Runtime>::runtime_list_domains()
+        }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    impl frame_benchmarking::Benchmark<Block> for Runtime {
+        fn benchmark_metadata(extra: bool) -> (
+            Vec<frame_benchmarking::BenchmarkList>,
+            Vec<frame_support::traits::StorageInfo>,
+        ) {
+            use frame_benchmarking::BenchmarkList;
+            use frame_support::traits::StorageInfoTrait;
+            let mut list = Vec::<BenchmarkList>::new();
+            list_benchmarks!(list, extra);
+            let storage_info = AllPalletsWithSystem::storage_info();
+            (list, storage_info)
+        }
+
+        fn dispatch_benchmark(
+            config: frame_benchmarking::BenchmarkConfig
+        ) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, alloc::string::String> {
+            use frame_benchmarking::BenchmarkBatch;
+            use frame_support::traits::WhitelistedStorageKeys;
+            let whitelist = AllPalletsWithSystem::whitelisted_storage_keys();
+            let mut batches = Vec::<BenchmarkBatch>::new();
+            let params = (&config, &whitelist);
+            add_benchmarks!(params, batches);
+            Ok(batches)
         }
     }
 

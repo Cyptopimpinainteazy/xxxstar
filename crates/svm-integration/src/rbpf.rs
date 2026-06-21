@@ -8,7 +8,6 @@ use crate::{
     SvmExecutor, SvmInstruction, SvmResult,
 };
 use sha2::Digest as Sha2Digest;
-use sha3::Digest as Sha3Digest;
 use solana_rbpf::{
     elf::Executable,
     error::ProgramResult,
@@ -356,7 +355,7 @@ fn syscall_sol_panic(
     // The syscall receives a *mut EbpfVm, so we access via the raw
     // pointer to get mutable access to the context.
     unsafe {
-        let vm_mut = &mut *(vm as *mut EbpfVm<AtlasSyscallContext>);
+        let vm_mut = &mut *vm;
         vm_mut.context_object_pointer.logs.push(msg.into_bytes());
     }
 }
@@ -422,7 +421,7 @@ fn syscall_sol_try_find_program_address(
     for bump in (0u8..=255).rev() {
         let mut hasher = sha2::Sha256::new();
         hasher.update(&seeds_data);
-        hasher.update(&[bump]);
+        hasher.update([bump]);
         hasher.update(&pid_data);
         hasher.update(b"ProgramDerivedAddress");
         let derived: [u8; 32] = hasher.finalize().into();

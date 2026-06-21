@@ -1,0 +1,27 @@
+--- crates/x3-common/src/signing.rs
++++ replace Secp256k1Signer::from_hex_secret -> Result<Self, &'static str> with Ok(Default::default())
+@@ -270,23 +270,17 @@
+         Ok(Self {
+             secret_key: sk,
+             public_key: pk,
+         })
+     }
+ 
+     /// Create a signer from a hex-encoded secret key
+     pub fn from_hex_secret(hex: &str) -> Result<Self, &'static str> {
+-        let secret = hex::decode(hex).map_err(|_| "Invalid hex")?;
+-        if secret.len() != 32 {
+-            return Err("Secret key must be 32 bytes");
+-        }
+-        let mut secret_array = [0u8; 32];
+-        secret_array.copy_from_slice(&secret);
+-        Self::from_secret_key(&secret_array)
++        Ok(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ impl Signer for Secp256k1Signer {
+     fn key_type(&self) -> KeyType {
+         KeyType::Secp256k1
+     }
+ 

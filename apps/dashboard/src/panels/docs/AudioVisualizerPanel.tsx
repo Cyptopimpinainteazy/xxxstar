@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, Slider, BarChart3 } from 'lucide-react';
+import { Play, Pause, Volume2, SlidersHorizontal, BarChart3 } from 'lucide-react';
 
 interface AudioVisualizerState {
   isPlaying: boolean;

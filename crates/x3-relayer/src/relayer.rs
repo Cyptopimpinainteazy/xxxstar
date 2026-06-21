@@ -18,8 +18,8 @@ use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
 use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
 use x3_verification_router::{
-    ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, VerificationError, VerificationOutcome,
-    VerificationRouter, VerificationStrategy, Verifier,
+    ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, VerificationRouter,
+    VerificationStrategy,
 };
 
 pub struct RelayerService {
@@ -854,6 +854,45 @@ impl RelayerSafetyPipeline {
     }
 }
 
+// ── Solana finalization verifier ────────────────────────────────────────────
+//
+// The relayer registers an SVM-side verifier in production. The real
+// implementation will plug in an SVM light client or a validator
+// attestation set. For now, the verifier enforces the minimum
+// structural properties: the source chain must be Solana, the payload
+// must contain at least one byte, and the strategy must be
+// `SolanaFinalizedProof`. Anything else fails closed.
+pub struct SolanaFinalizationVerifier;
+
+impl x3_verification_router::Verifier for SolanaFinalizationVerifier {
+    fn strategy(&self) -> x3_verification_router::VerificationStrategy {
+        x3_verification_router::VerificationStrategy::SolanaFinalizedProof
+    }
+
+    fn verify(
+        &self,
+        proof: &x3_verification_router::ProofEnvelope,
+    ) -> Result<
+        x3_verification_router::VerificationOutcome,
+        x3_verification_router::VerificationError,
+    > {
+        if proof.payload.is_empty() {
+            return Err(x3_verification_router::VerificationError::MalformedProof);
+        }
+        if !matches!(
+            proof.source_chain,
+            x3_verification_router::ChainKind::Solana
+        ) {
+            return Err(x3_verification_router::VerificationError::UnsupportedChain);
+        }
+        Ok(x3_verification_router::VerificationOutcome {
+            accepted: true,
+            reason: "solana_finalization_verified",
+            verified_at_height: None,
+        })
+    }
+}
+
 // ── Test verifier ──────────────────────────────────────────────────────────
 
 /// Test-only verifier that accepts any non-empty EVM proof payload.
@@ -865,20 +904,30 @@ impl RelayerSafetyPipeline {
 struct AcceptAnyEvmVerifier;
 
 #[cfg(test)]
-impl Verifier for AcceptAnyEvmVerifier {
-    fn strategy(&self) -> VerificationStrategy {
-        VerificationStrategy::EvmReceiptProof
+impl x3_verification_router::Verifier for AcceptAnyEvmVerifier {
+    fn strategy(&self) -> x3_verification_router::VerificationStrategy {
+        x3_verification_router::VerificationStrategy::EvmReceiptProof
     }
 
-    fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
-        if matches!(proof.source_chain, ChainKind::Evm { .. }) && !proof.payload.is_empty() {
-            Ok(VerificationOutcome {
+    fn verify(
+        &self,
+        proof: &x3_verification_router::ProofEnvelope,
+    ) -> Result<
+        x3_verification_router::VerificationOutcome,
+        x3_verification_router::VerificationError,
+    > {
+        if matches!(
+            proof.source_chain,
+            x3_verification_router::ChainKind::Evm { .. }
+        ) && !proof.payload.is_empty()
+        {
+            Ok(x3_verification_router::VerificationOutcome {
                 accepted: true,
                 reason: "test_accept_any",
                 verified_at_height: None,
             })
         } else {
-            Err(VerificationError::UnsupportedChain)
+            Err(x3_verification_router::VerificationError::UnsupportedChain)
         }
     }
 }
@@ -1135,44 +1184,5 @@ mod tests {
             .expect_err("insufficient signatures should fail quorum");
         assert!(err.contains("attestation_quorum_not_met"));
         assert!(err.contains("dispute_status=Accepted"));
-    }
-}
-
-// ── Solana finalization verifier ────────────────────────────────────────────
-//
-// The relayer registers an SVM-side verifier in production. The real
-// implementation will plug in an SVM light client or a validator
-// attestation set. For now, the verifier enforces the minimum
-// structural properties: the source chain must be Solana, the payload
-// must contain at least one byte, and the strategy must be
-// `SolanaFinalizedProof`. Anything else fails closed.
-pub struct SolanaFinalizationVerifier;
-
-impl x3_verification_router::Verifier for SolanaFinalizationVerifier {
-    fn strategy(&self) -> x3_verification_router::VerificationStrategy {
-        x3_verification_router::VerificationStrategy::SolanaFinalizedProof
-    }
-
-    fn verify(
-        &self,
-        proof: &x3_verification_router::ProofEnvelope,
-    ) -> Result<
-        x3_verification_router::VerificationOutcome,
-        x3_verification_router::VerificationError,
-    > {
-        if proof.payload.is_empty() {
-            return Err(x3_verification_router::VerificationError::MalformedProof);
-        }
-        if !matches!(
-            proof.source_chain,
-            x3_verification_router::ChainKind::Solana
-        ) {
-            return Err(x3_verification_router::VerificationError::UnsupportedChain);
-        }
-        Ok(x3_verification_router::VerificationOutcome {
-            accepted: true,
-            reason: "solana_finalization_verified",
-            verified_at_height: None,
-        })
     }
 }

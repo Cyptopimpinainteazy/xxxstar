@@ -182,17 +182,17 @@ fn all_invariants_hold_returns_false_on_supply_breach() {
 #[test]
 fn set_halt_on_violation_toggles_flag() {
     new_test_ext().execute_with(|| {
-        assert_eq!(HaltOnViolation::<Test>::get(), false);
+        assert!(!HaltOnViolation::<Test>::get());
         assert_ok!(Invariants::set_halt_on_violation(
             RuntimeOrigin::root(),
             true
         ));
-        assert_eq!(HaltOnViolation::<Test>::get(), true);
+        assert!(HaltOnViolation::<Test>::get());
         assert_ok!(Invariants::set_halt_on_violation(
             RuntimeOrigin::root(),
             false
         ));
-        assert_eq!(HaltOnViolation::<Test>::get(), false);
+        assert!(!HaltOnViolation::<Test>::get());
     });
 }
 

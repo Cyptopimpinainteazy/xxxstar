@@ -1,6 +1,6 @@
 use crate::types::*;
 use sha2::{Digest, Sha256};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Off-chain task executor (RC1).
 ///
@@ -63,27 +63,22 @@ impl TaskExecutor {
 
     /// Deterministic execution kernel.
     ///
-    /// **RC1 stub**: output = `body || serialised_params` (identity pass-through).
-    /// The result hash is therefore fully determined by the input, satisfying the
-    /// quorum invariant.
-    ///
-    /// Replace this in RC4 with the X3 Lang bytecode interpreter:
-    /// ```text
-    /// // RC4 target
-    /// let vm = X3LangVm::new();
-    /// vm.exec(payload.body.as_slice(), payload.params)
-    /// ```
+    /// Fails closed: the executor does not perform identity pass-through.
+    /// Real X3 VM bytecode dispatch is gated behind the `x3-vm` feature.
     fn run_deterministic(&self, payload: &TaskPayload) -> Result<Vec<u8>, NorthernSwarmError> {
         if payload.body.is_empty() {
-            warn!(task_id = %payload.task_id, "payload body is empty — producing empty-hash result");
+            return Err(NorthernSwarmError::ExecutionFailed {
+                task_id: payload.task_id.clone(),
+                reason: "empty payload body".into(),
+            });
         }
 
-        let params_bytes =
-            serde_json::to_vec(&payload.params).map_err(NorthernSwarmError::Serde)?;
-
-        let mut combined = payload.body.clone();
-        combined.extend_from_slice(&params_bytes);
-        Ok(combined)
+        // X3 VM integration not available in this crate.
+        // Fail closed.
+        Err(NorthernSwarmError::ExecutionFailed {
+            task_id: payload.task_id.clone(),
+            reason: "X3 bytecode execution not available".into(),
+        })
     }
 }
 

@@ -1,0 +1,24 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace Operation::key_type -> KeyType with Default::default()
+@@ -435,20 +435,17 @@
+     CrossVmBridge,
+     /// Transaction
+     Transaction,
+ }
+ 
+ impl Operation {
+     /// Get the key type for signing/verification operations
+     pub fn key_type(&self) -> KeyType {
+-        match self {
+-            Operation::Sign(key_type) | Operation::Verify(key_type) => *key_type,
+-            _ => KeyType::Ed25519, // Default for non-key operations
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     #[test]

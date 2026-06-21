@@ -51,7 +51,7 @@ mod tests {
         assert_eq!(report.gas_before, before_gas);
         assert_eq!(report.gas_after, after_gas);
         assert!(
-            report.per_pass.len() > 0,
+            !report.per_pass.is_empty(),
             "should have run at least one pass"
         );
     }

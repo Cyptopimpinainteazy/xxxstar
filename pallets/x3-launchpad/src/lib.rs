@@ -10,6 +10,10 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 
 extern crate alloc;
 
@@ -24,11 +28,7 @@ mod tests;
 pub mod pallet {
     use alloc::format;
     use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
-    use frame_support::{
-        pallet_prelude::*,
-        traits::{Currency, ExistenceRequirement, Get},
-        transactional,
-    };
+    use frame_support::{pallet_prelude::*, traits::Get, transactional};
     use frame_system::pallet_prelude::*;
     use scale_info::TypeInfo;
     use sp_runtime::traits::Saturating;
@@ -620,6 +620,40 @@ pub mod pallet {
                 });
                 Ok(())
             })
+        }
+    }
+
+    // ── Hooks ────────────────────────────────────────────────────────────────
+
+    #[pallet::hooks]
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+        /// Auto-finalize any launches whose `end_block` has been reached.
+        fn on_initialize(now: BlockNumberFor<T>) -> Weight {
+            let mut weight = T::WeightInfo::create_launch(); // base weight
+
+            for (launch_id, _) in ExpiryQueue::<T>::drain_prefix(now) {
+                let mut consumed = Weight::from_parts(5_000, 0);
+                if let Some(mut state) = Launches::<T>::get(launch_id) {
+                    let new_status = if state.total_raised >= state.soft_cap {
+                        LaunchStatus::Successful
+                    } else {
+                        LaunchStatus::Failed
+                    };
+                    state.status = new_status.clone();
+                    let total_raised = state.total_raised;
+                    ActiveLaunchCount::<T>::mutate(|c| *c = c.saturating_sub(1));
+                    Launches::<T>::insert(launch_id, state);
+                    Self::deposit_event(Event::LaunchFinalized {
+                        launch_id,
+                        status: new_status,
+                        total_raised,
+                    });
+                    consumed = T::WeightInfo::finalize_launch();
+                }
+                weight = weight.saturating_add(consumed);
+            }
+
+            weight
         }
     }
 

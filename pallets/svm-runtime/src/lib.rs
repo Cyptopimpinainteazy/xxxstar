@@ -1,5 +1,9 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # SVM Pallet
 //!
 //! A Substrate pallet providing Solana Virtual Machine (SVM) functionality for X3 Chain.
@@ -225,8 +229,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type
-
         /// Currency for native token operations
         type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
@@ -406,7 +408,7 @@ pub mod pallet {
             let _who = ensure_signed(origin)?;
 
             ensure!(
-                !Accounts::<T>::contains_key(&pubkey),
+                !Accounts::<T>::contains_key(pubkey),
                 Error::<T>::AccountAlreadyExists
             );
 
@@ -427,12 +429,12 @@ pub mod pallet {
                 created_at: frame_system::Pallet::<T>::block_number(),
             };
 
-            Accounts::<T>::insert(&pubkey, account_info);
+            Accounts::<T>::insert(pubkey, account_info);
 
             if space > 0 {
                 let data = BoundedVec::try_from(sp_std::vec![0u8; space as usize])
                     .map_err(|_| Error::<T>::AccountDataTooLarge)?;
-                AccountData::<T>::insert(&pubkey, data);
+                AccountData::<T>::insert(pubkey, data);
             }
 
             TotalLamports::<T>::mutate(|total| *total = total.saturating_add(lamports));
@@ -458,7 +460,7 @@ pub mod pallet {
             let _who = ensure_signed(origin)?;
 
             ensure!(
-                !Programs::<T>::contains_key(&program_id),
+                !Programs::<T>::contains_key(program_id),
                 Error::<T>::AccountAlreadyExists
             );
 
@@ -475,11 +477,11 @@ pub mod pallet {
                 is_frozen: false,
             };
 
-            Programs::<T>::insert(&program_id, program_info);
+            Programs::<T>::insert(program_id, program_info);
 
             let bounded_bytecode =
                 BoundedVec::try_from(bytecode).map_err(|_| Error::<T>::ProgramTooLarge)?;
-            ProgramData::<T>::insert(&program_id, bounded_bytecode);
+            ProgramData::<T>::insert(program_id, bounded_bytecode);
 
             let lamports = Self::rent_exempt_balance(bytecode_len);
             let account_info = SvmAccountInfo {
@@ -490,7 +492,7 @@ pub mod pallet {
                 data_len: bytecode_len,
                 created_at: frame_system::Pallet::<T>::block_number(),
             };
-            Accounts::<T>::insert(&program_id, account_info);
+            Accounts::<T>::insert(program_id, account_info);
 
             TotalLamports::<T>::mutate(|total| *total = total.saturating_add(lamports));
 
@@ -514,7 +516,7 @@ pub mod pallet {
         ) -> DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            Accounts::<T>::try_mutate(&from, |maybe_account| -> DispatchResult {
+            Accounts::<T>::try_mutate(from, |maybe_account| -> DispatchResult {
                 let account = maybe_account.as_mut().ok_or(Error::<T>::AccountNotFound)?;
                 account.lamports = account
                     .lamports
@@ -523,8 +525,8 @@ pub mod pallet {
                 Ok(())
             })?;
 
-            if Accounts::<T>::contains_key(&to) {
-                Accounts::<T>::try_mutate(&to, |maybe_account| -> DispatchResult {
+            if Accounts::<T>::contains_key(to) {
+                Accounts::<T>::try_mutate(to, |maybe_account| -> DispatchResult {
                     let account = maybe_account.as_mut().ok_or(Error::<T>::AccountNotFound)?;
                     account.lamports = account
                         .lamports
@@ -541,7 +543,7 @@ pub mod pallet {
                     data_len: 0,
                     created_at: frame_system::Pallet::<T>::block_number(),
                 };
-                Accounts::<T>::insert(&to, account_info);
+                Accounts::<T>::insert(to, account_info);
             }
 
             Self::deposit_event(Event::Transfer { from, to, amount });
@@ -559,17 +561,17 @@ pub mod pallet {
         ) -> DispatchResult {
             let _who = ensure_signed(origin)?;
 
-            let account = Accounts::<T>::get(&pubkey).ok_or(Error::<T>::AccountNotFound)?;
+            let account = Accounts::<T>::get(pubkey).ok_or(Error::<T>::AccountNotFound)?;
             ensure!(!account.executable, Error::<T>::CannotCloseExecutable);
 
             let lamports = account.lamports;
 
-            Accounts::<T>::remove(&pubkey);
-            AccountData::<T>::remove(&pubkey);
+            Accounts::<T>::remove(pubkey);
+            AccountData::<T>::remove(pubkey);
 
             if lamports > 0 {
-                if Accounts::<T>::contains_key(&recipient) {
-                    Accounts::<T>::try_mutate(&recipient, |maybe_account| -> DispatchResult {
+                if Accounts::<T>::contains_key(recipient) {
+                    Accounts::<T>::try_mutate(recipient, |maybe_account| -> DispatchResult {
                         let account = maybe_account.as_mut().ok_or(Error::<T>::AccountNotFound)?;
                         account.lamports = account
                             .lamports
@@ -586,7 +588,7 @@ pub mod pallet {
                         data_len: 0,
                         created_at: frame_system::Pallet::<T>::block_number(),
                     };
-                    Accounts::<T>::insert(&recipient, account_info);
+                    Accounts::<T>::insert(recipient, account_info);
                 }
             }
 
@@ -631,8 +633,8 @@ pub mod pallet {
                 frame_support::traits::ExistenceRequirement::KeepAlive,
             )?;
 
-            if Accounts::<T>::contains_key(&svm_pubkey) {
-                Accounts::<T>::try_mutate(&svm_pubkey, |maybe_account| -> DispatchResult {
+            if Accounts::<T>::contains_key(svm_pubkey) {
+                Accounts::<T>::try_mutate(svm_pubkey, |maybe_account| -> DispatchResult {
                     let account = maybe_account.as_mut().ok_or(Error::<T>::AccountNotFound)?;
                     account.lamports = account
                         .lamports
@@ -649,7 +651,7 @@ pub mod pallet {
                     data_len: 0,
                     created_at: frame_system::Pallet::<T>::block_number(),
                 };
-                Accounts::<T>::insert(&svm_pubkey, account_info);
+                Accounts::<T>::insert(svm_pubkey, account_info);
             }
 
             TotalLamports::<T>::mutate(|total| *total = total.saturating_add(amount));
@@ -710,15 +712,15 @@ pub mod pallet {
             );
 
             // Check program exists and is executable
-            let _program = Programs::<T>::get(&program_id).ok_or(Error::<T>::ProgramNotFound)?;
+            let _program = Programs::<T>::get(program_id).ok_or(Error::<T>::ProgramNotFound)?;
 
             let program_account =
-                Accounts::<T>::get(&program_id).ok_or(Error::<T>::ProgramNotFound)?;
+                Accounts::<T>::get(program_id).ok_or(Error::<T>::ProgramNotFound)?;
 
             ensure!(program_account.executable, Error::<T>::ProgramNotExecutable);
 
             // Get program bytecode
-            let bytecode = ProgramData::<T>::get(&program_id)
+            let bytecode = ProgramData::<T>::get(program_id)
                 .ok_or(Error::<T>::ProgramNotFound)?
                 .into_inner();
 
@@ -769,7 +771,7 @@ pub mod pallet {
 
                             // Update lamports using try_mutate
                             Accounts::<T>::try_mutate(
-                                &upd.pubkey,
+                                upd.pubkey,
                                 |maybe_info| -> DispatchResult {
                                     if let Some(info) = maybe_info.as_mut() {
                                         info.lamports = upd.lamports;
@@ -781,7 +783,7 @@ pub mod pallet {
                             // Update data (even if empty - BPF program may clear data intentionally)
                             let bounded_data = BoundedVec::try_from(upd.data.clone())
                                 .map_err(|_| Error::<T>::AccountDataTooLarge)?;
-                            AccountData::<T>::insert(&upd.pubkey, bounded_data);
+                            AccountData::<T>::insert(upd.pubkey, bounded_data);
                         }
                     }
 
@@ -818,7 +820,7 @@ mod tests {
     use super::*;
     use frame_support::{
         assert_noop, assert_ok, parameter_types,
-        traits::{ConstU32, ConstU64, Nothing},
+        traits::{ConstU32, ConstU64},
     };
     use sp_core::H256;
     use sp_runtime::{
@@ -927,7 +929,7 @@ mod tests {
 
             assert!(pallet::Pallet::<Test>::account_exists(&pubkey));
 
-            let account = pallet::Accounts::<Test>::get(&pubkey).unwrap();
+            let account = pallet::Accounts::<Test>::get(pubkey).unwrap();
             assert_eq!(account.lamports, lamports);
             assert_eq!(account.owner, owner);
             assert!(!account.executable);
@@ -978,10 +980,10 @@ mod tests {
                 500_000
             ));
 
-            let from_account = pallet::Accounts::<Test>::get(&from_pubkey).unwrap();
+            let from_account = pallet::Accounts::<Test>::get(from_pubkey).unwrap();
             assert_eq!(from_account.lamports, 500_000);
 
-            let to_account = pallet::Accounts::<Test>::get(&to_pubkey).unwrap();
+            let to_account = pallet::Accounts::<Test>::get(to_pubkey).unwrap();
             assert_eq!(to_account.lamports, 500_000);
         });
     }
@@ -1023,12 +1025,12 @@ mod tests {
                 Some(authority)
             ));
 
-            let program = pallet::Programs::<Test>::get(&program_id).unwrap();
+            let program = pallet::Programs::<Test>::get(program_id).unwrap();
             assert_eq!(program.upgrade_authority, Some(authority));
             assert_eq!(program.bytecode_len, 1024);
             assert!(!program.is_frozen);
 
-            let account = pallet::Accounts::<Test>::get(&program_id).unwrap();
+            let account = pallet::Accounts::<Test>::get(program_id).unwrap();
             assert!(account.executable);
         });
     }
@@ -1056,7 +1058,7 @@ mod tests {
 
             assert!(!pallet::Pallet::<Test>::account_exists(&pubkey));
 
-            let recipient_account = pallet::Accounts::<Test>::get(&recipient).unwrap();
+            let recipient_account = pallet::Accounts::<Test>::get(recipient).unwrap();
             assert_eq!(recipient_account.lamports, 1_000_000);
         });
     }

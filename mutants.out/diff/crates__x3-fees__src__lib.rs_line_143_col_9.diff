@@ -1,0 +1,24 @@
+--- crates/x3-fees/src/lib.rs
++++ replace SlashingInsuranceFund::contribute_from_slash with ()
+@@ -135,20 +135,17 @@
+             contribution_rate: Permill::from_percent(5),
+             claims: HashMap::new(),
+             approved_claims: HashMap::new(),
+         }
+     }
+ 
+     /// Contribute when slash occurs (5% of slash amount)
+     pub fn contribute_from_slash(&mut self, slash_amount: u128) {
+-        let contribution = (slash_amount as u64)
+-            .saturating_mul(self.contribution_rate.deconstruct() as u64)
+-            / 1_000_000;
+-        self.pool_balance = self.pool_balance.saturating_add(contribution as u128);
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// File new claim (e.g., validator recovery)
+     pub fn file_claim(&mut self, claim_id: String, amount: u128) {
+         self.claims.insert(claim_id, amount);
+     }
+ 
+     /// Process claim approval or denial

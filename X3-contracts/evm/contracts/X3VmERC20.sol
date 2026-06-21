@@ -55,20 +55,22 @@ contract X3VmERC20 is ERC20, AccessControl {
     // ── Constructor ─────────────────────────────────────────────────────────
 
     constructor(
-        string memory _name,
-        string memory _symbol,
+        string memory name_,
+        string memory symbol_,
         uint8 _tokenDecimals,
         bytes32 _assetId,
         uint8 _originDomain,
         uint256 _originChainId,
-        address _originToken,
+        address originToken_,
         address _kernel
-    ) ERC20(_name, _symbol) {
+    ) ERC20(name_, symbol_) {
         require(_kernel != address(0), "ZERO_KERNEL");
         assetId = _assetId;
         originDomain = _originDomain;
         originChainId = _originChainId;
-        originToken = _originToken;
+        // slither-disable-next-line missing-zero-check
+        // address(0) is valid - represents native chain tokens
+        originToken = originToken_;
         _decimals = _tokenDecimals;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _kernel);

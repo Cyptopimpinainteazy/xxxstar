@@ -3,7 +3,6 @@ use std::env;
 ///
 /// Runs the TPS tracking service that polls the blockchain and stores metrics in InfluxDB
 use tps_tracker::{TpsTracker, TpsTrackerConfig};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

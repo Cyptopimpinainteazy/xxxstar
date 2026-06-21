@@ -1,4 +1,8 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # X3Chain Agent Memory Pallet
 //!
 //! Append-only on-chain memory for AI agents with LLM-friendly serialization.
@@ -76,8 +80,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Currency for storage deposits.
         type Currency: ReservableCurrency<Self::AccountId>;
 

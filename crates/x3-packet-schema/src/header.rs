@@ -149,8 +149,7 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_evm_only() {
-        let mut header = PacketHeader::default();
-        header.domain_mask = 0b0001;
+        let header = PacketHeader { domain_mask: 0b0001, ..Default::default() };
         assert!(header.targets_evm());
         assert!(!header.targets_svm());
         assert!(!header.targets_x3vm());
@@ -158,8 +157,7 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_svm_only() {
-        let mut header = PacketHeader::default();
-        header.domain_mask = 0b0010;
+        let header = PacketHeader { domain_mask: 0b0010, ..Default::default() };
         assert!(!header.targets_evm());
         assert!(header.targets_svm());
         assert!(!header.targets_x3vm());
@@ -167,8 +165,7 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_x3vm_only() {
-        let mut header = PacketHeader::default();
-        header.domain_mask = 0b0100;
+        let header = PacketHeader { domain_mask: 0b0100, ..Default::default() };
         assert!(!header.targets_evm());
         assert!(!header.targets_svm());
         assert!(header.targets_x3vm());
@@ -176,8 +173,7 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_all() {
-        let mut header = PacketHeader::default();
-        header.domain_mask = 0b0111;
+        let header = PacketHeader { domain_mask: 0b0111, ..Default::default() };
         assert!(header.targets_evm());
         assert!(header.targets_svm());
         assert!(header.targets_x3vm());
@@ -185,8 +181,7 @@ mod tests {
 
     #[test]
     fn test_header_expiry_validation() {
-        let mut header = PacketHeader::default();
-        header.expires_at = 1000;
+        let header = PacketHeader { expires_at: 1000, ..Default::default() };
 
         assert!(!header.is_expired(999));
         assert!(header.is_expired(1000));
@@ -202,30 +197,22 @@ mod tests {
 
     #[test]
     fn test_header_validation_rejects_invalid_version() {
-        let mut header = PacketHeader::default();
-        header.version = 99;
+        let header = PacketHeader { version: 99, ..Default::default() };
         assert!(header.validate().is_err());
     }
 
     #[test]
     fn test_header_validation_rejects_large_payload() {
-        let mut header = PacketHeader::default();
-        // Use u16::MAX which is 65535, then test that exceeding that fails
-        // Since payload_size is u16, we can't set it > 65535 directly
-        // Instead test the validation logic by checking that u16::MAX is accepted
-        header.payload_size = 65535;
+        let header = PacketHeader { payload_size: 65535, ..Default::default() };
         assert!(header.validate().is_ok());
 
-        // To test "exceeds", we'd need a payload_size > 65535 which can't be stored
-        // So we test the boundary condition
-        header.payload_size = 65000;
+        let header = PacketHeader { payload_size: 65000, ..Default::default() };
         assert!(header.validate().is_ok());
     }
 
     #[test]
     fn test_header_validation_rejects_no_domain() {
-        let mut header = PacketHeader::default();
-        header.domain_mask = 0;
+        let header = PacketHeader { domain_mask: 0, ..Default::default() };
         assert!(header.validate().is_err());
     }
 

@@ -362,7 +362,7 @@ mod tests {
         let mut tx = PrivacyMixer::deposit_to_pool(&mut pool, 1000, [1u8; 32], 100).unwrap();
 
         let score = PrivacyMixer::calculate_privacy_score(&tx, &pool, 100);
-        assert!(score >= 0 && score <= 100);
+        assert!((0..=100).contains(&score));
 
         PrivacyMixer::mark_mixed(&mut tx, 150).unwrap();
         let score_after_mix = PrivacyMixer::calculate_privacy_score(&tx, &pool, 150);

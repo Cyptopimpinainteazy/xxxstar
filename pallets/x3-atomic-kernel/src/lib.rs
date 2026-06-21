@@ -1,4 +1,8 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # X3 Atomic Kernel Pallet
 //!
 //! ## Overview
@@ -89,6 +93,7 @@ pub mod pallet {
         dispatch::DispatchResult,
         pallet_prelude::*,
         traits::{Currency, EnsureOrigin, ReservableCurrency},
+        PalletId,
     };
     use frame_system::offchain::SubmitTransaction;
     use frame_system::pallet_prelude::*;
@@ -96,11 +101,12 @@ pub mod pallet {
     use sp_core::H256;
     use sp_io::hashing::{blake2_256, sha2_256};
     use sp_runtime::offchain::StorageKind;
-    use sp_runtime::traits::{SaturatedConversion, Saturating};
+    use sp_runtime::traits::{AccountIdConversion, SaturatedConversion, Saturating};
     use sp_runtime::transaction_validity::{
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         ValidTransaction,
     };
+    use sp_runtime::Perbill;
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
@@ -321,14 +327,20 @@ pub mod pallet {
         /// `None` while the bundle is in `Pending` status.
         /// Unsigned finalization is only accepted when this is `Some`.
         pub executor: Option<T::AccountId>,
+        /// Bond amount reserved at submission. Used for slashing on rollback.
+        pub bond: BalanceOf<T>,
     }
 
     // ── Pallet ────────────────────────────────────────────────────────────────
 
-    /// Storage layout version. Increment whenever storage types or keys change
+    /// Storage layout version. Increment whenever storage types or key changes
     /// and provide an `on_runtime_upgrade` migration. Missing this declaration
     /// causes silent data corruption on upgrade — P0 per DEEP_AUDIT_PROTOCOL §4.
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
+
+    /// Pallet ID for deriving a deterministic treasury account that receives
+    /// slashed bond funds during bundle rollback.
+    const PALLET_ID: PalletId = PalletId(*b"x3/atkr0");
 
     #[pallet::pallet]
     #[pallet::storage_version(STORAGE_VERSION)]
@@ -378,11 +390,26 @@ pub mod pallet {
             leg_index: u32,
             vm_type: VmType,
         },
+        /// A bond was slashed during bundle rollback.
+        BondSlashed {
+            submitter: T::AccountId,
+            amount: BalanceOf<T>,
+            reason: BundleRollbackReason,
+        },
     }
 
     /// Reason a bundle was rolled back.
     #[derive(
-        Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo,
+        Debug,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        MaxEncodedLen,
+        TypeInfo,
     )]
     pub enum BundleRollbackReason {
         /// One or more legs failed execution.
@@ -447,8 +474,10 @@ pub mod pallet {
         /// convention:  `b"x3fin:" + bundle_id_bytes (32)`.
         /// The value is 40 bytes: `receipt_root (32) || committed_at_ns (8, LE)`.
         ///
-        /// The Flash Finality voter in `service.rs` writes the cert hash under
+        /// The finality voter in `service.rs` writes the cert hash under
         /// key `b"x3ff:" + block_number_le (8 bytes)` = 13-byte key, 32-byte value.
+        /// When Flash-Finality is active, the cert is the Flash cert hash; otherwise
+        /// it is derived from the GRANDPA-finalized block hash via blake2_256.
         /// The OCW reads this cert and attaches it to the PoAE proof so external
         /// verifiers can validate finality without trusting a zero placeholder.
         fn offchain_worker(now: BlockNumberFor<T>) {
@@ -467,7 +496,7 @@ pub mod pallet {
                 cert_key.extend_from_slice(&block_num_u64.to_le_bytes());
                 match sp_io::offchain::local_storage_get(StorageKind::PERSISTENT, &cert_key) {
                     Some(v) if v.len() == 32 => H256::from_slice(&v),
-                    _ => H256::zero(), // Flash Finality not yet running — do_finalize_bundle rejects zero, so this path is a no-op until Flash Finality is active
+                    _ => H256::zero(), // No cert found — do_finalize_bundle rejects zero, so this path is a no-op until a voter writes certs
                 }
             };
 
@@ -740,7 +769,6 @@ pub mod pallet {
             // Slashing (Currency::slash) consumes reserved funds first.
             let bond: BalanceOf<T> = T::MinBond::get().saturated_into();
             T::Currency::reserve(&submitter, bond).map_err(|_| Error::<T>::InsufficientBond)?;
-
             let record = BundleRecord::<T> {
                 submitter: submitter.clone(),
                 legs_hash,
@@ -749,6 +777,7 @@ pub mod pallet {
                 deadline_block: deadline,
                 submitted_at: now,
                 executor: None,
+                bond,
             };
 
             Bundles::<T>::insert(bundle_id, record);
@@ -762,7 +791,7 @@ pub mod pallet {
                 .map(|(i, leg)| crate::vm_revert::LegReceipt::new(i as u32, leg.vm_type.clone()))
                 .collect::<Vec<_>>()
                 .try_into()
-                .expect("leg count already validated against MaxLegsPerBundle");
+                .map_err(|_| Error::<T>::TooManyLegs)?;
             BundleLegReceipts::<T>::insert(bundle_id, leg_receipts);
 
             // Add to deadline index for O(1) expiry lookup
@@ -822,10 +851,10 @@ pub mod pallet {
         /// Substrate account.  The `receipt_root` itself acts as proof-of-execution
         /// (it is SHA-256 of the GPU-committed shm entry).
         ///
-        /// `finality_cert` is the Flash Finality certificate hash written by
-        /// `run_flash_finality_voter` in `service.rs` to off-chain local storage
-        /// under key `"x3ff:" + block_number_le`.  Set to `H256::zero()` when
-        /// Flash Finality is not running (pallet accepts zero for this path).
+        /// `finality_cert` is the finality certificate hash written by
+        /// the finality voter in `service.rs` to off-chain local storage
+        /// under key `"x3ff:" + block_number_le`.  Derived from the
+        /// GRANDPA block hash when Flash-Finality is not active.
         ///
         /// `committed_at_ns` is the GPU commit timestamp for auditing only — it is
         /// not stored on-chain but is included for `ValidateUnsigned` deduplication.
@@ -915,6 +944,9 @@ pub mod pallet {
         /// Roll back a bundle, emitting a reason for the rollback.
         ///
         /// Called by the submitter to cancel, or by governance/runtime on deadline.
+        /// Roll back a bundle, emitting a reason for the rollback.
+        ///
+        /// Called by the submitter to cancel, or by governance/runtime on deadline.
         /// In a production system, slash a portion of the bond if called due to
         /// `ExecutionFailed` or `AccessSetViolation`.
         ///
@@ -930,113 +962,9 @@ pub mod pallet {
             bundle_id: H256,
             reason: BundleRollbackReason,
         ) -> DispatchResult {
-            frame_support::storage::with_storage_layer(|| {
-                let caller = ensure_signed(origin)?;
-
-                let mut record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
-
-                // Only Pending or Executing bundles can be rolled back
-                ensure!(
-                    record.status == BundleStatus::Pending
-                        || record.status == BundleStatus::Executing,
-                    Error::<T>::InvalidBundleState
-                );
-
-                // C-005: Per-reason authorization guards.
-                // - SubmitterCancelled: only the bundle submitter may cancel voluntarily.
-                // - ExecutionFailed / AccessSetViolation: only the assigned executor may
-                //   report these; any signed account triggering them was the C-005 bug.
-                // - DeadlineExceeded: only a party to the bundle may trigger this, AND the
-                //   deadline must actually have elapsed (auto-expiry via on_initialize is
-                //   the preferred path; this guard prevents arbitrary third-party slashing).
-                match reason {
-                    BundleRollbackReason::SubmitterCancelled => {
-                        ensure!(record.submitter == caller, Error::<T>::NotBundleSubmitter);
-                    }
-                    BundleRollbackReason::ExecutionFailed
-                    | BundleRollbackReason::AccessSetViolation => {
-                        ensure!(
-                            record.executor == Some(caller.clone()),
-                            Error::<T>::NotBundleSubmitter
-                        );
-                    }
-                    BundleRollbackReason::DeadlineExceeded => {
-                        let now = <frame_system::Pallet<T>>::block_number();
-                        ensure!(now > record.deadline_block, Error::<T>::InvalidBundleState);
-                        ensure!(
-                            caller == record.submitter || record.executor == Some(caller.clone()),
-                            Error::<T>::NotBundleSubmitter
-                        );
-                    }
-                }
-
-                // Attempt to revert VM side effects for each executed leg.
-                let revert_failures = Self::do_revert_bundle_legs(bundle_id);
-
-                // S0-005: Status update now participates in storage transaction.
-                // If slashing or event emission fails, this status change reverts.
-                record.status = BundleStatus::RolledBack;
-                Bundles::<T>::insert(bundle_id, &record);
-
-                // Slash bond proportional to reason severity
-                let slash_amount: u128 = match reason {
-                    BundleRollbackReason::ExecutionFailed
-                    | BundleRollbackReason::AccessSetViolation => {
-                        // Slash 10% of bond for execution failures or access violations
-                        let bond = T::MinBond::get();
-                        bond.saturating_div(10)
-                    }
-                    BundleRollbackReason::DeadlineExceeded => {
-                        // Slash 5% of bond for deadline exceeded
-                        let bond = T::MinBond::get();
-                        bond.saturating_div(20)
-                    }
-                    BundleRollbackReason::SubmitterCancelled => {
-                        // Unreserve full bond for voluntary cancellation (no slash)
-                        let bond: BalanceOf<T> = T::MinBond::get().saturated_into();
-                        T::Currency::unreserve(&record.submitter, bond);
-                        0
-                    }
-                };
-
-                if slash_amount > 0 {
-                    let slash: BalanceOf<T> = slash_amount.saturated_into();
-                    // S0-005: slash() now participates in storage transaction.
-                    // If this fails, entire rollback (including status update) reverts.
-                    // slash() targets reserved balance first, then free balance
-                    let _ = T::Currency::slash(&record.submitter, slash);
-                    log::info!(
-                        target: "x3-atomic-kernel",
-                        "Bundle {:?} slashed by {} for reason {:?}",
-                        bundle_id, slash_amount, reason
-                    );
-                }
-
-                // Clean up leg receipts storage after rollback
-                BundleLegReceipts::<T>::remove(bundle_id);
-
-                Self::deposit_event(Event::BundleRolledBack { bundle_id, reason });
-
-                if revert_failures > 0 {
-                    log::error!(
-                        target: "x3-atomic-kernel",
-                        "Bundle {:?}: {}/legs failed VM revert — side effects may persist",
-                        bundle_id, revert_failures
-                    );
-                }
-
-                log::warn!(
-                    target: "x3-atomic-kernel",
-                    "Bundle {:?} rolled back",
-                    bundle_id
-                );
-
-                Ok(())
-            })
+            let caller = ensure_signed(origin)?;
+            Self::do_rollback_atomic_bundle(bundle_id, reason, &caller)
         }
-
-        /// Phase 1b: Settlement ↔ Kernel Dispatch Linking
-        ///
         /// Finalize an atomic bundle with a settlement proof from the settlement engine.
         /// This extrinsic is called by the settlement engine after all cross-VM legs
         /// have been executed and the settlement intent is ready for finalization.
@@ -1045,7 +973,7 @@ pub mod pallet {
         /// - `bundle_id`: The atomic bundle identifier
         /// - `settlement_intent_id`: The settlement intent that triggered this bundle
         /// - `receipt_root`: Merkle root of execution receipts from GPU executors
-        /// - `finality_cert`: Flash-Finality certificate (if available), or H256::zero()
+        /// - `finality_cert`: Flash-Finality or GRANDPA-derived certificate hash
         ///
         /// # Security
         /// Only the settlement engine (via dispatcher) or authorized settler account can call this.
@@ -1303,6 +1231,131 @@ pub mod pallet {
             revert_failures
         }
 
+        /// Roll back an atomic bundle: verify authorization, revert VM side effects,
+        /// slash bond proportionally, transfer slashed funds to treasury, emit events.
+        ///
+        /// This is the internal implementation used by `rollback_atomic_bundle`.
+        /// Authorization guards (per `reason`) are enforced using `caller`:
+        /// - `SubmitterCancelled`: only the bundle submitter.
+        /// - `ExecutionFailed` / `AccessSetViolation`: only the assigned executor.
+        /// - `DeadlineExceeded`: the caller must be a party to the bundle AND the
+        ///   deadline must have elapsed.
+        ///
+        /// ## Slashing schedule
+        /// - `SubmitterCancelled`: 50% of bond slashed, remainder unreserved.
+        /// - `ExecutionFailed` / `AccessSetViolation`: 10% of bond slashed.
+        /// - `DeadlineExceeded`: 100% of bond slashed.
+        fn do_rollback_atomic_bundle(
+            bundle_id: H256,
+            reason: BundleRollbackReason,
+            caller: &T::AccountId,
+        ) -> DispatchResult {
+            frame_support::storage::with_storage_layer(|| {
+                let mut record = Bundles::<T>::get(bundle_id).ok_or(Error::<T>::BundleNotFound)?;
+
+                // Only Pending or Executing bundles can be rolled back
+                ensure!(
+                    record.status == BundleStatus::Pending
+                        || record.status == BundleStatus::Executing,
+                    Error::<T>::InvalidBundleState
+                );
+
+                // C-005: Per-reason authorization guards.
+                match reason {
+                    BundleRollbackReason::SubmitterCancelled => {
+                        ensure!(record.submitter == *caller, Error::<T>::NotBundleSubmitter);
+                    }
+                    BundleRollbackReason::ExecutionFailed
+                    | BundleRollbackReason::AccessSetViolation => {
+                        ensure!(
+                            record.executor == Some(caller.clone()),
+                            Error::<T>::NotBundleSubmitter
+                        );
+                    }
+                    BundleRollbackReason::DeadlineExceeded => {
+                        let now = <frame_system::Pallet<T>>::block_number();
+                        ensure!(now > record.deadline_block, Error::<T>::InvalidBundleState);
+                        ensure!(
+                            *caller == record.submitter || record.executor == Some(caller.clone()),
+                            Error::<T>::NotBundleSubmitter
+                        );
+                    }
+                }
+
+                // Attempt to revert VM side effects for each executed leg.
+                let revert_failures = Self::do_revert_bundle_legs(bundle_id);
+
+                // ── Bond slashing ────────────────────────────────────────────
+                // Use the bond stored on the record (set at submission time).
+                let bond: BalanceOf<T> = record.bond;
+
+                // Determine slash amount (as BalanceOf<T>) and unreserve amount.
+                let (slash_amount, unreserve_amount): (BalanceOf<T>, BalanceOf<T>) = match reason {
+                    BundleRollbackReason::SubmitterCancelled => {
+                        // 50% slash for submitter-cancelled
+                        let slashed = Perbill::from_percent(50) * bond;
+                        let unreserved = bond.saturating_sub(slashed);
+                        (slashed, unreserved)
+                    }
+                    BundleRollbackReason::DeadlineExceeded => {
+                        // 100% slash for deadline-exceeded
+                        (bond, Zero::zero())
+                    }
+                    BundleRollbackReason::ExecutionFailed
+                    | BundleRollbackReason::AccessSetViolation => {
+                        // 10% slash for execution failures / access violations
+                        let slashed = Perbill::from_percent(10) * bond;
+                        (slashed, bond.saturating_sub(slashed))
+                    }
+                };
+
+                // Slash (removes from submitter, returns imbalance)
+                if slash_amount > Zero::zero() {
+                    let (imbalance, _actual) = T::Currency::slash(&record.submitter, slash_amount);
+                    // Transfer slashed funds to treasury by converting the
+                    // negative imbalance into a positive deposit.
+                    let treasury = Self::treasury_account();
+                    T::Currency::resolve_creating(&treasury, imbalance);
+
+                    Self::deposit_event(Event::BondSlashed {
+                        submitter: record.submitter.clone(),
+                        amount: slash_amount,
+                        reason,
+                    });
+                }
+
+                // Unreserve any remaining bond not slashed.
+                if unreserve_amount > Zero::zero() {
+                    T::Currency::unreserve(&record.submitter, unreserve_amount);
+                }
+
+                // ── Status update ───────────────────────────────────────────
+                record.status = BundleStatus::RolledBack;
+                Bundles::<T>::insert(bundle_id, &record);
+
+                // Clean up leg receipts storage after rollback
+                BundleLegReceipts::<T>::remove(bundle_id);
+
+                Self::deposit_event(Event::BundleRolledBack { bundle_id, reason });
+
+                if revert_failures > 0 {
+                    log::error!(
+                        target: "x3-atomic-kernel",
+                        "Bundle {:?}: {}/legs failed VM revert — side effects may persist",
+                        bundle_id, revert_failures
+                    );
+                }
+
+                log::warn!(
+                    target: "x3-atomic-kernel",
+                    "Bundle {:?} rolled back (slashed {:?})",
+                    bundle_id, slash_amount
+                );
+
+                Ok(())
+            })
+        }
+
         /// Verify bundle record consistency before finalization (S0-005).
         ///
         /// This function validates that a bundle's metadata is internally consistent
@@ -1466,6 +1519,10 @@ pub mod pallet {
         /// Check if a bundle exists and return its status.
         pub fn bundle_status(bundle_id: H256) -> Option<BundleStatus> {
             Bundles::<T>::get(bundle_id).map(|r| r.status)
+        }
+        /// Derive the pallet-level treasury account that receives slashed bond funds.
+        fn treasury_account() -> T::AccountId {
+            PALLET_ID.into_account_truncating()
         }
     }
 }

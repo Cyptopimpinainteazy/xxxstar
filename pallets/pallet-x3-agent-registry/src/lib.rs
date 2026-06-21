@@ -1,4 +1,9 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::type_complexity)]
 //! # X3 Unified Agent Registry Pallet
 //!
 //! **SECURITY-CRITICAL**: This pallet is the single source of truth for all agent
@@ -77,8 +82,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Currency for deposits, bonds, and fees.
         type Currency: ReservableCurrency<Self::AccountId>;
 
@@ -725,12 +728,12 @@ pub mod pallet {
                 ensure!(agent.controller == who, Error::<T>::NotController);
                 ensure!(agent.atlas_id.is_none(), Error::<T>::AtlasIdAlreadyBound);
                 ensure!(
-                    !AtlasToAgent::<T>::contains_key(&atlas_id),
+                    !AtlasToAgent::<T>::contains_key(atlas_id),
                     Error::<T>::AtlasIdAlreadyBound
                 );
 
                 agent.atlas_id = Some(atlas_id);
-                AtlasToAgent::<T>::insert(&atlas_id, agent_id);
+                AtlasToAgent::<T>::insert(atlas_id, agent_id);
 
                 Self::deposit_event(Event::AtlasIdBound { agent_id, atlas_id });
 
@@ -988,7 +991,7 @@ pub mod pallet {
 
             let bond_counter = BondIdCounter::<T>::get();
             let bond_hash = T::Hashing::hash_of(&(agent.clone(), bond_counter));
-            let bond_id: H256 = bond_hash.using_encoded(|b| H256::from_slice(b));
+            let bond_id: H256 = bond_hash.using_encoded(H256::from_slice);
             BondIdCounter::<T>::put(bond_counter.saturating_add(1));
 
             let now: u32 = frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
@@ -1092,7 +1095,7 @@ pub mod pallet {
             };
 
             let slash_amount: BalanceOf<T> =
-                (bond_state.amount / 10000u32.into()) * (slash_bps as u32).into();
+                (bond_state.amount / 10000u32.into()) * slash_bps.into();
 
             // Unreserve and transfer slashed amount to treasury
             T::Currency::unreserve(&bond_state.agent, bond_state.amount);
@@ -1467,7 +1470,7 @@ pub mod pallet {
             let bonds: Vec<AgentBond<T::AccountId, BalanceOf<T>>> =
                 BondsByAgent::<T>::get(&record.controller)
                     .iter()
-                    .filter_map(|bond_id| Bonds::<T>::get(bond_id))
+                    .filter_map(Bonds::<T>::get)
                     .collect();
 
             let policies = ActivePolicies::<T>::get(&record.controller);

@@ -1,10 +1,10 @@
 use crate::error::FoundryError;
 use crate::templates::{Template, TemplateRegistry};
-use crate::types::{DAppType, FeeMode, PricingTier, ProjectState, RevenueConfig};
+use crate::types::{DAppType, FeeMode, PricingTier, RevenueConfig};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArchitecturePlan {
@@ -205,7 +205,7 @@ impl ProductArchitectAgent {
             Ok(t)
         } else {
             let all = registry.list_templates();
-            all.first().map(|t| *t).ok_or_else(|| {
+            all.first().copied().ok_or_else(|| {
                 FoundryError::TemplateNotFound(format!("No template found for {:?}", dapp_type))
             })
         }
@@ -329,15 +329,14 @@ impl ProductArchitectAgent {
     fn generate_name(&self, prompt: &str, dapp_type: &DAppType) -> String {
         let words: Vec<&str> = prompt.split_whitespace().collect();
         for (i, w) in words.iter().enumerate() {
-            if w.eq_ignore_ascii_case("called")
+            if (w.eq_ignore_ascii_case("called")
                 || w.eq_ignore_ascii_case("named")
-                || w.eq_ignore_ascii_case("name")
+                || w.eq_ignore_ascii_case("name"))
+                && i + 1 < words.len()
             {
-                if i + 1 < words.len() {
-                    let n = words[i + 1].trim_matches(|c: char| c.is_ascii_punctuation());
-                    if !n.is_empty() && n.len() >= 2 {
-                        return n.to_string();
-                    }
+                let n = words[i + 1].trim_matches(|c: char| c.is_ascii_punctuation());
+                if !n.is_empty() && n.len() >= 2 {
+                    return n.to_string();
                 }
             }
         }
@@ -875,6 +874,7 @@ impl Generator {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn generate_all(
         &self,
         prompt: &str,

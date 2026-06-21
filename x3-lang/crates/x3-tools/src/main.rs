@@ -13,13 +13,11 @@ fn main() {
             params: vec![],
             ret: None,
             generics: vec![],
-            body: Block::new(vec![Statement::Expr(Expression::Literal(
-                LiteralExpr::Int {
-                    value: 42,
-                    base: x3_lang_common::IntBase::Decimal,
-                    suffix: None,
-                },
-            ))]),
+            body: Block::new(vec![Statement::Expr(Expression::Literal(LiteralExpr::Int {
+                value: 42,
+                base: x3_lang_common::IntBase::Decimal,
+                suffix: None,
+            }))]),
             visibility: Visibility::Pub,
             is_async: false,
             annotations: vec![],

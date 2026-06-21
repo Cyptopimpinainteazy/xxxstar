@@ -5,7 +5,7 @@
 //! - DEPIN-MARKET-003: Escrow lifecycle
 //! - DEPIN-MARKET-005: Provider slashing on failure
 
-use crate::{mock::*, types::*, Error, Event};
+use crate::{mock::*, types::*, Error};
 use frame_support::BoundedVec;
 use frame_support::{assert_noop, assert_ok};
 
@@ -175,7 +175,7 @@ fn escrow_lifecycle() {
         // Provider earned revenue
         let provider = DepinMarketplace::providers(1).unwrap();
         assert_eq!(provider.total_jobs_completed, 1);
-        assert!(provider.total_revenue > 0u128.into());
+        assert!(provider.total_revenue > 0u128);
     });
 }
 

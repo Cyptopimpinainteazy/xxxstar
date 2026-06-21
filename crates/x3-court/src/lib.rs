@@ -1,3 +1,5 @@
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::or_fun_call)]
 //! # X3 Deterministic Courts
 //!
 //! Dispute resolution through deterministic replay. No humans. No voting.
@@ -34,6 +36,6 @@ pub use replay::ReplayEngine;
 pub use types::*;
 pub use verdict::Verdict;
 pub use vm::{
-    adjudicate, Action, Address, Block, BlockHeader, ChainState, CourtVmError, Hash, PriceVector,
-    Receipt,
+    adjudicate, apply_verdict, Action, Address, Block, BlockHeader, ChainState, CourtVmConfig,
+    CourtVmError, Hash, PriceVector, Receipt,
 };

@@ -33,10 +33,8 @@
 
 extern crate alloc;
 
-use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
-use core::marker::{Send, Sync};
 use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
@@ -630,6 +628,77 @@ fn decode_u64(b: &[u8]) -> u64 {
     let len = b.len().min(8);
     buf[..len].copy_from_slice(&b[..len]);
     u64::from_be_bytes(buf)
+}
+
+// ── Proof construction helpers ──────────────────────────────────────────────
+
+/// Encode a wire-format body section: 4-byte big-endian length prefix + data.
+/// This is the encoding used by the `take_section` decoder.
+#[inline]
+pub fn enc_section(buf: &mut alloc::vec::Vec<u8>, data: &[u8]) {
+    buf.extend_from_slice(&(data.len() as u32).to_be_bytes());
+    buf.extend_from_slice(data);
+}
+
+/// Build the receipt-trie key for a given receipt index.
+/// The receipts trie key is `rlp(receipt_index)` as a single-element list.
+pub fn receipt_trie_key(receipt_index: u64) -> alloc::vec::Vec<u8> {
+    let mut stream = rlp::RlpStream::new_list(1);
+    stream.append(&receipt_index);
+    stream.out().to_vec()
+}
+
+/// Encode a complete proof payload in the wire format expected by
+/// `ProductionEvmReceiptVerifier::verify` / `DecodedProof::decode`.
+///
+/// Wire format:
+///   [8 bytes: current_block_number (little-endian)]
+///   [8 bytes: min_confirmations (little-endian)]
+///   [body: 4 length-prefixed sections (header_rlp, receipt_rlp, receipt_index, proof)]
+///
+/// # Arguments
+///
+/// * `current_block_number` — the current chain head at proof construction time.
+/// * `min_confirmations` — the minimum confirmations the verifier will enforce.
+/// * `header_rlp` — RLP-encoded EIP-1186 block header (15-element list).
+/// * `receipt_rlp` — RLP-encoded transaction receipt.
+/// * `receipt_index` — raw bytes of the receipt index (big-endian, variable length).
+/// * `proof` — Merkle Patricia trie proof (RLP list of node byte strings).
+pub fn encode_proof_payload(
+    current_block_number: u64,
+    min_confirmations: u64,
+    header_rlp: &[u8],
+    receipt_rlp: &[u8],
+    receipt_index: &[u8],
+    proof: &[u8],
+) -> alloc::vec::Vec<u8> {
+    let mut body = alloc::vec::Vec::with_capacity(
+        16 + 4
+            + header_rlp.len()
+            + 4
+            + receipt_rlp.len()
+            + 4
+            + receipt_index.len()
+            + 4
+            + proof.len(),
+    );
+    body.extend_from_slice(&current_block_number.to_le_bytes());
+    body.extend_from_slice(&min_confirmations.to_le_bytes());
+    enc_section(&mut body, header_rlp);
+    enc_section(&mut body, receipt_rlp);
+    enc_section(&mut body, receipt_index);
+    enc_section(&mut body, proof);
+    body
+}
+
+/// Compute the keccak256 hash of a 32-byte value using the X3 EVM precompile
+/// compatible hash function.
+pub fn keccak256_32(input: &[u8]) -> [u8; 32] {
+    let mut k = Keccak::v256();
+    let mut out = [0u8; 32];
+    k.update(input);
+    k.finalize(&mut out);
+    out
 }
 
 // ── The verifier ───────────────────────────────────────────────────────────

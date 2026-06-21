@@ -75,6 +75,16 @@ pub struct InMemoryCollateral<AccountId, Balance> {
 impl<
         AccountId: Clone + PartialEq,
         Balance: Copy + PartialOrd + core::ops::Sub<Output = Balance> + Default,
+    > Default for InMemoryCollateral<AccountId, Balance>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<
+        AccountId: Clone + PartialEq,
+        Balance: Copy + PartialOrd + core::ops::Sub<Output = Balance> + Default,
     > InMemoryCollateral<AccountId, Balance>
 {
     pub fn new() -> Self {

@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 use crate as pallet_x3_supply_ledger;
 use frame_support::{
     assert_ok, construct_runtime, derive_impl, parameter_types,

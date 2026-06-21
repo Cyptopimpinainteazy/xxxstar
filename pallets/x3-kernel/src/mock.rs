@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use crate as pallet_x3_kernel;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use frame_support::{
@@ -54,6 +52,26 @@ impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {
         EMERGENCY_HALT_TRIGGERED.store(true, Ordering::SeqCst);
         EMERGENCY_HALT_TRIGGER_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+pub struct TestProofVerifier;
+impl pallet_x3_kernel::CrossChainProofVerifier<AccountId> for TestProofVerifier {
+    fn verify_proof(
+        _origin: &AccountId,
+        _operation: &x3_cross_vm_bridge::CrossVmOperation,
+        proof: &pallet_x3_kernel::CrossChainProof,
+    ) -> Result<(), DispatchError> {
+        match proof {
+            pallet_x3_kernel::CrossChainProof::None => Ok(()),
+            pallet_x3_kernel::CrossChainProof::LockProof(bytes)
+            | pallet_x3_kernel::CrossChainProof::MerkleReceipt(bytes)
+                if !bytes.is_empty() =>
+            {
+                Ok(())
+            }
+            _ => Err(DispatchError::Other("invalid test proof")),
+        }
     }
 }
 
@@ -307,7 +325,7 @@ impl pallet_x3_kernel::Config for Test {
     type MaxPreparedOpsPerBlock = ConstU32<8>;
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type RequireCrossVmProof = ConstBool<false>;
-    type CrossChainProofVerifier = crate::NoopProofVerifier;
+    type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
     type EmergencyHaltController = TestEmergencyHaltController;
@@ -364,6 +382,8 @@ impl ExtBuilder {
 
         pallet_x3_kernel::GenesisConfig::<Test> {
             assets: Vec::new(),
+            authorities: self.authorized_accounts.clone(),
+            authorized_accounts: self.authorized_accounts.clone(),
             evm_escrow: self.evm_escrow,
             svm_escrow: self.svm_escrow,
         }

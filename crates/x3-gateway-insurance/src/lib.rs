@@ -1,3 +1,5 @@
+pub mod bridge_integration;
+
 use std::collections::HashMap;
 
 pub type AssetId = [u8; 32];

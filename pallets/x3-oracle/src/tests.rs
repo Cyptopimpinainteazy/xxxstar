@@ -85,7 +85,7 @@ fn submit_price_rate_limit_works() {
         for i in 0..MaxSubmissionsPerBlock::get() {
             assert_ok!(Oracle::submit_price(
                 RuntimeOrigin::signed(1),
-                i as u32,
+                i,
                 1000 + i as u64
             ));
         }

@@ -1,3 +1,5 @@
+#![allow(clippy::ptr_arg)]
+#![allow(unused_variables, dead_code)]
 mod dashboard;
 mod feature_proof;
 mod gap_proof;
@@ -681,7 +683,7 @@ async fn prove_everything(
 
         if receipts {
             println!("Generating master receipt...");
-            runners::generate_receipt(workspace, "mainnet", &vec![], verbose).await?;
+            runners::generate_receipt(workspace, "mainnet", &[], verbose).await?;
         }
 
         Ok(())

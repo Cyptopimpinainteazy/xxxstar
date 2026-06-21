@@ -26,6 +26,7 @@ pub struct AtomicSwapOrchestrator {
     registry: Arc<AtomicRegistry>,
     evm_validator: Arc<EvmHeaderValidator>,
     svm_validator: Arc<SvmHeaderValidator>,
+    #[allow(dead_code)]
     failover: Arc<FailoverManager>,
     default_timeout: Duration,
 }
@@ -317,7 +318,6 @@ impl AtomicSwapOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::Result;
     use std::sync::Arc;
 
     #[test]
@@ -332,7 +332,7 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let result = rt.block_on(orchestrator.validate_evm_side("test", 1, vec![]));
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.unwrap());
     }
 
     #[test]
@@ -347,7 +347,26 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let result = rt.block_on(orchestrator.validate_svm_side("test", 1, vec![]));
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.unwrap());
+    }
+
+    #[test]
+    fn pending_tasks_snapshot_returns_empty_when_no_registry() {
+        // Service-level test: orchestrator with in-memory registry
+        // should return an empty task list (no Redis available)
+        let orchestrator = AtomicSwapOrchestrator {
+            registry: Arc::new(crate::registry::AtomicRegistry::new_in_memory()),
+            evm_validator: Arc::new(crate::evm_validator::EvmHeaderValidator::new()),
+            svm_validator: Arc::new(crate::svm_validator::SvmHeaderValidator::new()),
+            failover: Arc::new(crate::failover::FailoverManager::new(32)),
+            default_timeout: std::time::Duration::from_secs(60),
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(orchestrator.pending_tasks_snapshot());
+        // With in-memory registry that doesn't connect to real Redis,
+        // should return empty vec (unwrapping default)
+        assert!(result.is_empty(), "No Redis = no pending tasks");
     }
 
     #[test]

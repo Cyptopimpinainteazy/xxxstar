@@ -1,0 +1,22 @@
+[package]
+name = "x3-external-gateway"
+version = "0.1.0"
+description = "X3 external gateway — lock/release for external SVM chains"
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "x3_external_gateway"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.30.1"
+anchor-spl = "0.30.1"

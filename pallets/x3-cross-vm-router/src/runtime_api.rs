@@ -9,7 +9,6 @@
 // This file also contains the sp_api `decl_runtime_apis!` macro for
 // runtime-to-host-bridge APIs used by offchain workers and sidecars.
 
-use super::*;
 use sp_api::decl_runtime_apis;
 
 decl_runtime_apis! {

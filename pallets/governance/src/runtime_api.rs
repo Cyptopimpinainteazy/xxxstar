@@ -2,7 +2,7 @@
 //!
 //! Provides offchain access to governance state snapshots.
 
-use frame_support::pallet_prelude::{DecodeWithMemTracking, *};
+use frame_support::pallet_prelude::*;
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_std::prelude::*;

@@ -20,5 +20,7 @@ jobs:
         run: make test-all-pallets
       - name: Audit (invariants + readiness + consistency)
         run: make audit
+      - name: Node Build Verification (mainnet-rc1)
+        run: make test-node-build
       - name: Mainnet Check
         run: make mainnet-check

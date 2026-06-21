@@ -1,6 +1,5 @@
 /// Anchor Framework IDL Parser — Parses Anchor IDL JSON and generates X3-compatible Rust code
 /// Enables zero-modification Solana program deployment on X3 SVM
-
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
@@ -85,10 +84,7 @@ pub struct AnchorIDLParser;
 
 impl AnchorIDLParser {
     /// Parse Anchor IDL from JSON (simplified for integration)
-    pub fn parse_idl(
-        idl_name: Vec<u8>,
-        version: Vec<u8>,
-    ) -> Result<AnchorIDL, &'static str> {
+    pub fn parse_idl(idl_name: Vec<u8>, version: Vec<u8>) -> Result<AnchorIDL, &'static str> {
         if idl_name.is_empty() {
             return Err("IDL name cannot be empty");
         }
@@ -154,11 +150,7 @@ impl AnchorIDLParser {
             return Err("Type name cannot be empty");
         }
 
-        let type_def = TypeDef {
-            name,
-            kind,
-            fields,
-        };
+        let type_def = TypeDef { name, kind, fields };
 
         idl.types.push(type_def);
         Ok(())
@@ -319,11 +311,13 @@ impl AnchorIDLParser {
     }
 
     fn generate_error_definition(error: &ErrorDef) -> Result<Vec<u8>, &'static str> {
-        let mut code = format!("pub const {}: u32 = {}; // {}", 
+        let code = format!(
+            "pub const {}: u32 = {}; // {}",
             String::from_utf8_lossy(&error.name),
             error.code,
             String::from_utf8_lossy(&error.msg)
-        ).into_bytes();
+        )
+        .into_bytes();
         Ok(code)
     }
 }
@@ -348,13 +342,8 @@ mod tests {
     fn test_add_instruction() {
         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
 
-        AnchorIDLParser::add_instruction(
-            &mut idl,
-            b"initialize".to_vec(),
-            [0; 8],
-            vec![],
-            vec![],
-        ).unwrap();
+        AnchorIDLParser::add_instruction(&mut idl, b"initialize".to_vec(), [0; 8], vec![], vec![])
+            .unwrap();
 
         assert_eq!(idl.instructions.len(), 1);
     }
@@ -363,11 +352,7 @@ mod tests {
     fn test_add_account() {
         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
 
-        AnchorIDLParser::add_account(
-            &mut idl,
-            b"state".to_vec(),
-            vec![],
-        ).unwrap();
+        AnchorIDLParser::add_account(&mut idl, b"state".to_vec(), vec![]).unwrap();
 
         assert_eq!(idl.accounts.len(), 1);
     }
@@ -376,12 +361,7 @@ mod tests {
     fn test_add_event() {
         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
 
-        AnchorIDLParser::add_event(
-            &mut idl,
-            b"initialized".to_vec(),
-            [1; 8],
-            vec![],
-        ).unwrap();
+        AnchorIDLParser::add_event(&mut idl, b"initialized".to_vec(), [1; 8], vec![]).unwrap();
 
         assert_eq!(idl.events.len(), 1);
     }
@@ -395,7 +375,8 @@ mod tests {
             1,
             b"InvalidAmount".to_vec(),
             b"Amount cannot be zero".to_vec(),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(idl.errors.len(), 1);
     }
@@ -403,7 +384,8 @@ mod tests {
     #[test]
     fn test_generate_code() {
         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
-        AnchorIDLParser::add_instruction(&mut idl, b"test_instr".to_vec(), [0; 8], vec![], vec![]).unwrap();
+        AnchorIDLParser::add_instruction(&mut idl, b"test_instr".to_vec(), [0; 8], vec![], vec![])
+            .unwrap();
 
         let code = AnchorIDLParser::generate_code(&idl).unwrap();
         assert!(!code.instruction_handlers.is_empty());
@@ -419,7 +401,8 @@ mod tests {
     #[test]
     fn test_validate_idl_complete() {
         let mut idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
-        AnchorIDLParser::add_instruction(&mut idl, b"init".to_vec(), [0; 8], vec![], vec![]).unwrap();
+        AnchorIDLParser::add_instruction(&mut idl, b"init".to_vec(), [0; 8], vec![], vec![])
+            .unwrap();
 
         assert!(AnchorIDLParser::validate_idl(&idl).unwrap());
     }
@@ -429,7 +412,7 @@ mod tests {
         let idl = AnchorIDLParser::parse_idl(b"test".to_vec(), b"0.1.0".to_vec()).unwrap();
         let json = AnchorIDLParser::export_idl_json(&idl).unwrap();
 
-        assert!(json.len() > 0);
+        assert!(!json.is_empty());
         assert!(String::from_utf8_lossy(&json).contains("test"));
     }
 }

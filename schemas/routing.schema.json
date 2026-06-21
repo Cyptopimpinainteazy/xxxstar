@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "X3 Frontend Routing Config",
+  "description": "Schema for routing.config.json - the single source of truth for all X3 frontend apps",
+  "type": "object",
+  "required": ["version", "domains", "apps"],
+  "properties": {
+    "version": { "type": "string", "description": "Schema version" },
+    "domains": {
+      "type": "object",
+      "description": "Deployment domain targets",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["url", "type"],
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "type": { "type": "string", "enum": ["web", "desktop"] },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "apps": {
+      "type": "object",
+      "description": "All frontend applications in the X3 ecosystem",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name", "route", "type", "category", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "route": { "type": "string" },
+          "entry": { "type": "string" },
+          "build": { "type": "string" },
+          "domain": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "type": {
+            "type": "string",
+            "enum": ["static", "react", "nextjs", "tauri", "vue"]
+          },
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "icon": { "type": "string" },
+          "tauri": {
+            "type": "object",
+            "properties": {
+              "config": { "type": "string" },
+              "devPort": { "type": "integer" },
+              "identifier": { "type": "string" }
+            }
+          },
+          "vite": {
+            "type": "object",
+            "properties": {
+              "port": { "type": "integer" }
+            }
+          },
+          "next": {
+            "type": "object",
+            "properties": {
+              "port": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "shared": {
+      "type": "object",
+      "description": "Shared component library configuration",
+      "properties": {
+        "components": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "exports": { "type": "array", "items": { "type": "string" } },
+            "quantumUi": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "hooks": { "type": "array", "items": { "type": "string" } },
+        "providers": { "type": "array", "items": { "type": "string" } },
+        "styles": { "type": "string" },
+        "config": { "type": "string" }
+      }
+    },
+    "services": {
+      "type": "object",
+      "description": "Backend service endpoints",
+      "properties": {
+        "rpc": {
+          "type": "object",
+          "properties": {
+            "testnet": { "type": "string" },
+            "mainnet": { "type": "string" },
+            "wsTestnet": { "type": "string" },
+            "wsMainnet": { "type": "string" }
+          }
+        },
+        "swarmApi": { "type": "string" },
+        "mdSupervisor": { "type": "string" },
+        "ipfs": { "type": "string" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "description": "Build output configuration per domain target",
+      "properties": {
+        "org": { "$ref": "#/definitions/buildTarget" },
+        "net": { "$ref": "#/definitions/buildTarget" }
+      }
+    }
+  },
+  "definitions": {
+    "buildTarget": {
+      "type": "object",
+      "required": ["type", "outDir", "strategy"],
+      "properties": {
+        "type": { "type": "string" },
+        "outDir": { "type": "string" },
+        "strategy": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -137,6 +137,12 @@ contract FoundryGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @notice Emitted when timelock is updated
     event TimelockUpdated(uint256 oldTimelock, uint256 newTimelock, uint256 timestamp);
 
+    /// @notice Emitted when quorum is updated
+    event QuorumBpsUpdated(uint256 oldBps, uint256 newBps, uint256 timestamp);
+
+    /// @notice Emitted when voting power is set
+    event VotingPowerSet(address indexed voter, uint256 oldPower, uint256 newPower, uint256 timestamp);
+
     /// @notice Emitted when contract is paused/unpaused
     event PausedUpdated(bool isPaused, uint256 timestamp);
 
@@ -195,7 +201,9 @@ contract FoundryGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @param newQuorumBps The new quorum in basis points
     function setQuorumBps(uint256 newQuorumBps) external onlyOwner {
         if (newQuorumBps > 5000) revert("QUORUM_TOO_HIGH"); // Max 50%
+        uint256 oldBps = quorumBps;
         quorumBps = newQuorumBps;
+        emit QuorumBpsUpdated(oldBps, newQuorumBps, block.timestamp);
     }
 
     /// @notice Set voting power for an address
@@ -203,8 +211,10 @@ contract FoundryGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @param power The voting power
     function setVotingPower(address voter, uint256 power) external onlyOwner {
         if (voter == address(0)) revert ZeroAddress();
-        totalVotingPower = totalVotingPower - votingPower[voter] + power;
+        uint256 oldPower = votingPower[voter];
+        totalVotingPower = totalVotingPower - oldPower + power;
         votingPower[voter] = power;
+        emit VotingPowerSet(voter, oldPower, power, block.timestamp);
     }
 
     /// @notice Enable/disable fee increase timelock
@@ -417,13 +427,15 @@ contract FoundryGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @param status The proposal status
     /// @return proposalIds Array of proposal IDs
     function getProposalsByStatus(ProposalStatus status) external view returns (uint256[] memory proposalIds) {
-        uint256 count;
+        uint256 count = 0;
         for (uint256 i = 1; i <= _proposalCount; i++) {
+            // slither-disable-next-line incorrect-equality
             if (_proposals[i].status == status) count++;
         }
         proposalIds = new uint256[](count);
-        uint256 idx;
+        uint256 idx = 0;
         for (uint256 i = 1; i <= _proposalCount; i++) {
+            // slither-disable-next-line incorrect-equality
             if (_proposals[i].status == status) {
                 proposalIds[idx] = i;
                 idx++;
@@ -435,12 +447,12 @@ contract FoundryGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @param proposer The proposer address
     /// @return proposalIds Array of proposal IDs
     function getProposalsByProposer(address proposer) external view returns (uint256[] memory proposalIds) {
-        uint256 count;
+        uint256 count = 0;
         for (uint256 i = 1; i <= _proposalCount; i++) {
             if (_proposals[i].proposer == proposer) count++;
         }
         proposalIds = new uint256[](count);
-        uint256 idx;
+        uint256 idx = 0;
         for (uint256 i = 1; i <= _proposalCount; i++) {
             if (_proposals[i].proposer == proposer) {
                 proposalIds[idx] = i;

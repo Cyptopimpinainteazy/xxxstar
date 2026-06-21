@@ -37,11 +37,13 @@
 //! - **Before**: Pure interpreter @ ~5M ops/sec
 //! - **After**: JIT compiled hot loops @ ~15-25M ops/sec (3-5× speedup)
 
+#[cfg(test)]
+use log::info;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 /// JIT compilation configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,7 +232,7 @@ impl JitCompiler {
                 "[JIT] Native compilation requested for function {} but JIT backend is not available",
                 func_id
             );
-            return Err("JIT native compilation not yet available outside test builds".to_string());
+            Err("JIT native compilation not yet available outside test builds".to_string())
         }
 
         // Test-only mock path: simulates compilation so the JIT pipeline

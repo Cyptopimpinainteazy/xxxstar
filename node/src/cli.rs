@@ -184,7 +184,7 @@ pub enum Commands {
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
     /// Execute try-runtime checks against on-chain state.
     #[cfg(feature = "try-runtime")]
-    TryRuntime(try_runtime_cli::TryRuntimeCmd),
+    TryRuntime,
     /// Execute try-runtime checks against on-chain state.
     #[cfg(not(feature = "try-runtime"))]
     TryRuntime,
@@ -518,7 +518,7 @@ impl SubstrateCli for Cli {
             "staging" | "staging-net" => crate::chain_spec::staging_config(),
             "testnet" | "test-net" => crate::chain_spec::testnet_config(),
             "production" | "prod" => crate::chain_spec::production_config(),
-            path => crate::chain_spec::ChainSpec::from_json_file(PathBuf::from(path)),
+            path => crate::chain_spec::load_json_spec(PathBuf::from(path)),
         }?;
         Ok(Box::new(spec))
     }

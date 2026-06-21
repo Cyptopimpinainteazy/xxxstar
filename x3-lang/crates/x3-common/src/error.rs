@@ -34,10 +34,7 @@ pub enum X3Error {
     CodegenError { message: String, span: Option<Span> },
 
     #[error("IO error: {message}")]
-    IoError {
-        message: String,
-        path: Option<String>,
-    },
+    IoError { message: String, path: Option<String> },
 
     #[error("Internal compiler error: {message}")]
     InternalError { message: String },

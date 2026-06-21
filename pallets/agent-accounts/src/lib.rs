@@ -1,4 +1,9 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::multiple_bound_locations)]
 //! # X3Chain Agent Accounts Pallet
 //!
 //! On-chain identities, permissions, and quotas for autonomous AI agents.
@@ -71,8 +76,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Currency for deposits and fees.
         type Currency: ReservableCurrency<Self::AccountId>;
 

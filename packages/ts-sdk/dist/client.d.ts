@@ -150,6 +150,18 @@ export declare class AtlasSphereClient {
     unsubscribe(subscriptionId: string): Promise<boolean>;
     private ensureConnected;
     private submitAndWaitForFinalization;
+    /**
+     * Extract payload from extrinsic hex data
+     */
+    private extractPayloadFromExtrinsic;
+    /**
+     * Extract fee from extrinsic hex data
+     */
+    private extractFeeFromExtrinsic;
+    /**
+     * Extract nonce from extrinsic hex data
+     */
+    private extractNonceFromExtrinsic;
     private parseComitEvent;
     private parseFailureReason;
 }

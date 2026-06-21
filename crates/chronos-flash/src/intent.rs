@@ -206,75 +206,18 @@ impl IntentDetector {
     }
 
     fn decode_exact_input_single(&self, _data: &[u8]) -> Option<(Token, Token, Balance, Balance)> {
-        // UniswapV3 exactInputSingle decoding
-        // struct ExactInputSingleParams {
-        //     address tokenIn;
-        //     address tokenOut;
-        //     uint24 fee;
-        //     address recipient;
-        //     uint256 deadline;
-        //     uint256 amountIn;
-        //     uint256 amountOutMinimum;
-        //     uint160 sqrtPriceLimitX96;
-        // }
-
-        // For now, return placeholder - full ABI decoding needed
-        Some((
-            Token {
-                chain_id: 1,
-                address: [0u8; 32],
-                symbol: "TOKEN_A".to_string(),
-                decimals: 18,
-            },
-            Token {
-                chain_id: 1,
-                address: [0u8; 32],
-                symbol: "TOKEN_B".to_string(),
-                decimals: 18,
-            },
-            1_000_000_000_000_000_000, // 1 token
-            950_000_000_000_000_000,   // 0.95 token min out
-        ))
+        tracing::warn!("ChronosFlash: UniswapV3 exactInputSingle param decoding not yet implemented");
+        None
     }
 
     fn decode_exact_input(&self, _data: &[u8]) -> Option<(Token, Token, Balance, Balance)> {
-        // UniswapV3 exactInput (multi-hop) decoding
-        Some((
-            Token {
-                chain_id: 1,
-                address: [0u8; 32],
-                symbol: "TOKEN_A".to_string(),
-                decimals: 18,
-            },
-            Token {
-                chain_id: 1,
-                address: [0u8; 32],
-                symbol: "TOKEN_B".to_string(),
-                decimals: 18,
-            },
-            1_000_000_000_000_000_000,
-            950_000_000_000_000_000,
-        ))
+        tracing::warn!("ChronosFlash: UniswapV3 exactInput (multi-hop) param decoding not yet implemented");
+        None
     }
 
     fn decode_swap_exact_tokens(&self, _data: &[u8]) -> Option<(Token, Token, Balance, Balance)> {
-        // UniswapV2-style swapExactTokensForTokens
-        Some((
-            Token {
-                chain_id: 1,
-                address: [0u8; 32],
-                symbol: "TOKEN_A".to_string(),
-                decimals: 18,
-            },
-            Token {
-                chain_id: 1,
-                address: [0u8; 32],
-                symbol: "TOKEN_B".to_string(),
-                decimals: 18,
-            },
-            1_000_000_000_000_000_000,
-            950_000_000_000_000_000,
-        ))
+        tracing::warn!("ChronosFlash: UniswapV2 swapExactTokensForTokens param decoding not yet implemented");
+        None
     }
 
     fn default_routers() -> Vec<KnownRouter> {

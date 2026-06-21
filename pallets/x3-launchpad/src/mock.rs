@@ -3,9 +3,8 @@
 use crate as pallet_x3_launchpad;
 use frame_support::{
     construct_runtime, derive_impl, parameter_types,
-    traits::{ConstU32, ConstU64, Hooks},
+    traits::{ConstU32, ConstU64},
 };
-use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},

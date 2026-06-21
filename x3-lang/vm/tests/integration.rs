@@ -41,10 +41,7 @@ fn nested_calls_use_real_call_stack_through_verified_execute() {
     let mut vm = VM::new(code, VMConfig::default(), 1000);
     vm.execute().expect("verified nested calls should execute");
 
-    assert!(
-        vm.state.call_stack.is_empty(),
-        "call stack must be empty after RET"
-    );
+    assert!(vm.state.call_stack.is_empty(), "call stack must be empty after RET");
     // HALT returns immediately, leaving pc at the instruction after the
     // outermost CALL's return address (i.e. the HALT position + 4).
     assert_eq!(vm.state.pc, 4, "pc must be at the position after HALT");
@@ -93,8 +90,7 @@ fn compiler_asset_op_payloads_execute_with_real_fields() {
 
     let bytecode = emit_x3ir(&ir).expect("asset payload bytecode should emit");
     let mut vm = VM::new(bytecode, VMConfig::default(), 100_000);
-    vm.execute()
-        .expect("verified asset payload bytecode should execute");
+    vm.execute().expect("verified asset payload bytecode should execute");
 
     assert_eq!(
         vm.state.asset_ops,
@@ -143,8 +139,7 @@ fn production_bridge_adapter_verifies_and_persists_structured_receipt() {
     use x3_lang_compiler::emitter::emit_x3ir;
     use x3_lang_compiler::{Operation, X3IR};
     use x3_lang_vm::bridge::{
-        BridgeError, BridgeTransferRequest, ProductionBridgeAdapter, ProductionBridgeBackend,
-        SettlementReceipt,
+        BridgeError, BridgeTransferRequest, ProductionBridgeAdapter, ProductionBridgeBackend, SettlementReceipt,
     };
     use x3_lang_vm::{VMConfig, VM};
 
@@ -156,15 +151,9 @@ fn production_bridge_adapter_verifies_and_persists_structured_receipt() {
     }
 
     impl ProductionBridgeBackend for RecordingBackend {
-        fn verify_source_finality(
-            &self,
-            request: &BridgeTransferRequest,
-        ) -> Result<Vec<u8>, BridgeError> {
+        fn verify_source_finality(&self, request: &BridgeTransferRequest) -> Result<Vec<u8>, BridgeError> {
             assert_eq!(request.from_chain, "ethereum");
-            assert_eq!(
-                request.source_finality_proof,
-                b"eth-header-and-receipt-trie-proof"
-            );
+            assert_eq!(request.source_finality_proof, b"eth-header-and-receipt-trie-proof");
             *self.finality_checks.borrow_mut() += 1;
             Ok(b"finality:ethereum:confirmed".to_vec())
         }
@@ -216,19 +205,12 @@ fn production_bridge_adapter_verifies_and_persists_structured_receipt() {
     assert_eq!(*proof_checks.borrow(), 1);
     assert_eq!(receipts.borrow().len(), 1);
     assert_eq!(receipts.borrow()[0].amount, 100);
-    assert_eq!(
-        receipts.borrow()[0].finality_proof,
-        b"finality:ethereum:confirmed"
-    );
+    assert_eq!(receipts.borrow()[0].finality_proof, b"finality:ethereum:confirmed");
     assert_eq!(receipts.borrow()[0].transfer_proof, b"proof:lock:100:USDC");
     assert_eq!(
         receipts.borrow()[0].source_finality_proof_input,
         b"eth-header-and-receipt-trie-proof"
     );
-    assert_eq!(
-        receipts.borrow()[0].transfer_proof_input,
-        b"erc20-transfer-log-proof"
-    );
-    assert!(String::from_utf8_lossy(&vm.state.bridge_receipts[0])
-        .starts_with("x3-settlement-receipt:v1:"));
+    assert_eq!(receipts.borrow()[0].transfer_proof_input, b"erc20-transfer-log-proof");
+    assert!(String::from_utf8_lossy(&vm.state.bridge_receipts[0]).starts_with("x3-settlement-receipt:v1:"));
 }

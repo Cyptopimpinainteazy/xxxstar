@@ -3,9 +3,7 @@
 
 use x3_lang_ast::ast::*;
 use x3_lang_common::{IntBase, Span, Spanned, Symbol};
-use x3_lang_compiler::{
-    compile_program, compile_source, compile_to_ir, parser::parse_source, Operation,
-};
+use x3_lang_compiler::{compile_program, compile_source, compile_to_ir, parser::parse_source, Operation};
 
 fn lit_int(value: u128) -> Expression {
     Expression::Literal(LiteralExpr::Int {
@@ -36,11 +34,7 @@ fn test_compile_to_ir() {
 
     assert!(result.is_ok(), "should compile to IR");
     let ir = result.unwrap();
-    assert_eq!(
-        ir.operations.len(),
-        0,
-        "empty program should have no operations"
-    );
+    assert_eq!(ir.operations.len(), 0, "empty program should have no operations");
 }
 
 /// Test 3: IR with atomic block structure
@@ -49,14 +43,23 @@ fn test_ir_contains_atomic_operations() {
     let program = Program::new(vec![Spanned::new(
         Item::AtomicSwap(AtomicSwapDecl {
             name: Symbol::new("settle"),
+            from_asset: AssetRef::new(ChainRef(Symbol::new("ethereum")), Symbol::new("USDC")),
+            to_asset: AssetRef::new(ChainRef(Symbol::new("solana")), Symbol::new("SOL")),
+            source_vm: None,
+            dest_vm: None,
+            amount: None,
+            receiver: None,
+            hashlock: None,
             body: vec![Statement::Lock {
                 chain: ChainRef(Symbol::new("ethereum")),
                 asset: AssetRef::new(ChainRef(Symbol::new("ethereum")), Symbol::new("USDC")),
                 amount: lit_int(100),
                 from: Expression::Literal(LiteralExpr::Address(Symbol::new("0xsender"))),
             }],
+            requires: vec![],
             on_fail: Some(FailureAction::Rollback),
-            timeout: Some(lit_int(10)),
+            timeout_source: None,
+            timeout_destination: Some(lit_int(10)),
         }),
         Span::DUMMY,
     )]);
@@ -64,14 +67,8 @@ fn test_ir_contains_atomic_operations() {
 
     assert!(result.is_ok());
     let ir = result.unwrap();
-    assert!(ir
-        .operations
-        .iter()
-        .any(|op| matches!(op, Operation::AtomicBegin)));
-    assert!(ir
-        .operations
-        .iter()
-        .any(|op| matches!(op, Operation::AtomicEnd)));
+    assert!(ir.operations.iter().any(|op| matches!(op, Operation::AtomicBegin)));
+    assert!(ir.operations.iter().any(|op| matches!(op, Operation::AtomicEnd)));
 }
 
 /// Test 4: Bytecode compiles successfully with basic operations
@@ -250,14 +247,8 @@ fn test_source_parser_annotation_and_capability_call_reach_bytecode() {
         .any(|op| matches!(op, Operation::MempoolScan { max_results: 16 })));
 
     let bytecode = compile_source(source).expect("source should compile");
-    assert!(
-        bytecode.contains(&0x93),
-        "role check opcode should be emitted"
-    );
-    assert!(
-        bytecode.contains(&0x88),
-        "mempool scan opcode should be emitted"
-    );
+    assert!(bytecode.contains(&0x93), "role check opcode should be emitted");
+    assert!(bytecode.contains(&0x88), "mempool scan opcode should be emitted");
 }
 
 #[test]
@@ -275,21 +266,15 @@ fn test_source_parser_capability_matrix_reaches_x3ir_and_bytecode() {
 
     let program = parse_source(source).expect("capability matrix source should parse");
     let ir = compile_to_ir(&program).expect("capability matrix should lower");
-    assert!(ir.operations.iter().any(|op| matches!(
-        op,
-        Operation::MultisigCheck {
-            required: 2,
-            total: 3
-        }
-    )));
+    assert!(ir
+        .operations
+        .iter()
+        .any(|op| matches!(op, Operation::MultisigCheck { required: 2, total: 3 })));
     assert!(ir
         .operations
         .iter()
         .any(|op| matches!(op, Operation::ProofVerify { .. })));
-    assert!(ir
-        .operations
-        .iter()
-        .any(|op| matches!(op, Operation::StorageOp { .. })));
+    assert!(ir.operations.iter().any(|op| matches!(op, Operation::StorageOp { .. })));
     assert!(ir
         .operations
         .iter()
@@ -304,10 +289,7 @@ fn test_source_parser_capability_matrix_reaches_x3ir_and_bytecode() {
 
     let bytecode = compile_source(source).expect("capability matrix source should compile");
     for opcode in [0x94, 0x85, 0x86, 0x87, 0x8A] {
-        assert!(
-            bytecode.contains(&opcode),
-            "expected capability opcode 0x{opcode:02x}"
-        );
+        assert!(bytecode.contains(&opcode), "expected capability opcode 0x{opcode:02x}");
     }
 }
 
@@ -350,12 +332,10 @@ fn test_swap_min_output_survives_ir_to_bytecode_roundtrip() {
         dex: Some("uniswap".to_string()),
     });
 
-    let bytecode =
-        x3_lang_compiler::emitter::emit_x3ir(&ir).expect("swap IR should emit to bytecode");
+    let bytecode = x3_lang_compiler::emitter::emit_x3ir(&ir).expect("swap IR should emit to bytecode");
 
     // Disassemble and confirm min_output appears in the human-readable trace
-    let trace = x3_lang_compiler::emitter::disassemble(&bytecode)
-        .expect("swap bytecode should disassemble");
+    let trace = x3_lang_compiler::emitter::disassemble(&bytecode).expect("swap bytecode should disassemble");
     assert!(
         trace.contains("777"),
         "disassembly should contain min_output value: {}",
@@ -363,10 +343,7 @@ fn test_swap_min_output_survives_ir_to_bytecode_roundtrip() {
     );
 
     // Bytecode should contain the swap opcode (0x24)
-    assert!(
-        bytecode.contains(&0x24u8),
-        "bytecode should emit SWAP opcode (0x24)"
-    );
+    assert!(bytecode.contains(&0x24u8), "bytecode should emit SWAP opcode (0x24)");
 }
 
 #[test]

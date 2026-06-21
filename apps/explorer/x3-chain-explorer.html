@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3 Chain Explorer — Live</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; padding: 20px; }
+  h1 { color: #00ff88; font-size: 1.6rem; margin-bottom: 5px; }
+  .status-bar { display: flex; gap: 20px; margin: 10px 0 20px; flex-wrap: wrap; }
+  .stat { background: #141420; border: 1px solid #2a2a3a; padding: 10px 16px; border-radius: 6px; }
+  .stat .label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+  .stat .value { font-size: 1.3rem; font-weight: bold; color: #00ff88; }
+  .blocks { display: flex; flex-wrap: wrap; gap: 4px; margin: 20px 0; }
+  .block {
+    background: #141420; border: 1px solid #2a2a3a;
+    padding: 8px 10px; border-radius: 4px; font-size: 0.7rem;
+    min-width: 80px; text-align: center; transition: all 0.3s;
+  }
+  .block.new { border-color: #00ff88; box-shadow: 0 0 12px rgba(0,255,136,0.3); }
+  .block .num { color: #00ff88; font-weight: bold; font-size: 0.9rem; }
+  .block .hash { color: #666; font-size: 0.6rem; word-break: break-all; }
+  .block .time { color: #555; font-size: 0.6rem; }
+  .events { margin-top: 20px; }
+  .events h2 { color: #00ff88; font-size: 1rem; margin-bottom: 10px; }
+  .event { background: #141420; border-left: 3px solid #00ff88; padding: 8px 12px; margin: 4px 0; font-size: 0.75rem; border-radius: 0 4px 4px 0; }
+  .event.warn { border-left-color: #ffaa00; }
+  .event.error { border-left-color: #ff4444; }
+  .pulse { animation: pulse 0.5s ease-out; }
+  @keyframes pulse { 0% { transform: scale(1.03); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+  .rpc-status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .rpc-status.online { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+  .rpc-status.offline { background: #ff4444; }
+</style>
+</head>
+<body>
+
+<h1>⚡ X3 Chain Explorer</h1>
+<p style="color:#888;font-size:0.8rem;">Real-time block viewer — Substrate dev chain</p>
+
+<div class="status-bar">
+  <div class="stat">
+    <div class="label">RPC Status <span class="rpc-status online" id="rpc-dot"></span></div>
+    <div class="value" id="rpc-status">Checking...</div>
+  </div>
+  <div class="stat">
+    <div class="label">Latest Block #</div>
+    <div class="value" id="block-num">...</div>
+  </div>
+  <div class="stat">
+    <div class="label">Finalized #</div>
+    <div class="value" id="finalized">...</div>
+  </div>
+  <div class="stat">
+    <div class="label">Peers</div>
+    <div class="value" id="peers">0</div>
+  </div>
+  <div class="stat">
+    <div class="label">Blocks Produced</div>
+    <div class="value" id="block-count">0</div>
+  </div>
+</div>
+
+<h2 style="color:#00ff88;font-size:1rem;">📦 Recent Blocks</h2>
+<div class="blocks" id="blocks-container">
+  <div class="block"><div class="num">Waiting for blocks...</div></div>
+</div>
+
+<div class="events">
+  <h2>📋 Events</h2>
+  <div id="events-container"></div>
+</div>
+
+<script>
+const RPC_URL = 'http://localhost:9933';
+const MAX_BLOCKS = 48;
+const MAX_EVENTS = 50;
+let lastBlockNum = -1;
+let blockCount = 0;
+let blocks = [];
+let rpcOnline = false;
+
+async function rpc(method, params = []) {
+  const res = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 1, jsonrpc: '2.0', method, params }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return json.result;
+}
+
+function addEvent(msg, type = '') {
+  const container = document.getElementById('events-container');
+  const div = document.createElement('div');
+  div.className = 'event ' + type + ' pulse';
+  const ts = new Date().toLocaleTimeString();
+  div.textContent = `[${ts}] ${msg}`;
+  container.prepend(div);
+  while (container.children.length > MAX_EVENTS) container.lastElementChild.remove();
+}
+
+function renderBlock(b) {
+  const div = document.createElement('div');
+  div.className = 'block new';
+  div.innerHTML =
+    `<div class="num">#${b.number}</div>` +
+    `<div class="hash">${b.hash}</div>` +
+    `<div class="time">${new Date().toLocaleTimeString()}</div>`;
+  return div;
+}
+
+async function fetchLatestBlock() {
+  try {
+    const header = await rpc('chain_getHeader', []);
+    const hash = await rpc('chain_getBlockHash', [header.number]);
+    const num = parseInt(header.number, 16);
+    const shortHash = hash.substring(2, 14) + '…';
+    return { number: num, hash: shortHash, fullHash: hash };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function tick() {
+  try {
+    const health = await rpc('system_health', []);
+    document.getElementById('rpc-dot').className = 'rpc-status online';
+    document.getElementById('rpc-status').textContent = 'Online';
+    document.getElementById('peers').textContent = health.peers;
+    document.getElementById('finalized').textContent = '#' + parseInt(health.finalized?.number || '0', 16);
+    rpcOnline = true;
+
+    const block = await fetchLatestBlock();
+    if (!block) throw new Error('no block data');
+
+    document.getElementById('block-num').textContent = '#' + block.number;
+
+    if (block.number > lastBlockNum) {
+      lastBlockNum = block.number;
+      blockCount += (block.number === 0 ? 0 : 1);
+      document.getElementById('block-count').textContent = blockCount;
+
+      if (block.number > 0) {
+        blocks.unshift(block);
+        if (blocks.length > MAX_BLOCKS) blocks.pop();
+
+        const container = document.getElementById('blocks-container');
+        container.innerHTML = '';
+        blocks.forEach(b => container.appendChild(renderBlock(b)));
+
+        addEvent(`Block #${block.number} produced — ${block.hash}`, '');
+      }
+    }
+  } catch (e) {
+    document.getElementById('rpc-dot').className = 'rpc-status offline';
+    document.getElementById('rpc-status').textContent = 'Offline — ' + e.message;
+    rpcOnline = false;
+    addEvent(`RPC offline: ${e.message}`, 'error');
+  }
+}
+
+// Initial fetch
+tick().then(() => {
+  addEvent('Explorer started — watching X3 chain at ' + RPC_URL, '');
+});
+
+// Poll every 3 seconds (matches typical 6s block time on dev)
+setInterval(tick, 3000);
+</script>
+</body>
+</html>

@@ -1259,6 +1259,7 @@ mod tests {
         emitter.emit_int(Register(0), 42).unwrap();
         emitter.emit_int(Register(1), 0).unwrap();
         emitter.emit_int(Register(2), 1000000).unwrap();
+        #[allow(clippy::approx_constant)]
         emitter.emit_float(Register(3), 3.14159).unwrap();
         emitter.emit_string(Register(4), "hello").unwrap();
 

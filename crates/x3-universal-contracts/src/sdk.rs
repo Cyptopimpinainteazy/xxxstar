@@ -87,8 +87,8 @@ impl UniversalContract {
             use sha2::{Digest, Sha256};
             let mut h = Sha256::new();
             h.update(b"x3:uc:intent-id:v1:");
-            h.update(&self.submitter);
-            h.update(&self.intent_seq.to_le_bytes());
+            h.update(self.submitter);
+            h.update(self.intent_seq.to_le_bytes());
             let out = h.finalize();
             let mut bytes = [0u8; 16];
             bytes.copy_from_slice(&out[..16]);

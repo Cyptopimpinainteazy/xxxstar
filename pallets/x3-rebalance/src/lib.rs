@@ -1,5 +1,9 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # pallet-x3-rebalance
 //!
 //! Rebalance Engine (Module 4) for the X3 Phase 4.5 liquidity control plane.
@@ -53,6 +57,17 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        pub _phantom: sp_std::marker::PhantomData<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {}
+    }
+
     // -----------------------------------------------------------------------
     // Config
     // -----------------------------------------------------------------------
@@ -60,7 +75,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_x3_inventory::pallet::Config {
         /// The runtime event type.
-
         /// Maximum total balance (in native units) that may be rebalanced across all vaults
         /// within a single calendar day. Rejects steps that would exceed this threshold.
         ///

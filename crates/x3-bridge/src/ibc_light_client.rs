@@ -406,7 +406,7 @@ mod tests {
             next_validators_hash: [0; 32],
         };
 
-        let result = IBCLightClient::verify_header(&header, &prev, &vec![], 1000000, 2000);
+        let result = IBCLightClient::verify_header(&header, &prev, &[], 1000000, 2000);
         assert!(result.is_err());
     }
 

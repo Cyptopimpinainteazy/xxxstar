@@ -12,7 +12,7 @@ use sp_runtime::{
     traits::{
         AsSystemOriginSigner, DispatchInfoOf, Dispatchable, TransactionExtension, ValidateResult,
     },
-    transaction_validity::{InvalidTransaction, TransactionValidityError, ValidTransaction},
+    transaction_validity::{InvalidTransaction, ValidTransaction},
 };
 use sp_std::{fmt, marker::PhantomData, prelude::*};
 

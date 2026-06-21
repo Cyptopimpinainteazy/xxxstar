@@ -2,10 +2,10 @@
 //!
 //! Coverage: 20 test cases spanning:
 //! - Asset registration (happy path, duplicate rejection, zero-supply rejection)
-//! - Mint (happy path, nonce replay, supply cap, paused asset, deprecated asset,
-//!         unregistered asset, zero-amount)
+//! - Mint (happy path, nonce replay, supply cap, paused asset, deprecated asset, unregistered
+//!   asset, zero-amount)
 //! - Burn (happy path, insufficient balance, unregistered asset, deprecated rejection,
-//!         burn-while-paused allowed)
+//!   burn-while-paused allowed)
 //! - Governance power calculation and update
 //! - Pause / resume lifecycle
 //! - Bridge fee update
@@ -459,9 +459,9 @@ fn total_supply_invariant_holds_after_mixed_ops() {
 
         // Expected: 300 - 50 + 200 + 100 = 550.
         let stored_total = TotalWrappedSupply::<Test>::get();
-        let manual_sum = WrappedSupply::<Test>::iter()
+        let manual_sum: u128 = WrappedSupply::<Test>::iter()
             .map(|(_, _, bal)| bal)
-            .fold(0_u128, |a, b| a + b);
+            .sum();
         assert_eq!(stored_total, 550);
         assert_eq!(stored_total, manual_sum);
     });

@@ -411,16 +411,10 @@ impl ArbitrageExecutor {
     }
 
     /// Simulate execution
-    async fn simulate_execution(&self, opportunity: &ArbitrageOpportunityType) -> Result<bool> {
-        // In a real implementation, this would:
-        // 1. Check liquidity on both chains
-        // 2. Verify prices haven't changed
-        // 3. Simulate the trades
-        // 4. Calculate actual profit
-
-        // For now, return true with 80% probability
-        let random = sp_io::offchain::random_seed();
-        Ok(random[0] % 5 != 0) // 80% success rate
+    async fn simulate_execution(&self, _opportunity: &ArbitrageOpportunityType) -> Result<bool> {
+        Err(PositionManagerError::Arbitrage(
+            "Arbitrage simulation: DEX liquidity oracle and price feeds not configured; wire exchange adapters".into(),
+        ))
     }
 
     /// Generate execution ID

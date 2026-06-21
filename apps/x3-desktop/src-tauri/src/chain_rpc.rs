@@ -15,7 +15,7 @@ impl Default for ChainRpcConfig {
             ethereum_rpc: std::env::var("ETH_RPC_URL")
                 .unwrap_or_else(|_| "https://eth-mainnet.g.alchemy.com/v2/demo".to_string()),
             x3_rpc: std::env::var("X3_NODE_RPC")
-                .unwrap_or_else(|_| "http://127.0.0.1:9944".to_string()),
+                .unwrap_or_else(|_| "http://rpc.testnet.x3-chain.io:9944".to_string()),
             local_rpc: "http://127.0.0.1:8545".to_string(),
         }
     }

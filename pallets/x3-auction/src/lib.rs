@@ -1,4 +1,8 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # X3 Auction Pallet
 //!
 //! Phase 6 scaffold — English (ascending-price) on-chain auction with configurable
@@ -84,8 +88,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Origin that can perform governance actions (extend, force-cancel).
         type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 

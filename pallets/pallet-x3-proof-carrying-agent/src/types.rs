@@ -68,6 +68,7 @@ pub enum ProofStatus {
 /// NOTE: This type is NOT stored directly in storage maps that require
 /// `MaxEncodedLen`. It is used transiently during submission. The stored
 /// version is `VerifiedAction`.
+#[allow(dead_code)]
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, DecodeWithMemTracking)]
 pub struct ProofCarryingAction<AccountId, BlockNumber> {
     /// The agent submitting the action

@@ -993,9 +993,11 @@ mod tests {
         }
     }
 
+    type TicketRecord = (Vec<u8>, u128, bool);
+
     struct RecordingEscrowProvider {
         balances: Arc<RecordingBalanceProvider>,
-        tickets: Mutex<HashMap<[u8; 32], (Vec<u8>, u128, bool)>>,
+        tickets: Mutex<HashMap<[u8; 32], TicketRecord>>,
         locks: AtomicUsize,
         releases: AtomicUsize,
     }

@@ -217,6 +217,16 @@ pub mod pallet {
         /// Account that receives collected protocol trade fees (on-chain treasury).
         #[pallet::constant]
         type ProtocolTreasury: Get<Self::AccountId>;
+
+        /// Maximum slippage tolerance in basis points (1/100th of a percent).
+        /// Default: 5000 = 50%.
+        #[pallet::constant]
+        type MaxSlippageBps: Get<u32>;
+
+        /// Minimum slippage tolerance in basis points.
+        /// Default: 1 = 0.01%.
+        #[pallet::constant]
+        type MinSlippageBps: Get<u32>;
     }
 
     /// Active trade batches indexed by batch_id.
@@ -530,7 +540,8 @@ pub mod pallet {
                 Error::<T>::TooManyTradeLegs
             );
             ensure!(
-                (MIN_SLIPPAGE_BPS..=MAX_SLIPPAGE_BPS).contains(&slippage_tolerance_bps),
+                (T::MinSlippageBps::get()..=T::MaxSlippageBps::get())
+                    .contains(&slippage_tolerance_bps),
                 Error::<T>::InvalidSlippageTolerance
             );
 
@@ -2153,7 +2164,7 @@ pub mod pallet {
 
             // Validate slippage
             ensure!(
-                (MIN_SLIPPAGE_BPS..=MAX_SLIPPAGE_BPS).contains(&slippage_bps),
+                (T::MinSlippageBps::get()..=T::MaxSlippageBps::get()).contains(&slippage_bps),
                 Error::<T>::InvalidSlippageTolerance
             );
 

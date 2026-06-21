@@ -1238,7 +1238,8 @@ async fn web_search(query: &str, max_results: usize) -> Result<Vec<SearchResult>
     let resp = client.get(&url).send().await.map_err(|e| format!("Search request failed: {}", e))?;
     let html = resp.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
 
-    // Scraper not available in this build — return stub results
+    // scraper HTML parser not available in this build — log and return empty
+    eprintln!("[agents] web_search: scraping disabled (no HTML parser), returning empty results for query=\"{query}\"");
     let _ = html;
     let _ = max_results;
     Ok(Vec::new())
@@ -1255,7 +1256,8 @@ async fn fetch_page_text(url: &str) -> Result<String, String> {
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
     let html = resp.text().await.map_err(|e| e.to_string())?;
 
-    // Scraper not available in this build — return stub text
+    // scraper HTML parser not available in this build — log and return empty
+    eprintln!("[agents] fetch_page_text: scraping disabled (no HTML parser), returning empty for url=\"{url}\"");
     let _ = html;
     Ok(String::new())
 }

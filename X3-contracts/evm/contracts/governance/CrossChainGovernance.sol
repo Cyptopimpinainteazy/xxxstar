@@ -16,19 +16,21 @@ contract CrossChainGovernance is Ownable {
         mapping(address => bool) voted;
     }
 
-    AtlasSphereX3 public x3;
-    mapping(uint256 => WrappedX3) public wrappedTokens; // chainId => wrapped
+    AtlasSphereX3 public immutable x3;
+    mapping(uint256 => WrappedX3) public wrappedTokens;
     uint256 public proposalCount;
     mapping(uint256 => Proposal) public proposals;
-    address public treasury;
+    address public immutable treasury;
 
     event ProposalCreated(uint256 indexed id, string description);
     event Voted(uint256 indexed id, address indexed voter, bool support, uint256 weight);
     event Executed(uint256 indexed id);
 
-    constructor(address _x3, address _treasury) {
-        x3 = AtlasSphereX3(_x3);
-        treasury = _treasury;
+    constructor(address x3Token, address treasuryAddr) {
+        require(x3Token != address(0), "ZERO_X3");
+        require(treasuryAddr != address(0), "ZERO_TREASURY");
+        x3 = AtlasSphereX3(x3Token);
+        treasury = treasuryAddr;
     }
 
     function addWrapped(uint256 chainId, address wrapped) external onlyOwner {
@@ -36,16 +38,31 @@ contract CrossChainGovernance is Ownable {
     }
 
     function createProposal(string memory description, uint256 duration) external onlyOwner {
+        return _createProposal(description, block.number, duration);
+    }
+
+    function createProposalWithStart(
+        string memory description,
+        uint256 startBlock,
+        uint256 duration
+    ) external onlyOwner {
+        require(startBlock >= block.number, "START_IN_PAST");
+        _createProposal(description, startBlock, duration);
+    }
+
+    function _createProposal(string memory description, uint256 startBlock, uint256 duration) internal {
         Proposal storage p = proposals[++proposalCount];
         p.description = description;
-        p.voteStart = block.number;
-        p.voteEnd = block.number + duration;
+        p.voteStart = startBlock;
+        p.voteEnd = startBlock + duration;
         emit ProposalCreated(proposalCount, description);
     }
 
     function vote(uint256 id, bool support) external {
         Proposal storage p = proposals[id];
-        require(block.number >= p.voteStart && block.number <= p.voteEnd, "Voting closed");
+        require(p.voteEnd > 0, "Proposal does not exist");
+        require(block.number >= p.voteStart, "Voting not started");
+        require(block.number <= p.voteEnd, "Voting closed");
         require(!p.voted[msg.sender], "Already voted");
         uint256 weight = x3.balanceOf(msg.sender);
         for (uint256 i = 0; i < 103; i++) {

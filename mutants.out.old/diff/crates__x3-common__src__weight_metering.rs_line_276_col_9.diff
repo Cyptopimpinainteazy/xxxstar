@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace ComputeMeter::reset with ()
+@@ -268,17 +268,17 @@
+ 
+     /// Get the limit
+     pub fn limit(&self) -> u64 {
+         self.limit
+     }
+ 
+     /// Reset the meter
+     pub fn reset(&mut self) {
+-        self.consumed = 0;
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Gas meter for EVM-style execution
+ #[derive(Debug, Clone)]
+ pub struct GasMeter {
+     /// Maximum gas
+     limit: u64,

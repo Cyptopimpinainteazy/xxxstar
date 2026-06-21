@@ -29,6 +29,7 @@ enum Commands {
 #[derive(Debug, Deserialize)]
 struct FeatureRecord {
     mode: String,
+    #[allow(dead_code)]
     crate_or_service: Option<String>,
     tauri_app: Option<String>,
     required_tests: Vec<String>,
@@ -73,9 +74,9 @@ fn main() -> Result<()> {
         Commands::MissingTests => Ok(generate_missing_tests(&registry)),
         Commands::TauriWiring => Ok(generate_tauri_wiring(&registry)),
         Commands::ServiceHealth => Ok(generate_service_health(&registry)),
-        Commands::BtcGatewayReport => Ok(generate_btc_gateway_report()),
-        Commands::MarketingClaimsAudit => Ok(generate_marketing_audit()),
-        Commands::GrantPipelineReport => Ok(generate_grant_pipeline_report()),
+        Commands::BtcGatewayReport => Ok(generate_btc_gateway_report(&registry)),
+        Commands::MarketingClaimsAudit => Ok(generate_marketing_audit(&registry)),
+        Commands::GrantPipelineReport => Ok(generate_grant_pipeline_report(&registry)),
         Commands::SwarmTasks => generate_swarm_tasks(&registry, &flags),
     }?;
 
@@ -192,7 +193,7 @@ fn generate_testnet_report(registry: &FeatureRegistry, flags: &Flags) -> String 
     } else {
         lines.push("- TESTNET GO: NO".to_string());
         if bridge_blocked {
-            lines.push("- Reason: external_bridges_mainnet is DISABLED_BLOCKED (real on-chain Ed25519 verification not available).");
+            lines.push("- Reason: external_bridges_mainnet is DISABLED_BLOCKED (real on-chain Ed25519 verification not available).".to_string());
         }
         if any_blocked {
             lines.push(format!(
@@ -292,38 +293,60 @@ fn generate_service_health(registry: &FeatureRegistry) -> String {
     lines.join("\n")
 }
 
-fn generate_btc_gateway_report() -> String {
-    vec![
-        "# BTC Gateway Report".to_string(),
-        "".to_string(),
-        "- Mode: SIM_TESTNET".to_string(),
-        "- Mainnet BTC gateway: DISABLED_BLOCKED".to_string(),
-        "- Status: initial simulator mode only".to_string(),
-        "- Notes: regtest/signet support required before any claim of live BTC gateway readiness."
-            .to_string(),
-    ]
-    .join("\n")
+fn generate_btc_gateway_report(registry: &FeatureRegistry) -> String {
+    let mut lines = vec!["# BTC Gateway Report".to_string(), "".to_string()];
+    if let Some(entry) = registry.get("btc_fortress_gateway") {
+        lines.push(format!("- Mode: {}", entry.mode));
+        lines.push(format!(
+            "- Readiness score: {}",
+            entry.readiness_score.unwrap_or(0)
+        ));
+        if let Some(blockers) = &entry.blockers {
+            if !blockers.is_empty() {
+                lines.push("- Blockers:".to_string());
+                for b in blockers {
+                    lines.push(format!("  - {}", b));
+                }
+            }
+        }
+        lines.push("- Mainnet BTC gateway: DISABLED_BLOCKED".to_string());
+        lines.push("- Notes: regtest/signet support required before any claim of live BTC gateway readiness.".to_string());
+    } else {
+        lines.push("- BTC gateway feature not found in registry.".to_string());
+    }
+    lines.join("\n")
 }
 
-fn generate_marketing_audit() -> String {
-    vec![
-        "# Marketing Claims Audit".to_string(),
-        "".to_string(),
-        "- Only verified reports may drive marketing claims.".to_string(),
-        "- Unsupported claims must be marked UNSUPPORTED_CLAIM.".to_string(),
-        "- Source reports: testnet_readiness_report.md, reactor_benchmark_report.md, six_route_invariants.md, btc_gateway_report.md, tauri_e2e_report.md, marketing_claims_audit.md".to_string(),
-    ]
-    .join("\n")
+fn generate_marketing_audit(registry: &FeatureRegistry) -> String {
+    let mut lines = vec!["# Marketing Claims Audit".to_string(), "".to_string()];
+    lines.push("- Only verified reports may drive marketing claims.".to_string());
+    lines.push("- Unsupported claims must be marked UNSUPPORTED_CLAIM.".to_string());
+    for (feature, entry) in sorted_registry_entries(registry) {
+        if entry.mode == "SIM_TESTNET" || entry.mode == "PLANNED" {
+            lines.push(format!(
+                "- UNSUPPORTED_CLAIM: {} (mode={}, score={})",
+                feature,
+                entry.mode,
+                entry.readiness_score.unwrap_or(0)
+            ));
+        }
+    }
+    lines.join("\n")
 }
 
-fn generate_grant_pipeline_report() -> String {
-    vec![
-        "# Grant Pipeline Report".to_string(),
-        "".to_string(),
-        "- Grant schema and tracking are under development.".to_string(),
-        "- This report is a placeholder for Grantsmith grant opportunity, proposal, budget, and milestone generation.".to_string(),
-    ]
-    .join("\n")
+fn generate_grant_pipeline_report(registry: &FeatureRegistry) -> String {
+    let mut lines = vec!["# Grant Pipeline Report".to_string(), "".to_string()];
+    lines.push("- Grant schema and tracking are under development.".to_string());
+    lines.push("- This report is a placeholder for Grantsmith grant opportunity, proposal, budget, and milestone generation.".to_string());
+    let unready = sorted_registry_entries(registry)
+        .into_iter()
+        .filter(|(_, e)| e.readiness_score.unwrap_or(0) < 50)
+        .count();
+    lines.push(format!(
+        "- {} features below 50% readiness (not grant-eligible until they pass 50% barrier)",
+        unready
+    ));
+    lines.join("\n")
 }
 
 #[derive(serde::Serialize)]

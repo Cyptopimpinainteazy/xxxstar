@@ -6,17 +6,16 @@ use crate::types::{PostSubmissionContext, QuoteContext, ReservationContext, Subm
 use crate::{Error, Event};
 use frame_support::{
     assert_ok,
-    traits::{ConstU32, Hooks},
+    traits::Hooks,
     BoundedVec,
 };
 use pallet_x3_inventory::{
-    pallet::Pallet as InventoryPallet,
     types::{
-        LaneClass, LaneId, LiquiditySourceType, OwnerType, ReservationId, ReservationStatus,
+        LaneClass, LaneId, LiquiditySourceType, OwnerType, ReservationStatus,
         RouteId, VaultId, VaultType,
     },
 };
-use pallet_x3_reservation::pallet::{Pallet as ReservationPallet, ReservationState};
+use pallet_x3_reservation::pallet::ReservationState;
 
 // ──────────────────────────────────────────
 // Helpers

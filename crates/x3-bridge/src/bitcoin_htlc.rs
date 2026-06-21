@@ -75,7 +75,7 @@ impl BitcoinHTLC {
         if hash_lock == [0; 32] {
             return Err("Hash lock cannot be zero");
         }
-        if time_lock_seconds < MIN_TIMELOCK_SECONDS || time_lock_seconds > MAX_TIMELOCK_SECONDS {
+        if !(MIN_TIMELOCK_SECONDS..=MAX_TIMELOCK_SECONDS).contains(&time_lock_seconds) {
             return Err("Time lock outside acceptable range");
         }
         if initiator.is_empty() {

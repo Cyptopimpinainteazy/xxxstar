@@ -1,3 +1,9 @@
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::type_complexity)]
 //! # Northern Swarm Pallet (RC2)
 //!
 //! On-chain registry for the Northern Swarm off-chain executor network.
@@ -224,10 +230,26 @@ pub mod pallet {
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn on_finalize(block: BlockNumberFor<T>) {
-            // RC3 hook placeholder: run quorum comparison and finalise tasks
-            // whose all claimants have committed.
-            let _ = block; // suppress unused warning until RC3
+        fn on_finalize(_block: BlockNumberFor<T>) {
+            for (task_id, mut task) in Tasks::<T>::iter() {
+                if task.status == TaskStatus::ResultCommitted {
+                    if let Some(result_hash) = task.result_hash {
+                        task.status = TaskStatus::Finalised;
+                        Tasks::<T>::insert(task_id, &task);
+                        Self::deposit_event(Event::TaskFinalised {
+                            task_id,
+                            winning_hash: result_hash,
+                        });
+                        if let Some(ref executor) = task.claimed_by {
+                            Self::deposit_event(Event::ExecutorRewarded {
+                                executor: executor.clone(),
+                                task_id,
+                                amount: task.reward,
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
 

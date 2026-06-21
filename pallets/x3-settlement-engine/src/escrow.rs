@@ -3,7 +3,7 @@
 //! Manages atomic escrow operations across EVM, SVM, and X3VM.
 //! Because X3 hosts all three VMs, internal swaps are atomic within a single block.
 
-use crate::types::{EscrowLeg, EscrowLegState, ExternalChainId};
+use crate::types::ExternalChainId;
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use core::fmt::Debug;
 use scale_info::TypeInfo;

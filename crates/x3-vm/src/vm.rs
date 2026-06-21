@@ -552,12 +552,13 @@ impl VM {
 
                 let func_id = func_idx as u32;
                 self.jit.record_execution(func_id);
-                if self.jit.should_compile(func_id) && self.jit.get_compiled(func_id).is_none() {
-                    if self.jit.backend_available() {
-                        self.jit
-                            .compile(func_id, &self.module.code)
-                            .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
-                    }
+                if self.jit.should_compile(func_id)
+                    && self.jit.get_compiled(func_id).is_none()
+                    && self.jit.backend_available()
+                {
+                    self.jit
+                        .compile(func_id, &self.module.code)
+                        .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
                 }
 
                 self.isolation.enter_call().map_err(|err| {
@@ -1420,6 +1421,7 @@ fn value_to_storage_value(value: &Value) -> Option<[u8; 32]> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::vec_init_then_push)]
     use super::*;
     use x3_backend::bc_format_helpers;
 

@@ -120,6 +120,7 @@ impl<T: SourcedType, S: MetricSource> Collector for SourcedMetric<T, S> {
         m.set_name(self.desc.fq_name.clone());
         m.set_help(self.desc.help.clone());
         m.set_field_type(T::proto());
+        #[allow(clippy::useless_conversion)]
         m.set_metric(counters.into());
 
         vec![m]

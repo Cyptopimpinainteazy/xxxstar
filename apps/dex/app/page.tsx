@@ -83,7 +83,6 @@ export default function HomePage() {
           ) : (
             <LimitOrderInterface
               walletConnected={walletConnected}
-              walletId={walletId}
             />
           )}
 

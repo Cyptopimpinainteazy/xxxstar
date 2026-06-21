@@ -10,10 +10,8 @@ fn registry_invariants_are_referenced() {
         .unwrap()
         .to_path_buf();
     let path = workspace_root.join("tests/invariants/registry.toml");
-    let toml = fs::read_to_string(&path).expect(&format!(
-        "Failed to read registry.toml at {}",
-        path.display()
-    ));
+    let err_msg = format!("Failed to read registry.toml at {}", path.display());
+    let toml = fs::read_to_string(&path).expect(&err_msg);
     let ids: BTreeSet<String> = toml
         .lines()
         .filter_map(|l| {

@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace >= with < in WeightConfig::verify_canonical_fee
+@@ -117,17 +117,17 @@
+     /// Calculate the fee for a given weight
+     /// Fee = (weight / fee_denominator) + canonical_fee
+     pub fn calculate_fee(&self, weight: u64) -> u64 {
+         (weight / self.fee_denominator).saturating_add(self.canonical_fee)
+     }
+ 
+     /// Verify that a fee meets the canonical fee requirement
+     pub fn verify_canonical_fee(&self, fee: u64) -> bool {
+-        fee >= self.canonical_fee
++        fee < /* ~ changed by cargo-mutants ~ */ self.canonical_fee
+     }
+ 
+     /// Get the minimum fee for a given weight
+     pub fn minimum_fee(&self, weight: u64) -> u64 {
+         self.calculate_fee(weight)
+     }
+ }
+ 

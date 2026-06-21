@@ -17,8 +17,10 @@ impl ChainAdapter for SvmAdapter {
         self.id.clone()
     }
 
-    fn send(&self, msg: &CrossVmMessage) -> Result<String> {
-        msg.id()
+    fn send(&self, _msg: &CrossVmMessage) -> Result<String> {
+        Err(OrchestratorError::ExecutionFailed(
+            "SVM adapter: send not yet wired to node RPC backend".into(),
+        ))
     }
 
     fn verify(&self, proof: &ExecutionProof) -> Result<bool> {
@@ -31,6 +33,8 @@ impl ChainAdapter for SvmAdapter {
     }
 
     fn execute(&self, _msg: &CrossVmMessage) -> Result<()> {
-        Ok(())
+        Err(OrchestratorError::ExecutionFailed(
+            "SVM adapter: execute not yet wired to node RPC backend".into(),
+        ))
     }
 }

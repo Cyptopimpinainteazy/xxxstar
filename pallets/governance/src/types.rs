@@ -190,7 +190,7 @@ pub struct Proposal<AccountId, Balance, BlockNumber, Call> {
     Default,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-pub struct ProposalTally<Balance: Default> {
+pub struct ProposalTally<Balance> {
     /// Total voting power for Aye.
     pub ayes: Balance,
     /// Total voting power for Nay.
@@ -287,7 +287,7 @@ pub struct VoteLock<Balance, BlockNumber> {
     Default,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-pub struct GovernanceParams<Balance: Default, BlockNumber: Default> {
+pub struct GovernanceParams<Balance, BlockNumber> {
     /// Minimum percentage of issuance that must vote.
     pub quorum: Percent,
     /// Percentage of votes required for approval.

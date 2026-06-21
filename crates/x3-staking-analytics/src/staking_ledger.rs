@@ -96,7 +96,7 @@ impl StakingPosition {
     pub fn claimable_unbonded(&self) -> Vec<&UnbondingPhase> {
         self.unbonding_phases
             .iter()
-            .filter(|p| p.claimed == false)
+            .filter(|p| !p.claimed)
             .collect()
     }
 }
@@ -153,7 +153,7 @@ impl StakingLedger {
         self.positions.insert(position_id.clone(), position);
         self.by_delegator
             .entry(delegator.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(position_id.clone());
 
         Ok(position_id)

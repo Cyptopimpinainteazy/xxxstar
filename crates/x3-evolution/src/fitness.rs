@@ -1,7 +1,7 @@
 //! Fitness scoring for strategy evaluation
 
 use crate::chromosome::Chromosome;
-use crate::error::Result;
+use crate::error::{EvolutionError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Fitness score with multiple components
@@ -141,20 +141,10 @@ impl PnLFitness {
     }
 
     /// Simulate strategy execution
-    fn simulate(&self, _chromosome: &Chromosome) -> SimulationResult {
-        // In a real implementation, this would:
-        // 1. Load strategy bytecode into X3 VM
-        // 2. Feed price data through the strategy
-        // 3. Track trades, PnL, equity curve
-        // 4. Calculate all metrics
-
-        // For now, return placeholder results
-        // This would be replaced with actual X3 VM integration
-        SimulationResult {
-            trades: vec![],
-            equity_curve: vec![self.initial_capital],
-            final_capital: self.initial_capital,
-        }
+    fn simulate(&self, _chromosome: &Chromosome) -> Result<SimulationResult> {
+        Err(EvolutionError::SimulationFailed(
+            "strategy simulation not yet implemented; X3 VM integration pending".into(),
+        ))
     }
 
     /// Calculate metrics from simulation result
@@ -288,7 +278,7 @@ impl FitnessEvaluator for PnLFitness {
         let mut total_score = FitnessScore::default();
 
         for _ in 0..self.num_simulations {
-            let result = self.simulate(chromosome);
+            let result = self.simulate(chromosome)?;
             let score = self.calculate_metrics(&result);
 
             // Aggregate scores

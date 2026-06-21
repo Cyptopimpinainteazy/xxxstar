@@ -96,7 +96,7 @@ export const NFTCRMIntegrationPanel: React.FC = () => {
     },
   ]);
 
-  const [onChainDeals] = useState<OnChainDeal[]>>[
+  const [onChainDeals] = useState<OnChainDeal[]>([
     {
       id: 'deal-1',
       dealName: 'Enterprise Holder Benefits Program',

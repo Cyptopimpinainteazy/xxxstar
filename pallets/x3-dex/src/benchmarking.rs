@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::Pallet as DEXPallet;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use frame_benchmarking::{v2::benchmarks, whitelisted_caller};
 use frame_system::RawOrigin;
 use x3_dex::amm_pools::TokenId;
 

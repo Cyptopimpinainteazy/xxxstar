@@ -524,8 +524,7 @@ mod tests {
 
     #[test]
     fn test_weight_meter_budget() {
-        let mut config = WeightConfig::default();
-        config.max_operation_budget = 50_000;
+        let mut config = WeightConfig { max_operation_budget: 50_000, ..Default::default() };
 
         let mut meter = WeightMeter::new(config.clone());
 

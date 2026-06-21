@@ -127,7 +127,7 @@ impl BridgeSecurityCouncil {
     }
 
     /// Cast vote on proposal
-    pub fn vote(&mut self, proposal_id: u32, member_id: u32, vote_yes: bool) -> Result<(), String> {
+    pub fn vote(&mut self, proposal_id: u32, member_id: u32, vote_yes: bool, current_block: u32) -> Result<(), String> {
         // Verify member exists and is active
         let member = self.members.get(&member_id).ok_or("Member not found")?;
 
@@ -142,7 +142,8 @@ impl BridgeSecurityCouncil {
             .ok_or("Proposal not found")?;
 
         // Check voting period (first 100 blocks)
-        if proposal.created_block + 100 < proposal.created_block {
+        let deadline = proposal.created_block.checked_add(100).ok_or("Overflow in deadline calculation")?;
+        if current_block > deadline {
             return Err("Voting period expired".to_string());
         }
 
@@ -254,7 +255,7 @@ impl BridgeSecurityCouncil {
 
         // Only proposer or any active member can cancel
         if proposal.proposer != canceller_id
-            && !self.members.get(&canceller_id).map_or(false, |m| m.active)
+            && !self.members.get(&canceller_id).is_some_and(|m| m.active)
         {
             return Err("Only proposer or council member can cancel".to_string());
         }
@@ -398,7 +399,7 @@ mod tests {
 
         // 5 members vote yes
         for i in 1..=5 {
-            assert!(council.vote(proposal.id, i, true).is_ok());
+            assert!(council.vote(proposal.id, i, true, 150).is_ok());
         }
 
         let status = council.get_proposal_status(proposal.id);
@@ -432,7 +433,7 @@ mod tests {
             .unwrap();
 
         for i in 1..=5 {
-            council.vote(proposal.id, i, true).ok();
+            council.vote(proposal.id, i, true, 150).ok();
         }
 
         // Try execute before timelock

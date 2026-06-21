@@ -597,12 +597,7 @@ impl FlashFinalityGadget {
 
         let leader_sig = if let Some(_keystore) = &self.keystore {
             // Try to sign with the keystore if available
-            if let Some(sig) = self.sign_with_keystore(&message_array) {
-                sig
-            } else {
-                // Fallback to empty signature if keystore signing fails
-                [0u8; 64]
-            }
+            self.sign_with_keystore(&message_array).unwrap_or([0u8; 64])
         } else {
             // Fallback to empty signature if no keystore
             [0u8; 64]
@@ -720,9 +715,9 @@ mod tests {
         let id = keypair.public.to_bytes();
         let msg_hash = {
             let mut h = Sha256::new();
-            h.update(&block_hash);
+            h.update(block_hash);
             h.update(round.to_le_bytes());
-            h.update(&id);
+            h.update(id);
             h.finalize()
         };
         let sig_array = keypair
@@ -965,7 +960,7 @@ mod tests {
             gadget.on_vote(make_vote(hash, i, 0x11)).await;
             let cert = gadget.on_vote(make_vote(hash, i, 0x22)).await.unwrap();
 
-            assert_eq!(cert.block_number, i as u64);
+            assert_eq!(cert.block_number, i);
             certs.push(cert);
         }
 

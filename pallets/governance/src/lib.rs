@@ -1,4 +1,17 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
 //! # X3Chain Governance Pallet
 //!
 //! A comprehensive governance system for the X3 blockchain supporting:
@@ -55,11 +68,11 @@ pub mod pallet {
     use frame_support::{
         dispatch::{GetDispatchInfo, PostDispatchInfo},
         pallet_prelude::*,
-        traits::{
-            schedule::Named as ScheduleNamed, Currency, LockableCurrency, ReservableCurrency,
-        },
+        traits::{Currency, LockableCurrency, ReservableCurrency},
         Blake2_128Concat,
     };
+    #[allow(deprecated)]
+    use frame_support::traits::schedule::Named as ScheduleNamed;
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::Dispatchable;
     use sp_runtime::{
@@ -91,7 +104,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type.
-
         /// The overarching call type.
         type RuntimeCall: Parameter
             + From<Call<Self>>
@@ -592,6 +604,8 @@ pub mod pallet {
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
+        /// Authorized governance accounts (S1-2). Empty = everyone can participate.
+        pub authorized_accounts: Vec<T::AccountId>,
         pub _phantom: PhantomData<T>,
     }
 
@@ -612,6 +626,11 @@ pub mod pallet {
 
             // Initialize kill switch to normal
             KillSwitchLevelStorage::<T>::put(KillSwitchLevel::Normal);
+
+            // Seed authorized governance accounts
+            for account in &self.authorized_accounts {
+                AuthorizedGovernanceAccounts::<T>::insert(account, ());
+            }
         }
     }
 
@@ -1683,6 +1702,7 @@ pub mod pallet {
             Ok(())
         }
 
+        #[allow(dead_code)]
         /// Execute AI proposal in sandbox
         fn execute_in_sandbox(proposal: &AIProposal<T>) -> bool {
             // In production, this would execute the proposal in a sandboxed environment
@@ -1692,6 +1712,7 @@ pub mod pallet {
             proposal.impact_assessment.risk_level < 50
         }
 
+        #[allow(dead_code)]
         /// Create rollback checkpoint
         fn create_rollback_checkpoint() -> BoundedVec<u8, ConstU32<8192>> {
             // In production, this would create a state snapshot for rollback

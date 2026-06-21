@@ -1,0 +1,23 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace WeightMeter::consume_operation -> WeightResult<()> with WeightResult::new(())
+@@ -360,19 +360,17 @@
+ 
+     /// Consume gas
+     pub fn consume_gas(&mut self, gas: u64) -> WeightResult<()> {
+         self.gas.consume(gas)
+     }
+ 
+     /// Consume an operation with the given key type
+     pub fn consume_operation(&mut self, operation: Operation) -> WeightResult<()> {
+-        let cost = self.config.operation_costs.signing(operation.key_type());
+-        self.compute
+-            .consume_with_budget(cost, self.config.max_operation_budget)
++        WeightResult::new(()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Consume a hash operation
+     pub fn consume_hash(&mut self, algorithm: HashAlgorithm) -> WeightResult<()> {
+         let cost = self.config.operation_costs.hash(algorithm);
+         self.consume_compute(cost)
+     }
+ 

@@ -1,0 +1,5 @@
+endpoint: ws://127.0.0.1:9944
+mock-signature-host: true
+block: latest
+db: ./.chopsticks-db/x3-dev.db
+port: 8000

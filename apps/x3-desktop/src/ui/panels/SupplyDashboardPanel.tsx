@@ -1,150 +1,107 @@
-import { useEffect, useState } from 'react'
-import { invoke } from '../../ipc/tauri'
+import { useEffect, useState, useCallback } from 'react';
+import { invoke } from '../../ipc/tauri';
 
 interface SupplyData {
-  totalSupply: number
-  minted: number
-  burned: number
-  circulating: number
-  timestamp: number
-}
-
-interface SupplyResult {
-  total_supply?: string
-  circulating_supply?: string
-  locked_supply?: string
-  block_hash?: string
+  total_supply: string;
+  circulating_supply: string;
+  locked_supply: string;
 }
 
 function SupplyDashboardPanel() {
-  const [data, setData] = useState<SupplyData>({
-    totalSupply: 1_000_000_000,
-    minted: 245_000_000,
-    burned: 82_000_000,
-    circulating: 683_000_000,
-    timestamp: Date.now(),
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [supply, setSupply] = useState<SupplyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSupply = useCallback(async () => {
+    try {
+      const result = await invoke<SupplyData>('get_supply_data');
+      if (result) {
+        setSupply(result);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch supply data:', err);
+      setError('Node RPC unreachable');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true
-
-    const fetchSupply = async () => {
-      try {
-        const result = await invoke<SupplyResult>('get_supply_data')
-        if (!mounted) return
-
-        const totalSupply = parseInt(result.total_supply || '0', 10) || 1_000_000_000
-        const circulating = parseInt(result.circulating_supply || '0', 10) || Math.floor(totalSupply * 0.683)
-        const locked = parseInt(result.locked_supply || '0', 10) || Math.floor(totalSupply * 0.317)
-        // Derive burned/minted from known pattern: burned is ~8.2% of total
-        const burned = Math.floor(totalSupply * 0.082)
-        const minted = totalSupply - circulating - locked + burned
-
-        setData({
-          totalSupply,
-          minted: Math.max(0, minted),
-          burned,
-          circulating,
-          timestamp: Date.now(),
-        })
-        setLoading(false)
-        setError(null)
-      } catch (err) {
-        if (mounted) {
-          console.error('Failed to fetch supply data via Tauri:', err)
-          setError('Failed to fetch real-time supply data. Check chain connection.')
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchSupply()
-
-    // Refresh every 10 seconds (supply changes slowly)
-    const interval = setInterval(fetchSupply, 10000)
-
-    return () => {
-      mounted = false
-      clearInterval(interval)
-    }
-  }, [])
-
-  const circPct = ((data.circulating / data.totalSupply) * 100).toFixed(1)
-  const burnedPct = ((data.burned / data.totalSupply) * 100).toFixed(1)
-  const mintedPct = ((data.minted / data.totalSupply) * 100).toFixed(1)
+    fetchSupply();
+    const interval = setInterval(fetchSupply, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchSupply]);
 
   if (loading) {
     return (
-      <div className="view">
-        <h2>Supply Dashboard</h2>
-        <div className="loading">Loading real-time supply data via Tauri backend...</div>
+      <div className="view p-6">
+        <h2 className="text-xl font-bold text-white mb-2">Token Supply</h2>
+        <div className="text-gray-400">Loading supply data via Tauri → node RPC...</div>
       </div>
-    )
+    );
   }
 
+  const total = supply?.total_supply || '0';
+  const circ = supply?.circulating_supply || '0';
+  const locked = supply?.locked_supply || '0';
+
+  const totalNum = parseFloat(total) || 0;
+  const circNum = parseFloat(circ) || 0;
+  const lockedNum = parseFloat(locked) || 0;
+  const circPct = totalNum > 0 ? ((circNum / totalNum) * 100).toFixed(1) : '0';
+  const lockedPct = totalNum > 0 ? ((lockedNum / totalNum) * 100).toFixed(1) : '0';
+
   return (
-    <div className="view">
-      <h2>Supply Dashboard</h2>
-      <p className="view-subtitle">Live tokenomics from token_getSupply RPC</p>
-      {error && <div className="error-banner">{error}</div>}
-      <div className="card-grid">
-        <div className="card">
-          <span className="card-label">Total Supply</span>
-          <span className="card-value">{data.totalSupply.toLocaleString()}</span>
-          <span className="card-unit">tX3</span>
+    <div className="view p-6">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-white">Token Supply</h2>
+        <p className="text-gray-400 text-sm">Circulating + locked supply from chain state</p>
+      </div>
+
+      {error && <div className="bg-yellow-900/30 border border-yellow-600/30 rounded-lg p-3 mb-4 text-yellow-300 text-sm">{error}</div>}
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-gray-800/40 rounded-lg p-5 border border-gray-700/50">
+          <div className="text-gray-500 text-xs mb-1">Total Supply</div>
+          <div className="text-white font-mono text-xl font-bold">{Number(total).toLocaleString()}</div>
+          <div className="text-gray-500 text-xs mt-1">X3 tokens</div>
         </div>
-        <div className="card">
-          <span className="card-label">Minted</span>
-          <span className="card-value">{data.minted.toLocaleString()}</span>
-          <span className="card-unit">tX3 ({mintedPct}%)</span>
+        <div className="bg-gray-800/40 rounded-lg p-5 border border-green-700/30">
+          <div className="text-gray-500 text-xs mb-1">Circulating</div>
+          <div className="text-green-400 font-mono text-xl font-bold">{Number(circ).toLocaleString()}</div>
+          <div className="text-gray-500 text-xs mt-1">{circPct}% of total</div>
         </div>
-        <div className="card">
-          <span className="card-label">Burned</span>
-          <span className="card-value">{data.burned.toLocaleString()}</span>
-          <span className="card-unit">tX3 ({burnedPct}%)</span>
-        </div>
-        <div className="card">
-          <span className="card-label">Circulating Supply</span>
-          <span className="card-value">{data.circulating.toLocaleString()}</span>
-          <span className="card-unit">tX3 ({circPct}%)</span>
+        <div className="bg-gray-800/40 rounded-lg p-5 border border-yellow-700/30">
+          <div className="text-gray-500 text-xs mb-1">Locked</div>
+          <div className="text-yellow-400 font-mono text-xl font-bold">{Number(locked).toLocaleString()}</div>
+          <div className="text-gray-500 text-xs mt-1">{lockedPct}% of total</div>
         </div>
       </div>
 
-      <div className="supply-bars">
-        <div className="supply-bar-row">
-          <span className="bar-label">Minted ({mintedPct}%)</span>
-          <div className="bar-track">
-            <div className="bar-fill minted" style={{ width: `${mintedPct}%` }} />
-          </div>
+      <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
+        <h3 className="text-sm font-medium text-gray-300 mb-2">Supply Distribution</h3>
+        <div className="w-full h-4 bg-gray-700 rounded-full overflow-hidden">
+          {totalNum > 0 ? (
+            <>
+              <div className="h-full bg-green-500 float-left" style={{ width: `${circPct}%` }} />
+              <div className="h-full bg-yellow-600 float-left" style={{ width: `${lockedPct}%` }} />
+            </>
+          ) : (
+            <div className="h-full bg-gray-600 w-full" />
+          )}
         </div>
-        <div className="supply-bar-row">
-          <span className="bar-label">Burned ({burnedPct}%)</span>
-          <div className="bar-track">
-            <div className="bar-fill burned" style={{ width: `${burnedPct}%` }} />
-          </div>
-        </div>
-        <div className="supply-bar-row">
-          <span className="bar-label">Circulating ({circPct}%)</span>
-          <div className="bar-track">
-            <div className="bar-fill circulating" style={{ width: `${circPct}%` }} />
-          </div>
+        <div className="flex gap-4 mt-2 text-xs text-gray-500">
+          <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500" /> Circulating</div>
+          <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-600" /> Locked</div>
         </div>
       </div>
 
-      <div className="supply-info">
-        <div className="info-item">
-          <span className="info-label">Last Updated:</span>
-          <span className="info-value">{new Date(data.timestamp).toLocaleString()}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">Data Source:</span>
-          <span className="info-value">X3 Chain Runtime (via Tauri invoke → node RPC)</span>
-        </div>
+      <div className="mt-3 text-xs text-gray-600">
+        Query: invoke('get_supply_data') → node RPC :9933 (token_getSupply)
       </div>
     </div>
-  )
+  );
 }
 
-export default SupplyDashboardPanel
+export default SupplyDashboardPanel;

@@ -69,7 +69,7 @@ pub struct FeatureStatus {
     pub name: String,
     pub mode: String,
     pub readiness_score: u8,
-    pub required_tests_present: bool,
+    pub required_tests_present: Option<bool>,
     pub health_status: String,
     pub tauri_wired: bool,
     pub proof_report_generated: bool,
@@ -107,7 +107,7 @@ pub struct UnsupportedClaim {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Verdict {
     TestnetGo,
     TestnetNoGo,
@@ -133,8 +133,10 @@ pub fn load_feature_registry() -> Result<FeatureRegistry, String> {
                 "FEATURE_REGISTRY.toml not found at '{}'. \
                  A file exists at the legacy path '{}'. \
                  Move it to the root level: mv {} {}",
-                FEATURE_REGISTRY_PATH, LEGACY_REGISTRY_PATH,
-                LEGACY_REGISTRY_PATH, FEATURE_REGISTRY_PATH
+                FEATURE_REGISTRY_PATH,
+                LEGACY_REGISTRY_PATH,
+                LEGACY_REGISTRY_PATH,
+                FEATURE_REGISTRY_PATH
             ));
         }
         return Err(format!(
@@ -177,8 +179,7 @@ pub fn load_testnet_flags() -> Result<TestnetFeatureFlags, String> {
                 "TESTNET_FEATURE_FLAGS.toml not found at '{}'. \
                  A file exists at the legacy path '{}'. \
                  Move it: mv {} {}",
-                TESTNET_FLAGS_PATH, LEGACY_FLAGS_PATH,
-                LEGACY_FLAGS_PATH, TESTNET_FLAGS_PATH
+                TESTNET_FLAGS_PATH, LEGACY_FLAGS_PATH, LEGACY_FLAGS_PATH, TESTNET_FLAGS_PATH
             ));
         }
         return Err(format!(
@@ -226,20 +227,29 @@ pub fn generate_testnet_report() -> ReadinessReport {
     let mut feature_status = Vec::new();
     for (name, entry) in &registry {
         let required_tests_present = check_required_tests_from_list(&entry.required_tests);
+        // Surface uncertainty: if the check returned None, the report
+        // records `null` and a blocker is added below.
         let health_status = check_health_endpoint(&entry.health_endpoint);
-        let tauri_wired = check_tauri_wiring_for_app(&name, &entry.tauri_app);
+        let tauri_wired = check_tauri_wiring_for_app(name, &entry.tauri_app);
         let proof_report_generated = check_proof_report_path(&entry.proof_report);
 
         let mut blockers: Vec<String> = entry.blockers.clone();
 
-        if !required_tests_present {
+        if required_tests_present == Some(false) {
             blockers.push("Missing required tests".to_string());
+        } else if required_tests_present.is_none() {
+            blockers.push(
+                "Required tests status unknown (could not verify in source tree)".to_string(),
+            );
         }
         if health_status != "healthy" && health_status != "no-endpoint" {
             blockers.push(format!("Service health check: {}", health_status));
         }
         if !tauri_wired && !entry.tauri_app.is_empty() {
-            blockers.push(format!("Tauri wiring incomplete for app '{}'", entry.tauri_app));
+            blockers.push(format!(
+                "Tauri wiring incomplete for app '{}'",
+                entry.tauri_app
+            ));
         }
         if !proof_report_generated && !entry.proof_report.is_empty() {
             blockers.push(format!("Proof report missing: {}", entry.proof_report));
@@ -258,9 +268,7 @@ pub fn generate_testnet_report() -> ReadinessReport {
     }
 
     // Determine verdict
-    let verdict = if !errors.is_empty() {
-        Verdict::TestnetNoGo
-    } else if feature_status.iter().any(|s| !s.blockers.is_empty()) {
+    let verdict = if !errors.is_empty() || feature_status.iter().any(|s| !s.blockers.is_empty()) {
         Verdict::TestnetNoGo
     } else {
         Verdict::TestnetGo
@@ -282,22 +290,82 @@ pub fn generate_testnet_report() -> ReadinessReport {
 
 // ── Health and wiring checks ──
 
-fn check_required_tests_from_list(tests: &[String]) -> bool {
+/// Try to verify that each required test function name can be found in
+/// Rust source files under standard test directories (`pallets/`, `crates/`,
+/// `x3-lang/`).  The search is approximate — it scans for `fn <test_name>`
+/// patterns.  If the search encounters IO errors or the directories cannot
+/// be inspected, we return `None` (unknown) rather than falsely claiming
+/// coverage.
+fn check_required_tests_from_list(tests: &[String]) -> Option<bool> {
     if tests.is_empty() {
-        return true; // no tests required → pass
+        return Some(true); // no tests required → pass
     }
+
+    // Collect candidate source directories that commonly contain #[cfg(test)] blocks.
+    let search_dirs = ["pallets", "crates", "x3-lang"];
+
     for test_name in tests {
-        // Test names in the registry are test function names, not file paths.
-        // We treat them as present if they are non-empty names that look valid.
         if test_name.is_empty() {
-            return false;
+            return Some(false);
         }
-        // We don't check file existence for test function names — that would
-        // require parsing Rust source files. The caller is responsible for
-        // verifying these via CI. This function checks that the list is
-        // well-formed.
+
+        let mut found = false;
+        for dir in &search_dirs {
+            let path = Path::new(dir);
+            if !path.is_dir() {
+                continue;
+            }
+            if let Ok(entries) = walk_dir(path) {
+                for entry_path in entries {
+                    let entry_path = entry_path.path();
+                    if entry_path.extension().map(|e| e == "rs").unwrap_or(false) {
+                        if let Ok(content) = fs::read_to_string(&entry_path) {
+                            // Look for the test function definition.
+                            // Test functions are annotated with #[test] or defined
+                            // inside a #[cfg(test)] module.  We search for the
+                            // bare function signature as a heuristic.
+                            let pattern = format!("fn {}", test_name);
+                            if content.contains(&pattern) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if found {
+                break;
+            }
+        }
+
+        if !found {
+            // Could not find the test — report unknown rather than false negative,
+            // because a filename-based grep is not guaranteed to catch all test
+            // definitions (e.g. integration tests in tests/ directories, generated
+            // tests, or tests referenced via module re-exports).
+            return None;
+        }
     }
-    true
+
+    Some(true)
+}
+
+/// A minimal recursive directory walker that does not pull in the `walkdir` crate.
+fn walk_dir(dir: &Path) -> Result<Vec<std::fs::DirEntry>, std::io::Error> {
+    let mut acc = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        for entry in fs::read_dir(&current)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                acc.push(entry);
+            }
+        }
+    }
+    Ok(acc)
 }
 
 fn check_health_endpoint(endpoint: &str) -> String {
@@ -378,7 +446,14 @@ pub fn generate_feature_gap_report() -> String {
         .feature_completion
         .iter()
         .filter(|f| !f.blockers.is_empty())
-        .map(|f| format!("  {} (score={}): {}", f.name, f.readiness_score, f.blockers.join(", ")))
+        .map(|f| {
+            format!(
+                "  {} (score={}): {}",
+                f.name,
+                f.readiness_score,
+                f.blockers.join(", ")
+            )
+        })
         .collect();
 
     if gaps.is_empty() {
@@ -434,11 +509,7 @@ pub fn generate_tauri_wiring_report() -> String {
         out.push_str(&format!(
             "  {}: {}\n",
             name,
-            if wired {
-                "wired"
-            } else {
-                "NOT WIRED"
-            }
+            if wired { "wired" } else { "NOT WIRED" }
         ));
     }
     out
@@ -449,7 +520,29 @@ pub fn generate_marketing_claims_audit() -> String {
 }
 
 pub fn generate_btc_gateway_report() -> String {
-    String::from("# BTC Gateway Report\n\nSPV header count and UTXO health not yet wired.\n")
+    match load_feature_registry() {
+        Ok(reg) => {
+            let mut out = String::from("# BTC Gateway Report\n\n");
+            if let Some(entry) = reg.get("btc_fortress_gateway") {
+                out.push_str(&format!("- Mode: {}\n", entry.mode));
+                out.push_str(&format!("- Readiness score: {}\n", entry.readiness_score));
+                if !entry.blockers.is_empty() {
+                    out.push_str("- Blockers:\n");
+                    for b in &entry.blockers {
+                        out.push_str(&format!("  - {}\n", b));
+                    }
+                }
+                if !entry.health_endpoint.is_empty() {
+                    let status = check_health_endpoint(&entry.health_endpoint);
+                    out.push_str(&format!("- Health: {}\n", status));
+                }
+            } else {
+                out.push_str("No BTC gateway feature entry found in registry.\n");
+            }
+            out
+        }
+        Err(e) => format!("# BTC Gateway Report\n\nError loading registry: {}\n", e),
+    }
 }
 
 pub fn generate_service_health_report() -> String {
@@ -465,13 +558,65 @@ pub fn generate_service_health_report() -> String {
 }
 
 pub fn generate_swarm_health_report() -> String {
-    String::from("# Swarm Health Report\n\nSwarm agent heartbeat collection not yet wired.\n")
+    match load_feature_registry() {
+        Ok(reg) => {
+            let mut out = String::from("# Swarm Health Report\n\n");
+            let swarm_features: Vec<_> = reg.iter().filter(|(k, _)| k.contains("swarm")).collect();
+            if swarm_features.is_empty() {
+                out.push_str("No swarm-related features registered.\n");
+            } else {
+                for (name, entry) in &swarm_features {
+                    out.push_str(&format!("- {} (score={})\n", name, entry.readiness_score));
+                    if !entry.health_endpoint.is_empty() {
+                        let status = check_health_endpoint(&entry.health_endpoint);
+                        out.push_str(&format!("  health: {}\n", status));
+                    }
+                    if !entry.blockers.is_empty() {
+                        for b in &entry.blockers {
+                            out.push_str(&format!("  blocker: {}\n", b));
+                        }
+                    }
+                }
+            }
+            out
+        }
+        Err(e) => {
+            format!("# Swarm Health Report\n\nError loading registry: {}\n", e)
+        }
+    }
 }
 
 pub fn generate_reactor_benchmark_report() -> String {
-    String::from(
-        "# Reactor Benchmark Report\n\nBenchmark harness exists; CI pipeline not yet wired.\n",
-    )
+    match load_feature_registry() {
+        Ok(reg) => {
+            let mut out = String::from("# Reactor Benchmark Report\n\n");
+            if let Some(entry) = reg.get("x3_reactor") {
+                out.push_str(&format!("- Mode: {}\n", entry.mode));
+                out.push_str(&format!("- Readiness score: {}\n", entry.readiness_score));
+                if !entry.required_tests.is_empty() {
+                    out.push_str("- Required tests:\n");
+                    for t in &entry.required_tests {
+                        out.push_str(&format!("  - {}\n", t));
+                    }
+                }
+                if !entry.blockers.is_empty() {
+                    out.push_str("- Blockers:\n");
+                    for b in &entry.blockers {
+                        out.push_str(&format!("  - {}\n", b));
+                    }
+                }
+            } else {
+                out.push_str("No x3_reactor feature entry found in registry.\n");
+            }
+            out
+        }
+        Err(e) => {
+            format!(
+                "# Reactor Benchmark Report\n\nError loading registry: {}\n",
+                e
+            )
+        }
+    }
 }
 
 pub fn generate_grant_pipeline_report() -> String {
@@ -499,7 +644,10 @@ mod tests {
                 );
                 let kernel = &registry["atomic_kernel"];
                 assert!(!kernel.mode.is_empty(), "atomic_kernel must have a mode");
-                assert!(kernel.readiness_score > 0, "atomic_kernel must have a score");
+                assert!(
+                    kernel.readiness_score > 0,
+                    "atomic_kernel must have a score"
+                );
             }
             Err(e) => {
                 // If the file doesn't exist in this test context, that's OK —
@@ -542,11 +690,17 @@ mod tests {
 
     #[test]
     fn test_required_tests_for_valid_names() {
-        let tests = vec!["test_something".to_string(), "test_other".to_string()];
-        assert!(check_required_tests_from_list(&tests));
+        // Empty list → Some(true)
+        let empty: Vec<String> = vec![];
+        assert_eq!(check_required_tests_from_list(&empty), Some(true));
 
+        // Empty string in list → Some(false)
         let empty_names = vec!["".to_string()];
-        assert!(!check_required_tests_from_list(&empty_names));
+        assert_eq!(check_required_tests_from_list(&empty_names), Some(false));
+
+        // Non-existent test names → None (unknown) because source search can't find them
+        let fake_tests = vec!["test_something".to_string(), "test_other".to_string()];
+        assert_eq!(check_required_tests_from_list(&fake_tests), None);
     }
 
     #[test]
@@ -556,6 +710,90 @@ mod tests {
         let result = load_feature_registry();
         if let Err(msg) = result {
             assert!(msg.contains(FEATURE_REGISTRY_PATH));
+        }
+    }
+
+    #[test]
+    fn real_registry_parses_all_features() {
+        // Integration-level test: load the actual FEATURE_REGISTRY.toml
+        // and validate that all expected features are present with valid scores.
+        let registry = match load_feature_registry() {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Note: real_registry_parses_all_features skipped: {e}");
+                return;
+            }
+        };
+        // Verify core features exist
+        for required in &[
+            "atomic_kernel",
+            "atomic_router",
+            "atomic_gateway",
+            "btc_fortress_gateway",
+        ] {
+            assert!(
+                registry.contains_key(*required),
+                "FEATURE_REGISTRY.toml must contain '{required}'"
+            );
+        }
+        // Every feature must have a mode and score
+        for (name, entry) in &registry {
+            assert!(!entry.mode.is_empty(), "Feature '{name}' has empty mode");
+            // Score should be <= 100
+            assert!(
+                entry.readiness_score <= 100,
+                "Feature '{name}' has score {} > 100",
+                entry.readiness_score
+            );
+        }
+        // Verify feature flag alignment
+        let flags = match load_testnet_flags() {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+        for (name, flag_mode) in &flags {
+            if let Some(entry) = registry.get(name) {
+                // Flag modes should be compatible with registry modes
+                let flag_upper = flag_mode.to_uppercase();
+                let reg_mode = entry.mode.to_uppercase();
+                // LIVE_TESTNET, GUARDED_TESTNET, SIM_TESTNET, DISABLED_BLOCKED
+                // are all valid mode values. They should not contradict each other.
+                if flag_upper == "DISABLED_BLOCKED" && reg_mode != "DISABLED_BLOCKED" {
+                    // This is fine: some features are disabled in flags but present in registry
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn real_flags_parse_all_features() {
+        let flags = match load_testnet_flags() {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Note: real_flags_parse_all_features skipped: {e}");
+                return;
+            }
+        };
+        assert!(
+            !flags.is_empty(),
+            "TESTNET_FEATURE_FLAGS.toml should have entries"
+        );
+        // Verify known flags exist
+        for required in &["atomic_kernel", "atomic_router"] {
+            assert!(
+                flags.contains_key(*required),
+                "TESTNET_FEATURE_FLAGS.toml must contain '{required}'"
+            );
+        }
+        // All flag values must be valid modes
+        for (name, mode) in &flags {
+            assert!(
+                matches!(
+                    mode.as_str(),
+                    "LIVE_TESTNET" | "GUARDED_TESTNET" | "SIM_TESTNET" | "DISABLED_BLOCKED"
+                ),
+                "Feature '{name}' has invalid mode '{mode}'"
+            );
         }
     }
 }

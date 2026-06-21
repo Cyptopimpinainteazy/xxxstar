@@ -1,3 +1,7 @@
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # X3 Proof-Carrying Agent Execution Pallet
 //!
 //! Allows agents to submit ZK, formal, replay, or fraud proofs alongside
@@ -80,7 +84,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type.
-
         /// Currency for staking and fees.
         type Currency: ReservableCurrency<Self::AccountId>;
 
@@ -365,7 +368,7 @@ pub mod pallet {
             let _verifier = ensure_signed(origin)?;
 
             let mut action =
-                VerifiedActions::<T>::get(&action_id).ok_or(Error::<T>::ActionNotFound)?;
+                VerifiedActions::<T>::get(action_id).ok_or(Error::<T>::ActionNotFound)?;
 
             ensure!(
                 action.status == types::ProofStatus::Pending,
@@ -421,7 +424,7 @@ pub mod pallet {
         ) -> DispatchResult {
             let challenger = ensure_signed(origin)?;
 
-            let action = VerifiedActions::<T>::get(&action_id).ok_or(Error::<T>::ActionNotFound)?;
+            let action = VerifiedActions::<T>::get(action_id).ok_or(Error::<T>::ActionNotFound)?;
 
             // Only verified actions can be challenged
             ensure!(
@@ -431,7 +434,7 @@ pub mod pallet {
 
             // Check if challenge already exists
             ensure!(
-                !ActiveChallenges::<T>::contains_key(&action_id),
+                !ActiveChallenges::<T>::contains_key(action_id),
                 Error::<T>::ChallengeAlreadyExists
             );
 
@@ -494,7 +497,7 @@ pub mod pallet {
             T::AdminOrigin::ensure_origin(origin)?;
 
             let challenge =
-                ActiveChallenges::<T>::get(&action_id).ok_or(Error::<T>::ChallengeNotFound)?;
+                ActiveChallenges::<T>::get(action_id).ok_or(Error::<T>::ChallengeNotFound)?;
 
             ensure!(
                 challenge.resolution.is_none(),
@@ -502,7 +505,7 @@ pub mod pallet {
             );
 
             let mut action =
-                VerifiedActions::<T>::get(&action_id).ok_or(Error::<T>::ActionNotFound)?;
+                VerifiedActions::<T>::get(action_id).ok_or(Error::<T>::ActionNotFound)?;
 
             // Resolve the challenge
             let mut challenge = challenge;

@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace >= with < in FeeCurve::reputation_discount
+@@ -70,17 +70,17 @@
+         if success_bps < 5000 {
+             return 0;
+         }
+ 
+         // Slash penalty: each slash halves the discount
+         let slash_penalty = 2u64.saturating_pow(reputation.slashes as u32);
+ 
+         // Age factor: agents need at least 100 blocks of history
+-        let age_factor = if reputation.age_blocks >= 1000 {
++        let age_factor = if reputation.age_blocks < /* ~ changed by cargo-mutants ~ */ 1000 {
+             100u64 // Full credit
+         } else if reputation.age_blocks >= 100 {
+             50u64 // Half credit
+         } else {
+             0u64 // No credit — too new
+         };
+ 
+         if age_factor == 0 {

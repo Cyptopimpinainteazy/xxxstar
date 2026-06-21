@@ -1,4 +1,17 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
 //! # X3Chain Treasury Pallet
 //!
 //! A comprehensive treasury management system supporting:
@@ -72,7 +85,6 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// The overarching event type.
-
         /// Currency type for treasury operations.
         type Currency: ReservableCurrency<Self::AccountId>;
 

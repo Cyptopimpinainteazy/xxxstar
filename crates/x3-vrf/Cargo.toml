@@ -27,3 +27,4 @@ std = [
     "sp-std/std",
     "sp-application-crypto/std",
 ]
+dev = []

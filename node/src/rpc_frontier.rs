@@ -828,8 +828,7 @@ where
     module.register_method(
         "x3_getEvmLogs",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let filter: serde_json::Value =
-                params.one().unwrap_or(serde_json::Value::Null);
+            let filter: serde_json::Value = params.one().unwrap_or(serde_json::Value::Null);
             let from_block = filter
                 .get("fromBlock")
                 .and_then(|v| v.as_str())

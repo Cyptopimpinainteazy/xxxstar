@@ -710,10 +710,7 @@ pub enum Literal {
         base: IntBase,
     },
     /// Floating-point literal (e.g., 3.14, 1e-10)
-    Float {
-        value: Symbol,
-        suffix: Option<FloatSuffix>,
-    },
+    Float { value: Symbol, suffix: Option<FloatSuffix> },
     /// String literal (e.g., "hello")
     String(Symbol),
     /// Raw string literal (e.g., r#"hello"#)
@@ -739,11 +736,7 @@ pub enum Literal {
 impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Literal::Int {
-                value,
-                suffix,
-                base,
-            } => {
+            Literal::Int { value, suffix, base } => {
                 write!(f, "Int({:?}, {:?}, {:?})", value, suffix, base)
             }
             Literal::Float { value, suffix } => write!(f, "Float({}, {:?})", value, suffix),
@@ -766,11 +759,7 @@ impl fmt::Debug for Literal {
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Literal::Int {
-                value,
-                suffix,
-                base,
-            } => {
+            Literal::Int { value, suffix, base } => {
                 match base {
                     IntBase::Decimal => write!(f, "{}", value)?,
                     IntBase::Hex => write!(f, "0x{:x}", value)?,
@@ -1000,10 +989,7 @@ impl Delimiter {
     pub fn is_open(&self) -> bool {
         matches!(
             self,
-            Delimiter::OpenParen
-                | Delimiter::OpenBracket
-                | Delimiter::OpenBrace
-                | Delimiter::OpenAngle
+            Delimiter::OpenParen | Delimiter::OpenBracket | Delimiter::OpenBrace | Delimiter::OpenAngle
         )
     }
 

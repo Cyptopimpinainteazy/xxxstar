@@ -30,8 +30,8 @@ scale-info = { workspace = true, default-features = false }
 log = { workspace = true, default-features = false }
 
 # Crypto
-sha2 = { workspace = true, default-features = false }
-sha3 = { workspace = true, default-features = false }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
 ripemd = { version = "0.1", default-features = false }
 
 # Arkworks — BN254 (alt_bn128) curve operations for EVM precompiles (no-std compatible)

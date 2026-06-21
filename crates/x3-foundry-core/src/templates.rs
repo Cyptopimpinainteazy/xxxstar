@@ -20,6 +20,7 @@ pub struct Template {
 }
 
 impl Template {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: &str,
         name: &str,

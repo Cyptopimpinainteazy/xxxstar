@@ -205,73 +205,17 @@ impl BiometricAuth {
     }
 
     /// Verify PIN (fallback authentication)
-    pub async fn verify_pin(&self, pin: &str) -> Result<AuthResult, SdkError> {
-        // In production: stored PIN is hashed/salted in Keystore
-        // For now: simple validation (minimum 4 digits)
-        if pin.len() < 4 || !pin.chars().all(|c| c.is_numeric()) {
-            return Ok(AuthResult::Failure("Invalid PIN format".to_string()));
-        }
-
-        // Hash PIN and compare with stored hash
-        let pin_hash = hash_pin(pin);
-
-        // Placeholder: In production, compare against stored hash
-        let stored_hash = "placeholder_hash";
-
-        if pin_hash == stored_hash {
-            let session_token = generate_session_token();
-            let now = chrono::Utc::now().timestamp();
-
-            let session = BiometricSession {
-                session_token: session_token.clone(),
-                auth_method: BiometricType::PIN,
-                created_at: now,
-                expires_at: now + self.session_timeout,
-            };
-
-            self.sessions.write().await.push(session);
-            Ok(AuthResult::Success(session_token))
-        } else {
-            let mut failed = self.failed_attempts.lock().expect("failed_attempts mutex poisoned");
-            *failed += 1;
-
-            if *failed >= self.max_failures {
-                Ok(AuthResult::Retry)
-            } else {
-                Ok(AuthResult::Failure(format!(
-                    "{} attempts remaining",
-                    self.max_failures - *failed
-                )))
-            }
-        }
+    pub async fn verify_pin(&self, _pin: &str) -> Result<AuthResult, SdkError> {
+        Err(SdkError::BiometricError(
+            "PIN verification backend not initialized — configure a PIN storage provider before calling verify_pin".to_string(),
+        ))
     }
 
     /// Set PIN (fallback authentication)
-    pub async fn set_pin(&self, existing_pin: &str, new_pin: &str) -> Result<(), SdkError> {
-        // Verify user knows current PIN first
-        match self.verify_pin(existing_pin).await? {
-            AuthResult::Success(_) => {}
-            _ => return Err(SdkError::BiometricError("Current PIN incorrect".to_string())),
-        }
-
-        // Validate new PIN
-        if new_pin.len() < 4 {
-            return Err(SdkError::BiometricError(
-                "PIN must be at least 4 digits".to_string(),
-            ));
-        }
-
-        if !new_pin.chars().all(|c| c.is_numeric()) {
-            return Err(SdkError::BiometricError(
-                "PIN must contain only digits".to_string(),
-            ));
-        }
-
-        // In production: store hash(new_pin) in Keystore
-        let _ = hash_pin(new_pin);
-
-        tracing::info!("PIN updated");
-        Ok(())
+    pub async fn set_pin(&self, _existing_pin: &str, _new_pin: &str) -> Result<(), SdkError> {
+        Err(SdkError::BiometricError(
+            "PIN storage backend not initialized — cannot set PIN".to_string(),
+        ))
     }
 
     /// Verify active session
@@ -448,10 +392,9 @@ mod tests {
     #[tokio::test]
     async fn test_pin_verification() {
         let auth = BiometricAuth::new(300);
-        
-        // PIN verification would require setting PIN first in production
+
         let result = auth.verify_pin("1234").await;
-        assert!(result.is_ok());
+        assert!(result.is_err());
     }
 
     #[tokio::test]

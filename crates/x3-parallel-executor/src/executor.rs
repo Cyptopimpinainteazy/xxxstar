@@ -21,8 +21,8 @@ pub enum TxOutcome {
     /// Transaction executed and produced write-set `writes`.
     Success {
         tx_id: TxId,
-        /// Keys actually written (may differ from declared access list).
-        writes: Vec<[u8; 32]>,
+        /// (key, value) pairs actually written.
+        writes: Vec<([u8; 32], [u8; 32])>,
     },
     /// Transaction failed with `reason`; no state changes applied.
     Failed { tx_id: TxId, reason: FailReason },

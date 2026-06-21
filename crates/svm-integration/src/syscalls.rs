@@ -4,6 +4,8 @@
 //! Programs cannot access host resources directly — they must go through the
 //! syscall table. This module implements the approved syscall set.
 
+use sha2::{Digest, Sha256};
+use sha3::Keccak256;
 use std::collections::BTreeMap;
 
 /// A syscall identifier.
@@ -99,11 +101,26 @@ impl Syscall for Sha256Syscall {
         cu_cost::SHA256 + (input.len() as u64 / 32) * 100
     }
     fn execute(&self, input: &[u8]) -> SyscallResult {
-        let mut out = [0u8; 32];
-        for (i, &b) in input.iter().enumerate() {
-            out[i % 32] ^= b;
-        }
-        Ok(out.to_vec())
+        let mut hasher = Sha256::new();
+        hasher.update(input);
+        Ok(hasher.finalize().to_vec())
+    }
+}
+
+/// Keccak-256 hash syscall (ID: 4).
+pub struct Keccak256Syscall;
+impl Syscall for Keccak256Syscall {
+    fn id(&self) -> SyscallId {
+        4
+    }
+    fn name(&self) -> &'static str {
+        "sol_keccak256"
+    }
+    fn compute_units(&self, input: &[u8]) -> u64 {
+        cu_cost::KECCAK256 + (input.len() as u64 / 32) * 200
+    }
+    fn execute(&self, input: &[u8]) -> SyscallResult {
+        Ok(Keccak256::digest(input).to_vec())
     }
 }
 
@@ -125,8 +142,9 @@ impl Syscall for CrossVmInvokeSyscall {
                 "cross-vm invoke requires at least 8 bytes (vm_id + selector)".into(),
             ));
         }
-        // Stub: return echo of vm_id byte + success marker
-        Ok(vec![input[0], 0x01])
+        Err(SyscallError::CrossVmRejected(
+            "cross-vm invoke not yet implemented in this syscall path".into(),
+        ))
     }
 }
 
@@ -143,6 +161,7 @@ impl SyscallTable {
         table.register(Box::new(LogSyscall));
         table.register(Box::new(GetClockSyscall));
         table.register(Box::new(Sha256Syscall));
+        table.register(Box::new(Keccak256Syscall));
         table.register(Box::new(CrossVmInvokeSyscall));
         table
     }
@@ -223,12 +242,11 @@ mod tests {
     }
 
     #[test]
-    fn test_cross_vm_invoke_valid() {
+    fn test_cross_vm_invoke_not_implemented() {
         let table = SyscallTable::new();
         let input = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
-        let result = table.invoke(0xA0, &input, 1_000_000).unwrap();
-        assert_eq!(result[0], 0x01);
-        assert_eq!(result[1], 0x01);
+        let result = table.invoke(0xA0, &input, 1_000_000);
+        assert!(matches!(result, Err(SyscallError::CrossVmRejected(_))));
     }
 
     #[test]

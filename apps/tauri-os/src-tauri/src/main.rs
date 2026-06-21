@@ -223,6 +223,49 @@ async fn swarm_approve_task(task_id: String) -> Result<String, IpcError> {
     Ok(json.to_string())
 }
 
+#[derive(Serialize, Deserialize)]
+struct ServiceStatus {
+    name: String,
+    port: u16,
+    healthy: bool,
+}
+
+#[tauri::command]
+async fn inferstructor_check_services() -> Result<Vec<ServiceStatus>, IpcError> {
+    let services = vec![
+        ("GPU Lane 1", 9001),
+        ("GPU Lane 2", 9002),
+        ("GPU Lane 3", 9003),
+        ("TPS Bridge", 9999),
+        ("Validator Registry", 7001),
+        ("RPC Proxy", 8899),
+        ("Admin API", 7777),
+    ];
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(2000))
+        .build()
+        .map_err(|e| IpcError::new("HTTP_CLIENT", &format!("{e}"), None))?;
+
+    let mut results = Vec::new();
+    for (name, port) in services {
+        let url = format!("http://127.0.0.1:{}/health", port);
+        let healthy = client
+            .get(&url)
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
+        results.push(ServiceStatus {
+            name: name.to_string(),
+            port,
+            healthy,
+        });
+    }
+
+    Ok(results)
+}
+
 #[tauri::command]
 async fn swarm_reject_task(task_id: String) -> Result<String, IpcError> {
     let client = reqwest::Client::builder()
@@ -365,6 +408,7 @@ fn main() {
             get_system_metrics,
             swarm_approve_task,
             swarm_reject_task,
+            inferstructor_check_services,
         ])
         .setup(move |app| {
             start_os_monitor(app.handle().clone(), os_state.clone());

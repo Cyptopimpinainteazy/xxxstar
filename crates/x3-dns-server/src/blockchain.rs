@@ -236,8 +236,8 @@ impl BlockchainClient {
                 "Ownership verification is not implemented in DNS server (requires AccountId format + signatures)".to_string(),
             ))
         } else {
-            warn!("⚠️  Blockchain integration is disabled, assuming verification passed");
-            Ok(true)
+            warn!("⚠️  Blockchain integration is disabled, ownership verification cannot proceed");
+            Err(DnsError::blockchain("blockchain integration not available for ownership verification"))
         }
     }
 

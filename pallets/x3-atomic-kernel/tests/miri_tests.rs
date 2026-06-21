@@ -1,4 +1,6 @@
 //! Undefined Behavior Detection with Miri
+#![allow(dead_code)]
+#![allow(clippy::vec_init_then_push)]
 //!
 //! Tests for S0-6 (runtime_panic) and S1-3 (unauthorized_mint)
 //! using the Miri interpreter to catch:
@@ -98,7 +100,7 @@ fn miri_lifetime_correctness_in_rollback_log() {
 
 #[test]
 fn miri_array_indexing_safety() {
-    let changes = vec![1u32, 2u32, 3u32];
+    let changes = [1u32, 2u32, 3u32];
 
     // Safe index
     assert_eq!(changes[0], 1);
@@ -143,7 +145,7 @@ fn miri_reference_counting_safety() {
 
 #[test]
 fn miri_slice_aliasing_safety() {
-    let mut data = vec![1u32, 2u32, 3u32, 4u32];
+    let mut data = [1u32, 2u32, 3u32, 4u32];
 
     // Create two non-overlapping mutable slices
     let (first, second) = data.split_at_mut(2);
@@ -214,6 +216,5 @@ fn miri_stack_depth_reasonable() {
 
 #[test]
 fn test_miri_tests_compile() {
-    // If this runs, Miri is available or normal test runner is used
-    assert!(true);
+    // Tests that all miri tests compile
 }

@@ -43,9 +43,14 @@ const FINALITY_WITNESS_LEN: usize = 96;
 const EVM_FINALITY_TAIL_LEN: usize = 52;
 const SVM_FINALITY_TAIL_LEN: usize = 41;
 const BTC_FINALITY_PREFIX_LEN: usize = 40;
+#[allow(dead_code)]
 const MIN_EVM_CONFIRMATIONS: u32 = 12;
+#[allow(dead_code)]
 const MIN_SVM_CONFIRMATIONS: u32 = 32;
+#[allow(dead_code)]
 const MIN_BTC_CONFIRMATIONS: u32 = 6;
+
+type FinalityEnvelope<'a> = (u32, [u8; 32], [u8; 32], &'a [u8]);
 
 pub use weights::WeightInfo;
 
@@ -210,8 +215,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_x3_kernel::Config {
-        /// Aggregated runtime event type
-
         /// Unix time for vesting calculations
         type UnixTime: UnixTime;
 
@@ -237,6 +240,18 @@ pub mod pallet {
         /// Bonus claim period (blocks)
         #[pallet::constant]
         type BonusClaimPeriod: Get<u64>;
+
+        /// Minimum EVM confirmations for finality proofs.
+        #[pallet::constant]
+        type MinEvmConfirmations: Get<u32>;
+
+        /// Minimum SVM confirmations for finality proofs.
+        #[pallet::constant]
+        type MinSvmConfirmations: Get<u32>;
+
+        /// Minimum BTC confirmations for finality proofs.
+        #[pallet::constant]
+        type MinBtcConfirmations: Get<u32>;
     }
 
     #[pallet::pallet]
@@ -879,10 +894,10 @@ pub mod pallet {
             Ok(())
         }
 
-        fn parse_finality_envelope(
-            proof_bytes: &[u8],
+        fn parse_finality_envelope<'a>(
+            proof_bytes: &'a [u8],
             expected_chain: u8,
-        ) -> Result<(u32, [u8; 32], [u8; 32], &[u8]), Error<T>> {
+        ) -> Result<FinalityEnvelope<'a>, Error<T>> {
             ensure!(
                 proof_bytes.len() >= FINALITY_ENVELOPE_LEN,
                 Error::<T>::InvalidProof
@@ -1083,7 +1098,10 @@ pub mod pallet {
             );
             ensure!(observed_height == block_height, Error::<T>::InvalidProof);
             ensure!(!merkle_branch.is_empty(), Error::<T>::InvalidProof);
-            ensure!(merkle_branch.len() % 32 == 0, Error::<T>::InvalidProof);
+            ensure!(
+                merkle_branch.len().is_multiple_of(32),
+                Error::<T>::InvalidProof
+            );
 
             Ok(())
         }
@@ -1102,27 +1120,27 @@ pub mod pallet {
         /// - Balance corruption
         /// - Arithmetic overflow/underflow bugs
         ///
-        /// NOTE: This function is computationally expensive as it requires iterating
-        /// over all accounts. It should only be called after critical operations
-        /// (mint/burn) and in debug/audit builds with on_finalize hooks.
-        #[cfg(any(feature = "runtime-benchmarks", test))]
+        /// COST NOTE: This function iterates all TeamVesting entries (O(N) in the number
+        /// of vesting schedules). At genesis there are at most a few hundred schedules.
+        /// Call sparingly — only after critical mint/burn operations and in audit hooks.
+        /// IMPLEMENTATION PLAN: To remove the iteration cost, introduce a `DistributedSupply`
+        /// StorageValue<T::Balance> that is incremented/decremented atomically in every
+        /// mint and burn dispatchable. The invariant then reduces to:
+        ///     TotalSupply == TreasuryBalance + BonusPoolBalance + DistributedSupply
+        /// which is O(1) and safe for every block.
+        #[allow(dead_code)]
         fn verify_supply_invariant_full() -> bool {
             let total_supply = TotalSupply::<T>::get();
             let treasury = TreasuryBalance::<T>::get();
             let bonus = BonusPoolBalance::<T>::get();
 
-            // TODO: In production, we need to track distributed_sum incrementally
-            // rather than iterating all accounts. For now, this is test-only.
             let mut distributed_sum = T::Balance::zero();
 
-            // Sum all vesting schedules
             for (_account, schedule) in TeamVesting::<T>::iter() {
                 distributed_sum = distributed_sum
                     .saturating_add(schedule.total_amount.saturated_into::<T::Balance>());
             }
 
-            // In production, we would track canonical balance sum incrementally
-            // For tests, we verify: treasury + bonus + vesting ≤ total_supply
             let accounted = treasury
                 .saturating_add(bonus)
                 .saturating_add(distributed_sum);
@@ -1202,7 +1220,7 @@ pub mod pallet {
                     let (confirmations, inclusion_commitment, header_commitment, witness_and_tail) =
                         Self::parse_finality_envelope(proof_data, FINALITY_CHAIN_EVM)?;
                     ensure!(
-                        confirmations >= MIN_EVM_CONFIRMATIONS,
+                        confirmations >= T::MinEvmConfirmations::get(),
                         Error::<T>::InvalidProof
                     );
                     ensure!(
@@ -1233,7 +1251,7 @@ pub mod pallet {
                     let (confirmations, inclusion_commitment, header_commitment, witness_and_tail) =
                         Self::parse_finality_envelope(proof_data, FINALITY_CHAIN_SVM)?;
                     ensure!(
-                        confirmations >= MIN_SVM_CONFIRMATIONS,
+                        confirmations >= T::MinSvmConfirmations::get(),
                         Error::<T>::InvalidProof
                     );
                     ensure!(
@@ -1263,7 +1281,7 @@ pub mod pallet {
                     let (confirmations, inclusion_commitment, header_commitment, witness_and_tail) =
                         Self::parse_finality_envelope(merkle_proof, FINALITY_CHAIN_BTC)?;
                     ensure!(
-                        confirmations >= MIN_BTC_CONFIRMATIONS,
+                        confirmations >= T::MinBtcConfirmations::get(),
                         Error::<T>::InvalidProof
                     );
                     ensure!(
@@ -1393,10 +1411,8 @@ pub mod pallet {
             RelayerRegistryStore::<T>::iter()
                 .filter_map(
                     |(relayer, (enabled_chains, _min_confirmations, max_gas_price))| {
-                        let source_supported =
-                            enabled_chains.iter().any(|chain| *chain == source_chain);
-                        let target_supported =
-                            enabled_chains.iter().any(|chain| *chain == target_chain);
+                        let source_supported = enabled_chains.contains(&source_chain);
+                        let target_supported = enabled_chains.contains(&target_chain);
                         if source_supported && target_supported {
                             Some((relayer, fee_bps, max_gas_price))
                         } else {

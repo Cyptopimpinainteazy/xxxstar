@@ -255,19 +255,10 @@ impl X3ChainService {
             return Ok(cached.clone());
         }
 
-        // In production, this would make an actual RPC call
-        // For now, return a mock response
-        let result = serde_json::json!({
-            "number": block_number.unwrap_or(12345),
-            "hash": block_hash.unwrap_or("0x1234...".to_string()),
-            "parentHash": "0x5678...".to_string(),
-            "timestamp": 1234567890,
-            "extrinsics": [],
-            "events": []
-        });
-
-        self.cache.set(&cache_key, result.clone(), None);
-        Ok(result)
+        // RPC call not yet implemented — return a clear error instead of fake data
+        Err(X3ChainServiceError::InvalidOperation(
+            "Block query by number/hash not yet implemented: requires RPC client integration".to_string()
+        ))
     }
 
     /// Execute an account query
@@ -463,8 +454,8 @@ mod tests {
     #[test]
     fn test_x3_chain_service_creation() {
         let config = X3ChainServiceConfig {
-            rpc_url: "http://127.0.0.1:9933".to_string(),
-            ws_url: "ws://127.0.0.1:9944".to_string(),
+            rpc_url: "http://rpc.testnet.x3-chain.io:9944".to_string(),
+            ws_url: "ws://rpc.testnet.x3-chain.io:9944".to_string(),
             timeout_ms: 30000,
             cache_ttl_ms: 60000,
             max_retries: 3,
@@ -479,8 +470,8 @@ mod tests {
     #[test]
     fn test_cache_ttl() {
         let config = X3ChainServiceConfig {
-            rpc_url: "http://127.0.0.1:9933".to_string(),
-            ws_url: "ws://127.0.0.1:9944".to_string(),
+            rpc_url: "http://rpc.testnet.x3-chain.io:9944".to_string(),
+            ws_url: "ws://rpc.testnet.x3-chain.io:9944".to_string(),
             timeout_ms: 30000,
             cache_ttl_ms: 100, // 100ms TTL
             max_retries: 3,

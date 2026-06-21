@@ -358,7 +358,7 @@ mod tests {
                 .unwrap();
 
         let found =
-            AddressBookManager::get_contact_by_address(&book, [2u8; 32], &[contact.clone()]);
+            AddressBookManager::get_contact_by_address(&book, [2u8; 32], std::slice::from_ref(&contact));
         assert!(found.is_some());
         assert_eq!(found.unwrap().address, [2u8; 32]);
     }
@@ -388,7 +388,7 @@ mod tests {
         assert!(AddressBookManager::has_address(
             &book,
             [2u8; 32],
-            &[contact.clone()]
+            std::slice::from_ref(&contact)
         ));
         assert!(!AddressBookManager::has_address(
             &book,

@@ -6,8 +6,8 @@
 
 use crate::intent_emit;
 use crate::ir::{
-    self, ChainMetricKind, Condition, CrdtKind as IrCrdtKind, EmergencyKind, LifecycleKind,
-    Operation, ProofKind, SerialFormat, StorageKind, VectorOp, X3IR,
+    self, ChainMetricKind, Condition, CrdtKind as IrCrdtKind, EmergencyKind, LifecycleKind, Operation, ProofKind,
+    SerialFormat, StorageKind, VectorOp, X3IR,
 };
 use x3_lang_ast::ast;
 use x3_lang_ast::ast::*;
@@ -76,11 +76,7 @@ pub fn lower_program(program: &Program, ctx: LowerCtx) -> Result<X3IR, x3_lang_c
             }
             Item::IntentDecl(intent) => {
                 ir.push(Operation::IntentResolve {
-                    constraints: intent
-                        .constraints
-                        .iter()
-                        .map(expression_to_string)
-                        .collect(),
+                    constraints: intent.constraints.iter().map(expression_to_string).collect(),
                     resolver: intent.name.as_str().to_string(),
                 });
                 lower_function_body(&intent.body, &mut ir)?;
@@ -93,11 +89,151 @@ pub fn lower_program(program: &Program, ctx: LowerCtx) -> Result<X3IR, x3_lang_c
                 lower_function_body(&sub.body, &mut ir)?;
             }
             Item::AtomicSwap(atomic) => {
+                // ── Semantic validation ──────────────────────────────────
+                // Validate hash function name if hashlock is specified
+                if let Some(hashlock) = &atomic.hashlock {
+                    let hash_fn = hashlock.hash_fn.as_str();
+                    match hash_fn {
+                        "sha256" | "blake2b" | "keccak256" | "ripemd160" => {}
+                        _ => {
+                            return Err(semantic(&format!(
+                                "unsupported hash function '{hash_fn}' in atomic swap \
+                                 hashlock; supported: sha256, blake2b, keccak256, ripemd160"
+                            )));
+                        }
+                    }
+                }
+
+                // Validate source and destination chains map to known VM families
+                // via parse_vm_family (called during parsing, but verify non-None)
+                let src_chain = atomic.from_asset.chain.as_str();
+                let dst_chain = atomic.to_asset.chain.as_str();
+                let src_known = KNOWN_CHAIN_PREFIXES.iter().any(|p| src_chain.starts_with(p));
+                let dst_known = KNOWN_CHAIN_PREFIXES.iter().any(|p| dst_chain.starts_with(p));
+                if !src_known {
+                    return Err(semantic(&format!(
+                        "source chain '{src_chain}' is not a known chain prefix; \
+                         expected one of: {}",
+                        KNOWN_CHAIN_PREFIXES.join(", ")
+                    )));
+                }
+                if !dst_known {
+                    return Err(semantic(&format!(
+                        "destination chain '{dst_chain}' is not a known chain prefix; \
+                         expected one of: {}",
+                        KNOWN_CHAIN_PREFIXES.join(", ")
+                    )));
+                }
+
+                // Validate timeout ranges (non-zero, not absurdly large)
+                if let Some(timeout) = &atomic.timeout_source {
+                    let blocks = expression_to_blocks(timeout)?;
+                    if blocks == 0 {
+                        return Err(semantic("source timeout must be greater than 0 blocks"));
+                    }
+                    if blocks > MAX_TIMEOUT_BLOCKS {
+                        return Err(semantic(&format!(
+                            "source timeout of {blocks} blocks exceeds maximum {}",
+                            MAX_TIMEOUT_BLOCKS
+                        )));
+                    }
+                }
+                if let Some(timeout) = &atomic.timeout_destination {
+                    let blocks = expression_to_blocks(timeout)?;
+                    if blocks == 0 {
+                        return Err(semantic("destination timeout must be greater than 0 blocks"));
+                    }
+                    if blocks > MAX_TIMEOUT_BLOCKS {
+                        return Err(semantic(&format!(
+                            "destination timeout of {blocks} blocks exceeds maximum {}",
+                            MAX_TIMEOUT_BLOCKS
+                        )));
+                    }
+                }
+
+                // Validate source and destination chains are different
+                let src_chain_str = atomic.from_asset.chain.as_str();
+                let dst_chain_str = atomic.to_asset.chain.as_str();
+                if src_chain_str == dst_chain_str {
+                    return Err(semantic(&format!(
+                        "atomic swap source and destination chains are the same \
+                         ('{src_chain_str}'); cross-chain swap must target a different chain"
+                    )));
+                }
+
+                // Validate amount is positive if specified
+                if let Some(amt_expr) = &atomic.amount {
+                    let amount_val = expression_to_u128(amt_expr)?;
+                    if amount_val == 0 {
+                        return Err(semantic("atomic swap amount must be greater than 0"));
+                    }
+                }
+
                 // Wrap in atomic block and lower body
                 ir.push(Operation::AtomicBegin);
+
+                // Add requires guards first
+                for require in &atomic.requires {
+                    ir.push(Operation::Require {
+                        kind: require_kind_to_ir(&require.kind),
+                        subject: require.subject.as_ref().map(|s| s.as_str().to_string()),
+                        condition: expression_to_condition(&require.value)?,
+                        error_msg: None,
+                    });
+                }
+
+                // If amount is specified, add a lock operation for the source asset
+                if let Some(amt) = &atomic.amount {
+                    let amount_val = expression_to_u128(amt)?;
+                    let receiver_str = atomic
+                        .receiver
+                        .as_ref()
+                        .map(expression_to_string)
+                        .unwrap_or_else(|| "receiver".to_string());
+                    // Lock on source chain: funds come from the sender, not the receiver.
+                    ir.push(Operation::Lock {
+                        chain: atomic.from_asset.chain.as_str().to_string(),
+                        asset: atomic.from_asset.name.as_str().to_string(),
+                        amount: amount_val,
+                        from: "sender".to_string(),
+                    });
+                    // Release on destination chain to the receiver.
+                    ir.push(Operation::Release {
+                        chain: atomic.to_asset.chain.as_str().to_string(),
+                        asset: atomic.to_asset.name.as_str().to_string(),
+                        to: receiver_str,
+                    });
+                }
+
+                // Lower body statements
                 for stmt in &atomic.body {
                     lower_statement(stmt, &mut ir)?;
                 }
+
+                // Add source timeout handling if specified
+                if let Some(timeout_expr) = &atomic.timeout_source {
+                    ir.push(Operation::OnTimeout {
+                        duration_blocks: expression_to_blocks(timeout_expr)?,
+                        action: ir::FailureAction::Refund {
+                            chain: atomic.from_asset.chain.as_str().to_string(),
+                            asset: atomic.from_asset.name.as_str().to_string(),
+                            to: "sender".to_string(),
+                        },
+                    });
+                }
+
+                // Add destination timeout handling if specified
+                if let Some(timeout_expr) = &atomic.timeout_destination {
+                    ir.push(Operation::OnTimeout {
+                        duration_blocks: expression_to_blocks(timeout_expr)?,
+                        action: ir::FailureAction::Refund {
+                            chain: atomic.to_asset.chain.as_str().to_string(),
+                            asset: atomic.to_asset.name.as_str().to_string(),
+                            to: "sender".to_string(),
+                        },
+                    });
+                }
+
                 // Add failure handling if specified
                 if let Some(failure) = &atomic.on_fail {
                     ir.push(Operation::OnFail {
@@ -114,6 +250,7 @@ pub fn lower_program(program: &Program, ctx: LowerCtx) -> Result<X3IR, x3_lang_c
                 for require in &bridge.requires {
                     ir.push(Operation::Require {
                         kind: require_kind_to_ir(&require.kind),
+                        subject: require.subject.as_ref().map(|s| s.as_str().to_string()),
                         condition: expression_to_condition(&require.value)?,
                         error_msg: None,
                     });
@@ -153,6 +290,7 @@ pub fn lower_program(program: &Program, ctx: LowerCtx) -> Result<X3IR, x3_lang_c
                 for require in &strategy.requires {
                     ir.push(Operation::Require {
                         kind: require_kind_to_ir(&require.kind),
+                        subject: require.subject.as_ref().map(|s| s.as_str().to_string()),
                         condition: expression_to_condition(&require.value)?,
                         error_msg: None,
                     });
@@ -263,11 +401,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 to: expression_to_string(to),
             });
         }
-        Statement::Burn {
-            asset,
-            amount,
-            from,
-        } => {
+        Statement::Burn { asset, amount, from } => {
             // burn ASSET amount VALUE from ADDR
             ir.push(Operation::Burn {
                 chain: chain_to_string(&asset.chain),
@@ -297,10 +431,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 from_asset: from.name.as_str().to_string(),
                 to_asset: to.name.as_str().to_string(),
                 input_amount: route.as_ref().and_then(expression_to_u128_opt).unwrap_or(0),
-                min_output: min_output
-                    .as_ref()
-                    .and_then(expression_to_u128_opt)
-                    .unwrap_or(0),
+                min_output: min_output.as_ref().and_then(expression_to_u128_opt).unwrap_or(0),
                 dex: dex.as_ref().map(expression_to_string),
             });
         }
@@ -343,6 +474,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
             }
             ir.push(Operation::Require {
                 kind: require_kind_to_ir(&guard.kind),
+                subject: guard.subject.as_ref().map(|s| s.as_str().to_string()),
                 condition: expression_to_condition(&guard.value)?,
                 error_msg: None,
             });
@@ -369,9 +501,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 action: failure_action_to_ir(action),
             });
             if let ast::FailureAction::Refund(expr) = action {
-                if let crate::ir::FailureAction::Refund { chain, asset, to } =
-                    refund_expression_to_ir(expr)
-                {
+                if let crate::ir::FailureAction::Refund { chain, asset, to } = refund_expression_to_ir(expr) {
                     ir.push(Operation::Release {
                         chain: chain.to_ascii_lowercase(),
                         asset,
@@ -428,11 +558,7 @@ fn lower_statement(stmt: &Statement, ir: &mut X3IR) -> Result<(), x3_lang_common
                 data: expression_to_string(data),
             });
         }
-        Statement::Pathfind {
-            from,
-            to,
-            max_depth,
-        } => {
+        Statement::Pathfind { from, to, max_depth } => {
             ir.push(Operation::Pathfind {
                 from: expression_to_string(from),
                 to: expression_to_string(to),
@@ -503,11 +629,7 @@ fn lower_expression(expr: &Expression, ir: &mut X3IR) -> Result<(), x3_lang_comm
             lower_builtin_call(callee, args, ir)?;
             Ok(())
         }
-        Expression::Binary {
-            lhs: _,
-            op: _,
-            rhs: _,
-        } => {
+        Expression::Binary { lhs: _, op: _, rhs: _ } => {
             // Binary operations don't produce direct IR ops (used in conditions)
             Ok(())
         }
@@ -515,10 +637,7 @@ fn lower_expression(expr: &Expression, ir: &mut X3IR) -> Result<(), x3_lang_comm
     }
 }
 
-fn lower_annotations_prefix(
-    annotations: &[Annotation],
-    ir: &mut X3IR,
-) -> Result<(), x3_lang_common::X3Error> {
+fn lower_annotations_prefix(annotations: &[Annotation], ir: &mut X3IR) -> Result<(), x3_lang_common::X3Error> {
     for annotation in annotations {
         match annotation {
             Annotation::Role(role) => ir.push(Operation::RoleCheck {
@@ -547,17 +666,15 @@ fn lower_annotations_prefix(
             }),
             Annotation::Sandbox => ir.push(Operation::Require {
                 kind: ir::RequireKind::Custom("sandbox_gas_limit".to_string()),
+                subject: None,
                 condition: Condition::True,
                 error_msg: Some("sandbox gas limit exceeded".to_string()),
             }),
             Annotation::Whitelist(entries) => ir.push(Operation::Require {
                 kind: ir::RequireKind::Custom("whitelist".to_string()),
+                subject: None,
                 condition: Condition::Expression {
-                    expr: entries
-                        .iter()
-                        .map(|sym| sym.as_str())
-                        .collect::<Vec<_>>()
-                        .join(","),
+                    expr: entries.iter().map(|sym| sym.as_str()).collect::<Vec<_>>().join(","),
                 },
                 error_msg: Some("call target not whitelisted".to_string()),
             }),
@@ -593,10 +710,7 @@ fn lower_annotations_prefix(
     Ok(())
 }
 
-fn lower_annotations_suffix(
-    annotations: &[Annotation],
-    ir: &mut X3IR,
-) -> Result<(), x3_lang_common::X3Error> {
+fn lower_annotations_suffix(annotations: &[Annotation], ir: &mut X3IR) -> Result<(), x3_lang_common::X3Error> {
     let mut version = None;
     let mut upgrade_from = None;
     for annotation in annotations {
@@ -633,19 +747,12 @@ fn lower_annotations_suffix(
         }
     }
     if let Some(version) = version {
-        ir.push(Operation::VersionMeta {
-            version,
-            upgrade_from,
-        });
+        ir.push(Operation::VersionMeta { version, upgrade_from });
     }
     Ok(())
 }
 
-fn lower_builtin_call(
-    callee: &Expression,
-    args: &[Expression],
-    ir: &mut X3IR,
-) -> Result<(), x3_lang_common::X3Error> {
+fn lower_builtin_call(callee: &Expression, args: &[Expression], ir: &mut X3IR) -> Result<(), x3_lang_common::X3Error> {
     let name = expression_to_string(callee);
     match name.as_str() {
         "encode_rlp" => emit_serialize(ir, SerialFormat::Rlp, args),
@@ -771,6 +878,7 @@ fn require_kind_to_ir(kind: &ast::RequireKind) -> ir::RequireKind {
         ast::RequireKind::InvariantCheck => ir::RequireKind::Custom("invariant".to_string()),
         ast::RequireKind::RiskScore => ir::RequireKind::Custom("risk_score".to_string()),
         ast::RequireKind::AuditGate => ir::RequireKind::Custom("audit_gate".to_string()),
+        ast::RequireKind::RelayerQuorum => ir::RequireKind::Custom("relayer_quorum".to_string()),
     }
 }
 
@@ -797,19 +905,13 @@ fn expression_to_string(expr: &Expression) -> String {
         }
         Expression::Literal(LiteralExpr::Bool(b)) => b.to_string(),
         Expression::Ident(s) => s.as_str().to_string(),
-        Expression::Binary { op, lhs, rhs } => format!(
-            "{} {:?} {}",
-            expression_to_string(lhs),
-            op,
-            expression_to_string(rhs)
-        ),
+        Expression::Binary { op, lhs, rhs } => {
+            format!("{} {:?} {}", expression_to_string(lhs), op, expression_to_string(rhs))
+        }
         Expression::Call { callee, args } => format!(
             "{}({})",
             expression_to_string(callee),
-            args.iter()
-                .map(expression_to_string)
-                .collect::<Vec<_>>()
-                .join(",")
+            args.iter().map(expression_to_string).collect::<Vec<_>>().join(",")
         ),
         _ => format!("{:?}", expr),
     }
@@ -843,6 +945,57 @@ fn semantic(message: &str) -> x3_lang_common::X3Error {
         span: Span::DUMMY,
     }
 }
+
+/// Known chain prefixes (from parser VM family mapping).
+const KNOWN_CHAIN_PREFIXES: &[&str] = &[
+    "eth",
+    "ethereum",
+    "polygon",
+    "arb",
+    "optimism",
+    "base",
+    "bsc",
+    "avax",
+    "sol",
+    "solana",
+    "svm",
+    "substrate",
+    "dot",
+    "ksm",
+    "polkadot",
+    "kusama",
+    "btc",
+    "bitcoin",
+    "x3",
+    "x3vm",
+    "move",
+    "sui",
+    "aptos",
+    "cosmwasm",
+    "cosmos",
+    "atom",
+    "osmo",
+    "cairo",
+    "starknet",
+    "ada",
+    "cardano",
+    "plutus",
+    "ton",
+    "fuel",
+    "near",
+    "xlm",
+    "stellar",
+    "soroban",
+    "ink",
+    "pvm",
+    "zk",
+    "zkvm",
+    "risc0",
+    "sp1",
+];
+
+/// Maximum allowed timeout in blocks (24 hours at 6s/block = 14400 blocks).
+const MAX_TIMEOUT_BLOCKS: u32 = 14400;
 fn crdt_kind_to_ir(kind: &CrdtOpKind) -> IrCrdtKind {
     match kind {
         CrdtOpKind::Get => IrCrdtKind::Get,
@@ -884,10 +1037,7 @@ fn emit_gas_estimate(ir: &mut X3IR, chain: &str, args: &[Expression]) {
 fn emit_metric(ir: &mut X3IR, metric: ChainMetricKind) {
     ir.push(Operation::ChainMetric { metric });
 }
-fn condition_from_call(
-    callee: &Expression,
-    args: &[Expression],
-) -> Result<Condition, x3_lang_common::X3Error> {
+fn condition_from_call(callee: &Expression, args: &[Expression]) -> Result<Condition, x3_lang_common::X3Error> {
     let name = expression_to_string(callee);
     if name == "verify_proof" && args.len() >= 2 {
         return Ok(Condition::ProofValid {
@@ -905,10 +1055,7 @@ fn condition_from_call(
         expr: format!(
             "{}({})",
             name,
-            args.iter()
-                .map(expression_to_string)
-                .collect::<Vec<_>>()
-                .join(",")
+            args.iter().map(expression_to_string).collect::<Vec<_>>().join(",")
         ),
     })
 }

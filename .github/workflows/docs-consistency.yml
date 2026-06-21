@@ -34,3 +34,14 @@ jobs:
         run: |
           chmod +x tools/docs/check-session-summary.sh
           tools/docs/check-session-summary.sh
+
+  readiness-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run readiness consistency check
+        run: |
+          chmod +x scripts/check-readiness-consistency.sh
+          scripts/check-readiness-consistency.sh

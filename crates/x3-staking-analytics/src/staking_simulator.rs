@@ -3,7 +3,6 @@
 //! Models staking returns under various conditions and timeframes,
 //! with support for fee impact analysis and delegation scenarios.
 
-use crate::Result;
 use serde::{Deserialize, Serialize};
 
 /// Projection timeframe
@@ -98,6 +97,7 @@ impl StakingSimulator {
     }
 
     /// Custom projection
+    #[allow(clippy::too_many_arguments)]
     pub fn project(
         name: String,
         initial_balance: u128,
@@ -125,10 +125,10 @@ impl StakingSimulator {
             current_balance += monthly_deposits as f64;
 
             let gross_rewards = (current_balance as u128)
-                .saturating_sub(initial_balance + (monthly_deposits as u128 * month as u128));
+                .saturating_sub(initial_balance + (monthly_deposits * month as u128));
             let commission_cost = (gross_rewards as f64 * (validator_commission / 100.0)) as u128;
             let net_rewards = gross_rewards.saturating_sub(commission_cost);
-            let total_invested = initial_balance + (monthly_deposits as u128 * month as u128);
+            let total_invested = initial_balance + (monthly_deposits * month as u128);
             let roi = if total_invested > 0 {
                 (net_rewards as f64 / total_invested as f64) * 100.0
             } else {
@@ -164,11 +164,7 @@ impl StakingSimulator {
     ) -> ScenarioComparison {
         let final1 = scenario1.final_balance().unwrap_or(0);
         let final2 = scenario2.final_balance().unwrap_or(0);
-        let difference = if final1 > final2 {
-            final1 - final2
-        } else {
-            final2 - final1
-        };
+        let difference = final1.abs_diff(final2);
 
         ScenarioComparison {
             scenario1_name: scenario1.name.clone(),
@@ -247,8 +243,7 @@ impl StakingSimulator {
     ) -> Vec<ProjectionScenario> {
         commissions
             .iter()
-            .enumerate()
-            .map(|(i, &commission)| {
+            .map(|&commission| {
                 StakingSimulator::project(
                     format!("{}% Commission", commission as u32),
                     initial_balance,

@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use x3_parser;
 
 #[cfg(test)]
 mod golden_fixtures {

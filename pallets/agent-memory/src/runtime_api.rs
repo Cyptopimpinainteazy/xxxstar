@@ -2,7 +2,7 @@
 //!
 //! Provides offchain access to agent memory chunks.
 
-use frame_support::pallet_prelude::{DecodeWithMemTracking, *};
+use frame_support::pallet_prelude::*;
 use parity_scale_codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_std::prelude::*;

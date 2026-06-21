@@ -1004,7 +1004,7 @@ mod tests {
         });
         r.finalize();
         assert!(r.risk_score > 0);
-        assert_eq!(r.passed, false);
+        assert!(!r.passed);
     }
 
     #[test]

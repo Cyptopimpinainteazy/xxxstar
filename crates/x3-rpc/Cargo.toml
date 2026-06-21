@@ -33,6 +33,12 @@ jsonrpsee = { workspace = true }
 tokio = { workspace = true }
 futures = "0.3"
 
+# Hex encoding
+hex = { workspace = true }
+
+# SCALE Codec
+codec = { workspace = true }
+
 # Error handling
 thiserror = { workspace = true }
 anyhow = { workspace = true }
@@ -46,6 +52,9 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chro
 
 # Serialization helpers
 chrono = { version = "0.4", features = ["serde"] }
+
+# Gateway pallet for RPC storage queries
+pallet-x3-crosschain-gateway = { path = "../../pallets/x3-crosschain-gateway", default-features = false, features = ["std"] }
 
 # Metrics and analytics
 x3-metrics-tracker = { path = "../x3-metrics-tracker", features = ["std"] }

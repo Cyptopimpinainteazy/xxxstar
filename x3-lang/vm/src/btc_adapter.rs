@@ -126,15 +126,10 @@ impl BtcBridgeAdapter {
 
 /// Public verification of Bitcoin-style finality.
 ///
-/// Returns `Ok(())` only when:
-/// - the `bitcoin-adapter` feature is enabled AND
-/// - the proof buffer is a non-empty UTF-8 string starting with
-///   `btc-header-v1` (placeholder for the real PoW header check that
-///   the production runtime must implement).
-///
-/// In the default (no-feature) build this returns the `disabled()`
-/// error so production callers cannot accidentally route a
-/// Bitcoin/UTXO call through an unverified stub.
+/// Returns `Ok(())` only when real PoW verification is wired.
+/// Without the `bitcoin-adapter` feature, always fails closed.
+/// The adapter surface exists so the consuming crate can plug in a
+/// header-chain verifier; no magic-byte prefix is accepted.
 pub fn verify_btc_finality(proof: &[u8]) -> Result<(), BtcBridgeError> {
     if proof.is_empty() {
         return Err(BtcBridgeError {
@@ -199,8 +194,7 @@ impl BtcBridgeAdapter {
         // behavior) so existing test fixtures can drive this code.
         if self.dry_run {
             let _ = (source_finality_proof, transfer_proof, receiver);
-            let receipt =
-                self.synthetic_dry_run_receipt(from_chain, from_asset, to_chain, to_asset, amount);
+            let receipt = self.synthetic_dry_run_receipt(from_chain, from_asset, to_chain, to_asset, amount);
             return self.gate(receipt);
         }
         // Production path: fail closed unless feature enabled.

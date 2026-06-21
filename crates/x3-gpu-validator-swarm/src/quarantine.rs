@@ -426,7 +426,7 @@ mod tests {
             vec![4, 5, 6],
         );
 
-        assert_eq!(record.replay_confirmed, false);
+        assert!(!record.replay_confirmed);
     }
 
     #[test]

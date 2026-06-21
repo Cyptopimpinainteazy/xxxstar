@@ -1,16 +1,17 @@
 //! Unit tests for `x3-metrics-tracker`.
+#![allow(clippy::inconsistent_digit_grouping)]
 //!
 //! Coverage (10 tests):
-//!  1. meets_a_tier_threshold — all metrics at exact minimums returns true.
-//!  2. meets_a_tier_threshold — tps_avg one below minimum returns false.
-//!  3. meets_a_tier_threshold — tvl one cent below minimum returns false.
-//!  4. meets_a_tier_threshold — route volume one cent below minimum returns false.
-//!  5. meets_a_tier_threshold — dau one below minimum returns false.
-//!  6. meets_a_tier_threshold — any p1 incident returns false.
-//!  7. meets_a_tier_threshold — all metrics well above minimums returns true.
-//!  8. SCALE codec roundtrip for ATierSnapshot.
-//!  9. SCALE codec roundtrip for ThroughputMetrics.
-//! 10. SCALE codec roundtrip for TreasuryMetrics with negative growth rate.
+//!  1. `meets_a_tier_threshold` — all metrics at exact minimums returns true.
+//!  2. `meets_a_tier_threshold` — `tps_avg` one below minimum returns false.
+//!  3. `meets_a_tier_threshold` — tvl one cent below minimum returns false.
+//!  4. `meets_a_tier_threshold` — route volume one cent below minimum returns false.
+//!  5. `meets_a_tier_threshold` — dau one below minimum returns false.
+//!  6. `meets_a_tier_threshold` — any p1 incident returns false.
+//!  7. `meets_a_tier_threshold` — all metrics well above minimums returns true.
+//!  8. SCALE codec roundtrip for `ATierSnapshot`.
+//!  9. SCALE codec roundtrip for `ThroughputMetrics`.
+//! 10. SCALE codec roundtrip for `TreasuryMetrics` with negative growth rate.
 
 use super::*;
 use codec::{Decode, Encode};

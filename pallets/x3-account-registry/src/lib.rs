@@ -12,6 +12,21 @@
 //! `anchor_nonce` extrinsic below.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::unnecessary_map_or)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
 
 pub use pallet::*;
 
@@ -138,7 +153,7 @@ pub mod pallet {
                 Error::<T>::AlreadyRegistered
             );
             ensure!(
-                !AtlasRegistry::<T>::contains_key(&atlas_id),
+                !AtlasRegistry::<T>::contains_key(atlas_id),
                 Error::<T>::AtlasIdInUse
             );
 
@@ -148,7 +163,7 @@ pub mod pallet {
             );
 
             AccountRegistry::<T>::insert(&who, atlas_id);
-            AtlasRegistry::<T>::insert(&atlas_id, &who);
+            AtlasRegistry::<T>::insert(atlas_id, &who);
             AccountKinds::<T>::insert(&who, kind);
             AccountCount::<T>::mutate(|count| *count = count.saturating_add(1));
 
@@ -165,7 +180,7 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
             let atlas_id = AccountRegistry::<T>::take(&who).ok_or(Error::<T>::NotRegistered)?;
 
-            AtlasRegistry::<T>::remove(&atlas_id);
+            AtlasRegistry::<T>::remove(atlas_id);
             AccountKinds::<T>::remove(&who);
             AccountCount::<T>::mutate(|count| *count = count.saturating_sub(1));
 

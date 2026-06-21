@@ -24,6 +24,9 @@ env_logger = "0.11"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 hex = "0.4"
 sha3 = "0.10"
+codec = { workspace = true }
+sp-core = { workspace = true }
+x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 x3-finality-oracle = { path = "../x3-finality-oracle" }
 x3-verification-router = { path = "../x3-verification-router" }
 x3-validator-attestation = { path = "../x3-validator-attestation" }

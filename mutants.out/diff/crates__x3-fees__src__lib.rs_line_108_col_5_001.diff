@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/lib.rs
++++ replace blake2_256 -> [u8; 32] with [1; 32]
+@@ -100,17 +100,17 @@
+     /// Verify commit hash matches data
+     pub fn verify(&self) -> bool {
+         let hash = blake2_256(&self.tx_data);
+         hash == self.commit_hash
+     }
+ }
+ 
+ fn blake2_256(data: &[u8]) -> [u8; 32] {
+-    sp_core::hashing::blake2_256(data)
++    [1; 32] /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ /// Slashing insurance fund state
+ #[derive(Clone, Debug)]
+ pub struct SlashingInsuranceFund {
+     /// Total balance in insurance pool
+     pub pool_balance: u128,
+     /// Contribution rate: 5% of slashes

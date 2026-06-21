@@ -27,7 +27,26 @@ pub struct SolvencyDashboard {
     pub treasury_at_risk: u128,
     /// Ring-buffer of recent system alerts; capped at 100 entries.
     pub recent_alerts: Vec<Alert>,
+
+    // ── Real-time fill-time tracking ────────────────────────────────────
+    /// Rolling average settlement fill time in seconds, computed from the
+    /// last `FILL_TIME_WINDOW` completed cross-chain settlement legs.
+    /// Updated by the subscriber on every new block when new settlement
+    /// receipts are detected.
+    pub average_fill_time_secs: f64,
+
+    /// Total number of completed settlement legs in the current window
+    /// (used to compute the rolling average).
+    pub completed_settlements: u64,
+
+    /// Sum of fill times (seconds) for completed settlement legs in the
+    /// current window.  `average_fill_time_secs = fill_time_sum_secs /
+    /// completed_settlements` when `completed_settlements > 0`.
+    pub fill_time_sum_secs: f64,
 }
+
+/// Maximum number of settlement legs retained in the rolling fill-time window.
+pub const FILL_TIME_WINDOW: usize = 1000;
 
 /// Liquidity status for a single vault instance.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -193,6 +212,30 @@ fn is_leap(y: u32) -> bool {
     (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
 }
 
+/// Record a completed settlement leg's fill time and update the rolling average.
+///
+/// Call this from the subscriber (or any relayer task) every time a settlement
+/// receipt is detected on-chain.
+pub fn record_fill_time(dashboard: &SharedDashboard, fill_secs: f64) {
+    let mut dash = dashboard
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let window = FILL_TIME_WINDOW as f64;
+    if dash.completed_settlements < FILL_TIME_WINDOW as u64 {
+        dash.completed_settlements += 1;
+        dash.fill_time_sum_secs += fill_secs;
+    } else {
+        // Rolling window: subtract oldest, add newest.
+        // This is a simple EMA-style decay to keep the metric responsive.
+        let alpha = 2.0 / (window + 1.0);
+        dash.average_fill_time_secs =
+            fill_secs * alpha + dash.average_fill_time_secs * (1.0 - alpha);
+        return;
+    }
+    dash.average_fill_time_secs =
+        dash.fill_time_sum_secs / dash.completed_settlements as f64;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +250,38 @@ mod tests {
         assert_eq!(dash.global_unsettled_notional, 0);
         assert_eq!(dash.frozen_lane_count, 0);
         assert!(dash.recent_alerts.is_empty());
+        assert_eq!(dash.average_fill_time_secs, 0.0);
+        assert_eq!(dash.completed_settlements, 0);
+        assert_eq!(dash.fill_time_sum_secs, 0.0);
+    }
+
+    #[test]
+    fn record_fill_time_computes_average() {
+        let dashboard = new_dashboard();
+        record_fill_time(&dashboard, 10.0);
+        record_fill_time(&dashboard, 20.0);
+        record_fill_time(&dashboard, 30.0);
+        let dash = dashboard.read().unwrap();
+        assert_eq!(dash.completed_settlements, 3);
+        assert!((dash.average_fill_time_secs - 20.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn record_fill_time_ema_after_window() {
+        let dashboard = new_dashboard();
+        // Fill the window with 10.0 sec each.
+        for _ in 0..FILL_TIME_WINDOW {
+            record_fill_time(&dashboard, 10.0);
+        }
+        let dash = dashboard.read().unwrap();
+        assert_eq!(dash.completed_settlements, FILL_TIME_WINDOW as u64);
+        assert!((dash.average_fill_time_secs - 10.0).abs() < 0.001);
+        // After window fill, a spike should move the EMA but not replace the window.
+        record_fill_time(&dashboard, 100.0);
+        let dash2 = dashboard.read().unwrap();
+        // EMA should be > 10 and < 100.
+        assert!(dash2.average_fill_time_secs > 10.0);
+        assert!(dash2.average_fill_time_secs < 100.0);
     }
 
     #[test]

@@ -1,0 +1,25 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace OperationCosts::hash -> u64 with 1
+@@ -198,21 +198,17 @@
+             KeyType::Ed25519 => self.verify_ed25519,
+             KeyType::Secp256k1 => self.verify_secp256k1,
+             KeyType::Sr25519 => self.verify_sr25519,
+         }
+     }
+ 
+     /// Get the cost of hashing for a given algorithm
+     pub fn hash(&self, algorithm: HashAlgorithm) -> u64 {
+-        match algorithm {
+-            HashAlgorithm::Sha256 => self.hash_sha256,
+-            HashAlgorithm::Blake2b => self.hash_blake2b,
+-            HashAlgorithm::Keccak256 => self.hash_keccak256,
+-        }
++        1 /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Hash algorithm identifier
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub enum HashAlgorithm {
+     /// SHA-256
+     Sha256,

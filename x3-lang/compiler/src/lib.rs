@@ -14,9 +14,9 @@ pub mod spec {
 use emitter::emit_x3ir;
 use lowering::{lower_program, LowerCtx};
 use parser::parse_source;
-use semantic::verify_with_defaults as verify_semantics;
+use semantic::{verify_atomic_swap_decls, verify_with_defaults as verify_semantics};
 use x3_lang_ast::ast::Program;
-use x3_lang_common::X3Error;
+use x3_lang_common::{ErrorAccumulator, X3Error};
 
 // Re-export IR types
 pub use ir::{Condition, FailureAction, Operation, ProgramMetadata, RequireKind, X3IR};
@@ -42,6 +42,14 @@ pub fn compile_source(source: &str) -> Result<Vec<u8>, X3Error> {
 /// in a single shot.
 pub fn check_source(source: &str) -> Result<(Program, crate::ir::X3IR, Vec<X3Error>), X3Error> {
     let program = parse_source(source)?;
+
+    // AST-level atomic swap validation (catches info lost during lowering)
+    let mut ast_errors = ErrorAccumulator::new();
+    verify_atomic_swap_decls(&program, &mut ast_errors);
+    if ast_errors.has_errors() {
+        return Ok((program, crate::ir::X3IR::new(), ast_errors.take_errors()));
+    }
+
     let ir = compile_to_ir(&program)?;
     match verify_semantics(&ir) {
         Ok(()) => Ok((program, ir, Vec::new())),

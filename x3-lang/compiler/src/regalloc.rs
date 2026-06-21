@@ -47,6 +47,18 @@ pub struct AllocationResult {
     pub temps_processed: usize,
 }
 
+impl AllocationResult {
+    /// Returns true if the operation list is empty.
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
+
+    /// Returns the number of operations.
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+}
+
 /// Register assignment for a single temporary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Assignment {
@@ -192,10 +204,7 @@ fn op_referenced_temps(_op: &Operation) -> Vec<u32> {
                 end += 1;
             }
             if end > start {
-                if let Ok(num) = std::str::from_utf8(&bytes[start..end])
-                    .unwrap_or("")
-                    .parse::<u32>()
-                {
+                if let Ok(num) = std::str::from_utf8(&bytes[start..end]).unwrap_or("").parse::<u32>() {
                     temps.push(num);
                 }
             }
@@ -210,6 +219,7 @@ fn op_referenced_temps(_op: &Operation) -> Vec<u32> {
 
 /// Rewrite operation list, replacing temporary references with assigned physical
 /// registers or spill slot operands.
+#[allow(dead_code)]
 fn rewrite_operations(
     instrs: &mut [Operation],
     temp_to_reg: &HashMap<u32, usize>,
@@ -224,11 +234,8 @@ fn rewrite_operations(
 }
 
 /// Patch a single operation's temporary references to physical registers.
-fn patch_operation(
-    _op: &mut Operation,
-    _temp_to_reg: &HashMap<u32, usize>,
-    _temp_to_spill: &HashMap<u32, StackSlot>,
-) {
+#[allow(dead_code)]
+fn patch_operation(_op: &mut Operation, _temp_to_reg: &HashMap<u32, usize>, _temp_to_spill: &HashMap<u32, StackSlot>) {
     // In the full compiler, each Operation variant carries explicit operand
     // slots (defs and uses). The v0.1 pipeline uses Display/Debug for temp
     // identification, so the rewrite is a no-op at the IR level — the

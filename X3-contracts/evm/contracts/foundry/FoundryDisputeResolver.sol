@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -350,14 +350,14 @@ contract FoundryDisputeResolver is Ownable, ReentrancyGuard {
     /// @param participant The address to query
     /// @return disputeIds Array of dispute IDs
     function getDisputesByParticipant(address participant) external view returns (uint256[] memory disputeIds) {
-        uint256 count;
+        uint256 count = 0;
         for (uint256 i = 1; i <= _disputeCount; i++) {
             if (_disputes[i].disputant == participant || _disputes[i].respondent == participant) {
                 count++;
             }
         }
         disputeIds = new uint256[](count);
-        uint256 idx;
+        uint256 idx = 0;
         for (uint256 i = 1; i <= _disputeCount; i++) {
             if (_disputes[i].disputant == participant || _disputes[i].respondent == participant) {
                 disputeIds[idx] = i;
@@ -370,13 +370,15 @@ contract FoundryDisputeResolver is Ownable, ReentrancyGuard {
     /// @param status The dispute status to filter
     /// @return disputeIds Array of dispute IDs
     function getDisputesByStatus(DisputeStatus status) external view returns (uint256[] memory disputeIds) {
-        uint256 count;
+        uint256 count = 0;
         for (uint256 i = 1; i <= _disputeCount; i++) {
+            // slither-disable-next-line incorrect-equality
             if (_disputes[i].status == status) count++;
         }
         disputeIds = new uint256[](count);
-        uint256 idx;
+        uint256 idx = 0;
         for (uint256 i = 1; i <= _disputeCount; i++) {
+            // slither-disable-next-line incorrect-equality
             if (_disputes[i].status == status) {
                 disputeIds[idx] = i;
                 idx++;

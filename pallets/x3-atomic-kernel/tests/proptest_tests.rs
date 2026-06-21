@@ -81,7 +81,7 @@ proptest! {
         }
 
         // Rollback: subtract all changes in reverse order
-        let mut was_reverted = true;
+        let was_reverted = true;
         for &change in changes.iter().rev() {
             state = state.saturating_sub(change);
         }
@@ -111,6 +111,5 @@ proptest! {
 // ════════════════════════════════════════════════════════════
 
 #[test]
-fn test_proptest_available() {
-    assert!(true);
-}
+#[allow(clippy::no_effect, clippy::assertions_on_constants)]
+fn test_proptest_available() {}

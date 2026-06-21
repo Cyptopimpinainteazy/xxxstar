@@ -26,6 +26,9 @@ rand = "0.8"
 pkcs11 = "0.5"
 openssl = "0.10"
 
+[features]
+dev = []
+
 [[bin]]
 name = "custody-service"
 path = "src/bin/main.rs"

@@ -243,7 +243,7 @@ export const BugBountyProgramPanel: React.FC = () => {
                       <div className="text-gray-400 text-xs">Submissions</div>
                       <div className="text-cyan-400 font-semibold">{bounty.submissions}</div>
                     </div>
-                    <div colSpan={2}>
+                    <div className="col-span-2">
                       <button className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs rounded font-semibold transition">
                         View & Submit
                       </button>

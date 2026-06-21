@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::Pallet as OraclePallet;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use frame_benchmarking::{v2::benchmarks, whitelisted_caller};
 use frame_system::RawOrigin;
 
 #[benchmarks]

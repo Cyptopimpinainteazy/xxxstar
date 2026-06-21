@@ -101,7 +101,7 @@ impl SlashTracker {
         self.events.insert(event_id.clone(), event);
         self.by_validator
             .entry(validator.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(event_id.clone());
 
         event_id
@@ -389,7 +389,7 @@ mod tests {
     fn test_unrecovered_count() {
         let mut tracker = SlashTracker::new();
         let id1 = tracker.record_slash("val1", SlashingReason::Offline, 10, 1000, 5.0);
-        let id2 = tracker.record_slash("val1", SlashingReason::Offline, 20, 1000, 5.0);
+        let _id2 = tracker.record_slash("val1", SlashingReason::Offline, 20, 1000, 5.0);
 
         assert_eq!(tracker.unrecovered_count("val1"), 2);
 

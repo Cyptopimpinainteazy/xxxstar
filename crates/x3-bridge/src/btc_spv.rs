@@ -260,7 +260,7 @@ fn bits_to_target(bits: u32) -> SpvResult<[u8; 32]> {
     let exponent = (bits >> 24) as u8;
     let mantissa = bits & 0x00ff_ffff;
 
-    if exponent < 3 || exponent > 32 {
+    if !(3..=32).contains(&exponent) {
         return Err(SpvError::InvalidDifficultyRetarget);
     }
 

@@ -125,6 +125,7 @@ pub struct RedFlagCounts {
 }
 
 /// Audit multiplier per spec (lowest applicable).
+#[allow(clippy::too_many_arguments)]
 pub fn audit_multiplier_from(
     critical: usize,
     high: usize,

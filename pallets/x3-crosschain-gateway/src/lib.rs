@@ -74,17 +74,21 @@ mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use alloc::string::String;
 
-    use frame_support::{pallet_prelude::*, traits::StorageVersion};
+    use alloc::vec::Vec;
+    use frame_support::{
+        pallet_prelude::*,
+        traits::{BuildGenesisConfig, StorageVersion},
+    };
     use frame_system::pallet_prelude::BlockNumberFor;
     use frame_system::pallet_prelude::*;
-    use sp_runtime::traits::{SaturatedConversion, Saturating};
+    use sp_runtime::traits::SaturatedConversion;
     use sp_std::fmt::Debug;
     use sp_std::sync::Arc;
 
     use x3_verification_router::{
-        BitcoinSpvVerifier, ChainKind, EvmReceiptVerifier, ProofEnvelope, SolanaFinalizedVerifier,
+        evm_receipt::withdrawal_released_selector, BitcoinSpvVerifier, ChainKind,
+        ProductionEvmReceiptVerifier, ProofEnvelope, SolanaFinalizedVerifier,
         ValidatorQuorumVerifier, VerificationRouter, VerificationStrategy, Verifier,
         X3InternalVerifier,
     };
@@ -108,6 +112,7 @@ pub mod pallet {
         PartialEq,
         Eq,
     )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
     pub enum ExternalChainId {
         EthereumMainnet,
         EthereumSepolia,
@@ -117,6 +122,9 @@ pub mod pallet {
         SolanaDevnet,
         BitcoinMainnet,
         BitcoinTestnet,
+        /// User-defined EVM chain. The inner value is the EIP-155 chain
+        /// id (e.g. 10 for Optimism, 137 for Polygon, 42161 for Arbitrum).
+        Custom(u64),
     }
 
     impl ExternalChainId {
@@ -126,6 +134,7 @@ pub mod pallet {
                 | ExternalChainId::EthereumSepolia
                 | ExternalChainId::BaseMainnet
                 | ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 1 },
+                ExternalChainId::Custom(chain_id) => ChainKind::Evm { chain_id },
                 ExternalChainId::SolanaMainnet | ExternalChainId::SolanaDevnet => ChainKind::Solana,
                 ExternalChainId::BitcoinMainnet | ExternalChainId::BitcoinTestnet => {
                     ChainKind::Bitcoin
@@ -140,6 +149,7 @@ pub mod pallet {
     #[derive(
         Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
     )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExternalAssetRef {
         pub chain_id: ExternalChainId,
         pub token_address_or_mint: BoundedVec<u8, ConstU32<128>>,
@@ -167,6 +177,7 @@ pub mod pallet {
         PartialEq,
         Eq,
     )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
     pub enum RouteVerificationLevel {
         ValidatorQuorum { threshold: u32, total: u32 },
         EvmReceiptProof,
@@ -204,6 +215,7 @@ pub mod pallet {
         PartialEq,
         Eq,
     )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
     pub enum GatewayMode {
         Disabled,
         DryRun,
@@ -225,6 +237,7 @@ pub mod pallet {
         PartialEq,
         Eq,
     )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
     pub enum X3Domain {
         Native,
         Evm,
@@ -235,6 +248,7 @@ pub mod pallet {
     #[derive(
         Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
     )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
     pub struct RouteConfig {
         pub route_id: RouteId,
         pub external_chain_id: ExternalChainId,
@@ -254,6 +268,11 @@ pub mod pallet {
         pub mode: GatewayMode,
         pub require_dispute_window: bool,
         pub dispute_window_blocks: u32,
+        /// Address of the gateway contract / program on the external
+        /// chain. For EVM chains this is the 20-byte
+        /// `X3ExternalGateway` contract address; for Solana the
+        /// 32-byte program id.
+        pub contract_address: BoundedVec<u8, ConstU32<128>>,
     }
 
     /// Status of a verified deposit transfer.
@@ -405,6 +424,218 @@ pub mod pallet {
     #[pallet::getter(fn pending_withdrawals)]
     pub type PendingWithdrawals<T: Config> =
         StorageMap<_, Blake2_128Concat, X3AssetId, Balance, ValueQuery>;
+
+    // ── Genesis config ──────────────────────────────────────────────────
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// SCALE-encoded initial assets: `Vec<(ExternalChainId, Vec<u8>, X3AssetId)>`.
+        pub initial_assets: Vec<u8>,
+        /// SCALE-encoded initial routes: `Vec<RouteConfig>`.
+        pub initial_routes: Vec<u8>,
+        #[serde(skip)]
+        pub _phantom: core::marker::PhantomData<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            if !self.initial_assets.is_empty() {
+                let assets: Vec<(ExternalChainId, BoundedVec<u8, ConstU32<128>>, X3AssetId)> =
+                    codec::Decode::decode(&mut &self.initial_assets[..])
+                        .expect("valid SCALE data for initial_assets");
+                for (chain_id, token, asset_id) in &assets {
+                    Assets::<T>::insert(chain_id, token, asset_id);
+                }
+            }
+            if !self.initial_routes.is_empty() {
+                let routes: Vec<RouteConfig> = codec::Decode::decode(&mut &self.initial_routes[..])
+                    .expect("valid SCALE data for initial_routes");
+                for route in &routes {
+                    Routes::<T>::insert(route.route_id, route);
+                }
+            }
+        }
+    }
+
+    impl<T: Config> GenesisConfig<T> {
+        /// Build a base route template for ETH on a given external chain.
+        fn eth_route_template(chain_id: ExternalChainId, contract: &str) -> RouteConfig {
+            let bounded = |s: &str| -> BoundedVec<u8, ConstU32<128>> {
+                alloc::vec::Vec::from(s.as_bytes()).try_into().unwrap()
+            };
+            let asset_id = |id: u32| -> X3AssetId {
+                let mut arr = [0u8; 32];
+                arr[..4].copy_from_slice(&id.to_be_bytes());
+                arr
+            };
+            RouteConfig {
+                route_id: asset_id(1001),
+                external_chain_id: chain_id,
+                external_asset: ExternalAssetRef {
+                    chain_id,
+                    token_address_or_mint: bounded("0x0000000000000000000000000000000000000000"),
+                },
+                x3_asset_id: asset_id(1),
+                destination_domain: X3Domain::Native,
+                enabled: true,
+                min_amount: 1_000_000_000_000_000,
+                max_amount: 100_000_000_000_000_000_000_000,
+                daily_limit: 1_000_000_000_000_000_000_000_000,
+                daily_deposited: 0,
+                daily_reset_at_block: 0,
+                pending_limit: 100,
+                finality_requirement: 12,
+                verification_level: RouteVerificationLevel::EvmReceiptProof,
+                fee_bps: 10,
+                mode: GatewayMode::TestnetLive,
+                require_dispute_window: false,
+                dispute_window_blocks: 0,
+                contract_address: bounded(contract),
+            }
+        }
+
+        /// Empty genesis config — no assets, no routes. Governance will
+        /// register them at runtime.
+        #[cfg(feature = "std")]
+        pub fn empty() -> Self {
+            GenesisConfig {
+                initial_assets: alloc::vec![],
+                initial_routes: alloc::vec![],
+                _phantom: core::marker::PhantomData,
+            }
+        }
+
+        /// Development / local genesis config with ETH and USDC routes on
+        /// Sepolia and Base Sepolia at `FullLive` mode.
+        #[cfg(feature = "std")]
+        pub fn dev_defaults() -> Self {
+            use codec::Encode;
+
+            let bounded = |s: &str| -> BoundedVec<u8, ConstU32<128>> {
+                alloc::vec::Vec::from(s.as_bytes()).try_into().unwrap()
+            };
+            let asset_id = |id: u32| -> X3AssetId {
+                let mut arr = [0u8; 32];
+                arr[..4].copy_from_slice(&id.to_be_bytes());
+                arr
+            };
+
+            let sepolia = ExternalChainId::Custom(11155111);
+            let base_sepolia = ExternalChainId::Custom(84532);
+
+            let assets = alloc::vec![
+                (
+                    sepolia,
+                    bounded("0x0000000000000000000000000000000000000000"),
+                    asset_id(1)
+                ),
+                (
+                    sepolia,
+                    bounded("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"),
+                    asset_id(3)
+                ),
+                (
+                    base_sepolia,
+                    bounded("0x0000000000000000000000000000000000000000"),
+                    asset_id(1)
+                ),
+            ];
+
+            let mut eth_sepolia_route = Self::eth_route_template(sepolia, "0xGATEWAY_ON_SEPOLIA");
+            eth_sepolia_route.mode = GatewayMode::FullLive;
+
+            let usdc_sepolia_route = RouteConfig {
+                route_id: asset_id(1002),
+                external_asset: ExternalAssetRef {
+                    chain_id: sepolia,
+                    token_address_or_mint: bounded("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"),
+                },
+                x3_asset_id: asset_id(3),
+                min_amount: 1_000_000,
+                max_amount: 10_000_000_000_000,
+                daily_limit: 1_000_000_000_000,
+                contract_address: bounded("0xGATEWAY_ON_SEPOLIA"),
+                ..eth_sepolia_route.clone()
+            };
+
+            let mut eth_base_route =
+                Self::eth_route_template(base_sepolia, "0xGATEWAY_ON_BASE_SEPOLIA");
+            eth_base_route.mode = GatewayMode::FullLive;
+
+            GenesisConfig {
+                initial_assets: assets.encode(),
+                initial_routes: alloc::vec![eth_sepolia_route, usdc_sepolia_route, eth_base_route]
+                    .encode(),
+                _phantom: core::marker::PhantomData,
+            }
+        }
+
+        /// Default testnet genesis config with pre-configured routes for
+        /// Ethereum Sepolia and Base Sepolia (ETH + USDC) at
+        /// `TestnetLive` mode.
+        #[cfg(feature = "std")]
+        pub fn testnet_defaults() -> Self {
+            use codec::Encode;
+
+            let bounded = |s: &str| -> BoundedVec<u8, ConstU32<128>> {
+                alloc::vec::Vec::from(s.as_bytes()).try_into().unwrap()
+            };
+            let asset_id = |id: u32| -> X3AssetId {
+                let mut arr = [0u8; 32];
+                arr[..4].copy_from_slice(&id.to_be_bytes());
+                arr
+            };
+
+            let sepolia = ExternalChainId::Custom(11155111);
+            let base_sepolia = ExternalChainId::Custom(84532);
+
+            let assets = alloc::vec![
+                (
+                    sepolia,
+                    bounded("0x0000000000000000000000000000000000000000"),
+                    asset_id(1)
+                ),
+                (
+                    sepolia,
+                    bounded("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"),
+                    asset_id(3)
+                ),
+                (
+                    base_sepolia,
+                    bounded("0x0000000000000000000000000000000000000000"),
+                    asset_id(1)
+                ),
+            ];
+
+            let eth_sepolia_route = Self::eth_route_template(sepolia, "0xGATEWAY_ON_SEPOLIA");
+
+            let usdc_sepolia_route = RouteConfig {
+                route_id: asset_id(1002),
+                external_asset: ExternalAssetRef {
+                    chain_id: sepolia,
+                    token_address_or_mint: bounded("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"),
+                },
+                x3_asset_id: asset_id(3),
+                min_amount: 1_000_000,
+                max_amount: 10_000_000_000_000,
+                daily_limit: 1_000_000_000_000,
+                contract_address: bounded("0xGATEWAY_ON_SEPOLIA"),
+                ..eth_sepolia_route.clone()
+            };
+
+            let eth_base_route =
+                Self::eth_route_template(base_sepolia, "0xGATEWAY_ON_BASE_SEPOLIA");
+
+            GenesisConfig {
+                initial_assets: assets.encode(),
+                initial_routes: alloc::vec![eth_sepolia_route, usdc_sepolia_route, eth_base_route]
+                    .encode(),
+                _phantom: core::marker::PhantomData,
+            }
+        }
+    }
 
     // ── Events & errors ────────────────────────────────────────────────
 
@@ -850,6 +1081,73 @@ pub mod pallet {
             Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
             Ok(())
         }
+
+        /// Relayer: submit a withdrawal-release proof. Verifies the
+        /// release proof (e.g. an EVM `WithdrawalReleased` event
+        /// receipt proof) through the route's configured verifier and
+        /// marks the withdrawal as released on success. Decrements
+        /// the external-locked and pending counters.
+        #[pallet::call_index(8)]
+        #[pallet::weight(frame_support::weights::Weight::from_parts(60_000, 0))]
+        pub fn submit_release_proof(
+            origin: OriginFor<T>,
+            withdrawal_id: WithdrawalId,
+            route_id: RouteId,
+            proof_payload: BoundedVec<u8, ConstU32<4096>>,
+        ) -> DispatchResult {
+            T::RelayerOrigin::ensure_origin(origin)?;
+
+            let withdrawal =
+                Withdrawals::<T>::get(withdrawal_id).ok_or(Error::<T>::WithdrawalNotFound)?;
+            ensure!(!withdrawal.released, Error::<T>::WithdrawalAlreadyReleased);
+            ensure!(withdrawal.burned, Error::<T>::WithdrawalNotBurned);
+
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                withdrawal.destination_chain == route.external_chain_id,
+                Error::<T>::WrongChain
+            );
+            ensure!(
+                withdrawal.x3_asset_id == route.x3_asset_id,
+                Error::<T>::WrongToken
+            );
+
+            let router = Self::build_release_router(&route);
+            let envelope = ProofEnvelope {
+                proof_id: withdrawal_id,
+                strategy: route.verification_level.to_router_strategy(),
+                source_chain: route.external_chain_id.to_chain_kind(),
+                destination_chain: ChainKind::X3,
+                payload: proof_payload.to_vec(),
+                expected_asset_id: route.x3_asset_id,
+                expected_amount: withdrawal.amount,
+                expected_sender: withdrawal.recipient.to_vec(),
+                expected_recipient: route.contract_address.to_vec(),
+            };
+            router
+                .route(&envelope)
+                .map_err(|_| Error::<T>::VerificationFailed)?;
+
+            let x3_asset_id = withdrawal.x3_asset_id;
+            let amount = withdrawal.amount;
+            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
+                let w = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
+                w.released = true;
+                Ok(())
+            })?;
+            ExternalLocked::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
+                *v = v.saturating_sub(amount);
+                Ok(())
+            })?;
+            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
+                *v = v.saturating_sub(amount);
+                Ok(())
+            })?;
+            Self::check_collateral_invariant(x3_asset_id)?;
+            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
+            Ok(())
+        }
     }
 
     // ── Internal helpers ───────────────────────────────────────────────
@@ -868,8 +1166,9 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::EvmReceiptProof => {
-                    let v: Arc<dyn Verifier> =
-                        Arc::new(EvmReceiptVerifier::new(route.finality_requirement));
+                    let v: Arc<dyn Verifier> = Arc::new(ProductionEvmReceiptVerifier::new(
+                        route.finality_requirement,
+                    ));
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
@@ -889,6 +1188,25 @@ pub mod pallet {
             router
         }
 
+        /// Build a verification router configured for release-proof
+        /// verification. For EVM routes the verifier uses the
+        /// `WithdrawalReleased` event selector instead of
+        /// `DepositLocked`.
+        fn build_release_router(route: &RouteConfig) -> VerificationRouter {
+            let mut router = VerificationRouter::new();
+            match route.verification_level {
+                RouteVerificationLevel::EvmReceiptProof => {
+                    let v: Arc<dyn Verifier> = Arc::new(
+                        ProductionEvmReceiptVerifier::new(route.finality_requirement)
+                            .with_selector(withdrawal_released_selector()),
+                    );
+                    router.register_verifier(v);
+                }
+                _ => return Self::build_router(route),
+            }
+            router
+        }
+
         fn envelope_from_deposit(proof: &DepositProof, route: &RouteConfig) -> ProofEnvelope {
             ProofEnvelope {
                 proof_id: proof.proof_id,
@@ -899,7 +1217,7 @@ pub mod pallet {
                 expected_asset_id: route.x3_asset_id,
                 expected_amount: proof.amount,
                 expected_sender: proof.sender.to_vec(),
-                expected_recipient: proof.recipient.to_vec(),
+                expected_recipient: route.contract_address.to_vec(),
             }
         }
 

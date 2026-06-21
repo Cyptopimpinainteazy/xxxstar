@@ -39,6 +39,15 @@ export interface JsonRpcResponse<T = unknown> {
     id: number | string;
 }
 
+interface JsonRpcNotification {
+    jsonrpc: '2.0';
+    method: string;
+    params: {
+        subscription: string;
+        result: unknown;
+    };
+}
+
 /**
  * Subscription callback type
  */
@@ -150,7 +159,7 @@ export class JsonRpcProvider {
         reject: (error: Error) => void
     ): void {
         const id = `${method}_${this.nextId++}`;
-        this.subscriptions.set(id, callback);
+        this.subscriptions.set(id, callback as SubscriptionCallback<unknown>);
 
         const payload: JsonRpcRequest = {
             jsonrpc: '2.0',
@@ -173,14 +182,14 @@ export class JsonRpcProvider {
 
     private handleWebSocketMessage(event: MessageEvent): void {
         try {
-            const data: JsonRpcResponse<unknown> = JSON.parse(event.data);
+            const data = JSON.parse(event.data) as JsonRpcResponse<unknown> | JsonRpcNotification;
 
-            // Handle subscription notification
-            if (data.method && data.params && data.params.subscription) {
-                const subscriptionId = data.params.subscription;
+            if ('method' in data && data.params && 'subscription' in data.params) {
+                const notification = data as JsonRpcNotification;
+                const subscriptionId = notification.params.subscription;
                 const callback = this.subscriptions.get(subscriptionId);
                 if (callback) {
-                    callback(data.params.result);
+                    callback(notification.params.result);
                 }
             }
         } catch (error) {

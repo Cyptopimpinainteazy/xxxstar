@@ -40,10 +40,8 @@ pub struct CommitSummary {
     pub failed: usize,
     /// Transactions that require serial re-execution due to access violations.
     pub reexecute: Vec<TxId>,
-    /// Final merged write overlay (keys written in serial order).  The current
-    /// `TxOutcome::Success` only records keys, not values, so the overlay is a
-    /// key set until values are threaded through the executor.
-    pub write_overlay: BTreeMap<[u8; 32], ()>,
+    /// Final merged write overlay (keys written in serial order).
+    pub write_overlay: BTreeMap<[u8; 32], [u8; 32]>,
 }
 
 pub struct Commit;
@@ -62,10 +60,8 @@ impl Commit {
                 TxOutcome::Success { writes, .. } => {
                     // Apply writes in serial order — later writes overwrite
                     // earlier ones, which is the correct serial semantics.
-                    for key in writes {
-                        // Values are not yet available from the executor;
-                        // record only the key so we do not fabricate state.
-                        summary.write_overlay.insert(*key, ());
+                    for (key, value) in writes {
+                        summary.write_overlay.insert(*key, *value);
                     }
                     summary.committed += 1;
                 }

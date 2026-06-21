@@ -313,10 +313,10 @@ impl PositionTracker {
     }
 
     /// Get USD value of an asset
-    async fn get_usd_value(&self, chain_id: u64, asset: H160, amount: U256) -> Result<U256> {
-        // In a real implementation, this would query price oracles
-        // For now, return a placeholder value
-        Ok(amount) // 1:1 ratio for simplicity
+    async fn get_usd_value(&self, _chain_id: u64, _asset: H160, _amount: U256) -> Result<U256> {
+        Err(PositionManagerError::PriceFeedNotFound(
+            "Position tracking: oracle price feed not configured; wire a price oracle adapter".into(),
+        ))
     }
 
     /// Start background tracking task

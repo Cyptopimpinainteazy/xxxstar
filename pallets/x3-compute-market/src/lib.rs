@@ -1,4 +1,18 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
+#![allow(clippy::module_name_repetitions)]
 //! # X3 Compute Market Pallet
 //!
 //! Phase 10 — Productize AI swarm as service: bot rental, premium execution,
@@ -35,10 +49,20 @@ pub type SessionId = u64;
 
 /// Compute tier offered by a provider listing.
 #[derive(
-    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    MaxEncodedLen,
+    Default,
 )]
 pub enum ComputeTier {
     /// Single-bot rental session.
+    #[default]
     BotRental = 0,
     /// Premium execution with priority scheduling.
     PremiumExecution = 1,
@@ -48,18 +72,22 @@ pub enum ComputeTier {
     BatchInference = 3,
 }
 
-impl Default for ComputeTier {
-    fn default() -> Self {
-        ComputeTier::BotRental
-    }
-}
-
 /// Status of a compute listing.
 #[derive(
-    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    MaxEncodedLen,
+    Default,
 )]
 pub enum ListingStatus {
     /// Accepting new sessions.
+    #[default]
     Active = 0,
     /// Temporarily not accepting sessions; existing sessions continue.
     Paused = 1,
@@ -67,18 +95,22 @@ pub enum ListingStatus {
     Delisted = 2,
 }
 
-impl Default for ListingStatus {
-    fn default() -> Self {
-        ListingStatus::Active
-    }
-}
-
 /// Lifecycle status of a compute session.
 #[derive(
-    Encode, Decode, DecodeWithMemTracking, TypeInfo, Clone, PartialEq, Eq, Debug, MaxEncodedLen,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    Clone,
+    PartialEq,
+    Eq,
+    Debug,
+    MaxEncodedLen,
+    Default,
 )]
 pub enum SessionStatus {
     /// Session is running.
+    #[default]
     Active = 0,
     /// Provider marked the session done and payment calculated.
     Completed = 1,
@@ -86,12 +118,6 @@ pub enum SessionStatus {
     Expired = 2,
     /// Renter raised a dispute; awaiting governance resolution.
     Disputed = 3,
-}
-
-impl Default for SessionStatus {
-    fn default() -> Self {
-        SessionStatus::Active
-    }
 }
 
 /// On-chain record for a compute listing.
@@ -151,8 +177,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Origin that can perform governance actions (resolve disputes, etc.).
         type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 

@@ -22,6 +22,81 @@ impl SolanaBridgeAdapter {
     pub fn rpc_url(&self) -> &str {
         &self.rpc_url
     }
+
+    /// Poll SVM logs from the bridge program in a slot range.
+    /// Uses `getSignaturesForAddress` to find transactions and
+    /// `getTransaction` to extract log messages. Returns (slot, log_data)
+    /// pairs. Returns an empty vec when there are no matching logs.
+    pub fn poll_svm_logs(
+        &self,
+        program_id: &str,
+        from_slot: u64,
+        to_slot: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>, BridgeError> {
+        let sig_params = serde_json::json!([
+            program_id,
+            {
+                "limit": 100,
+                "commitment": "confirmed"
+            }
+        ]);
+
+        let sigs_result = make_json_rpc_call(&self.rpc_url, "getSignaturesForAddress", sig_params)?;
+
+        let sigs = match sigs_result.as_array() {
+            Some(arr) => arr,
+            None => return Ok(Vec::new()),
+        };
+
+        let mut results = Vec::new();
+        for sig_entry in sigs {
+            let slot = sig_entry.get("slot").and_then(|v| v.as_u64()).unwrap_or(0);
+            if slot < from_slot || slot > to_slot {
+                continue;
+            }
+
+            let signature = match sig_entry.get("signature").and_then(|v| v.as_str()) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+
+            let tx_params = serde_json::json!([
+                signature,
+                {
+                    "encoding": "json",
+                    "commitment": "confirmed",
+                    "maxSupportedTransactionVersion": 0
+                }
+            ]);
+
+            let tx_data = match make_json_rpc_call(&self.rpc_url, "getTransaction", tx_params) {
+                Ok(val) => val,
+                Err(_) => continue,
+            };
+
+            let log_messages = tx_data
+                .get("meta")
+                .and_then(|m| m.get("logMessages"))
+                .and_then(|l| l.as_array())
+                .map(|msgs| {
+                    let mut combined = Vec::new();
+                    for (i, msg) in msgs.iter().enumerate() {
+                        if i > 0 {
+                            combined.push(b'\n');
+                        }
+                        if let Some(s) = msg.as_str() {
+                            combined.extend_from_slice(s.as_bytes());
+                        }
+                    }
+                    combined
+                })
+                .unwrap_or_default();
+
+            results.push((slot, log_messages));
+        }
+
+        Ok(results)
+    }
 }
 
 impl BridgeAdapter for SolanaBridgeAdapter {

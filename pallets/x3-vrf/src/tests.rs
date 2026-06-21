@@ -108,7 +108,7 @@ fn fulfill_randomness_works() {
         // Check that it's fulfilled
         let result = Vrf::fulfilled_requests(request_id).unwrap();
         assert_eq!(result.request_id, request_id);
-        assert!(!Vrf::pending_requests(request_id).is_some());
+        assert!(Vrf::pending_requests(request_id).is_none());
 
         System::assert_has_event(RuntimeEvent::Vrf(Event::RandomnessFulfilled {
             request_id,
@@ -167,7 +167,7 @@ fn cancel_randomness_works() {
         assert_ok!(Vrf::cancel_randomness(RuntimeOrigin::signed(1), request_id));
 
         // Check that it's removed
-        assert!(!Vrf::pending_requests(request_id).is_some());
+        assert!(Vrf::pending_requests(request_id).is_none());
         assert_eq!(Vrf::account_requests(1).len(), 0);
 
         System::assert_has_event(RuntimeEvent::Vrf(Event::RandomnessCancelled {

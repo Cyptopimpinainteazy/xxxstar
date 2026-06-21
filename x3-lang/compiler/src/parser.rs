@@ -7,12 +7,53 @@
 //!   - cross-chain asset operations and guards
 //!   - expressions with operators, if-exprs, closures
 //!
-//! Architecture: hand-rolled recursive descent with explicit cursor
-//! (avoids pulling in the lexer crate until it's ready — the lexer
-//!  currently returns placeholder tokens; we tokenize inline here).
+//! Architecture: hand-rolled recursive descent with explicit cursor.
+//! Tokenization is delegated to the x3-lang-lexer crate; the parser
+//! converts lexer `TokenKind` items into its internal `Tok` enum.
 
 use x3_lang_ast::ast::*;
-use x3_lang_common::{IntBase, Span, Spanned, Symbol, X3Error};
+use x3_lang_common::{BinOp as CBinOp, IntBase, Span, Spanned, Symbol, UnOp as CUnOp, X3Error};
+use x3_lang_lexer::token::{Keyword, Token, TokenKind};
+
+/// Map a chain prefix string to its VM family name (as used by the x3-atomic-swap VmType enum).
+///
+/// Returns `None` for unrecognised prefixes – the caller should fall back to
+/// the raw chain name.
+pub fn parse_vm_family(prefix: &str) -> Option<&'static str> {
+    Some(match prefix {
+        // evm family
+        "evm" | "eth" | "polygon" | "arb" | "optimism" | "base" | "bsc" | "avax" => "Evm",
+        // svm family
+        "svm" | "sol" | "solana" => "Svm",
+        // substrate family
+        "substrate" | "dot" | "ksm" | "polkadot" | "kusama" => "Substrate",
+        // bitcoin script
+        "btc" | "bitcoin" => "BitcoinScript",
+        // x3vm
+        "x3" | "x3vm" => "X3Vm",
+        // move family
+        "move" | "sui" | "aptos" => "MoveVm",
+        // cosmwasm family
+        "cosmwasm" | "cosmos" | "atom" | "osmo" => "CosmWasm",
+        // cairo / starknet
+        "cairo" | "starknet" => "CairoVm",
+        // cardano / plutus
+        "ada" | "cardano" | "plutus" => "PlutusEutxo",
+        // ton
+        "ton" => "TonTvm",
+        // fuel
+        "fuel" => "FuelVm",
+        // near
+        "near" => "NearWasm",
+        // stellar / soroban
+        "xlm" | "stellar" | "soroban" => "SorobanWasm",
+        // ink! / polkadot pvm
+        "ink" | "pvm" => "InkWasm",
+        // zk
+        "zk" | "zkvm" | "risc0" | "sp1" => "ZkVm",
+        _ => return None,
+    })
+}
 
 // ---------------------------------------------------------------------------
 // Public entry
@@ -186,6 +227,19 @@ impl<'a> Parser<'a> {
             Tok::KwConst => self.parse_const_item(),
             Tok::KwBridge => self.parse_bridge_item(),
             Tok::KwAtomicSwap => self.parse_atomic_swap_item(),
+            Tok::KwAtomic => {
+                self.advance(); // consume 'atomic'
+                if self.check(Tok::KwSwap) {
+                    self.parse_atomic_swap_item_new()
+                } else {
+                    // Parser saw 'atomic' at top level without 'swap' —
+                    // not a valid top-level item.
+                    Err(parse_err(
+                        "expected 'swap' after 'atomic' at top level".into(),
+                        self.peek(),
+                    ))
+                }
+            }
             Tok::KwStrategy => self.parse_strategy_item(),
             Tok::KwProposal => self.parse_proposal_item(),
             Tok::KwGpu => self.parse_gpu_item(),
@@ -311,10 +365,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                     _ => {
-                        return Err(parse_err(
-                            "expected fn or strategy in agent body".into(),
-                            self.peek(),
-                        ));
+                        return Err(parse_err("expected fn or strategy in agent body".into(), self.peek()));
                     }
                 }
             }
@@ -526,7 +577,8 @@ impl<'a> Parser<'a> {
         self.expect(Tok::LBrace, "expected '{'")?;
         let mut body = Vec::new();
         let mut on_fail = None;
-        let mut timeout = None;
+        let mut timeout_source = None;
+        let mut timeout_destination = None;
         while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
             match self.peek() {
                 Tok::KwOnFail => {
@@ -535,8 +587,13 @@ impl<'a> Parser<'a> {
                 }
                 Tok::KwOnTimeout => {
                     self.advance();
-                    timeout = Some(self.parse_expr()?);
-                    on_fail = Some(self.parse_failure_action()?);
+                    let duration = self.parse_expr()?;
+                    let action = self.parse_failure_action()?;
+                    // Store timeout on destination by default for backward compat
+                    timeout_destination = Some(duration);
+                    if on_fail.is_none() {
+                        on_fail = Some(action);
+                    }
                 }
                 _ => body.push(self.parse_statement()?),
             }
@@ -544,9 +601,115 @@ impl<'a> Parser<'a> {
         self.expect(Tok::RBrace, "expected '}'")?;
         Ok(Item::AtomicSwap(AtomicSwapDecl {
             name: Symbol::new(&name),
+            from_asset: AssetRef::new(ChainRef(Symbol::new("unknown")), Symbol::new("unknown")),
+            to_asset: AssetRef::new(ChainRef(Symbol::new("unknown")), Symbol::new("unknown")),
+            source_vm: None,
+            dest_vm: None,
+            amount: None,
+            receiver: None,
+            hashlock: None,
             body,
+            requires: vec![],
             on_fail,
-            timeout,
+            timeout_source,
+            timeout_destination,
+        }))
+    }
+
+    /// Parse the new `atomic swap <from> -> <to> { ... }` syntax.
+    /// The caller has already consumed `atomic` and `swap` tokens.
+    fn parse_atomic_swap_item_new(&mut self) -> Result<Item, X3Error> {
+        let from_asset = self.parse_asset_ref()?;
+        self.expect(Tok::Arrow, "expected '->' after source asset")?;
+        let to_asset = self.parse_asset_ref()?;
+        self.expect(Tok::LBrace, "expected '{'")?;
+
+        // Extract VM families from chain prefixes.
+        let source_vm = parse_vm_family(from_asset.chain.as_str()).map(String::from);
+        let dest_vm = parse_vm_family(to_asset.chain.as_str()).map(String::from);
+
+        let mut body = Vec::new();
+        let mut amount = None;
+        let mut receiver = None;
+        let mut hashlock = None;
+        let mut requires = Vec::new();
+        let mut on_fail = None;
+        let mut timeout_source = None;
+        let mut timeout_destination = None;
+
+        while self.peek() != Tok::RBrace && self.peek() != Tok::Eof {
+            match self.peek() {
+                Tok::Ident(ref s) if s == "amount" => {
+                    self.advance();
+                    amount = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "receiver" => {
+                    self.advance();
+                    receiver = Some(self.parse_expr()?);
+                }
+                Tok::Ident(ref s) if s == "hashlock" => {
+                    self.advance();
+                    // hashlock <hash_fn>(<secret_expr>)
+                    let hash_fn_name = self.expect_ident("hash function name")?;
+                    self.expect(Tok::LParen, "expected '(' after hash function")?;
+                    let secret = self.parse_expr()?;
+                    self.expect(Tok::RParen, "expected ')' after hashlock secret")?;
+                    hashlock = Some(HashlockSpec {
+                        hash_fn: Symbol::new(&hash_fn_name),
+                        secret: Box::new(secret),
+                    });
+                }
+                Tok::Ident(ref s) if s == "timeout" => {
+                    self.advance();
+                    // timeout source <expr>  |  timeout destination <expr>
+                    let kind = self.expect_ident("timeout kind (source/destination)")?;
+                    let duration = self.parse_expr()?;
+                    match kind.as_str() {
+                        "source" => timeout_source = Some(duration),
+                        "destination" => timeout_destination = Some(duration),
+                        other => {
+                            return Err(parse_err(
+                                format!("expected 'source' or 'destination' after 'timeout', got '{other}'"),
+                                self.peek(),
+                            ));
+                        }
+                    }
+                }
+                Tok::KwRequire => {
+                    requires.push(self.parse_require_guard()?);
+                }
+                Tok::KwOnFail => {
+                    self.advance();
+                    on_fail = Some(self.parse_failure_action()?);
+                }
+                _ => {
+                    body.push(self.parse_statement()?);
+                }
+            }
+        }
+        self.expect(Tok::RBrace, "expected '}'")?;
+
+        // Auto-generate a name from the source/destination chains.
+        let name = Symbol::from_string(format!(
+            "atomic_swap_{}_{}",
+            from_asset.chain.as_str(),
+            to_asset.chain.as_str()
+        ));
+
+        Ok(Item::AtomicSwap(AtomicSwapDecl {
+            name,
+            from_asset,
+            to_asset,
+            source_vm,
+            dest_vm,
+            amount,
+            receiver,
+            hashlock,
+            body,
+            requires,
+            on_fail,
+            timeout_source,
+            timeout_destination,
         }))
     }
 
@@ -893,8 +1056,7 @@ impl<'a> Parser<'a> {
                 suffix: None,
             })
         });
-        let target = from_or_to
-            .unwrap_or_else(|| Expression::Literal(LiteralExpr::String(Symbol::new("sender"))));
+        let target = from_or_to.unwrap_or_else(|| Expression::Literal(LiteralExpr::String(Symbol::new("sender"))));
         match kw {
             "lock" => Ok(Statement::Lock {
                 chain: chain.clone(),
@@ -1047,14 +1209,9 @@ impl<'a> Parser<'a> {
                         let receiver = receiver
                             .map(|expr| expression_debug_string(&expr))
                             .unwrap_or_else(|| "sender".to_string());
-                        action = FailureAction::Refund(Expression::Literal(LiteralExpr::String(
-                            Symbol::new(&format!(
-                                "{}.{}:{}",
-                                asset.chain.as_str(),
-                                asset.name.as_str(),
-                                receiver
-                            )),
-                        )));
+                        action = FailureAction::Refund(Expression::Literal(LiteralExpr::String(Symbol::new(
+                            &format!("{}.{}:{}", asset.chain.as_str(), asset.name.as_str(), receiver),
+                        ))));
                     }
                 }
                 _ => break,
@@ -1397,11 +1554,7 @@ impl<'a> Parser<'a> {
                 self.expect_ident("from")?;
                 let from = self.parse_expr()?;
                 self.opt_semi();
-                Ok(Statement::Burn {
-                    asset,
-                    amount,
-                    from,
-                })
+                Ok(Statement::Burn { asset, amount, from })
             }
             Tok::KwRelease => {
                 self.advance();
@@ -1852,18 +2005,25 @@ impl<'a> Parser<'a> {
     fn parse_require_guard(&mut self) -> Result<RequireGuard, X3Error> {
         self.advance(); // 'require'
         let kind = self.parse_require_kind()?;
-        let subject = if matches!(self.peek(), Tok::Ident(_)) {
+        // Check for dot-separated subject: `finality.eth`
+        let subject = if self.peek() == Tok::Dot {
+            self.advance(); // '.'
+            Some(Symbol::new(&self.expect_ident("require subject after '.'")?))
+        } else if matches!(self.peek(), Tok::Ident(_)) {
             Some(Symbol::new(&self.expect_ident("require subject")?))
         } else {
             None
         };
+        // Skip optional comparison operator (>=, ==, <=, >, <, !=)
+        match self.peek() {
+            Tok::Ge | Tok::Gt | Tok::Le | Tok::Lt | Tok::EqEq | Tok::Ne => {
+                self.advance();
+            }
+            _ => {}
+        }
         let value = self.parse_expr()?;
         self.opt_semi();
-        Ok(RequireGuard {
-            kind,
-            subject,
-            value,
-        })
+        Ok(RequireGuard { kind, subject, value })
     }
 
     fn parse_require_stmt(&mut self) -> Result<Statement, X3Error> {
@@ -1883,6 +2043,7 @@ impl<'a> Parser<'a> {
             "audit_gate" => Ok(RequireKind::AuditGate),
             "bridge_liquidity" => Ok(RequireKind::BridgeLiquidity),
             "canonical_supply" => Ok(RequireKind::CanonicalSupply),
+            "relayer_quorum" => Ok(RequireKind::RelayerQuorum),
             other => Ok(RequireKind::Custom(Symbol::new(other))),
         }
     }
@@ -1940,6 +2101,16 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Consume the next token if it matches `expected`.
+    fn check(&mut self, expected: Tok) -> bool {
+        if self.peek() == expected {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+
     fn expect(&mut self, expected: Tok, msg: &str) -> Result<(), X3Error> {
         let found = self.advance();
         if found == expected {
@@ -1986,10 +2157,7 @@ fn annotation_from_name_args(name: &str, args: &[Expression]) -> Result<Annotati
         "off_chain" => Ok(Annotation::OffChain),
         "sandbox" => Ok(Annotation::Sandbox),
         "whitelist" => {
-            let items: Vec<Symbol> = args
-                .iter()
-                .map(|e| Symbol::new(&expr_to_string(e)))
-                .collect();
+            let items: Vec<Symbol> = args.iter().map(|e| Symbol::new(&expr_to_string(e))).collect();
             Ok(Annotation::Whitelist(items))
         }
         "concurrent" => Ok(Annotation::Concurrent),
@@ -2031,10 +2199,7 @@ fn annotation_from_name_args(name: &str, args: &[Expression]) -> Result<Annotati
                         None
                     }
                 })
-                .or_else(|| {
-                    args.get(1)
-                        .and_then(|e| expr_to_u128(e).ok().map(|v| v as u64))
-                })
+                .or_else(|| args.get(1).and_then(|e| expr_to_u128(e).ok().map(|v| v as u64)))
                 .unwrap_or(1);
             Ok(Annotation::Subscription(amount, period))
         }
@@ -2054,11 +2219,7 @@ fn annotation_from_name_args(name: &str, args: &[Expression]) -> Result<Annotati
 }
 
 fn capability_from_call(name: &str, args: &[Expression]) -> Statement {
-    let a = |i: usize| -> Expression {
-        args.get(i)
-            .cloned()
-            .unwrap_or(Expression::Literal(LiteralExpr::Unit))
-    };
+    let a = |i: usize| -> Expression { args.get(i).cloned().unwrap_or(Expression::Literal(LiteralExpr::Unit)) };
     match name {
         "snapshot" => Statement::Snapshot,
         "diff" => Statement::Diff {
@@ -2149,10 +2310,7 @@ fn fill_route_bridge_amounts(stmts: &mut [Statement]) {
         .iter()
         .filter_map(|stmt| match stmt {
             Statement::Lock {
-                chain,
-                asset,
-                amount,
-                ..
+                chain, asset, amount, ..
             } if !expression_is_zero(amount) => Some((
                 chain.as_str().to_ascii_lowercase(),
                 asset.name.as_str().to_string(),
@@ -2169,21 +2327,13 @@ fn fill_route_bridge_amounts(stmts: &mut [Statement]) {
     }
 }
 
-fn fill_route_bridge_amounts_in_block(
-    block: &mut Block,
-    source_amounts: &[(String, String, Expression)],
-) {
+fn fill_route_bridge_amounts_in_block(block: &mut Block, source_amounts: &[(String, String, Expression)]) {
     for stmt in &mut block.stmts {
         match stmt {
             Statement::Bridge { from, amount, .. } if expression_is_zero(amount) => {
-                if let Some((_, _, source_amount)) =
-                    source_amounts
-                        .iter()
-                        .find(|(source_chain, source_asset, _)| {
-                            *source_chain == from.chain.as_str().to_ascii_lowercase()
-                                && source_asset == from.name.as_str()
-                        })
-                {
+                if let Some((_, _, source_amount)) = source_amounts.iter().find(|(source_chain, source_asset, _)| {
+                    *source_chain == from.chain.as_str().to_ascii_lowercase() && source_asset == from.name.as_str()
+                }) {
                     *amount = source_amount.clone();
                 }
             }
@@ -2240,218 +2390,142 @@ fn annotate_item(item: Item, annotations: Vec<Annotation>) -> Item {
     }
 }
 
-/// Inline tokenizer used until the lexer crate is production-ready
+/// Tokenize source via the x3-lang-lexer crate, converting its
+/// `Token` stream into the parser's internal `Tok` enum.
 fn tokenize(source: &str) -> Vec<Tok> {
-    let mut tokens = Vec::new();
-    let chars: Vec<char> = source.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        // Skip whitespace and comments
-        if c.is_whitespace() {
-            i += 1;
-            continue;
-        }
-        if c == '/' && i + 1 < chars.len() && chars[i + 1] == '/' {
-            while i < chars.len() && chars[i] != '\n' {
-                i += 1;
-            }
-            continue;
-        }
-        if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
-            i += 2;
-            while i + 1 < chars.len() && !(chars[i] == '*' && chars[i + 1] == '/') {
-                i += 1;
-            }
-            i += 2;
-            continue;
-        }
-        // Strings
-        if c == '"' {
-            i += 1;
-            let mut s = String::new();
-            while i < chars.len() && chars[i] != '"' {
-                if chars[i] == '\\' {
-                    i += 1;
-                }
-                s.push(chars[i]);
-                i += 1;
-            }
-            i += 1; // closing "
-            tokens.push(Tok::String_(s));
-            continue;
-        }
-        // Numbers AND alphanumeric identifiers. We greedily consume any
-        // run of [A-Za-z0-9_-], then classify: all-digit -> Int(...)
-        // (parsing as base-10), otherwise -> keyword/Ident. This keeps
-        // base58 addresses (which often start with a digit, e.g.
-        // Solana receivers like "4Nd1mzi8...") tokenized as a single
-        // Ident rather than being split into Int(4) + Ident. Hyphens are
-        // included in the run so values like `x3-receiver-1234` parse
-        // as a single receiver name; the arrow operator `->` is checked
-        // explicitly first.
-        if c.is_ascii_digit() || (c.is_ascii_alphabetic() || c == '_') {
-            let start = i;
-            // Detect `->` arrow: stop the identifier at `-` if it
-            // would otherwise form an arrow. We still allow hyphens
-            // mid-identifier; we only refuse a trailing `-` that would
-            // be part of `->`.
-            while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '-')
-            {
-                if chars[i] == '-' && i + 1 < chars.len() && chars[i + 1] == '>' {
-                    break;
-                }
-                i += 1;
-            }
-            let word: String = chars[start..i].iter().collect();
-            if word.chars().all(|ch| ch.is_ascii_digit()) {
-                let num = word.parse::<u128>().unwrap_or(0);
-                tokens.push(Tok::Int(num));
-            } else {
-                tokens.push(keyword_or_ident(&word));
-            }
-            continue;
-        }
-        // Identifiers and keywords
-        if c.is_ascii_alphabetic() || c == '_' {
-            let start = i;
-            while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') {
-                i += 1;
-            }
-            let word: String = chars[start..i].iter().collect();
-            tokens.push(keyword_or_ident(&word));
-            continue;
-        }
-        // Multi-char punctuation
-        if c == '-' && i + 1 < chars.len() && chars[i + 1] == '>' {
-            tokens.push(Tok::Arrow);
-            i += 2;
-            continue;
-        }
-        if c == '=' && i + 1 < chars.len() {
-            match chars[i + 1] {
-                '>' => {
-                    tokens.push(Tok::FatArrow);
-                    i += 2;
-                    continue;
-                }
-                '=' => {
-                    tokens.push(Tok::EqEq);
-                    i += 2;
-                    continue;
-                }
-                _ => {}
-            }
-        }
-        if c == '!' && i + 1 < chars.len() && chars[i + 1] == '=' {
-            tokens.push(Tok::Ne);
-            i += 2;
-            continue;
-        }
-        if c == '&' && i + 1 < chars.len() && chars[i + 1] == '&' {
-            tokens.push(Tok::AmpAmp);
-            i += 2;
-            continue;
-        }
-        if c == '|' && i + 1 < chars.len() && chars[i + 1] == '|' {
-            tokens.push(Tok::PipePipe);
-            i += 2;
-            continue;
-        }
-        if c == '<' && i + 1 < chars.len() && chars[i + 1] == '=' {
-            tokens.push(Tok::Le);
-            i += 2;
-            continue;
-        }
-        if c == '>' && i + 1 < chars.len() && chars[i + 1] == '=' {
-            tokens.push(Tok::Ge);
-            i += 2;
-            continue;
-        }
-        // Single-char punctuation
-        let tok = match c {
-            '(' => Tok::LParen,
-            ')' => Tok::RParen,
-            '{' => Tok::LBrace,
-            '}' => Tok::RBrace,
-            '[' => Tok::LBracket,
-            ']' => Tok::RBracket,
-            ',' => Tok::Comma,
-            ':' => Tok::Colon,
-            ';' => Tok::Semicolon,
-            '=' => Tok::Eq,
-            '.' => Tok::Dot,
-            '@' => Tok::At,
-            '+' => Tok::Plus,
-            '-' => Tok::Minus,
-            '*' => Tok::Star,
-            '/' => Tok::Slash,
-            '%' => Tok::Percent,
-            '<' => Tok::Lt,
-            '>' => Tok::Gt,
-            '!' => Tok::Bang,
-            _ => {
-                i += 1;
-                continue; // skip unrecognized
-            }
-        };
-        tokens.push(tok);
-        i += 1;
-    }
-    tokens
+    let lexer = x3_lang_lexer::Lexer::new(source, 0);
+    lexer.filter_map(lexer_token_to_tok).collect()
 }
 
-fn keyword_or_ident(word: &str) -> Tok {
+/// Convert a lexer token to the parser's Tok enum.
+fn lexer_token_to_tok(token: Token) -> Option<Tok> {
+    Some(match token.kind {
+        TokenKind::Eof => Tok::Eof,
+        TokenKind::Newline => return None,
+        TokenKind::Unknown(_c) => return None,
+
+        TokenKind::Ident(sym) => ident_to_tok(sym.as_str()),
+        TokenKind::Keyword(kw) => {
+            keyword_to_tok(kw)
+                .unwrap_or_else(|| Tok::Ident(kw.as_str().to_string()))
+        }
+
+        TokenKind::Literal(lit) => match lit {
+            x3_lang_lexer::token::Literal::Int { value, .. } => Tok::Int(value),
+            x3_lang_lexer::token::Literal::String(sym) => Tok::String_(sym.as_str().to_string()),
+            _ => return None,
+        },
+
+        // Delimiters
+        TokenKind::Delimiter(d) => match d {
+            x3_lang_lexer::token::Delimiter::OpenParen => Tok::LParen,
+            x3_lang_lexer::token::Delimiter::CloseParen => Tok::RParen,
+            x3_lang_lexer::token::Delimiter::OpenBrace => Tok::LBrace,
+            x3_lang_lexer::token::Delimiter::CloseBrace => Tok::RBrace,
+            x3_lang_lexer::token::Delimiter::OpenBracket => Tok::LBracket,
+            x3_lang_lexer::token::Delimiter::CloseBracket => Tok::RBracket,
+            x3_lang_lexer::token::Delimiter::OpenAngle => Tok::Lt,
+            x3_lang_lexer::token::Delimiter::CloseAngle => Tok::Gt,
+        },
+
+        TokenKind::Comma => Tok::Comma,
+        TokenKind::Semi => Tok::Semicolon,
+        TokenKind::Colon => Tok::Colon,
+        TokenKind::Eq => Tok::Eq,
+        TokenKind::Dot => Tok::Dot,
+        TokenKind::At => Tok::At,
+
+        TokenKind::Arrow => Tok::Arrow,
+        TokenKind::FatArrow => Tok::FatArrow,
+
+        TokenKind::BinOp(op) => match op {
+            CBinOp::Plus => Tok::Plus,
+            CBinOp::Minus => Tok::Minus,
+            CBinOp::Star => Tok::Star,
+            CBinOp::Slash => Tok::Slash,
+            CBinOp::Percent => Tok::Percent,
+            CBinOp::AndAnd => Tok::AmpAmp,
+            CBinOp::OrOr => Tok::PipePipe,
+            CBinOp::EqEq => Tok::EqEq,
+            CBinOp::Ne => Tok::Ne,
+            CBinOp::Lt => Tok::Lt,
+            CBinOp::Gt => Tok::Gt,
+            CBinOp::Le => Tok::Le,
+            CBinOp::Ge => Tok::Ge,
+            _ => return None,
+        },
+        TokenKind::UnOp(CUnOp::Not) => Tok::Bang,
+        TokenKind::UnOp(CUnOp::Neg) => Tok::Minus,
+        TokenKind::UnOp(_) => return None,
+
+        TokenKind::BinOpEq(_)
+        | TokenKind::Question
+        | TokenKind::Hash
+        | TokenKind::Dollar
+        | TokenKind::DotDot
+        | TokenKind::DotDotDot
+        | TokenKind::DotDotEq
+        | TokenKind::PathSep => return None,
+    })
+}
+
+fn ident_to_tok(word: &str) -> Tok {
     match word {
-        "fn" => Tok::KwFn,
-        "let" => Tok::KwLet,
-        "mut" => Tok::KwMut,
-        "return" => Tok::KwReturn,
-        "if" => Tok::KwIf,
-        "else" => Tok::KwElse,
-        "while" => Tok::KwWhile,
-        "for" => Tok::KwFor,
-        "in" => Tok::KwIn,
-        "loop" => Tok::KwLoop,
-        "break" => Tok::KwBreak,
-        "continue" => Tok::KwContinue,
-        "agent" => Tok::KwAgent,
-        "struct" => Tok::KwStruct,
-        "enum" => Tok::KwEnum,
-        "use" => Tok::KwUse,
-        "mod" => Tok::KwMod,
-        "import" => Tok::KwImport,
-        "const" => Tok::KwConst,
-        "bridge" => Tok::KwBridge,
-        "atomic_swap" => Tok::KwAtomicSwap,
-        "strategy" => Tok::KwStrategy,
-        "proposal" => Tok::KwProposal,
-        "gpu" => Tok::KwGpu,
-        "simulate" => Tok::KwSimulate,
-        "scheduled" => Tok::KwScheduled,
-        "intent" => Tok::KwIntent,
-        "subscription" => Tok::KwSubscription,
-        "pub" => Tok::KwPub,
-        "async" => Tok::KwAsync,
         "as" => Tok::KwAs,
-        "true" => Tok::KwTrue,
-        "false" => Tok::KwFalse,
-        "require" => Tok::KwRequire,
-        "on_fail" => Tok::KwOnFail,
-        "on_timeout" => Tok::KwOnTimeout,
-        "lock" => Tok::KwLock,
-        "mint" => Tok::KwMint,
-        "burn" => Tok::KwBurn,
-        "release" => Tok::KwRelease,
-        "swap" => Tok::KwSwap,
-        "match" => Tok::KwMatch,
-        "atomic" => Tok::KwAtomic,
-        "emit" => Tok::KwEmit,
-        "try" => Tok::KwTry,
-        "await" => Tok::KwAwait,
+        "in" => Tok::KwIn,
+        "import" => Tok::KwImport,
+        "atomic_swap" => Tok::KwAtomicSwap,
+        "simd" => Tok::Ident(word.to_string()),
         other => Tok::Ident(other.to_string()),
     }
+}
+
+fn keyword_to_tok(kw: Keyword) -> Option<Tok> {
+    Some(match kw {
+        Keyword::Fn => Tok::KwFn,
+        Keyword::Let => Tok::KwLet,
+        Keyword::Mut => Tok::KwMut,
+        Keyword::Return => Tok::KwReturn,
+        Keyword::If => Tok::KwIf,
+        Keyword::Else => Tok::KwElse,
+        Keyword::While => Tok::KwWhile,
+        Keyword::For => Tok::KwFor,
+        Keyword::Loop => Tok::KwLoop,
+        Keyword::Break => Tok::KwBreak,
+        Keyword::Continue => Tok::KwContinue,
+        Keyword::Agent => Tok::KwAgent,
+        Keyword::Struct => Tok::KwStruct,
+        Keyword::Enum => Tok::KwEnum,
+        Keyword::Use => Tok::KwUse,
+        Keyword::Mod => Tok::KwMod,
+        Keyword::Const => Tok::KwConst,
+        Keyword::Bridge => Tok::KwBridge,
+        Keyword::Strategy => Tok::KwStrategy,
+        Keyword::Proposal => Tok::KwProposal,
+        Keyword::Gpu => Tok::KwGpu,
+        Keyword::Simulate => Tok::KwSimulate,
+        Keyword::Schedule => Tok::KwScheduled,
+        Keyword::Intent => Tok::KwIntent,
+        Keyword::Subscription => Tok::KwSubscription,
+        Keyword::Pub => Tok::KwPub,
+        Keyword::Async => Tok::KwAsync,
+        Keyword::True => Tok::KwTrue,
+        Keyword::False => Tok::KwFalse,
+        Keyword::Require => Tok::KwRequire,
+        Keyword::OnFail => Tok::KwOnFail,
+        Keyword::OnTimeout => Tok::KwOnTimeout,
+        Keyword::Lock => Tok::KwLock,
+        Keyword::Mint => Tok::KwMint,
+        Keyword::Burn => Tok::KwBurn,
+        Keyword::Release => Tok::KwRelease,
+        Keyword::Swap => Tok::KwSwap,
+        Keyword::Match => Tok::KwMatch,
+        Keyword::Atomic => Tok::KwAtomic,
+        Keyword::Emit => Tok::KwEmit,
+        Keyword::Try => Tok::KwTry,
+        Keyword::Await => Tok::KwAwait,
+        _ => return None,
+    })
 }
 
 fn parse_err(message: String, found: Tok) -> X3Error {

@@ -29,10 +29,8 @@ fn run() -> Result<(), String> {
         .unwrap_or_else(|| "local".to_string());
 
     let dataset = if let Some(input_json) = input_json {
-        serde_json::from_str::<Value>(
-            &fs::read_to_string(input_json).map_err(|err| err.to_string())?,
-        )
-        .map_err(|err| err.to_string())?
+        serde_json::from_str::<Value>(&fs::read_to_string(input_json).map_err(|err| err.to_string())?)
+            .map_err(|err| err.to_string())?
     } else {
         let rpc_url = rpc_url.ok_or("--rpc-url or --input-json is required")?;
         let block = block.ok_or("--block is required with --rpc-url")?;
@@ -118,10 +116,7 @@ fn fetch_block_receipts(rpc_url: &str, block: &str) -> Result<Value, String> {
     let block_param = if block.starts_with("0x") {
         block.to_string()
     } else {
-        format!(
-            "0x{:x}",
-            block.parse::<u64>().map_err(|err| err.to_string())?
-        )
+        format!("0x{:x}", block.parse::<u64>().map_err(|err| err.to_string())?)
     };
     let block_value = rpc(rpc_url, "eth_getBlockByNumber", json!([block_param, false]))?;
     let txs = block_value
@@ -200,10 +195,7 @@ fn rlp_log(log: &Value) -> Result<Vec<u8>, String> {
         .and_then(Value::as_array)
         .ok_or("log topics missing")?
         .iter()
-        .map(|topic| {
-            hex_to_bytes(topic.as_str().ok_or("topic is not a string")?)
-                .map(|bytes| rlp_bytes(&bytes))
-        })
+        .map(|topic| hex_to_bytes(topic.as_str().ok_or("topic is not a string")?).map(|bytes| rlp_bytes(&bytes)))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rlp_list(vec![
         rlp_bytes(&hex_to_bytes(expect_str(log, "address")?)?),
@@ -242,31 +234,23 @@ fn header_rlp(block: &Value) -> Result<Vec<u8>, String> {
     if let Some(excess_blob_gas) = block.get("excessBlobGas").and_then(Value::as_str) {
         fields.push(uint_rlp_hex(excess_blob_gas)?);
     }
-    if let Some(parent_beacon_block_root) =
-        block.get("parentBeaconBlockRoot").and_then(Value::as_str)
-    {
+    if let Some(parent_beacon_block_root) = block.get("parentBeaconBlockRoot").and_then(Value::as_str) {
         fields.push(rlp_bytes(&hex_to_bytes(parent_beacon_block_root)?));
     }
     Ok(rlp_list(fields))
 }
 
 fn first_transfer_log(receipt: &Value) -> Option<&Value> {
-    receipt
-        .get("logs")
-        .and_then(Value::as_array)?
-        .iter()
-        .find(|log| {
-            log.get("topics")
-                .and_then(Value::as_array)
-                .and_then(|topics| topics.first())
-                .and_then(Value::as_str)
-                .map(|topic| {
-                    topic.eq_ignore_ascii_case(
-                        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-                    )
-                })
-                .unwrap_or(false)
-        })
+    receipt.get("logs").and_then(Value::as_array)?.iter().find(|log| {
+        log.get("topics")
+            .and_then(Value::as_array)
+            .and_then(|topics| topics.first())
+            .and_then(Value::as_str)
+            .map(|topic| {
+                topic.eq_ignore_ascii_case("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+            })
+            .unwrap_or(false)
+    })
 }
 
 fn build_trie(pairs: &[(Vec<u8>, Vec<u8>)]) -> Node {
@@ -318,15 +302,10 @@ fn common_prefix(pairs: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
 
 fn encode_node(node: &Node) -> Vec<u8> {
     match node {
-        Node::Leaf(path, value) => {
-            rlp_list(vec![rlp_bytes(&compact_path(path, true)), rlp_bytes(value)])
-        }
+        Node::Leaf(path, value) => rlp_list(vec![rlp_bytes(&compact_path(path, true)), rlp_bytes(value)]),
         Node::Extension(path, child) => {
             let child = encode_node(child);
-            rlp_list(vec![
-                rlp_bytes(&compact_path(path, false)),
-                child_ref(&child),
-            ])
+            rlp_list(vec![rlp_bytes(&compact_path(path, false)), child_ref(&child)])
         }
         Node::Branch(children, value) => {
             let mut fields = Vec::new();

@@ -170,8 +170,8 @@ impl DomainRegistry {
             return client.verify_ownership(domain_name, owner_address).await;
         }
 
-        // If blockchain is not enabled, assume ownership verification passes
-        Ok(true)
+        // If blockchain is not enabled, ownership cannot be verified
+        Err(DnsError::blockchain("blockchain integration not available for ownership verification"))
     }
 
     /// Get domains by owner address

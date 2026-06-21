@@ -9,14 +9,14 @@ use std::time::Instant;
 /// GPU-accelerated secp256k1 signature verifier
 #[derive(Debug, Clone)]
 pub struct Secp256k1Kernel {
-    batch_size: usize,
+    _batch_size: usize,
     use_gpu: bool,
 }
 
 impl Secp256k1Kernel {
-    pub fn new(batch_size: usize, use_gpu: bool) -> Self {
+    pub fn new(_batch_size: usize, use_gpu: bool) -> Self {
         Self {
-            batch_size,
+            _batch_size,
             use_gpu,
         }
     }
@@ -29,9 +29,10 @@ impl Secp256k1Kernel {
         signatures: &[&[u8]],
         public_keys: &[&[u8]],
     ) -> Result<(usize, u64)> {
-        let start = Instant::now();
+        let _start = Instant::now();
 
         // Feature-gated GPU dispatch.
+        #[allow(unexpected_cfgs)]
         #[cfg(feature = "cuda")]
         {
             if self.use_gpu {

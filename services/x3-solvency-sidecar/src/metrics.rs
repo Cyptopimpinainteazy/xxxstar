@@ -96,6 +96,18 @@ lazy_static::lazy_static! {
         "x3_last_processed_block",
         "Most recent block number processed by the solvency subscriber"
     ).expect("register x3_last_processed_block");
+
+    /// Rolling average settlement fill time in seconds.
+    static ref AVERAGE_FILL_TIME_SECS: Gauge = prometheus::register_gauge!(
+        "x3_average_fill_time_secs",
+        "Rolling average settlement fill time in seconds (EMA over last 1000 legs)"
+    ).expect("register x3_average_fill_time_secs");
+
+    /// Total completed settlement legs in the rolling window.
+    static ref COMPLETED_SETTLEMENTS: Gauge = prometheus::register_gauge!(
+        "x3_completed_settlements",
+        "Total completed settlement legs in the rolling fill-time window"
+    ).expect("register x3_completed_settlements");
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +149,8 @@ pub fn update_metrics(dashboard: &SolvencyDashboard) {
     lazy_static::initialize(&FROZEN_LANE_COUNT);
     lazy_static::initialize(&TREASURY_AT_RISK);
     lazy_static::initialize(&LAST_PROCESSED_BLOCK);
+    lazy_static::initialize(&AVERAGE_FILL_TIME_SECS);
+    lazy_static::initialize(&COMPLETED_SETTLEMENTS);
 
     // Per-vault gauges.
     for vault in &dashboard.vaults {
@@ -183,12 +197,14 @@ pub fn update_metrics(dashboard: &SolvencyDashboard) {
     }
 
     // Scalar gauges.
+    // Scalar gauges.
     GLOBAL_UNSETTLED_NOTIONAL.set(dashboard.global_unsettled_notional as f64);
     FROZEN_LANE_COUNT.set(f64::from(dashboard.frozen_lane_count));
     TREASURY_AT_RISK.set(dashboard.treasury_at_risk as f64);
     LAST_PROCESSED_BLOCK.set(dashboard.last_updated_block as f64);
+    AVERAGE_FILL_TIME_SECS.set(dashboard.average_fill_time_secs);
+    COMPLETED_SETTLEMENTS.set(dashboard.completed_settlements as f64);
 }
-
 /// Collect all metric families from the default Prometheus registry.
 ///
 /// Provided as a convenience for operators and integration tests that want

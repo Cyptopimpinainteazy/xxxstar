@@ -1,5 +1,9 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 
 //! # X3 VRF Pallet
 //!
@@ -38,8 +42,6 @@ pub mod pallet {
     /// Maximum number of pending randomness requests per account
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Currency trait for fee deduction and balance management.
         type Currency: frame_support::traits::ReservableCurrency<Self::AccountId>;
 

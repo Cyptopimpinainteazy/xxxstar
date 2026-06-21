@@ -6,6 +6,12 @@ exclude = [
     # (Foundry for EVM, Anchor for SVM). Excluding it prevents the parent
     # cargo from picking up SVM program crates and confusing build graphs.
     "X3-contracts",
+    # x3-adapters is a standalone HTLC adapter crate with its own test suite.
+    # Excluded from workspace to keep it fast and independent.
+    "adapters",
+    # Solana BPF programs are standalone crates that conflict with the
+    # workspace's solana-program dependency graph.
+    "programs/svm/*",
 ]
 members = [
     "pallets/x3-kernel",
@@ -94,11 +100,13 @@ members = [
     "crates/x3-accel-wgpu",
     "crates/x3-asset-kernel-types",
     "crates/x3-atomic-trade",
+    "crates/x3-atomic-swap",
     "crates/x3-automation",
     "crates/x3-common",
     "crates/x3-dex",
     "crates/x3-gateway-risk-engine",
     "crates/x3-gpu-validator-swarm",
+    "crates/x3-readiness",
     "crates/x3-integration",
     "crates/x3-ixl",
     "crates/x3-liquidity-core",
@@ -108,6 +116,7 @@ members = [
     "crates/x3-revenue-sharing",
     "crates/x3-rpc",
     "crates/x3-slash",
+    "crates/x3-svm",
     "crates/x3-vrf",
     "crates/x3-wallet",
 # ] and rust-toolchain.toml)
@@ -169,6 +178,9 @@ members = [
     "crates/x3-semantics",               # <- x3-typeck
     # Cross-chain intent system: user-facing intent language, compiler, lifecycle, simulation
     "crates/x3-crosschain-intent",
+    "crates/x3-court",
+    "crates/x3-agent",
+    "crates/x3-intent",
     # CI canonical crate paths: required workspace members
     "crates/x3-relayer",
     "crates/x3-bridge-security-council",
@@ -177,6 +189,10 @@ members = [
     "crates/x3-foundry-auditor",
     "crates/x3-foundry-revenue",
     "crates/x3-foundry-indexer",
+    # X3 Cross-VM Atomic Swap Proof Mode — HTLC hashlocks, timelocks, relayer, scoreboard
+    "crates/x3-atomic-swap",
+    # Bitcoin vault — threshold multisig vault with SPV proof accounting
+    "crates/x3-bitcoin-vault",
 ]
 default-members = ["node"]
 resolver = "2"
@@ -490,6 +506,8 @@ sp-crypto-hashing = { path = "vendor/sp-crypto-hashing" }
 # wasm32 builds when sp-runtime/serde is enabled. Required for clean wasm runtime build under
 # polkadot-sdk stable2512.
 frame-support-procedural = { path = "patches/frame-support-procedural" }
+# X3 patch: disable WASM build for test runtime to avoid git checkout issues
+frame-storage-access-test-runtime = { path = "patches/frame-storage-access-test-runtime" }
 # sc-network* patches removed for RC1: the patched tree is a snapshot of an older
 # polkadot-sdk era (monolithic libp2p 0.51) and is structurally incompatible with
 # stable2512's dual libp2p/litep2p backend. Using upstream sc-network directly.

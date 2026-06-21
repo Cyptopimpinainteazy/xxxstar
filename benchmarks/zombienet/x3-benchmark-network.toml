@@ -1,0 +1,183 @@
+# X3 Chain — Zombienet Network Benchmark Configuration
+#
+# Deploys a 5-validator network to benchmark:
+#   - Finality time (GRANDPA)
+#   - Block production throughput
+#   - Peer discovery latency
+#   - Network partition recovery
+#   - Node sync time
+#
+# Usage:
+#   zombienet spawn benchmarks/zombienet/x3-benchmark-network.toml
+
+[settings]
+timeout = 600                         # 10 minute overall timeout
+provider = "native"                   # or "kubernetes"
+
+# ─── Relay Chain (5 validators) ─────────────────────────────────────────────
+
+[relaychain]
+default_image = "ghcr.io/x3-chain/x3-chain-node:latest"
+default_command = "./x3-chain-node"
+default_args = [
+    "--validator",
+    "--no-telemetry",
+    "--no-prometheus",
+    "--rpc-cors=all",
+    "--rpc-methods=unsafe",
+    "--unsafe-rpc-external",
+    "--wasm-execution=compiled",
+]
+
+chain = "local5"
+
+[[relaychain.nodes]]
+name = "validator-1"
+validator = true
+rpc_port = 9933
+ws_port = 9944
+
+[[relaychain.nodes]]
+name = "validator-2"
+validator = true
+rpc_port = 9934
+ws_port = 9945
+
+[[relaychain.nodes]]
+name = "validator-3"
+validator = true
+rpc_port = 9935
+ws_port = 9946
+
+[[relaychain.nodes]]
+name = "validator-4"
+validator = true
+rpc_port = 9936
+ws_port = 9947
+
+[[relaychain.nodes]]
+name = "validator-5"
+validator = true
+rpc_port = 9937
+ws_port = 9948
+
+# ─── Network Tests ──────────────────────────────────────────────────────────
+
+[[tests]]
+name = "finality_benchmark"
+description = "Measure finality time under load"
+timeout = 300
+script = '''
+# Wait for blocks to start producing
+sleep 30
+
+# Record block height start
+START=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"chain_getHeader"}' \
+    http://127.0.0.1:9933 | jq -r '.result.number')
+
+echo "Starting block: $START"
+
+# Send 1000 balance transfers
+for i in $(seq 1 100); do
+    curl -s -X POST -H "Content-Type: application/json" \
+        -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"author_submitExtrinsic\",\"params\":[\"0x410284...\"]}" \
+        http://127.0.0.1:9933 &
+done
+wait
+
+# Wait for finalization
+sleep 60
+
+END=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"chain_getHeader"}' \
+    http://127.0.0.1:9933 | jq -r '.result.number')
+
+FIN=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead"}' \
+    http://127.0.0.1:9933 | jq -r '.result')
+
+echo "End block: $END"
+echo "Finalized head: $FIN"
+
+# Report
+BLOCKS=$((END - START))
+echo "Blocks produced: $BLOCKS"
+echo "TPS (approx): $(echo "scale=2; $BLOCKS / 60" | bc)"
+'''
+
+[[tests]]
+name = "block_import_benchmark"
+description = "Measure block import time after catch-up"
+timeout = 120
+script = '''
+# Force one node to stop
+STOPPED=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"system_name"}' \
+    http://127.0.0.1:9934 || echo "stopped")
+
+echo "Validator-2 taken offline temporarily"
+
+sleep 30
+
+# Restart and measure sync time
+T0=$(date +%s%N)
+sleep 30
+T1=$(date +%s%N)
+
+SYNC_MS=$(( (T1 - T0) / 1000000 ))
+echo "Sync elapsed (approx): ${SYNC_MS}ms"
+
+# Check finality
+FINAL=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead"}' \
+    http://127.0.0.1:9934 | jq -r '.result // "error"')
+
+echo "Finalized head on validator-2: $FINAL"
+'''
+
+[[tests]]
+name = "network_partition_recovery"
+description = "Simulate a 2-node netsplit and measure convergence"
+timeout = 180
+script = '''
+# Measure finality convergence after simulated partition
+# (requires toxiproxy or tc netem in the container)
+
+echo "Network partition recovery test placeholder"
+echo "Install toxiproxy or configure tc netem for full test"
+echo "Verifying all 5 validators are at same block:"
+
+BLOCKS=""
+for port in 9933 9934 9935 9936 9937; do
+    H=$(curl -s -X POST -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","id":1,"method":"chain_getHeader"}' \
+        "http://127.0.0.1:${port}" | jq -r '.result.number // "N/A"')
+    BLOCKS="$BLOCKS $H"
+done
+echo "Block heights: $BLOCKS"
+'''
+
+[[tests]]
+name = "validator_count_rampdown"
+description = "Test finality with validator count reduction"
+timeout = 120
+script = '''
+# Verify 5-validator finality still works
+F0=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead"}' \
+    http://127.0.0.1:9933 | jq -r '.result')
+
+echo "Finalized head before rampdown: $F0"
+sleep 10
+
+F1=$(curl -s -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"chain_getFinalizedHead"}' \
+    http://127.0.0.1:9933 | jq -r '.result')
+
+if [ "$F0" != "$F1" ]; then
+    echo "Finality progressing normally"
+else
+    echo "Finality stalled!"
+fi
+'''

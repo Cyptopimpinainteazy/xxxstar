@@ -152,6 +152,6 @@ pub fn run_to_block(n: u64) {
 /// Test accounts
 pub const ALICE: u64 = 1;
 pub const BOB: u64 = 2;
-pub const CHARLIE: u64 = 3;
-pub const DAVE: u64 = 4;
-pub const EVE: u64 = 5;
+pub const _CHARLIE: u64 = 3;
+pub const _DAVE: u64 = 4;
+pub const _EVE: u64 = 5;

@@ -2,6 +2,7 @@
 //!
 //! Indexes on-chain Foundry events including FoundryRegistry,
 //! FoundryRevenueRouter, and FoundryAppFactory events.
+#![allow(clippy::too_many_arguments)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -44,7 +45,7 @@ impl DAppStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_status_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "active" => DAppStatus::Active,
             "paused" => DAppStatus::Paused,
@@ -192,6 +193,7 @@ pub mod schema {
 pub struct FoundryIndexer {
     pool: PgPool,
     chain_id: u64,
+    #[allow(dead_code)]
     rpc_url: String,
 }
 
@@ -221,7 +223,7 @@ impl FoundryIndexer {
             "Indexing block {} on chain_id={}",
             block_number, self.chain_id
         );
-        let mut result = IndexResult {
+        let result = IndexResult {
             block_number,
             chain_id: self.chain_id,
             dapps_registered: 0,
@@ -279,7 +281,7 @@ impl FoundryIndexer {
         .bind(dapp.chain_id as i64)
         .bind(dapp.block_number as i64)
         .bind(&dapp.transaction_hash)
-        .bind(&dapp.registered_at)
+        .bind(dapp.registered_at)
         .bind(serde_json::to_value(&dapp.metadata)?)
         .bind(dapp.status.as_str())
         .execute(&self.pool)
@@ -334,7 +336,7 @@ impl FoundryIndexer {
         .bind(&record.treasury_share)
         .bind(record.block_number as i64)
         .bind(&record.transaction_hash)
-        .bind(&record.recorded_at)
+        .bind(record.recorded_at)
         .execute(&self.pool)
         .await?;
 
@@ -382,7 +384,7 @@ impl FoundryIndexer {
         .bind(app.chain_id as i64)
         .bind(app.block_number as i64)
         .bind(&app.transaction_hash)
-        .bind(&app.created_at)
+        .bind(app.created_at)
         .bind(serde_json::to_value(&app.metadata)?)
         .execute(&self.pool)
         .await?;
@@ -501,7 +503,7 @@ impl DAppRow {
             transaction_hash: self.transaction_hash,
             registered_at: self.registered_at,
             metadata: serde_json::from_value(self.metadata).unwrap_or_default(),
-            status: DAppStatus::from_str(&self.status),
+            status: DAppStatus::from_status_str(&self.status),
         }
     }
 }
@@ -571,10 +573,10 @@ mod tests {
 
     #[test]
     fn test_dapp_status_conversion() {
-        assert_eq!(DAppStatus::from_str("active"), DAppStatus::Active);
-        assert_eq!(DAppStatus::from_str("paused"), DAppStatus::Paused);
-        assert_eq!(DAppStatus::from_str("revoked"), DAppStatus::Revoked);
-        assert_eq!(DAppStatus::from_str("unknown"), DAppStatus::Unknown);
+        assert_eq!(DAppStatus::from_status_str("active"), DAppStatus::Active);
+        assert_eq!(DAppStatus::from_status_str("paused"), DAppStatus::Paused);
+        assert_eq!(DAppStatus::from_status_str("revoked"), DAppStatus::Revoked);
+        assert_eq!(DAppStatus::from_status_str("unknown"), DAppStatus::Unknown);
         assert_eq!(DAppStatus::Active.as_str(), "active");
         assert_eq!(DAppStatus::Paused.as_str(), "paused");
     }

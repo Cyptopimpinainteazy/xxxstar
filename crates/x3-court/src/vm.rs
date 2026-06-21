@@ -77,23 +77,23 @@ pub enum ChallengePayload {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Action {
     pub id: u64,
     pub hash: Hash,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Receipt {
     pub hash: Hash,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BlockHeader {
     pub proposer: Address,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Block {
     pub header: BlockHeader,
     pub actions: Vec<Action>,
@@ -104,8 +104,24 @@ pub struct Block {
 }
 
 #[derive(Debug, Clone)]
+pub struct CourtVmConfig {
+    pub proposer_slash_penalty: u128,
+}
+
+impl Default for CourtVmConfig {
+    fn default() -> Self {
+        Self {
+            proposer_slash_penalty: 10_000_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ChainState {
     pub dummy_state: u64,
+    pub config: CourtVmConfig,
+    pub balances: HashMap<Address, u128>,
+    pub reputations: HashMap<Address, u64>,
 }
 
 impl ChainState {
@@ -121,15 +137,18 @@ impl ChainState {
     }
 }
 
+#[derive(Debug)]
 pub enum CourtVmError {
     BlockHashMismatch,
     InvalidDag,
     ExecutionFailure,
     InvalidEquivocationProof,
+    BalanceInsufficient,
+    AccountNotFound,
 }
 
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 fn hash<T: serde::Serialize>(value: &T) -> Hash {
     let bytes = bincode::serialize(value).unwrap_or_default();
@@ -162,12 +181,12 @@ impl ActionDag {
         sorted_ids.sort();
         for id in &sorted_ids {
             let action = &self.by_id[id];
-            hasher.update(&action.id.to_le_bytes());
-            hasher.update(&action.hash);
+            hasher.update(action.id.to_le_bytes());
+            hasher.update(action.hash);
             let mut deps = self.reverse.get(id).cloned().unwrap_or_default();
             deps.sort();
             for dep in deps {
-                hasher.update(&dep.to_le_bytes());
+                hasher.update(dep.to_le_bytes());
             }
         }
         let result = hasher.finalize();
@@ -205,14 +224,8 @@ fn derive_action_dag(actions: &[Action]) -> Result<ActionDag, CourtVmError> {
             // Real impl would parse SEEN/READS/WRITES annotations.
             let dep_pattern = a.id.to_le_bytes();
             if b.hash[..8] == dep_pattern {
-                edges
-                    .entry(a.id)
-                    .or_insert_with(Vec::new)
-                    .push(b.id);
-                reverse
-                    .entry(b.id)
-                    .or_insert_with(Vec::new)
-                    .push(a.id);
+                edges.entry(a.id).or_default().push(b.id);
+                reverse.entry(b.id).or_default().push(a.id);
             }
         }
     }
@@ -300,22 +313,46 @@ fn execute_action(state: &mut ChainState, action: &Action) -> Result<Receipt, Co
     state.dummy_state = state.dummy_state.wrapping_add(action.id);
     let receipt_hash = {
         let mut h = Sha256::new();
-        h.update(&old_state.to_le_bytes());
-        h.update(&action.id.to_le_bytes());
-        h.update(&state.dummy_state.to_le_bytes());
+        h.update(old_state.to_le_bytes());
+        h.update(action.id.to_le_bytes());
+        h.update(state.dummy_state.to_le_bytes());
         let result = h.finalize();
         let mut out = [0u8; 32];
         out.copy_from_slice(&result);
         out
     };
-    Ok(Receipt {
-        hash: receipt_hash,
-    })
+    Ok(Receipt { hash: receipt_hash })
 }
 
-fn slash_challenger(_state: &mut ChainState, _addr: &Address, _amount: u128) {}
-fn slash_proposer(_state: &mut ChainState, _addr: &Address) {}
-fn reward_challenger(_state: &mut ChainState, _addr: &Address, _amount: u128) {}
+fn slash_challenger(
+    state: &mut ChainState,
+    addr: &Address,
+    amount: u128,
+) -> Result<(), CourtVmError> {
+    let balance = state.balances.entry(*addr).or_insert(0);
+    *balance = balance.saturating_sub(amount);
+    Ok(())
+}
+
+fn slash_proposer(state: &mut ChainState, addr: &Address) -> Result<(), CourtVmError> {
+    let penalty = state.config.proposer_slash_penalty;
+    let balance = state.balances.entry(*addr).or_insert(0);
+    *balance = balance.saturating_sub(penalty);
+    // Reduce reputation on slash
+    let rep = state.reputations.entry(*addr).or_insert(0);
+    *rep = rep.saturating_sub(1);
+    Ok(())
+}
+
+fn reward_challenger(
+    state: &mut ChainState,
+    addr: &Address,
+    amount: u128,
+) -> Result<(), CourtVmError> {
+    let balance = state.balances.entry(*addr).or_insert(0);
+    *balance = balance.saturating_add(amount);
+    Ok(())
+}
 
 /// Apply Court Rules deterministic check
 pub fn adjudicate(
@@ -371,11 +408,10 @@ pub fn apply_verdict(
     block: &Block,
     challenge: &Challenge,
     state: &mut ChainState,
-) {
+) -> Result<(), CourtVmError> {
     match verdict {
         Verdict::Valid => {
-            // False challenge: slash challenger bond
-            slash_challenger(state, &challenge.challenger, challenge.bond);
+            slash_challenger(state, &challenge.challenger, challenge.bond)?;
         }
         Verdict::InvalidDag
         | Verdict::InvalidOrder
@@ -383,9 +419,153 @@ pub fn apply_verdict(
         | Verdict::ReceiptMismatch
         | Verdict::ResourceMismatch
         | Verdict::ProposerEquivocation => {
-            // Valid challenge: slash proposer and reward challenger
-            slash_proposer(state, &block.header.proposer);
-            reward_challenger(state, &challenge.challenger, challenge.bond);
+            slash_proposer(state, &block.header.proposer)?;
+            reward_challenger(state, &challenge.challenger, challenge.bond)?;
         }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn addr1() -> Address {
+        [1u8; 32]
+    }
+
+    fn addr2() -> Address {
+        [2u8; 32]
+    }
+
+    fn make_balance(balances: Vec<(Address, u128)>) -> HashMap<Address, u128> {
+        let mut m = HashMap::new();
+        for (addr, bal) in balances {
+            m.insert(addr, bal);
+        }
+        m
+    }
+
+    fn default_state(balances: HashMap<Address, u128>) -> ChainState {
+        ChainState {
+            dummy_state: 0,
+            config: CourtVmConfig::default(),
+            balances,
+            reputations: HashMap::new(),
+        }
+    }
+
+    fn default_block(proposer: Address) -> Block {
+        Block {
+            header: BlockHeader { proposer },
+            actions: vec![],
+            action_dag_root: [0; 32],
+            execution_order_hash: [0; 32],
+            receipts: vec![],
+            resource_summary: ResourceVector {
+                cpu_cycles: 0,
+                gpu_cycles: 0,
+                memory_bytes: 0,
+                io_ops: 0,
+                storage_reads: 0,
+                storage_writes: 0,
+            },
+        }
+    }
+
+    fn default_challenge(challenger: Address, bond: u128) -> Challenge {
+        Challenge {
+            block_hash: [0; 32],
+            challenge_type: ChallengeType::Execution,
+            challenger,
+            bond,
+            payload: ChallengePayload::ReceiptMismatch {
+                action_id: 0,
+                expected: [0; 32],
+                observed: [0; 32],
+            },
+        }
+    }
+
+    #[test]
+    fn test_slash_challenger_reduces_balance() {
+        let mut state = default_state(make_balance(vec![(addr1(), 100_000)]));
+        slash_challenger(&mut state, &addr1(), 10_000).unwrap();
+        assert_eq!(state.balances[&addr1()], 90_000);
+    }
+
+    #[test]
+    fn test_slash_challenger_saturates_to_zero() {
+        let mut state = default_state(make_balance(vec![(addr1(), 5_000)]));
+        slash_challenger(&mut state, &addr1(), 10_000).unwrap();
+        assert_eq!(state.balances[&addr1()], 0);
+    }
+
+    #[test]
+    fn test_slash_challenger_new_account() {
+        let mut state = default_state(HashMap::new());
+        slash_challenger(&mut state, &addr1(), 10_000).unwrap();
+        assert_eq!(state.balances[&addr1()], 0);
+    }
+
+    #[test]
+    fn test_reward_challenger_increases_balance() {
+        let mut state = default_state(make_balance(vec![(addr1(), 50_000)]));
+        reward_challenger(&mut state, &addr1(), 25_000).unwrap();
+        assert_eq!(state.balances[&addr1()], 75_000);
+    }
+
+    #[test]
+    fn test_reward_challenger_new_account() {
+        let mut state = default_state(HashMap::new());
+        reward_challenger(&mut state, &addr1(), 100_000).unwrap();
+        assert_eq!(state.balances[&addr1()], 100_000);
+    }
+
+    #[test]
+    fn test_slash_proposer_reduces_balance_and_reputation() {
+        let mut state = default_state(make_balance(vec![(addr1(), 20_000_000)]));
+        slash_proposer(&mut state, &addr1()).unwrap();
+        assert_eq!(
+            state.balances[&addr1()],
+            20_000_000 - state.config.proposer_slash_penalty
+        );
+        assert_eq!(state.reputations[&addr1()], 0); // 0 stays 0 with saturating_sub
+    }
+
+    #[test]
+    fn test_slash_proposer_saturates_balance_to_zero() {
+        let mut state = default_state(make_balance(vec![(addr1(), 100)]));
+        slash_proposer(&mut state, &addr1()).unwrap();
+        assert_eq!(state.balances[&addr1()], 0);
+    }
+
+    #[test]
+    fn test_apply_verdict_valid_slashes_challenger() {
+        let challenger = addr1();
+        let mut state = default_state(make_balance(vec![(challenger, 50_000)]));
+        let block = default_block(addr2());
+        let challenge = default_challenge(challenger, 10_000);
+        apply_verdict(Verdict::Valid, &block, &challenge, &mut state).unwrap();
+        assert_eq!(state.balances[&challenger], 40_000);
+    }
+
+    #[test]
+    fn test_apply_verdict_invalid_slashes_proposer_rewards_challenger() {
+        let proposer = addr1();
+        let challenger = addr2();
+        let mut state = default_state(make_balance(vec![
+            (proposer, 20_000_000),
+            (challenger, 50_000),
+        ]));
+        let block = default_block(proposer);
+        let challenge = default_challenge(challenger, 10_000);
+        apply_verdict(Verdict::InvalidDag, &block, &challenge, &mut state).unwrap();
+        assert_eq!(
+            state.balances[&proposer],
+            20_000_000 - state.config.proposer_slash_penalty
+        );
+        assert_eq!(state.balances[&challenger], 60_000);
     }
 }

@@ -30,6 +30,9 @@ pub enum CustodyError {
     #[error("HSM operation failed: {0}")]
     HSMError(String),
 
+    #[error("no hardware security module available — cannot sign or verify")]
+    HsmNotAvailable,
+
     #[error("key not found in HSM: {0}")]
     KeyNotFound(String),
 

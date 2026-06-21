@@ -1,0 +1,28 @@
+--- crates/x3-fees/src/lib.rs
++++ replace ResourceVector::zero -> Self with Default::default()
+@@ -318,24 +318,17 @@
+     pub storage_reads: u64,
+     /// Storage write operations
+     pub storage_writes: u64,
+ }
+ 
+ impl ResourceVector {
+     /// Create a new zero-initialized resource vector
+     pub fn zero() -> Self {
+-        Self {
+-            cpu_cycles: 0,
+-            gpu_cycles: 0,
+-            memory_bytes: 0,
+-            io_ops: 0,
+-            storage_reads: 0,
+-            storage_writes: 0,
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Sum two resource vectors (for aggregation)
+     pub fn saturating_add(&self, other: &Self) -> Self {
+         Self {
+             cpu_cycles: self.cpu_cycles.saturating_add(other.cpu_cycles),
+             gpu_cycles: self.gpu_cycles.saturating_add(other.gpu_cycles),
+             memory_bytes: self.memory_bytes.saturating_add(other.memory_bytes),

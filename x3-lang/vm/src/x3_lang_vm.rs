@@ -109,9 +109,11 @@ pub struct VM {
 
 impl VM {
     pub fn new(code: Vec<u8>, cfg: VMConfig, initial_gas: u128) -> Self {
+        let code_deposit = code.len() as u128;
+        let gas = initial_gas.saturating_sub(code_deposit);
         VM {
             config: cfg.clone(),
-            state: VMState::new(&cfg, initial_gas),
+            state: VMState::new(&cfg, gas),
             code: InstructionStream::new(code),
             bridge: Box::new(crate::bridge::DryRunBridge),
         }
@@ -124,6 +126,9 @@ impl VM {
     /// makes the choice explicit. `BackendMode::Production` requires
     /// a fully-wired production adapter; the call fails closed if the
     /// adapter is `None` rather than silently falling back to dry-run.
+    ///
+    /// A **code-deposit cost** equal to `bytecode.len()` is deducted
+    /// from `initial_gas` at construction time, same as [`VM::new`].
     pub fn with_bridge(
         code: Vec<u8>,
         cfg: VMConfig,
@@ -141,9 +146,11 @@ impl VM {
                 )
             })?,
         };
+        let code_deposit = code.len() as u128;
+        let gas = initial_gas.saturating_sub(code_deposit);
         Ok(VM {
             config: cfg.clone(),
-            state: VMState::new(&cfg, initial_gas),
+            state: VMState::new(&cfg, gas),
             code: InstructionStream::new(code),
             bridge,
         })
@@ -154,8 +161,7 @@ impl VM {
     }
 
     pub fn verify_and_execute(&mut self) -> ExecResult<()> {
-        crate::verifier::verify(&self.code)
-            .map_err(|err| ExecError::Panic(format!("X3_VERIFY_FAILED: {err:?}")))?;
+        crate::verifier::verify(&self.code).map_err(|err| ExecError::Panic(format!("X3_VERIFY_FAILED: {err:?}")))?;
         self.execute_unverified()
     }
 

@@ -23,6 +23,7 @@ impl IntentLifecycle {
     /// - Agent must have sufficient balance for bond
     /// - Program hash must be valid
     /// - Slashable flag must be true for production
+    #[allow(clippy::too_many_arguments)]
     pub fn submit_intent(
         id: IntentId,
         agent_id: AgentIdentity,
@@ -237,19 +238,19 @@ impl IntentLifecycle {
     /// Compute the hash of a route for sealing.
     fn hash_route(legs: &[RouteLeg]) -> Hash256 {
         let mut hasher = Sha256::new();
-        hasher.update(&(legs.len() as u64).to_le_bytes());
+        hasher.update((legs.len() as u64).to_le_bytes());
         for leg in legs {
-            hasher.update(&leg.source_chain.to_le_bytes());
-            hasher.update(&leg.dest_chain.to_le_bytes());
-            hasher.update(&(leg.source_asset.len() as u64).to_le_bytes());
+            hasher.update(leg.source_chain.to_le_bytes());
+            hasher.update(leg.dest_chain.to_le_bytes());
+            hasher.update((leg.source_asset.len() as u64).to_le_bytes());
             hasher.update(&leg.source_asset);
-            hasher.update(&(leg.dest_asset.len() as u64).to_le_bytes());
+            hasher.update((leg.dest_asset.len() as u64).to_le_bytes());
             hasher.update(&leg.dest_asset);
-            hasher.update(&leg.amount_in.to_le_bytes());
-            hasher.update(&leg.min_amount_out.to_le_bytes());
-            hasher.update(&(leg.venue.len() as u64).to_le_bytes());
+            hasher.update(leg.amount_in.to_le_bytes());
+            hasher.update(leg.min_amount_out.to_le_bytes());
+            hasher.update((leg.venue.len() as u64).to_le_bytes());
             hasher.update(&leg.venue);
-            hasher.update(&leg.state_touches.to_le_bytes());
+            hasher.update(leg.state_touches.to_le_bytes());
         }
         let result = hasher.finalize();
         let mut hash = [0u8; 32];

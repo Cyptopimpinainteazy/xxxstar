@@ -11,7 +11,7 @@ mod integration_tests {
     use frame_support::assert_ok;
     use parity_scale_codec::Encode;
     use x3_packet_schema::{
-        EvmCall, EvmPacket, Packet, SvmAccount, SvmDeployMetadata, SvmPacket, X3VmPacket, U256,
+        EvmCall, EvmPacket, Packet, SvmAccount, SvmPacket, X3VmPacket, U256,
     };
 
     use crate::{
@@ -344,7 +344,7 @@ mod integration_tests {
     // ── Phase 1.4: Extrinsic-level packet validation regression tests ──
 
     mod phase14_extrinsic_validation {
-        use frame_support::{assert_err, assert_ok};
+        use frame_support::assert_err;
         use parity_scale_codec::Encode;
         use sp_core::H256;
         use sp_runtime::DispatchError;

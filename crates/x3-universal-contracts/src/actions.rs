@@ -87,9 +87,9 @@ impl Action {
                 domain,
             } => {
                 h.update(b"Lock:");
-                h.update(&asset_id.to_le_bytes());
-                h.update(&amount.to_le_bytes());
-                h.update(&[domain.as_u8()]);
+                h.update(asset_id.to_le_bytes());
+                h.update(amount.to_le_bytes());
+                h.update([domain.as_u8()]);
             }
             Action::Mint {
                 asset_id,
@@ -97,9 +97,9 @@ impl Action {
                 domain,
             } => {
                 h.update(b"Mint:");
-                h.update(&asset_id.to_le_bytes());
-                h.update(&amount.to_le_bytes());
-                h.update(&[domain.as_u8()]);
+                h.update(asset_id.to_le_bytes());
+                h.update(amount.to_le_bytes());
+                h.update([domain.as_u8()]);
             }
             Action::Burn {
                 asset_id,
@@ -107,9 +107,9 @@ impl Action {
                 domain,
             } => {
                 h.update(b"Burn:");
-                h.update(&asset_id.to_le_bytes());
-                h.update(&amount.to_le_bytes());
-                h.update(&[domain.as_u8()]);
+                h.update(asset_id.to_le_bytes());
+                h.update(amount.to_le_bytes());
+                h.update([domain.as_u8()]);
             }
             Action::Swap {
                 asset_in,
@@ -119,11 +119,11 @@ impl Action {
                 domain,
             } => {
                 h.update(b"Swap:");
-                h.update(&asset_in.to_le_bytes());
-                h.update(&asset_out.to_le_bytes());
-                h.update(&amount_in.to_le_bytes());
-                h.update(&min_out.to_le_bytes());
-                h.update(&[domain.as_u8()]);
+                h.update(asset_in.to_le_bytes());
+                h.update(asset_out.to_le_bytes());
+                h.update(amount_in.to_le_bytes());
+                h.update(min_out.to_le_bytes());
+                h.update([domain.as_u8()]);
             }
             Action::Settle { packet_id } => {
                 h.update(b"Settle:");
@@ -131,7 +131,7 @@ impl Action {
             }
             Action::EmitProof { asset_id } => {
                 h.update(b"EmitProof:");
-                h.update(&asset_id.to_le_bytes());
+                h.update(asset_id.to_le_bytes());
             }
             Action::Refund {
                 asset_id,
@@ -140,10 +140,10 @@ impl Action {
                 domain,
             } => {
                 h.update(b"Refund:");
-                h.update(&asset_id.to_le_bytes());
-                h.update(&amount.to_le_bytes());
+                h.update(asset_id.to_le_bytes());
+                h.update(amount.to_le_bytes());
                 h.update(recipient);
-                h.update(&[domain.as_u8()]);
+                h.update([domain.as_u8()]);
             }
             Action::Abort { reason } => {
                 h.update(b"Abort:");

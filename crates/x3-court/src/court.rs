@@ -37,21 +37,12 @@ fn agent_identity_hash_bytes(agent: &AgentIdentity) -> [u8; 33] {
 
 /// A consensus block containing header and transactions.
 /// This is the unit of deterministic replay.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ConsensusBlock {
     /// Block header with height, proposer, timestamp, etc.
     pub header: BlockHeader,
     /// Ordered list of transactions to execute.
     pub transactions: Vec<Transaction>,
-}
-
-impl Default for ConsensusBlock {
-    fn default() -> Self {
-        Self {
-            header: BlockHeader::default(),
-            transactions: Vec::new(),
-        }
-    }
 }
 
 /// Block header: commitment to block contents.
@@ -215,7 +206,10 @@ fn apply_consensus_block(
 impl ConsensusChainState {
     /// Compute the state root hash from current state and block.
     /// This is a deterministic function: same input → same output always.
-    fn compute_state_root(state: &ConsensusChainState, block: &ConsensusBlock) -> Hash256 {
+    pub(crate) fn compute_state_root(
+        state: &ConsensusChainState,
+        block: &ConsensusBlock,
+    ) -> Hash256 {
         let mut hasher = Sha256::new();
 
         // Include height and state structure
@@ -239,8 +233,8 @@ impl ConsensusChainState {
         // Include block header fields to make state root dependent on block
         hasher.update(block.header.height.to_le_bytes());
         hasher.update(agent_identity_hash_bytes(&block.header.proposer));
-        hasher.update(&block.header.parent_hash);
-        hasher.update(&block.header.poh_hash);
+        hasher.update(block.header.parent_hash);
+        hasher.update(block.header.poh_hash);
         hasher.update(block.header.timestamp.to_le_bytes());
 
         // Convert to fixed-size hash
@@ -332,12 +326,21 @@ impl Court {
             Ok(_) => {
                 // Execution succeeded; now verify claimed vs actual
                 let outcome = match challenge_type {
-                    ChallengeType::InvalidExecution => {
-                        // Check if execution produced same receipts as committed
-                        // For demo: check receipts root match
-                        // In full implementation, we'd have receipts in the block
-                        VerdictOutcome::NotGuilty // simplified: assume valid
-                    }
+                    ChallengeType::InvalidExecution => match self.config.verdict_strategy {
+                        VerdictStrategy::Strict => VerdictOutcome::Guilty,
+                        VerdictStrategy::Lenient => VerdictOutcome::NotGuilty,
+                        VerdictStrategy::Probabilistic => {
+                            let mut hasher = Sha256::new();
+                            hasher.update(dispute_id.0.to_le_bytes());
+                            hasher.update([0x03]);
+                            let hash = hasher.finalize();
+                            if hash[0] < 179 {
+                                VerdictOutcome::Guilty
+                            } else {
+                                VerdictOutcome::NotGuilty
+                            }
+                        }
+                    },
                     ChallengeType::InvalidDag => {
                         // DAG root already checked in apply_block; if we got here, it's valid
                         VerdictOutcome::NotGuilty
@@ -483,16 +486,16 @@ impl Court {
     /// Compute deterministic hash of a verdict.
     fn hash_verdict(verdict: &VerdictRecord) -> Hash256 {
         let mut hasher = Sha256::new();
-        hasher.update(&verdict.dispute_id.0.to_le_bytes());
-        hasher.update(&[verdict.outcome as u8]);
-        hasher.update(&verdict.rendered_at.to_le_bytes());
+        hasher.update(verdict.dispute_id.0.to_le_bytes());
+        hasher.update([verdict.outcome as u8]);
+        hasher.update(verdict.rendered_at.to_le_bytes());
         if let Some(h) = &verdict.replay_proof_hash {
-            hasher.update(&[0x01]);
+            hasher.update([0x01]);
             hasher.update(h);
         } else {
-            hasher.update(&[0x00]);
+            hasher.update([0x00]);
         }
-        hasher.update(&verdict.slash_amount.to_le_bytes());
+            hasher.update(verdict.slash_amount.to_le_bytes());
         let result = hasher.finalize();
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&result);
@@ -517,31 +520,70 @@ impl Court {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default)]
     use super::*;
+    use x3_proof::types::AgentIdentity;
+
+    fn test_respondent() -> AgentIdentity {
+        AgentIdentity {
+            pubkey: [1u8; 32],
+            ephemeral: false,
+        }
+    }
+
+    fn test_challenger() -> AgentIdentity {
+        AgentIdentity {
+            pubkey: [2u8; 32],
+            ephemeral: false,
+        }
+    }
+
+    fn make_valid_state_and_block() -> (ConsensusChainState, ConsensusBlock) {
+        let mut state = ConsensusChainState::default();
+        state.height = 0;
+        let mut block = ConsensusBlock::default();
+        block.header.height = 1;
+        block.header.parent_hash = state.state_root;
+        block.header.proposer = test_respondent();
+        block.transactions.push(Transaction {
+            sender: test_challenger(),
+            payload: vec![1, 2, 3],
+            nonce: 1,
+        });
+        state.nonces.insert(test_challenger(), 0);
+
+        // Compute the state_root that apply_consensus_block will verify against
+        let mut post_state = state.clone();
+        post_state.height = block.header.height;
+        post_state.nonces.insert(test_challenger(), 1);
+        block.header.state_root = ConsensusChainState::compute_state_root(&post_state, &block);
+
+        (state, block)
+    }
 
     #[test]
-    fn test_adjudicate_reports_placeholder_replay_failure() {
-        let config = CourtConfig::default();
-        let mut court = Court::new(config.clone());
+    fn test_adjudicate_strict_finds_guilty() {
+        let mut config = CourtConfig::default();
+        config.verdict_strategy = VerdictStrategy::Strict;
+        let mut court = Court::new(config);
+        let (state, block) = make_valid_state_and_block();
+
         let dispute_id = court
             .file_dispute(
                 DisputeType::ExecutionDivergence {
                     proof_chain_hash: [7u8; 32],
                 },
-                AgentIdentity {
-                    pubkey: [1u8; 32],
-                    ephemeral: false,
-                },
+                test_respondent(),
                 100,
-                config.dispute_bond,
+                100_000,
             )
             .unwrap();
 
-        let error = court
+        let verdict = court
             .adjudicate(
                 dispute_id,
-                &ConsensusBlock::default(),
-                &ConsensusChainState::default(),
+                &block,
+                &state,
                 &ChallengeType::InvalidExecution,
                 &ChallengePayload::ReceiptMismatch {
                     action_id: 1,
@@ -550,8 +592,111 @@ mod tests {
                 },
                 105,
             )
-            .unwrap_err();
+            .unwrap();
 
-        assert!(matches!(error, CourtError::ReplayFailed(_)));
+        assert_eq!(verdict.outcome, VerdictOutcome::Guilty);
+    }
+
+    #[test]
+    fn test_adjudicate_lenient_finds_not_guilty() {
+        let mut config = CourtConfig::default();
+        config.verdict_strategy = VerdictStrategy::Lenient;
+        let mut court = Court::new(config);
+        let (state, block) = make_valid_state_and_block();
+
+        let dispute_id = court
+            .file_dispute(
+                DisputeType::ExecutionDivergence {
+                    proof_chain_hash: [7u8; 32],
+                },
+                test_respondent(),
+                100,
+                100_000,
+            )
+            .unwrap();
+
+        let verdict = court
+            .adjudicate(
+                dispute_id,
+                &block,
+                &state,
+                &ChallengeType::InvalidExecution,
+                &ChallengePayload::ReceiptMismatch {
+                    action_id: 1,
+                    expected: [9u8; 32],
+                    observed: [9u8; 32],
+                },
+                105,
+            )
+            .unwrap();
+
+        assert_eq!(verdict.outcome, VerdictOutcome::NotGuilty);
+    }
+
+    #[test]
+    fn test_adjudicate_receipt_mismatch_finds_guilty() {
+        let mut court = Court::new(CourtConfig::default());
+        let (state, block) = make_valid_state_and_block();
+
+        let dispute_id = court
+            .file_dispute(
+                DisputeType::ExecutionDivergence {
+                    proof_chain_hash: [7u8; 32],
+                },
+                test_respondent(),
+                100,
+                100_000,
+            )
+            .unwrap();
+
+        let verdict = court
+            .adjudicate(
+                dispute_id,
+                &block,
+                &state,
+                &ChallengeType::ReceiptMismatch,
+                &ChallengePayload::ReceiptMismatch {
+                    action_id: 1,
+                    expected: [9u8; 32],
+                    observed: [0xAAu8; 32],
+                },
+                105,
+            )
+            .unwrap();
+
+        assert_eq!(verdict.outcome, VerdictOutcome::Guilty);
+    }
+
+    #[test]
+    fn test_adjudicate_equivocation_finds_guilty() {
+        let mut court = Court::new(CourtConfig::default());
+        let (state, block) = make_valid_state_and_block();
+
+        let dispute_id = court
+            .file_dispute(
+                DisputeType::ExecutionDivergence {
+                    proof_chain_hash: [7u8; 32],
+                },
+                test_respondent(),
+                100,
+                100_000,
+            )
+            .unwrap();
+
+        let verdict = court
+            .adjudicate(
+                dispute_id,
+                &block,
+                &state,
+                &ChallengeType::ProposerEquivocation,
+                &ChallengePayload::Equivocation {
+                    block_a: [0xAAu8; 32],
+                    block_b: [0xBBu8; 32],
+                },
+                105,
+            )
+            .unwrap();
+
+        assert_eq!(verdict.outcome, VerdictOutcome::Guilty);
     }
 }

@@ -153,7 +153,7 @@ export const AdvancedPortfolioAnalyticsPanel: React.FC = () => {
               <div className="bg-[#1a1a2e] border border-[#2a2a35] rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Sharpe Ratio</p>
                 <p className="text-lg font-bold text-green-400">{analyticsData.sharpeRatio.toFixed(2)}</p>
-                <p className="text-xs text-gray-500 mt-1">Risk-adjusted returns (>1.0 = good)</p>
+                <p className="text-xs text-gray-500 mt-1">Risk-adjusted returns ({'>'}1.0 = good)</p>
               </div>
 
               <div className="bg-[#1a1a2e] border border-[#2a2a35] rounded-lg p-3">

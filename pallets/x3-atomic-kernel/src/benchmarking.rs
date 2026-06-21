@@ -9,6 +9,7 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use frame_system::RawOrigin;
 use sp_core::H256;
 use sp_runtime::traits::SaturatedConversion;
+use sp_std::vec;
 
 benchmarks! {
     // Benchmark submitting an atomic bundle with variable number of legs.
@@ -17,7 +18,7 @@ benchmarks! {
         let b in 1 .. T::MaxLegsPerBundle::get();
         let caller: T::AccountId = whitelisted_caller();
 
-        let mut legs = Vec::new();
+        let mut legs = vec![];
         for _i in 0..b {
             legs.push(proof::BundleLeg {
                 vm_type: proof::VmType::Svm,
@@ -37,7 +38,7 @@ benchmarks! {
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(legs)
             .expect("legs within MaxLegsPerBundle");
 
-    }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into())
+    }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into(), 0u32, 0u64)
     verify {
         // Verify bundle was created and is in Pending status
         let bundle_id = Bundles::<T>::iter_keys().next().expect("bundle should exist");
@@ -65,7 +66,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: _(RawOrigin::Signed(executor.clone()), bundle_id)
@@ -96,7 +97,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(executor.clone()).into(), bundle_id).unwrap();
@@ -131,7 +132,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: _(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::ExecutionFailed)
@@ -158,7 +159,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: rollback_atomic_bundle(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::SubmitterCancelled)
@@ -185,7 +186,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into()).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(caller.clone()).into(), bundle_id).unwrap();

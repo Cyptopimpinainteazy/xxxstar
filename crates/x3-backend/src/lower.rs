@@ -829,8 +829,12 @@ impl BytecodeCompiler {
                 Literal::Unit => self.emitter.const_pool.add_integer(0),
             },
             _ => {
-                // Non-constant expression - emit a zero placeholder
-                self.emitter.const_pool.add_integer(0)
+                Err(BackendError::new(
+                    BackendErrorKind::NotImplemented(
+                        "non-constant global initializer: only literals are supported".to_string(),
+                    ),
+                    expr.span,
+                ))
             }
         }
     }

@@ -125,15 +125,8 @@ impl AiRouteOptimizer {
         Ok(best_route.clone())
     }
 
-    /// Get oracle price for an asset (simplified - would integrate with pallet)
-    fn get_oracle_price(asset_id: u32) -> Option<u64> {
-        // In real implementation, this would query the oracle pallet
-        // For demo, return mock prices
-        match asset_id {
-            0 => Some(1000000),  // Native token ~$1
-            1 => Some(60000000), // Some other asset
-            _ => None,
-        }
+    fn get_oracle_price(_asset_id: u32) -> Option<u64> {
+        None
     }
 }
 

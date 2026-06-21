@@ -137,7 +137,7 @@ mod tests {
         let ngrams_3 = vec![("binary_add binary_add binary_add".to_string(), 5)];
 
         let rules = RuleMiner::mine_rules(&ngrams_2, &ngrams_3);
-        assert!(rules.len() > 0);
+        assert!(!rules.is_empty());
         assert!(rules[0].frequency >= 42);
     }
 

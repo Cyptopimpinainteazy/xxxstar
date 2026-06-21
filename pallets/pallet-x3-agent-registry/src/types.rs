@@ -111,7 +111,7 @@ pub enum AgentKind {
     Debug,
     Default,
 )]
-pub struct AgentQuota<BlockNumber: Default> {
+pub struct AgentQuota<BlockNumber> {
     /// Maximum gas per block.
     pub gas_per_block: u128,
     /// Maximum compute units per block.

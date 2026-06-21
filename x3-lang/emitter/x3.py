@@ -54,51 +54,10 @@ def emit(plan: Dict[str, Any], step: Dict[str, Any], *, proof_bundle: Dict[str, 
         'dry_run': dry_run,
     }
     if dry_run:
-        # Dry-run mode records the payload hash but never fabricates
-        # signatures, settlement roots, or finality confirmations.
-        tx['proof_bundle'] = {
-            'bundle_version': '0.1',
-            'dry_run': True,
-            'verifier': {'status': 'pending', 'id': None},
-            'finality': {
-                'confirmed': False,
-                'checkpoint': 0,
-                'source_chain': payload.get('source_chain'),
-                'target_chain': payload.get('target_chain'),
-            },
-            'checkpoint': 0,
-            'settlement_root': None,
-            'payload_hash': '0x' + __import__('hashlib').sha256(_serialize_x3_payload(payload).encode()).hexdigest(),
-            'signatures': [],
-            'error': 'dry-run cannot produce a production proof bundle',
-            'error_code': 'X3_PROOF_REQUIRED',
-        }
-        return tx
+        raise ProofRequiredError('dry-run cannot produce a production proof bundle')
 
     if not verify_proof_bundle(payload, proof_bundle or {}):
-        # Production settlement requires a real backend-produced proof
-        # bundle. The emitter never manufactures signatures, roots, or
-        # finality confirmations. Return a structured rejection so
-        # downstream callers fail closed.
-        import hashlib as _hashlib
-        tx['proof_bundle'] = {
-            'bundle_version': '0.1',
-            'dry_run': False,
-            'verifier': {'status': 'pending', 'id': None},
-            'finality': {
-                'confirmed': False,
-                'checkpoint': 0,
-                'source_chain': payload.get('source_chain'),
-                'target_chain': payload.get('target_chain'),
-            },
-            'checkpoint': 0,
-            'settlement_root': None,
-            'payload_hash': '0x' + _hashlib.sha256(_serialize_x3_payload(payload).encode()).hexdigest(),
-            'signatures': [],
-            'error': 'missing or invalid verifier proof/finality/settlement bundle',
-            'error_code': 'X3_PROOF_REQUIRED',
-        }
-        return tx
+        raise ProofRequiredError('missing or invalid verifier proof/finality/settlement bundle')
 
     tx['proof_bundle'] = proof_bundle
     return tx

@@ -1,12 +1,4 @@
 //! Comprehensive tests for pallet-swarm.
-//!
-//! Tests cover:
-//! - Contributor registration, deregistration, and lifecycle
-//! - Task submission and claiming
-//! - Heartbeat mechanism
-//! - Error conditions
-
-#![cfg(test)]
 
 use crate::{mock::*, pallet::*, types::*, Error, Event};
 use frame_support::{assert_err, assert_noop, assert_ok, BoundedVec};

@@ -11,8 +11,7 @@ use crate::x3_lang_vm::InstructionStream;
 use crate::spec::opcodes::*;
 use std::collections::HashSet;
 use x3_lang_common::{
-    decode_asset_op_payload, decode_bridge_payload, decode_capability_payload, AssetOpPayload,
-    CapabilityPayload,
+    decode_asset_op_payload, decode_bridge_payload, decode_capability_payload, AssetOpPayload, CapabilityPayload,
 };
 
 #[derive(Debug)]
@@ -135,9 +134,7 @@ fn read_payload(bytes: &[u8], pc: usize) -> Result<&[u8], VerifyError> {
     }
     let len = u16::from_le_bytes([bytes[pc + 1], bytes[pc + 2]]) as usize;
     let start = pc + 3;
-    let end = start
-        .checked_add(len)
-        .ok_or(VerifyError::InvalidOperand(pc))?;
+    let end = start.checked_add(len).ok_or(VerifyError::InvalidOperand(pc))?;
     if end > bytes.len() {
         return Err(VerifyError::OutOfBounds(pc));
     }
@@ -146,8 +143,7 @@ fn read_payload(bytes: &[u8], pc: usize) -> Result<&[u8], VerifyError> {
 
 fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), VerifyError> {
     if matches!(opcode, LOCK | MINT | BURN | RELEASE | SWAP) {
-        let payload = decode_asset_op_payload(opcode, payload)
-            .map_err(|_| VerifyError::InvalidOperand(pc))?;
+        let payload = decode_asset_op_payload(opcode, payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
         match payload {
             AssetOpPayload::Lock {
                 chain,
@@ -183,11 +179,7 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
                 input_amount,
                 ..
             } => {
-                if from_chain.is_empty()
-                    || from_asset.is_empty()
-                    || to_asset.is_empty()
-                    || input_amount == 0
-                {
+                if from_chain.is_empty() || from_asset.is_empty() || to_asset.is_empty() || input_amount == 0 {
                     return Err(VerifyError::InvalidOperand(pc));
                 }
             }
@@ -196,8 +188,7 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
     }
 
     if opcode == BRIDGE {
-        let payload =
-            decode_bridge_payload(payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
+        let payload = decode_bridge_payload(payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
         if payload.via.is_empty()
             || payload.from_chain.is_empty()
             || payload.from_asset.is_empty()
@@ -211,8 +202,7 @@ fn validate_payload_opcode(opcode: u8, payload: &[u8], pc: usize) -> Result<(), 
         return Ok(());
     }
 
-    let payload =
-        decode_capability_payload(opcode, payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
+    let payload = decode_capability_payload(opcode, payload).map_err(|_| VerifyError::InvalidOperand(pc))?;
     match payload {
         CapabilityPayload::ScheduledDispatch { period_blocks, .. } => {
             if period_blocks == 0 {
@@ -296,13 +286,7 @@ mod tests {
                     key_or_threshold: "vk".into(),
                 },
             ),
-            (
-                0x94,
-                CapabilityPayload::MultisigCheck {
-                    required: 2,
-                    total: 3,
-                },
-            ),
+            (0x94, CapabilityPayload::MultisigCheck { required: 2, total: 3 }),
             (
                 0x99,
                 CapabilityPayload::GasAdaptive {
@@ -337,13 +321,7 @@ mod tests {
                     key_or_threshold: "vk".into(),
                 },
             ),
-            (
-                0x94,
-                CapabilityPayload::MultisigCheck {
-                    required: 4,
-                    total: 3,
-                },
-            ),
+            (0x94, CapabilityPayload::MultisigCheck { required: 4, total: 3 }),
             (
                 0x99,
                 CapabilityPayload::GasAdaptive {

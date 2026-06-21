@@ -13,9 +13,16 @@ fn test_cross_vm_atomic_sequence_lowers_without_placeholders() {
     let program = Program::new(vec![Spanned::new(
         Item::AtomicSwap(x3_lang_ast::ast::AtomicSwapDecl {
             name: Symbol::new("dual_chain_settlement"),
+            from_asset: AssetRef::new(ChainRef::new(Symbol::new("ethereum")), Symbol::new("USDC")),
+            to_asset: AssetRef::new(ChainRef::new(Symbol::new("solana")), Symbol::new("SOL")),
+            source_vm: None,
+            dest_vm: None,
+            amount: None,
+            receiver: None,
+            hashlock: None,
             body: vec![
                 Statement::Lock {
-                    chain: Symbol::new("ethereum"),
+                    chain: ChainRef(Symbol::new("ethereum")),
                     asset: AssetRef::new(ChainRef::new(Symbol::new("ethereum")), Symbol::new("USDC")),
                     amount: lit_int(500),
                     from: Expression::Literal(LiteralExpr::Address(Symbol::new("0xsender"))),
@@ -26,8 +33,10 @@ fn test_cross_vm_atomic_sequence_lowers_without_placeholders() {
                     to: Expression::Literal(LiteralExpr::Address(Symbol::new("So1Receiver"))),
                 },
             ],
+            requires: vec![],
             on_fail: None,
-            timeout: Some(lit_int(20)),
+            timeout_source: Some(lit_int(20)),
+            timeout_destination: None,
         }),
         Span::DUMMY,
     )]);

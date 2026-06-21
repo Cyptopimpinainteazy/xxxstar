@@ -29,7 +29,7 @@ impl IdentityManager {
         let mut hasher = Sha256::new();
         hasher.update(b"x3-ephemeral-v1");
         hasher.update(primary_pubkey);
-        hasher.update(&nonce.to_le_bytes());
+        hasher.update(nonce.to_le_bytes());
         let result = hasher.finalize();
         let mut key = [0u8; 32];
         key.copy_from_slice(&result);
@@ -50,8 +50,8 @@ impl IdentityManager {
     pub fn identity_hash(identity: &AgentIdentity) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(b"x3-identity-v1");
-        hasher.update(&identity.pubkey);
-        hasher.update(&[identity.ephemeral as u8]);
+        hasher.update(identity.pubkey);
+        hasher.update([identity.ephemeral as u8]);
         let result = hasher.finalize();
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&result);

@@ -1,6 +1,5 @@
 /// Solana Programs Port — Rust implementations of 10 standard Solana programs for X3 SVM compatibility
 /// Enables direct CPI compatibility without relying on WebAssembly cross-VM translation
-
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
@@ -222,7 +221,7 @@ impl SolanaPrograms {
     /// Approve delegation (Token Program)
     pub fn approve_delegation(
         account: &mut TokenAccount,
-        delegate: [u8; 32],
+        _delegate: [u8; 32],
         amount: u128,
     ) -> Result<(), &'static str> {
         if account.is_frozen {
@@ -247,7 +246,10 @@ impl SolanaPrograms {
     }
 
     /// Register program type
-    pub fn register_program(program_id: [u8; 32], program_type: ProgramType) -> Result<SolanaProgram, &'static str> {
+    pub fn register_program(
+        program_id: [u8; 32],
+        program_type: ProgramType,
+    ) -> Result<SolanaProgram, &'static str> {
         if program_id == [0; 32] {
             return Err("Invalid program ID");
         }

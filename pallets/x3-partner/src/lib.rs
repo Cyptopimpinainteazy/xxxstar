@@ -1,5 +1,20 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
+#![allow(clippy::clone_on_copy)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::unnecessary_map_or)]
 //! # pallet-x3-partner
 //!
 //! Partner Capacity Manager (Module 5) for the X3 Phase 4.5 liquidity control plane.
@@ -12,7 +27,6 @@
 //! - Maintain a bidirectional partner ↔ lane approval index.
 //! - Expose `is_partner_eligible` for the reservation engine to gate route selection.
 
-#![warn(clippy::all, clippy::pedantic)]
 // Allow module-level re-exports and large function signatures common in FRAME pallets.
 #![allow(clippy::module_name_repetitions, clippy::too_many_arguments)]
 
@@ -29,6 +43,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use pallet_x3_inventory::types::{LaneId, LaneStatus, PartnerId, PartnerStatus};
     use sp_runtime::traits::Saturating;
+    use sp_std::vec::Vec;
 
     // -----------------------------------------------------------------------
     // Constants
@@ -85,14 +100,32 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// SCALE-encoded (PartnerId, PartnerState<BalanceOf<T>>) entries.
+        pub initial_partners: Vec<Vec<u8>>,
+        pub _phantom: sp_std::marker::PhantomData<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            use codec::Decode;
+            for blob in &self.initial_partners {
+                let (partner_id, state): (PartnerId, PartnerStateOf<T>) =
+                    Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded partner state");
+                Partners::<T>::insert(partner_id, state);
+            }
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Config
     // -----------------------------------------------------------------------
 
     #[pallet::config]
     pub trait Config: frame_system::Config + pallet_x3_inventory::pallet::Config {
-        /// The overarching runtime event type.
-
         /// Maximum number of lanes a single partner may be approved on.
         #[pallet::constant]
         type MaxApprovedLanesPerPartner: Get<u32>;
@@ -238,7 +271,7 @@ pub mod pallet {
                 partner_id,
                 status: PartnerStatus::Active,
                 health_score_bps: 10_000,
-                exposure_limit: exposure_limit.clone(),
+                exposure_limit,
                 current_exposure: <BalanceOf<T> as Default>::default(),
                 quote_response_time_ms_p95: 0,
                 fill_reliability_bps: 10_000,
@@ -456,7 +489,7 @@ pub mod pallet {
                         partner.current_exposure = partner.current_exposure.saturating_sub(amount);
                     }
 
-                    Ok(partner.current_exposure.clone())
+                    Ok(partner.current_exposure)
                 },
             )?;
 
@@ -614,20 +647,17 @@ pub mod pallet {
     pub fn is_partner_eligible<T: Config>(partner_id: PartnerId, lane_id: LaneId) -> bool {
         // Lane must exist and not be frozen.
         let lane_ok = pallet_x3_inventory::pallet::Lanes::<T>::get(lane_id)
-            .map(|lane| lane.status != LaneStatus::Frozen)
-            .unwrap_or(false);
+            .map_or(false, |lane| lane.status != LaneStatus::Frozen);
 
         if !lane_ok {
             return false;
         }
 
         // Partner must be active, healthy, and approved for the lane.
-        Partners::<T>::get(partner_id)
-            .map(|p| {
-                p.status == PartnerStatus::Active
-                    && p.health_score_bps >= MIN_PARTNER_HEALTH_BPS
-                    && p.approved_lanes.contains(&lane_id)
-            })
-            .unwrap_or(false)
+        Partners::<T>::get(partner_id).map_or(false, |p| {
+            p.status == PartnerStatus::Active
+                && p.health_score_bps >= MIN_PARTNER_HEALTH_BPS
+                && p.approved_lanes.contains(&lane_id)
+        })
     }
 }

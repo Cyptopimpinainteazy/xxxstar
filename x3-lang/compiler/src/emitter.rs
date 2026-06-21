@@ -4,15 +4,15 @@
 //! for the X3 runtime or specific chain emitters (EVM, SVM, etc.).
 
 use crate::ir::{
-    ChainMetricKind, CrdtKind, EmergencyKind, LifecycleKind, Operation, ProofKind, SerialFormat,
-    StorageKind, VectorOp, X3IR,
+    ChainMetricKind, CrdtKind, EmergencyKind, LifecycleKind, Operation, ProofKind, SerialFormat, StorageKind, VectorOp,
+    X3IR,
 };
 // Import shared opcode constants
 use crate::spec::opcodes::*;
 use std::io::Write;
 use x3_lang_common::{
-    encode_asset_op_payload, encode_bridge_payload, encode_capability_payload, AssetOpPayload,
-    BridgePayload, CapabilityPayload, X3Error,
+    encode_asset_op_payload, encode_bridge_payload, encode_capability_payload, AssetOpPayload, BridgePayload,
+    CapabilityPayload, X3Error,
 };
 /// Pad `bytecode` so its length is a multiple of 4. The X3 VM verifier
 /// requires every instruction to start on a 4-byte boundary.
@@ -104,10 +104,7 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
                 bytecode.write_all(&0u32.to_le_bytes())?;
             }
         }
-        Operation::Loop {
-            max_iterations,
-            body,
-        } => {
+        Operation::Loop { max_iterations, body } => {
             bytecode.write_all(&[LOOP])?;
             bytecode.write_all(&max_iterations.to_le_bytes())?;
 
@@ -181,11 +178,9 @@ fn emit_operation(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
 
 fn emit_bridge_op(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error> {
     bytecode.write_all(&[BRIDGE])?;
-    let payload = encode_bridge_payload(&operation_to_bridge_payload(op)?).map_err(|err| {
-        X3Error::CodegenError {
-            message: format!("failed to encode bridge payload: {err}"),
-            span: None,
-        }
+    let payload = encode_bridge_payload(&operation_to_bridge_payload(op)?).map_err(|err| X3Error::CodegenError {
+        message: format!("failed to encode bridge payload: {err}"),
+        span: None,
     })?;
     if payload.len() > u16::MAX as usize {
         return Err(X3Error::CodegenError {
@@ -200,11 +195,9 @@ fn emit_bridge_op(op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error>
 
 fn emit_asset_op(opcode: u8, op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error> {
     bytecode.write_all(&[opcode])?;
-    let payload = encode_asset_op_payload(&operation_to_asset_payload(op)?).map_err(|err| {
-        X3Error::CodegenError {
-            message: format!("failed to encode asset payload: {err}"),
-            span: None,
-        }
+    let payload = encode_asset_op_payload(&operation_to_asset_payload(op)?).map_err(|err| X3Error::CodegenError {
+        message: format!("failed to encode asset payload: {err}"),
+        span: None,
     })?;
     if payload.len() > u16::MAX as usize {
         return Err(X3Error::CodegenError {
@@ -219,11 +212,9 @@ fn emit_asset_op(opcode: u8, op: &Operation, bytecode: &mut Vec<u8>) -> Result<(
 
 fn emit_payload_op(opcode: u8, op: &Operation, bytecode: &mut Vec<u8>) -> Result<(), X3Error> {
     bytecode.write_all(&[opcode])?;
-    let payload = encode_capability_payload(&operation_to_payload(op)?).map_err(|err| {
-        X3Error::CodegenError {
-            message: format!("failed to encode capability payload: {err}"),
-            span: None,
-        }
+    let payload = encode_capability_payload(&operation_to_payload(op)?).map_err(|err| X3Error::CodegenError {
+        message: format!("failed to encode capability payload: {err}"),
+        span: None,
     })?;
     if payload.len() > u16::MAX as usize {
         return Err(X3Error::CodegenError {
@@ -335,11 +326,7 @@ fn operation_to_asset_payload(op: &Operation) -> Result<AssetOpPayload, X3Error>
 
 fn operation_to_payload(op: &Operation) -> Result<CapabilityPayload, X3Error> {
     let payload = match op {
-        Operation::GpuDispatch {
-            kernel,
-            args,
-            is_simd,
-        } => CapabilityPayload::GpuDispatch {
+        Operation::GpuDispatch { kernel, args, is_simd } => CapabilityPayload::GpuDispatch {
             kernel: kernel.clone(),
             args: args.clone(),
             is_simd: *is_simd,
@@ -348,17 +335,11 @@ fn operation_to_payload(op: &Operation) -> Result<CapabilityPayload, X3Error> {
             body_ops: body.len() as u32,
             receipt_slot: receipt_slot.clone(),
         },
-        Operation::ScheduledDispatch {
-            period_blocks,
-            entry,
-        } => CapabilityPayload::ScheduledDispatch {
+        Operation::ScheduledDispatch { period_blocks, entry } => CapabilityPayload::ScheduledDispatch {
             period_blocks: *period_blocks,
             entry_ops: entry.len() as u32,
         },
-        Operation::IntentResolve {
-            constraints,
-            resolver,
-        } => CapabilityPayload::IntentResolve {
+        Operation::IntentResolve { constraints, resolver } => CapabilityPayload::IntentResolve {
             constraints: constraints.clone(),
             resolver: resolver.clone(),
         },
@@ -382,11 +363,7 @@ fn operation_to_payload(op: &Operation) -> Result<CapabilityPayload, X3Error> {
             kind: storage_kind_id(kind),
             data: data.clone(),
         },
-        Operation::Pathfind {
-            from,
-            to,
-            max_depth,
-        } => CapabilityPayload::Pathfind {
+        Operation::Pathfind { from, to, max_depth } => CapabilityPayload::Pathfind {
             from: from.clone(),
             to: to.clone(),
             max_depth: *max_depth,
@@ -439,10 +416,7 @@ fn operation_to_payload(op: &Operation) -> Result<CapabilityPayload, X3Error> {
             required: *required,
             total: *total,
         },
-        Operation::VersionMeta {
-            version,
-            upgrade_from,
-        } => CapabilityPayload::VersionMeta {
+        Operation::VersionMeta { version, upgrade_from } => CapabilityPayload::VersionMeta {
             version: version.clone(),
             upgrade_from: upgrade_from.clone(),
         },
@@ -450,11 +424,7 @@ fn operation_to_payload(op: &Operation) -> Result<CapabilityPayload, X3Error> {
             package: package.clone(),
             key: key.clone(),
         },
-        Operation::AbiExport {
-            function,
-            params,
-            ret,
-        } => CapabilityPayload::AbiExport {
+        Operation::AbiExport { function, params, ret } => CapabilityPayload::AbiExport {
             function: function.clone(),
             params: params.clone(),
             ret: ret.clone(),
@@ -573,19 +543,13 @@ pub fn disassemble(bytecode: &[u8]) -> Result<String, X3Error> {
         match bytecode[pc] {
             0x10 => {
                 let len = u16::from_le_bytes([bytecode[pc + 1], bytecode[pc + 2]]) as usize;
-                let value = std::str::from_utf8(&bytecode[pc + 3..pc + 3 + len])
-                    .unwrap_or("<invalid utf-8>");
+                let value = std::str::from_utf8(&bytecode[pc + 3..pc + 3 + len]).unwrap_or("<invalid utf-8>");
                 out.push_str(&format!("  {idx:04}  meta.nonce   = {value:?}\n"));
                 idx += 1;
                 pc = align4(pc + 3 + len);
             }
             0x11 => {
-                let id = u32::from_le_bytes([
-                    bytecode[pc + 1],
-                    bytecode[pc + 2],
-                    bytecode[pc + 3],
-                    bytecode[pc + 4],
-                ]);
+                let id = u32::from_le_bytes([bytecode[pc + 1], bytecode[pc + 2], bytecode[pc + 3], bytecode[pc + 4]]);
                 out.push_str(&format!("  {idx:04}  meta.chain_id = {id}\n"));
                 idx += 1;
                 pc += 5;
@@ -667,7 +631,7 @@ fn disassemble_op(opcode: u8, payload: &[u8]) -> String {
         0x66 => format!("CALL_HOST  {payload_str}"),
         0x70..=0x7F => format!("VECTOR   {payload_str}"),
         0x80..=0x9A => format!("CAP      {payload_str}"),
-        0x9B => "BOUNTY".into(),
+        0x9B => "SUB_EXEC".into(),
         0xA0..=0xA5 => format!("META     {payload_str}"),
         0xFF => "HALT".into(),
         other => format!("OP(0x{other:02x})"),
@@ -675,9 +639,7 @@ fn disassemble_op(opcode: u8, payload: &[u8]) -> String {
 }
 
 fn decode_payload(opcode: u8, payload: &[u8]) -> Result<String, X3Error> {
-    use x3_lang_common::{
-        decode_asset_op_payload, decode_bridge_payload, decode_capability_payload,
-    };
+    use x3_lang_common::{decode_asset_op_payload, decode_bridge_payload, decode_capability_payload};
     if matches!(opcode, 0x20..=0x24) {
         let p = decode_asset_op_payload(opcode, payload).map_err(|_| X3Error::CodegenError {
             message: "bad asset payload".into(),
@@ -706,8 +668,7 @@ fn decode_payload(opcode: u8, payload: &[u8]) -> Result<String, X3Error> {
 mod tests {
     use super::*;
     use crate::ir::{
-        ChainMetricKind, CrdtKind, EmergencyKind, LifecycleKind, ProofKind, SerialFormat,
-        StorageKind, VectorOp,
+        ChainMetricKind, CrdtKind, EmergencyKind, LifecycleKind, ProofKind, SerialFormat, StorageKind, VectorOp,
     };
     use x3_lang_common::{decode_capability_payload, CapabilityPayload};
 
@@ -793,13 +754,8 @@ mod tests {
                 b: "b".into(),
                 size: 2,
             },
-            Operation::RoleCheck {
-                role: "admin".into(),
-            },
-            Operation::MultisigCheck {
-                required: 2,
-                total: 3,
-            },
+            Operation::RoleCheck { role: "admin".into() },
+            Operation::MultisigCheck { required: 2, total: 3 },
             Operation::VersionMeta {
                 version: "1.0.0".into(),
                 upgrade_from: Some("0.9.0".into()),
@@ -813,9 +769,7 @@ mod tests {
                 params: vec!["u64".into()],
                 ret: "()".into(),
             },
-            Operation::DocEmbed {
-                content: "docs".into(),
-            },
+            Operation::DocEmbed { content: "docs".into() },
             Operation::GasAdaptive {
                 high_gas_ops: vec![Operation::Nop],
                 low_gas_ops: vec![Operation::Nop],
@@ -831,17 +785,10 @@ mod tests {
         for expected in 0x80u8..=0x9A {
             assert_eq!(bytecode[cursor], expected);
             let len = u16::from_le_bytes([bytecode[cursor + 1], bytecode[cursor + 2]]) as usize;
-            let payload =
-                decode_capability_payload(expected, &bytecode[cursor + 3..cursor + 3 + len])
-                    .expect("emitted capability payload should decode");
+            let payload = decode_capability_payload(expected, &bytecode[cursor + 3..cursor + 3 + len])
+                .expect("emitted capability payload should decode");
             if expected == 0x94 {
-                assert_eq!(
-                    payload,
-                    CapabilityPayload::MultisigCheck {
-                        required: 2,
-                        total: 3,
-                    }
-                );
+                assert_eq!(payload, CapabilityPayload::MultisigCheck { required: 2, total: 3 });
             }
             cursor += 3 + len;
             while cursor % 4 != 0 {

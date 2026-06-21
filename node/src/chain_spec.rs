@@ -12,7 +12,7 @@ use std::{collections::BTreeSet, path::PathBuf};
 use x3_chain_runtime::{
     x3_kernel_default_assets, AccountId, AtlasKernelConfig, AuraConfig, BalancesConfig,
     CouncilConfig, GrandpaConfig, RuntimeGenesisConfig, Signature, TreasuryConfig, X3CoinConfig,
-    WASM_BINARY,
+    X3CrosschainGatewayConfig, WASM_BINARY,
 };
 
 /// Chain specification specialized to this runtime's genesis configuration.
@@ -442,6 +442,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         Vec::new(),
         sp_core::H160::zero(),
         [0u8; 32],
+        X3CrosschainGatewayConfig::dev_defaults(),
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Development")
@@ -481,6 +482,7 @@ pub fn development_config_with_bridge_escrows(
         Vec::new(),
         evm_escrow_addr,
         svm_escrow_addr,
+        X3CrosschainGatewayConfig::dev_defaults(),
     );
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -527,6 +529,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
         Vec::new(),
         evm_escrow_addr,
         svm_escrow_addr,
+        X3CrosschainGatewayConfig::dev_defaults(),
     );
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -570,6 +573,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         Vec::new(),
         sp_core::H160::zero(),
         [0u8; 32],
+        X3CrosschainGatewayConfig::dev_defaults(),
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local Testnet")
@@ -614,6 +618,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         Vec::new(),
         sp_core::H160::zero(),
         [0u8; 32],
+        X3CrosschainGatewayConfig::dev_defaults(),
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local 3-Validator Testnet")
@@ -663,6 +668,7 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         treasury_signers,
         evm_escrow,
         svm_escrow,
+        X3CrosschainGatewayConfig::testnet_defaults(),
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Staging")
@@ -725,6 +731,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         treasury_signers,
         evm_escrow,
         svm_escrow,
+        X3CrosschainGatewayConfig::testnet_defaults(),
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Testnet")
@@ -784,6 +791,7 @@ pub fn production_config() -> Result<ChainSpec, String> {
         treasury_signers,
         evm_escrow,
         svm_escrow,
+        X3CrosschainGatewayConfig::empty(),
     );
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Production")
@@ -853,6 +861,7 @@ fn x3_chain_genesis(
     treasury_signers: Vec<AccountId>,
     evm_escrow_addr: sp_core::H160,
     svm_escrow_addr: [u8; 32],
+    gateway_config: X3CrosschainGatewayConfig,
 ) -> RuntimeGenesisConfig {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
 
@@ -880,6 +889,14 @@ fn x3_chain_genesis(
         .iter()
         .map(|(aura, _)| aura.clone())
         .collect();
+    let kernel_authorities: Vec<AccountId> = initial_authorities
+        .iter()
+        .map(|(aura, _)| {
+            let mut account_bytes = [0u8; 32];
+            account_bytes.copy_from_slice(&aura.encode()[..32]);
+            AccountId::from(account_bytes)
+        })
+        .collect();
 
     RuntimeGenesisConfig {
         system: Default::default(),
@@ -896,6 +913,8 @@ fn x3_chain_genesis(
         },
         atlas_kernel: AtlasKernelConfig {
             assets: x3_kernel_default_assets(),
+            authorities: kernel_authorities.clone(),
+            authorized_accounts: kernel_authorities,
             evm_escrow: evm_escrow_addr,
             svm_escrow: svm_escrow_addr,
         },
@@ -915,16 +934,29 @@ fn x3_chain_genesis(
             ecosystem_allocations: Vec::new(),
             liquidity_allocations: Vec::new(),
         },
+        #[cfg(not(feature = "mainnet-rc1"))]
+        x3_oracle: Default::default(),
+        x3_slash: Default::default(),
+        x3_inventory: Default::default(),
+        x3_rebalance: Default::default(),
+        x3_partner: Default::default(),
+        x3_custody: Default::default(),
         session: Default::default(),
         #[cfg(feature = "frontier")]
         ethereum: Default::default(),
+        #[cfg(not(feature = "mainnet-rc1"))]
         evolution_core: Default::default(),
         x3_verifier: Default::default(),
+        #[cfg(not(feature = "mainnet-rc1"))]
         depin_marketplace: Default::default(),
+        #[cfg(not(feature = "mainnet-rc1"))]
         private_execution: Default::default(),
         x3_invariants: Default::default(),
+        #[cfg(not(feature = "mainnet-rc1"))]
         x3_dapp_hub: Default::default(),
+        #[cfg(not(feature = "mainnet-rc1"))]
         x3_flash_loan: Default::default(),
+        x3_crosschain_gateway: gateway_config,
     }
 }
 

@@ -952,8 +952,8 @@ pub mod pallet {
                 // Check if settlement has exceeded timeout
                 if age > timeout_blocks_u32 {
                     // Verify intent still exists and is in pending state
-                    if let Some(_intent) = SettlementIntents::<T>::get(&intent_id) {
-                        let state = IntentStates::<T>::get(&intent_id);
+                    if let Some(_intent) = SettlementIntents::<T>::get(intent_id) {
+                        let state = IntentStates::<T>::get(intent_id);
 
                         // Only process if still in a pending state (not already finalized/refunded)
                         if matches!(
@@ -990,7 +990,7 @@ pub mod pallet {
             // Process refunds for timed-out settlements
             // Each refund involves multiple storage ops: marked as 4R + 4W
             for intent_id in to_refund {
-                if let Some(intent) = SettlementIntents::<T>::get(&intent_id) {
+                if let Some(intent) = SettlementIntents::<T>::get(intent_id) {
                     let _ = Self::process_refund(intent_id, &intent, RefundReason::Timeout);
                     weight = weight.saturating_add(
                         <T as frame_system::Config>::DbWeight::get().reads_writes(4, 4),
@@ -1160,7 +1160,7 @@ pub mod pallet {
                 intent_id,
                 leg_index,
                 depositor: who.clone(),
-                chain: chain.clone(),
+                chain: chain,
                 amount,
                 escrow_address: bounded_escrow_address,
                 state: EscrowLegState::Locked,
@@ -1288,8 +1288,8 @@ pub mod pallet {
             );
 
             // Enforce chain-specific finality depth before accepting external proofs.
-            let finality_cfg = ChainFinality::<T>::get(chain.clone())
-                .unwrap_or_else(|| finality::FinalityOracle::default_config(chain.clone()));
+            let finality_cfg = ChainFinality::<T>::get(chain)
+                .unwrap_or_else(|| finality::FinalityOracle::default_config(chain));
             ensure!(
                 proof.confirmations >= finality_cfg.confirmations_required,
                 Error::<T>::InvalidProof
@@ -1313,7 +1313,7 @@ pub mod pallet {
             );
             Self::deposit_event(Event::SettlementProofVerified {
                 intent_id,
-                chain: chain.clone(),
+                chain: chain,
                 block_or_slot,
                 proof_hash: H256::from(sp_io::hashing::sha2_256(&proof.encode())),
                 verified_at_block: current_block,
@@ -1324,12 +1324,12 @@ pub mod pallet {
             let proof_bytes = proof.encode();
             let proof_hash = H256::from(sp_io::hashing::sha2_256(&proof_bytes));
             ensure!(
-                !ProofCache::<T>::contains_key(&proof_hash),
+                !ProofCache::<T>::contains_key(proof_hash),
                 Error::<T>::InvalidProof
             );
 
             // Store proof in cache to mark it as submitted
-            ProofCache::<T>::insert(&proof_hash, ());
+            ProofCache::<T>::insert(proof_hash, ());
 
             // Update state
             IntentStates::<T>::insert(intent_id, IntentState::ExecutingExternal);
@@ -1818,7 +1818,7 @@ pub mod pallet {
             // makes re-submission of the same final sig a no-op error.
             let final_tx_hash = H256::from(sp_io::hashing::sha2_256(&final_sig_rsv.0));
             ensure!(
-                !FinalSignatureCache::<T>::contains_key(&final_tx_hash),
+                !FinalSignatureCache::<T>::contains_key(final_tx_hash),
                 Error::<T>::FinalSignatureAlreadyUsed
             );
 
@@ -2285,7 +2285,7 @@ pub mod pallet {
                 .and_then(|s| s.try_into().ok())
                 .ok_or(DispatchError::Other("SVM proof: blockhash slice error"))?;
 
-            if proof.block_hash.as_bytes() != &recent_blockhash {
+            if proof.block_hash.as_bytes() != recent_blockhash {
                 return Ok(false);
             }
 
@@ -2529,9 +2529,7 @@ pub mod pallet {
             // ── Protocol settlement fee (best-effort, does not block finalization) ──
             let fee_bps = T::SettlementFeeBps::get() as u128;
             if fee_bps > 0 {
-                let fee_raw = (volume as u128)
-                    .saturating_mul(fee_bps)
-                    .saturating_div(10_000);
+                let fee_raw = volume.saturating_mul(fee_bps).saturating_div(10_000);
                 if fee_raw > 0 {
                     let fee: BalanceOf<T> = fee_raw.saturated_into();
                     if <T as Config>::Currency::transfer(
@@ -2739,7 +2737,7 @@ pub mod pallet {
             let mut index = tx_index;
 
             for sibling in proof {
-                let combined = if index % 2 == 0 {
+                let combined = if index.is_multiple_of(2) {
                     // Current node is a left child — concatenate current || sibling
                     let mut buf = [0u8; 64];
                     buf[0..32].copy_from_slice(current_hash.as_bytes());
@@ -2777,7 +2775,7 @@ pub mod pallet {
 
             // Decode nBits to get the target difficulty
             let bits = header.bits;
-            let size = (bits >> 24) as u32;
+            let size = bits >> 24;
             let word = bits & 0x00FFFFFF;
 
             // Compute the target as a 256-bit value

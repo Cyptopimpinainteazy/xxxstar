@@ -11,7 +11,7 @@
 //! BTC is a FIRST-CLASS ASSET, not a special case.
 //! All BTC operations are controlled by X3 proofs.
 
-use crate::types::{BtcBlockHeader, BtcUtxoState};
+use crate::types::BtcBlockHeader;
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use core::fmt::Debug;
 use frame_support::pallet_prelude::MaxEncodedLen;
@@ -162,7 +162,7 @@ impl BtcSpvProof {
         // Walk merkle path
         let mut index = self.tx_index;
         for sibling in &self.merkle_path {
-            let combined = if index % 2 == 0 {
+            let combined = if index.is_multiple_of(2) {
                 // Current is left child
                 Self::concat_and_hash(current.as_bytes(), sibling.as_bytes())
             } else {

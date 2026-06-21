@@ -120,7 +120,7 @@ async fn run_live_probe() -> SwarmResult<()> {
         .get_proof_aggregator()
         .lock()
         .latest_proof()
-        .ok_or_else(|| SwarmError::ProofNotFound)?;
+        .ok_or(SwarmError::ProofNotFound)?;
     if proof.header.finalized_block == 0 {
         return Err(SwarmError::VerificationFailed(
             "probe proof has finalized_block=0".to_string(),

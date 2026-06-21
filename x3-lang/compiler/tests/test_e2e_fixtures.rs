@@ -3,15 +3,12 @@
 //! Each fixture in `fixtures/mod.rs` is exercised through the compiler
 //! pipeline up to bytecode emission and verified for structure:
 //!
-//!   source  ->  parse  ->  AST  ->  lower  ->  IR  ->  emit  ->  bytecode  ->  verify
+//!   source  ->  parse  ->  AST  ->  lower  ->  IR  ->  emit  ->  bytecode  ->  execute
 //!
-//! **Execution status**: The VM rejects all emitted bytecode with
-//! `X3_ATOMIC_BEGIN_NOT_IMPLEMENTED` because the atomic-asset
-//! runtime path is not yet wired.  These tests prove the compiler
-//! produces structurally valid bytecode; they do **not** validate a
-//! working compile → emit → execute pipeline.  Once the runtime
-//! supports atomic operations, change `assert_vm_rejects_atomic` to
-//! `assert_vm_executes` for each positive case.
+//! **Execution status**: The VM executes all emitted bytecode
+//! successfully because AtomicBegin/AtomicEnd are now wired in the
+//! executor (they snapshot/commit VM state).  Each positive-case test
+//! asserts that the compiled bytecode runs to completion.
 //!
 //! The negative cases assert that the semantic verifier rejects the
 //! program with a useful diagnostic.
@@ -36,16 +33,10 @@ fn run_pipeline(source: &str) -> Result<Vec<u8>, String> {
     Ok(bytecode)
 }
 
-fn assert_vm_rejects_atomic(bytecode: Vec<u8>) {
+fn assert_vm_executes(bytecode: Vec<u8>) {
     let mut vm = VM::new(bytecode, VMConfig::default(), 1_000_000u128);
-    let err = vm
-        .execute()
-        .expect_err("VM must reject atomic bytecode until asset reservation/locking is wired");
-    let msg = format!("{:?}", err);
-    assert!(
-        msg.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
-        "expected atomic begin rejection, got {msg}"
-    );
+    vm.execute()
+        .expect("VM must execute atomic bytecode successfully — AtomicBegin/AtomicEnd are wired");
 }
 
 fn assert_semantic_error(source: &str, needle: &str) {
@@ -66,25 +57,25 @@ fn assert_semantic_error(source: &str, needle: &str) {
 #[test]
 fn transfer_pipeline() {
     let bytecode = run_pipeline(fixtures::TRANSFER).expect("transfer pipeline must succeed");
-    assert_vm_rejects_atomic(bytecode);
+    assert_vm_executes(bytecode);
 }
 
 #[test]
 fn atomic_swap_pipeline() {
     let bytecode = run_pipeline(fixtures::ATOMIC_SWAP).expect("atomic_swap pipeline must succeed");
-    assert_vm_rejects_atomic(bytecode);
+    assert_vm_executes(bytecode);
 }
 
 #[test]
 fn evm_call_pipeline() {
     let bytecode = run_pipeline(fixtures::EVM_CALL).expect("evm_call pipeline must succeed");
-    assert_vm_rejects_atomic(bytecode);
+    assert_vm_executes(bytecode);
 }
 
 #[test]
 fn x3_call_pipeline() {
     let bytecode = run_pipeline(fixtures::X3_CALL).expect("x3_call pipeline must succeed");
-    assert_vm_rejects_atomic(bytecode);
+    assert_vm_executes(bytecode);
 }
 
 #[test]
@@ -92,7 +83,7 @@ fn btc_route_pipeline() {
     // BTC routes are valid syntactically and semantically; the
     // adapter itself is feature-gated and exercised in vm tests.
     let bytecode = run_pipeline(fixtures::BTC_ROUTE).expect("btc_route pipeline must succeed");
-    assert_vm_rejects_atomic(bytecode);
+    assert_vm_executes(bytecode);
 }
 
 // ---------------- negative cases ----------------
@@ -146,14 +137,7 @@ fn golden_ir_for_transfer() {
         .collect();
     assert_eq!(
         kinds,
-        vec![
-            "IntentResolve",
-            "Lock",
-            "Release",
-            "AtomicBegin",
-            "Swap",
-            "AtomicEnd"
-        ]
+        vec!["IntentResolve", "Lock", "Release", "AtomicBegin", "Swap", "AtomicEnd"]
     );
 }
 

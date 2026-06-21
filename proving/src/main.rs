@@ -3,6 +3,7 @@
 //! Probes each chain concurrently with six RPC checks, computes per-chain
 //! metrics, prints a human-readable table, and writes a machine-readable
 //! JSON compatibility scorecard.  Exits 0 when all chains pass their
+#![allow(clippy::too_many_lines)]
 //! configured thresholds, exits 1 otherwise.
 #![warn(clippy::all, clippy::pedantic)]
 #![allow(clippy::missing_errors_doc)] // binary entry point; errors printed & exit 2
@@ -60,6 +61,7 @@ struct Args {
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -223,7 +225,7 @@ fn print_table(reports: &[ChainReport]) {
 
     println!("{SEP}");
     println!(
-        "{:<15}  {:<8} {:<8} {:<8} {:<9} {:<8} {:<8}  {:>8} {:>10} {:>8}   {}",
+        "{:<15}  {:<8} {:<8} {:<8} {:<9} {:<8} {:<8}  {:>8} {:>10} {:>8}   Status",
         "Chain",
         "Quoting",
         "Bundle",
@@ -233,15 +235,14 @@ fn print_table(reports: &[ChainReport]) {
         "State",
         "Bundle%",
         "Rollback%",
-        "Recon%",
-        "Status"
+        "Recon%"
     );
     println!("{SEP}");
 
     for report in reports {
         let c = &report.checks;
         // Use `get` so the function is safe even if the vec is shorter than expected.
-        let get = |i: usize| c.get(i).map_or(false, |r| r.passed);
+        let get = |i: usize| c.get(i).is_some_and(|r| r.passed);
 
         let status_str = match report.overall_status {
             ChainStatus::Passing => "Passing",

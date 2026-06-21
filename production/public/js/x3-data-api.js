@@ -5,6 +5,10 @@
     apiBase:
       (typeof window !== "undefined" ? window.location.origin : "") + "/api/site",
     cacheTtlMs: 15000,
+    x3RpcUrl: "https://rpc.x3-chain.io",
+    x3RpcWsUrl: "wss://rpc.x3-chain.io",
+    x3TestnetRpcUrl: "http://rpc.testnet.x3-chain.io:9944",
+    x3TestnetWsUrl: "wss://testnet.x3star.net",
   };
 
   var cache = new Map();
@@ -231,6 +235,25 @@
     return source;
   }
 
+  // ── X3 Chain JSON-RPC client ──
+  async function x3RpcCall(method, params) {
+    var url = CONFIG.x3RpcUrl;
+    var response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: method,
+        params: params || [],
+      }),
+    });
+    if (!response.ok) throw new Error("RPC " + method + " failed: " + response.status);
+    var json = await response.json();
+    if (json.error) throw new Error("RPC error: " + JSON.stringify(json.error));
+    return json.result;
+  }
+
   var publicApi = {
     init: initialize,
     isConnected: function () {
@@ -239,6 +262,19 @@
     renderModuleMeta: renderModuleMeta,
     renderStatusBanner: renderStatusBanner,
     subscribe: subscribe,
+    // ── X3 Chain RPC methods ──
+    x3RpcCall: x3RpcCall,
+    getChainName: function () { return x3RpcCall("system_chain", []); },
+    getChainHealth: function () { return x3RpcCall("system_health", []); },
+    getChainPeers: function () { return x3RpcCall("system_peers", []); },
+    getBlockNumber: function () {
+      return x3RpcCall("chain_getHeader", []).then(function (h) {
+        return parseInt(h.number, 16);
+      });
+    },
+    getAccountBalance: function (address) {
+      return x3RpcCall("system_account", [address]);
+    },
     getHealthEnvelope: createEnvelopeGetter("/health"),
     getDashboardEnvelope: createEnvelopeGetter("/dashboard"),
     getNetworkEnvelope: createEnvelopeGetter("/network"),
@@ -276,10 +312,6 @@
     getReservationsData: createDataGetter("/reservations"),
     getWhalesData: createDataGetter("/whales"),
     getTokenomicsData: createDataGetter("/tokenomics"),
-    getBlockNumber: async function (options) {
-      var data = await publicApi.getDashboardData(options);
-      return data.blockNumber;
-    },
     getGasPrice: async function (options) {
       var data = await publicApi.getDashboardData(options);
       return data.gasPriceGwei ? data.gasPriceGwei * 1000000000 : null;

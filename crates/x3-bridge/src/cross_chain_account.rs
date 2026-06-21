@@ -163,7 +163,7 @@ impl CrossChainAccountManager {
     /// - **Solana / Cosmos**: Ed25519 verification; `signature.signer` used as the 32-byte public key
     /// - **X3**: sr25519 verification; `signature.signer` used as the 32-byte public key
     /// - **Bitcoin**: secp256k1 recovery; recovered key hash matched against `signature.signer[12..]`
-    /// Convert ChainType to KeyType for signature verification
+    // Convert ChainType to KeyType for signature verification
     fn chain_type_to_key_type(chain_type: ChainType) -> KeyType {
         match chain_type {
             ChainType::Ethereum | ChainType::Bitcoin => KeyType::Secp256k1,

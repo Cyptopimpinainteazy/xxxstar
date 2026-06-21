@@ -13,7 +13,7 @@ contract WrappedX3 is ERC20, Ownable {
     address public treasury;
     address public adapter;
     uint256 public treasuryFeeBps;
-    uint256 public chainId;
+    uint256 public immutable chainId;
     mapping(address => bool) public feeExempt;
 
     event TreasuryChanged(address indexed newTreasury);
@@ -21,21 +21,25 @@ contract WrappedX3 is ERC20, Ownable {
     event FeeUpdated(uint256 newBps);
     event FeeExempt(address indexed user, bool exempt);
 
-    constructor(address _treasury, address _adapter, uint256 _chainId) ERC20("Wrapped X3", "wX3") {
-        treasury = _treasury;
-        adapter = _adapter;
-        chainId = _chainId;
+    constructor(address treasuryAddr, address adapterAddr, uint256 chainId_) ERC20("Wrapped X3", "wX3") {
+        require(treasuryAddr != address(0), "ZERO_TREASURY");
+        require(adapterAddr != address(0), "ZERO_ADAPTER");
+        treasury = treasuryAddr;
+        adapter = adapterAddr;
+        chainId = chainId_;
         treasuryFeeBps = 50;
     }
 
-    function setTreasury(address _treasury) external onlyOwner {
-        treasury = _treasury;
-        emit TreasuryChanged(_treasury);
+    function setTreasury(address newTreasury) external onlyOwner {
+        require(newTreasury != address(0), "ZERO_TREASURY");
+        treasury = newTreasury;
+        emit TreasuryChanged(newTreasury);
     }
 
-    function setAdapter(address _adapter) external onlyOwner {
-        adapter = _adapter;
-        emit AdapterChanged(_adapter);
+    function setAdapter(address newAdapter) external onlyOwner {
+        require(newAdapter != address(0), "ZERO_ADAPTER");
+        adapter = newAdapter;
+        emit AdapterChanged(newAdapter);
     }
 
     function setFee(uint256 bps) external onlyOwner {
@@ -48,15 +52,22 @@ contract WrappedX3 is ERC20, Ownable {
         emit FeeExempt(user, exempt);
     }
 
-    function mint(address to, uint256 amount) external {
-        require(msg.sender == adapter, "Only adapter");
+    event Mint(address indexed to, uint256 amount, uint256 fee);
+    event Burn(address indexed from, uint256 amount);
+
+    function mint(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "ZERO_TO");
+        require(amount > 0, "ZERO_AMOUNT");
         uint256 fee = feeExempt[to] ? 0 : (amount * treasuryFeeBps) / 10000;
         if (fee > 0) _mint(treasury, fee);
         _mint(to, amount - fee);
+        emit Mint(to, amount, fee);
     }
 
-    function burn(address from, uint256 amount) external {
-        require(msg.sender == adapter, "Only adapter");
+    function burn(address from, uint256 amount) external onlyOwner {
+        require(from != address(0), "ZERO_FROM");
+        require(amount > 0, "ZERO_AMOUNT");
         _burn(from, amount);
+        emit Burn(from, amount);
     }
 }

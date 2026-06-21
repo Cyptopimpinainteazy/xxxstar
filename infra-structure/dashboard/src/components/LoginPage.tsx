@@ -21,8 +21,8 @@ export function LoginPage({ onLoginSuccess, onBackToRegister }: LoginPageProps) 
     try {
       await api.login(apiKey, apiSecret);
       onLoginSuccess();
-    } catch (err: unknown) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+    } catch (err) {
+      setError((err as Error).message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

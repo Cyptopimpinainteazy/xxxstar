@@ -203,9 +203,10 @@ pub enum SimulationMode {
 }
 
 impl IntentSimulator {
-    /// Build a test-mode simulator. Equivalent to `test_mode()`.
+    /// Build a production-mode simulator. Fails closed when no real
+    /// data source is wired up. This is the default for production.
     pub fn new() -> Self {
-        Self::test_mode()
+        Self::production_mode()
     }
 
     /// Build an explicit test-mode simulator. Synthetic `route_found = true`

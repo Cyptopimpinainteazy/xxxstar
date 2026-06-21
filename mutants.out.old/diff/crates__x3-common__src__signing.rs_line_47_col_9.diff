@@ -1,0 +1,25 @@
+--- crates/x3-common/src/signing.rs
++++ replace PublicKey::key_type -> KeyType with Default::default()
+@@ -39,21 +39,17 @@
+     Secp256k1([u8; 65]),
+     /// sr25519 public key (32 bytes)
+     Sr25519(sr25519::Public),
+ }
+ 
+ impl PublicKey {
+     /// Get the key type
+     pub fn key_type(&self) -> KeyType {
+-        match self {
+-            PublicKey::Ed25519(_) => KeyType::Ed25519,
+-            PublicKey::Secp256k1(_) => KeyType::Secp256k1,
+-            PublicKey::Sr25519(_) => KeyType::Sr25519,
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Get the raw bytes of the public key
+     pub fn as_bytes(&self) -> &[u8] {
+         match self {
+             PublicKey::Ed25519(pk) => pk.as_ref(),
+             PublicKey::Secp256k1(pk) => pk.as_ref(),
+             PublicKey::Sr25519(pk) => pk.as_ref(),

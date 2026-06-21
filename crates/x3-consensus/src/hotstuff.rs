@@ -387,15 +387,18 @@ fn derive_action_dag(actions: &[ActionCommitment]) -> Result<ActionDag, Consensu
 /// Deterministic execution order from DAG (topological sort, ties broken by ID)
 fn derive_execution_order(
     dag: &ActionDAG,
-    _actions: &[ActionCommitment],
+    actions: &[ActionCommitment],
 ) -> Result<Vec<ActionCommitment>, ConsensusError> {
-    let order_ids = dag.topological_order();
-    // The ActionDAG only stores node ids and hashes, not the full
-    // ActionCommitment. Reconstructing the ordered commitment list from
-    // the original actions is not yet implemented; fail closed rather
-    // than return an empty list that would silently skip execution.
-    let _ = order_ids;
-    Err(ConsensusError::InvalidDag)
+    let order_ids = dag.topological_sort();
+    let mut ordered: Vec<ActionCommitment> = Vec::with_capacity(order_ids.len());
+    for id in order_ids {
+        let action = actions
+            .iter()
+            .find(|a| a.id == id)
+            .ok_or(ConsensusError::InvalidDag)?;
+        ordered.push(action.clone());
+    }
+    Ok(ordered)
 }
 
 /// Compute hash of any serializable type

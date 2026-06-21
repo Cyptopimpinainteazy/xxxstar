@@ -58,7 +58,60 @@ def _serialize_swap_instruction(amount: int, min_amount_out: int, source_mint: s
     return payload
 
 
+def _serialize_kernel_mint_instruction(mint: str, amount: int, destination: str) -> bytes:
+    instruction_tag = b'\x02'
+    payload = instruction_tag
+    payload += _encode_pubkey(mint)
+    payload += _encode_u64(amount)
+    payload += _encode_pubkey(destination)
+    return payload
+
+
+def _serialize_kernel_burn_instruction(mint: str, amount: int, source: str) -> bytes:
+    instruction_tag = b'\x03'
+    payload = instruction_tag
+    payload += _encode_pubkey(mint)
+    payload += _encode_u64(amount)
+    payload += _encode_pubkey(source)
+    return payload
+
+
 def emit(plan: Dict[str, Any], step: Dict[str, Any]) -> Dict[str, Any]:
+    action = step.get('action', 'swap')
+
+    if action in ('mint', 'burn'):
+        mint = step.get('mint') or step.get('token') or registry.TOKEN_ADDRESSES.get('solana', {}).get(step.get('from', 'SOL'), registry.TOKEN_ADDRESSES['solana']['SOL'])
+        amount = int(float(step.get('amount') or 0)) if step.get('amount') else 0
+        party = step.get('destination' if action == 'mint' else 'source') or step.get('recipient') or getattr(registry, 'DEFAULT_SVM_RECIPIENT', '11111111111111111111111111111111')
+        kernel_program = registry.CONTRACT_ADDRESSES.get('x3_kernel', 'X3Kernel1111111111111111111111111111111111')
+
+        if action == 'mint':
+            data_bytes = _serialize_kernel_mint_instruction(mint, amount, party)
+        else:
+            data_bytes = _serialize_kernel_burn_instruction(mint, amount, party)
+
+        data_b58 = _base58_encode(data_bytes)
+        raw_data_hex = '0x' + data_bytes.hex()
+
+        accounts = [
+            {'pubkey': mint, 'is_signer': False, 'is_writable': True},
+            {'pubkey': party, 'is_signer': False, 'is_writable': True},
+            {'pubkey': kernel_program, 'is_signer': False, 'is_writable': False},
+            {'pubkey': 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', 'is_signer': False, 'is_writable': False},
+        ]
+
+        return {
+            'type': action,
+            'chain': 'solana',
+            'mint': mint,
+            'amount': amount,
+            'program': kernel_program,
+            'accounts': accounts,
+            'data': data_b58,
+            'raw_data_hex': raw_data_hex,
+            'note': f'SVM kernel {action} instruction',
+        }
+
     from_token = step.get('from')
     to_token = step.get('to')
     amount = int(float(step.get('amount') or 0)) if step.get('amount') else 0

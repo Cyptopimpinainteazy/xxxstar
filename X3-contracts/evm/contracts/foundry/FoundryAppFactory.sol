@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
@@ -66,20 +66,20 @@ contract FoundryAppFactory is Ownable, ReentrancyGuard {
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
-    constructor(address _templateRegistry) {
+    constructor(address registry) {
         _transferOwnership(msg.sender);
-        if (_templateRegistry == address(0)) revert ZeroAddress();
-        templateRegistry = _templateRegistry;
+        if (registry == address(0)) revert ZeroAddress();
+        templateRegistry = registry;
     }
 
     // ── Admin Functions ──────────────────────────────────────────────────────
 
     /// @notice Update the template registry address
-    /// @param _templateRegistry New template registry address
-    function setTemplateRegistry(address _templateRegistry) external onlyOwner {
-        if (_templateRegistry == address(0)) revert ZeroAddress();
-        templateRegistry = _templateRegistry;
-        emit TemplateRegistryUpdated(_templateRegistry, block.timestamp);
+    /// @param registry New template registry address
+    function setTemplateRegistry(address registry) external onlyOwner {
+        if (registry == address(0)) revert ZeroAddress();
+        templateRegistry = registry;
+        emit TemplateRegistryUpdated(registry, block.timestamp);
     }
 
     // ── Core Functions ───────────────────────────────────────────────────────

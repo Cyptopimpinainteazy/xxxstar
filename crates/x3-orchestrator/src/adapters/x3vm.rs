@@ -18,8 +18,10 @@ impl ChainAdapter for X3VmAdapter {
         self.id.clone()
     }
 
-    fn send(&self, msg: &CrossVmMessage) -> Result<String> {
-        msg.id()
+    fn send(&self, _msg: &CrossVmMessage) -> Result<String> {
+        Err(OrchestratorError::ExecutionFailed(
+            "X3VM adapter: send not yet wired to node RPC backend".into(),
+        ))
     }
 
     fn verify(&self, proof: &ExecutionProof) -> Result<bool> {
@@ -32,6 +34,8 @@ impl ChainAdapter for X3VmAdapter {
     }
 
     fn execute(&self, _msg: &CrossVmMessage) -> Result<()> {
-        Ok(())
+        Err(OrchestratorError::ExecutionFailed(
+            "X3VM adapter: execute not yet wired to node RPC backend".into(),
+        ))
     }
 }

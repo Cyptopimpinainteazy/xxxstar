@@ -136,22 +136,17 @@ impl ParallelExecutor {
     /// Execute a single batch of transactions
     fn execute_batch(
         &self,
-        batch: ExecutionBatch,
-        transactions: &[Transaction],
+        _batch: ExecutionBatch,
+        _transactions: &[Transaction],
     ) -> Result<Vec<TransactionResult>, ExecutionError> {
-        // In parallel execution, we'd spawn tasks here
-        // For now, simulate parallel execution
-        batch
-            .transaction_indices
-            .into_iter()
-            .map(|index| self.execute_transaction(transactions[index].clone()))
-            .collect()
+        Err(ExecutionError::ParallelExecutionNotAvailable)
     }
 
     /// Execute single transaction
     fn execute_transaction(&self, tx: Transaction) -> Result<TransactionResult, ExecutionError> {
         let mut state_changes = Vec::new();
         let mut events = Vec::new();
+        let mut all_success = true;
 
         for instruction in tx.instructions.iter() {
             match instruction.opcode {
@@ -170,9 +165,13 @@ impl ParallelExecutor {
                     });
                 }
                 _ => {
-                    return Err(ExecutionError::TransactionFailed);
+                    all_success = false;
                 }
             }
+        }
+
+        if !all_success {
+            return Err(ExecutionError::TransactionFailed);
         }
 
         Ok(TransactionResult {
@@ -444,6 +443,23 @@ pub enum ExecutionError {
     SerialEquivalenceViolation,
     TransactionFailed,
     StateCorruption,
+    ParallelExecutionNotAvailable,
+}
+
+impl core::fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ExecutionError::ConflictDetected => write!(f, "conflict detected"),
+            ExecutionError::SerialEquivalenceViolation => {
+                write!(f, "serial equivalence violation")
+            }
+            ExecutionError::TransactionFailed => write!(f, "transaction failed"),
+            ExecutionError::StateCorruption => write!(f, "state corruption"),
+            ExecutionError::ParallelExecutionNotAvailable => {
+                write!(f, "parallel execution requires hardware thread pool — not available in this build; use sequential executor instead")
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -475,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serial_equivalence() {
+    fn test_serial_equivalence_not_available() {
         let executor = ParallelExecutor::new(4);
         let transactions = vec![Transaction {
             id: 1,
@@ -483,7 +499,10 @@ mod tests {
         }];
 
         let result = executor.execute_parallel(transactions);
-        assert!(result.is_ok());
+        assert!(matches!(
+            result,
+            Err(ExecutionError::ParallelExecutionNotAvailable)
+        ));
     }
 
     #[test]
@@ -694,7 +713,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parallel_execution_with_no_conflicts() {
+    fn test_parallel_execution_rejected_when_no_thread_pool() {
         let executor = ParallelExecutor::new(4);
 
         let transactions = vec![
@@ -715,13 +734,14 @@ mod tests {
         ];
 
         let result = executor.execute_parallel(transactions);
-        assert!(result.is_ok());
-        let execution_result = result.unwrap();
-        assert_eq!(execution_result.results.len(), 2);
+        assert!(matches!(
+            result,
+            Err(ExecutionError::ParallelExecutionNotAvailable)
+        ));
     }
 
     #[test]
-    fn test_parallel_execution_with_conflicts() {
+    fn test_parallel_execution_rejected_even_with_conflicts() {
         let executor = ParallelExecutor::new(4);
 
         // Create transactions that would conflict
@@ -743,8 +763,11 @@ mod tests {
 
         let transactions = vec![tx1, tx2];
         let result = executor.execute_parallel(transactions);
-        // Should still succeed as conflict detection handles it
-        assert!(result.is_ok());
+        // Fail-closed: no thread pool available
+        assert!(matches!(
+            result,
+            Err(ExecutionError::ParallelExecutionNotAvailable)
+        ));
     }
 
     #[test]

@@ -12,11 +12,9 @@ impl Cursor {
     }
 
     pub fn peek(&self) -> &Token {
-        self.tokens.get(self.pos).unwrap_or_else(|| {
-            self.tokens
-                .last()
-                .expect("lexer cursor requires at least an EOF token")
-        })
+        self.tokens
+            .get(self.pos)
+            .unwrap_or_else(|| self.tokens.last().expect("lexer cursor requires at least an EOF token"))
     }
 
     pub fn bump(&mut self) -> Token {

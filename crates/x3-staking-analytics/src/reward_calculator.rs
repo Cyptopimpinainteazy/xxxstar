@@ -1,6 +1,5 @@
 //! Reward Calculator — APY and reward estimation engine
 
-use crate::Result;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -344,7 +343,6 @@ mod tests {
 
         let calc = calculator.get_apy_calculation(1000);
         assert!(calc.current_apy >= 0.0);
-        assert!(calc.estimated_annual_reward >= 0);
         assert!(calc.compounded_24m_balance >= 1000);
     }
 }

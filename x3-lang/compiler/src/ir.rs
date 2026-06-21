@@ -125,6 +125,8 @@ pub enum Operation {
     /// Require a condition to be true
     Require {
         kind: RequireKind,
+        /// Optional subject: chain for Finality, invariant name, etc.
+        subject: Option<String>,
         condition: Condition,
         error_msg: Option<String>,
     },
@@ -336,10 +338,7 @@ pub enum Condition {
     /// Nonce comparison: nonce(account) == expected
     NonceEq { account: String, expected: u64 },
     /// Proof verification: verify_proof(proof_data, expected_hash)
-    ProofValid {
-        proof: String,
-        expected_hash: String,
-    },
+    ProofValid { proof: String, expected_hash: String },
     /// Boolean expression evaluation
     Expression { expr: String },
     /// Always true
@@ -373,11 +372,7 @@ pub enum FailureAction {
     /// Roll back all operations in atomic block
     Rollback,
     /// Refund specific asset to account
-    Refund {
-        chain: String,
-        asset: String,
-        to: String,
-    },
+    Refund { chain: String, asset: String, to: String },
     /// Halt the bridge (stop processing)
     Halt,
     /// Quarantine for manual review

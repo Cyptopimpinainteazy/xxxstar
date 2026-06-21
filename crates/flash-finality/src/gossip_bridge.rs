@@ -316,7 +316,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_proposal_broadcast() {
-        let (bridge, mut rx) = FlashFinalityGossipBridge::new([0x01; 32]);
+        let (bridge, _rx) = FlashFinalityGossipBridge::new([0x01; 32]);
 
         bridge
             .broadcast_proposal([0x11; 32], 100, 1, [0x22; 64])
@@ -328,7 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_incoming_message() {
-        let (bridge, mut rx) = FlashFinalityGossipBridge::new([0x01; 32]);
+        let (bridge, _rx) = FlashFinalityGossipBridge::new([0x01; 32]);
 
         let msg = FlashGossipMessage::Vote {
             block_hash: [0x11; 32],

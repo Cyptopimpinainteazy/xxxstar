@@ -1,5 +1,19 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
+#![allow(clippy::shadow_unrelated)]
 
 //! # X3 Automation Pallet
 //!
@@ -28,10 +42,9 @@ pub mod pallet {
         BoundedVec,
     };
     use frame_system::pallet_prelude::*;
-    use parity_scale_codec::Encode;
-    use sp_core::H256;
+
     use sp_runtime::traits::{SaturatedConversion, Saturating};
-    use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId, TaskStatus};
+    use x3_automation::{Action, Condition, Task, TaskId, TaskStatus};
 
     /// Trait for querying asset prices from an oracle.
     /// Wired at runtime to the concrete price feed (e.g. Chainlink-style pallet).
@@ -341,18 +354,13 @@ pub mod pallet {
     }
 }
 
-use frame_support::{
-    ensure,
-    pallet_prelude::DispatchResult,
-    traits::{Currency, Get, ReservableCurrency},
-};
-use pallet::BalanceOf;
+use frame_support::{ensure, pallet_prelude::DispatchResult, traits::Get};
 use parity_scale_codec::Encode;
 use sp_core::H256;
 use sp_runtime::{traits::SaturatedConversion, DispatchError};
 use sp_std::vec;
 use sp_std::vec::Vec;
-use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId};
+use x3_automation::{Action, Condition, ExecutionResult, Task, TaskId, TaskStatus};
 
 impl<T: pallet::Config> pallet::Pallet<T> {
     /// Generate a unique task ID
@@ -462,8 +470,26 @@ impl<T: pallet::Config> pallet::Pallet<T> {
         let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
         let mut cleaned = 0u32;
 
-        // Simplified cleanup - in production would iterate all tasks
-        // This is just a placeholder implementation
+        // Collect expired task IDs first to avoid mutation during iteration
+        let expired: Vec<TaskId> = Tasks::<T>::iter()
+            .filter(|(_id, task)| {
+                task.expiry_block <= current_block && task.status == TaskStatus::Active
+            })
+            .map(|(task_id, _)| task_id)
+            .collect();
+
+        for task_id in expired {
+            Tasks::<T>::mutate(task_id, |maybe_task| {
+                if let Some(task) = maybe_task {
+                    if task.status == TaskStatus::Active {
+                        task.status = TaskStatus::Expired;
+                        Self::deposit_event(Event::TaskExpired { task_id });
+                        cleaned += 1;
+                    }
+                }
+            });
+        }
+
         cleaned
     }
 }

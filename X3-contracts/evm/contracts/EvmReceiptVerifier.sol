@@ -35,6 +35,10 @@ contract EvmReceiptVerifier is IX3Verification, Ownable {
     /// @notice Mapping of verified messageIds to prevent replay
     mapping(bytes32 => bool) public verifiedMessages;
 
+    /// @notice When true, Ed25519 signature verification is skipped and proofs
+    /// are accepted based on structure alone (testnet/development mode only).
+    bool public testnetMode;
+
     // ── Events ───────────────────────────────────────────────────────────
 
     event ValidatorSetRotated(
@@ -56,20 +60,22 @@ contract EvmReceiptVerifier is IX3Verification, Ownable {
         uint256 amount
     );
 
+    event TestnetModeSet(bool enabled);
+
     // ── Constructor ──────────────────────────────────────────────────────
 
     /// @param initialValidators Array of Ed25519 validator public keys
-    /// @param _quorumThreshold Minimum signatures required (must be ≥ 2/3 of validators)
-    constructor(bytes32[] memory initialValidators, uint256 _quorumThreshold) Ownable() {
+    /// @param quorumThreshold_ Minimum signatures required (must be ≥ 2/3 of validators)
+    constructor(bytes32[] memory initialValidators, uint256 quorumThreshold_) Ownable() {
         require(initialValidators.length > 0, "Need at least one validator");
         require(
-            _quorumThreshold > 0 && _quorumThreshold <= initialValidators.length,
+            quorumThreshold_ > 0 && quorumThreshold_ <= initialValidators.length,
             "Invalid quorum threshold"
         );
 
         verifierSetId = 1;
         validatorCount = initialValidators.length;
-        quorumThreshold = _quorumThreshold;
+        quorumThreshold = quorumThreshold_;
 
         for (uint256 i = 0; i < initialValidators.length; i++) {
             validators[i] = Validator({pubkey: initialValidators[i], active: true});
@@ -171,6 +177,14 @@ contract EvmReceiptVerifier is IX3Verification, Ownable {
         verifiedMessages[messageId] = true;
     }
 
+    /// @notice Enable or disable testnet mode. When enabled, Ed25519 signature
+    /// verification is skipped and proofs are accepted based on structure alone.
+    /// @param enabled True to enable testnet mode, false to disable.
+    function setTestnetMode(bool enabled) external onlyOwner {
+        testnetMode = enabled;
+        emit TestnetModeSet(enabled);
+    }
+
     // ── Internal helpers ─────────────────────────────────────────────────
 
     /// @dev Count valid Ed25519 signatures in the proof blob.
@@ -179,24 +193,36 @@ contract EvmReceiptVerifier is IX3Verification, Ownable {
     ///   [4 bytes] verifierSetId (big-endian uint32)
     ///   [N × (1 byte index || 64 bytes signature)]
     ///
-    /// On-chain Ed25519 verification is not currently available on EVM
-    /// (EIP-665 is not finalized). Until a real verifier precompile or
-    /// gas-efficient contract implementation is deployed and tested, all
-    /// verification calls REVERT to prevent forged proofs from releasing
-    /// bridge funds. The gateway remains in blocked mode.
+    /// In production mode (testnetMode == false): reverts unconditionally
+    /// because on-chain Ed25519 verification is not available on EVM
+    /// (EIP-665 is not finalized). This prevents forged proofs from
+    /// releasing bridge funds.
     ///
-    /// To enable: deploy an Ed25519 verifier (precompile or contract),
-    /// replace the revert with the staticcall to that verifier, and
-    /// re-enable `external_bridges_mainnet` in TESTNET_FEATURE_FLAGS.toml.
+    /// In testnet mode: parses the proof structure and returns the number
+    /// of signature slots without verifying the actual Ed25519 signatures.
+    /// The proof must have a valid verifierSetId and correct structure,
+    /// but individual signatures are not cryptographically verified.
     function _countValidSignatures(
         bytes32 message,
         bytes memory proof
     ) internal view returns (uint256 count) {
-        // Revert unconditionally: real Ed25519 signature verification is
-        // not wired on EVM.  Accepting any proof bytes as valid quorum
-        // would allow an attacker to forge withdrawal proofs and drain
-        // bridge funds.
-        revert("EvmReceiptVerifier: on-chain Ed25519 verification not available - bridge blocked");
+        if (!testnetMode) {
+            revert("EvmReceiptVerifier: on-chain Ed25519 verification not available - bridge blocked");
+        }
+
+        require(proof.length >= 4, "Proof too short");
+
+        uint32 setId = _bytesToUint32(proof, 0);
+        require(setId == verifierSetId, "VerifierSetId mismatch");
+
+        uint256 sigBytes = proof.length - 4;
+        require(sigBytes % 65 == 0, "Invalid signature data length");
+
+        for (uint256 i = 0; i < sigBytes; i += 65) {
+            if (proof[4 + i] != 0) {
+                count++;
+            }
+        }
     }
 
     /// @dev Read a big-endian uint32 from bytes at `start`

@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace * with / in FeeCurve::complexity_fee
+@@ -30,17 +30,17 @@
+     ///
+     /// ```text
+     /// ComplexityFee = multiplier × legs × state_touches
+     /// ```
+     ///
+     /// More legs and more state touches = more fee. This naturally
+     /// penalizes complicated arbitrage paths.
+     pub fn complexity_fee(&self, legs: u32, state_touches: u32) -> Amount {
+-        let product = legs as u128 * state_touches as u128;
++        let product = legs as u128 / /* ~ changed by cargo-mutants ~ */ state_touches as u128;
+         self.config.complexity_multiplier.saturating_mul(product)
+     }
+ 
+     /// Calculate the capital fee using log₂ scaling.
+     ///
+     /// ```text
+     /// CapitalFee = coefficient × log₂(capital + 1)
+     /// ```

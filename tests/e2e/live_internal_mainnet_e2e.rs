@@ -257,15 +257,11 @@ async fn live_bridge_proof_crypto_and_full_accounting_paths() {
         .unwrap()
         .to_string();
 
+    let proof_hash_hex = format!("0x{}", hex::encode(proof.proof_hash));
     let verified = rpc_call(
         &client,
         "x3_verify_signature",
-        json![
-            format!("0x{}", hex::encode(proof.proof_hash)),
-            signature_hex,
-            pubkey_hex,
-            "ed25519"
-        ],
+        serde_json::json!([proof_hash_hex, signature_hex, pubkey_hex, "ed25519"]),
     )
     .as_bool()
     .unwrap();

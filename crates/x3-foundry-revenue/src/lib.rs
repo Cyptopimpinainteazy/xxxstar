@@ -5,10 +5,8 @@
 
 use chrono::{DateTime, Utc};
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::info;
 
 /// Maximum basis points (100%).
 pub const MAX_BASIS_POINTS: u64 = 10_000;

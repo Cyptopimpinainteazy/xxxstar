@@ -123,21 +123,21 @@ contract X3ExternalGateway is Ownable {
     }
 
     /// @notice Update the verifier contract address
-    function setVerifier(address _verifier) external onlyOwner {
-        require(_verifier != address(0), "ZERO_VERIFIER");
-        verifier = IX3Verification(_verifier);
-        emit VerifierUpdated(_verifier);
+    function setVerifier(address newVerifier) external onlyOwner {
+        require(newVerifier != address(0), "ZERO_VERIFIER");
+        verifier = IX3Verification(newVerifier);
+        emit VerifierUpdated(newVerifier);
     }
 
     /// @notice Emergency pause/unpause
-    function setPaused(bool _paused) external onlyOwner {
-        paused = _paused;
-        emit Paused(_paused);
+    function setPaused(bool paused_) external onlyOwner {
+        paused = paused_;
+        emit Paused(paused_);
     }
 
     /// @notice Set minimum X3 confirmations for proof acceptance
-    function setMinX3Confirmations(uint256 _min) external onlyOwner {
-        minX3Confirmations = _min;
+    function setMinX3Confirmations(uint256 min_) external onlyOwner {
+        minX3Confirmations = min_;
     }
 
     // ── Core Functions ──────────────────────────────────────────────────────

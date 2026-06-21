@@ -1,4 +1,3 @@
-use crate::error::FoundryError;
 use crate::types::{DAppType, RevenueConfig, SecurityReport};
 use chrono::Utc;
 use sha2::{Digest, Sha256};
@@ -301,13 +300,12 @@ impl SecurityAuditor {
     }
 
     /// Checks license compliance.
-    pub fn check_license(&self, dapp_type: &DAppType) -> Vec<String> {
-        let mut findings = Vec::new();
-        // Check for standard open-source licenses
-        findings.push("License set to Apache-2.0 - compatible with X3 Chain requirements".into());
-        findings.push("All dependencies must have compatible licenses".into());
-        findings.push("Commercial use permitted under Apache-2.0".into());
-        findings
+    pub fn check_license(&self, _dapp_type: &DAppType) -> Vec<String> {
+        vec![
+            "License set to Apache-2.0 - compatible with X3 Chain requirements".into(),
+            "All dependencies must have compatible licenses".into(),
+            "Commercial use permitted under Apache-2.0".into(),
+        ]
     }
 
     /// Checks for scam-like patterns in the prompt.
@@ -430,7 +428,7 @@ impl SecurityAuditor {
             .map(|s| s.lines().filter(|l| l.trim().starts_with("//")).count())
             .sum();
         let coverage = (commented as f64 / total_lines as f64) * 100.0;
-        coverage.min(100.0).max(10.0)
+        coverage.clamp(10.0, 100.0)
     }
 
     /// Validates fee configuration and returns warnings.
@@ -443,7 +441,6 @@ impl SecurityAuditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FeeMode;
 
     #[test]
     fn test_audit_empty_contracts() {
@@ -468,8 +465,7 @@ mod tests {
     #[test]
     fn test_fee_sanity() {
         let auditor = SecurityAuditor::new("test".into());
-        let mut config = RevenueConfig::default();
-        config.platform_fee_bps = 9999;
+        let config = RevenueConfig { platform_fee_bps: 9999, ..Default::default() };
         let (_, findings) = auditor.check_fee_sanity(&config);
         assert!(!findings.is_empty());
     }

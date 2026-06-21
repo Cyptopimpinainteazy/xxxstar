@@ -58,45 +58,47 @@ function CrossVmActivityPanel() {
 
   if (loading) {
     return (
-      <div className="view">
-        <h2>Cross-VM Activity</h2>
-        <div className="loading">Loading real-time transfer data via Tauri backend...</div>
+      <div className="view p-6">
+        <h2 className="text-xl font-bold text-white mb-2">Cross-VM Activity</h2>
+        <div className="text-gray-400">Loading real-time transfer data via Tauri backend...</div>
       </div>
     )
   }
 
   return (
-    <div className="view">
-      <h2>Cross-VM Activity</h2>
-      <p className="view-subtitle">Recent transfers by route (Live Data via Tauri RPC)</p>
-      {error && <div className="error-banner">{error}</div>}
-      <div className="table-container">
-        <table className="data-table">
+    <div className="view p-6">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-white">Cross-VM Activity</h2>
+        <p className="text-gray-400 text-sm">Recent transfers by route (Live Data via Tauri RPC)</p>
+      </div>
+      {error && <div className="bg-red-900/30 border border-red-600/30 rounded-lg p-3 mb-4 text-red-300 text-sm">{error}</div>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th>From</th>
-              <th>To</th>
-              <th>Value (tX3)</th>
-              <th>Time</th>
-              <th>Block</th>
-              <th>TX Hash</th>
+            <tr className="text-left text-gray-400 border-b border-gray-700">
+              <th className="py-2 px-3">From</th>
+              <th className="py-2 px-3">To</th>
+              <th className="py-2 px-3">Value (tX3)</th>
+              <th className="py-2 px-3">Time</th>
+              <th className="py-2 px-3">Block</th>
+              <th className="py-2 px-3">TX Hash</th>
             </tr>
           </thead>
           <tbody>
             {transfers.length > 0 ? (
               transfers.map((t, i) => (
-                <tr key={i}>
-                  <td><span className="vm-badge">{t.from}</span></td>
-                  <td><span className="vm-badge">{t.to}</span></td>
-                  <td>{t.value}</td>
-                  <td className="time-cell">{t.time}</td>
-                  <td className="mono">#{t.blockHeight}</td>
-                  <td className="mono tx-hash">{t.txHash ? t.txHash.slice(0, 8) + '...' : '—'}</td>
+                <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/30">
+                  <td className="py-2 px-3"><span className="px-2 py-0.5 rounded bg-cyan-900/40 text-cyan-400 text-xs font-mono">{t.from}</span></td>
+                  <td className="py-2 px-3"><span className="px-2 py-0.5 rounded bg-purple-900/40 text-purple-400 text-xs font-mono">{t.to}</span></td>
+                  <td className="py-2 px-3 text-white font-mono">{t.value}</td>
+                  <td className="py-2 px-3 text-gray-400 text-xs">{t.time}</td>
+                  <td className="py-2 px-3 text-cyan-400 font-mono text-xs">#{t.blockHeight}</td>
+                  <td className="py-2 px-3 text-gray-500 font-mono text-xs">{t.txHash ? t.txHash.slice(0, 8) + '...' : '—'}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="no-data">
+                <td colSpan={6} className="py-8 text-center text-gray-500">
                   No recent cross-VM transfers found. Deploy a bridge transfer to see live data.
                 </td>
               </tr>
@@ -104,7 +106,7 @@ function CrossVmActivityPanel() {
           </tbody>
         </table>
       </div>
-      <div className="refresh-info">
+      <div className="mt-3 text-xs text-gray-600">
         Last updated: {new Date().toLocaleTimeString()} (via Tauri invoke → node RPC :9933)
       </div>
     </div>

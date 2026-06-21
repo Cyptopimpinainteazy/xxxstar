@@ -594,7 +594,7 @@ export class AtlasSphereClient {
         reject(new TimeoutError('comit finalization', this.config.finalizationTimeoutMs));
       }, this.config.finalizationTimeoutMs);
 
-      extrinsic.signAndSend(account, (result: ISubmittableResult) => {
+      extrinsic.signAndSend(account, async (result: ISubmittableResult) => {
         if (result.status.isFinalized) {
           clearTimeout(timeout);
 
@@ -626,8 +626,8 @@ export class AtlasSphereClient {
 
           // Extract payload from extrinsic
           const extrinsicData = extrinsic.toHex();
-          const evmPayload = this.extractPayloadFromExtrinsic(extrinsicData, 'evm');
-          const svmPayload = this.extractPayloadFromExtrinsic(extrinsicData, 'svm');
+          const evmPayload = this.extractPayloadFromExtrinsic(extrinsicData);
+          const svmPayload = this.extractPayloadFromExtrinsic(extrinsicData);
 
           // Get fee and nonce from the extrinsic
           const fee = this.extractFeeFromExtrinsic(extrinsicData);
@@ -670,11 +670,10 @@ export class AtlasSphereClient {
   /**
    * Extract payload from extrinsic hex data
    */
-  private extractPayloadFromExtrinsic(extrinsicHex: string, type: 'evm' | 'svm'): Uint8Array {
+  private extractPayloadFromExtrinsic(_extrinsicHex: string): Uint8Array {
     try {
       // The extrinsic is a SCALE-encoded tuple (call, signature)
       // The call is a tuple (method, args...) where args for submitComit are (evmPayload, svmPayload, fee, prepareRoot)
-      const hex = extrinsicHex.startsWith('0x') ? extrinsicHex.slice(2) : extrinsicHex;
       
       // For submitComit call:
       // - evmPayload is the first argument (after method index)
@@ -692,7 +691,7 @@ export class AtlasSphereClient {
   /**
    * Extract fee from extrinsic hex data
    */
-  private extractFeeFromExtrinsic(extrinsicHex: string): bigint {
+  private extractFeeFromExtrinsic(_extrinsicHex: string): bigint {
     try {
       // This is a simplified extraction - in production, use proper SCALE decoding
       return 0n;
@@ -704,7 +703,7 @@ export class AtlasSphereClient {
   /**
    * Extract nonce from extrinsic hex data
    */
-  private extractNonceFromExtrinsic(extrinsicHex: string): bigint {
+  private extractNonceFromExtrinsic(_extrinsicHex: string): bigint {
     try {
       // This is a simplified extraction - in production, use proper SCALE decoding
       return 0n;
@@ -843,6 +842,6 @@ export async function createLocalClient(): Promise<AtlasSphereClient> {
  * Create a client for testnet
  */
 export async function createTestnetClient(): Promise<AtlasSphereClient> {
-  const endpoint = process.env.X3_RPC_ENDPOINT ?? TESTNET_WS_ENDPOINT;
+  const endpoint = process.env.X3_RPC_ENDPOINT ?? 'wss://testnet.atlassphere.io';
   return createClient({ endpoint });
 }

@@ -69,11 +69,7 @@ impl Span {
 
     #[inline]
     pub fn new(start: BytePos, end: BytePos, file_id: u32) -> Self {
-        Span {
-            start,
-            end,
-            file_id,
-        }
+        Span { start, end, file_id }
     }
 
     #[inline]

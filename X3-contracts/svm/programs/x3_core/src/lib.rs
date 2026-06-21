@@ -11,14 +11,14 @@
 //!   I2 no reentrancy : a flashloan call cannot recursively borrow the same asset.
 //!   I3 fee monotonic : `fee` is purely additive; protocol never owes borrower.
 //!   I4 round-up      : fee rounds up so 1-lamport loops cannot drain the pool.
-//!
-//! This module is intentionally minimal. It exposes pure helpers that the
-//! parity harness can drive directly without spinning up a validator, plus
-//! Anchor instruction scaffolding that wires those helpers to on-chain state.
 
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 declare_id!("X3CoreFL11111111111111111111111111111111111");
+
+pub const POOL_SEED: &[u8] = b"pool";
+
 
 /// Default protocol fee in basis points (0.09%). Mirrors `X3Flashloan.feeBps`.
 pub const DEFAULT_FEE_BPS: u16 = 9;
@@ -95,15 +95,138 @@ pub mod x3_core {
         pool.locked = false;
         Ok(())
     }
+
+    /// Execute a repay-or-revert flashloan on-chain.
+    ///
+    /// 1. Acquires per-pool reentrancy lock.
+    /// 2. Records pre-balance of the pool vault.
+    /// 3. Transfers `amount` tokens from pool vault to borrower vault.
+    /// 4. CPI-invokes the borrower program with the flashloan callback.
+    /// 5. Verifies that the pool vault holds >= pre_balance + fee.
+    /// 6. Releases the lock.
+    ///
+    /// Matches the EVM `flashloan` function behaviour contract.
+    pub fn flashloan(ctx: Context<Flashloan>, amount: u64, call_data: Vec<u8>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        require!(!pool.locked, X3CoreError::AlreadyEntered);
+        pool.locked = true;
+
+        let fee = quote_fee(amount as u128, pool.fee_bps) as u64;
+        let pre_balance = ctx.accounts.pool_vault.amount;
+
+        // ── lend ──────────────────────────────────────────────────
+        let authority = pool.authority;
+        let bump = ctx.bumps.pool;
+        let pool_seeds: &[&[u8]] = &[POOL_SEED, authority.as_ref(), &[bump]];
+        let signer_seeds: &[&[&[u8]]] = &[pool_seeds];
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.pool_vault.to_account_info(),
+                    to: ctx.accounts.borrower_vault.to_account_info(),
+                    authority: pool.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            amount,
+        )?;
+
+        // ── callback ──────────────────────────────────────────────
+        let callback_ix = make_flashloan_callback_ix(
+            ctx.accounts.borrower_program.key,
+            ctx.accounts.pool_vault.key(),
+            ctx.accounts.borrower_vault.key(),
+            amount,
+            fee,
+            &call_data,
+        );
+
+        anchor_lang::solana_program::program::invoke(
+            &callback_ix,
+            &[
+                ctx.accounts.pool_vault.to_account_info(),
+                ctx.accounts.borrower_vault.to_account_info(),
+            ],
+        ).map_err(|_| error!(X3CoreError::CallbackFailed))?;
+
+        // ── verify repayment ──────────────────────────────────────
+        ctx.accounts.pool_vault.reload()?;
+        let post_balance = ctx.accounts.pool_vault.amount;
+        let min_repayment = pre_balance.checked_add(fee).unwrap_or(u64::MAX);
+        require!(post_balance >= min_repayment, X3CoreError::NotRepaid);
+
+        pool.locked = false;
+        Ok(())
+    }
+}
+
+/// Build a cross-program instruction for the flashloan callback.
+///
+/// The discriminator `[0x01; 8]` is the agreed-upon interface for
+/// `handle_flashloan(amount: u64, fee: u64, call_data: Vec<u8>)`.
+fn make_flashloan_callback_ix(
+    program_id: &Pubkey,
+    pool_vault: Pubkey,
+    borrower_vault: Pubkey,
+    amount: u64,
+    fee: u64,
+    call_data: &[u8],
+) -> anchor_lang::solana_program::instruction::Instruction {
+    use anchor_lang::solana_program::instruction::AccountMeta;
+    let mut data = vec![0x01u8, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01];
+    data.extend_from_slice(&amount.to_le_bytes());
+    data.extend_from_slice(&fee.to_le_bytes());
+    let call_data_len = call_data.len() as u32;
+    data.extend_from_slice(&call_data_len.to_le_bytes());
+    data.extend_from_slice(call_data);
+
+    anchor_lang::solana_program::instruction::Instruction {
+        program_id: *program_id,
+        accounts: vec![
+                AccountMeta::new(pool_vault, false),
+                AccountMeta::new(borrower_vault, false),
+        ],
+        data,
+    }
 }
 
 #[derive(Accounts)]
+#[instruction(bump: u8)]
 pub struct InitializePool<'info> {
-    #[account(init, payer = authority, space = 8 + FlashloanPool::SIZE)]
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + FlashloanPool::SIZE,
+        seeds = [POOL_SEED, authority.key().as_ref()],
+        bump,
+    )]
     pub pool: Account<'info, FlashloanPool>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Flashloan<'info> {
+    #[account(
+        mut,
+        seeds = [POOL_SEED, pool.authority.as_ref()],
+        bump,
+    )]
+    pub pool: Account<'info, FlashloanPool>,
+
+    #[account(mut)]
+    pub pool_vault: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub borrower_vault: Account<'info, TokenAccount>,
+
+    /// CHECK: borrower program to CPI-invoke
+    pub borrower_program: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 #[account]
@@ -136,13 +259,11 @@ mod tests {
 
     #[test]
     fn fee_rounds_up_for_tiny_amounts() {
-        // Vector: flashloan/repay_or_revert/4-tiny-amount-fee-rounds-up
         assert_eq!(quote_fee(1, DEFAULT_FEE_BPS), 1);
     }
 
     #[test]
     fn fee_matches_evm_for_one_hundred_units() {
-        // 100e18 * 9 / 10000 = 9e16 (no rounding required).
         let amount: u128 = 100_000_000_000_000_000_000;
         assert_eq!(quote_fee(amount, DEFAULT_FEE_BPS), 90_000_000_000_000_000);
     }
@@ -174,8 +295,69 @@ mod tests {
 
     #[test]
     fn fee_capped_at_ten_percent() {
-        // Defense in depth: even if a misconfigured pool tried 1100 bps, the
-        // initialize_pool path rejects it. The math itself is still defined.
         assert_eq!(quote_fee(10_000, 1000), 1000);
+    }
+
+    #[test]
+    fn flashloan_pool_size() {
+        assert_eq!(FlashloanPool::SIZE, 32 + 2 + 1);
+    }
+
+    #[test]
+    fn pool_pda_is_deterministic() {
+        let authority = Pubkey::new_from_array([1u8; 32]);
+        let (pda1, bump1) = Pubkey::find_program_address(
+            &[POOL_SEED, authority.as_ref()],
+            &id(),
+        );
+        let (pda2, bump2) = Pubkey::find_program_address(
+            &[POOL_SEED, authority.as_ref()],
+            &id(),
+        );
+        assert_eq!(pda1, pda2);
+        assert_eq!(bump1, bump2);
+        assert_ne!(pda1, Pubkey::default());
+    }
+
+    #[test]
+    fn pool_pda_distinct_for_different_authorities() {
+        let auth1 = Pubkey::new_from_array([1u8; 32]);
+        let auth2 = Pubkey::new_from_array([2u8; 32]);
+        let (pda1, _) = Pubkey::find_program_address(
+            &[POOL_SEED, auth1.as_ref()],
+            &id(),
+        );
+        let (pda2, _) = Pubkey::find_program_address(
+            &[POOL_SEED, auth2.as_ref()],
+            &id(),
+        );
+        assert_ne!(pda1, pda2);
+    }
+
+    #[test]
+    fn reentrancy_lock_prevents_nested_flashloan() {
+        let mut pool = FlashloanPool {
+            authority: Pubkey::new_from_array([1u8; 32]),
+            fee_bps: DEFAULT_FEE_BPS,
+            locked: true,
+        };
+        assert!(pool.locked);
+        // In a real instruction, checking `!pool.locked` would fail with AlreadyEntered
+    }
+
+    #[test]
+    fn flashloan_repayment_requires_full_principal_plus_fee() {
+        let pre_balance: u64 = 1_000_000;
+        let amount: u64 = 100_000;
+        let fee = quote_fee(amount as u128, DEFAULT_FEE_BPS) as u64;
+        let min_repayment = pre_balance.checked_add(fee).unwrap_or(u64::MAX);
+
+        // honest: post >= pre + fee
+        let post_balance = pre_balance + fee;
+        assert!(post_balance >= min_repayment);
+
+        // underpay: post < pre + fee
+        let post_balance = pre_balance + fee - 1;
+        assert!(post_balance < min_repayment);
     }
 }

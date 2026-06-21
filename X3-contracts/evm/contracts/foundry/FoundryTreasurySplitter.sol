@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -92,7 +92,7 @@ contract FoundryTreasurySplitter is Ownable, ReentrancyGuard {
             revert TooManyDestinations(destinations.length, MAX_DESTINATIONS);
         }
 
-        uint256 totalBps;
+        uint256 totalBps = 0;
         for (uint256 i = 0; i < destinations.length; i++) {
             if (destinations[i].destination == address(0)) revert ZeroAddress();
             if (destinations[i].bps == 0) revert InvalidBps(0);
@@ -130,7 +130,8 @@ contract FoundryTreasurySplitter is Ownable, ReentrancyGuard {
         uint256 amount = msg.value;
         totalNativeSplit += amount;
 
-        for (uint256 i = 0; i < _destinations.length; i++) {
+        uint256 destLen = _destinations.length;
+        for (uint256 i = 0; i < destLen; i++) {
             SplitDestination memory dest = _destinations[i];
             uint256 destAmount = (amount * dest.bps) / MAX_BPS;
             if (destAmount > 0) {
@@ -152,7 +153,8 @@ contract FoundryTreasurySplitter is Ownable, ReentrancyGuard {
         token.safeTransferFrom(msg.sender, address(this), amount);
         totalTokenSplit[address(token)] += amount;
 
-        for (uint256 i = 0; i < _destinations.length; i++) {
+        uint256 destLen = _destinations.length;
+        for (uint256 i = 0; i < destLen; i++) {
             SplitDestination memory dest = _destinations[i];
             uint256 destAmount = (amount * dest.bps) / MAX_BPS;
             if (destAmount > 0) {

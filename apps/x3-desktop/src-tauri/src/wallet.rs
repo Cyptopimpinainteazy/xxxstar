@@ -1267,7 +1267,7 @@ pub fn get_privacy_audit_report() -> Result<PrivacyAuditRecord, String> {
 
 #[command]
 pub async fn subscribe_substrate_events(app: AppHandle, state: State<'_, crate::SubstrateState>) -> Result<String, String> {
-    let rpc_url = "ws://127.0.0.1:9944";
+    let rpc_url = "ws://rpc.testnet.x3-chain.io:9944";
     let mut manager = SubstrateHookManager::new(rpc_url);
     let handler = manager.get_handler("default");
 

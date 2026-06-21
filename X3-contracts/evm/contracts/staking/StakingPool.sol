@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import "../WrappedX3.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract StakingNFT is ERC721, Ownable {
     uint256 public nextId;
@@ -19,10 +21,12 @@ contract StakingNFT is ERC721, Ownable {
     }
 }
 
-contract StakingPool is Ownable {
-    IERC20 public stakingToken;
-    StakingNFT public stakingNFT;
-    address public treasury;
+contract StakingPool is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    IERC20 public immutable stakingToken;
+    StakingNFT public immutable stakingNFT;
+    address public immutable treasury;
     uint256 public rewardRate; // per block
     uint256 public totalStaked;
     uint256 public lastUpdateBlock;
@@ -34,10 +38,13 @@ contract StakingPool is Ownable {
     event Staked(address indexed user, uint256 nftId, uint256 amount);
     event Unstaked(address indexed user, uint256 nftId, uint256 amount);
     event Claimed(address indexed user, uint256 nftId, uint256 reward);
+    event RewardRateUpdated(uint256 oldRate, uint256 newRate);
 
-    constructor(address _stakingToken, address _treasury) {
-        stakingToken = IERC20(_stakingToken);
-        treasury = _treasury;
+    constructor(address stakingToken_, address treasuryAddr) {
+        require(stakingToken_ != address(0), "ZERO_STAKING_TOKEN");
+        require(treasuryAddr != address(0), "ZERO_TREASURY");
+        stakingToken = IERC20(stakingToken_);
+        treasury = treasuryAddr;
         stakingNFT = new StakingNFT();
         rewardRate = 1e18; // placeholder
         lastUpdateBlock = block.number;
@@ -45,7 +52,9 @@ contract StakingPool is Ownable {
 
     function setRewardRate(uint256 rate) external onlyOwner {
         updatePool();
+        uint256 oldRate = rewardRate;
         rewardRate = rate;
+        emit RewardRateUpdated(oldRate, rate);
     }
 
     function updatePool() public {
@@ -58,9 +67,9 @@ contract StakingPool is Ownable {
         lastUpdateBlock = block.number;
     }
 
-    function stake(uint256 amount) external {
+    function stake(uint256 amount) external nonReentrant {
         updatePool();
-        stakingToken.transferFrom(msg.sender, address(this), amount);
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         uint256 nftId = stakingNFT.mint(msg.sender);
         stakeAmount[nftId] = amount;
         rewardDebt[nftId] = (amount * accRewardPerShare) / 1e12;
@@ -69,26 +78,28 @@ contract StakingPool is Ownable {
         emit Staked(msg.sender, nftId, amount);
     }
 
-    function unstake(uint256 nftId) external {
+    function unstake(uint256 nftId) external nonReentrant {
         require(stakingNFT.ownerOf(nftId) == msg.sender, "Not owner");
         updatePool();
         uint256 amount = stakeAmount[nftId];
         uint256 pending = ((amount * accRewardPerShare) / 1e12) - rewardDebt[nftId];
-        stakingToken.transfer(msg.sender, amount);
-        if (pending > 0) stakingToken.transfer(msg.sender, pending);
-        stakingNFT.burn(nftId);
+        delete stakeAmount[nftId];
+        delete rewardDebt[nftId];
         totalStaked -= amount;
+        stakingToken.safeTransfer(msg.sender, amount);
+        if (pending > 0) stakingToken.safeTransfer(msg.sender, pending);
+        stakingNFT.burn(nftId);
         emit Unstaked(msg.sender, nftId, amount);
         emit Claimed(msg.sender, nftId, pending);
     }
 
-    function claim(uint256 nftId) external {
+    function claim(uint256 nftId) external nonReentrant {
         require(stakingNFT.ownerOf(nftId) == msg.sender, "Not owner");
         updatePool();
         uint256 amount = stakeAmount[nftId];
         uint256 pending = ((amount * accRewardPerShare) / 1e12) - rewardDebt[nftId];
-        if (pending > 0) stakingToken.transfer(msg.sender, pending);
         rewardDebt[nftId] = (amount * accRewardPerShare) / 1e12;
+        if (pending > 0) stakingToken.safeTransfer(msg.sender, pending);
         emit Claimed(msg.sender, nftId, pending);
     }
 }

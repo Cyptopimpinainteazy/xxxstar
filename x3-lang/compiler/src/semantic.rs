@@ -30,7 +30,8 @@
 
 use crate::ir::{Condition, FailureAction, Operation, X3IR};
 use std::collections::HashSet;
-use x3_lang_common::{ErrorAccumulator, Span, X3Error};
+use x3_lang_ast::ast::{AtomicSwapDecl, Expression, Item, LiteralExpr, Program};
+use x3_lang_common::{ErrorAccumulator, Span, Spanned, X3Error};
 
 /// Maximum number of cross-VM operations allowed in a single atomic block.
 /// This is a hard production safety limit: 8 is the contract default.
@@ -61,14 +62,7 @@ pub const KNOWN_CHAINS: &[&str] = &[
 /// Hard-coded allow-list of bridge adapter names. Anything else must be
 /// added explicitly via the feature gate (target F in the production
 /// contract).
-pub const KNOWN_BRIDGE_ADAPTERS: &[&str] = &[
-    "x3",
-    "wormhole",
-    "layerzero",
-    "axelar",
-    "native",
-    "btc-relay",
-];
+pub const KNOWN_BRIDGE_ADAPTERS: &[&str] = &["x3", "wormhole", "layerzero", "axelar", "native", "btc-relay"];
 
 /// Run the semantic verifier on an X3IR program.
 ///
@@ -84,11 +78,7 @@ pub fn verify_with_defaults(ir: &X3IR) -> Result<(), Vec<X3Error>> {
 }
 
 /// Verify with explicit budgets.
-pub fn verify_with_config(
-    ir: &X3IR,
-    max_atomic_ops: u32,
-    max_route_hops: u32,
-) -> Result<(), Vec<X3Error>> {
+pub fn verify_with_config(ir: &X3IR, max_atomic_ops: u32, max_route_hops: u32) -> Result<(), Vec<X3Error>> {
     let mut acc = ErrorAccumulator::new();
     verify_symbols(ir, &mut acc);
     verify_route_depths(ir, &mut acc, max_atomic_ops, max_route_hops);
@@ -120,23 +110,17 @@ fn err(message: impl Into<String>) -> X3Error {
 fn verify_symbols(ir: &X3IR, acc: &mut ErrorAccumulator) {
     for op in &ir.operations {
         match op {
-            Operation::Lock {
-                chain, asset, from, ..
-            } => {
+            Operation::Lock { chain, asset, from, .. } => {
                 check_safe_symbol("chain", chain, acc);
                 check_safe_symbol("asset", asset, acc);
                 check_safe_symbol("from", from, acc);
             }
-            Operation::Mint {
-                chain, asset, to, ..
-            } => {
+            Operation::Mint { chain, asset, to, .. } => {
                 check_safe_symbol("chain", chain, acc);
                 check_safe_symbol("asset", asset, acc);
                 check_safe_symbol("to", to, acc);
             }
-            Operation::Burn {
-                chain, asset, from, ..
-            } => {
+            Operation::Burn { chain, asset, from, .. } => {
                 check_safe_symbol("chain", chain, acc);
                 check_safe_symbol("asset", asset, acc);
                 check_safe_symbol("from", from, acc);
@@ -195,18 +179,11 @@ fn check_safe_symbol(field: &str, value: &str, acc: &mut ErrorAccumulator) {
         )));
     }
     if value.len() > 64 {
-        acc.add_error(err(format!(
-            "{field}={value:?} exceeds 64-character safety limit"
-        )));
+        acc.add_error(err(format!("{field}={value:?} exceeds 64-character safety limit")));
     }
 }
 
-fn verify_route_depths(
-    ir: &X3IR,
-    acc: &mut ErrorAccumulator,
-    max_atomic_ops: u32,
-    max_route_hops: u32,
-) {
+fn verify_route_depths(ir: &X3IR, acc: &mut ErrorAccumulator, max_atomic_ops: u32, max_route_hops: u32) {
     // Reject nested atomic blocks first.
     let mut atomic_depth: u32 = 0;
     for op in &ir.operations {
@@ -271,10 +248,7 @@ fn verify_atomic_balance(ir: &X3IR, acc: &mut ErrorAccumulator) {
         }
     }
     if depth > 0 {
-        acc.add_error(err(format!(
-            "{} unmatched AtomicBegin (missing AtomicEnd)",
-            depth
-        )));
+        acc.add_error(err(format!("{} unmatched AtomicBegin (missing AtomicEnd)", depth)));
     }
 }
 
@@ -298,16 +272,14 @@ fn verify_rollback_presence(ir: &X3IR, acc: &mut ErrorAccumulator) {
 }
 
 fn verify_replay_and_expiry(ir: &X3IR, acc: &mut ErrorAccumulator) {
-    let has_bridge = ir
-        .operations
-        .iter()
-        .any(|op| matches!(op, Operation::Bridge { .. }));
+    let has_bridge = ir.operations.iter().any(|op| matches!(op, Operation::Bridge { .. }));
     if !has_bridge {
         return;
     }
-    let has_timeout = ir.operations.iter().any(
-        |op| matches!(op, Operation::OnTimeout { duration_blocks, .. } if *duration_blocks > 0),
-    );
+    let has_timeout = ir
+        .operations
+        .iter()
+        .any(|op| matches!(op, Operation::OnTimeout { duration_blocks, .. } if *duration_blocks > 0));
     if !has_timeout {
         acc.add_error(err(
             "bridge operation present without an OnTimeout policy — expiry/deadline required for \
@@ -342,9 +314,7 @@ fn verify_adapter_compatibility(ir: &X3IR, acc: &mut ErrorAccumulator) {
     for op in &ir.operations {
         match op {
             Operation::Bridge {
-                from_chain,
-                to_chain,
-                ..
+                from_chain, to_chain, ..
             } => {
                 let from_norm = from_chain.to_ascii_lowercase();
                 if !known.contains(from_norm.as_str()) {
@@ -388,9 +358,7 @@ fn verify_adapter_compatibility(ir: &X3IR, acc: &mut ErrorAccumulator) {
 fn verify_asset_moves(ir: &X3IR, acc: &mut ErrorAccumulator) {
     for op in &ir.operations {
         match op {
-            Operation::Lock { amount, .. }
-            | Operation::Mint { amount, .. }
-            | Operation::Burn { amount, .. } => {
+            Operation::Lock { amount, .. } | Operation::Mint { amount, .. } | Operation::Burn { amount, .. } => {
                 if *amount == 0 {
                     acc.add_error(err(format!("asset move operation has zero amount: {op:?}")));
                 }
@@ -407,6 +375,7 @@ fn verify_asset_moves(ir: &X3IR, acc: &mut ErrorAccumulator) {
             }
             Operation::Require {
                 kind: _,
+                subject: _,
                 condition,
                 error_msg,
             } => {
@@ -417,9 +386,7 @@ fn verify_asset_moves(ir: &X3IR, acc: &mut ErrorAccumulator) {
                     )));
                 }
             }
-            Operation::OnTimeout {
-                duration_blocks, ..
-            } => {
+            Operation::OnTimeout { duration_blocks, .. } => {
                 if *duration_blocks == 0 {
                     acc.add_error(err("OnTimeout with zero duration"));
                 }
@@ -433,6 +400,168 @@ fn verify_asset_moves(ir: &X3IR, acc: &mut ErrorAccumulator) {
             }
             _ => {}
         }
+    }
+}
+
+/// Known chain names — mirrors the production allow-list.
+/// Defined here (also in [`KNOWN_CHAINS`]) so AST-level validation
+/// does not depend on the IR lowering pass.
+pub const SWAP_KNOWN_CHAINS: &[&str] = &[
+    "eth",
+    "ethereum",
+    "sol",
+    "solana",
+    "x3",
+    "btc",
+    "bitcoin",
+    "utxo",
+    "polygon",
+    "arbitrum",
+    "optimism",
+    "base",
+    "bsc",
+    "avalanche",
+];
+
+/// Supported hash function names for hashlock in atomic swaps.
+pub const SUPPORTED_HASH_FUNCTIONS: &[&str] = &["sha256", "blake2b"];
+
+/// Extract a `u128` integer value from an expression, if it is a literal integer.
+fn extract_int_from_expr(expr: &Expression) -> Option<u128> {
+    match expr {
+        Expression::Literal(LiteralExpr::Int { value, .. }) => Some(*value),
+        _ => None,
+    }
+}
+
+/// Extract a duration in seconds from an expression.
+///
+/// - `Literal(Int(n))` → bare number treated as seconds → `Some(n)`
+/// - `Literal(Duration { value, unit })` → converts to seconds
+/// - Otherwise → `None`
+fn extract_seconds_from_expr(expr: &Expression) -> Option<u64> {
+    match expr {
+        Expression::Literal(LiteralExpr::Int { value, .. }) => Some(*value as u64),
+        Expression::Literal(LiteralExpr::Duration { value, unit }) => {
+            use x3_lang_common::DurationUnit;
+            let secs = match unit {
+                DurationUnit::Seconds => *value,
+                DurationUnit::Minutes => value.saturating_mul(60),
+                DurationUnit::Hours => value.saturating_mul(3600),
+                DurationUnit::Days => value.saturating_mul(86400),
+                DurationUnit::Milliseconds => value / 1000,
+                DurationUnit::Microseconds => value / 1_000_000,
+                DurationUnit::Nanoseconds => value / 1_000_000_000,
+            };
+            Some(secs)
+        }
+        _ => None,
+    }
+}
+
+/// Check that a chain name is in the known-chains allow-list (case-insensitive).
+fn is_known_chain(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    SWAP_KNOWN_CHAINS.iter().any(|k| *k == lower)
+}
+
+/// Run AST-level validation on every `AtomicSwap` declaration in the program.
+///
+/// Catches problems that are invisible after lowering:
+/// - unknown chain names
+/// - same source/destination chain
+/// - unsupported hash functions
+/// - zero amounts
+/// - timeout ordering violations
+pub fn verify_atomic_swap_decls(program: &Program, acc: &mut ErrorAccumulator) {
+    for item in &program.items {
+        if let Spanned {
+            node: Item::AtomicSwap(decl),
+            ..
+        } = item
+        {
+            validate_atomic_swap(decl, acc);
+        }
+    }
+}
+
+fn validate_atomic_swap(decl: &AtomicSwapDecl, acc: &mut ErrorAccumulator) {
+    // Validate 1: Known chain names
+    let from_chain = decl.from_asset.chain.as_str();
+    let to_chain = decl.to_asset.chain.as_str();
+
+    if !is_known_chain(from_chain) {
+        acc.add_error(err(format!("Unknown chain '{from_chain}' in atomic swap")));
+    }
+    if !is_known_chain(to_chain) {
+        acc.add_error(err(format!("Unknown chain '{to_chain}' in atomic swap")));
+    }
+
+    // Validate 2: Cross-chain (different source/dest)
+    if from_chain.to_ascii_lowercase() == to_chain.to_ascii_lowercase() {
+        acc.add_error(err("Atomic swap must be between different chains"));
+    }
+
+    // Validate 3: Valid hash function
+    if let Some(hashlock) = &decl.hashlock {
+        let hash_fn = hashlock.hash_fn.as_str();
+        if !SUPPORTED_HASH_FUNCTIONS
+            .iter()
+            .any(|h| *h == hash_fn.to_ascii_lowercase())
+        {
+            acc.add_error(err(format!(
+                "Unknown hash function '{hash_fn}' in atomic swap. Supported: sha256, blake2b"
+            )));
+        }
+    }
+
+    // Validate 4: Positive amount
+    if let Some(amount_expr) = &decl.amount {
+        if let Some(n) = extract_int_from_expr(amount_expr) {
+            if n == 0 {
+                acc.add_error(err("Atomic swap amount must be positive"));
+            }
+        }
+    }
+
+    // Validate 5: Timeout ordering
+    if let (Some(src_expr), Some(dst_expr)) = (&decl.timeout_source, &decl.timeout_destination) {
+        if let (Some(src_secs), Some(dst_secs)) =
+            (extract_seconds_from_expr(src_expr), extract_seconds_from_expr(dst_expr))
+        {
+            if src_secs <= dst_secs {
+                acc.add_error(err(format!(
+                    "Source timeout ({src_secs}s) must be greater than destination timeout ({dst_secs}s) in atomic swap"
+                )));
+            }
+        }
+    }
+
+    // Validate 6: Require guards
+    for require in &decl.requires {
+        validate_atomic_swap_require(require, acc);
+    }
+}
+
+fn validate_atomic_swap_require(require: &x3_lang_ast::ast::RequireGuard, acc: &mut ErrorAccumulator) {
+    match &require.kind {
+        x3_lang_ast::ast::RequireKind::Finality => {
+            // finality requires a subject (chain name)
+            if require.subject.is_none() {
+                acc.add_error(err(
+                    "require finality needs a chain subject (e.g. 'finality.eth >= 12')",
+                ));
+            }
+        }
+        x3_lang_ast::ast::RequireKind::RelayerQuorum => {
+            // relayer_quorum must be a positive integer
+            if let Some(n) = extract_int_from_expr(&require.value) {
+                if n == 0 {
+                    acc.add_error(err("require relayer_quorum must be positive"));
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -564,9 +693,7 @@ mod tests {
             },
         ]);
         let errs = verify(&ir).expect_err("must fail");
-        assert!(errs
-            .iter()
-            .any(|e| e.to_string().contains("adapter allow-list")));
+        assert!(errs.iter().any(|e| e.to_string().contains("adapter allow-list")));
     }
 
     #[test]
@@ -590,9 +717,7 @@ mod tests {
             },
         ]);
         let errs = verify(&ir).expect_err("must fail");
-        assert!(errs
-            .iter()
-            .any(|e| e.to_string().contains("from_chain == to_chain")));
+        assert!(errs.iter().any(|e| e.to_string().contains("from_chain == to_chain")));
     }
 
     #[test]
@@ -613,9 +738,7 @@ mod tests {
             },
         ];
         let errs = verify(&ir).expect_err("must fail");
-        assert!(errs
-            .iter()
-            .any(|e| e.to_string().contains("unmatched AtomicBegin")));
+        assert!(errs.iter().any(|e| e.to_string().contains("unmatched AtomicBegin")));
     }
 
     #[test]
@@ -648,6 +771,7 @@ mod tests {
         ir.operations = atomic(vec![
             Operation::Require {
                 kind: RequireKind::Finality,
+                subject: None,
                 condition: Condition::False,
                 error_msg: Some("never reachable".into()),
             },
@@ -657,9 +781,7 @@ mod tests {
             },
         ]);
         let errs = verify(&ir).expect_err("must fail");
-        assert!(errs
-            .iter()
-            .any(|e| e.to_string().contains("statically false")));
+        assert!(errs.iter().any(|e| e.to_string().contains("statically false")));
     }
 
     #[test]
@@ -683,9 +805,7 @@ mod tests {
             },
         ]);
         let errs = verify(&ir).expect_err("must fail");
-        assert!(errs
-            .iter()
-            .any(|e| e.to_string().contains("unsafe characters")));
+        assert!(errs.iter().any(|e| e.to_string().contains("unsafe characters")));
     }
 
     #[test]
@@ -717,5 +837,212 @@ mod tests {
         assert!(errs
             .iter()
             .any(|e| e.to_string().contains("max 8") || e.to_string().contains("max 4")));
+    }
+
+    // ========== Atomic swap AST-level validation tests ==========
+
+    use x3_lang_ast::ast::{AssetRef, AtomicSwapDecl, ChainRef, HashlockSpec, Item, Program};
+    use x3_lang_common::{Span, Spanned};
+
+    fn make_swap_program(decl: AtomicSwapDecl) -> Program {
+        Program {
+            items: vec![Spanned::dummy(Item::AtomicSwap(decl))],
+        }
+    }
+
+    fn valid_atomic_swap() -> AtomicSwapDecl {
+        AtomicSwapDecl {
+            name: "test_swap".into(),
+            from_asset: AssetRef::new(ChainRef("eth".into()), "USDC".into()),
+            to_asset: AssetRef::new(ChainRef("sol".into()), "USDC".into()),
+            source_vm: None,
+            dest_vm: None,
+            amount: Some(Expression::Literal(LiteralExpr::Int {
+                value: 100,
+                base: x3_lang_common::IntBase::Decimal,
+                suffix: None,
+            })),
+            receiver: None,
+            hashlock: Some(HashlockSpec {
+                hash_fn: "sha256".into(),
+                secret: Box::new(Expression::Literal(LiteralExpr::String("my_secret".into()))),
+            }),
+            body: vec![],
+            requires: vec![],
+            on_fail: None,
+            timeout_source: Some(Expression::Literal(LiteralExpr::Duration {
+                value: 3600,
+                unit: x3_lang_common::DurationUnit::Seconds,
+            })),
+            timeout_destination: Some(Expression::Literal(LiteralExpr::Duration {
+                value: 1800,
+                unit: x3_lang_common::DurationUnit::Seconds,
+            })),
+        }
+    }
+
+    #[test]
+    fn test_valid_atomic_swap_passes() {
+        let mut acc = ErrorAccumulator::new();
+        let program = make_swap_program(valid_atomic_swap());
+        verify_atomic_swap_decls(&program, &mut acc);
+        assert!(!acc.has_errors(), "expected no errors, got: {:?}", acc.take_errors());
+    }
+
+    #[test]
+    fn test_unknown_source_chain_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.from_asset = AssetRef::new(ChainRef("unknown_chain".into()), "USDC".into());
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs.iter().any(|e| e.to_string().contains("Unknown chain")));
+    }
+
+    #[test]
+    fn test_unknown_dest_chain_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.to_asset = AssetRef::new(ChainRef("not_a_chain".into()), "USDC".into());
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs.iter().any(|e| e.to_string().contains("Unknown chain")));
+    }
+
+    #[test]
+    fn test_same_chain_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.to_asset = AssetRef::new(ChainRef("eth".into()), "USDC".into());
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs
+            .iter()
+            .any(|e| e.to_string().contains("must be between different chains")));
+    }
+
+    #[test]
+    fn test_unknown_hash_function_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.hashlock = Some(HashlockSpec {
+            hash_fn: "md5".into(),
+            secret: Box::new(Expression::Literal(LiteralExpr::String("secret".into()))),
+        });
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs.iter().any(|e| e.to_string().contains("Unknown hash function")));
+    }
+
+    #[test]
+    fn test_zero_amount_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.amount = Some(Expression::Literal(LiteralExpr::Int {
+            value: 0,
+            base: x3_lang_common::IntBase::Decimal,
+            suffix: None,
+        }));
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs.iter().any(|e| e.to_string().contains("amount must be positive")));
+    }
+
+    #[test]
+    fn test_timeout_ordering_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.timeout_source = Some(Expression::Literal(LiteralExpr::Duration {
+            value: 100,
+            unit: x3_lang_common::DurationUnit::Seconds,
+        }));
+        decl.timeout_destination = Some(Expression::Literal(LiteralExpr::Duration {
+            value: 500,
+            unit: x3_lang_common::DurationUnit::Seconds,
+        }));
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs.iter().any(|e| e.to_string().contains("Source timeout")));
+    }
+
+    #[test]
+    fn test_timeout_equal_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.timeout_source = Some(Expression::Literal(LiteralExpr::Duration {
+            value: 300,
+            unit: x3_lang_common::DurationUnit::Seconds,
+        }));
+        decl.timeout_destination = Some(Expression::Literal(LiteralExpr::Duration {
+            value: 300,
+            unit: x3_lang_common::DurationUnit::Seconds,
+        }));
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(errs.iter().any(|e| e.to_string().contains("Source timeout")));
+    }
+
+    #[test]
+    fn test_finality_require_missing_subject_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.requires = vec![x3_lang_ast::ast::RequireGuard {
+            kind: x3_lang_ast::ast::RequireKind::Finality,
+            subject: None,
+            value: Expression::Literal(LiteralExpr::Int {
+                value: 12,
+                base: x3_lang_common::IntBase::Decimal,
+                suffix: None,
+            }),
+        }];
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(
+            errs.iter().any(|e| e.to_string().contains("chain subject")),
+            "expected 'needs a chain subject', got: {errs:?}"
+        );
+    }
+
+    #[test]
+    fn test_relayer_quorum_require_accepts_valid() {
+        let mut decl = valid_atomic_swap();
+        decl.requires = vec![x3_lang_ast::ast::RequireGuard {
+            kind: x3_lang_ast::ast::RequireKind::RelayerQuorum,
+            subject: None,
+            value: Expression::Literal(LiteralExpr::Int {
+                value: 3,
+                base: x3_lang_common::IntBase::Decimal,
+                suffix: None,
+            }),
+        }];
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        assert!(
+            !acc.has_errors(),
+            "expected no errors for valid relayer_quorum, got: {:?}",
+            acc.take_errors()
+        );
+    }
+
+    #[test]
+    fn test_relayer_quorum_zero_rejected() {
+        let mut decl = valid_atomic_swap();
+        decl.requires = vec![x3_lang_ast::ast::RequireGuard {
+            kind: x3_lang_ast::ast::RequireKind::RelayerQuorum,
+            subject: None,
+            value: Expression::Literal(LiteralExpr::Int {
+                value: 0,
+                base: x3_lang_common::IntBase::Decimal,
+                suffix: None,
+            }),
+        }];
+        let mut acc = ErrorAccumulator::new();
+        verify_atomic_swap_decls(&make_swap_program(decl), &mut acc);
+        let errs = acc.take_errors();
+        assert!(
+            errs.iter()
+                .any(|e| e.to_string().contains("relayer_quorum must be positive")),
+            "expected 'relayer_quorum must be positive', got: {errs:?}"
+        );
     }
 }

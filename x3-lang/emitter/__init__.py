@@ -19,7 +19,8 @@ _emit_x3 = _load_emitter('x3')
 def emit(plan, *, dry_run=False, proof_bundle=None):
     emitted = []
     for step in plan.get('steps', []):
-        if step['action'] == 'swap':
+        action = step['action']
+        if action == 'swap':
             dex = step.get('dex', '').lower()
             if dex == 'raydium':
                 emitted.append(_emit_svm.emit(plan, step))
@@ -27,8 +28,16 @@ def emit(plan, *, dry_run=False, proof_bundle=None):
                 emitted.append(_emit_evm.emit(plan, step))
             else:
                 emitted.append({'type': 'swap', 'chain': 'unknown', 'error': f'unsupported dex {dex}'})
-        elif step['action'] == 'bridge':
+        elif action == 'bridge':
             emitted.append(_emit_x3.emit(plan, step, dry_run=dry_run, proof_bundle=proof_bundle))
+        elif action == 'lock':
+            emitted.append(_emit_evm.emit(plan, step))
+        elif action == 'release':
+            emitted.append(_emit_evm.emit(plan, step))
+        elif action == 'mint':
+            emitted.append(_emit_svm.emit(plan, step))
+        elif action == 'burn':
+            emitted.append(_emit_svm.emit(plan, step))
         else:
             emitted.append({'type': 'unknown', 'step': step})
     return {'emitted': emitted}

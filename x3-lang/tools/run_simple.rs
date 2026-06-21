@@ -1,6 +1,7 @@
 use x3_lang_ast::ast::*;
 use x3_lang_common::Symbol;
 use x3_lang_compiler::emitter;
+use x3_lang_compiler::lowering::LowerCtx;
 use x3_lang_compiler::lowering;
 use x3_lang_vm::executor::execute;
 use x3_lang_vm::{VMConfig, VM};
@@ -29,7 +30,7 @@ fn main() {
         span,
     )]);
 
-    let lowered = lowering::lower_program(&program).expect("lower failed");
+    let lowered = lowering::lower_program(&program, LowerCtx::new()).expect("lower failed");
     let code = emitter::emit_x3ir(&lowered).expect("emit failed");
 
     let mut vm = VM::new(code, VMConfig::default(), 1000u128);

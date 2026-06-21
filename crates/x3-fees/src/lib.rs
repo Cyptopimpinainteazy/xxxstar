@@ -75,7 +75,7 @@ impl Eip1559FeeMarket {
 /// Commit-reveal proof for MEV protection
 #[derive(Clone, Debug)]
 pub struct CommitRevealProof {
-    /// SHA-256 hash of transaction data
+    /// BLAKE2-256 hash of transaction data
     pub commit_hash: [u8; 32],
     /// Full transaction data (revealed in block 2)
     pub tx_data: Vec<u8>,
@@ -88,7 +88,7 @@ pub struct CommitRevealProof {
 impl CommitRevealProof {
     /// Create a new commit-reveal proof
     pub fn new(tx_data: Vec<u8>, signature: Vec<u8>) -> Self {
-        let commit_hash = sha256(&tx_data);
+        let commit_hash = blake2_256(&tx_data);
         Self {
             commit_hash,
             tx_data,
@@ -99,17 +99,13 @@ impl CommitRevealProof {
 
     /// Verify commit hash matches data
     pub fn verify(&self) -> bool {
-        let hash = sha256(&self.tx_data);
+        let hash = blake2_256(&self.tx_data);
         hash == self.commit_hash
     }
 }
 
-/// SHA-256 helper (mock implementation)
-fn sha256(data: &[u8]) -> [u8; 32] {
-    let hasher = sp_core::hashing::blake2_256(data);
-    let mut result = [0u8; 32];
-    result.copy_from_slice(&hasher[..32.min(hasher.len())]);
-    result
+fn blake2_256(data: &[u8]) -> [u8; 32] {
+    sp_core::hashing::blake2_256(data)
 }
 
 /// Slashing insurance fund state

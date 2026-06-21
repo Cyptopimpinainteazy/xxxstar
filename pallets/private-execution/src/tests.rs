@@ -4,7 +4,7 @@
 //! - PRIV-EXEC-004: Attestation verified before joining confidential set
 //! - PRIV-EXEC-005: Premium fee correctly collected and split
 
-use crate::{mock::*, types::*, Error, Event};
+use crate::{mock::*, types::*, Error};
 use frame_support::{assert_noop, assert_ok};
 use sp_core::H256;
 

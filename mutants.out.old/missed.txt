@@ -1,0 +1,81 @@
+crates/x3-common/src/lib.rs:28:9: replace Span::merge -> Self with Default::default()
+crates/x3-common/src/lib.rs:39:9: replace <impl Add for Span>::add -> Self::Output with Default::default()
+crates/x3-common/src/lib.rs:83:9: replace Keyword::parse -> Option<Self> with None
+crates/x3-common/src/lib.rs:84:13: delete match arm "fn" in Keyword::parse
+crates/x3-common/src/lib.rs:85:13: delete match arm "let" in Keyword::parse
+crates/x3-common/src/lib.rs:86:13: delete match arm "mut" in Keyword::parse
+crates/x3-common/src/lib.rs:87:13: delete match arm "if" in Keyword::parse
+crates/x3-common/src/lib.rs:88:13: delete match arm "else" in Keyword::parse
+crates/x3-common/src/lib.rs:89:13: delete match arm "while" in Keyword::parse
+crates/x3-common/src/lib.rs:90:13: delete match arm "loop" in Keyword::parse
+crates/x3-common/src/lib.rs:91:13: delete match arm "for" in Keyword::parse
+crates/x3-common/src/lib.rs:92:13: delete match arm "return" in Keyword::parse
+crates/x3-common/src/lib.rs:93:13: delete match arm "break" in Keyword::parse
+crates/x3-common/src/lib.rs:94:13: delete match arm "continue" in Keyword::parse
+crates/x3-common/src/lib.rs:95:13: delete match arm "struct" in Keyword::parse
+crates/x3-common/src/lib.rs:96:13: delete match arm "enum" in Keyword::parse
+crates/x3-common/src/lib.rs:97:13: delete match arm "match" in Keyword::parse
+crates/x3-common/src/lib.rs:98:13: delete match arm "true" in Keyword::parse
+crates/x3-common/src/lib.rs:99:13: delete match arm "false" in Keyword::parse
+crates/x3-common/src/lib.rs:100:13: delete match arm "atomic" in Keyword::parse
+crates/x3-common/src/lib.rs:101:13: delete match arm "emit" in Keyword::parse
+crates/x3-common/src/lib.rs:102:13: delete match arm "agent" in Keyword::parse
+crates/x3-common/src/lib.rs:103:13: delete match arm "context" in Keyword::parse
+crates/x3-common/src/lib.rs:104:13: delete match arm "const" in Keyword::parse
+crates/x3-common/src/lib.rs:105:13: delete match arm "in" in Keyword::parse
+crates/x3-common/src/lib.rs:117:9: replace <impl fmt::Display for KeywordParseError>::fmt -> fmt::Result with Ok(Default::default())
+crates/x3-common/src/lib.rs:178:9: replace TokenKind::symbol -> Option<Symbol> with None
+crates/x3-common/src/lib.rs:179:13: delete match arm TokenKind::Symbol(sym) in TokenKind::symbol
+crates/x3-common/src/signing.rs:65:9: replace PublicKey::to_evm_address -> [u8; 20] with [0; 20]
+crates/x3-common/src/signing.rs:65:9: replace PublicKey::to_evm_address -> [u8; 20] with [1; 20]
+crates/x3-common/src/signing.rs:66:13: delete match arm PublicKey::Secp256k1(pk) in PublicKey::to_evm_address
+crates/x3-common/src/signing.rs:127:9: replace Signature::verify_hash -> bool with true
+crates/x3-common/src/signing.rs:127:9: replace Signature::verify_hash -> bool with false
+crates/x3-common/src/signing.rs:128:13: delete match arm (Signature::Ed25519(sig), PublicKey::Ed25519(pk)) in Signature::verify_hash
+crates/x3-common/src/signing.rs:131:13: delete match arm (Signature::Secp256k1(sig), PublicKey::Secp256k1(pk)) in Signature::verify_hash
+crates/x3-common/src/signing.rs:137:13: delete match arm (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) in Signature::verify_hash
+crates/x3-common/src/signing.rs:133:57: replace == with != in Signature::verify_hash
+crates/x3-common/src/signing.rs:279:25: replace != with == in Secp256k1Signer::from_hex_secret
+crates/x3-common/src/signing.rs:391:5: replace verify_signature -> bool with true
+crates/x3-common/src/signing.rs:393:38: replace || with && in verify_signature
+crates/x3-common/src/signing.rs:411:38: replace || with && in verify_signature
+crates/x3-common/src/signing.rs:424:38: replace || with && in verify_signature
+crates/x3-common/src/signing.rs:449:5: replace verify_signature_hash -> bool with true
+crates/x3-common/src/signing.rs:449:5: replace verify_signature_hash -> bool with false
+crates/x3-common/src/signing.rs:451:38: replace || with && in verify_signature_hash
+crates/x3-common/src/signing.rs:451:32: replace != with == in verify_signature_hash
+crates/x3-common/src/signing.rs:451:58: replace != with == in verify_signature_hash
+crates/x3-common/src/signing.rs:469:38: replace || with && in verify_signature_hash
+crates/x3-common/src/signing.rs:469:32: replace != with == in verify_signature_hash
+crates/x3-common/src/signing.rs:469:58: replace != with == in verify_signature_hash
+crates/x3-common/src/signing.rs:477:53: replace == with != in verify_signature_hash
+crates/x3-common/src/signing.rs:482:38: replace || with && in verify_signature_hash
+crates/x3-common/src/signing.rs:482:32: replace != with == in verify_signature_hash
+crates/x3-common/src/signing.rs:482:58: replace != with == in verify_signature_hash
+crates/x3-common/src/weight_metering.rs:50:9: replace <impl sp_std::fmt::Display for WeightError>::fmt -> sp_std::fmt::Result with Ok(Default::default())
+crates/x3-common/src/weight_metering.rs:120:9: replace WeightConfig::calculate_fee -> u64 with 0
+crates/x3-common/src/weight_metering.rs:120:9: replace WeightConfig::calculate_fee -> u64 with 1
+crates/x3-common/src/weight_metering.rs:120:17: replace / with % in WeightConfig::calculate_fee
+crates/x3-common/src/weight_metering.rs:120:17: replace / with * in WeightConfig::calculate_fee
+crates/x3-common/src/weight_metering.rs:125:9: replace WeightConfig::verify_canonical_fee -> bool with true
+crates/x3-common/src/weight_metering.rs:125:9: replace WeightConfig::verify_canonical_fee -> bool with false
+crates/x3-common/src/weight_metering.rs:125:13: replace >= with < in WeightConfig::verify_canonical_fee
+crates/x3-common/src/weight_metering.rs:130:9: replace WeightConfig::minimum_fee -> u64 with 0
+crates/x3-common/src/weight_metering.rs:130:9: replace WeightConfig::minimum_fee -> u64 with 1
+crates/x3-common/src/weight_metering.rs:252:18: replace > with >= in ComputeMeter::consume_with_budget
+crates/x3-common/src/weight_metering.rs:271:9: replace ComputeMeter::limit -> u64 with 0
+crates/x3-common/src/weight_metering.rs:271:9: replace ComputeMeter::limit -> u64 with 1
+crates/x3-common/src/weight_metering.rs:276:9: replace ComputeMeter::reset with ()
+crates/x3-common/src/weight_metering.rs:307:18: replace > with == in GasMeter::consume_with_budget
+crates/x3-common/src/weight_metering.rs:307:18: replace > with < in GasMeter::consume_with_budget
+crates/x3-common/src/weight_metering.rs:307:18: replace > with >= in GasMeter::consume_with_budget
+crates/x3-common/src/weight_metering.rs:326:9: replace GasMeter::limit -> u64 with 0
+crates/x3-common/src/weight_metering.rs:326:9: replace GasMeter::limit -> u64 with 1
+crates/x3-common/src/weight_metering.rs:331:9: replace GasMeter::reset with ()
+crates/x3-common/src/weight_metering.rs:391:9: replace WeightMeter::remaining_compute -> u64 with 0
+crates/x3-common/src/weight_metering.rs:391:9: replace WeightMeter::remaining_compute -> u64 with 1
+crates/x3-common/src/weight_metering.rs:396:9: replace WeightMeter::remaining_gas -> u64 with 0
+crates/x3-common/src/weight_metering.rs:396:9: replace WeightMeter::remaining_gas -> u64 with 1
+crates/x3-common/src/weight_metering.rs:411:9: replace WeightMeter::config -> &WeightConfig with Box::leak(Box::new(Default::default()))
+crates/x3-common/src/weight_metering.rs:416:9: replace WeightMeter::reset with ()
+crates/x3-common/src/weight_metering.rs:444:13: delete match arm Operation::Sign(key_type) | Operation::Verify(key_type) in Operation::key_type

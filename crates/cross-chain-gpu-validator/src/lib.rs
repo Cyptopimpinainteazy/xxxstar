@@ -102,16 +102,18 @@ impl CrossChainValidator {
                     // The record's evm_block/svm_slot fields from the registry are the
                     // authoritative block/slot numbers. We read them back from the registry
                     // rather than hard-coding zeros.
-                    let evm_block = if let Ok(Some(record)) = orch.get_swap_internal(&task.swap_id).await {
-                        record.evm_block
-                    } else {
-                        0
-                    };
-                    let svm_slot = if let Ok(Some(record)) = orch.get_swap_internal(&task.swap_id).await {
-                        record.svm_slot
-                    } else {
-                        0
-                    };
+                    let evm_block =
+                        if let Ok(Some(record)) = orch.get_swap_internal(&task.swap_id).await {
+                            record.evm_block
+                        } else {
+                            0
+                        };
+                    let svm_slot =
+                        if let Ok(Some(record)) = orch.get_swap_internal(&task.swap_id).await {
+                            record.svm_slot
+                        } else {
+                            0
+                        };
                     let _ = orch
                         .execute_atomic_swap(
                             task.swap_id,
@@ -130,6 +132,7 @@ impl CrossChainValidator {
     }
 
     /// Validate an EVM block header using the GPU-accelerated Keccak256 path.
+    #[allow(clippy::too_many_arguments)]
     pub async fn validate_evm_header(
         &self,
         block_number: u64,

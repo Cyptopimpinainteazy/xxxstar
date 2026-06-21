@@ -439,9 +439,7 @@ fn precompile_modexp(
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
     if input.len() < 96 {
         return Err(PrecompileFailure::Error {
-            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
-                "modexp: input too short",
-            )),
+            exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed("modexp: input too short")),
         });
     }
 
@@ -463,7 +461,7 @@ fn precompile_modexp(
         0
     } else {
         let max_len = core::cmp::max(base_len, mod_len);
-        let words = (max_len + 7) / 8;
+        let words = max_len.div_ceil(8);
         let mult_complexity = match words {
             0..=1 => 1,
             2..=3 => 2,
@@ -552,10 +550,10 @@ fn precompile_modexp(
 
     // For small operands (<= 32 bytes), use U256 arithmetic
     if base_trimmed.len() <= 32 && modulus_trimmed.len() <= 32 {
-        let base_val = bigint_from_be_bytes(&base_trimmed);
-        let mod_val = bigint_from_be_bytes(&modulus_trimmed);
+        let base_val = bigint_from_be_bytes(base_trimmed);
+        let mod_val = bigint_from_be_bytes(modulus_trimmed);
         let result = if exp_trimmed.len() <= 32 {
-            let exp_val = bigint_from_be_bytes(&exp_trimmed);
+            let exp_val = bigint_from_be_bytes(exp_trimmed);
             mod_pow_u256(base_val, exp_val, mod_val)
         } else {
             // Large exponent — use binary method byte-by-byte
@@ -575,7 +573,7 @@ fn precompile_modexp(
     }
 
     // Large operands — use byte-level binary exponentiation
-    let result = mod_pow_binary_large(&base_trimmed, &exp_trimmed, &modulus_trimmed);
+    let result = mod_pow_binary_large(base_trimmed, exp_trimmed, modulus_trimmed);
     let mut output = vec![0u8; mod_len];
     let copy_len = core::cmp::min(result.len(), mod_len);
     output[mod_len - copy_len..].copy_from_slice(&result[..copy_len]);
@@ -600,9 +598,9 @@ fn u256_from_be_slice(slice: &[u8]) -> sp_core::U256 {
 fn bit_length(val: &sp_core::U256, max_bytes: usize) -> usize {
     let be = val.to_big_endian();
     let start = 32 - core::cmp::min(max_bytes, 32);
-    for i in start..32 {
-        if be[i] != 0 {
-            return (32 - i) * 8 - be[i].leading_zeros() as usize;
+    for (i, &byte) in be[start..32].iter().enumerate() {
+        if byte != 0 {
+            return (32 - (start + i)) * 8 - byte.leading_zeros() as usize;
         }
     }
     0
@@ -714,11 +712,7 @@ fn long_division_remainder(a: &[u8], modulus: &[u8]) -> Vec<u8> {
         return a.to_vec();
     }
     if a.len() == modulus.len() && a <= modulus {
-        return if a < modulus {
-            a.to_vec()
-        } else {
-            vec![0u8]
-        };
+        return if a < modulus { a.to_vec() } else { vec![0u8] };
     }
     // Binary long division
     let mut remainder = a.to_vec();
@@ -905,7 +899,7 @@ fn precompile_bn128_pairing(
     _is_static: bool,
 ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
     // Each pair is 192 bytes (128 G2 + 64 G1)
-    if input.len() % 192 != 0 {
+    if !input.len().is_multiple_of(192) {
         return Err(PrecompileFailure::Error {
             exit_status: ExitError::Other(sp_std::borrow::Cow::Borrowed(
                 "bn128pairing: input length must be multiple of 192",
@@ -1038,10 +1032,10 @@ fn decode_g2(bytes: &[u8]) -> Option<ark_bn254::G2Affine> {
     debug_assert!(bytes.len() >= 128);
     // Fp2 element: c0 + c1 * u, where u^2 = -1
     // EVM encoding: (c1, c0) = (imaginary, real)
-    let x_c1 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[..32]);   // imaginary
+    let x_c1 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[..32]); // imaginary
     let x_c0 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[32..64]); // real
-    let y_c1 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[64..96]);   // imaginary
-    let y_c0 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[96..128]);  // real
+    let y_c1 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[64..96]); // imaginary
+    let y_c0 = ark_bn254::Fq::from_be_bytes_mod_order(&bytes[96..128]); // real
 
     let x = ark_bn254::Fq2::new(x_c0, x_c1);
     let y = ark_bn254::Fq2::new(y_c0, y_c1);

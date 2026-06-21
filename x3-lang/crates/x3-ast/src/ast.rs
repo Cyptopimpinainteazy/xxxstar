@@ -1,13 +1,9 @@
 use serde::{Deserialize, Serialize};
-use x3_lang_common::{
-    BinOp, DurationUnit, FloatSuffix, IntBase, IntSuffix, SizeUnit, Spanned, Symbol, UnOp,
-};
+use x3_lang_common::{BinOp, DurationUnit, FloatSuffix, IntBase, IntSuffix, SizeUnit, Spanned, Symbol, UnOp};
 
 /// Node ID - deterministic, 0-based index assigned during parsing/lowering when required.
 /// Internally is a simple u32 wrapper for compactness and reproducibility.
-#[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NodeId(pub u32);
 
 /// The root of an X3 program AST.
@@ -433,6 +429,10 @@ pub enum StorageRefOp {
 pub struct ChainRef(pub Symbol);
 
 impl ChainRef {
+    pub fn new(name: Symbol) -> Self {
+        ChainRef(name)
+    }
+
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -472,6 +472,9 @@ pub enum RequireKind {
     BridgeLiquidity,
     /// `require canonical_supply <asset>`
     CanonicalSupply,
+    /// `require relayer_quorum >= <count>` — minimum number of relayers
+    /// that must attest to the cross-chain operation before settlement.
+    RelayerQuorum,
     /// Custom / catch-all require
     Custom(Symbol),
 }
@@ -517,13 +520,33 @@ pub struct BridgeDecl {
     pub timeout: Option<Expression>,
 }
 
-/// `atomic <name> { ... }` block — a named atomic multi-step cross-chain swap.
+/// Specification of a hashlock guard.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HashlockSpec {
+    /// Hash function name: "sha256" or "blake2b"
+    pub hash_fn: Symbol,
+    /// The secret expression that will be hashed.
+    pub secret: Box<Expression>,
+}
+
+/// `atomic swap <from> -> <to> { ... }` — a named atomic multi-step cross-chain swap.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AtomicSwapDecl {
     pub name: Symbol,
+    pub from_asset: AssetRef,
+    pub to_asset: AssetRef,
+    /// VM family for the source chain (e.g. "Evm", "Svm", "MoveVm").
+    pub source_vm: Option<String>,
+    /// VM family for the destination chain (e.g. "Evm", "Svm", "MoveVm").
+    pub dest_vm: Option<String>,
+    pub amount: Option<Expression>,
+    pub receiver: Option<Expression>,
+    pub hashlock: Option<HashlockSpec>,
     pub body: Vec<Statement>,
+    pub requires: Vec<RequireGuard>,
     pub on_fail: Option<FailureAction>,
-    pub timeout: Option<Expression>,
+    pub timeout_source: Option<Expression>,
+    pub timeout_destination: Option<Expression>,
 }
 
 /// `strategy <name> { ... }` — a constrained execution strategy (arb, liquidation, etc.).
@@ -556,14 +579,8 @@ pub enum TypeExpr {
     Array(Box<TypeExpr>, Option<usize>),
     Tuple(Vec<TypeExpr>),
     Primitive(Symbol),
-    Generic {
-        base: Box<TypeExpr>,
-        args: Vec<TypeExpr>,
-    },
-    Func {
-        params: Vec<TypeExpr>,
-        ret: Box<TypeExpr>,
-    },
+    Generic { base: Box<TypeExpr>, args: Vec<TypeExpr> },
+    Func { params: Vec<TypeExpr>, ret: Box<TypeExpr> },
     Option(Box<TypeExpr>),
 }
 

@@ -3,7 +3,7 @@
 use crate as pallet_x3_sequencer;
 use frame_support::{
     derive_impl, parameter_types,
-    traits::{ConstU32, ConstU64, Hooks},
+    traits::{ConstU32, Hooks},
 };
 use frame_system as system;
 use sp_core::H256;
@@ -110,7 +110,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 /// Helper: run to a specific block (executes on_finalize + on_initialize).
-pub fn run_to_block(n: u64) {
+pub fn _run_to_block(n: u64) {
     while System::block_number() < n {
         X3Sequencer::on_finalize(System::block_number());
         System::set_block_number(System::block_number() + 1);

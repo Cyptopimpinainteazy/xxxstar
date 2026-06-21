@@ -73,7 +73,7 @@ function SupplyDashboard() {
         <div className="card">
           <span className="card-label">Minted</span>
           <span className="card-value">{data.minted.toLocaleString()}</span>
-          <span className="card-unit">tX3 ({mintValue}%)</span>
+          <span className="card-unit">tX3 ({mintedPct}%)</span>
         </div>
         <div className="card">
           <span className="card-label">Burned</span>
@@ -89,9 +89,9 @@ function SupplyDashboard() {
 
       <div className="supply-bars">
         <div className="supply-bar-row">
-          <span className="bar-label">Minted ({mintValue}%)</span>
+          <span className="bar-label">Minted ({mintedPct}%)</span>
           <div className="bar-track">
-            <div className="bar-fill minted" style={{ width: `${mintValue}%` }} />
+            <div className="bar-fill minted" style={{ width: `${mintedPct}%` }} />
           </div>
         </div>
         <div className="supply-bar-row">

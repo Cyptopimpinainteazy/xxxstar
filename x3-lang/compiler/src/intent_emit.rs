@@ -195,9 +195,7 @@ pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
                 draft.source_amount = amt;
                 draft.source_owner = from_str;
             }
-            x3_lang_ast::ast::Statement::Mint {
-                asset, amount, to, ..
-            } => {
+            x3_lang_ast::ast::Statement::Mint { asset, amount, to, .. } => {
                 let chain_str = asset.chain.as_str().to_string();
                 let asset_str = asset.name.as_str().to_string();
                 let amt = match amount {
@@ -220,8 +218,7 @@ pub fn from_intent_decl(intent: &IntentDecl) -> IntentSpecDraft {
                             .map(|s| s.as_str().to_string())
                             .unwrap_or_else(|| "x3".to_string());
                         let val_str = value_string_from_expr(value);
-                        draft =
-                            draft.with_constraint("finality", format!("{chain_str} >= {val_str}"));
+                        draft = draft.with_constraint("finality", format!("{chain_str} >= {val_str}"));
                         continue;
                     }
                     AstRequireKind::Slippage => "slippage",

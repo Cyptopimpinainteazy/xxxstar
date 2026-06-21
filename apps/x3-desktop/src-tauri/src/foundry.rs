@@ -367,7 +367,8 @@ pub async fn foundry_deploy(
     // Resolve the chain RPC URL from chain_rpc::rpc_url_for_chain, then send
     // eth_sendRawTransaction for each contract. Falls back to deterministic
     // address derivation if the node is unreachable.
-    let rpc_url = crate::chain_rpc::rpc_url_for_chain(&chain);
+    let cfg = crate::chain_rpc::ChainRpcConfig::default();
+    let rpc_url = crate::chain_rpc::rpc_url_for_chain(&cfg, &chain);
     let rpc_client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()

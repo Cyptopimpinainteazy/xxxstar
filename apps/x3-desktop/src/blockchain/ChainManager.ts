@@ -28,8 +28,8 @@ export const AVAILABLE_CHAINS: ChainConfig[] = [
     id: 'x3-local',
     name: 'X3 Local Dev',
     enabled: true,
-    rpcUrl: 'http://localhost:9944',
-    wsUrl: 'ws://localhost:9944',
+    rpcUrl: 'http://rpc.testnet.x3-chain.io:9944',
+    wsUrl: 'ws://rpc.testnet.x3-chain.io:9944',
   },
   {
     id: 'ethereum',
@@ -115,8 +115,8 @@ export class ChainManager {
    */
   getActiveAdapter(): ChainAdapter {
     if (!this.activeChainId) {
-      // Default to x3-local if no active chain
-      this.activeChainId = 'x3-local';
+      // Default to x3-testnet if no active chain
+      this.activeChainId = 'x3-testnet';
     }
     const adapter = this.adapters.get(this.activeChainId);
     if (!adapter) {

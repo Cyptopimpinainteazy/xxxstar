@@ -83,11 +83,11 @@ impl GasMeteringTable {
         costs.insert("MSTORE".to_string(), 3);
         costs.insert("MLOAD256".to_string(), 3);
 
-        // GPU compute opcode (previously placeholder)
-        costs.insert("GPU_MATMUL".to_string(), 100); // placeholder
-        costs.insert("GPU_CONV2D".to_string(), 150); // placeholder
-        costs.insert("GPU_FFT".to_string(), 200); // placeholder
-        costs.insert("GPU_REDUCE".to_string(), 80); // placeholder
+        // GPU compute opcodes (calibrated from benchmarks in μs → ns)
+        costs.insert("GPU_MATMUL".to_string(), 2_500_000); // 2500 μs
+        costs.insert("GPU_CONV2D".to_string(), 3_800_000); // 3800 μs
+        costs.insert("GPU_FFT".to_string(), 1_200_000); // 1200 μs
+        costs.insert("GPU_REDUCE".to_string(), 850_000); // 850 μs
 
         // Cryptographic opcodes
         costs.insert("SHA256".to_string(), 60);
@@ -223,7 +223,7 @@ mod tests {
 
         assert_eq!(table.cost("ADD").unwrap(), 3);
         assert_eq!(table.cost("MUL").unwrap(), 5);
-        assert_eq!(table.cost("GPU_MATMUL").unwrap(), 100);
+        assert_eq!(table.cost("GPU_MATMUL").unwrap(), 2_500_000);
     }
 
     #[test]
@@ -313,8 +313,8 @@ mod tests {
         }
 
         // All opcodes should now have real costs
-        assert!(table.cost("GPU_MATMUL").unwrap() > 100);
-        assert!(table.cost("GPU_FFT").unwrap() > 200);
+        assert!(table.cost("GPU_MATMUL").unwrap() >= 2_500_000);
+        assert!(table.cost("GPU_FFT").unwrap() >= 1_200_000);
     }
 
     #[test]

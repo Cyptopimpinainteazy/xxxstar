@@ -98,7 +98,7 @@ contract FlashloanParityTest is Test {
         uint16 jsonFeeBps = uint16(json.readUint(".fee_bps"));
         assertEq(jsonFeeBps, feeBps, "fee_bps drift between JSON and EVM setup");
 
-        uint256 count = json.readUintArray(".vectors[*].amount").length;
+        uint256 count = _vectorCount(json);
         assertGt(count, 0, "no vectors found");
 
         for (uint256 i = 0; i < count; i++) {
@@ -129,8 +129,15 @@ contract FlashloanParityTest is Test {
                 assertEq(asset.balanceOf(address(pool)), prePoolBal, string.concat(id, ": revert leaked balance"));
             } else if (_eq(kind, "underpay")) {
                 UnderpayBorrower b = new UnderpayBorrower();
-                asset.mint(address(b), pool.quoteFee(amount));
-                vm.expectRevert(X3Flashloan.NotRepaid.selector);
+                uint256 fee = pool.quoteFee(amount);
+                asset.mint(address(b), fee);
+                vm.expectRevert(
+                    abi.encodeWithSelector(
+                        X3Flashloan.NotRepaid.selector,
+                        prePoolBal + fee,
+                        prePoolBal + fee - 1
+                    )
+                );
                 pool.flashloan(address(asset), amount, address(b), bytes(""));
                 assertEq(asset.balanceOf(address(pool)), prePoolBal, string.concat(id, ": revert leaked balance"));
             } else {
@@ -141,5 +148,11 @@ contract FlashloanParityTest is Test {
 
     function _eq(string memory a, string memory b) private pure returns (bool) {
         return keccak256(bytes(a)) == keccak256(bytes(b));
+    }
+
+    function _vectorCount(string memory json) private view returns (uint256 count) {
+        while (json.keyExists(string.concat(".vectors[", vm.toString(count), "].amount"))) {
+            count++;
+        }
     }
 }

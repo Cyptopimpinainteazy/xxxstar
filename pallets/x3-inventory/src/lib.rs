@@ -37,6 +37,7 @@ pub mod pallet {
     use frame_support::{pallet_prelude::*, traits::Get, BoundedVec};
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::{Saturating, Zero};
+    use sp_std::vec::Vec;
 
     // -----------------------------------------------------------------------
     // Pallet config
@@ -70,6 +71,33 @@ pub mod pallet {
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// SCALE-encoded (VaultId, VaultState<T::Balance>) entries.
+        pub initial_vaults: Vec<Vec<u8>>,
+        /// SCALE-encoded (LaneId, LaneState<T::Balance, T::MaxLiquiditySources>) entries.
+        pub initial_lanes: Vec<Vec<u8>>,
+        pub _phantom: sp_std::marker::PhantomData<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            use codec::Decode;
+            for blob in &self.initial_vaults {
+                let (vault_id, state): (VaultId, VaultState<T::Balance>) =
+                    Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded vault");
+                Vaults::<T>::insert(vault_id, state);
+            }
+            for blob in &self.initial_lanes {
+                let (lane_id, state): (LaneId, LaneState<T::Balance, T::MaxLiquiditySources>) =
+                    Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded lane");
+                Lanes::<T>::insert(lane_id, state);
+            }
+        }
+    }
 
     #[pallet::storage]
     #[pallet::getter(fn vaults)]

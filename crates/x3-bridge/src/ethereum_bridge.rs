@@ -306,11 +306,8 @@ impl EthereumBridge {
             .clone();
 
         // S0-003: Prevent bridge message replay attacks
-        match message.status {
-            MessageStatus::Executed { .. } => {
-                return Err("Bridge message already executed".to_string());
-            }
-            _ => {}
+        if let MessageStatus::Executed { .. } = message.status {
+            return Err("Bridge message already executed".to_string());
         }
 
         // Verify signatures threshold met

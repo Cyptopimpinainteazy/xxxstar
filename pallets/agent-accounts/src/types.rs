@@ -70,6 +70,7 @@ pub struct Agent<AccountId, Balance, BlockNumber> {
     Debug,
     Default,
 )]
+#[allow(clippy::multiple_bound_locations)]
 pub struct AgentQuota<BlockNumber: Default> {
     /// Maximum gas per block.
     pub gas_per_block: u128,

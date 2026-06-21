@@ -9358,6 +9358,7 @@ dependencies = [
  "base64 0.22.1",
  "bincode",
  "bip39",
+ "blake3",
  "bs58 0.4.0",
  "chrono",
  "ed25519-dalek",

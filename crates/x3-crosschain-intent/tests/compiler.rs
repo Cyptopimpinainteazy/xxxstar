@@ -246,9 +246,6 @@ fn happy_path_compiles_to_valid_plan() {
         "Expected instruction plan to be non-empty"
     );
 
-    // Verify key instruction types are present
-    use x3_crosschain_intent::instructions::X3Instruction;
-
     let labels: Vec<&'static str> = result.plan.iter().map(|i| i.label()).collect();
     println!("Generated plan ({} instructions):", labels.len());
     for (n, label) in labels.iter().enumerate() {

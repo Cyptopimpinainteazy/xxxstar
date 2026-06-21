@@ -22,6 +22,52 @@ impl EthereumBridgeAdapter {
     pub fn rpc_url(&self) -> &str {
         &self.rpc_url
     }
+
+    /// Poll EVM logs for Transfer events from the bridge contract in a
+    /// block range using `eth_getLogs`. Returns (block_number, raw event data)
+    /// pairs. Returns an empty vec when there are no matching logs.
+    pub fn poll_evm_logs(
+        &self,
+        contract_address: &str,
+        from_block: u64,
+        to_block: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>, BridgeError> {
+        // keccak256("Transfer(address,address,uint256)")
+        let transfer_event_sig =
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+        let params = serde_json::json!([{
+            "fromBlock": format!("0x{:x}", from_block),
+            "toBlock": format!("0x{:x}", to_block),
+            "address": contract_address,
+            "topics": [transfer_event_sig]
+        }]);
+
+        let result = make_json_rpc_call(&self.rpc_url, "eth_getLogs", params)?;
+
+        let logs = result
+            .as_array()
+            .ok_or_else(|| BridgeError::RpcError("eth_getLogs returned non-array".to_string()))?;
+
+        let mut events = Vec::with_capacity(logs.len());
+        for log in logs {
+            let block_hex = log
+                .get("blockNumber")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x0");
+            let block_number =
+                u64::from_str_radix(block_hex.trim_start_matches("0x"), 16).unwrap_or(0);
+
+            let data_hex = log.get("data").and_then(|v| v.as_str()).unwrap_or("0x");
+            let data = hex::decode(data_hex.trim_start_matches("0x")).map_err(|e| {
+                BridgeError::Serialization(format!("Failed to decode log data: {e}"))
+            })?;
+
+            events.push((block_number, data));
+        }
+
+        Ok(events)
+    }
 }
 
 impl BridgeAdapter for EthereumBridgeAdapter {
@@ -57,7 +103,7 @@ impl BridgeAdapter for EthereumBridgeAdapter {
         }
 
         // Field 0: parentHash (32 bytes)
-        let parent_hash = decoded.get(0).unwrap();
+        let parent_hash = decoded.first().unwrap();
         if parent_hash.len() != 32 {
             return Err(BridgeError::InvalidHeader(
                 "parentHash is not 32 bytes".to_string(),

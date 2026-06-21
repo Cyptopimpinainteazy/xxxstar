@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace WeightMeter::config -> &WeightConfig with Box::leak(Box::new(Default::default()))
+@@ -403,17 +403,17 @@
+ 
+     /// Get the consumed gas
+     pub fn consumed_gas(&self) -> u64 {
+         self.gas.consumed()
+     }
+ 
+     /// Get the config
+     pub fn config(&self) -> &WeightConfig {
+-        &self.config
++        Box::leak(Box::new(Default::default())) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Reset the meter
+     pub fn reset(&mut self) {
+         self.compute.reset();
+         self.gas.reset();
+     }
+ }

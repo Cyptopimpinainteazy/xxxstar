@@ -2,7 +2,6 @@ use crate::{
     types::{PolicyResult, PolicyRule, ViolationType},
     Config,
 };
-use frame_support::pallet_prelude::*;
 use sp_std::prelude::*;
 
 /// Core policy evaluation engine
@@ -29,7 +28,7 @@ impl PolicyEngine {
     /// Evaluate a single policy rule
     pub fn evaluate_rule<T: Config>(
         rule: &PolicyRule<T::AccountId>,
-        agent: &T::AccountId,
+        _agent: &T::AccountId,
         context: &PolicyContext<T>,
     ) -> PolicyResult {
         match rule {

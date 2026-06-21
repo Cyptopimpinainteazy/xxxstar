@@ -261,13 +261,15 @@
 <nav>
   <a href="/" class="nav-logo">⬡ X3 <span>Chain</span></a>
   <ul class="nav-links">
-    <li><a href="intelligence/">Intelligence</a></li>
-    <li><a href="wallet/">Wallet</a></li>
-    <li><a href="dex/">DEX</a></li>
-    <li><a href="validators/">Validators</a></li>
-    <li><a href="dashboard/">Dashboard</a></li>
-    <li><a href="inferstructor/">Inferstructor</a></li>
-    <li><a href="tps/">TPS</a></li>
+    <li><a href="/intelligence/">Intelligence</a></li>
+    <li><a href="/wallet/">Wallet</a></li>
+    <li><a href="/dex/">DEX</a></li>
+    <li><a href="/validators/">Validators</a></li>
+    <li><a href="/dashboard/">Dashboard</a></li>
+    <li><a href="/inferstructor/">Inferstructor</a></li>
+    <li><a href="/tps/">TPS</a></li>
+    <li><a href="/explorer/">Explorer</a></li>
+    <li><a href="/governance/">Governance</a></li>
   </ul>
 </nav>
 
@@ -293,119 +295,89 @@
 
 <main>
 
-  <section class="section" data-category="Infrastructure">
-    <div class="section-title">Infrastructure</div>
-    <div class="app-grid">
-      <a class="app-card" href="inferstructor/" data-category="Infrastructure" data-title="Inferstructor Dashboard" data-desc="GPU validator admin with TPS leaderboard and orchestra controls">
-        <div class="app-icon">⚡</div>
-        <div class="app-title">Inferstructor Dashboard</div>
-        <div class="app-desc">GPU validator admin with TPS leaderboard and orchestra controls</div>
-        <span class="app-tag tag-infra">Infrastructure</span>
-      </a>
-      <a class="app-card" href="infra-dashboard/" data-category="Infrastructure" data-title="Infra Dashboard" data-desc="Infrastructure monitoring and blockchain explorer">
-        <div class="app-icon">🔧</div>
-        <div class="app-title">Infra Dashboard</div>
-        <div class="app-desc">Infrastructure monitoring and blockchain explorer</div>
-        <span class="app-tag tag-infra">Infrastructure</span>
-      </a>
-      <a class="app-card" href="tps/" data-category="Infrastructure" data-title="TPS Monitor" data-desc="Blockchain transactions-per-second monitoring and leaderboard">
-        <div class="app-icon">📈</div>
-        <div class="app-title">TPS Monitor</div>
-        <div class="app-desc">Blockchain transactions-per-second monitoring and leaderboard</div>
-        <span class="app-tag tag-infra">Infrastructure</span>
-      </a>
-      <a class="app-card" href="swarm-autonomic/" data-category="Infrastructure" data-title="Swarm Autonomic" data-desc="Swarm infrastructure autonomic control plane">
-        <div class="app-icon">🤖</div>
-        <div class="app-title">Swarm Autonomic</div>
-        <div class="app-desc">Swarm infrastructure autonomic control plane</div>
-        <span class="app-tag tag-infra">Infrastructure</span>
-      </a>
-      <a class="app-card" href="jury/" data-category="Infrastructure" data-title="Jury Anchoring UI" data-desc="Blockchain jury anchoring visualization component">
-        <div class="app-icon">⚖️</div>
-        <div class="app-title">Jury Anchoring UI</div>
-        <div class="app-desc">Blockchain jury anchoring visualization component</div>
-        <span class="app-tag tag-infra">Infrastructure</span>
-      </a>
-    </div>
-  </section>
+  <!-- Apps loaded dynamically from routing.config.json -->
+  <div id="app-grid-container"></div>
 
-  <section class="section" data-category="Trading &amp; DeFi">
-    <div class="section-title">Trading &amp; DeFi</div>
-    <div class="app-grid">
-      <a class="app-card" href="intelligence/" data-category="Trading & DeFi" data-title="X3 Intelligence" data-desc="Arbitrage control surface with floor analytics and intent matching">
-        <div class="app-icon">🧠</div>
-        <div class="app-title">X3 Intelligence</div>
-        <div class="app-desc">Arbitrage control surface with floor analytics and intent matching</div>
-        <span class="app-tag tag-trading">Trading &amp; DeFi</span>
-      </a>
-      <a class="app-card" href="wallet/" data-category="Trading & DeFi" data-title="X3 Wallet" data-desc="Multi-chain cryptocurrency wallet with Polkadex launchpad">
-        <div class="app-icon">💼</div>
-        <div class="app-title">X3 Wallet</div>
-        <div class="app-desc">Multi-chain cryptocurrency wallet with Polkadex launchpad</div>
-        <span class="app-tag tag-trading">Trading &amp; DeFi</span>
-      </a>
-      <a class="app-card" href="dex/" data-category="Trading & DeFi" data-title="X3 DEX" data-desc="Decentralized exchange interface">
-        <div class="app-icon">🔄</div>
-        <div class="app-title">X3 DEX</div>
-        <div class="app-desc">Decentralized exchange interface</div>
-        <span class="app-tag tag-trading">Trading &amp; DeFi</span>
-      </a>
-    </div>
-  </section>
+  <script type="module">
+    // ── Load routing config and render all app cards ──
+    async function loadAppGrid() {
+      try {
+        const res = await fetch('/routing.config.json');
+        const config = await res.json();
+        const apps = Object.entries(config.apps).filter(([key]) => key !== 'hub');
+        const container = document.getElementById('app-grid-container');
+        const categories = {};
 
-  <section class="section" data-category="Validators">
-    <div class="section-title">Validators</div>
-    <div class="app-grid">
-      <a class="app-card" href="validators/" data-category="Validators" data-title="Validator Globe" data-desc="3D globe visualization of validator nodes with live RPC polling">
-        <div class="app-icon">🌐</div>
-        <div class="app-title">Validator Globe</div>
-        <div class="app-desc">3D globe visualization of validator nodes with live RPC polling</div>
-        <span class="app-tag tag-validators">Validators</span>
-      </a>
-    </div>
-  </section>
+        apps.forEach(([key, app]) => {
+          const cat = app.category;
+          if (!categories[cat]) categories[cat] = [];
+          categories[cat].push({ key, ...app });
+        });
 
-  <section class="section" data-category="Analytics">
-    <div class="section-title">Analytics</div>
-    <div class="app-grid">
-      <a class="app-card" href="dashboard/" data-category="Analytics" data-title="Modular Dashboard" data-desc="Extensible 50+ panel modular dashboard system">
-        <div class="app-icon">📊</div>
-        <div class="app-title">Modular Dashboard</div>
-        <div class="app-desc">Extensible 50+ panel modular dashboard system</div>
-        <span class="app-tag tag-analytics">Analytics</span>
-      </a>
-    </div>
-  </section>
+        const categoryIcons = {
+          'Infrastructure': '🔧',
+          'Trading & DeFi': '💱',
+          'Validators': '🌐',
+          'Analytics': '📊',
+          'Site Pages': '🚀',
+          'Tools': '🧩',
+          'Desktop': '🖥️'
+        };
 
-  <section class="section" data-category="Site Pages">
-    <div class="section-title">Site Pages</div>
-    <div class="app-grid">
-      <a class="app-card" href="./" data-category="Site Pages" data-title="X3 Landing & Pages" data-desc="Marketing landing page and 40+ specialized blockchain dashboard pages">
-        <div class="app-icon">🚀</div>
-        <div class="app-title">X3 Landing &amp; Pages</div>
-        <div class="app-desc">Marketing landing page and 40+ specialized blockchain dashboard pages</div>
-        <span class="app-tag tag-site">Site Pages</span>
-      </a>
-      <a class="app-card" href="mainnet-progress/" data-category="Site Pages" data-title="Mainnet Progress" data-desc="Network mainnet launch progress tracker">
-        <div class="app-icon">🏁</div>
-        <div class="app-title">Mainnet Progress</div>
-        <div class="app-desc">Network mainnet launch progress tracker</div>
-        <span class="app-tag tag-site">Site Pages</span>
-      </a>
-    </div>
-  </section>
+        Object.entries(categories).forEach(([catName, catApps]) => {
+          const section = document.createElement('section');
+          section.className = 'section';
+          section.dataset.category = catName;
+          section.innerHTML = `
+            <div class="section-title">${categoryIcons[catName] || '📁'} ${catName}</div>
+            <div class="app-grid">
+              ${catApps.map(app => {
+                const href = app.route || `/${app.key}/`;
+                const tagClass = catName.toLowerCase().replace(/[^a-z]/g, '');
+                return `
+                  <a class="app-card" href="${href}" data-category="${catName}" data-title="${app.name}" data-desc="${app.description}">
+                    <div class="app-icon">${app.icon || '📦'}</div>
+                    <div class="app-title">${app.name}</div>
+                    <div class="app-desc">${app.description}</div>
+                    <span class="app-tag tag-${tagClass}">${catName}</span>
+                    ${app.type === 'tauri' ? '<div style="font-size:9px;color:#888;margin-top:4px">⬡ Tauri Desktop</div>' : ''}
+                    ${app.type === 'nextjs' ? '<div style="font-size:9px;color:#888;margin-top:4px">⚡ Next.js</div>' : ''}
+                  </a>
+                `;
+              }).join('')}
+            </div>
+          `;
+          container.appendChild(section);
+        });
+        
+        // Rebind filter to work with dynamically loaded cards
+        window.filterApps = function() {
+          const q = document.getElementById('search').value.toLowerCase();
+          document.querySelectorAll('.app-card').forEach(card => {
+            const cardCat = card.dataset.category;
+            const title = (card.dataset.title || '').toLowerCase();
+            const desc = (card.dataset.desc || '').toLowerCase();
+            const matchesCat = activeCategory === 'All' || cardCat === activeCategory;
+            const matchesQ = !q || title.includes(q) || desc.includes(q) || cardCat.toLowerCase().includes(q);
+            card.dataset.hidden = String(!(matchesCat && matchesQ));
+          });
+          document.querySelectorAll('.section').forEach(section => {
+            const visible = [...section.querySelectorAll('.app-card')].some(c => c.dataset.hidden !== 'true');
+            section.style.display = visible ? '' : 'none';
+          });
+        };
+      } catch (e) {
+        document.getElementById('app-grid-container').innerHTML = `
+          <div style="text-align:center;padding:3rem;color:#666">
+            <p>⚠️ Could not load app registry.</p>
+            <p style="font-size:0.8rem">Make sure routing.config.json is served at the root.</p>
+          </div>
+        `;
+      }
+    }
 
-  <section class="section" data-category="Tools">
-    <div class="section-title">Tools</div>
-    <div class="app-grid">
-      <a class="app-card" href="extension/" data-category="Tools" data-title="X3 Browser Extension" data-desc="Chrome/browser extension for X3 Chain">
-        <div class="app-icon">🧩</div>
-        <div class="app-title">X3 Browser Extension</div>
-        <div class="app-desc">Chrome/browser extension for X3 Chain</div>
-        <span class="app-tag tag-tools">Tools</span>
-      </a>
-    </div>
-  </section>
+    loadAppGrid();
+  </script>
 
 </main>
 

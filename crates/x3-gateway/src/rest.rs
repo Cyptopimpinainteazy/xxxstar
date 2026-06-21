@@ -597,17 +597,25 @@ async fn get_funding_swarm_timeline(
 
 // ── Funding Swarm admin authorization ────────────────────────────────────────
 //
-// HUMAN APPROVAL GATE — placeholder for production auth.
-// Set FUNDING_SWARM_ADMIN_TOKEN in the environment to enable the gate.
-// When the env var is unset, the gate is open (dev/staging mode).
-// Replace with a real auth middleware before production deployment.
+// HUMAN APPROVAL GATE — production auth.
+// FUNDING_SWARM_ADMIN_TOKEN env var MUST be set in production. When it is
+// unset and the `dev` feature is active, the gate is open for local dev.
 
 fn authorize_funding_swarm_admin(headers: &axum::http::HeaderMap) -> Result<(), GatewayError> {
     let expected = std::env::var("FUNDING_SWARM_ADMIN_TOKEN").unwrap_or_default();
     if expected.is_empty() {
-        // No token configured — open for local dev. Gate is enforced only when the
-        // env var is set, matching the benchmark-publish token pattern.
-        return Ok(());
+        #[cfg(feature = "dev")]
+        {
+            // Dev-only: no token configured, gate open for local dev.
+            return Ok(());
+        }
+        #[cfg(not(feature = "dev"))]
+        {
+            // Production: FUNDING_SWARM_ADMIN_TOKEN must be set.
+            return Err(GatewayError::BadRequest(
+                "FUNDING_SWARM_ADMIN_TOKEN not configured — admin endpoints disabled".to_string(),
+            ));
+        }
     }
     let provided = headers
         .get("x-admin-token")

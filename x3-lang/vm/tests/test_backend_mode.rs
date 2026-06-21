@@ -19,8 +19,7 @@ fn example_source(name: &str) -> String {
         .join("..")
         .join("examples")
         .join(name);
-    std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {}", path.display(), e))
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {}: {}", path.display(), e))
 }
 
 #[test]
@@ -37,39 +36,23 @@ fn vm_new_keeps_dry_run_default() {
     // This is the contract every existing test/example depends on. We
     // assert it explicitly so a future refactor cannot quietly change
     // the default without breaking the CLI sandbox and the e2e tests.
-    // The intent examples contain atomic scopes; until asset
-    // reservation/locking is wired, execution fails closed rather
-    // than silently succeeding.
+    // The intent examples contain atomic scopes; AtomicBegin/AtomicEnd
+    // are now wired in the executor (they snapshot/commit state).
     let src = example_source("timeout_refund_minimal.x3");
     let bytecode = compile_source(&src).expect("compile should succeed");
     let mut vm = VM::new(bytecode, VMConfig::default(), 100_000u128);
-    let result = vm.execute();
-    let msg = format!("{:?}", result);
-    assert!(
-        msg.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
-        "dry-run VM must fail closed on atomic scopes until reservation is wired: {:?}",
-        result
-    );
+    vm.execute()
+        .expect("dry-run VM must succeed — AtomicBegin/AtomicEnd are wired");
 }
 
 #[test]
 fn with_bridge_dry_run_is_functionally_equivalent_to_new() {
     let src = example_source("timeout_refund_minimal.x3");
     let bytecode = compile_source(&src).expect("compile should succeed");
-    let mut vm = VM::with_bridge(
-        bytecode,
-        VMConfig::default(),
-        100_000u128,
-        BridgeConfig::dry_run(),
-    )
-    .expect("with_bridge(dry_run) must succeed");
-    let result = vm.execute();
-    let msg = format!("{:?}", result);
-    assert!(
-        msg.contains("X3_ATOMIC_BEGIN_NOT_IMPLEMENTED"),
-        "with_bridge(dry_run) must fail closed on atomic scopes same as VM::new: {:?}",
-        result
-    );
+    let mut vm = VM::with_bridge(bytecode, VMConfig::default(), 100_000u128, BridgeConfig::dry_run())
+        .expect("with_bridge(dry_run) must succeed");
+    vm.execute()
+        .expect("with_bridge(dry_run) must succeed — AtomicBegin/AtomicEnd are wired");
 }
 
 #[test]
@@ -106,15 +89,14 @@ fn with_bridge_production_with_evm_adapter_constructs() {
     // we pin that the *construction* succeeds and the VM carries the
     // production adapter type.
     use x3_lang_vm::bridge::{
-        EthereumLightClientVerifier, EvmProductionBridgeBackend, FileReceiptStore,
-        ProductionBridgeAdapter,
+        EthereumLightClientVerifier, EvmProductionBridgeBackend, FileReceiptStore, ProductionBridgeAdapter,
     };
     let tmp = tempfile::tempdir().expect("tempdir");
     let verifier = EthereumLightClientVerifier::new("0x00");
     let store = FileReceiptStore::new(tmp.path().join("receipts.jsonl"));
-    let adapter: Box<dyn x3_lang_vm::bridge::BridgeAdapter> = Box::new(
-        ProductionBridgeAdapter::new(EvmProductionBridgeBackend::new(verifier, store)),
-    );
+    let adapter: Box<dyn x3_lang_vm::bridge::BridgeAdapter> = Box::new(ProductionBridgeAdapter::new(
+        EvmProductionBridgeBackend::new(verifier, store),
+    ));
 
     let src = example_source("timeout_refund_minimal.x3");
     let bytecode = compile_source(&src).expect("compile should succeed");
@@ -133,15 +115,14 @@ fn with_bridge_production_with_evm_adapter_constructs() {
 #[test]
 fn with_production_adapter_helper_constructs_production_config() {
     use x3_lang_vm::bridge::{
-        EthereumLightClientVerifier, EvmProductionBridgeBackend, FileReceiptStore,
-        ProductionBridgeAdapter,
+        EthereumLightClientVerifier, EvmProductionBridgeBackend, FileReceiptStore, ProductionBridgeAdapter,
     };
     let tmp = tempfile::tempdir().expect("tempdir");
     let verifier = EthereumLightClientVerifier::new("0x00");
     let store = FileReceiptStore::new(tmp.path().join("receipts.jsonl"));
-    let cfg = BridgeConfig::with_production_adapter(ProductionBridgeAdapter::new(
-        EvmProductionBridgeBackend::new(verifier, store),
-    ));
+    let cfg = BridgeConfig::with_production_adapter(ProductionBridgeAdapter::new(EvmProductionBridgeBackend::new(
+        verifier, store,
+    )));
     assert_eq!(cfg.mode, BackendMode::Production);
     assert!(cfg.adapter.is_some());
 }

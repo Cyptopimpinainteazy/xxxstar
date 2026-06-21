@@ -301,7 +301,7 @@ export const panelRegistry = {
   'poll': GovernanceProposalsPanel,
 
   'treasury': TreasuryManagementPanel,
-  'multisig': TreasuryManagementPanel,
+  'multisig-treasury': TreasuryManagementPanel,
   'budget': TreasuryManagementPanel,
   'spending': TreasuryManagementPanel,
   'fund-allocation': TreasuryManagementPanel,
@@ -315,7 +315,7 @@ export const panelRegistry = {
   'streaming': MediaStreamingPanel,
   'music': MediaStreamingPanel,
   'media': MediaStreamingPanel,
-  'audio': MediaStreamingPanel,
+  'audio-streaming': MediaStreamingPanel,
   'creator-monetization': MediaStreamingPanel,
 
   'quantum': QuantumSecurityPanel,

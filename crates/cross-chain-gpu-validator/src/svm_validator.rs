@@ -10,7 +10,6 @@ use crate::kernels::Keccak256Kernel;
 ///
 /// Validates Solana block headers using GPU-accelerated hashing.
 /// Falls back to CPU validation if GPU is unavailable.
-
 pub struct SvmHeaderValidator {
     gpu_kernel: Option<Keccak256Kernel>,
     cpu_fallback: CpuFallback,
@@ -74,7 +73,7 @@ impl SvmHeaderValidator {
         state_root: [u8; 32],
         parent_slot: u64,
         timestamp: u64,
-        height: u64,
+        _height: u64,
     ) -> Result<(), ValidatorError> {
         // Basic field validation
         if slot == 0 {
@@ -203,6 +202,7 @@ impl Default for SvmHeaderValidator {
 
 /// High-level SVM state validator wrapping the GPU kernel.
 pub struct SvmValidator {
+    #[allow(dead_code)]
     hasher: Keccak256Kernel,
 }
 
@@ -212,6 +212,12 @@ pub struct SvmState {
     /// Block hash; must be exactly 32 bytes for a valid block.
     pub block_hash: Vec<u8>,
     pub transactions: Vec<Vec<u8>>,
+}
+
+impl Default for SvmValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SvmValidator {

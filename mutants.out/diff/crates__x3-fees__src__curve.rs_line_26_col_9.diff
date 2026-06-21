@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace FeeCurve::base_fee -> Amount with Default::default()
+@@ -18,17 +18,17 @@
+     /// Create a new fee curve with the given configuration.
+     pub fn new(config: FeeConfig) -> Self {
+         Self { config }
+     }
+ 
+     /// Calculate the base fee.
+     /// The base fee is the absolute minimum cost of any execution.
+     pub fn base_fee(&self) -> Amount {
+-        self.config.base_fee_floor
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Calculate the complexity fee.
+     ///
+     /// ```text
+     /// ComplexityFee = multiplier × legs × state_touches
+     /// ```
+     ///

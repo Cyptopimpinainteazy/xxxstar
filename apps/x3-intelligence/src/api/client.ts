@@ -50,7 +50,7 @@ export interface SwarmMetrics {
 /**
  * X3 Intelligence API Client
  */
-class X3IntelligenceClient {
+export class X3IntelligenceClient {
   private rpcUrl: string;
   private wsUrl: string;
   private ws: WebSocket | null = null;
@@ -161,7 +161,7 @@ class X3IntelligenceClient {
 
       return transfers.map(t => ({
         ...t,
-        time: new Date(t.timestamp).toLocaleTimeString(),
+        time: new Date(t.time).toLocaleTimeString(),
       }));
     } catch (error) {
       console.error('Failed to fetch cross-VM transfers:', error);

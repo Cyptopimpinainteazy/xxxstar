@@ -1,14 +1,17 @@
 use frame_support::{assert_noop, assert_ok};
 use parity_scale_codec::Encode;
-use sp_core::{hashing::blake2_256, H160, H256};
+use sp_core::{H160, H256};
 use sp_runtime::DispatchError;
 
 use crate::test_helpers::{wrap_evm_payload, wrap_svm_payload, wrap_x3_payload};
 use crate::{
-    AccountRegistry, AssetRegistry, CanonicalLedger, ComitFailureReason, EvmTransactionData,
-    EvmTransactionReceipts, EvmTransactions, KernelCrossVmDispatcher, Nonces, SubmittedComits,
+    AccountRegistry, AssetRegistry, CanonicalLedger, CrossChainProof,
+    EvmTransactionData, EvmTransactionReceipts, EvmTransactions, KernelCrossVmDispatcher, Nonces,
+    SubmittedComits,
 };
-use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher as _, CrossVmStatus, VmId};
+use x3_cross_vm_bridge::{
+    CrossVmCall, CrossVmDispatcher as _, CrossVmOperation, CrossVmStatus, VmId,
+};
 
 use crate::mock::{
     self, new_test_ext, AssetId, AtlasId, AtlasKernel, Balance, ExtBuilder, RuntimeEvent,
@@ -180,6 +183,38 @@ fn submit_comit_v2_successful_flow() {
             AtlasEvent::ComitFinalized { .. }
         ));
     });
+}
+
+#[test]
+fn submit_cross_vm_operation_with_lock_proof_credits_recipient_without_internal_source_balance() {
+    ExtBuilder::default()
+        .balances(vec![(ALICE, INITIAL_BALANCE)])
+        .authorized_accounts(vec![ALICE])
+        .build()
+        .execute_with(|| {
+            let source = [0x11u8; 20];
+            let mut destination = [0u8; 32];
+            let bob_encoded = BOB.encode();
+            destination[..bob_encoded.len()].copy_from_slice(&bob_encoded);
+            let amount = 1_000u128;
+            let operation = CrossVmOperation::TransferToSvm {
+                source,
+                destination: destination.to_vec(),
+                amount,
+            };
+
+            assert_eq!(CanonicalLedger::<Test>::get(BOB, &0), 0);
+
+            assert_ok!(AtlasKernel::submit_cross_vm_operation(
+                RuntimeOrigin::signed(ALICE),
+                operation,
+                0,
+                10,
+                CrossChainProof::LockProof(b"evm-deposit-proof".to_vec()),
+            ));
+
+            assert_eq!(CanonicalLedger::<Test>::get(BOB, &0), amount);
+        });
 }
 
 #[test]

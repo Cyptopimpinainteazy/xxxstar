@@ -196,7 +196,7 @@ pub struct SecurityReport {
 }
 
 impl SecurityReport {
-    pub fn new(auditor_key: String) -> Self {
+    pub fn new(_auditor_key: String) -> Self {
         Self {
             risk_score: 0,
             passed: false,

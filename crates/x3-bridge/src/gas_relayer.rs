@@ -163,7 +163,8 @@ impl GasRelayer {
         }
 
         // Relayer keeps (fee_share_bps % of native equivalent)
-        let relayer_share = (fee_req.native_fee_equivalent as u128)
+        let relayer_share = fee_req
+            .native_fee_equivalent
             .saturating_mul(relayer_config.fee_share_bps as u128)
             .saturating_div(10000u128);
 

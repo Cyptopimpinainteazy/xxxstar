@@ -1,4 +1,8 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # DePIN GPU Marketplace Pallet
 //!
 //! Proposal: DEPIN-GPU-001
@@ -78,8 +82,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Currency for escrow, staking, and revenue distribution.
         type Currency: ReservableCurrency<Self::AccountId>;
 

@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace WeightConfig::minimum_fee -> u64 with 1
+@@ -122,17 +122,17 @@
+ 
+     /// Verify that a fee meets the canonical fee requirement
+     pub fn verify_canonical_fee(&self, fee: u64) -> bool {
+         fee >= self.canonical_fee
+     }
+ 
+     /// Get the minimum fee for a given weight
+     pub fn minimum_fee(&self, weight: u64) -> u64 {
+-        self.calculate_fee(weight)
++        1 /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Operation costs for various cryptographic and computational operations
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct OperationCosts {
+     /// ed25519 signing cost
+     pub signing_ed25519: u64,

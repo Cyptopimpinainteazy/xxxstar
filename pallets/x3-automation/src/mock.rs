@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 /// Test oracle that returns a static price map.
 /// Use `set_price` to configure expected values before each test.
+#[derive(Default)]
 pub struct TestOracle {
     prices: HashMap<u32, u128>,
 }
@@ -37,8 +38,8 @@ impl pallet::OracleProvider for TestOracle {
     }
 }
 
-/// Thread-local so that `OracleProvider::get_price` (a static call) can
-/// reach test-configured prices.
+// Thread-local so that `OracleProvider::get_price` (a static call) can
+// reach test-configured prices.
 std::thread_local! {
     static TEST_ORACLE: std::cell::RefCell<TestOracle> =
         std::cell::RefCell::new(TestOracle::new());

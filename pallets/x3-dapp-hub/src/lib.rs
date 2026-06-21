@@ -1,4 +1,8 @@
 #![deny(unsafe_code)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
 //! # X3 dApp Hub Pallet — Phase 8
 //!
 //! On-chain dApp registry with governance-controlled approval lifecycle,
@@ -78,8 +82,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        /// The overarching event type.
-
         /// Origin that may perform all governance actions.
         type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 

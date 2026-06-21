@@ -4,17 +4,9 @@ use crate::{DeclaredAccess, ParallelProposer, ProposalConfig, ProposalResult, Tr
 use anyhow::Result;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct IntegrationConfig {
     pub proposer_config: ProposalConfig,
-}
-
-impl Default for IntegrationConfig {
-    fn default() -> Self {
-        Self {
-            proposer_config: ProposalConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default)]

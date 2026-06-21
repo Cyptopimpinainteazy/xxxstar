@@ -182,7 +182,7 @@ pub fn run() -> CliResult<()> {
                                     .into(),
                             );
                         }
-                        cmd.run::<Block, sp_io::SubstrateHostFunctions>(config)
+                        cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, sp_io::SubstrateHostFunctions>(Some(config.chain_spec))
                     }
                     BenchmarkCmd::Block(cmd) => {
                         let partial = service::new_partial(&config).map_err(|e| {
@@ -204,7 +204,8 @@ pub fn run() -> CliResult<()> {
                         } = partial;
                         let db = backend.expose_db();
                         let storage = backend.expose_storage();
-                        cmd.run(config, client, db, storage)
+                        let shared_trie_cache = backend.expose_shared_trie_cache();
+                        cmd.run(config, client, db, storage, shared_trie_cache)
                     }
                     BenchmarkCmd::Machine(cmd) => {
                         cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone())
@@ -221,33 +222,11 @@ pub fn run() -> CliResult<()> {
             })
         }
         #[cfg(feature = "try-runtime")]
-        Some(Commands::TryRuntime(cmd)) => {
-            let runner = cli.create_runner(cmd).map_err(|e| {
-                error!("Failed to initialize runner for `try-runtime`: {e}");
-                e
-            })?;
-
-            runner.async_run(|config| {
-                let registry = config.prometheus_config.as_ref().map(|cfg| &cfg.registry);
-                let task_manager =
-                    sc_service::TaskManager::new(config.tokio_handle.clone(), registry).map_err(
-                        |e| CliError::Service(sc_service::Error::Prometheus(e)),
-                    )?;
-                let info_provider =
-                    try_runtime_cli::block_building_info::substrate_info(x3_chain_runtime::SLOT_DURATION);
-
-                Ok((
-                    cmd.run::<
-                        Block,
-                        ExtendedHostFunctions<
-                            sp_io::SubstrateHostFunctions,
-                            <service::AtlasSphereExecutorDispatch as NativeExecutionDispatch>::ExtendHostFunctions,
-                        >,
-                        _,
-                    >(Some(info_provider)),
-                    task_manager,
-                ))
-            })
+        Some(Commands::TryRuntime) => {
+            println!("try-runtime CLI was removed in polkadot-sdk stable2512.");
+            println!("Use Chopsticks for runtime upgrade testing:");
+            println!("  ./scripts/run-chopsticks.sh upgrade");
+            Ok(())
         }
         #[cfg(not(feature = "try-runtime"))]
         Some(Commands::TryRuntime) => Err("TryRuntime wasn't enabled when building the node. \

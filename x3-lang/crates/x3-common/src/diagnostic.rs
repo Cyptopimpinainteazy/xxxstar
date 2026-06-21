@@ -198,12 +198,10 @@ impl From<X3Error> for Diagnostic {
                 }
                 diag
             }
-            X3Error::InternalError { message } => {
-                Diagnostic::error(format!("internal compiler error: {}", message))
-                    .with_code("E9999")
-                    .with_note("this is a bug in the X3 compiler")
-                    .with_help("please report this issue")
-            }
+            X3Error::InternalError { message } => Diagnostic::error(format!("internal compiler error: {}", message))
+                .with_code("E9999")
+                .with_note("this is a bug in the X3 compiler")
+                .with_help("please report this issue"),
             X3Error::AgentError {
                 message,
                 span,
@@ -257,9 +255,7 @@ impl<'a> DiagnosticBuilder<'a> {
     }
 
     pub fn has_errors(&self) -> bool {
-        self.diagnostics
-            .iter()
-            .any(|d| d.level == DiagnosticLevel::Error)
+        self.diagnostics.iter().any(|d| d.level == DiagnosticLevel::Error)
     }
 
     pub fn error_count(&self) -> usize {
@@ -284,12 +280,7 @@ impl<'a> DiagnosticBuilder<'a> {
         Ok(())
     }
 
-    fn emit_diagnostic<W: Write>(
-        &self,
-        w: &mut W,
-        diag: &Diagnostic,
-        use_color: bool,
-    ) -> std::io::Result<()> {
+    fn emit_diagnostic<W: Write>(&self, w: &mut W, diag: &Diagnostic, use_color: bool) -> std::io::Result<()> {
         // Level and code
         let level_str = match diag.level {
             DiagnosticLevel::Error => {
@@ -332,11 +323,7 @@ impl<'a> DiagnosticBuilder<'a> {
         for label in &diag.labels {
             if let Some(file) = self.source_map.get_file(label.span.file_id) {
                 let line_col = file.span_to_line_col(label.span);
-                let arrow = if use_color {
-                    "\x1b[1;34m-->\x1b[0m"
-                } else {
-                    "-->"
-                };
+                let arrow = if use_color { "\x1b[1;34m-->\x1b[0m" } else { "-->" };
                 writeln!(
                     w,
                     " {} {}:{}:{}",
@@ -379,11 +366,7 @@ impl<'a> DiagnosticBuilder<'a> {
 
                     let spaces = " ".repeat(underline_start);
                     if let Some(msg) = &label.message {
-                        writeln!(
-                            w,
-                            " {} {} {}{} {}",
-                            padding, pipe, spaces, underline_colored, msg
-                        )?;
+                        writeln!(w, " {} {} {}{} {}", padding, pipe, spaces, underline_colored, msg)?;
                     } else {
                         writeln!(w, " {} {} {}{}", padding, pipe, spaces, underline_colored)?;
                     }
@@ -393,21 +376,13 @@ impl<'a> DiagnosticBuilder<'a> {
 
         // Notes
         for note in &diag.notes {
-            let note_label = if use_color {
-                "\x1b[1;36mnote\x1b[0m"
-            } else {
-                "note"
-            };
+            let note_label = if use_color { "\x1b[1;36mnote\x1b[0m" } else { "note" };
             writeln!(w, " = {}: {}", note_label, note)?;
         }
 
         // Help
         for help in &diag.help {
-            let help_label = if use_color {
-                "\x1b[1;32mhelp\x1b[0m"
-            } else {
-                "help"
-            };
+            let help_label = if use_color { "\x1b[1;32mhelp\x1b[0m" } else { "help" };
             writeln!(w, " = {}: {}", help_label, help)?;
         }
 

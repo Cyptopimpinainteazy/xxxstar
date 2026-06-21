@@ -833,8 +833,10 @@ fn collect_requirements(
 ) -> Result<(Vec<Requirement>, ScanStats)> {
     let inputs = scan_markdown(root, &cfg.scan)?;
     let mut out: Vec<Requirement> = Vec::new();
-    let mut stats = ScanStats::default();
-    stats.total_md_files = inputs.files.len();
+    let mut stats = ScanStats {
+        total_md_files: inputs.files.len(),
+        ..Default::default()
+    };
 
     for path in inputs.files {
         let rel = match path.strip_prefix(root) {
@@ -931,7 +933,7 @@ fn build_feature_matrix(
         test_ev.truncate(5);
         items.push(FeatureMatrixItem {
             feature: r.id.clone(),
-            module: r.module.clone(),
+            module: r.module,
             source_file: r.source_file.clone(),
             status,
             risk: r.risk.clone(),
@@ -968,7 +970,7 @@ fn build_blockers(
             out.push(BlockerItem {
                 severity: sev,
                 id: r.id.clone(),
-                module: r.module.clone(),
+                module: r.module,
                 source_file: r.source_file.clone(),
                 line: r.line,
                 reason: format!("Explicit [!] blocker: {}", r.text),
@@ -983,7 +985,7 @@ fn build_blockers(
                 out.push(BlockerItem {
                     severity: DriftSeverity::High,
                     id: r.id.clone(),
-                    module: r.module.clone(),
+                    module: r.module,
                     source_file: r.source_file.clone(),
                     line: r.line,
                     reason: format!("[#] needs_test but no test evidence: {}", r.text),
@@ -1001,7 +1003,7 @@ fn build_blockers(
                     out.push(BlockerItem {
                         severity: DriftSeverity::Critical,
                         id: r.id.clone(),
-                        module: r.module.clone(),
+                        module: r.module,
                         source_file: r.source_file.clone(),
                         line: r.line,
                         reason: format!("Tagged {:?} without evidence: {}", r.tags, r.text),

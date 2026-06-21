@@ -29,14 +29,14 @@ export interface JsonRpcResponse<T = unknown> {
 }
 
 export interface JsonRpcClientOptions {
-  /** Base URL of the JSON-RPC HTTP endpoint (default: http://127.0.0.1:9933). */
+  /** Base URL of the JSON-RPC HTTP endpoint (default: http://rpc.testnet.x3-chain.io:9944). */
   url?: string;
   /** Request timeout in milliseconds (default: 8000). */
   timeoutMs?: number;
 }
 
 export interface WsClientOptions {
-  /** WebSocket URL (default: ws://127.0.0.1:9944). */
+  /** WebSocket URL (default: ws://rpc.testnet.x3-chain.io:9944). */
   url?: string;
   /** Auto-reconnect on close (default: true). */
   autoReconnect?: boolean;
@@ -55,7 +55,7 @@ function getDefaultHttpUrl(): string {
   if (typeof process !== 'undefined' && process.env?.VITE_X3_RPC_HTTP) {
     return process.env.VITE_X3_RPC_HTTP;
   }
-  return 'http://127.0.0.1:9933';
+  return 'http://rpc.testnet.x3-chain.io:9944';
 }
 
 function getDefaultWsUrl(): string {
@@ -65,7 +65,7 @@ function getDefaultWsUrl(): string {
   if (typeof process !== 'undefined' && process.env?.VITE_RPC_WS) {
     return process.env.VITE_RPC_WS;
   }
-  return 'ws://127.0.0.1:9944';
+  return 'ws://rpc.testnet.x3-chain.io:9944';
 }
 
 // ── HTTP JSON-RPC Client ────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ let idCounter = 0;
  *
  * @example
  * ```typescript
- * const rpc = createJsonRpcClient({ url: 'http://127.0.0.1:9933' });
+ * const rpc = createJsonRpcClient({ url: 'http://rpc.testnet.x3-chain.io:9944' });
  * const validators = await rpc.call<ValidatorInfo[]>('validator_getValidators', []);
  * ```
  */
@@ -139,7 +139,7 @@ type MessageHandler<T = unknown> = (data: T) => void;
  *
  * @example
  * ```typescript
- * const ws = createWsClient({ url: 'ws://127.0.0.1:9944' });
+ * const ws = createWsClient({ url: 'ws://rpc.testnet.x3-chain.io:9944' });
  * ws.on('network_subscribeMetrics', (metrics) => {
  *   console.log('Live metrics:', metrics);
  * });`
@@ -292,24 +292,29 @@ export function createX3RpcClient(httpUrl?: string) {
         rpc.call('x3_verify_signature', [msg, sig, pk, keyType]),
     },
 
-    // ── Cross-VM (EXPERIMENTAL — backend not yet wired) ──
+    // ── Cross-VM ──
     crossVm: {
-      /** @experimental Backend returns JSON-RPC error until wired to bridge pallet runtime data. */
+      /** Query recent cross-VM asset transfers (wired to bridge pallet; degrades to empty array). */
       getRecentTransfers: (limit?: number) => rpc.call('crossVm_getRecentTransfers', [{ limit: limit ?? 10 }]),
     },
 
-    // ── Swarm (EXPERIMENTAL — backend not yet wired) ──
+    // ── Swarm ──
     swarm: {
-      /** @experimental Backend returns JSON-RPC error until wired to swarm API. */
+      /** Proxy x3-swarm-api :8787 health + scoreboard; degrades gracefully when unreachable. */
       getMetrics: () => rpc.call('swarm_getMetrics', []),
-      /** @experimental Backend returns JSON-RPC error until wired to swarm API. */
+      /** Proxy x3-swarm-api :8787/tasks for recent task list. */
       getRecentTasks: (limit?: number) => rpc.call('swarm_getRecentTasks', [{ limit: limit ?? 10 }]),
     },
 
-    // ── Token (EXPERIMENTAL — backend not yet wired) ──
+    // ── Token ──
     token: {
-      /** @experimental Backend returns JSON-RPC error until wired to balances pallet runtime data. */
+      /** Query total token supply from balances pallet runtime API; degrades to zero. */
       getSupply: () => rpc.call('token_getSupply', []),
+    },
+
+    // ── Network (subscription) ──
+    network: {
+      subscribeMetrics: () => rpc.call('network_subscribeMetrics', []),
     },
 
     // ── Weight meter ──

@@ -188,24 +188,15 @@ impl std::fmt::Display for CapabilityCodecError {
 
 impl std::error::Error for CapabilityCodecError {}
 
-pub fn encode_capability_payload(
-    payload: &CapabilityPayload,
-) -> Result<Vec<u8>, CapabilityCodecError> {
+pub fn encode_capability_payload(payload: &CapabilityPayload) -> Result<Vec<u8>, CapabilityCodecError> {
     let mut out = Vec::new();
     match payload {
-        CapabilityPayload::GpuDispatch {
-            kernel,
-            args,
-            is_simd,
-        } => {
+        CapabilityPayload::GpuDispatch { kernel, args, is_simd } => {
             write_string(&mut out, kernel)?;
             write_string_vec(&mut out, args)?;
             write_bool(&mut out, *is_simd);
         }
-        CapabilityPayload::Simulate {
-            body_ops,
-            receipt_slot,
-        } => {
+        CapabilityPayload::Simulate { body_ops, receipt_slot } => {
             write_u32(&mut out, *body_ops);
             write_string(&mut out, receipt_slot)?;
         }
@@ -216,10 +207,7 @@ pub fn encode_capability_payload(
             write_u32(&mut out, *period_blocks);
             write_u32(&mut out, *entry_ops);
         }
-        CapabilityPayload::IntentResolve {
-            constraints,
-            resolver,
-        } => {
+        CapabilityPayload::IntentResolve { constraints, resolver } => {
             write_string_vec(&mut out, constraints)?;
             write_string(&mut out, resolver)?;
         }
@@ -243,11 +231,7 @@ pub fn encode_capability_payload(
             write_u8(&mut out, *kind);
             write_string(&mut out, data)?;
         }
-        CapabilityPayload::Pathfind {
-            from,
-            to,
-            max_depth,
-        } => {
+        CapabilityPayload::Pathfind { from, to, max_depth } => {
             write_string(&mut out, from)?;
             write_string(&mut out, to)?;
             write_u32(&mut out, *max_depth);
@@ -262,8 +246,7 @@ pub fn encode_capability_payload(
             write_u8(&mut out, *kind);
             write_optional_string(&mut out, target.as_deref())?;
         }
-        CapabilityPayload::Serialize { format, data }
-        | CapabilityPayload::Deserialize { format, data } => {
+        CapabilityPayload::Serialize { format, data } | CapabilityPayload::Deserialize { format, data } => {
             write_u8(&mut out, *format);
             write_string(&mut out, data)?;
         }
@@ -291,10 +274,7 @@ pub fn encode_capability_payload(
             write_u32(&mut out, *required);
             write_u32(&mut out, *total);
         }
-        CapabilityPayload::VersionMeta {
-            version,
-            upgrade_from,
-        } => {
+        CapabilityPayload::VersionMeta { version, upgrade_from } => {
             write_string(&mut out, version)?;
             write_optional_string(&mut out, upgrade_from.as_deref())?;
         }
@@ -302,11 +282,7 @@ pub fn encode_capability_payload(
             write_string(&mut out, package)?;
             write_string(&mut out, key)?;
         }
-        CapabilityPayload::AbiExport {
-            function,
-            params,
-            ret,
-        } => {
+        CapabilityPayload::AbiExport { function, params, ret } => {
             write_string(&mut out, function)?;
             write_string_vec(&mut out, params)?;
             write_string(&mut out, ret)?;
@@ -396,10 +372,7 @@ pub fn encode_asset_op_payload(payload: &AssetOpPayload) -> Result<Vec<u8>, Capa
     Ok(out)
 }
 
-pub fn decode_asset_op_payload(
-    opcode: u8,
-    bytes: &[u8],
-) -> Result<AssetOpPayload, CapabilityCodecError> {
+pub fn decode_asset_op_payload(opcode: u8, bytes: &[u8]) -> Result<AssetOpPayload, CapabilityCodecError> {
     let mut reader = Reader { bytes, pos: 0 };
     let payload = match opcode {
         0x20 => AssetOpPayload::Lock {
@@ -474,10 +447,7 @@ pub fn decode_bridge_payload(bytes: &[u8]) -> Result<BridgePayload, CapabilityCo
     Ok(payload)
 }
 
-pub fn decode_capability_payload(
-    opcode: u8,
-    bytes: &[u8],
-) -> Result<CapabilityPayload, CapabilityCodecError> {
+pub fn decode_capability_payload(opcode: u8, bytes: &[u8]) -> Result<CapabilityPayload, CapabilityCodecError> {
     let mut reader = Reader { bytes, pos: 0 };
     let payload = match opcode {
         0x80 => CapabilityPayload::GpuDispatch {
@@ -639,10 +609,7 @@ fn write_bytes(out: &mut Vec<u8>, bytes: &[u8]) -> Result<(), CapabilityCodecErr
     Ok(())
 }
 
-fn write_optional_string(
-    out: &mut Vec<u8>,
-    value: Option<&str>,
-) -> Result<(), CapabilityCodecError> {
+fn write_optional_string(out: &mut Vec<u8>, value: Option<&str>) -> Result<(), CapabilityCodecError> {
     match value {
         Some(value) => {
             write_bool(out, true);
@@ -671,10 +638,7 @@ struct Reader<'a> {
 
 impl<'a> Reader<'a> {
     fn read_exact(&mut self, len: usize) -> Result<&'a [u8], CapabilityCodecError> {
-        let end = self
-            .pos
-            .checked_add(len)
-            .ok_or(CapabilityCodecError::UnexpectedEof)?;
+        let end = self.pos.checked_add(len).ok_or(CapabilityCodecError::UnexpectedEof)?;
         if end > self.bytes.len() {
             return Err(CapabilityCodecError::UnexpectedEof);
         }

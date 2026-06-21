@@ -124,7 +124,7 @@ pub enum RelayerStateEnum {
     Stopped,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct RelayerMetrics {
     pub blocks_polled: u64,
     pub blocks_finalized: u64,
@@ -133,20 +133,12 @@ pub struct RelayerMetrics {
     pub poll_failures: u64,
     pub pause_events: u64,
     pub uptime_secs: u64,
-}
-
-impl Default for RelayerMetrics {
-    fn default() -> Self {
-        Self {
-            blocks_polled: 0,
-            blocks_finalized: 0,
-            proofs_submitted: 0,
-            proofs_failed: 0,
-            poll_failures: 0,
-            pause_events: 0,
-            uptime_secs: 0,
-        }
-    }
+    /// Watchdog: number of stale-cycle warnings emitted (no new blocks/slots)
+    pub stale_warnings: u64,
+    /// Watchdog: number of times RPC retry was triggered
+    pub rpc_retries: u64,
+    /// Watchdog: number of reconnection attempts
+    pub reconnections: u64,
 }
 
 impl Default for SubmissionConfig {

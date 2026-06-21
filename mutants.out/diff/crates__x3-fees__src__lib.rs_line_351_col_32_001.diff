@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/lib.rs
++++ replace > with < in ResourceVector::exceeds
+@@ -343,17 +343,17 @@
+             storage_reads: self.storage_reads.saturating_add(other.storage_reads),
+             storage_writes: self.storage_writes.saturating_add(other.storage_writes),
+         }
+     }
+ 
+     /// Check if this vector exceeds declared limits
+     pub fn exceeds(&self, limits: &ResourceVector) -> bool {
+         self.cpu_cycles > limits.cpu_cycles
+-            || self.gpu_cycles > limits.gpu_cycles
++            || self.gpu_cycles < /* ~ changed by cargo-mutants ~ */ limits.gpu_cycles
+             || self.memory_bytes > limits.memory_bytes
+             || self.io_ops > limits.io_ops
+             || self.storage_reads > limits.storage_reads
+             || self.storage_writes > limits.storage_writes
+     }
+ }
+ 
+ /// Price vector - unit costs for each resource type

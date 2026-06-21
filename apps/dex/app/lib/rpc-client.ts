@@ -41,7 +41,7 @@ export class X3DexRpcClient {
   private ws: WebSocket | null = null;
   private requestId = 0;
   private pendingRequests = new Map<number, {
-    resolve: (value: unknown) => void;
+    resolve: (value: any) => void;
     reject: (error: unknown) => void;
   }>();
 
@@ -110,7 +110,7 @@ export class X3DexRpcClient {
   /**
    * Send JSON-RPC request
    */
-  private async request(method: string, params: unknown[]): Promise<unknown> {
+  private async request<T = unknown>(method: string, params: unknown[]): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected');
     }
@@ -123,7 +123,7 @@ export class X3DexRpcClient {
       params,
     };
 
-    return new Promise((resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       this.pendingRequests.set(id, { resolve, reject });
       this.ws!.send(JSON.stringify(request));
 
@@ -141,7 +141,7 @@ export class X3DexRpcClient {
    * Estimate swap output amount
    */
   async estimateSwap(request: SwapRequest): Promise<SwapResponse> {
-    return await this.request('walletDex_estimateSwap', [
+    return await this.request<SwapResponse>('walletDex_estimateSwap', [
       request.token_in,
       request.token_out,
       request.amount_in,
@@ -152,11 +152,8 @@ export class X3DexRpcClient {
     ]);
   }
 
-  /**
-   * Execute swap
-   */
   async executeSwap(request: SwapRequest): Promise<SwapResponse> {
-    return await this.request('walletDex_executeSwap', [
+    return await this.request<SwapResponse>('walletDex_executeSwap', [
       request.token_in,
       request.token_out,
       request.amount_in,
@@ -167,16 +164,10 @@ export class X3DexRpcClient {
     ]);
   }
 
-  /**
-   * Get token balance
-   */
   async getBalance(walletId: string, token: string): Promise<BalanceResponse> {
-    return await this.request('walletDex_getBalance', [walletId, token]);
+    return await this.request<BalanceResponse>('walletDex_getBalance', [walletId, token]);
   }
 
-  /**
-   * Get approval status
-   */
   async getApprovalStatus(approvalId: string): Promise<{
     approved: boolean;
     threshold_met: boolean;

@@ -1058,7 +1058,7 @@ pub async fn check_mainnet_readiness(
             "proof-09-atlas-tests",
         ] {
             if evidence.join(format!("{}.log", stem)).is_file() {
-                return Pass(format!("integration logs present"));
+                return Pass("integration logs present".to_string());
             }
         }
         Unknown("no proof-07/08/09 integration logs".into())
@@ -1066,7 +1066,7 @@ pub async fn check_mainnet_readiness(
     gates.push(("Integration tests", integ_state));
 
     // 4. Invariant tests — proptest!/quickcheck files under pallets/, runtime/, crates/.
-    let invariant_state = (|| -> GateState {
+    let invariant_state = {
         let probes = [
             "runtime/tests/fraud_proofs_proptest.rs",
             "pallets/x3-invariants/src/tests.rs",
@@ -1084,11 +1084,11 @@ pub async fn check_mainnet_readiness(
         } else {
             Pass(format!("{} invariant test file(s) present", found.len()))
         }
-    })();
+    };
     gates.push(("Invariant tests", invariant_state));
 
     // 5. Fuzz tests — fuzz_targets directories + corpus presence.
-    let fuzz_state = (|| -> GateState {
+    let fuzz_state = {
         let probes = [
             "pallets/x3-atomic-kernel/fuzz/fuzz_targets",
             "crates/x3-proof/fuzz/fuzz_targets",
@@ -1106,7 +1106,7 @@ pub async fn check_mainnet_readiness(
         } else {
             Pass(format!("{} fuzz target tree(s) present", found.len()))
         }
-    })();
+    };
     gates.push(("Fuzz tests", fuzz_state));
 
     // 6. Fresh machine boot — proof-fresh-machine.log must end with success marker.
@@ -1152,7 +1152,7 @@ pub async fn check_mainnet_readiness(
     gates.push(("Testnet dry run", testnet_state));
 
     // 8. Launch gate receipt — proof/receipts/launch/*.json must exist.
-    let receipt_state = (|| -> GateState {
+    let receipt_state = {
         let dir = workspace.join("proof/receipts/launch");
         match std::fs::read_dir(&dir) {
             Err(_) => Unknown("proof/receipts/launch/ directory missing".into()),
@@ -1174,7 +1174,7 @@ pub async fn check_mainnet_readiness(
                 }
             }
         }
-    })();
+    };
     gates.push(("Launch gate receipt", receipt_state));
 
     println!();

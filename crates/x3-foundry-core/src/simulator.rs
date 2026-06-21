@@ -1,6 +1,5 @@
 use crate::error::FoundryError;
 use crate::types::{BreakEvenModel, DAppType, MonthlyProjection, RevenueConfig, SimulationResult};
-use chrono::Utc;
 use tracing::info;
 
 /// Revenue projection for a single period.
@@ -168,7 +167,7 @@ impl Simulator {
             _ => (user_base as f64 * 1.0) as u64,
         };
 
-        let daily_tx_gas = (daily_tx_count as u64).saturating_mul(gas_per_tx);
+        let daily_tx_gas = daily_tx_count.saturating_mul(gas_per_tx);
         let daily_gas_cost_wei = (daily_tx_gas as u128).saturating_mul(gas_price_gwei as u128);
         let daily_gas_cost = daily_gas_cost_wei / 1_000_000_000_000_000_000; // Convert to token units
 
@@ -366,7 +365,6 @@ impl Default for Simulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FeeMode;
 
     #[test]
     fn test_simulate_volume() {

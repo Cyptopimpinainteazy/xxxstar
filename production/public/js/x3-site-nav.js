@@ -67,9 +67,20 @@
       items: [
         { href: "/chainbench-pro.html", title: "RPC Report", description: "Saved RPC validation artifact." },
         { href: "/chainbench-ultimate.html", title: "Overview", description: "Suite overview and live network snapshot." },
-        { href: "/chainbench-ultimate(1).html", title: "Overview Alt", description: "Alternate overview variant." },
         { href: "/blockchain-stress-test.html", title: "Stress Artifact", description: "Saved throughput stress artifact." },
-        { href: "/blockchain-stress-test(1).html", title: "Stress Artifact Alt", description: "Alternate stress artifact variant." },
+      ],
+    },
+    {
+      label: "Chain Apps",
+      items: [
+        { href: "/intelligence/", title: "Intelligence", description: "Arbitrage control surface & intent matching." },
+        { href: "/wallet/", title: "Wallet", description: "Multi-chain wallet with Polkadex launchpad." },
+        { href: "/dex/", title: "DEX", description: "Decentralized exchange interface." },
+        { href: "/validators/", title: "Validators", description: "3D globe with live validator RPC polling." },
+        { href: "/dashboard/", title: "Dashboard", description: "50+ panel modular dashboard system." },
+        { href: "/inferstructor/", title: "Inferstructor", description: "GPU validator admin & TPS leaderboard." },
+        { href: "/explorer/", title: "Explorer", description: "Blockchain explorer for X3 Chain." },
+        { href: "/governance/", title: "Governance", description: "Phase 5 AST heatmap & rollback events." },
       ],
     },
   ];

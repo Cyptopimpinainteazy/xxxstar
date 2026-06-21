@@ -3,9 +3,9 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use sp_std::vec;
+use frame_benchmarking::benchmarks;
 use frame_system::RawOrigin;
-use sp_core::H256;
 
 const SEED: u32 = 0;
 

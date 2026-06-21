@@ -382,9 +382,9 @@ mod tests {
         let mir = MirLowerer::lower(&hir).expect("mir");
         assert_eq!(mir.functions.len(), 1);
         let function = &mir.functions[0];
-        assert!(function.blocks.iter().any(|block| match block.terminator {
-            Some(MirTerminator::Return(Some(_))) => true,
-            _ => false,
-        }));
+        assert!(function.blocks.iter().any(|block| matches!(
+            block.terminator,
+            Some(MirTerminator::Return(Some(_)))
+        )));
     }
 }

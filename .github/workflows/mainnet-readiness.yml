@@ -70,9 +70,18 @@ jobs:
       - name: Run cargo deny check
         run: cargo deny check
 
+  readiness-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run readiness consistency check
+        run: |
+          chmod +x scripts/check-readiness-consistency.sh
+          scripts/check-readiness-consistency.sh
+
   readiness:
     runs-on: ubuntu-latest
-    needs: [secret-scan, cargo-audit, cargo-deny]
+    needs: [secret-scan, cargo-audit, cargo-deny, readiness-consistency]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -80,6 +89,10 @@ jobs:
           python-version: '3.11'
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Readiness consistency check
+        run: |
+          chmod +x scripts/check-readiness-consistency.sh
+          scripts/check-readiness-consistency.sh
       - name: Mainnet gate
         run: make mainnet-check
       - name: Fresh machine gate

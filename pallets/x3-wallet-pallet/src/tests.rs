@@ -7,10 +7,8 @@
 //! - Biometric registration
 //! - Error conditions
 
-#![cfg(test)]
-
 use crate::{mock::*, pallet::*};
-use frame_support::{assert_noop, assert_ok, BoundedVec};
+use frame_support::{assert_noop, assert_ok};
 
 // ============================================================================
 // Hardware Wallet Tests

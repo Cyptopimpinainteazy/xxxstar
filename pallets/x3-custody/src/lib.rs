@@ -1,5 +1,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![warn(clippy::all, clippy::pedantic)]
+#![allow(deprecated)]
+#![allow(missing_docs)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::large_enum_variant)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::empty_line_after_outer_attr)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::multiple_bound_locations)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::unnecessary_map_or)]
 #![allow(clippy::module_name_repetitions)]
 //! # X3 Custody Pallet — Phase 3.5
 //!
@@ -180,9 +194,37 @@ pub mod pallet {
     };
     use frame_support::{pallet_prelude::*, BoundedVec};
     use frame_system::pallet_prelude::*;
+    use sp_std::vec::Vec;
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// SCALE-encoded (AuthorizationTier, ThresholdPolicy) entries.
+        pub initial_tier_thresholds: Vec<Vec<u8>>,
+        /// SCALE-encoded (T::AccountId, SignerPolicy) entries.
+        pub initial_signer_limits: Vec<Vec<u8>>,
+        pub _phantom: sp_std::marker::PhantomData<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            use codec::Decode;
+            for blob in &self.initial_tier_thresholds {
+                let (tier, policy): (AuthorizationTier, ThresholdPolicy) =
+                    Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded tier threshold");
+                TierThresholds::<T>::insert(tier, policy);
+            }
+            for blob in &self.initial_signer_limits {
+                let (signer, policy): (T::AccountId, SignerPolicy) =
+                    Decode::decode(&mut &blob[..]).expect("valid SCALE-encoded signer limit");
+                SignerLimits::<T>::insert(signer, policy);
+            }
+        }
+    }
 
     // ── Config ────────────────────────────────────────────────────────────────
 
@@ -341,7 +383,7 @@ pub mod pallet {
             role: KeyRole,
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
-            Self::ensure_role_tier_compatible(&role, &tier)?;
+            Self::ensure_role_tier_compatible(role, tier)?;
 
             CustodyMap::<T>::try_mutate(chain_id, asset_id, |entries| -> DispatchResult {
                 ensure!(
@@ -594,16 +636,16 @@ pub mod pallet {
         /// Defaults to `true` when no threshold policy has been set.
         pub fn meets_threshold(chain_id: u32, asset_id: u32, tier: AuthorizationTier) -> bool {
             let count = Self::count_active_signers(chain_id, asset_id, tier);
-            TierThresholds::<T>::get(tier).map_or(true, |p| count >= p.min_signers)
+            TierThresholds::<T>::get(tier).is_none_or(|p| count >= p.min_signers)
         }
 
         // ── Private helpers ───────────────────────────────────────────────────
 
         /// Enforces custody separation: `ValidatorSigning` keys MUST NOT be
         /// registered under the `Operational` tier.
-        fn ensure_role_tier_compatible(role: &KeyRole, tier: &AuthorizationTier) -> DispatchResult {
-            if matches!(role, KeyRole::ValidatorSigning)
-                && matches!(tier, AuthorizationTier::Operational)
+        fn ensure_role_tier_compatible(role: KeyRole, tier: AuthorizationTier) -> DispatchResult {
+            if matches!(&role, KeyRole::ValidatorSigning)
+                && matches!(&tier, AuthorizationTier::Operational)
             {
                 return Err(Error::<T>::KeyRoleNotAllowedForTier.into());
             }

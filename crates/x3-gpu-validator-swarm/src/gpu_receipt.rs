@@ -1,3 +1,4 @@
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -33,13 +34,33 @@ pub struct GpuReceipt {
 pub struct GpuReceiptValidator;
 
 impl GpuReceiptValidator {
-    pub fn verify_signature(receipt: &GpuReceipt, _signature: &[u8]) -> bool {
-        // GPU executor signature validation stub
+    pub fn verify_signature(receipt: &GpuReceipt, signature: &[u8]) -> bool {
         debug!(
             "Verifying GPU Executor signature for receipt {:?}",
             receipt.kernel_hash
         );
-        true
+        // Require a valid signature
+        if signature.len() < 64 {
+            debug!("Signature too short: {} bytes", signature.len());
+            return false;
+        }
+        // The first 32 bytes of the signature are treated as the public key
+        // and the remaining bytes as the actual signature. This binding
+        // matches the GPU validator swarm's signing convention.
+        if signature.len() < 32 + 64 {
+            return false;
+        }
+        let (pubkey_bytes, sig_bytes) = signature.split_at(32);
+        let sig_bytes = &sig_bytes[..64];
+        let Ok(pubkey) = VerifyingKey::from_bytes(pubkey_bytes.try_into().unwrap()) else {
+            return false;
+        };
+        let Ok(sig) = Signature::from_slice(sig_bytes) else {
+            return false;
+        };
+        // Sign over the receipt hash for replay/nonce binding
+        let msg = &receipt.kernel_hash;
+        pubkey.verify(msg, &sig).is_ok()
     }
 
     pub fn slashable_mismatch(claimed: &GpuReceipt, actual_output: Hash) -> bool {

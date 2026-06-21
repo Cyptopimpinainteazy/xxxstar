@@ -1,5 +1,4 @@
-#![cfg(test)]
-
+#![allow(deprecated)]
 use crate as pallet_x3_domain_registry;
 
 use frame_support::{construct_runtime, parameter_types, traits::Everything};
@@ -12,7 +11,7 @@ use sp_runtime::{
 
 pub type AccountId = u64;
 
-pub type UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
+pub type _UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = system::mocking::MockBlock<Test>;
 
 construct_runtime!(

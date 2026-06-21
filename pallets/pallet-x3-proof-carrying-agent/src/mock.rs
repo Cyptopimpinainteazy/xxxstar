@@ -3,17 +3,16 @@
 use crate as pallet_x3_proof_carrying_agent;
 use frame_support::{
     parameter_types,
-    traits::{ConstU32, ConstU64, Everything},
+    traits::{ConstU64, Everything},
 };
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
-    testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type _UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(

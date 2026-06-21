@@ -1,7 +1,7 @@
 //! Strategy simulation using X3 VM
 
 use crate::chromosome::Chromosome;
-use crate::error::Result;
+use crate::error::{EvolutionError, Result};
 use crate::fitness::{FitnessEvaluator, FitnessScore};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -284,48 +284,16 @@ impl Simulator {
     fn execute_strategy(
         &self,
         chromosome: &Chromosome,
-        tick: &MarketTick,
-        portfolio: &PortfolioState,
+        _tick: &MarketTick,
+        _portfolio: &PortfolioState,
     ) -> Result<TradeAction> {
-        // In a real implementation, this would:
-        // 1. Initialize X3 VM with strategy bytecode
-        // 2. Set up input memory with tick data
-        // 3. Execute bytecode
-        // 4. Read output (trading decision)
-
-        // For now, use chromosome parameters to make decision
         let bytecode = chromosome.to_bytecode();
-
         if bytecode.is_empty() {
             return Ok(TradeAction::Hold);
         }
-
-        // Simple decision based on bytecode parameters
-        // This is a placeholder - real implementation uses X3 VM
-        let decision_byte = bytecode.get(1).copied().unwrap_or(128);
-        let threshold = bytecode.get(2).copied().unwrap_or(128);
-
-        // Calculate a simple signal from price
-        let price_signal = ((tick.price * 1000.0) as u64 % 256) as u8;
-
-        // Position check
-        let has_position = portfolio
-            .positions
-            .get(&tick.symbol)
-            .map(|&q| q > 0.0)
-            .unwrap_or(false);
-
-        let action = if price_signal > threshold && !has_position {
-            // Buy signal
-            TradeAction::Buy
-        } else if price_signal < decision_byte && has_position {
-            // Sell signal
-            TradeAction::Sell
-        } else {
-            TradeAction::Hold
-        };
-
-        Ok(action)
+        Err(EvolutionError::SimulationFailed(
+            "strategy simulation not yet implemented; X3 VM integration pending".into(),
+        ))
     }
 
     /// Execute a trade based on action

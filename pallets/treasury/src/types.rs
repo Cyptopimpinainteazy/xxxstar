@@ -173,7 +173,7 @@ pub struct EmergencyPause<AccountId, BlockNumber> {
 #[derive(
     Clone, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen, RuntimeDebug,
 )]
-pub struct TreasuryStats<Balance: Default> {
+pub struct TreasuryStats<Balance> {
     /// Total deposited to treasury.
     pub total_deposited: Balance,
     /// Total spent from treasury.
@@ -200,7 +200,7 @@ pub struct ProposalSummary<AccountId, Balance, BlockNumber> {
 
 /// Treasury snapshot for runtime API.
 #[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
-pub struct TreasurySnapshot<AccountId, Balance: Default, BlockNumber> {
+pub struct TreasurySnapshot<AccountId, Balance, BlockNumber> {
     /// Current treasury balance.
     pub balance: Balance,
     /// Whether treasury is paused.

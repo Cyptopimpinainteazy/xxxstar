@@ -76,7 +76,7 @@ impl StateDiff {
                 .take(<MaxStateDiffBytes as Get<u32>>::get() as usize)
                 .collect::<Vec<_>>()
                 .try_into()
-                .expect("truncated state diff fits bound")
+                .unwrap_or_default()
         }))
     }
 

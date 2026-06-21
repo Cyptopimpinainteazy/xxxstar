@@ -84,7 +84,7 @@ async fn main() -> std::io::Result<()> {
     info!("Starting X3 Chain Analytics Service");
     info!(
         "Database: {}",
-        config.database_url.split('@').last().unwrap_or("***")
+        config.database_url.split('@').next_back().unwrap_or("***")
     );
 
     // Create database pool
@@ -163,13 +163,13 @@ async fn create_pool(config: &ServiceConfig) -> Result<Pool, ServiceError> {
         let auth: Vec<&str> = parts[0].split(':').collect();
         let host_db: Vec<&str> = parts[1].split('/').collect();
 
-        if auth.len() >= 1 {
+        if !auth.is_empty() {
             pg_config.user = Some(auth[0].to_string());
         }
         if auth.len() >= 2 {
             pg_config.password = Some(auth[1].to_string());
         }
-        if host_db.len() >= 1 {
+        if !host_db.is_empty() {
             let host_port: Vec<&str> = host_db[0].split(':').collect();
             pg_config.host = Some(host_port[0].to_string());
             if host_port.len() >= 2 {

@@ -617,7 +617,7 @@ impl SignatureVerifier {
                         }
 
                         // Parse public key (assumed hex sender)
-                        if let Ok(pub_bytes) = hex::decode(&tx.sender.trim_start_matches("0x")) {
+                        if let Ok(pub_bytes) = hex::decode(tx.sender.trim_start_matches("0x")) {
                             let len = pub_bytes.len().min(32);
                             entry[64..64 + len].copy_from_slice(&pub_bytes[0..len]);
                         }

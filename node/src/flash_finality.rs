@@ -42,11 +42,31 @@ impl<Block: BlockT> Validator<Block> for FlashFinalityGossipValidator<Block> {
         _sender: &PeerId,
         data: &[u8],
     ) -> ValidationResult<Block::Hash> {
-        if let Ok(_msg) = GossipMessage::decode(&mut &data[..]) {
-            ValidationResult::ProcessAndKeep(Default::default())
-        } else {
-            ValidationResult::Discard
+        let Ok(msg) = GossipMessage::decode(&mut &data[..]) else {
+            return ValidationResult::Discard;
+        };
+        match &msg {
+            GossipMessage::Proposal(p) => {
+                if p.block_hash == [0u8; 32] || p.round == 0 || p.block_number == 0 {
+                    return ValidationResult::Discard;
+                }
+            }
+            GossipMessage::Vote(v) => {
+                if v.block_hash == [0u8; 32] || v.round == 0 {
+                    return ValidationResult::Discard;
+                }
+            }
+            GossipMessage::Certificate(c) => {
+                if c.block_hash == [0u8; 32]
+                    || c.round == 0
+                    || c.vote_count == 0
+                    || c.voter_set_hash == [0u8; 32]
+                {
+                    return ValidationResult::Discard;
+                }
+            }
         }
+        ValidationResult::ProcessAndKeep(Default::default())
     }
 
     fn message_expired<'a>(&'a self) -> Box<dyn FnMut(Block::Hash, &[u8]) -> bool + 'a> {

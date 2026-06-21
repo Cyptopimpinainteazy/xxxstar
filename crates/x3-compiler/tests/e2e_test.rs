@@ -26,6 +26,7 @@ fn compile_and_measure(source: &str, opt_level: OptLevel) -> (usize, usize) {
 }
 
 /// Helper to load fixture and compile
+#[allow(clippy::expect_fun_call)]
 fn compile_fixture(name: &str, opt_level: OptLevel) -> (usize, usize) {
     let path = format!("{}/tests/fixtures/{}.x3", env!("CARGO_MANIFEST_DIR"), name);
     let source = std::fs::read_to_string(&path).expect(&format!("Failed to read {}", path));

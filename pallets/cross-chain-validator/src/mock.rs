@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use frame_support::parameter_types;
 use frame_system as system;
 use sp_core::H256;

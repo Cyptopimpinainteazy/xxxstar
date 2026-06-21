@@ -94,7 +94,7 @@ export const TerminalShellPanel: React.FC = () => {
 
   const [replCode, setReplCode] = useState('// X3-Lang REPL\nlet wallet = new Wallet();\nawait wallet.connect();\n');
   const [replOutput, setReplOutput] = useState('Connected to X3 Network\n> Wallet initialized');
-  const [replVars, setReplVars] = useState<Record<string, string>>({\
+  const [replVars, setReplVars] = useState<Record<string, string>>({
     'wallet': 'Wallet { connected: true, balance: 2450.25 }',
     'chain_height': '12,845,230',
   });

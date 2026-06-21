@@ -92,10 +92,7 @@ impl SourceFile {
 
     /// Get the file name (without directory).
     pub fn file_name(&self) -> &str {
-        self.path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("<unknown>")
+        self.path.file_name().and_then(|n| n.to_str()).unwrap_or("<unknown>")
     }
 }
 

@@ -1,13 +1,11 @@
 //! Tests for AMM mathematical safety
 
-use super::*;
-use crate::mock::*;
 use x3_dex::amm_pools::{AMMPool, LiquidityPool, TokenId};
 
 #[test]
 fn test_amm_calculations() {
     // Test basic AMM calculations are mathematically correct
-    let mut pool = LiquidityPool {
+    let pool = LiquidityPool {
         pool_id: 0,
         token_a: TokenId {
             chain_id: 1,

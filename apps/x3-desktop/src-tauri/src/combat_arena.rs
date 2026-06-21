@@ -186,16 +186,12 @@ pub fn get_arena_status(state: State<'_, CombatArenaState>) -> Result<bool, Stri
 
 use crate::chain_rpc;
 
-/// Try real JSON-RPC first, fall back to mock data if node unreachable.
-async fn try_rpc_or_mock<F, M, T>(rpc_fn: F, mock_fn: M) -> T
+/// Attempt a real JSON-RPC call. Returns an error if the node is unreachable.
+async fn try_rpc_or_err<F, T>(rpc_fn: F) -> Result<T, String>
 where
     F: std::future::Future<Output = Option<T>>,
-    M: std::future::Future<Output = T>,
 {
-    match rpc_fn.await {
-        Some(result) => result,
-        None => mock_fn.await,
-    }
+    rpc_fn.await.ok_or_else(|| "RPC call failed: node unreachable or returned no result".to_string())
 }
 
 #[tauri::command]
@@ -203,16 +199,11 @@ pub async fn connect_chain(chain: String) -> Result<String, String> {
     let config = chain_rpc::ChainRpcConfig::default();
     let url = chain_rpc::rpc_url_for_chain(&config, &chain);
     // Try a real RPC call to verify connectivity
-    let chain_id = chain_rpc::fetch_chain_id(url).await;
-    match chain_id {
+    match chain_rpc::fetch_chain_id(url).await {
         Some(_) => Ok("ok".to_string()),
-        None => {
-            // Fall back to mock for development
-            match chain.as_str() {
-                "ethereum" | "local" | "x3" => Ok("ok".to_string()),
-                _ => Err(format!("Unknown chain: {}", chain)),
-            }
-        }
+        None => Err(format!(
+            "Cannot connect to chain \"{chain}\": RPC endpoint at {url} is unreachable"
+        )),
     }
 }
 
@@ -241,14 +232,10 @@ pub async fn fetch_chain_status(chain: String) -> Result<serde_json::Value, Stri
         }));
     }
 
-    // Mock fallback
-    Ok(serde_json::json!({
-        "chainId": if chain == "ethereum" { 1 } else { 1337 },
-        "blockHeight": 1284391,
-        "peers": 3,
-        "synced": true,
-        "avgBlockTimeMs": 12000
-    }))
+    // RPC unreachable — return a clear error
+    Err(format!(
+        "Cannot fetch chain status for \"{chain}\": RPC endpoint at {url} is unreachable or returned no data"
+    ))
 }
 
 #[tauri::command]
@@ -282,19 +269,10 @@ pub async fn fetch_blocks(chain: String, limit: u32) -> Result<Vec<serde_json::V
         }
     }
 
-    // Mock fallback
-    let blocks: Vec<serde_json::Value> = (0..limit)
-        .map(|i| {
-            serde_json::json!({
-                "hash": format!("0x{:064x}", rand::random::<u64>()),
-                "height": 1284391 - i,
-                "timestamp": chrono::Utc::now().timestamp_millis() - (i as i64 * 12000),
-                "txCount": rand::random::<u8>() % 20,
-                "stateRoot": format!("0x{:064x}", rand::random::<u64>()),
-            })
-        })
-        .collect();
-    Ok(blocks)
+    // RPC unreachable — return a clear error
+    Err(format!(
+        "Cannot fetch blocks for chain \"{chain}\": RPC endpoint at {url} is unreachable"
+    ))
 }
 
 #[tauri::command]
@@ -322,21 +300,10 @@ pub async fn fetch_mempool(chain: String) -> Result<Vec<serde_json::Value>, Stri
         }
     }
 
-    // Mock fallback
-    let txs: Vec<serde_json::Value> = (0..5)
-        .map(|_| {
-            serde_json::json!({
-                "hash": format!("0x{:064x}", rand::random::<u64>()),
-                "blockHeight": 0,
-                "from": format!("0x{:040x}", rand::random::<u64>()),
-                "to": format!("0x{:040x}", rand::random::<u64>()),
-                "value": format!("{:.4} ETH", rand::random::<f64>() * 100.0),
-                "status": "pending",
-                "timestamp": chrono::Utc::now().timestamp_millis(),
-            })
-        })
-        .collect();
-    Ok(txs)
+    // RPC unreachable — return a clear error
+    Err(format!(
+        "Cannot fetch mempool for chain \"{chain}\": RPC endpoint at {url} is unreachable"
+    ))
 }
 
 #[tauri::command]
@@ -349,8 +316,10 @@ pub async fn sign_and_send_tx(chain: String, raw_tx: String) -> Result<String, S
             return Ok(tx_hash.to_string());
         }
     }
-    // Mock fallback
-    Ok(format!("0x{:064x}", rand::random::<u64>()))
+    // RPC unreachable — return a clear error
+    Err(format!(
+        "Cannot send transaction on \"{chain}\": RPC endpoint at {url} is unreachable"
+    ))
 }
 
 #[tauri::command]
@@ -364,6 +333,8 @@ pub async fn get_balance(chain: String, address: String) -> Result<String, Strin
             return Ok(format!("{:.4} ETH", eth));
         }
     }
-    // Mock fallback
-    Ok(format!("{:.4} ETH", rand::random::<f64>() * 1000.0))
+    // RPC unreachable — return a clear error
+    Err(format!(
+        "Cannot fetch balance on \"{chain}\": RPC endpoint at {url} is unreachable"
+    ))
 }

@@ -1,6 +1,5 @@
 /// Solana Devnet Fork — Test environment pointing at X3 with full Solana compatibility
 /// Allows testing Solana programs against X3 SVM with deterministic state snapshots
-
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
 use sp_std::vec::Vec;
 
@@ -9,7 +8,7 @@ pub struct DevnetForkConfig {
     pub fork_id: [u8; 32],
     pub fork_slot: u64,
     pub fork_timestamp: u64,
-    pub source_rpc: Vec<u8>, // http://localhost:8899 or custom
+    pub source_rpc: Vec<u8>,  // http://localhost:8899 or custom
     pub x3_endpoint: Vec<u8>, // X3 node RPC endpoint
     pub is_active: bool,
     pub is_deterministic: bool,
@@ -67,7 +66,6 @@ impl SolanaDevnetFork {
     const DEVNET_RPC: &'static [u8] = b"http://localhost:8899";
     const X3_RPC: &'static [u8] = b"http://localhost:9944";
     const MAX_ACCOUNTS_PER_FORK: u32 = 1_000_000;
-    const MAX_SNAPSHOTS_PER_FORK: u32 = 100;
 
     /// Initialize a new devnet fork pointing to X3
     pub fn create_fork(
@@ -164,11 +162,9 @@ impl SolanaDevnetFork {
     }
 
     /// Query account from fork state
-    pub fn get_forked_account(
-        state: &ForkState,
-        pubkey: &[u8; 32],
-    ) -> Option<ForkedAccount> {
-        state.accounts
+    pub fn get_forked_account(state: &ForkState, pubkey: &[u8; 32]) -> Option<ForkedAccount> {
+        state
+            .accounts
             .iter()
             .find(|acc| &acc.pubkey == pubkey)
             .cloned()
@@ -213,8 +209,8 @@ impl SolanaDevnetFork {
 
     /// Simulate instruction on fork (deterministic execution)
     pub fn simulate_instruction(
-        program_id: [u8; 32],
-        instruction_data: Vec<u8>,
+        _program_id: [u8; 32],
+        _instruction_data: Vec<u8>,
         accounts: Vec<[u8; 32]>,
     ) -> Result<ComputeMetrics, &'static str> {
         if accounts.is_empty() {
@@ -232,19 +228,13 @@ impl SolanaDevnetFork {
     }
 
     /// Advance fork slot (move time forward deterministically)
-    pub fn advance_slot(
-        current_slot: u64,
-        blocks: u64,
-    ) -> Result<u64, &'static str> {
+    pub fn advance_slot(current_slot: u64, blocks: u64) -> Result<u64, &'static str> {
         let new_slot = current_slot.saturating_add(blocks);
         Ok(new_slot)
     }
 
     /// Set account executable flag (for program accounts)
-    pub fn mark_executable(
-        state: &mut ForkState,
-        pubkey: [u8; 32],
-    ) -> Result<(), &'static str> {
+    pub fn mark_executable(state: &mut ForkState, pubkey: [u8; 32]) -> Result<(), &'static str> {
         for account in state.accounts.iter_mut() {
             if account.pubkey == pubkey {
                 account.executable = true;
@@ -255,10 +245,7 @@ impl SolanaDevnetFork {
     }
 
     /// Validate account lamports (check rent exemption)
-    pub fn validate_rent_exemption(
-        lamports: u64,
-        data_size: usize,
-    ) -> Result<bool, &'static str> {
+    pub fn validate_rent_exemption(lamports: u64, data_size: usize) -> Result<bool, &'static str> {
         let rent_exempt_minimum = Self::calculate_rent_exempt_minimum(data_size);
         if lamports < rent_exempt_minimum {
             return Err("Account not rent exempt");
@@ -272,9 +259,7 @@ impl SolanaDevnetFork {
     }
 
     /// Export fork state for reproducibility (deterministic serialization)
-    pub fn export_fork_state(
-        state: &ForkState,
-    ) -> Result<Vec<u8>, &'static str> {
+    pub fn export_fork_state(state: &ForkState) -> Result<Vec<u8>, &'static str> {
         if state.accounts.is_empty() {
             return Err("Cannot export empty fork state");
         }
@@ -289,14 +274,12 @@ impl SolanaDevnetFork {
     }
 
     /// Import fork state from export (restore from file/storage)
-    pub fn import_fork_state(
-        encoded: Vec<u8>,
-    ) -> Result<ForkState, &'static str> {
+    pub fn import_fork_state(encoded: Vec<u8>) -> Result<ForkState, &'static str> {
         if encoded.is_empty() {
             return Err("Cannot import empty fork state");
         }
 
-        if encoded.len() % 40 != 0 {
+        if !encoded.len().is_multiple_of(40) {
             return Err("Invalid fork state encoding");
         }
 
@@ -329,11 +312,7 @@ impl SolanaDevnetFork {
     }
 
     /// Derive deterministic snapshot ID from accounts
-    fn derive_snapshot_id(
-        slot: u64,
-        timestamp: u64,
-        accounts_hash: &[u8; 32],
-    ) -> [u8; 32] {
+    fn derive_snapshot_id(slot: u64, timestamp: u64, accounts_hash: &[u8; 32]) -> [u8; 32] {
         let mut id = [0u8; 32];
         let slot_bytes = slot.to_le_bytes();
         for (i, byte) in slot_bytes.iter().enumerate() {
@@ -417,7 +396,8 @@ mod tests {
             [0; 32],
             false,
             vec![],
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(state.accounts.len(), 1);
     }
@@ -437,7 +417,8 @@ mod tests {
             [0; 32],
             false,
             vec![42],
-        ).unwrap();
+        )
+        .unwrap();
 
         let account = SolanaDevnetFork::get_forked_account(&state, &[1; 32]);
         assert!(account.is_some());
@@ -467,13 +448,7 @@ mod tests {
 
     #[test]
     fn test_log_transaction() {
-        let log = SolanaDevnetFork::log_transaction(
-            [1; 32],
-            100,
-            true,
-            5_000,
-            1234567890,
-        ).unwrap();
+        let log = SolanaDevnetFork::log_transaction([1; 32], 100, true, 5_000, 1234567890).unwrap();
 
         assert_eq!(log.slot, 100);
         assert!(log.is_success);
@@ -482,11 +457,8 @@ mod tests {
 
     #[test]
     fn test_simulate_instruction() {
-        let metrics = SolanaDevnetFork::simulate_instruction(
-            [1; 32],
-            vec![],
-            vec![[0; 32]],
-        ).unwrap();
+        let metrics =
+            SolanaDevnetFork::simulate_instruction([1; 32], vec![], vec![[0; 32]]).unwrap();
 
         assert_eq!(metrics.total_instructions, 1);
         assert!(metrics.total_compute_units > 0);

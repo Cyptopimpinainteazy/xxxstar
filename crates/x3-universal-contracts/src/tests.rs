@@ -1,12 +1,10 @@
 //! Tests for the Universal Contracts SDK.
 
-#[cfg(test)]
-mod tests {
-    use crate::actions::{Action, Domain};
-    use crate::compiler::Compiler;
-    use crate::error::UcError;
-    use crate::intents::IntentBuilder;
-    use crate::sdk::UniversalContract;
+use crate::actions::{Action, Domain};
+use crate::compiler::Compiler;
+use crate::error::UcError;
+use crate::intents::IntentBuilder;
+use crate::sdk::UniversalContract;
 
     // ===== Action::validate() tests =====
 
@@ -354,4 +352,4 @@ mod tests {
             "packet should be Some for cross-VM actions"
         );
     }
-}
+

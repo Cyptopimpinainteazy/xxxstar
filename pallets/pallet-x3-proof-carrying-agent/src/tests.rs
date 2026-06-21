@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::needless_borrow)]
+//!
 //! Tests for the Proof-Carrying Agent pallet.
 //!
 //! Covers all 6 extrinsics and edge cases:
@@ -10,8 +13,7 @@
 
 use crate::mock::*;
 use crate::types::{
-    AgentProofStats, ChallengeResolution, ProofChallenge, ProofConfig, ProofKind, ProofStatus,
-    VerifiedAction,
+    ChallengeResolution, ProofConfig, ProofKind, ProofStatus,
 };
 use crate::{Error, Event};
 use frame_support::{assert_noop, assert_ok, traits::Currency};
@@ -43,7 +45,7 @@ fn submit_default_action(agent: u64, nonce: u64) -> [u8; 32] {
     panic!("Expected ActionSubmitted event");
 }
 
-fn get_action_id_from_events() -> [u8; 32] {
+fn _get_action_id_from_events() -> [u8; 32] {
     let events = frame_system::Pallet::<Test>::events();
     for event in events.iter().rev() {
         if let Event::ActionSubmitted { action_id, .. } = event.event.clone().try_into().unwrap() {
@@ -421,7 +423,7 @@ fn test_challenge_proof_valid() {
         assert!(challenge.resolution.is_none());
 
         // Stake should be reserved
-        assert_eq!(Balances::reserved_balance(&BOB), 100);
+        assert_eq!(Balances::reserved_balance(BOB), 100);
 
         // Stats updated
         let stats = ProofCarryingAgent::agent_proof_stats(ALICE);

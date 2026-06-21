@@ -90,7 +90,7 @@ fn test_scope_structure() {
         if let Ok(resolved) = resolver.resolve(&module) {
             // Verify we have at least a global scope
             assert!(
-                resolved.scopes.len() >= 1,
+            !resolved.scopes.is_empty(),
                 "{} should have at least global scope",
                 name
             );
