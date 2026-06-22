@@ -2,7 +2,7 @@
   "dependencies": {
     "@gotgenes/opencode-agent-identity": "^3.1.1",
     "@morphllm/opencode-morph-plugin": "^2.0.15",
-    "onnxruntime-node": "^1.20.1",
+    "onnxruntime-node": "^1.27.0",
     "opencode-agent-memory": "^0.2.0",
     "opencode-agent-skills": "^0.7.0",
     "opencode-notify": "^0.3.1",
