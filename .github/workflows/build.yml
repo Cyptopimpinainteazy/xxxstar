@@ -52,8 +52,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
       - uses: Swatinem/rust-cache@v2
-      - name: Remove vendored crate duplicates to avoid version conflicts
-        run: rm -rf vendor/sc-executor-common vendor/sc-executor-wasmtime vendor/sc-allocator vendor/sp-externalities vendor/sp-tracing vendor/sp-runtime-interface vendor/sp-runtime-interface-proc-macro vendor/sp-std vendor/sp-crypto-hashing vendor/sp-debug-derive vendor/sp-storage vendor/sc-executor-common || true
       - name: cargo clippy
         run: cargo clippy --all --all-targets --all-features -- -D warnings
 
@@ -74,8 +72,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
       - uses: Swatinem/rust-cache@v2
-      - name: Remove vendored crate duplicates to avoid version conflicts
-        run: rm -rf vendor/sc-executor-common vendor/sc-executor-wasmtime vendor/sc-allocator vendor/sp-externalities vendor/sp-tracing vendor/sp-runtime-interface vendor/sp-runtime-interface-proc-macro vendor/sp-std vendor/sp-crypto-hashing vendor/sp-debug-derive vendor/sp-storage vendor/sc-executor-common || true
       - name: cargo test (${{ matrix.test-type }})
         run: |
           if [ "${{ matrix.test-type }}" == "lib" ]; then
@@ -99,9 +95,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
       - uses: Swatinem/rust-cache@v2
-      - name: Remove vendored sc-executor duplicates (fixes crate version conflict with polkadot-sdk)
-        run: |
-          rm -rf vendor/sc-executor-common vendor/sc-executor-wasmtime vendor/sc-allocator vendor/sp-externalities vendor/sp-tracing vendor/sp-runtime-interface vendor/sp-runtime-interface-proc-macro vendor/sp-std vendor/sp-crypto-hashing vendor/sp-debug-derive vendor/sp-storage vendor/sc-executor-common || true
       - name: cargo build --release
         run: cargo build -p x3-chain-node --release
         timeout-minutes: 120
@@ -220,7 +213,6 @@ jobs:
            timeout 30 cargo fuzz run fuzz_codec_parsing --release --fuzz-dir pallets/x3-wallet-pallet/fuzz || true
         continue-on-error: true
 
-  # Run advanced fragile tests on critical pallets (weekly)
   advanced-fragile-critical:
     name: Advanced Fragile - Critical Pallets
     runs-on: ubuntu-latest
@@ -241,7 +233,6 @@ jobs:
           RUSTFLAGS="-Zsanitizer=memory" cargo +nightly build -p pallet-x3-oracle --lib --target x86_64-unknown-linux-gnu || true
         continue-on-error: true
 
-  # Multi-process consensus validator harness testing equivocation detection
   consensus-validator-harness:
     name: Consensus Validator Harness
     runs-on: ubuntu-latest
@@ -256,8 +247,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
       - uses: Swatinem/rust-cache@v2
-      - name: Remove vendored crate duplicates to avoid version conflicts
-        run: rm -rf vendor/sc-executor-common vendor/sc-executor-wasmtime vendor/sc-allocator vendor/sp-externalities vendor/sp-tracing vendor/sp-runtime-interface vendor/sp-runtime-interface-proc-macro vendor/sp-std vendor/sp-crypto-hashing vendor/sp-debug-derive vendor/sp-storage vendor/sc-executor-common || true
       - name: Build validator test binary
         run: cargo build -p x3-chain-node --release --features runtime-benchmarks
       - name: Run multi-validator consensus test
@@ -337,11 +326,7 @@ jobs:
           sudo apt-get install -y protobuf-compiler
       - uses: Swatinem/rust-cache@v2
       - name: Build test binary
-        run: |
-          # Remove problematic sc-executor-wasmtime vendored crate to fix
-          # "two different versions of sc_executor_common" compile error
-          rm -rf vendor/sc-executor-common vendor/sc-executor-wasmtime vendor/sc-allocator vendor/sp-externalities vendor/sp-tracing vendor/sp-runtime-interface vendor/sp-runtime-interface-proc-macro vendor/sp-std vendor/sp-crypto-hashing vendor/sp-debug-derive vendor/sp-storage vendor/sc-executor-common || true
-          cargo build -p x3-chain-node --release
+        run: cargo build -p x3-chain-node --release
       - name: Run RPC compatibility smoke test
         run: |
           ./target/release/x3-chain-node --chain dev --rpc-port 9933 &
@@ -400,7 +385,6 @@ jobs:
           for pallet_dir in pallets/*/; do
             if [ -f "${pallet_dir}Cargo.toml" ]; then
               echo "Auditing ${pallet_dir}..."
-              # cargo-audit v0.20.0 uses --json not --format json
               (cd "${pallet_dir}" && cargo audit --json || echo "Audit completed for ${pallet_dir}")
             fi
           done
@@ -418,7 +402,6 @@ jobs:
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx
       - name: Generate SBOM
-        # cargo-cyclonedx v0.5.9 uses --format not --output-format
         run: cargo cyclonedx --format json --output-file sbom.json
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
