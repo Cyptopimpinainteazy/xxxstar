@@ -51,7 +51,12 @@ fn verify_sequence(ops: &[Operation], context: &str, diagnostics: &mut Vec<Compi
     for (index, op) in ops.iter().enumerate() {
         let op_context = format!("{context}[{index}]");
         match op {
-            Operation::AtomicBegin => atomic_depth += 1,
+            Operation::AtomicBegin => {
+                if atomic_depth > 0 {
+                    push_unsafe(diagnostics, format!("{op_context}: nested atomic scopes are not allowed"));
+                }
+                atomic_depth += 1;
+            }
             Operation::AtomicEnd => {
                 if atomic_depth == 0 {
                     push_unsafe(diagnostics, format!("{op_context}: AtomicEnd has no matching AtomicBegin"));
