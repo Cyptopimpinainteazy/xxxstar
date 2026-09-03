@@ -1,58 +1,87 @@
 # RFC t5-6: Numeric Literal Coercion and Argument Type Error Policy
 
-**Status:** DRAFT — requires review
-**Scope:** `crates/x3-parser`, `crates/x3-typeck`
+**Status:** ACCEPTED for X3Lang 1.0 baseline
+**Scope:** canonical Rust compiler path under `x3-lang/compiler`; root `crates/x3-typeck` remains a compatibility/integration implementation and must not define divergent language semantics
 **Risk:** MEDIUM — affects language semantics and diagnostic consistency
 
 ---
 
-## Problem
+## Decision
 
-The current numeric literal semantics are underspecified for signed integers and function call argument mismatches.
+X3Lang 1.0 uses a conservative, deterministic integer policy:
 
-- The parser represents `-42` as unary negation of a positive integer literal rather than a first-class signed integer literal.
-- The type checker defaults integer literals to `u64` for non-negative values and uses unary negation semantics for negative values.
-- Call-site mismatches between literal expressions and fixed integer parameter types can be reported via different diagnostics depending on inference path.
-- Without a clear policy, it is unclear whether the compiler should perform implicit numeric coercion or always reject incompatible integer argument types.
-
-## Current state
-
-- `Literal::Integer(n)` is stored as an integer literal value.
-- `x3-typeck` currently infers positive integer literals as `u64` and negative integer expressions via unary negation.
-- There is no explicit integer literal suffix syntax for `u32`, `i64`, or similar in the parser today.
-- `TypeChecker::types_compatible(...)` only treats exact primitive kind matches as compatible, except for error/never/any/typevar recovery cases.
-- Existing tests now assert that function call argument mismatches should be diagnosed as `TypeErrorKind::ArgumentTypeMismatch`.
-
-## Proposed policy
-
-1. **Numeric literal typing**
-   - A bare integer literal without a sign is typed as `u64` by default.
-   - Negative values produced by `-` are handled as unary negation applied to a literal, not as a separate signed-literal kind.
-   - The compiler should not perform implicit signed/unsigned coercion for integer literals unless an explicit cast or suffix syntax is added later.
-
-2. **Argument mismatch diagnostics**
-   - For function call argument type incompatibility, the only expected diagnostic should be `ArgumentTypeMismatch`.
-   - Generic diagnostics such as `TypeMismatch` or `UnificationFailure` should not be used to represent direct call-site argument incompatibility.
-   - This policy gives a stable signal for call-site type errors and separates parameter-compatibility failures from other type checking failures.
-
-3. **No implicit numeric coercion**
-   - The current compiler behavior should remain reject-only for mismatches between numeric literal types and parameter types.
-   - If a literal is not assignable to the parameter type, the call should fail rather than be silently coerced.
+1. A bare non-negative integer literal is `u64`.
+2. A negative integer such as `-42` remains represented in the AST as unary negation applied to a positive integer literal; for numeric compatibility, the resulting expression type is `i64` for the current bare-literal baseline.
+3. Integer widths and signedness must match exactly at direct function-call boundaries.
+4. There is no implicit widening, narrowing, or signed/unsigned integer coercion.
+5. Direct function argument incompatibility reports the stable compiler diagnostic `X3E0202` (`ArgumentTypeMismatch`).
+6. Explicit literal suffix/cast syntax is not part of the current source-language contract. AST suffix variants are reserved for future syntax/tooling and must not be used to imply currently unsupported source syntax.
 
 ## Rationale
 
-- This policy keeps the language predictable and avoids hidden signed/unsigned coercions.
-- It clarifies diagnostic expectations for developers and prevents the type checker from returning inconsistent error variants.
-- It leaves room for future language evolution: explicit signed integer literal syntax or coercion rules can be added later without changing the current reject-only baseline.
+- Exact compatibility keeps compilation deterministic and prevents hidden value-changing conversions.
+- Bare literals have one predictable default (`u64`).
+- Unary negation preserves the parser model instead of inventing a separate signed-literal token kind.
+- Treating the resulting bare negative expression as `i64` gives X3Lang a usable signed baseline while retaining unary-negation AST semantics.
+- A dedicated call-site diagnostic gives tooling a stable machine-readable signal independent of diagnostic wording.
+
+## Required examples
+
+These are the X3Lang 1.0 baseline behaviors:
+
+```x3
+fn takes_u64(x: u64) { }
+fn main() { takes_u64(1); }
+```
+
+Accepted: bare `1` is `u64`.
+
+```x3
+fn takes_i64(x: i64) { }
+fn main() { takes_i64(-1); }
+```
+
+Accepted: `-1` is unary negation and the resulting bare negative integer expression is `i64`.
+
+```x3
+fn takes_i64(x: i64) { }
+fn main() { takes_i64(1); }
+```
+
+Rejected with `X3E0202`: no unsigned-to-signed coercion.
+
+```x3
+fn takes_u64(x: u64) { }
+fn main() { takes_u64(-1); }
+```
+
+Rejected with `X3E0202`: no signed-to-unsigned coercion.
+
+```x3
+fn takes_u32(x: u32) { }
+fn main() { takes_u32(1); }
+```
+
+Rejected with `X3E0202`: bare `1` is `u64`; implicit narrowing to `u32` is forbidden.
+
+## Implementation authority
+
+The accepted policy is implemented and regression-tested in the canonical Rust language workspace:
+
+- `x3-lang/compiler/src/numeric.rs`
+- `x3-lang/compiler/tests/test_numeric_policy.rs`
+- stable codes in `x3-lang/compiler/src/diagnostic.rs`
+
+The root workspace `crates/x3-parser` / `crates/x3-typeck` may temporarily retain older behavior while compatibility migration is in progress, but those crates do not supersede this policy. Differential tests should be used during migration where practical.
 
 ## Future work
 
-- Add parser support for explicit signed integer literals or literal suffixes once the language semantics are agreed.
-- Refine tests to cover exact signed/unsigned literal behavior as the parser evolves.
-- Consider a dedicated literal-typing pass for integer constants to preserve exact literal kinds beyond the current `u64` default.
+Future RFCs may add:
 
-## Open questions
+- explicit integer literal suffix syntax;
+- explicit cast syntax;
+- checked widening conversions;
+- literal-range-aware inference;
+- richer first-class numeric types.
 
-- Should `-42` be treated as a true `i64` literal or remain unary negation of a `u64` literal until literal suffixes exist?
-- Should the language ever support implicit widening or narrowing between integer literal kinds and parameter types?
-- If explicit literal suffixes are added, how should they interact with current `ArgumentTypeMismatch` diagnostics?
+Any such change is a language-semantic change and requires explicit specification and conformance coverage. It must not silently alter the X3Lang 1.0 baseline.
