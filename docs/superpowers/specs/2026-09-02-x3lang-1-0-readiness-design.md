@@ -63,7 +63,31 @@ Current pipeline responsibilities include:
 
 The design explicitly avoids a wholesale parser/compiler rewrite as a first step. Existing components should be decomposed or refactored only where required to establish clear interfaces, testability, and invariants.
 
-## 3. Architectural Principle: One Canonical Execution Contract
+## 3. Architecture Reconciliation Gate
+
+Before Milestone 1 implementation, identify and resolve the current split between the `x3-lang/` compiler stack and the top-level `crates/x3-*` language crates.
+
+Observed paths include:
+
+- `x3-lang/compiler` consuming `x3-lang-common`, `x3-lang-ast`, and `x3-lang-lexer` from `x3-lang/crates/*`;
+- top-level `crates/x3-parser`, `crates/x3-typeck`, `crates/x3-ast`, `crates/x3-common`, and related semantic crates implementing a second language front-end/type-checking path.
+
+The implementation plan must determine which path is authoritative for X3Lang 1.0 and prevent both stacks from independently defining language semantics.
+
+The preferred outcome is **one canonical front-end/type system with compatibility adapters where migration is required**, not two permanent implementations with drifting rules.
+
+Before hardening code, produce a dependency map answering:
+
+1. Which parser is invoked by the production `x3` CLI/build path?
+2. Which AST representation reaches the production compiler lowering pipeline?
+3. Which type checker/semantic analyzer is authoritative?
+4. Which path is used by current E2E tests?
+5. Which path is consumed by runtime/integration crates outside `x3-lang/`?
+6. Which duplicated crates can be retired, wrapped, or migrated without breaking production callers?
+
+No new language rule should be implemented in only one stack while both remain active.
+
+## 4. Architectural Principle: One Canonical Execution Contract
 
 Compiler and VM behavior must not depend on separate handwritten interpretations of the same execution rules.
 
@@ -83,9 +107,9 @@ Where possible, compiler emitter, verifier, executor, disassembler, and test too
 
 This contract is consensus-sensitive. Any incompatible change must require an explicit version bump rather than silently changing semantics.
 
-## 4. Core Compiler Hardening Milestone
+## 5. Core Compiler Hardening Milestone
 
-### 4.1 Lexer and parser conformance
+### 5.1 Lexer and parser conformance
 
 Create a canonical conformance suite under a dedicated test hierarchy, for example:
 
@@ -119,7 +143,7 @@ Each case should define the expected result in machine-checkable form. Depending
 
 Malformed source must never cause an uncontrolled panic. Invalid source must produce a structured diagnostic.
 
-### 4.2 Stable diagnostics
+### 5.2 Stable diagnostics
 
 Introduce stable diagnostic identifiers rather than relying only on human-readable strings.
 
@@ -145,7 +169,7 @@ A diagnostic should carry:
 
 Human-facing wording may improve over time, but the diagnostic code and semantic meaning should remain stable within the same language major version.
 
-### 4.3 Semantic/type validation
+### 5.3 Semantic/type validation
 
 The semantic layer becomes an explicit gate before lowering.
 
@@ -160,9 +184,18 @@ The X3Lang 1.0 baseline should prove at minimum:
 - valid chain/asset/bridge operation shapes;
 - preservation of safety-critical intent fields.
 
+The current numeric policy RFC is the baseline to encode as executable tests unless superseded by a separately reviewed RFC. Its current draft behavior is:
+
+- bare non-negative integer literals default to `u64`;
+- negative values are represented through unary negation rather than a separate signed-literal form;
+- implicit signed/unsigned numeric coercion is reject-only;
+- direct function-argument incompatibility must produce the dedicated argument-mismatch diagnostic rather than a generic unification/type-mismatch category.
+
+The RFC is still marked draft, so Milestone 1 must either approve/finalize it or replace it before declaring X3Lang 1.0 semantics stable.
+
 Finance- and chain-aware types can be expanded later, but the semantic infrastructure should be designed so types such as `Amount<USDC>` or `Address<Ethereum>` can be added without replacing the compiler architecture.
 
-## 5. IR Contract and Verification
+## 6. IR Contract and Verification
 
 The IR must become an explicitly verified compiler boundary.
 
@@ -196,7 +229,7 @@ Examples include:
 
 The verifier is not an optimizer. Its role is to reject malformed compiler output and define a trustworthy boundary between front-end/lowering logic and executable generation.
 
-## 6. Bytecode Verification
+## 7. Bytecode Verification
 
 The VM must not execute arbitrary bytecode simply because it can be decoded.
 
@@ -215,7 +248,7 @@ A bytecode verifier should validate:
 
 Verification failure must fail closed.
 
-## 7. Determinism Requirements
+## 8. Determinism Requirements
 
 X3Lang 1.0 execution is deterministic by contract.
 
@@ -247,7 +280,7 @@ Examples that must not leak uncontrolled nondeterminism into VM execution includ
 - ambient environment variables;
 - live RPC responses not committed as execution input.
 
-## 8. Gas and Cost Model
+## 9. Gas and Cost Model
 
 Gas accounting should be tied to the canonical opcode/host-call contract.
 
@@ -266,7 +299,7 @@ The compiler may estimate gas, but the VM is authoritative for execution account
 
 Cost-table changes that affect consensus behavior require explicit versioning.
 
-## 9. Atomicity and Rollback
+## 10. Atomicity and Rollback
 
 Atomic operations are a first-class correctness property.
 
@@ -280,7 +313,7 @@ unless a specifically documented non-rollback side effect is part of the executi
 
 Tests should cover failures at multiple points in an atomic sequence, including host-call rejection, insufficient output, timeout/finality failure, and out-of-gas behavior.
 
-## 10. Property, Fuzz, and Differential Testing
+## 11. Property, Fuzz, and Differential Testing
 
 ### Parser fuzzing
 
@@ -317,7 +350,9 @@ Generated failing atomic programs must leave state unchanged according to the at
 
 Where two independent implementations or execution paths exist, compare their observable results. Examples may include interpreter-vs-optimized execution or encoder/decoder round trips.
 
-## 11. X3-Native Type-System Direction
+During architecture reconciliation, differential tests may temporarily compare the two existing front-end/type-checking paths. This is a migration aid, not a justification for permanently maintaining two semantic implementations.
+
+## 12. X3-Native Type-System Direction
 
 Do not make the advanced domain type system a blocker for the first hardening milestone.
 
@@ -344,7 +379,7 @@ Examples:
 - using a bridge destination incompatible with the selected route;
 - constructing an atomic swap without a minimum-output policy when policy requires one.
 
-## 12. Developer Experience
+## 13. Developer Experience
 
 Developer tooling follows core correctness rather than preceding it.
 
@@ -375,7 +410,7 @@ Subsequent tooling can include:
 
 Tooling should call the same compiler APIs and diagnostic infrastructure as the production compiler rather than reimplementing parsing or semantics.
 
-## 13. Versioning
+## 14. Versioning
 
 X3Lang should distinguish at least:
 
@@ -388,7 +423,7 @@ A compiler must make target compatibility explicit.
 
 The VM must reject unsupported bytecode versions rather than guessing compatibility.
 
-## 14. Security Model
+## 15. Security Model
 
 The compiler must be treated as untrusted input processing software, and emitted bytecode must still be verified by the VM.
 
@@ -403,7 +438,7 @@ Security requirements include:
 - no silent fallback from production backends to dry/mock execution;
 - replay/nonce/finality semantics defined for cross-chain operations.
 
-## 15. CI and Release Gates
+## 16. CI and Release Gates
 
 A change should not qualify for X3Lang 1.0 readiness merely because it compiles.
 
@@ -426,7 +461,15 @@ Required gates should include:
 
 CI infrastructure failure is distinct from a failing test. X3Lang cannot be called release-ready until these gates execute successfully in trusted CI.
 
-## 16. Milestone Sequence
+## 17. Milestone Sequence
+
+### Milestone 0: Architecture Reconciliation
+
+- map production and test callers across both X3 language stacks;
+- choose the authoritative parser/AST/type-checking path;
+- define migration/compatibility adapters if required;
+- prevent new semantic drift between duplicate crates;
+- bind the numeric-coercion RFC to the authoritative type-checking path.
 
 ### Milestone 1: Core Compiler Hardening
 
@@ -468,15 +511,16 @@ CI infrastructure failure is distinct from a failing test. X3Lang cannot be call
 - LSP integration using shared compiler diagnostics;
 - documentation/examples refresh.
 
-## 17. X3Lang 1.0 Definition of Done
+## 18. X3Lang 1.0 Definition of Done
 
 X3Lang 1.0 readiness requires evidence for all of the following:
 
+- a single authoritative language semantics path is identified and duplicate front-end behavior is removed or compatibility-wrapped;
 - source tree and dependencies are complete and reproducibly buildable;
 - parser accepts the documented valid grammar and rejects documented invalid grammar;
 - diagnostics have stable codes and tested spans;
 - semantic/type checks are documented and tested;
-- numeric conversion/coercion policy is executable as tests;
+- numeric conversion/coercion policy is finalized and executable as tests;
 - IR verification rejects malformed compiler states;
 - safety-critical intent fields survive the full compilation pipeline;
 - emitted bytecode is versioned and structurally verified before execution;
@@ -489,7 +533,7 @@ X3Lang 1.0 readiness requires evidence for all of the following:
 - CI runs the full readiness gate successfully;
 - readiness documentation is regenerated from current evidence rather than historical assumptions.
 
-## 18. Explicit Non-Goals for Milestone 1
+## 19. Explicit Non-Goals for Milestone 1
 
 The first hardening milestone does not require:
 
@@ -503,7 +547,11 @@ The first hardening milestone does not require:
 
 These can be addressed after the correctness and execution contracts are reliable.
 
-## 19. Key Implementation Risks
+## 20. Key Implementation Risks
+
+### Duplicate language stacks drift semantically
+
+Mitigation: Milestone 0 dependency mapping, select one authoritative stack, compatibility-wrap or retire the other, and prohibit new semantic rules from landing independently in both.
 
 ### Compiler/VM contract drift
 
@@ -525,21 +573,27 @@ Mitigation: versioned canonical cost contract and deterministic gas tests.
 
 Mitigation: harden semantic infrastructure now; add domain-aware types incrementally after Milestone 1.
 
+### Draft semantic RFC remains ambiguous
+
+Mitigation: finalize or supersede the numeric-coercion RFC before X3Lang 1.0 semantic freeze; encode the approved policy as conformance tests.
+
 ### CI cannot provide trustworthy release evidence
 
 Mitigation: treat CI execution health as a release gate separate from local correctness. Do not claim X3Lang 1.0 readiness until required jobs actually execute and pass.
 
-## 20. Recommended First Implementation Slice
+## 21. Recommended First Implementation Slice
 
 The first implementation plan should target a bounded vertical slice:
 
-1. define stable diagnostic representation and error-code convention;
-2. add conformance-test harness and initial valid/invalid fixtures;
-3. encode numeric-coercion policy as tests;
-4. implement or harden IR verifier API;
-5. add intent-preservation tests for swap/bridge safety fields;
-6. expose `check`/compiler API behavior needed by tests;
-7. run workspace tests and targeted X3Lang gates;
-8. document remaining failures as evidence, not assumptions.
+1. map both current language stacks and choose the production-authoritative path;
+2. finalize the numeric-coercion policy for that path;
+3. define stable diagnostic representation and error-code convention;
+4. add conformance-test harness and initial valid/invalid fixtures;
+5. encode numeric-coercion policy as tests;
+6. implement or harden IR verifier API;
+7. add intent-preservation tests for swap/bridge safety fields;
+8. expose `check`/compiler API behavior needed by tests;
+9. run workspace tests and targeted X3Lang gates;
+10. document remaining failures as evidence, not assumptions.
 
 This slice creates a reliable foundation for later bytecode, gas, fuzzing, and developer-experience work.
