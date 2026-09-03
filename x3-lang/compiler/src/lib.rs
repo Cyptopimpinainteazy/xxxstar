@@ -7,6 +7,7 @@ pub mod numeric;
 pub mod parser;
 pub mod regalloc;
 pub mod semantic;
+pub mod verify;
 pub mod spec {
     pub mod opcodes {
         include!("../../spec/opcodes.rs");
@@ -17,6 +18,7 @@ use emitter::emit_x3ir;
 use lowering::{lower_program, LowerCtx};
 use parser::parse_source;
 use semantic::{verify_atomic_swap_decls, verify_with_defaults as verify_semantics};
+use verify::verify_ir;
 use x3_lang_ast::ast::Program;
 use x3_lang_common::{ErrorAccumulator, X3Error};
 
@@ -25,7 +27,7 @@ pub use ir::{Condition, FailureAction, Operation, ProgramMetadata, RequireKind, 
 
 /// Compile an X3 AST program to bytecode
 ///
-/// Pipeline: AST → X3IR → Bytecode
+/// Pipeline: AST → X3IR → IR verification → Bytecode
 pub fn compile_program(program: &Program) -> Result<Vec<u8>, X3Error> {
     compile_program_with_context(program, LowerCtx::new())
 }
@@ -68,6 +70,7 @@ pub fn check_ir(ir: &crate::ir::X3IR) -> Result<(), Vec<X3Error>> {
 pub fn compile_program_with_context(program: &Program, ctx: LowerCtx) -> Result<Vec<u8>, X3Error> {
     // AST → X3IR
     let ir = lower_program(program, ctx)?;
+    verify_lowered_ir(&ir)?;
 
     // X3IR → Bytecode
     let bytecode = emit_x3ir(&ir)?;
@@ -78,9 +81,25 @@ pub fn compile_program_with_context(program: &Program, ctx: LowerCtx) -> Result<
     Ok(bytecode)
 }
 
-/// Get the IR without emitting to bytecode (useful for analysis/optimization)
+/// Get verified IR without emitting to bytecode (useful for analysis/optimization).
 pub fn compile_to_ir(program: &Program) -> Result<X3IR, X3Error> {
-    lower_program(program, LowerCtx::new())
+    let ir = lower_program(program, LowerCtx::new())?;
+    verify_lowered_ir(&ir)?;
+    Ok(ir)
+}
+
+fn verify_lowered_ir(ir: &X3IR) -> Result<(), X3Error> {
+    if let Err(diagnostics) = verify_ir(ir) {
+        let first = diagnostics
+            .into_iter()
+            .next()
+            .expect("IR verifier returned Err with no diagnostics");
+        return Err(X3Error::CodegenError {
+            message: format!("{}: {}", first.code.as_str(), first.message),
+            span: Some(first.primary_span),
+        });
+    }
+    Ok(())
 }
 
 /// Re-export the cross-chain intent adapter boundary.
