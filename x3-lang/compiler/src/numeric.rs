@@ -3,7 +3,7 @@
 //! Baseline rules:
 //! - bare integer literals infer as `u64`;
 //! - unary negation of a bare integer literal produces an `i64` expression;
-//! - signed/unsigned integer arguments are never implicitly coerced;
+//! - integer widths and signedness must match exactly;
 //! - direct call-site incompatibility reports `X3E0202`.
 
 use std::collections::HashMap;
@@ -15,8 +15,20 @@ use crate::diagnostic::{CompilerDiagnostic, DiagnosticCode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NumericKind {
-    Signed,
-    Unsigned,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    U256,
+    Usize,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
+    Isize,
 }
 
 /// Verify numeric compatibility for direct calls to functions declared in the
@@ -54,38 +66,60 @@ fn numeric_type(ty: &TypeExpr) -> Option<NumericKind> {
     };
 
     match name {
-        "u8" | "u16" | "u32" | "u64" | "u128" | "u256" | "usize" => Some(NumericKind::Unsigned),
-        "i8" | "i16" | "i32" | "i64" | "i128" | "i256" | "isize" => Some(NumericKind::Signed),
+        "u8" => Some(NumericKind::U8),
+        "u16" => Some(NumericKind::U16),
+        "u32" => Some(NumericKind::U32),
+        "u64" => Some(NumericKind::U64),
+        "u128" => Some(NumericKind::U128),
+        "u256" => Some(NumericKind::U256),
+        "usize" => Some(NumericKind::Usize),
+        "i8" => Some(NumericKind::I8),
+        "i16" => Some(NumericKind::I16),
+        "i32" => Some(NumericKind::I32),
+        "i64" => Some(NumericKind::I64),
+        "i128" => Some(NumericKind::I128),
+        "i256" => Some(NumericKind::I256),
+        "isize" => Some(NumericKind::Isize),
         _ => None,
+    }
+}
+
+fn literal_numeric_kind(suffix: Option<IntSuffix>) -> NumericKind {
+    match suffix {
+        None | Some(IntSuffix::U64) => NumericKind::U64,
+        Some(IntSuffix::U8) => NumericKind::U8,
+        Some(IntSuffix::U16) => NumericKind::U16,
+        Some(IntSuffix::U32) => NumericKind::U32,
+        Some(IntSuffix::U128) => NumericKind::U128,
+        Some(IntSuffix::U256) => NumericKind::U256,
+        Some(IntSuffix::Usize) => NumericKind::Usize,
+        Some(IntSuffix::I8) => NumericKind::I8,
+        Some(IntSuffix::I16) => NumericKind::I16,
+        Some(IntSuffix::I32) => NumericKind::I32,
+        Some(IntSuffix::I64) => NumericKind::I64,
+        Some(IntSuffix::I128) => NumericKind::I128,
+        Some(IntSuffix::I256) => NumericKind::I256,
+        Some(IntSuffix::Isize) => NumericKind::Isize,
+    }
+}
+
+fn negated_kind(kind: NumericKind) -> NumericKind {
+    match kind {
+        NumericKind::U8 => NumericKind::I8,
+        NumericKind::U16 => NumericKind::I16,
+        NumericKind::U32 => NumericKind::I32,
+        NumericKind::U64 => NumericKind::I64,
+        NumericKind::U128 => NumericKind::I128,
+        NumericKind::U256 => NumericKind::I256,
+        NumericKind::Usize => NumericKind::Isize,
+        signed => signed,
     }
 }
 
 fn expression_numeric_kind(expr: &Expression) -> Option<NumericKind> {
     match expr {
-        Expression::Literal(LiteralExpr::Int { suffix, .. }) => match suffix {
-            None
-            | Some(IntSuffix::U8)
-            | Some(IntSuffix::U16)
-            | Some(IntSuffix::U32)
-            | Some(IntSuffix::U64)
-            | Some(IntSuffix::U128)
-            | Some(IntSuffix::U256)
-            | Some(IntSuffix::Usize) => Some(NumericKind::Unsigned),
-            Some(IntSuffix::I8)
-            | Some(IntSuffix::I16)
-            | Some(IntSuffix::I32)
-            | Some(IntSuffix::I64)
-            | Some(IntSuffix::I128)
-            | Some(IntSuffix::I256)
-            | Some(IntSuffix::Isize) => Some(NumericKind::Signed),
-        },
-        Expression::Unary { op: UnOp::Neg, expr } => {
-            if matches!(expr.as_ref(), Expression::Literal(LiteralExpr::Int { .. })) {
-                Some(NumericKind::Signed)
-            } else {
-                expression_numeric_kind(expr)
-            }
-        }
+        Expression::Literal(LiteralExpr::Int { suffix, .. }) => Some(literal_numeric_kind(*suffix)),
+        Expression::Unary { op: UnOp::Neg, expr } => expression_numeric_kind(expr).map(negated_kind),
         _ => None,
     }
 }
@@ -138,30 +172,28 @@ fn verify_expression(
         Expression::Call { callee, args } => {
             if let Expression::Ident(name) = callee.as_ref() {
                 if let Some(params) = signatures.get(name.as_str()) {
-                    for (index, (param, arg)) in params.iter().zip(args.iter()).enumerate() {
-                        if let (Some(expected), Some(actual)) = (param, expression_numeric_kind(arg)) {
-                            if expected != &actual {
-                                diagnostics.push(
-                                    CompilerDiagnostic::error(
-                                        DiagnosticCode::ArgumentTypeMismatch,
-                                        format!(
-                                            "argument {} to `{}` has incompatible signedness",
-                                            index + 1,
-                                            name.as_str()
-                                        ),
-                                        Span::DUMMY,
-                                    )
-                                    .with_help("X3Lang does not implicitly coerce signed and unsigned integer arguments"),
-                                );
+                    for (index, arg) in args.iter().enumerate() {
+                        if let Some(param) = params.get(index).and_then(|kind| *kind) {
+                            if let Some(actual) = expression_numeric_kind(arg) {
+                                if param != actual {
+                                    diagnostics.push(
+                                        CompilerDiagnostic::error(
+                                            DiagnosticCode::ArgumentTypeMismatch,
+                                            format!("argument {} to `{}` has incompatible integer type", index + 1, name.as_str()),
+                                            Span::DUMMY,
+                                        )
+                                        .with_help("X3Lang requires exact integer type compatibility; implicit widening, narrowing, and signed/unsigned coercion are disabled"),
+                                    );
+                                }
                             }
                         }
                         verify_expression(arg, signatures, diagnostics);
                     }
-                } else {
-                    for arg in args {
-                        verify_expression(arg, signatures, diagnostics);
-                    }
+                    return;
                 }
+            }
+            for arg in args {
+                verify_expression(arg, signatures, diagnostics);
             }
         }
         Expression::Binary { lhs, rhs, .. } => {
