@@ -27,47 +27,102 @@ on:
       - "x3-lang/**"
       - ".github/workflows/x3-lang-readiness.yml"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: x3-lang-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   x3_lang_combined_gate:
-    name: x3-lang + vm + evm + svm combined gate
+    name: x3-lang + vm + evm + svm production gate
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.90.0
+        with:
+          components: rustfmt, clippy
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            x3-lang -> target
 
-      - name: Prepare artifact directory
+      - name: Prepare readiness evidence
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p artifacts/readiness
+          rustc --version --verbose | tee artifacts/readiness/rustc-version.txt
+          cargo --version --verbose | tee artifacts/readiness/cargo-version.txt
+          sha256sum Cargo.lock x3-lang/Cargo.lock | tee artifacts/readiness/lockfile-sha256.txt
+
+      - name: X3Lang workspace format check
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check
+
+      - name: X3Lang workspace Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --manifest-path x3-lang/Cargo.toml --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: X3Lang authoritative workspace tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path x3-lang/Cargo.toml --workspace --all-targets --locked 2>&1 | tee artifacts/readiness/x3-lang-workspace.log
 
       - name: Capture dependency lineage snapshot
+        shell: bash
         run: |
-          cargo tree -p x3-svm-integration > artifacts/readiness/lineage-tree.txt
-          cargo tree -p x3-svm-integration --duplicates > artifacts/readiness/lineage-duplicates.txt
+          set -euo pipefail
+          cargo tree --locked -p x3-svm-integration > artifacts/readiness/lineage-tree.txt
+          cargo tree --locked -p x3-svm-integration --duplicates > artifacts/readiness/lineage-duplicates.txt
 
       - name: Fail on known Solana lineage regressions
+        shell: bash
         run: |
+          set -euo pipefail
           if grep -E "solana-hash v4\\.|solana-pubkey v4\\.|solana-address v2\\.5\\.0" artifacts/readiness/lineage-tree.txt; then
             echo "Detected forbidden Solana lineage entry in SVM dependency graph"
             exit 1
           fi
 
       - name: Combined gate run #1
+        shell: bash
         run: |
-          cargo test -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-1-core.log
-          cargo test -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-vm-evm.log
-          cargo test -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-svm.log
+          set -euo pipefail
+          cargo test --locked -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-1-core.log
+          cargo test --locked -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-vm-evm.log
+          cargo test --locked -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-svm.log
 
       - name: Combined gate run #2 (stability repeat)
+        shell: bash
         run: |
-          cargo test -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-2-core.log
-          cargo test -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-vm-evm.log
-          cargo test -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-svm.log
+          set -euo pipefail
+          cargo test --locked -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-2-core.log
+          cargo test --locked -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-vm-evm.log
+          cargo test --locked -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-svm.log
+
+      - name: Verify dependency state remained deterministic
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum Cargo.lock x3-lang/Cargo.lock | tee artifacts/readiness/lockfile-sha256-after.txt
+          git diff --exit-code -- Cargo.lock x3-lang/Cargo.lock
 
       - name: Upload readiness artifacts
         if: always()
@@ -79,3 +134,6 @@ jobs:
             reports/rc3/x3-lang-readiness-rerun-2026-05-23-source-evidence.md
             Cargo.toml
             Cargo.lock
+            rust-toolchain.toml
+            x3-lang/Cargo.toml
+            x3-lang/Cargo.lock
