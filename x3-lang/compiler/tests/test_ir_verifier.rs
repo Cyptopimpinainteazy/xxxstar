@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use x3_lang_compiler::diagnostic::DiagnosticCode;
+use x3_lang_compiler::emitter::emit_x3ir;
 use x3_lang_compiler::ir::{FailureAction, Operation, ProgramMetadata, X3IR};
 use x3_lang_compiler::verify::verify_ir;
 
@@ -56,6 +57,17 @@ fn rejects_unclosed_atomic_begin() {
 }
 
 #[test]
+fn rejects_nested_atomic_scope() {
+    let ir = ir_with(vec![
+        Operation::AtomicBegin,
+        Operation::AtomicBegin,
+        Operation::AtomicEnd,
+        Operation::AtomicEnd,
+    ]);
+    assert_eq!(codes(&ir), vec![DiagnosticCode::UnsafeIr]);
+}
+
+#[test]
 fn rejects_zero_iteration_loop() {
     let ir = ir_with(vec![Operation::Loop {
         max_iterations: 0,
@@ -97,4 +109,15 @@ fn recursively_rejects_unsafe_nested_control_flow() {
     }]);
 
     assert_eq!(codes(&ir), vec![DiagnosticCode::UnsafeIr]);
+}
+
+#[test]
+fn public_emitter_fails_closed_on_unsafe_ir() {
+    let ir = ir_with(vec![Operation::Call {
+        function: String::new(),
+        args: Vec::new(),
+    }]);
+
+    let error = emit_x3ir(&ir).expect_err("unsafe IR must not reach bytecode emission");
+    assert!(error.to_string().contains("X3E0501"), "unexpected error: {error}");
 }
