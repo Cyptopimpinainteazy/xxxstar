@@ -30,3 +30,9 @@ fn unary_negative_literal_is_not_implicitly_coerced_to_unsigned_argument() {
     let codes = numeric_codes("fn takes_u64(x: u64) { } fn main() { takes_u64(-1); }");
     assert_eq!(codes, vec![DiagnosticCode::ArgumentTypeMismatch]);
 }
+
+#[test]
+fn bare_u64_literal_is_not_implicitly_narrowed_to_u32() {
+    let codes = numeric_codes("fn takes_u32(x: u32) { } fn main() { takes_u32(1); }");
+    assert_eq!(codes, vec![DiagnosticCode::ArgumentTypeMismatch]);
+}
