@@ -11,7 +11,7 @@ contract FoundryFeeConfig is Ownable {
 
     /// @notice Revenue configuration for a dApp
     struct RevenueConfig {
-        uint256 platformFeeBps;     // Platform fee in basis points (e.g., 250 = 2.5%)
+        uint256 platformFeeBps;     // Platform fee in basis points (e.g., 200 = 2%)
         uint256 creatorFeeBps;      // Creator fee in basis points
         uint256 referralFeeBps;     // Referral fee in basis points
         uint256 royaltyFeeBps;      // Royalty fee in basis points
@@ -24,8 +24,8 @@ contract FoundryFeeConfig is Ownable {
     /// @notice Maximum basis points (100%)
     uint256 public constant MAX_BPS = 10000;
 
-    /// @notice Default platform minimum fee in basis points (2.5%)
-    uint256 public constant DEFAULT_MIN_PLATFORM_FEE_BPS = 250;
+    /// @notice Default platform minimum fee in basis points (2%)
+    uint256 public constant DEFAULT_MIN_PLATFORM_FEE_BPS = 200;
 
     // ── State ────────────────────────────────────────────────────────────────
 
