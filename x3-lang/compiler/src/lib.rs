@@ -3,6 +3,7 @@ pub mod emitter;
 pub mod intent_emit;
 pub mod ir;
 pub mod lowering;
+pub mod numeric;
 pub mod parser;
 pub mod regalloc;
 pub mod semantic;
