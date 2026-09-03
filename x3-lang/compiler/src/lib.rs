@@ -1,3 +1,4 @@
+pub mod diagnostic;
 pub mod emitter;
 pub mod intent_emit;
 pub mod ir;
