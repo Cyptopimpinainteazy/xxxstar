@@ -13,9 +13,11 @@
 
 set -euo pipefail
 
-REPO_ROOT="/home/lojak/Desktop/X3_ATOMIC_STAR"
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 EVIDENCE_DIR="${REPO_ROOT}/launch-gates/evidence"
 PROOF_SCRIPT_DIR="${REPO_ROOT}/launch-gates"
+PROOF_STATUS="${EVIDENCE_DIR}/proof-status.txt"
+FAILURE_COUNT=0
 
 # Colors for output
 RED='\033[0;31m'
@@ -26,6 +28,7 @@ NC='\033[0m' # No Color
 
 # Create evidence directory
 mkdir -p "${EVIDENCE_DIR}"
+: > "${PROOF_STATUS}"
 
 # Initialize proof report
 PROOF_REPORT="${EVIDENCE_DIR}/proof-report-$(date +%Y%m%d-%H%M%S).json"
@@ -74,7 +77,8 @@ if cargo check --workspace 2>&1 | tee "${EVIDENCE_DIR}/proof-01-cargo-check.log"
   echo -e "${GREEN}✅ PROOF 1 PASSED: Workspace compiles${NC}"
 else
   echo -e "${RED}❌ PROOF 1 FAILED: Cargo check failed${NC}"
-  echo "proof_01_compile=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_01_compile=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -86,7 +90,8 @@ if cargo test --workspace --lib 2>&1 | tee "${EVIDENCE_DIR}/proof-02-cargo-test.
   echo -e "${GREEN}✅ PROOF 2 PASSED: All tests pass${NC}"
 else
   echo -e "${RED}❌ PROOF 2 FAILED: Some tests failed${NC}"
-  echo "proof_02_tests=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_02_tests=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -98,7 +103,8 @@ if cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee "${EVIDENCE_
   echo -e "${GREEN}✅ PROOF 3 PASSED: No clippy warnings${NC}"
 else
   echo -e "${RED}❌ PROOF 3 FAILED: Clippy warnings found${NC}"
-  echo "proof_03_clippy=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_03_clippy=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -110,7 +116,8 @@ if cargo fmt --all -- --check 2>&1 | tee "${EVIDENCE_DIR}/proof-04-fmt-check.log
   echo -e "${GREEN}✅ PROOF 4 PASSED: Code is formatted${NC}"
 else
   echo -e "${RED}❌ PROOF 4 FAILED: Format issues found${NC}"
-  echo "proof_04_fmt=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_04_fmt=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -138,11 +145,12 @@ echo ""
 # PROOF 6: Runtime compiles
 # ═══════════════════════════════════════════════════════════════════════════════
 echo -e "${YELLOW}[6/12] Runtime compiles${NC}"
-if cargo check -p x3-runtime 2>&1 | tee "${EVIDENCE_DIR}/proof-06-runtime-check.log"; then
+if cargo check -p x3-chain-runtime 2>&1 | tee "${EVIDENCE_DIR}/proof-06-runtime-check.log"; then
   echo -e "${GREEN}✅ PROOF 6 PASSED: Runtime compiles${NC}"
 else
   echo -e "${RED}❌ PROOF 6 FAILED: Runtime check failed${NC}"
-  echo "proof_06_runtime=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_06_runtime=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -154,7 +162,8 @@ if cargo test -p x3-bridge --lib 2>&1 | tee "${EVIDENCE_DIR}/proof-07-bridge-tes
   echo -e "${GREEN}✅ PROOF 7 PASSED: Bridge tests pass${NC}"
 else
   echo -e "${RED}❌ PROOF 7 FAILED: Bridge tests failed${NC}"
-  echo "proof_07_bridge=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_07_bridge=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -166,7 +175,8 @@ if cargo test -p x3-atomic-trade --lib 2>&1 | tee "${EVIDENCE_DIR}/proof-08-atom
   echo -e "${GREEN}✅ PROOF 8 PASSED: Atomic execution tests pass${NC}"
 else
   echo -e "${RED}❌ PROOF 8 FAILED: Atomic execution tests failed${NC}"
-  echo "proof_08_atomic=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_08_atomic=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -178,7 +188,8 @@ if cargo test -p pallet-x3-supply-ledger --lib 2>&1 | tee "${EVIDENCE_DIR}/proof
   echo -e "${GREEN}✅ PROOF 9 PASSED: Supply ledger tests pass${NC}"
 else
   echo -e "${RED}❌ PROOF 9 FAILED: Supply ledger tests failed${NC}"
-  echo "proof_09_atlas=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_09_atlas=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -190,7 +201,8 @@ if cargo test -p x3-finality-oracle --lib 2>&1 | tee "${EVIDENCE_DIR}/proof-10-f
   echo -e "${GREEN}✅ PROOF 10 PASSED: Finality oracle tests pass${NC}"
 else
   echo -e "${RED}❌ PROOF 10 FAILED: Finality oracle tests failed${NC}"
-  echo "proof_10_finality=FAIL" >> "${EVIDENCE_DIR}/proof-status.txt"
+  echo "proof_10_finality=FAIL" >> "${PROOF_STATUS}"
+  FAILURE_COUNT=$((FAILURE_COUNT + 1))
 fi
 echo ""
 
@@ -198,7 +210,7 @@ echo ""
 # PROOF 11: Check chain spec
 # ═══════════════════════════════════════════════════════════════════════════════
 echo -e "${YELLOW}[11/12] Chain spec validation${NC}"
-if cargo run --release -- build-spec --chain mainnet 2>&1 | tee "${EVIDENCE_DIR}/proof-11-chain-spec.log"; then
+if cargo run --release -p x3-chain-node -- build-spec --chain production --disable-default-bootnode 2>&1 | tee "${EVIDENCE_DIR}/proof-11-chain-spec.log"; then
   echo -e "${GREEN}✅ PROOF 11 PASSED: Chain spec builds${NC}"
 else
   echo -e "${YELLOW}⚠️  PROOF 11 WARNING: Chain spec may need review${NC}"
@@ -243,9 +255,9 @@ echo ""
 # Save proof status
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if [ -f "${EVIDENCE_DIR}/proof-status.txt" ]; then
+if [ "${FAILURE_COUNT}" -gt 0 ]; then
   echo -e "${RED}⚠️  BLOCKERS FOUND:${NC}"
-  cat "${EVIDENCE_DIR}/proof-status.txt" | sed 's/^/  /'
+  sed 's/^/  /' "${PROOF_STATUS}"
   echo ""
 else
   echo -e "${GREEN}✅ ALL PROOFS PASSED${NC}"
@@ -253,3 +265,7 @@ fi
 
 echo "Completion time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo ""
+
+if [ "${FAILURE_COUNT}" -gt 0 ]; then
+  exit 1
+fi

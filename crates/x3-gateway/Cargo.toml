@@ -67,4 +67,5 @@ loom = "0.7"
 
 [features]
 default = []
+dev = []
 loom-tests = []

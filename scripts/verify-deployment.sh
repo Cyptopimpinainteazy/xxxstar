@@ -34,17 +34,17 @@ log_check() {
 
 log_pass() {
     echo -e "${GREEN}✓ $1${NC}"
-    ((CHECKS_PASSED++))
+    CHECKS_PASSED=$((CHECKS_PASSED + 1))
 }
 
 log_warn() {
     echo -e "${YELLOW}⚠ $1${NC}"
-    ((CHECKS_WARNINGS++))
+    CHECKS_WARNINGS=$((CHECKS_WARNINGS + 1))
 }
 
 log_fail() {
     echo -e "${RED}✗ $1${NC}"
-    ((CHECKS_FAILED++))
+    CHECKS_FAILED=$((CHECKS_FAILED + 1))
 }
 
 fix_issue() {
@@ -116,7 +116,7 @@ check_github_actions() {
             log_fail "Workflow missing jobs section"
         fi
         
-        if grep -q "s1-merge-gate" "$workflow_file"; then
+        if grep -q "s1-security-gate:" "$workflow_file"; then
             log_pass "S1 merge gate job defined"
         else
             log_fail "S1 merge gate job missing"
