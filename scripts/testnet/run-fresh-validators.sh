@@ -1,68 +1,64 @@
 #!/usr/bin/env bash
-# run-fresh-validators.sh — drive a LOCAL X3 testnet from freshly generated keys/spec.
+# run-fresh-validators.sh — boot a LOCAL X3 testnet from freshly generated keys.
 #
-# Creates N validator base dirs, injects session keys (aura=sr25519, grandpa=ed25519)
-# from deployment/chain-specs/fresh/validator-keys/*.suri into each node keystore, then
-# starts node 1 as bootnode and the rest peering to it. Uses the CLI surface the current
-# binary actually accepts (verified 2026-09-04).
+# Node 1 = bootnode; nodes 2..N peer to it. Each node is started with X3_DEV_SEED=<its
+# master seed>, which is the ONLY mechanism on this binary that surfaces the Aura+GRANDPA
+# keys to the block-authoring worker (verified 2026-09-04: file-only keystore injection
+# does not drive Aura; service maybe_insert_dev_keys inserts programmatically).
 #
-# Usage: ./scripts/testnet/run-fresh-validators.sh [count]        (count<= # of generated suri files)
+# Usage: ./scripts/testnet/run-fresh-validators.sh [count]    (count <= generated su-r files)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export PATH="$HOME/.cargo/bin:$PATH"
 NODE_BIN="$ROOT/target/release/x3-chain-node"
 FRESH="$ROOT/deployment/chain-specs/fresh"
-SPEC="$FRESH/x3-testnet-raw.json"
+SPEC="$FRESH/x3-testnet-plain.json"
 KEYS="$FRESH/validator-keys"
 COUNT="${1:-$(ls "$KEYS"/validator-*.suri 2>/dev/null | wc -l)}"
-if [[ "$COUNT" -lt 1 ]]; then echo "[err] no generated validator suri files in $KEYS"; exit 1; fi
-CHAIN_ID="$(python3 -c "import json;print(json.load(open('$SPEC'))['id'])")"
-BASE="${TESTNET_BASE:-/tmp/x3-fresh-testnet}"
+: "${COUNT:=7}"
+[[ "$COUNT" -lt 1 ]] && { echo "[err] no seeds in $KEYS"; exit 1; }
+BASE="${TESTNET_BASE:-$HOME/.local/share/x3/testnet-fresh}"
 LOG="$BASE/logs"; PID="$BASE/pids"; mkdir -p "$LOG" "$PID"
-
-# stop old
-[[ -n "$(ls "$PID" 2>/dev/null)" ]] && for f in "$PID"/*.pid; do kill "$(cat "$f")" 2>/dev/null || true; done; sleep 2
+# stop existing
+for f in "$PID"/node-*.pid; do [[ -f "$f" ]] && kill "$(cat "$f")" 2>/dev/null || true; done
+sleep 2
 rm -rf "$BASE"/node-* 2>/dev/null || true
 
-start_one () {
-  local i="$1" bootnode="${2:-}"
-  local p2p=$((30443 + i - 1)) rpc=$((9950 + i - 1)) prom=$((9620 + i - 1))
+start_one() {
+  local i="$1" boot="${2:-}"
+  local p2p=$((30533+i-1)) rpc=$((9950+i-1)) prom=$((9630+i-1))
   local bdir="$BASE/node-$i"
-  local kdir="$bdir/chains/$CHAIN_ID/keystore"; mkdir -p "$kdir"
-  # inject aura + grandpa session keys
-  local AURA GRAN; AURA="$(grep '^aura=' "$KEYS/validator-$i.suri" | cut -d= -f2)"
-  GRAN="$(grep '^grandpa=' "$KEYS/validator-$i.suri" | cut -d= -f2)"
-  local apub gpub afile gfile
-  apub="$(subkey inspect --scheme sr25519 "$AURA" | awk '/Public key \(hex\):/{print $4}')"
-  gpub="$(subkey inspect --scheme ed25519 "$GRAN" | awk '/Public key \(hex\):/{print $4}')"
-  afile="61757261${apub#0x}"; gfile="6772616e${gpub#0x}"
-  printf '%s' "$AURA" > "$kdir/$afile"; chmod 600 "$kdir/$afile"
-  printf '%s' "$GRAN" > "$kdir/$gfile"; chmod 600 "$kdir/$gfile"
-
-  local boot_args=(); [[ -n "$bootnode" ]] && boot_args=(--bootnodes "$bootnode")
-  local kp=(); kp=(--rpc-port "$rpc" --rpc-methods=Unsafe --rpc-cors=all --rpc-external --unsafe-force-node-key-generation --node-key "$(python3 -c "import secrets;print(secrets.token_hex(32))")")
-  nohup "$NODE_BIN" --chain "$SPEC" --base-path "$bdir" --name "fresh-v$i" \
-    "${kp[@]}" --validator --force-authoring --allow-private-ip \
+  mkdir -p "$bdir"
+  local seed; seed="$(grep '^seed=' "$KEYS/validator-$i.suri" | cut -d= -f2)"
+  local boot_args=(); [[ -n "$boot" ]] && boot_args=(--bootnodes "$boot")
+  X3_DEV_SEED="$seed" nohup "$NODE_BIN" --chain "$SPEC" --base-path "$bdir" --name "x3-v$i" \
+    --rpc-port "$rpc" --rpc-methods=Unsafe --rpc-cors=all --rpc-external \
+    --unsafe-force-node-key-generation --validator --force-authoring --allow-private-ip \
     --listen-addr "/ip4/0.0.0.0/tcp/${p2p}" --no-mdns --no-telemetry \
-    --prometheus-port "$prom" --prometheus-external --disable-log-color \
-    --execution=native-else-wasm "${boot_args[@]}" > "$LOG/node-$i.log" 2>&1 &
+    --prometheus-port "$prom" --disable-log-color "${boot_args[@]}" > "$LOG/node-$i.log" 2>&1 &
   echo $! > "$PID/node-$i.pid"
-  echo "[node] fresh-v$i started (p2p=${p2p} rpc=${rpc}); pid $!"
+  echo "[node] x3-v$i started (X3_DEV_SEED set) p2p=${p2p} rpc=${rpc} pid $!"
 }
 
-echo "== fresh-key testnet (${COUNT} validators) chain_id=$CHAIN_ID =="
+echo "== fresh-key testnet (${COUNT} nodes) chain=$SPEC =="
 start_one 1
-# discover peer id
+# wait until RPC is live AND node-1 has begun authoring (block>0) so libp2p is accepting
 PEER=""
-for _ in $(seq 1 60); do
+for _ in $(seq 1 90); do
   PEER="$(curl -s -m 2 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"system_localPeerId","params":[]}' "http://127.0.0.1:9950/" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("result",""))' 2>/dev/null || true)"
-  [[ -n "$PEER" ]] && break
-  sleep 1
+  [[ -n "$PEER" ]] && break; sleep 1
 done
-if [[ -z "$PEER" ]]; then echo "[err] node1 peer id not detected"; tail -15 "$LOG/node-1.log"; exit 1; fi
-BOOT="/ip4/0.0.0.0/tcp/30443/p2p/$PEER"
-echo "[net] bootnode: $BOOT"
+# confirm authoring started (genesis #0 -> authored #>0) before peers dial
+for _ in $(seq 1 60); do
+  n="$(curl -s -m 2 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"chain_getHeader","params":[]}' "http://127.0.0.1:9950/" | python3 -c 'import json,sys;h=json.load(sys.stdin).get("result") or {};print(int((h.get("number") or "0x0"),16))' 2>/dev/null || echo 0)"
+  [[ "$n" -gt 1 ]] && break; sleep 1
+done
+echo "[net] node-1 ready (peer=$PEER, block=$n)"
+[[ -z "$PEER" ]] && { echo "[err] node1 peer id not detected"; tail -20 "$LOG/node-1.log"; exit 1; }
+BOOT_IP="${BOOT_IP:-127.0.0.1}"
+BOOT="/ip4/${BOOT_IP}/tcp/30533/p2p/$PEER"
+echo "[net] bootnode $BOOT"
 for i in $(seq 2 "$COUNT"); do start_one "$i" "$BOOT"; done
-sleep 3
-echo "== started; logs under $LOG =="
-for i in $(seq 1 "$COUNT"); do echo "  rpc http://127.0.0.1:$((9950+i-1)) -> $LOG/node-$i.log"; done
+echo "== started: $COUNT validators =="
+for i in $(seq 1 "$COUNT"); do echo "  rpc ws://127.0.0.1:$((9950+i-1))  log $LOG/node-$i.log"; done
+echo "[next] ./scripts/testnet/status-fresh-testnet.sh  |  stop: kill pids in $PID"
