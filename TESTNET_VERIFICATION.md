@@ -277,3 +277,9 @@ verify_ir exhaustiveness). No files changed outside `x3-lang/`.
 - USB source working tree contains stray non-compiler artifacts (`ralph.py`,
   `ralph_*.txt`, `x3_dashboard.html`) — excluded from this merge (out of
   scope, not part of the compiler/VM subsystem).
+
+## X3-LANG-RECONCILE-GREEN-2026-09-04
+Command (x3-lang/): `cargo build --workspace` / `cargo clippy --workspace --all-targets -- -D warnings` / `cargo test --workspace`
+Result: PASS (all EXIT 0)
+Evidence: build Finished 0.18s; clippy 0.23s no warnings; test: every `test result: ok`, 0 failed (incl USB b52_test/executor_tests/parser_coverage + LOCAL test_ir_verifier(8)/test_numeric_policy(5)/test_conformance(1)/test_diagnostics(3)).
+Root-integration: x3-lang is a self-contained separate workspace; no root-workspace crate path- or name-depends on any x3-lang-* crate (only x3-compiler/tests/schema_validator.rs reads x3-lang/schema.json as a data fixture). Reproduced 2026-09-04 by parent session; commits f55fa53a + f4c4ddc8 from reconcile subagent, tree clean.
