@@ -183,3 +183,97 @@ from `run-mesh.py cycles --count 7 --cycles 8` (8/8) and `run-mesh.py kills --co
 Note: proof is on a single 127.0.0.1 host (loopback); production public-net resilience also
 needs real cross-host connectivity + stable on-disk node keys, but the P2P-structure root cause
 (sparse graph) is addressed deterministically here.
+
+---
+
+# X3-LANG RECONCILE 2026-09-04
+
+Reconciled the `x3-lang/` compiler + x3-vm subsystem between the LOCAL tree
+and the USB lineage (`/media/lojak/USB-Drive/home/x3star/Desktop/xxxstar-main`).
+Both are listed Critical X3 Systems (`.x3` language compiler + x3-vm
+executor/verifier). Scope = `x3-lang/` only. Commits: `f55fa53a`.
+
+## Direction facts (independent of this task, verified during work)
+- `x3-lang/` is its own Cargo **workspace** (members: x3-common, x3-lexer,
+  x3-ast, x3-tools, compiler, vm). No crate in the repo root workspace has a
+  path/`[patch]`/name dependency on any `x3-lang-*` crate, so the reconciliation
+  is fully self-contained: nothing outside `x3-lang/` can regress from it.
+- USB and LOCAL forked from a common base. Measured relationships:
+  - **USB lineage (June)** = the *finished cross-VM* compiler: keeps the B-52
+    DSL in-language and the full B-52 `Operation` set in `ir.rs`
+    (`RouteScore`, `SolverBid`, `RelayerAttest`, `RpcConsensus`, `RiskScore`,
+    `InvariantCheck`, `PrivacyCommit`, `ProofRequired`, `VmAdapterCall`,
+    `ModeCheck`, `PackageImport`, `RefundPolicy`) and the full inline
+    `semantic.rs` safety/verify engine (refund paths, explicit finality,
+    proof requirements, invariant rules `InvariantRule`/`get_builtin_invariants`,
+    route-score, mainnet-mode gating `CompilationMode`, risk scoring
+    `RiskScore`/`compute_risk_score`), plus `formatter.rs`, `linter.rs`,
+    `risk.rs`, B-52 examples, and its own test corpus.
+  - **LOCAL lineage (Sept)** independently *removed* the B-52 IR surface + mode
+    gating and added its own **orthogonal** compiler layers: `verify.rs`
+    (structural IR verifier `verify_ir`), `numeric.rs` (integer literal /
+    coercion policy `verify_numeric_policy`), `diagnostic.rs`
+    (`CompilerDiagnostic`/`DiagnosticCode`/`DiagnosticSeverity`) + their tests
+    + a `tests/conformance/` suite.
+  - => BIDIRECTIONALLY diverged, NOT a simple superset.
+
+## Disposition
+Adopted / kept-local / reconciled:
+- **Adopted from USB (base):** `compiler/src/{emitter,ir,lowering,parser,
+  semantic,regalloc,intent_emit}.rs`, the USB-only modules
+  `compiler/src/{formatter,linter,risk}.rs`, `crates/x3-{ast,common,lexer}`,
+  `spec/opcodes.{rs,yaml}`, `x3-tools/src/bin/x3c.rs`, `vm/{executor,
+  verifier,x3_lang_vm}.rs`, their test/fixture corpora, and `examples/*`.
+- **Kept from LOCAL (orthogonal first-class modules):**
+  `compiler/src/{verify,numeric,diagnostic}.rs` plus the compiler test targets
+  `test_ir_verifier.rs`, `test_numeric_policy.rs`, `test_diagnostics.rs`,
+  `test_conformance.rs` and the `tests/conformance/` fixtures. All remain green.
+- **Reconciled (no duplication, no dead code):**
+  - USB semantic verify engine and LOCAL `verify_ir` are **complementary
+    layers**, not duplicates (whole-program semantics vs structural IR
+    scoping/amounts). Both are kept; the semantic engine is the top-level
+    compile/check gate (USB canonical), while `verify_ir`/numeric/diagnostic
+    are exposed as first-class public modules exercised by their integration
+    test targets.
+  - Extended LOCAL `verify::verify_ir`'s match to be exhaustive over the
+    restored B-52 leaf `Operation`s (added to its no-op group) so it compiles
+    against the merged IR.
+  - Merged `compiler/src/lib.rs`: module set = USB modules + `verify`,
+    `numeric`, `diagnostic`; preserves USB's public API (`compile_with_mode`,
+    `check_source_with_mode`, `CompilationMode`/`InvariantRule`/`RiskScore`
+    re-exports, four-arg `verify_with_config`).
+  - Deliberate conflict resolution: USB's sanctioned example
+    `examples/flagship_b52.x3` lowers a swap `min_output` to default `0`, which
+    LOCAL's `verify_ir` rule ("swap min_output must be > 0") rejects. To not
+    regress the USB-finished example corpus, `verify_ir` is kept as an
+    exported/tested structural pass rather than force-injected into the
+    canonical `compile_*` pipeline (which it would break). The USB semantic gate is
+    the compiler's production safety gate.
+
+## Green proof (run in `x3-lang/`, all clean)
+```
+cargo build --workspace                                   # EXIT 0
+cargo clippy --workspace --all-targets -- -D warnings     # EXIT 0 (no warnings)
+cargo test --workspace                                    # 34 suites, 0 failed
+cargo fmt                                                 # EXIT 0
+```
+Fake-code scan on authored/merged files (`lib.rs`, `verify.rs`, `numeric.rs`,
+`diagnostic.rs`): clean.
+
+Test proof highlights (all `ok`): compiler lib unittests 43 (USB semantic
+engine incl. mode/risk/invariant), `b52_test` 33, `executor_tests` 30,
+`test_compiler_pipeline` 16, `test_parser_coverage` 24, `cli_integration` 8,
+`test_e2e_examples` 10, and LOCAL-side `test_ir_verifier` 8, `test_numeric_policy`
+5, `test_conformance` 1, `test_diagnostics` 3.
+
+## Files changed (commit f55fa53a)
+23 modified + 21 added inside `x3-lang/` (USB adoption + merged lib.rs +
+verify_ir exhaustiveness). No files changed outside `x3-lang/`.
+
+## Remaining blockers / out-of-scope
+- The two lineages genuinely disagree on whether a swap may lower `min_output=0`
+  (structural verifier) vs default-accepted (USB semantic). Resolved in favor
+  of the USB-finished example; revisit if a stricter emission gate is desired.
+- USB source working tree contains stray non-compiler artifacts (`ralph.py`,
+  `ralph_*.txt`, `x3_dashboard.html`) — excluded from this merge (out of
+  scope, not part of the compiler/VM subsystem).
