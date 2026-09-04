@@ -396,7 +396,7 @@ fn test_signing_test_vector() {
     // This is Hardhat/Anvil test account #0 (mnemonic: "test test test test test test test test test test test junk").
     // Publicly known, zero real value — NEVER use for anything of value.
     // Expected address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-    let private_key: &str = &concat!(
+    let private_key: &str = concat!(
         "ac0974bec39a17e36ba4a6b4d238ff944b",
         "acb478cbed5efcae784d7bf4f2ff80"
     );

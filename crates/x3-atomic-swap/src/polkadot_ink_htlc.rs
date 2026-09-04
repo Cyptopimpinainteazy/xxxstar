@@ -365,6 +365,7 @@ impl X3VmAdapter for InkHtlcAdapter {
             tests_implemented: true,
             proof_ledger_integration: false, // needs proof ledger integration
             ibc_support: false,
+            cross_adapter_atomicity_test: false,
         }
     }
 }

@@ -760,6 +760,7 @@ fn test_chaos_adapter_lies_about_readiness() {
         tests_implemented: true,        // +10
         proof_ledger_integration: true, // +10
         ibc_support: false,
+        cross_adapter_atomicity_test: false,
     };
 
     let total = score.score();

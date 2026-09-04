@@ -239,9 +239,7 @@ mod tests {
             let mut v = Vec::new();
             v.extend_from_slice(&1i32.to_le_bytes());
             v.push(1);
-            for _ in 0..32 {
-                v.push(1);
-            }
+            v.extend(std::iter::repeat_n(1, 32));
             v.extend_from_slice(&0u32.to_le_bytes());
             v.push(0);
             v.extend_from_slice(&0xffff_ffffu32.to_le_bytes());
@@ -253,7 +251,7 @@ mod tests {
             v
         };
         let h1 = Sha256::digest(&bytes);
-        let h2 = Sha256::digest(&h1);
+        let h2 = Sha256::digest(h1);
         let mut expect = [0u8; 32];
         for (i, b) in h2.iter().enumerate() {
             expect[31 - i] = *b;

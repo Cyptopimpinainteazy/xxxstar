@@ -297,6 +297,7 @@ impl X3VmAdapter for SubstrateHtlcAdapter {
             tests_implemented: true,
             proof_ledger_integration: true,
             ibc_support: false,
+            cross_adapter_atomicity_test: false,
         }
     }
 }
@@ -835,7 +836,7 @@ mod tests {
         assert!(missing.contains(&"event_proof_extraction"));
         assert!(missing.contains(&"rpc_indexer_support"));
         assert!(missing.contains(&"ibc_support"));
-        assert_eq!(missing.len(), 3);
+        assert_eq!(missing.len(), 4);
     }
 
     // ── Stateful Adapter Tests ────────────────────────────────────────────
