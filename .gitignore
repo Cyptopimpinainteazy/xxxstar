@@ -137,3 +137,8 @@ X3-contracts/evm/lib/openzeppelin-contracts
 # Foundry build artifacts (regenerable; do not commit)
 X3-contracts/evm/out/
 X3-contracts/evm/cache/
+
+# tests/security forge symlink + regenerable build artifacts
+tests/security/lib/forge-std
+tests/security/out/
+tests/security/cache/
