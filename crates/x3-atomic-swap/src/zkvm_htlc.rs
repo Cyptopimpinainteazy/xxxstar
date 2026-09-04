@@ -308,6 +308,7 @@ impl X3VmAdapter for ZkVmAdapter {
             tests_implemented: true,
             proof_ledger_integration: true,
             ibc_support: false,
+            cross_adapter_atomicity_test: false,
         }
     }
 }

@@ -572,6 +572,16 @@ impl AdapterScoreboard {
                 ],
             },
             AdapterScoreEntry {
+                vm_type: VmType::WasmL1,
+                adapter_name: "x3-adapter-wasm-l1".into(),
+                score: 80,
+                max_score: 100,
+                missing_capabilities: vec![
+                    "event_proof_extraction".into(),
+                    "rpc_indexer_support".into(),
+                ],
+            },
+            AdapterScoreEntry {
                 vm_type: VmType::InkWasm,
                 adapter_name: "x3-adapter-ink".into(),
                 score: 70,
@@ -595,8 +605,14 @@ impl AdapterScoreboard {
                 ],
             },
         ];
+        let count = entries.len();
         let total: u32 = entries.iter().map(|e| e.score).sum();
-        let overall = (total * 100) / (1600); // 16 * 100
+        let max_total = (count as u32) * 100;
+        let overall = if max_total > 0 {
+            (total * 100) / max_total
+        } else {
+            0
+        };
         Self {
             entries,
             overall_score: overall,
