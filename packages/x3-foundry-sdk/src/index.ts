@@ -132,7 +132,6 @@ import type {
   AppHealthScore,
   ForkLineage,
   TemplateRegistry,
-  Template,
   BigNumberish,
 } from './types';
 

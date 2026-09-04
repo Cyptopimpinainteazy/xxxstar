@@ -35,6 +35,24 @@ export interface ApiClientConfig {
 }
 
 /**
+ * Resolved configuration after defaults are applied. Scalar fields are
+ * required (defaults applied in the constructor); `apiKey` and `headers`
+ * remain optional because they can be cleared or added at runtime.
+ */
+interface ResolvedApiClientConfig {
+  /** Base URL for the Foundry API */
+  baseUrl: string;
+  /** Request timeout in milliseconds */
+  timeout: number;
+  /** Maximum number of retry attempts */
+  maxRetries: number;
+  /** Authentication token or API key (optional, cleared via clearAuthToken) */
+  apiKey?: string;
+  /** Additional headers to include in all requests */
+  headers: Record<string, string>;
+}
+
+/**
  * Retry configuration for failed requests.
  */
 interface RetryConfig {
@@ -153,7 +171,7 @@ export class ValidationError extends ApiClientError {
  */
 export class ApiClient {
   private readonly client: AxiosInstance;
-  private readonly config: Required<ApiClientConfig>;
+  private readonly config: ResolvedApiClientConfig;
   private readonly retryConfig: RetryConfig;
 
   constructor(config: ApiClientConfig) {

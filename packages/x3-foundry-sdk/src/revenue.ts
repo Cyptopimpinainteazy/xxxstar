@@ -13,8 +13,6 @@ import type {
   RevenueConfig,
   FeeMode,
   BigNumberish,
-  PaginatedResponse,
-  PaginationParams,
 } from './types';
 
 // =============================================================================
