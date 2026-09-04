@@ -1,0 +1,43 @@
+   derived node-1: 12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+   derived node-2: 12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+   derived node-3: 12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x
+   derived node-4: 12D3KooWSsChzF81YDUKpe9Uk5AHV5oqAaXAcWNSPYgoLauUk4st
+   derived node-5: 12D3KooWSuTq6MG9gPt7qZqLFKkYrfxMewTZhj9nmRHJkPwzWDG2
+   derived node-6: 12D3KooWMz5U7fR8mF5DNhZSSyFN8c19kU63xYopzDSNCzoFigYk
+   derived node-7: 12D3KooWE3quQCP6Xu7eXpcmmpwVS1KofWnPCBWYNHCswgaqwCso
+[mesh] count=7 deterministic keys -> reserved full mesh
+
+=== cycle 1/8 (fresh genesis, full mesh) ===
+[cycle 1] converged in 20s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0xbd701e692f9b77,peers=6 | mesh2:final=0xbd701e692f9b77,peers=6 | mesh3:final=0xbd701e692f9b77,peers=6 | mesh4:final=0xbd701e692f9b77,peers=6 | mesh5:final=0xbd701e692f9b77,peers=6 | mesh6:final=0xbd701e692f9b77,peers=6 | mesh7:final=0xbd701e692f9b77,peers=6
+
+=== cycle 2/8 (fresh genesis, full mesh) ===
+[cycle 2] converged in 16s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0xdc236eb9abb4df,peers=3 | mesh2:final=0xdc236eb9abb4df,peers=4 | mesh3:final=0xdc236eb9abb4df,peers=3 | mesh4:final=0xdc236eb9abb4df,peers=1 | mesh5:final=0xdc236eb9abb4df,peers=3 | mesh6:final=0xdc236eb9abb4df,peers=1 | mesh7:final=0xdc236eb9abb4df,peers=3
+
+=== cycle 3/8 (fresh genesis, full mesh) ===
+[cycle 3] converged in 18s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0x9f74e8b5e9d265,peers=6 | mesh2:final=0x9f74e8b5e9d265,peers=6 | mesh3:final=0x9f74e8b5e9d265,peers=6 | mesh4:final=0x9f74e8b5e9d265,peers=6 | mesh5:final=0x9f74e8b5e9d265,peers=6 | mesh6:final=0x9f74e8b5e9d265,peers=6 | mesh7:final=0x9f74e8b5e9d265,peers=6
+
+=== cycle 4/8 (fresh genesis, full mesh) ===
+[cycle 4] converged in 20s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0x316b63e9a4d350,peers=6 | mesh2:final=0x316b63e9a4d350,peers=6 | mesh3:final=0x316b63e9a4d350,peers=6 | mesh4:final=0x316b63e9a4d350,peers=6 | mesh5:final=0x316b63e9a4d350,peers=6 | mesh6:final=0x316b63e9a4d350,peers=6 | mesh7:final=0x316b63e9a4d350,peers=6
+
+=== cycle 5/8 (fresh genesis, full mesh) ===
+[cycle 5] converged in 20s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0x5cd8e418cdcaed,peers=6 | mesh2:final=0x5cd8e418cdcaed,peers=6 | mesh3:final=0x5cd8e418cdcaed,peers=6 | mesh4:final=0x5cd8e418cdcaed,peers=6 | mesh5:final=0x5cd8e418cdcaed,peers=6 | mesh6:final=0x5cd8e418cdcaed,peers=6 | mesh7:final=0x5cd8e418cdcaed,peers=6
+
+=== cycle 6/8 (fresh genesis, full mesh) ===
+[cycle 6] converged in 18s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0xba080887b7e6c3,peers=6 | mesh2:final=0xba080887b7e6c3,peers=6 | mesh3:final=0xba080887b7e6c3,peers=6 | mesh4:final=0xba080887b7e6c3,peers=6 | mesh5:final=0xba080887b7e6c3,peers=6 | mesh6:final=0xba080887b7e6c3,peers=6 | mesh7:final=0xba080887b7e6c3,peers=6
+
+=== cycle 7/8 (fresh genesis, full mesh) ===
+[cycle 7] converged in 14s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0xe481ee0ee6a5b2,peers=1 | mesh2:final=0xe481ee0ee6a5b2,peers=3 | mesh3:final=0xe481ee0ee6a5b2,peers=3 | mesh4:final=0xe481ee0ee6a5b2,peers=6 | mesh5:final=0xe481ee0ee6a5b2,peers=4 | mesh6:final=0xe481ee0ee6a5b2,peers=3 | mesh7:final=0xe481ee0ee6a5b2,peers=2
+
+=== cycle 8/8 (fresh genesis, full mesh) ===
+[cycle 8] converged in 14s unique_finalized_heads=1 -> CONVERGED
+    mesh1:final=0xf04c1f57ed2eca,peers=1 | mesh2:final=0xf04c1f57ed2eca,peers=3 | mesh3:final=0xf04c1f57ed2eca,peers=6 | mesh4:final=0xf04c1f57ed2eca,peers=3 | mesh5:final=0xf04c1f57ed2eca,peers=1 | mesh6:final=0xf04c1f57ed2eca,peers=1 | mesh7:final=0xf04c1f57ed2eca,peers=3
+
+[result] cold-start cycles converged: 8/8
+[OK] RESERVED FULL MESH: every cold-start converged to ONE finalized head.
