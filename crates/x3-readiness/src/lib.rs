@@ -516,7 +516,33 @@ pub fn generate_tauri_wiring_report() -> String {
 }
 
 pub fn generate_marketing_claims_audit() -> String {
-    String::from("# Marketing Claims Audit\n\nNo automated claims verification configured.\n")
+    match load_feature_registry() {
+        Ok(reg) => {
+            let mut out =
+                String::from("# Marketing Claims Audit\n\n");
+            out.push_str(
+                "- Only verified reports may drive marketing claims.\n",
+            );
+            out.push_str("- Unsupported claims must be marked UNSUPPORTED_CLAIM.\n");
+            let mut flagged = 0usize;
+            for (name, entry) in &reg {
+                if entry.mode == "SIM_TESTNET" || entry.mode == "PLANNED" {
+                    out.push_str(&format!(
+                        "- UNSUPPORTED_CLAIM: {} (mode={}, score={})\n",
+                        name, entry.mode, entry.readiness_score
+                    ));
+                    flagged += 1;
+                }
+            }
+            if flagged == 0 {
+                out.push_str("- No SIM_TESTNET/PLANNED features found; nothing flagged.\n");
+            }
+            out
+        }
+        Err(e) => {
+            String::from("# Marketing Claims Audit\n\nError loading feature registry: ") + &e + "\n"
+        }
+    }
 }
 
 pub fn generate_btc_gateway_report() -> String {
@@ -620,7 +646,35 @@ pub fn generate_reactor_benchmark_report() -> String {
 }
 
 pub fn generate_grant_pipeline_report() -> String {
-    String::from("# Grant Pipeline Report\n\nGrant tracking integration not yet wired.\n")
+    match load_feature_registry() {
+        Ok(reg) => {
+            let mut out = String::from("# Grant Pipeline Report\n\n");
+            out.push_str("- Grant schema and tracking are under development.\n");
+            out.push_str(
+                "- Not grant-eligible below the 50% readiness barrier.\n",
+            );
+            let below = reg
+                .iter()
+                .filter(|(_, e)| e.readiness_score < 50)
+                .count();
+            out.push_str(&format!(
+                "- {} feature(s) below 50% readiness (not grant-eligible until they pass 50% barrier).\n",
+                below
+            ));
+            for (name, entry) in &reg {
+                if entry.readiness_score < 50 {
+                    out.push_str(&format!(
+                        "  - {}: score={}\n",
+                        name, entry.readiness_score
+                    ));
+                }
+            }
+            out
+        }
+        Err(e) => {
+            String::from("# Grant Pipeline Report\n\nError loading feature registry: ") + &e + "\n"
+        }
+    }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────
