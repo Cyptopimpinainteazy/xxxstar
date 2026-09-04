@@ -47,6 +47,7 @@ pub enum MappingError {
 }
 
 #[cfg(test)]
+#[derive(Default)]
 pub struct InMemoryMappingStore {
     by_asset: std::collections::BTreeMap<AssetId, AssetMapping>,
     evm_to_asset: std::collections::BTreeMap<[u8; 20], AssetId>,
@@ -56,11 +57,7 @@ pub struct InMemoryMappingStore {
 #[cfg(test)]
 impl InMemoryMappingStore {
     pub fn new() -> Self {
-        Self {
-            by_asset: Default::default(),
-            evm_to_asset: Default::default(),
-            svm_to_asset: Default::default(),
-        }
+        Self::default()
     }
 
     pub fn register(

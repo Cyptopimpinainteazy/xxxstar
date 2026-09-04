@@ -44,6 +44,7 @@ pub enum PendingError {
 }
 
 #[cfg(test)]
+#[derive(Default)]
 pub struct InMemoryPendingStore {
     transfers: std::collections::BTreeMap<TransferId, PendingTransfer>,
     pub total_pending: Balance,
@@ -52,10 +53,7 @@ pub struct InMemoryPendingStore {
 #[cfg(test)]
 impl InMemoryPendingStore {
     pub fn new() -> Self {
-        Self {
-            transfers: Default::default(),
-            total_pending: 0,
-        }
+        Self::default()
     }
 
     pub fn begin(

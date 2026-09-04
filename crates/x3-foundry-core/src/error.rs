@@ -140,12 +140,13 @@ mod tests {
     }
 
     #[test]
-    fn test_foundry_result() {
+    fn test_foundry_result() -> Result<(), FoundryError> {
         let ok: FoundryResult<i32> = Ok(42);
-        let val = ok.unwrap();
+        let val = ok?;
         assert_eq!(val, 42);
 
         let err: FoundryResult<i32> = Err(FoundryError::NotFound("test".into()));
         assert!(err.is_err());
+        Ok(())
     }
 }
