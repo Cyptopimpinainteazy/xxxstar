@@ -64,6 +64,7 @@
 
 pub mod bridge;
 pub mod contract_upgrade_pattern;
+pub mod universal_escrow;
 pub mod dap_debugging;
 pub mod error;
 pub mod execution_guards;

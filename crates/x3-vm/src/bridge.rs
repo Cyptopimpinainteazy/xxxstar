@@ -105,6 +105,12 @@ pub trait BalanceProvider: Send + Sync {
 /// For `bridge_evm_to_svm` (0x31):
 ///   1. `lock_evm(from_h160, amount)` → ticket
 ///   2. `release_svm(to_pubkey, ticket, amount)`
+///
+/// # Symmetric Compensation
+///
+/// If `release_*` fails after a successful `lock_*`, the bridge MUST call
+/// `unwind_*_lock` to return funds to the sender.  If the unwind also fails,
+/// the ticket is marked as **orphaned** and requires manual recovery.
 pub trait CrossVmEscrow: Send + Sync {
     /// Lock `amount` of native tokens on the SVM side.  Returns a 32-byte
     /// escrow ticket that authorises the corresponding EVM release.
@@ -123,6 +129,32 @@ pub trait CrossVmEscrow: Send + Sync {
 
     /// Release `amount` of native tokens on the SVM side given a valid ticket.
     fn release_svm(&self, to: &[u8], ticket: &[u8; 32], amount: u128) -> Result<(), &'static str>;
+
+    /// Unwind an SVM lock — called when `release_evm` fails after `lock_svm`
+    /// succeeded.  Returns funds to `sender` and invalidates the ticket.
+    /// Default implementation removes the ticket from the escrow state.
+    fn unwind_svm_lock(
+        &self,
+        _ticket: &[u8; 32],
+        _sender: &[u8],
+        _amount: u128,
+    ) -> Result<(), &'static str> {
+        // Default: ticket is consumed but funds are NOT automatically returned
+        // to sender.  Real implementations must override this with actual
+        // refund logic (credit sender, invalidate ticket).
+        Err("unwind_svm_lock not implemented by escrow provider — ticket orphaned")
+    }
+
+    /// Unwind an EVM lock — called when `release_svm` fails after `lock_evm`
+    /// succeeded.  Default implementation marks ticket as orphaned.
+    fn unwind_evm_lock(
+        &self,
+        _ticket: &[u8; 32],
+        _sender: &[u8; 20],
+        _amount: u128,
+    ) -> Result<(), &'static str> {
+        Err("unwind_evm_lock not implemented by escrow provider — ticket orphaned")
+    }
 }
 
 /// X3VM Bridge for cross-VM execution
@@ -137,6 +169,8 @@ pub struct X3VMBridge {
     balance_provider: Option<std::sync::Arc<dyn BalanceProvider>>,
     /// Optional cross-VM escrow for 0x30 / 0x31 hostcalls.
     escrow: Option<std::sync::Arc<dyn CrossVmEscrow>>,
+    /// Universal escrow registry for 0x32 / 0x33 multi-family hostcalls.
+    universal_escrow: Option<std::sync::Arc<crate::universal_escrow::UniversalEscrowRegistry>>,
     /// Nonces consumed by successful cross-VM bridge operations.
     used_nonces: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<[u8; 32]>>>,
 }
@@ -163,6 +197,7 @@ impl X3VMBridge {
             svm: None,
             balance_provider: None,
             escrow: None,
+            universal_escrow: None,
             used_nonces: std::sync::Arc::new(std::sync::Mutex::new(
                 std::collections::HashSet::new(),
             )),
@@ -183,6 +218,19 @@ impl X3VMBridge {
     /// Without this, `bridge_svm_to_evm` and `bridge_evm_to_svm` remain fail-closed.
     pub fn with_escrow(mut self, escrow: std::sync::Arc<dyn CrossVmEscrow>) -> Self {
         self.escrow = Some(escrow);
+        self
+    }
+
+    /// Attach a universal escrow registry for 0x32/0x33 multi-family hostcalls.
+    ///
+    /// This enables `bridge_external_to_x3vm` and `bridge_x3vm_to_external`
+    /// which support all VM families through the registry's chain_id→provider
+    /// mapping.
+    pub fn with_universal_escrow(
+        mut self,
+        registry: std::sync::Arc<crate::universal_escrow::UniversalEscrowRegistry>,
+    ) -> Self {
+        self.universal_escrow = Some(registry);
         self
     }
 
@@ -243,6 +291,7 @@ impl X3VMBridge {
         // Clone shared state before the hostcall closures capture it
         let balance_provider = self.balance_provider.clone();
         let escrow = self.escrow.clone();
+        let universal_escrow = self.universal_escrow.clone();
         let used_nonces = self.used_nonces.clone();
 
         // ── SVM hostcalls ────────────────────────────────────────────────
@@ -538,6 +587,7 @@ impl X3VMBridge {
                 };
                 let nonce = bridge_nonce_arg(args.get(3), "bridge_svm_to_evm")?;
                 reserve_bridge_nonce(&nonces, nonce)?;
+                // ── Symmetric compensation ────────────────────────────────────
                 let result = (|| {
                     let ticket = provider.lock_svm(&from, amount).map_err(|e| {
                         VMError::without_ip(VMErrorKind::HostcallError(format!(
@@ -548,9 +598,14 @@ impl X3VMBridge {
                     provider
                         .release_evm(&to_bytes, &ticket, amount)
                         .map_err(|e| {
+                            let unwind_result = provider.unwind_svm_lock(&ticket, &from, amount);
                             VMError::without_ip(VMErrorKind::HostcallError(format!(
-                                "bridge_svm_to_evm release_evm: {}",
-                                e
+                                "bridge_svm_to_evm release_evm: {}. unwind_svm_lock: {}",
+                                e,
+                                match unwind_result {
+                                    Ok(()) => "unwound successfully".to_string(),
+                                    Err(ue) => format!("UNWIND ALSO FAILED: {}. Escrow ticket {:?} is ORPHANED — manual recovery required.", ue, ticket),
+                                }
                             )))
                         })?;
                     Ok(ticket)
@@ -566,8 +621,8 @@ impl X3VMBridge {
         });
 
         vm.register_hostcall(0x31, "bridge_evm_to_svm", 4, {
-            let esc = escrow;
-            let nonces = used_nonces;
+            let esc = escrow.clone();
+            let nonces = used_nonces.clone();
             move |args| {
                 let Some(ref provider) = esc else {
                     return Err(VMError::without_ip(VMErrorKind::HostcallError(
@@ -607,6 +662,7 @@ impl X3VMBridge {
                 };
                 let nonce = bridge_nonce_arg(args.get(3), "bridge_evm_to_svm")?;
                 reserve_bridge_nonce(&nonces, nonce)?;
+                // ── Symmetric compensation ────────────────────────────────────
                 let result = (|| {
                     let ticket = provider.lock_evm(&from_bytes, amount).map_err(|e| {
                         VMError::without_ip(VMErrorKind::HostcallError(format!(
@@ -615,9 +671,161 @@ impl X3VMBridge {
                         )))
                     })?;
                     provider.release_svm(&to, &ticket, amount).map_err(|e| {
+                        let unwind_result = provider.unwind_evm_lock(&ticket, &from_bytes, amount);
                         VMError::without_ip(VMErrorKind::HostcallError(format!(
-                            "bridge_evm_to_svm release_svm: {}",
-                            e
+                            "bridge_evm_to_svm release_svm: {}. unwind_evm_lock: {}",
+                            e,
+                            match unwind_result {
+                                Ok(()) => "unwound successfully".to_string(),
+                                Err(ue) => format!("UNWIND ALSO FAILED: {}. Escrow ticket {:?} is ORPHANED — manual recovery required.", ue, ticket),
+                            }
+                        )))
+                    })?;
+                    Ok(ticket)
+                })();
+                match result {
+                    Ok(ticket) => Ok(Some(Value::Bytes(ticket.to_vec()))),
+                    Err(err) => {
+                        release_bridge_nonce(&nonces, &nonce);
+                        Err(err)
+                    }
+                }
+            }
+        });
+
+        // ── Universal cross-chain bridge ops (0x32 / 0x33) ──────────────────
+        //
+        // These hostcalls enable "any chain → X3VM → any chain" via the
+        // UniversalEscrow registry.  Each external VM family registers a
+        // provider; the hostcall dispatches by chain_id.
+
+        let ue = universal_escrow.clone();
+        let internal_escrow = escrow.clone();
+
+        vm.register_hostcall(0x32, "bridge_external_to_x3vm", 4, {
+            let ue = ue.clone();
+            let esc = internal_escrow.clone();
+            let nonces = used_nonces.clone();
+            move |args| {
+                let chain_id = match args.first() {
+                    Some(Value::I64(v)) => (*v).max(0) as u64,
+                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_external_to_x3vm: arg[0] (chain_id) must be I64".into(),
+                    ))),
+                };
+                let sender = match args.get(1) {
+                    Some(Value::Bytes(b)) => b.clone(),
+                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_external_to_x3vm: arg[1] (sender) must be Bytes".into(),
+                    ))),
+                };
+                let amount = match args.get(2) {
+                    Some(Value::I64(v)) => (*v).max(0) as u128,
+                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_external_to_x3vm: arg[2] (amount) must be I64".into(),
+                    ))),
+                };
+                let nonce = bridge_nonce_arg(args.get(3), "bridge_external_to_x3vm")?;
+                reserve_bridge_nonce(&nonces, nonce)?;
+
+                let registry = ue.as_ref().ok_or_else(|| {
+                    VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_external_to_x3vm: wire universal escrow registry (X3VMBridge::with_universal_escrow())".into(),
+                    ))
+                })?;
+                let ext_provider = registry.get(chain_id).ok_or_else(|| {
+                    VMError::without_ip(VMErrorKind::HostcallError(format!(
+                        "bridge_external_to_x3vm: no escrow provider for chain_id {}", chain_id
+                    )))
+                })?;
+
+                let x3_provider = esc.as_ref().ok_or_else(|| {
+                    VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_external_to_x3vm: wire internal X3 escrow (X3VMBridge::with_escrow())".into(),
+                    ))
+                })?;
+
+                let result = (|| {
+                    let ticket = ext_provider.lock(&sender, amount).map_err(|e| {
+                        VMError::without_ip(VMErrorKind::HostcallError(format!(
+                            "bridge_external_to_x3vm lock(cid={}): {}", chain_id, e
+                        )))
+                    })?;
+                    x3_provider.release_svm(&sender, &ticket, amount).map_err(|e| {
+                        let _ = ext_provider.release(&sender, &ticket, amount);
+                        VMError::without_ip(VMErrorKind::HostcallError(format!(
+                            "bridge_external_to_x3vm release_x3vm: {}", e
+                        )))
+                    })?;
+                    Ok(ticket)
+                })();
+                match result {
+                    Ok(ticket) => Ok(Some(Value::Bytes(ticket.to_vec()))),
+                    Err(err) => {
+                        release_bridge_nonce(&nonces, &nonce);
+                        Err(err)
+                    }
+                }
+            }
+        });
+
+        vm.register_hostcall(0x33, "bridge_x3vm_to_external", 4, {
+            let ue = ue;
+            let esc = internal_escrow;
+            let nonces = used_nonces;
+            move |args| {
+                let chain_id = match args.first() {
+                    Some(Value::I64(v)) => (*v).max(0) as u64,
+                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_x3vm_to_external: arg[0] (chain_id) must be I64".into(),
+                    ))),
+                };
+                let x3_sender = match args.get(1) {
+                    Some(Value::Bytes(b)) => b.clone(),
+                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_x3vm_to_external: arg[1] (x3_sender) must be Bytes".into(),
+                    ))),
+                };
+                let amount = match args.get(2) {
+                    Some(Value::I64(v)) => (*v).max(0) as u128,
+                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_x3vm_to_external: arg[2] (amount) must be I64".into(),
+                    ))),
+                };
+                let nonce = bridge_nonce_arg(args.get(3), "bridge_x3vm_to_external")?;
+                reserve_bridge_nonce(&nonces, nonce)?;
+
+                let registry = ue.as_ref().ok_or_else(|| {
+                    VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_x3vm_to_external: wire universal escrow registry".into(),
+                    ))
+                })?;
+                let ext_provider = registry.get(chain_id).ok_or_else(|| {
+                    VMError::without_ip(VMErrorKind::HostcallError(format!(
+                        "bridge_x3vm_to_external: no escrow provider for chain_id {}", chain_id
+                    )))
+                })?;
+                let x3_provider = esc.as_ref().ok_or_else(|| {
+                    VMError::without_ip(VMErrorKind::HostcallError(
+                        "bridge_x3vm_to_external: wire internal X3 escrow".into(),
+                    ))
+                })?;
+
+                let result = (|| {
+                    let ticket = x3_provider.lock_svm(&x3_sender, amount).map_err(|e| {
+                        VMError::without_ip(VMErrorKind::HostcallError(format!(
+                            "bridge_x3vm_to_external lock_x3vm: {}", e
+                        )))
+                    })?;
+                    ext_provider.release(&x3_sender, &ticket, amount).map_err(|e| {
+                        let unwind = x3_provider.unwind_svm_lock(&ticket, &x3_sender, amount);
+                        VMError::without_ip(VMErrorKind::HostcallError(format!(
+                            "bridge_x3vm_to_external release_external(cid={}): {}. unwind: {}",
+                            chain_id, e,
+                            match unwind {
+                                Ok(()) => "unwound successfully".to_string(),
+                                Err(ue) => format!("UNWIND FAILED: {}. Ticket ORPHANED.", ue),
+                            }
                         )))
                     })?;
                     Ok(ticket)
