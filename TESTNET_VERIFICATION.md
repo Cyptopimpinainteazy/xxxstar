@@ -322,3 +322,11 @@ Command (root): `cargo clippy -p x3-atomic-swap -p x3-vm --all-targets --feature
 Result: PASS (EXIT 0; all suites ok, 0 failed)
 Evidence (independently re-run by parent session): clippy EXIT 0 (36s, no warnings); atomic-swap std tests 0 failed (lib 649 + chaos 31 + integration 44 + atlas 1); x3-vm 0 failed. Tree clean. Fake-code scan clean on adapter.rs/wasm_l1_htlc.rs/universal_escrow.rs/bridge.rs.
 Reconcile commits b1cb60ed + ac70bbb4 + 0df9ab5d from subagent: USB typed-VmFamily/readiness engine + wasm_l1_htlc adapter + x3-vm symmetric unwind + 0x32/0x33 cross-VM escrow hostcalls; kept local evm_live/btc_live + universal_escrow. Excluded (genuine conflicts): state_machine_proptest.rs (needs out-of-scope intent.rs fix), FoundryGovernance.sol (USB internally inconsistent; separate EVM-contracts reconcile). Reproduced 2026-09-04.
+
+## POST-USB-RECONCILE MESH RE-PROOF-2026-09-04 (fresh release binary from reconciled tree)
+Context: after merging USB-finished x3-atomic-swap (typed VmFamily adapter + wasm_l1_htlc + cross_adapter_atomicity_test ripple across 17 htlc files + scoreboard) and x3-vm (symmetric unwind + 0x32/0x33 universal escrow hostcalls) reconciles (commits b1cb60ed/ac70bbb4/0df9ab5d, verified 956f6465), re-ran reserved full-mesh proofs against a FRESH release build to confirm no bring-up/consensus regression. Node binary previously stale (2026-09-03) predating reconcile.
+Command: `cargo build --release -p x3-chain-node` (EXIT 0, 5m13s, 2026-09-04 12:06) then `python3 scripts/testnet/run-mesh.py cycles --count 7 --cycles 8` and `... kills --count 7`.
+Result: PASS
+- Cold-start convergence (GAP-CONSENSUS-REPRO-1 bar): 8/8 cycles -> each cycle exactly ONE GRANDPA-finalized head across all 7 validators (18s converge; e.g. cycle8 mesh1..7 all final=0x16c424b36b83ef).
+- Single-loss survival (GAP-P2P-1 bar): 7/7 victims -> killing any one validator left the other 6 finalizing ONE chain (0 survivors lost RPC; 5/7-peers majority intact).
+Excludes: cross-host/latency/NAT (loopback-only is the recorded honest bound), tx-load finTPS (unchanged prior: 110.6 finTPS / 2000 remarks / 0 lost). Reproduced 2026-09-04 12:11 against reconciled tree.
