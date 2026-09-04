@@ -1,0 +1,156 @@
+# X3 Bridge Adapter RPC Endpoints
+# Map each supported chain to its JSON-RPC endpoint.
+# Set the X3_CHAIN_RPC_<NAME> env var to override at runtime.
+
+[ethereum]
+chain_id = 1
+rpc_url = "https://eth.llamarpc.com"
+env_var = "X3_RPC_ETHEREUM"
+
+[ethereum-sepolia]
+chain_id = 11155111
+rpc_url = "https://sepolia.drpc.org"
+env_var = "X3_RPC_ETHEREUM_SEPOLIA"
+
+[arbitrum-one]
+chain_id = 42161
+rpc_url = "https://arb1.arbitrum.io/rpc"
+env_var = "X3_RPC_ARBITRUM"
+
+[arbitrum-nova]
+chain_id = 42170
+rpc_url = "https://nova.arbitrum.io/rpc"
+env_var = "X3_RPC_ARBITRUM_NOVA"
+
+[bsc]
+chain_id = 56
+rpc_url = "https://bsc-dataseed.binance.org"
+env_var = "X3_RPC_BSC"
+
+[bsc-testnet]
+chain_id = 97
+rpc_url = "https://data-seed-prebsc-1-s1.binance.org:8545"
+env_var = "X3_RPC_BSC_TESTNET"
+
+[optimism]
+chain_id = 10
+rpc_url = "https://mainnet.optimism.io"
+env_var = "X3_RPC_OPTIMISM"
+
+[base]
+chain_id = 8453
+rpc_url = "https://mainnet.base.org"
+env_var = "X3_RPC_BASE"
+
+[polygon]
+chain_id = 137
+rpc_url = "https://polygon-rpc.com"
+env_var = "X3_RPC_POLYGON"
+
+[avalanche]
+chain_id = 43114
+rpc_url = "https://api.avax.network/ext/bc/C/rpc"
+env_var = "X3_RPC_AVALANCHE"
+
+[solana]
+chain_id = 1399811149
+rpc_url = "https://api.mainnet-beta.solana.com"
+env_var = "X3_RPC_SOLANA"
+
+[bitcoin]
+# Bitcoin does not use JSON-RPC; uses Electrum or Bitcoin Core REST API.
+# Set X3_BTC_RPC_URL to an Electrum server or Bitcoin Core RPC URL.
+chain_id = 0
+rpc_url = ""
+env_var = "X3_RPC_BITCOIN"
+
+[sui]
+chain_id = 21
+rpc_url = "https://fullnode.mainnet.sui.io:443"
+env_var = "X3_RPC_SUI"
+
+[aptos]
+chain_id = 19
+rpc_url = "https://fullnode.mainnet.aptoslabs.com/v1"
+env_var = "X3_RPC_APTOS"
+
+[cosmos-hub]
+chain_id = 2000
+rpc_url = "https://rpc.cosmos.network"
+lcd_url = "https://api.cosmos.network"
+bech32_prefix = "cosmos"
+env_var = "X3_RPC_COSMOS"
+
+[osmosis]
+chain_id = 2001
+rpc_url = "https://rpc.osmosis.zone"
+lcd_url = "https://lcd.osmosis.zone"
+bech32_prefix = "osmo"
+env_var = "X3_RPC_OSMOSIS"
+
+[juno]
+chain_id = 2002
+rpc_url = "https://rpc.juno.strange.love"
+lcd_url = "https://api.juno.strange.love"
+bech32_prefix = "juno"
+env_var = "X3_RPC_JUNO"
+
+[starknet]
+chain_id = 23448594291968334
+rpc_url = "https://starknet-mainnet.public.blastapi.io"
+env_var = "X3_RPC_STARKNET"
+
+[cardano]
+chain_id = 3000
+rpc_url = "https://cardano-mainnet.blockfrost.io/api/v0"
+env_var = "X3_RPC_CARDANO"
+
+[ton]
+chain_id = 4000
+rpc_url = "https://toncenter.com/api/v2/jsonRPC"
+env_var = "X3_RPC_TON"
+
+[fuel]
+chain_id = 5000
+rpc_url = "https://mainnet.fuel.network/v1/graphql"
+env_var = "X3_RPC_FUEL"
+
+[near]
+chain_id = 6000
+rpc_url = "https://rpc.mainnet.near.org"
+env_var = "X3_RPC_NEAR"
+
+[stellar]
+chain_id = 7000
+rpc_url = "https://soroban.stellar.org"
+env_var = "X3_RPC_STELLAR"
+
+[polkadot-pvm]
+chain_id = 8000
+rpc_url = "https://rpc.polkadot.io"
+env_var = "X3_RPC_POLKADOT"
+
+[ink]
+chain_id = 8001
+rpc_url = "https://rococo-contracts-rpc.polkadot.io"
+env_var = "X3_RPC_INK"
+
+[zkvm-risc0]
+chain_id = 9000
+rpc_url = ""
+env_var = "X3_RPC_ZKVM_RISC0"
+
+[zkvm-sp1]
+chain_id = 9001
+rpc_url = ""
+env_var = "X3_RPC_ZKVM_SP1"
+
+[zkvm-zkwasm]
+chain_id = 9002
+rpc_url = ""
+env_var = "X3_RPC_ZKVM_ZKWASM"
+
+[x3-local]
+chain_id = 0
+rpc_url = "http://127.0.0.1:9933"
+env_var = "X3_RPC_LOCAL"
