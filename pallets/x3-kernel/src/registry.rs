@@ -44,12 +44,19 @@ pub struct InMemoryRegistry {
 }
 
 #[cfg(test)]
-impl InMemoryRegistry {
-    pub fn new() -> Self {
+impl Default for InMemoryRegistry {
+    fn default() -> Self {
         Self {
             assets: Default::default(),
             next_id: 1,
         }
+    }
+}
+
+#[cfg(test)]
+impl InMemoryRegistry {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn register(
