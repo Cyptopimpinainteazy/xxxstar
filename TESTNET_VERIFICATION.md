@@ -79,6 +79,14 @@ finalization.
   every tx reached a GRANDPA-finalized block. ~1.04 finalized/s is an artifact of the sequential
   await-per-tx loader, NOT a chain ceiling (peak measured separately ~50+/s parallel).
 - Account funded: free=1000000000000000000 (1 unit); nonce advanced 0->120.
+
+### SUSTAINED FINALIZED TPS ON 7-VALIDATOR NET — PASS — 2026-09-04
+Parallel loader packages/ts-sdk/par-load.mjs (bounded in-flight, nonce-delta finalized count).
+Senders = separate fresh-key endowed accounts (validator-2/3 master seeds).
+- count=300 limit=128: delta=300 lost=0, 23.3 finTPS (13s)
+- count=2000 limit=200: delta=2000 lost=0, 110.6 finTPS (18s)  <- genuine sustained result
+Canonical finalized head identical on all 7 nodes during load (0x9e96984ab550e508); heads within
+1 block. Verified 100% finalized inclusion with zero loss at >100 finalized TPS.
 - Validator node keys are random each boot (fine for ephemeral testnet); production nets need
   stable persisted node keys.
 
