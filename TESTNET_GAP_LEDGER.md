@@ -45,4 +45,21 @@ cross-host readiness should re-prove on real network paths (multi-host/NAT/laten
 on-disk node keys; the P2P-structure root cause is deterministically addressed here, but loopback
 does not exercise real-world network contention.
 
+## NEW SEC-v1 (integrity) — testnet seeds leaked into git history — 2026-09-04
+
+`build-x3-testnet-spec.py` writes each validator's plaintext Aura/Grandpa authoring seed to
+BOTH the gitignored `validator-N.suri` (per-key, safe) AND aggregate `validator-keys/suris.txt`.
+suris.txt — all 7 live authoring seeds — was committed in d594af8f despite fresh/.gitignore's
+"NEVER commit" policy, that commit's own "Key SURIs excluded" note, and the file's own
+"not committed" header.
+ROOT CAUSE: fresh/.gitignore used root-relative paths (`deployment/chain-specs/fresh/...`)
+but lives IN fresh/, so only the accidental `*.suri` glob matched; the dir and `.node-key-*`
+rules never applied from that base, letting suris.txt through.
+FIXED (non-destructive, commit cb1452e3): rewrote patterns relative to fresh/; untracked
+suris.txt (working copy kept, mode 0600, now gitignored).
+STILL OPEN: d594af8f remains in master history with the seeds — full purge needs a repo
+history rewrite (filter-repo), deferred pending operator decision on audit-trail preservation.
+Lesson: audit .gitignore path bases (nested dirs resolve relative to the .gitignore location),
+and verify with `git check-ignore -v` + `git ls-files` not just gitignore presence.
+
 Working notes: `.testnet-audit/`; evidence: `TESTNET_VERIFICATION.md`; mesh run logs /tmp/x3-mesh-*.
