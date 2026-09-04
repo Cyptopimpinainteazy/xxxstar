@@ -129,3 +129,11 @@ protoc_bin/
 DREAMS.md
 memory/dreaming/
 memory/.dreams/
+
+# Vendor libs for X3 EVM forge tests (runtime build deps, fetched locally, not committed)
+X3-contracts/evm/lib/forge-std
+X3-contracts/evm/lib/openzeppelin-contracts
+
+# Foundry build artifacts (regenerable; do not commit)
+X3-contracts/evm/out/
+X3-contracts/evm/cache/
