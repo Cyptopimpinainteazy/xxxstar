@@ -161,7 +161,7 @@ ensure_raw_spec() {
   echo "Raw chain spec is empty. Regenerating from $CHAIN_SPEC_PLAIN..."
   tmp_spec="${CHAIN_SPEC}.tmp"
   "$NODE_BIN" build-spec --chain "$CHAIN_SPEC_PLAIN" --raw --disable-log-color > "$tmp_spec" 2>/dev/null
-  TMP_SPEC="$tmp_spec" CHAIN_SPEC="$CHAIN_SPEC" python - <<'PY'
+  TMP_SPEC="$tmp_spec" CHAIN_SPEC="$CHAIN_SPEC" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -184,7 +184,7 @@ PY
 ensure_raw_spec
 
 # Sanitize chain spec to avoid conflicting bootnodes embedded in raw specs.
-CHAIN_SPEC="${CHAIN_SPEC}" CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN}" python - <<'PY'
+CHAIN_SPEC="${CHAIN_SPEC}" CHAIN_SPEC_RUN="${CHAIN_SPEC_RUN}" python3 - <<'PY'
 import os
 import re
 from pathlib import Path
@@ -217,7 +217,7 @@ DEV_SEEDS=(
   "//One"
 )
 
-CHAIN_ID="$(CHAIN_SPEC_RUN="$CHAIN_SPEC_RUN" python - <<'PY'
+CHAIN_ID="$(CHAIN_SPEC_RUN="$CHAIN_SPEC_RUN" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -230,6 +230,47 @@ PY
 if [[ -z "$CHAIN_ID" ]]; then
   echo "Failed to read chain id from ${CHAIN_SPEC_RUN}"
   exit 1
+fi
+
+# bootability + authority-consistency preflight (rollback-safe; override with
+# ALLOW_RAW_LIVE=1 and/or SKIP_SPEC_AUTHORITY_CHECK=1).
+if [[ "${ALLOW_RAW_LIVE:-0}" != "1" ]]; then
+  CHECK="$CHAIN_SPEC_RUN" python3 - <<'PY'
+import json, os, sys
+from pathlib import Path
+p = Path(os.environ["CHECK"])
+try:
+    spec = json.loads(p.read_text())
+except Exception as e:
+    sys.exit(f"[validate] cannot parse chain spec {p}: {e}")
+if str(spec.get("chainType", "")).lower() == "live":
+    g = spec.get("genesis", {})
+    cfg = g.get("runtimeGenesis", {}).get("config", {}) if "runtimeGenesis" in g else None
+    if cfg is None:
+        # storage-raw Live spec: this node's load_json_spec() rejects storage-raw
+        # Live specs (no aura/grandpa/council/treasury config arrays), so it cannot
+        # boot on a raw-Live file no matter the authority count.
+        print("[validate] spec is a storage-*raw* Live spec -> node boot will be rejected.")
+        print("  Boot a bootable *plain* Live spec whose Aura+Grandpa authorities == the "
+              "launcher's 7 dev seeds (see start_node comment). To force the raw path use "
+              "ALLOW_RAW_LIVE=1 (node error then surfaces directly).")
+        sys.exit(2)
+    dev = 7  # DEV_SEEDS length (Alice..One)
+    na = len(cfg.get("aura", {}).get("authorities", []))
+    ng = len(cfg.get("grandpa", {}).get("authorities", []))
+    if (na != dev or ng != dev) and os.environ.get("SKIP_SPEC_AUTHORITY_CHECK") != "1":
+        print(f"[validate] FAIL: spec Aura authorities={na}, Grandpa authorities={ng} "
+              f"but launcher DEV_SEEDS count={dev}. They must match to author+finalize.")
+        sys.exit(3)
+    print(f"[validate] ok: plain Live spec Aura={na} Grandpa={ng} == launcher DEV_SEEDS="
+          f"{dev}; authority sets consistent.")
+sys.exit(0)
+PY
+  rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    echo "run-7-validators-local.sh preflight failed (rc=$rc). Pass --chain-spec <equal-authority plain Live spec> or set ALLOW_RAW_LIVE=1 to force."
+    exit 1
+  fi
 fi
 
 if [[ "$COUNT" -lt 1 || "$COUNT" -gt 7 ]]; then
@@ -262,7 +303,7 @@ insert_keys() {
   local aura_file="61757261${aura_pub#0x}"
   local gran_file="6772616e${gran_pub#0x}"
 
-  SURI="$suri" OUT="$keystore_dir/$aura_file" python - <<'PY'
+  SURI="$suri" OUT="$keystore_dir/$aura_file" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -272,7 +313,7 @@ path.write_text(json.dumps(os.environ["SURI"]))
 path.chmod(0o600)
 PY
 
-  SURI="$suri" OUT="$keystore_dir/$gran_file" python - <<'PY'
+  SURI="$suri" OUT="$keystore_dir/$gran_file" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -338,6 +379,23 @@ start_node() {
   insert_keys "$base_path" "$dev_seed"
   validate_keys "$base_path" "$dev_seed"
 
+  # AUTHORING-DRIVER NOTE (verified 2026-09-04 on this fork):
+  #   run-7's authority set IS consistent with the genesis it boots -- the checked-in
+  #   raw spec installs the SAME 7 dev seeds (Alice..One) as Aura (sr25519) AND Grandpa
+  #   (ed25519) authorities (see deployment/chain-specs/x3-testnet-raw.json, decoded
+  #   storage: Aura Authorities=7, `:grandpa_authorities`=7). So DEV_SEEDS/COUNT=7 need
+  #   no change (there is NO 5-vs-7 mismatch as previously assumed).
+  #   The actual blockers for a REAL finalized run are:
+  #   (1) node/src/service.rs only drives Aura authoring + GRANDPA finality by inserting
+  #       keys from X3_DEV_SEED (maybe_insert_dev_keys), NOT from keystore files alone.
+  #   (2) the node's Live key loader rejects storage-*raw* Live specs (no aura/grandpa
+  #       config arrays), so launch each node from a bootable *plain* Live spec whose
+  #       authority set matches these same dev seeds, and export X3_DEV_SEED below.
+  local env_args=()
+  if [[ -n "$dev_seed" ]]; then
+    env_args+=(env "X3_DEV_SEED=$dev_seed")
+  fi
+
   local password_args=()
   if [[ -n "$KEYSTORE_PASSWORD_FILE" ]]; then
     password_args=(--password-filename "$KEYSTORE_PASSWORD_FILE")
@@ -375,7 +433,9 @@ start_node() {
     nice_args=(nice -n "$NODE_NICE")
   fi
 
-  nohup "${nice_args[@]}" "$NODE_BIN" \
+  # export X3_DEV_SEED so service.maybe_insert_dev_keys() inserts Aura(sr25519) +
+  # GRANDPA(ed25519) from <<dev_seed>> (the fork's authoring driver, see comment above).
+  nohup "${env_args[@]}" "${nice_args[@]}" "$NODE_BIN" \
     --chain "$CHAIN_SPEC_RUN" \
     --base-path "$base_path" \
     --name "$name" \
@@ -407,7 +467,7 @@ peer_id=""
 for _ in $(seq 1 60); do
   peer_id="$(curl -s -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","id":1,"method":"system_localPeerId","params":[]}' \
-    "http://127.0.0.1:9944" | python -c 'import json,sys; print(json.load(sys.stdin).get("result",""))' 2>/dev/null || true)"
+    "http://127.0.0.1:9944" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("result",""))' 2>/dev/null || true)"
   if [[ -n "$peer_id" ]]; then
     break
   fi
