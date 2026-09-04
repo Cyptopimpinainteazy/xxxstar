@@ -11437,6 +11437,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-x3-sentinel"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
+ "sp-io 44.0.0",
+ "sp-runtime 45.0.0",
+ "sp-std 14.0.0",
+ "x3-asset-kernel-types",
+]
+
+[[package]]
 name = "pallet-x3-sequencer"
 version = "0.1.0"
 dependencies = [
@@ -11547,6 +11562,7 @@ dependencies = [
  "frame-system",
  "pallet-x3-asset-registry",
  "pallet-x3-cross-vm-router",
+ "pallet-x3-sentinel",
  "pallet-x3-supply-ledger",
  "parity-scale-codec",
  "scale-info",
@@ -24428,6 +24444,7 @@ dependencies = [
  "pallet-x3-rebalance",
  "pallet-x3-reconciliation",
  "pallet-x3-reservation",
+ "pallet-x3-sentinel",
  "pallet-x3-sequencer",
  "pallet-x3-settlement-engine",
  "pallet-x3-slash",

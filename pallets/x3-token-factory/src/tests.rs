@@ -35,6 +35,7 @@ construct_runtime!(
         Ledger: pallet_x3_supply_ledger,
         Router: pallet_x3_cross_vm_router,
         Factory: pallet_x3_token_factory,
+        Sentinel: pallet_x3_sentinel,
     }
 );
 
@@ -133,11 +134,16 @@ impl pallet_x3_cross_vm_router::Config for Test {
     type BlocksPerDay = BlocksPerDay;
 }
 
+impl pallet_x3_sentinel::Config for Test {
+    type FreezeOrigin = RootOrAny;
+}
+
 impl pallet_x3_token_factory::Config for Test {
     type CreateTokenOrigin = EnsureSigned<u64>;
     type Registry = Registry;
     type Ledger = Ledger;
     type EconomicHalt = Ledger;
+    type Sentinel = Sentinel;
 }
 
 fn new_test_ext() -> sp_io::TestExternalities {
@@ -602,4 +608,153 @@ fn test_12_fuzz_launches_and_transfers_preserve_invariant() {
             }
         });
     }
+}
+
+// ------------------------------------------------------------------------
+// Sentinel guard integration — Sentinel freeze/review gating is enforced by
+// the factory before every supply-changing authority op. These tests wire the
+// REAL pallet-x3-sentinel (already registered as `Sentinel`) into the factory
+// mock, so they prove the end-to-end guard the runtime now uses.
+// ------------------------------------------------------------------------
+
+fn freeze_reason(text: &[u8]) -> BoundedVec<u8, pallet_x3_sentinel::pallet::MaxFreezeReasonLen> {
+    text.to_vec().try_into().expect("reason fits bound")
+}
+
+/// Sentinel `freeze_authority` on a CappedMintable token's mint authority
+/// blocks that authority from minting further supply (fail-closed).
+#[test]
+fn test_sentinel_frozen_mint_authority_blocks_mint() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(capped_config(b"SEN-A", 500_000, 1_000_000, all_three_domains()));
+        // Baseline: authority can mint before any freeze.
+        assert_ok!(Factory::mint(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            100_000,
+        ));
+
+        // Sentinel freezes the authority on this asset.
+        assert_ok!(Sentinel::freeze_authority(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            CREATOR,
+            freeze_reason(b"rogue minter"),
+        ));
+
+        // Factory mint from the frozen authority is now rejected.
+        assert_noop!(
+            Factory::mint(
+                RuntimeOrigin::signed(CREATOR),
+                asset_id,
+                DomainId::X3Native,
+                100_000,
+            ),
+            Error::<Test>::AuthorityFrozenBySentinel
+        );
+
+        // Unfreeze restores the authority's ability to mint.
+        assert_ok!(Sentinel::unfreeze_authority(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            CREATOR,
+        ));
+        assert_ok!(Factory::mint(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            100_000,
+        ));
+    });
+}
+
+/// A wholesale asset freeze blocks mint by any authority.
+#[test]
+fn test_sentinel_asset_freeze_blocks_mint() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(capped_config(b"SEN-B", 500_000, 1_000_000, all_three_domains()));
+        assert_ok!(Sentinel::freeze_asset(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            freeze_reason(b"suspected compromise"),
+        ));
+        assert_noop!(
+            Factory::mint(
+                RuntimeOrigin::signed(CREATOR),
+                asset_id,
+                DomainId::X3Native,
+                100_000,
+            ),
+            Error::<Test>::AssetFrozenBySentinel
+        );
+        // Unfreeze restores.
+        assert_ok!(Sentinel::unfreeze_asset(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+        ));
+        assert_ok!(Factory::mint(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            100_000,
+        ));
+    });
+}
+
+/// Enrolled-for-review tokens need a guardian approval before the authority
+/// can burn (or mint). Without approval the op is blocked; after approval it
+/// passes.
+#[test]
+fn test_sentinel_enrolled_burn_requires_approval() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(burnable_config(b"SEN-C", 1_000_000, all_three_domains()));
+        assert_ok!(Sentinel::enroll_for_review(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+        ));
+        // No guardian approval yet -> burn is blocked.
+        assert_noop!(
+            Factory::burn(
+                RuntimeOrigin::signed(CREATOR),
+                asset_id,
+                DomainId::X3Native,
+                250_000,
+            ),
+            Error::<Test>::GuardianReviewRequired
+        );
+        // Guardian grants approval -> burn now allowed.
+        assert_ok!(Sentinel::grant_guardian_approval(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+        ));
+        assert_ok!(Factory::burn(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            250_000,
+        ));
+    });
+}
+
+/// A frozen authority cannot hand mint authority to a new account.
+#[test]
+fn test_sentinel_frozen_authority_cannot_transfer() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(capped_config(b"SEN-D", 500_000, 1_000_000, all_three_domains()));
+        assert_ok!(Sentinel::freeze_authority(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            CREATOR,
+            freeze_reason(b"quarantine"),
+        ));
+        assert_noop!(
+            Factory::transfer_mint_authority(
+                RuntimeOrigin::signed(CREATOR),
+                asset_id,
+                7u64,
+            ),
+            Error::<Test>::AuthorityFrozenBySentinel
+        );
+    });
 }

@@ -772,6 +772,44 @@ pub mod traits {
         }
     }
 
+    /// Canonical denial reason returned by a Sentinel-style mint/freeze guard.
+    #[derive(Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
+    #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+    pub enum SentinelDenial {
+        /// The whole asset is frozen; no authority op allowed.
+        AssetFrozen,
+        /// This specific authority is frozen on the asset.
+        AuthorityFrozen,
+        /// The asset is enrolled for guardian review but no approval is on file.
+        ReviewRequired,
+    }
+
+    /// Read-only mint/freeze guard consulted by authority-facing pallets (e.g.
+    /// the token factory) before a supply-changing operation.
+    ///
+    /// Implementations MUST be fail-closed for any authority/asset the chain
+    /// has enrolled or frozen — never silently allow a dangerous op. The
+    /// [`NoSentinelGuard`] default is the explicit, compile-time opt-out a
+    /// runtime author chooses when no Sentinel is wired (mirroring
+    /// [`NoEconomicHalt`]); it is configured deliberately, not a runtime
+    /// fallback.
+    pub trait SentinelGuard<AccountId> {
+        /// Return `Ok(())` if `who` may exercise supply authority on `asset`,
+        /// otherwise describe which Sentinel rule blocks it.
+        fn can_authorize(asset: &AssetId, who: &AccountId) -> Result<(), SentinelDenial>;
+    }
+
+    /// Explicit no-op guard (allow everything) for runtimes/tests that wire no
+    /// real Sentinel. Same rationale as [`NoEconomicHalt`]: a deliberate
+    /// config-time choice, not an accidental silent fallback.
+    pub struct NoSentinelGuard;
+
+    impl<AccountId> SentinelGuard<AccountId> for NoSentinelGuard {
+        fn can_authorize(_asset: &AssetId, _who: &AccountId) -> Result<(), SentinelDenial> {
+            Ok(())
+        }
+    }
+
     /// Privileged, origin-free registry mutations used by the token factory.
     ///
     /// These bypass the signed-origin checks performed by the registry's
