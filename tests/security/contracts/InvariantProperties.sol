@@ -72,6 +72,15 @@ contract InvariantProperties {
         crossVMCallActive   = true;
         partialStateWritten = false;
 
+        // Realistic EVM gas: an ERC20-style cross-VM transfer costs fixed calldata/
+        // storage gas REGARDLESS of token amount (transfer is O(1) in value; only
+        // the effective balance checks are done). Charging 100 gas/ether would make
+        // a single large-but-legal transfer (balances hold 500M ether) claim
+        // thousands of blocks of gas and falsify the accumulated-gas invariant
+        // (gasUsed <= GAS_CAP * 1000) on one op. Fixed per-op gas keeps the
+        // accumulator a faithful budget over ~1000-op sequences.
+        uint256 txGas = 21_000 + 68_000; // base + cross-account storage updates
+
         // Debit VM-A first (would be partial if VM-B fails)
         vmABalance -= amount;
         partialStateWritten = true;   // mark as partial
@@ -81,7 +90,7 @@ contract InvariantProperties {
         partialStateWritten = false;  // cleared on success
 
         crossVMCallActive = false;
-        gasUsed += 21_000 + (amount / 1 ether) * 100;
+        gasUsed += txGas;
     }
 
     /**
