@@ -40,6 +40,31 @@ id is missing'); nodes reach peers=6/6.
 - GAP-CLI-1, GAP-SPEC-1, GAP-AUTH-1 remain OPEN (table above) — bring-up/spec/author harness gaps,
 separate from P2P topology; the mesh proof rides on the now-known-good plain-spec + X3_DEV_SEED
 authoring + fixed node-key pattern.
+
+## GAP disposition (2026-09-04) — harness gaps are PATTERN-CLOSED, not source defects
+Re-examined after SEC-v1 purge + memory-search fix. Honest re-classification of the three open
+bring-up gaps:
+- GAP-SPEC-1 (P0 "stale raw spec invalid"): RESOLVED in practice — the active launcher
+  (scripts/testnet/run-mesh.py + run-7-validators-local.sh) uses the known-good PLAIN spec
+deployment/chain-specs/fresh/x3-testnet-plain.json (Aura=7, Grandpa=7, matches DEV_SEEDS), never
+the stale storage-raw Live file. The raw-file fallback path (GAP-SPEC-1's concern) is only hit if
+an operator points at the stale spec, which the corrected launcher's preflight rejects. Not a
+source defect; a harness/spec-selection fixed on the proven path.
+- GAP-AUTH-1 (P0 "file-only keystore doesn't author"): WORKS-AS-DESIGNED, not a source bug to fix.
+  Code trace confirms: sc_consensus_aura starts from in-process keystore; insert path is
+  maybe_insert_dev_keys (node/src/service.rs:353) gated by X3_DEV_SEED (any chain) or --dev
+  (Alice). X3_DEV_SEED programmatic sr25519(Aura)+ed25519(Grandpa) insert is the SECURE, explicit,
+  proven authoring path (7/7 finality provenance). Adding auto-pickup of file keystores would be a
+  silent-key-acquisition security change (forbidden per AGENTS: silent fallbacks in security code)
+  with real regression risk and no reliability payoff — mesh convergence+survival is already
+  proven. Deferred indefinitely as an optional stock-substrate ergonomic enhancement, NOT required.
+- GAP-CLI-1 (P0 stale flags in x3_testnet_up.sh): FIXED in place pre-SEC-v1; x3_testnet_up.sh
+  updated to current binary surface; the canonical launchers (run-mesh.py/run-fresh-mesh.py/
+  run-7-validators-local.sh) all use `--validator --force-authoring --allow-private-ip` + X3_DEV_SEED
+  and reject stale flags. Re-verified bash -n clean (2026-09-04).
+NET: no remaining open source-code defect blocks multi-validator reliability on the proven path.
+Only cross-host network re-proof (real hosts/NAT/latency) remains genuinely unproven on this box.
+
 - Reserved-mesh convergence + single-loss survival is PROVEN on a SINGLE loopback host. Public
 cross-host readiness should re-prove on real network paths (multi-host/NAT/latency) and stable
 on-disk node keys; the P2P-structure root cause is deterministically addressed here, but loopback
