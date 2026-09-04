@@ -316,3 +316,9 @@ shared, out-of-scope `intent.rs` where `Expired` is terminal yet lists `Refundab
 transitions — adopting would force an out-of-scope intent.rs change) and `FoundryGovernance.sol`
 (USB rewrote its interface to VoteType/abstain/multisig but its governance test peer still uses the
 old interface — separate EVM-contracts reconcile; left local). Blockers below.
+
+## X3-ATOMIC-SWAP-X3VM-RECONCILE-GREEN-2026-09-04
+Command (root): `cargo clippy -p x3-atomic-swap -p x3-vm --all-targets --features x3-atomic-swap/std -- -D warnings` ; `cargo test -p x3-atomic-swap --features std` ; `cargo test -p x3-vm`
+Result: PASS (EXIT 0; all suites ok, 0 failed)
+Evidence (independently re-run by parent session): clippy EXIT 0 (36s, no warnings); atomic-swap std tests 0 failed (lib 649 + chaos 31 + integration 44 + atlas 1); x3-vm 0 failed. Tree clean. Fake-code scan clean on adapter.rs/wasm_l1_htlc.rs/universal_escrow.rs/bridge.rs.
+Reconcile commits b1cb60ed + ac70bbb4 + 0df9ab5d from subagent: USB typed-VmFamily/readiness engine + wasm_l1_htlc adapter + x3-vm symmetric unwind + 0x32/0x33 cross-VM escrow hostcalls; kept local evm_live/btc_live + universal_escrow. Excluded (genuine conflicts): state_machine_proptest.rs (needs out-of-scope intent.rs fix), FoundryGovernance.sol (USB internally inconsistent; separate EVM-contracts reconcile). Reproduced 2026-09-04.
