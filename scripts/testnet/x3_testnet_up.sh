@@ -305,7 +305,6 @@ start_node() {
   local p2p_port=$((30333 + i - 1))
   local rpc_port=$((9944 + i - 1))
   local prom_port=$((9615 + i - 1))
-  local ws_port=$((9944 + i - 1))
   local base_path="${BASE_DIR}/node-${i}"
   local name="x3-testnet-node-$(printf '%02d' "$i")"
   local dev_seed="${DEV_SEEDS[$((i-1))]}"
@@ -365,11 +364,10 @@ start_node() {
     --base-path "$base_path" \
     --name "$name" \
     --rpc-port "$rpc_port" \
-    --ws-port "$ws_port" \
     --rpc-methods=Unsafe \
     --rpc-cors=all \
-    --ws-external \
     --rpc-external \
+    --unsafe-force-node-key-generation \
     "${log_args[@]}" \
     "${net_args[@]}" \
     "${prom_args[@]}" \
@@ -378,12 +376,12 @@ start_node() {
     --validator \
     --force-authoring \
     --allow-private-ip \
-    --execution=NativeElseWasm \
+    --execution=native-else-wasm \
     "${boot_args[@]}" \
     > "$log_file" 2>&1 &
 
   echo $! > "${PID_DIR}/node-${i}.pid"
-  echo "[node] Started ${name} (p2p=${p2p_port}, rpc=${rpc_port}, ws=${ws_port}, prom=${prom_port})"
+  echo "[node] Started ${name} (p2p=${p2p_port}, rpc=${rpc_port}, prom=${prom_port})"
 
   wait_for_rpc "$rpc_port"
   echo "[node] ${name} ready"
