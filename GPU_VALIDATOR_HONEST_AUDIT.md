@@ -40,8 +40,9 @@ The repo's own `GAP_REPORT.md` records (line 180-182, 460):
 - `kernels.rs:34-35`: "GPU kernels are CPU simulations even with `use_gpu: true`."
 - Free-text rating: **18% — "Validation stubs; empty validation loop; GPU kernels are CPU
   simulations; failover has correctness bug."**
-- `MAINNET_READINESS_PUSH_COMPLETE.md`: validator/GPU acceleration rated **3/10, "experimental and
-  gated off RC-1."**
+- `MAINNET_READINESS_PUSH_COMPLETE.md` (retired 2026-09-04 to Desktop/xxxstar/olddocs; was the
+  authoritative score source at audit time): validator/GPU acceleration rated **3/10, "experimental and
+  gated off RC-1."**  Current authority: `LAUNCH_SCOPE.md` gates `gpu-acceleration` out of RC-1.
 
 ⇒ This crate is an acknowledged collection of simulation/stub code. Not production GPU.
 

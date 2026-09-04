@@ -91,23 +91,22 @@ X3 is not mainnet-ready unless all gates pass.
 - on-call handoff and escalation procedures are documented
 
 ### Documentation & Launch Support
-- launch instructions are published in `docs/MAINNET_LAUNCH_CHECKLIST.md`, `docs/MAINNET_READINESS_CHECKLIST.md`, and `launch-gates/EXECUTION_GUIDE.md`
+- launch instructions are published in `LAUNCH_SCOPE.md` (authoritative scope), `RELEASE_GATES.md` (binary pass/fail tracker), and `launch-gates/EXECUTION_GUIDE.md`
 - validator onboarding, bootstrap, and genesis ceremony docs are complete
 - wallet, explorer, and SDK launch readiness are tracked
 - post-launch support and post-mortem procedures are identified
 - failure in any documentation or launch support item blocks mainnet readiness
 
 ## Evidence and Coverage Links
-- `docs/MAINNET_LAUNCH_CHECKLIST.md`
-- `docs/MAINNET_READINESS_CHECKLIST.md`
-- `docs/MAINNET_CANARY_PLAN.md`
+- `LAUNCH_SCOPE.md` (authoritative launch scope; supersedes retired MAINNET_RC1_SCOPE.md)
+- `RELEASE_GATES.md` (mainnet release gates tracker)
 - `launch-gates/EXECUTION_GUIDE.md`
 - `crates/x3-launch-validator/`
 - `tests_phase4/run-all.sh`
 - `tests_core/invariants/registry.toml`
 - `proof/receipts/claims/` (atomic rollback, replay protection, supply conservation, DEX safety)
 - `reports/panic_unwrap_audit.md`
-- `docs/SECURITY_GATES.md`
+- `pallets/x3-kernel/src/security_gates.rs` (security-gate enforcement)
 - `docs/runbooks/testing/VALIDATION_CHECKLIST.md`
 - `package.json` (`npm test` / `vitest run`) for frontend / desktop test coverage
 
@@ -124,6 +123,6 @@ X3 is not mainnet-ready unless all gates pass.
 - `bash tests_phase4/run-all.sh`
 - `npm test` or `vitest run` for frontend/desktop test coverage
 - `grep -R "ExternalBridgesEnabled=false" chain-specs/`
-- `cat docs/MAINNET_LAUNCH_CHECKLIST.md launch-gates/EXECUTION_GUIDE.md reports/panic_unwrap_audit.md`
+- `cat RELEASE_GATES.md launch-gates/EXECUTION_GUIDE.md reports/panic_unwrap_audit.md`
 - `cargo run -p x3-launch-validator -- --checklist` (if applicable)
 

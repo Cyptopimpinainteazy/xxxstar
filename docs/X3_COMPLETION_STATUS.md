@@ -70,7 +70,8 @@ Legal Compliance Package               ░░░░░░░░░░    5%  Not
 5. **Secret Management Policy** — Created `docs/SECRET_MANAGEMENT_POLICY.md`.
 6. **Proof Ledger** — Created `docs/X3_PROOF_LEDGER.md` with 9 proven claims and stub detections.
 7. **Next Tasks** — Created `docs/X3_NEXT_TASKS.md` with prioritized steps.
-8. **Mainnet Launch Checklist** — Created `docs/MAINNET_LAUNCH_CHECKLIST.md`.
+8. **Mainnet Launch Checklist** — Created `docs/MAINNET_LAUNCH_CHECKLIST.md`. _(Note: retired
+   2026-09-04; current mainnet-release authority = `RELEASE_GATES.md` + `launch-gates/`)_
 9. **Gitignore** — Added `deployment/keys/` to `.gitignore`.
 10. **CURRENT_MAINNET_STATUS** — Updated with P0 remediation evidence.
 
