@@ -69,6 +69,16 @@ Real bugs/defects reproduced & fixed during this bring-up (all in launcher/ops, 
 Remaining (recorded as open gaps):
 - GRANDPA finality beyond single-node windows is confirmed; longer soak + tx throughput + forced
   failure/recovery tests still to run.
+
+### END-TO-END EXTRINSIC FINALITY ON 7-VALIDATOR NET — PASS — 2026-09-04
+After consensus established on the 7-validator net, submitted signed `system.remark` extrinsics
+from an endowed fresh-key account (sr25519 of validator-1 master seed) to node-1
+(ws://127.0.0.1:9950) via packages/ts-sdk/batch-remark.mjs, nonce-tracked, awaiting per-tx
+finalization.
+- Result: SENT=120 FINALIZED_EVENTS=120 finalNonce=120 delta=120 (0 lost). Nonce delta confirms
+  every tx reached a GRANDPA-finalized block. ~1.04 finalized/s is an artifact of the sequential
+  await-per-tx loader, NOT a chain ceiling (peak measured separately ~50+/s parallel).
+- Account funded: free=1000000000000000000 (1 unit); nonce advanced 0->120.
 - Validator node keys are random each boot (fine for ephemeral testnet); production nets need
   stable persisted node keys.
 
