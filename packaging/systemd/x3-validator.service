@@ -1,0 +1,59 @@
+[Unit]
+Description=X3 Validator Node
+Documentation=https://github.com/Cyptopimpinainteazy/xxxstar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=x3
+Group=x3
+RuntimeDirectory=x3
+RuntimeDirectoryMode=0750
+
+# ExecStart — path to binary, not a container
+#
+# The x3-chain-node binary must be obtained from a signed release artifact.
+# Either:
+#   1) Download from GitHub releases and verify checksums
+#   2) Build from tagged source and verify `srtool` WASM hash
+#
+# Do NOT use --unsafe-rpc-external, --rpc-methods Unsafe, or --tmp.
+ExecStart=/usr/local/bin/x3-chain-node \
+  --chain /etc/x3/chain-spec.json \
+  --base-path /var/lib/x3 \
+  --validator \
+  --name "x3-validator-$(hostname -s)" \
+  --port 30333 \
+  --rpc-port 9944 \
+  --prometheus-port 9615 \
+  --prometheus-external \
+  --log info
+
+Restart=always
+RestartSec=10
+
+# File descriptor limit — validators need many concurrent connections
+LimitNOFILE=1048576
+LimitNPROC=65536
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ReadWritePaths=/var/lib/x3 /var/log/x3 /run/x3
+
+# User/group
+User=x3
+Group=x3
+
+# Standard output handling
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

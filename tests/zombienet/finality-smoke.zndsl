@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# finality-smoke.zndsl — Zombienet smoke test for block finality
+#
+# Validates that a 3-validator network produces and finalizes blocks.
+# ─────────────────────────────────────────────────────────────────────────────
+Description: X3 Finality Smoke Test
+Network: ./docs/Zombienet-template.toml
+
+# Wait for network to start and produce blocks
+alice: block height is at least 10 within 60 seconds
+bob: block height is at least 10 within 60 seconds
+charlie: block height is at least 10 within 60 seconds
+
+# Verify finality: finalized height should be > 0
+alice: finalized block height is at least 5 within 30 seconds
+
+# Verify all validators agree on chain tip
+alice: block height == bob: block height within 10 seconds
+bob: block height == charlie: block height within 10 seconds
+
+# Verify peer connections (each node sees 2+ peers)
+alice: peers count is at least 2
+bob: peers count is at least 2
+charlie: peers count is at least 2
+
+# Verify health
+alice: node is healthy
+bob: node is healthy
+charlie: node is healthy
+
+# ── Success ──
+echo "✅ finality-smoke PASSED — 3 validators producing and finalizing blocks"

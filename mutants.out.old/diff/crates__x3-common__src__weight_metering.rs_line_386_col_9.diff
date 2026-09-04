@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace WeightMeter::gas_to_compute -> u64 with 0
+@@ -378,17 +378,17 @@
+ 
+     /// Convert compute units to gas
+     pub fn compute_to_gas(&self, units: u64) -> u64 {
+         units.saturating_mul(self.config.compute_to_gas_ratio)
+     }
+ 
+     /// Convert gas to compute units
+     pub fn gas_to_compute(&self, gas: u64) -> u64 {
+-        gas.saturating_div(self.config.compute_to_gas_ratio)
++        0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Get the remaining compute units
+     pub fn remaining_compute(&self) -> u64 {
+         self.compute.remaining()
+     }
+ 
+     /// Get the remaining gas

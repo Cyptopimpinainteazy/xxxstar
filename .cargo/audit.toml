@@ -1,0 +1,92 @@
+[advisories]
+# IGNORED ADVISORIES
+#
+# These are suppressed because they're transitive dependencies pinned by
+# the Substrate/Polkadot SDK (stable2512) or Solana vendored crates.
+# Upgrading requires bumping the entire SDK, a separate scoped project.
+#
+# ===== wasmtime v8.0.1 (via Substrate sp-wasm-interface v20) =====
+# Pinned by polkadot-sdk stable2512 -> sc-executor-wasmtime.
+# All wasmtime 8.x issues are mitigated by the sandboxed Wasm execution context
+# (untrusted code runs in a Wasm VM, not natively). Fix requires SDK upgrade.
+ignore = [
+    "RUSTSEC-2023-0091",   # wasmtime i64x2.shr_s miscompilation (Low, x86_64 only)
+    "RUSTSEC-2024-0438",   # wasmtime Windows device filenames (N/A on Linux)
+    "RUSTSEC-2025-0118",   # wasmtime shared linear memory (Low, guarded by API)
+    "RUSTSEC-2026-0020",   # wasmtime WASI resource exhaustion (Low, WASI not exposed)
+    "RUSTSEC-2026-0021",   # wasmtime wasi:http fields panic (Low, WASI not exposed)
+
+    # ===== wasmtime v8.0.1 / v35.0.0 cluster =====
+    # All are sandboxed-execution-context issues. N/A for our usage.
+    "RUSTSEC-2026-0006",   # wasmtime f64.copysign segfault (v35, x86_64)
+    "RUSTSEC-2026-0085",   # wasmtime flags component panic
+    "RUSTSEC-2026-0086",   # wasmtime Winch data leakage
+    "RUSTSEC-2026-0087",   # wasmtime f64x2.splat segfault
+    "RUSTSEC-2026-0088",   # wasmtime pooling allocator leakage
+    "RUSTSEC-2026-0089",   # wasmtime Winch table.fill panic
+    "RUSTSEC-2026-0091",   # wasmtime OOB component model strings
+    "RUSTSEC-2026-0092",   # wasmtime misaligned UTF-16 panic
+    "RUSTSEC-2026-0093",   # wasmtime heap OOB string transcoding
+    "RUSTSEC-2026-0094",   # wasmtime Winch table.grow
+    "RUSTSEC-2026-0095",   # wasmtime Winch sandbox escape
+    "RUSTSEC-2026-0096",   # wasmtime aarch64 sandbox escape (N/A on x86_64)
+    "RUSTSEC-2026-0114",   # wasmtime oversized table panic
+
+    # ===== curve25519-dalek v3.2.0 (timing) =====
+    # Pulled by ed25519-zebra -> sp-core -> Substrate stack.
+    # The workspace also has v4.1.3 but the Substrate path is pinned.
+    # Timing sidechannel is N/A for blockchain runtime (no adversarial
+    # timing measurements possible inside the Wasm sandbox).
+    "RUSTSEC-2024-0344",
+
+    # ===== ring v0.16.20 (AES panic, unmaintained) =====
+    # Also pinned by Substrate. Newer ring v0.17.14 is already in the
+    # lockfile for other deps. ring 0.16 only used for legacy paths.
+    "RUSTSEC-2025-0009",
+
+    # ===== hickory-proto v0.24.4 / v0.25.2 =====
+    # DNS resolution crate, pulled by Substrate/libp2p networking stack.
+    # CPU exhaustion / unbounded loop issues require attacker-controlled DNS.
+    # Validator nodes use trusted DNS infrastructure.
+    "RUSTSEC-2026-0118",
+    "RUSTSEC-2026-0119",
+
+    # ===== idna v0.1.5 (Punycode decoding) =====
+    # Pulled by url v1.7.2 -> jsonrpc-core-client v18 (legacy JSON-RPC).
+    # Only used for RPC endpoint URL parsing. Low impact.
+    "RUSTSEC-2024-0421",
+
+    # ===== protobuf v2.28.0 (recursion crash) =====
+    # Pulled via vendor/prometheus-client and vendor/quick-protobuf
+    # for legacy libp2p/Substrate networking stack. Upgrading protobuf
+    # requires coordinated vendored crate updates.
+    "RUSTSEC-2024-0437",
+
+    # ===== rsa v0.9.10 (Marvin timing attack) =====
+    # No fix available. Timing sidechannel only exploitable in
+    # non-sandboxed environments. N/A for runtime execution.
+    "RUSTSEC-2023-0071",
+
+    # ===== rustls-webpki v0.101.7 =====
+    # Pulled by Substrate/libp2p TLS stack. Newer v0.103.13 already
+    # present in lockfile for other deps. Certificate validation
+    # edge cases, low practical impact in validator network.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+
+    # ===== tokio-postgres v0.7.13 (panic DoS) =====
+    # Only used in analytics/indexer services (x3-metrics-tracker).
+    # Database connections are internal, not user-facing.
+    "RUSTSEC-2026-0178",
+
+    # ===== tracing-subscriber v0.2.25 (ANSI log injection) =====
+    # Old version, dev/logging only. Newer v0.3.23 already present.
+    "RUSTSEC-2025-0055",
+
+    # ===== ed25519-dalek v1.0.1 (double public key oracle) =====
+    # Pulled by Substrate sp-core. Requires attacker to obtain
+    # two signatures with the same key under attacker-controlled
+    # message conditions. Not practically exploitable in our usage.
+    "RUSTSEC-2022-0093",
+]

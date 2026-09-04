@@ -1,0 +1,28 @@
+{"name": "build_old_node", "result": "PASS", "detail": "using existing old binary /home/lojak/Desktop/X3_ATOMIC_STAR/target/rc2-current-node/debug/x3-chain-node", "timestamp": "2026-05-14T10:23:54Z"}
+{"name": "build_old_runtime_wasm", "result": "PASS", "detail": "/home/lojak/Desktop/X3_ATOMIC_STAR/target/rc2-current-node/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm", "timestamp": "2026-05-14T10:23:55Z"}
+{"name": "build_new_node", "result": "PASS", "detail": "using existing current binary /home/lojak/Desktop/X3_ATOMIC_STAR/target/rc4-current/debug/x3-chain-node (BUILD_CURRENT=0)", "timestamp": "2026-05-14T10:23:55Z"}
+{"name": "build_new_runtime_wasm", "result": "PASS", "detail": "/home/lojak/Desktop/X3_ATOMIC_STAR/target/rc4-current/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm", "timestamp": "2026-05-14T10:23:55Z"}
+{"name": "local3_boot", "result": "PASS", "detail": "/ip4/127.0.0.1/tcp/30543/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp", "timestamp": "2026-05-14T10:24:46Z"}
+{"name": "pre_upgrade_blocks", "result": "PASS", "detail": "advanced", "timestamp": "2026-05-14T10:24:48Z"}
+{"name": "pre_upgrade_finality", "result": "PASS", "detail": "finalized head advanced", "timestamp": "2026-05-14T10:24:50Z"}
+{"name": "pre_upgrade_settlement", "result": "PASS", "detail": "test_x3_native_evm_svm_roundtrip_preserves_supply", "timestamp": "2026-05-14T10:24:52Z"}
+{"name": "runtime_upgrade_submission", "result": "FAIL", "detail": "live setCode/governance upgrade extrinsic rejected; WASM payload 6802200 bytes exceeds old runtime block length cap 5242880 bytes (preimage max 4194304 bytes); see /home/lojak/Desktop/X3_ATOMIC_STAR/reports/rc4/runtime_upgrade_submission.json", "timestamp": "2026-05-14T10:24:54Z"}
+{"name": "post_upgrade_settlement", "result": "NOT_RUN", "detail": "not run because live runtime upgrade did not pass", "timestamp": "2026-05-14T10:24:55Z"}
+{"name": "post_upgrade_refund_halt", "result": "NOT_RUN", "detail": "not run because live runtime upgrade did not pass", "timestamp": "2026-05-14T10:24:55Z"}
+{"name": "post_upgrade_halt_reject", "result": "NOT_RUN", "detail": "not run because live runtime upgrade did not pass", "timestamp": "2026-05-14T10:24:55Z"}
+{"name": "build_old_node", "result": "PASS", "detail": "using existing old binary /home/lojak/Desktop/X3_ATOMIC_STAR/target/rc2-current-node/debug/x3-chain-node", "timestamp": "2026-05-14T10:23:54Z"}
+{"name": "build_old_runtime_wasm", "result": "PASS", "detail": "/home/lojak/Desktop/X3_ATOMIC_STAR/target/rc2-current-node/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm", "timestamp": "2026-05-14T10:23:55Z"}
+{"name": "build_new_node", "result": "PASS", "detail": "using existing current binary /home/lojak/Desktop/X3_ATOMIC_STAR/target/rc4-current/debug/x3-chain-node (BUILD_CURRENT=0)", "timestamp": "2026-05-14T10:23:55Z"}
+{"name": "build_new_runtime_wasm", "result": "PASS", "detail": "/home/lojak/Desktop/X3_ATOMIC_STAR/target/rc4-current/debug/wbuild/x3-chain-runtime/x3_chain_runtime.wasm", "timestamp": "2026-05-14T10:23:55Z"}
+{"name": "local3_boot", "result": "PASS", "detail": "/ip4/127.0.0.1/tcp/30543/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp", "timestamp": "2026-05-14T10:24:46Z"}
+{"name": "pre_upgrade_blocks", "result": "PASS", "detail": "advanced", "timestamp": "2026-05-14T10:24:48Z"}
+{"name": "pre_upgrade_finality", "result": "PASS", "detail": "finalized head advanced", "timestamp": "2026-05-14T10:24:50Z"}
+{"name": "pre_upgrade_settlement", "result": "PASS", "detail": "test_x3_native_evm_svm_roundtrip_preserves_supply", "timestamp": "2026-05-14T10:24:52Z"}
+{"name": "runtime_upgrade_submission", "result": "FAIL", "detail": "live setCode/governance upgrade extrinsic rejected; WASM payload 6802200 bytes exceeds old runtime block length cap 5242880 bytes (preimage max 4194304 bytes); see /home/lojak/Desktop/X3_ATOMIC_STAR/reports/rc4/runtime_upgrade_submission.json", "timestamp": "2026-05-14T10:24:54Z"}
+{"name": "post_upgrade_settlement", "result": "NOT_RUN", "detail": "not run because live runtime upgrade did not pass", "timestamp": "2026-05-14T10:24:55Z"}
+{"name": "post_upgrade_refund_halt", "result": "NOT_RUN", "detail": "not run because live runtime upgrade did not pass", "timestamp": "2026-05-14T10:24:55Z"}
+{"name": "post_upgrade_halt_reject", "result": "NOT_RUN", "detail": "not run because live runtime upgrade did not pass", "timestamp": "2026-05-14T10:24:55Z"}
+{"detail": "reused current workspace for HEAD", "name": "create_new_worktree", "result": "PASS", "timestamp": "2026-05-15T00:51:38Z"}
+{"detail": "/home/lojak/Desktop/X3_ATOMIC_STAR/.rc4-worktrees/old", "name": "create_old_worktree", "result": "PASS", "timestamp": "2026-05-15T00:51:39Z"}
+{"detail": "patched /home/lojak/Desktop/X3_ATOMIC_STAR/.rc4-worktrees/old/pallets/x3-cross-vm-router/src/tests.rs for current router Config trait", "name": "old_router_test_compat", "result": "PASS", "timestamp": "2026-05-15T00:51:40Z"}
+{"detail": "/home/lojak/Desktop/X3_ATOMIC_STAR/chain-specs/x3-local-rc2-raw.json", "name": "resolve_old_chain_spec", "result": "PASS", "timestamp": "2026-05-15T00:51:40Z"}

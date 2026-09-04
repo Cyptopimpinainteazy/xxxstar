@@ -1,0 +1,19 @@
+--- crates/x3-fees/src/types.rs
++++ replace + with * in AgentReputation::success_rate_bps
+@@ -97,15 +97,15 @@
+     pub total_volume: Amount,
+     /// Agent age in blocks.
+     pub age_blocks: u64,
+ }
+ 
+ impl AgentReputation {
+     /// Calculate success rate as basis points (10000 = 100%).
+     pub fn success_rate_bps(&self) -> u32 {
+-        let total = self.successes + self.failures;
++        let total = self.successes * /* ~ changed by cargo-mutants ~ */ self.failures;
+         if total == 0 {
+             return 0;
+         }
+         ((self.successes as u128 * 10000) / total as u128) as u32
+     }
+ }

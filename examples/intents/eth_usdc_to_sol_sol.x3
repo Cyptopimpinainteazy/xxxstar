@@ -1,0 +1,20 @@
+// X3 intent: bridge USDC from Ethereum to SOL on Solana
+intent swap_and_bridge {
+    from Ethereum.USDC amount 500000000 receiver 0xA1b2C3d4E5f6A7b8C9d0E1f2A3b4C5d6E7f8A9b0
+    to Solana.SOL receiver 4Nd1mzi8Y1QYxJt9wZWBYZpG7S4pYkZs6YzD3Vt9aBcD
+    
+    require finality eth >= 12
+    require slippage <= 0.5%
+    require proof eth.lock_event
+    require proof sol.release_receipt
+    require max_fee <= 10 USDC
+    require canonical_supply
+    
+    route {
+        best
+        allow "x3.dex"
+    }
+    
+    timeout 30m
+    on_fail refund_source
+}

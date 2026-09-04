@@ -1,0 +1,32 @@
+name: markdown-autodocs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "FEATURE_REGISTRY.toml"
+      - "TESTNET_FEATURE_FLAGS.toml"
+      - "apps/dex/package.json"
+      - "**.md"
+  workflow_dispatch:
+
+jobs:
+  markdown-autodocs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Run markdown-autodocs
+        uses: dineshsonachalam/markdown-autodocs@v1.0.7
+        with:
+          commit_author: X3 Bot <actions@github.com>
+          commit_user_email: actions@github.com
+          commit_message: "docs: auto-sync markdown from source files [skip ci]"
+          output_file_paths: "[./README.md,./CURRENT_MAINNET_STATUS.md,./MAINNET_LAUNCH_CHECKLIST.md,./MAINNET_RC1_SCOPE.md,./.x3/X3_FEATURE_REGISTRY.md,./.x3/X3_MAINNET_GATES.md,./BUILD_VERIFICATION_REPORT.md,./MAINNET_READINESS_PUSH_COMPLETE.md,./X3_END_TO_END_GAPS_MASTER_PLAN.md,./.x3/X3_RISK_REGISTER.md,./apps/dex/README.md,./FINAL_REPORT.md,./TODO.md,./.planning/SPRINT_0_LAUNCH_CHECKLIST.md,./.swarm/state/task_queue.md,./apps/inferstructor-dashboard/TESTING.md,./docs/CANONICAL_SUPPLY_INVARIANT.md,./docs/MINT_BURN_AUDIT.md,./docs/swarm-ops/ROLLOUT_STAGES.md,./apps/dex/PRPs/templates/prp_base.md,./docs/RC1_FEATURE_DEBT.md,./launch-gates/MAINNET_AUDIT_WORKFLOW.md,./launch-gates/PROOF_EXECUTION_GUIDE.md,./launch-gates/GENESIS_CEREMONY_CHECKLIST.md,./launch-gates/QUICK_REFERENCE.md,./docs/release-notes/RELEASE_CANDIDATE_CHECKLIST.md]"
+          categories: "[code-block]"

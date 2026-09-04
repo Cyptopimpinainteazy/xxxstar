@@ -1,0 +1,38 @@
+# Validator 02 - Authority Keys
+# Generated: 2025-11-09 23:32:55 UTC
+
+## AURA KEY (Block Production - Sr25519)
+SS58 Address:     5H8hDUbjKqYjB3X333NDCqnYzmcNjLNpX9xHfpTUF1Y3bhHx
+Public Key (Hex): 0xe037fd8212784724ab6601c6d24f56fbdfb3f8e0f35da6e619140b4ab8f2da08
+Secret Seed:      0x227415ee18379e2e1d8f31f4f12fe674568ce16370d4f86d66c2e4446f8a0e46
+Secret Phrase:    double clever athlete birth notable evil type shrug off ready notable rose
+
+## GRANDPA KEY (Finality - Ed25519)
+SS58 Address:     5EmWeBxn2fumE41e3mnQf6znus8N5s8ZgHqCVhJyRi63rHzQ
+Public Key (Hex): 0x7797c660892e54fb822c1261cfec0a18118de0f21175e74c4da6b44255d9d7bc
+Secret Seed:      0x3b619b75dc5ba58371f7371a2063871006447e29880883e0657360036703859b
+Secret Phrase:    elder true eagle furnace waste decorate sheriff resource arena rescue gorilla exile
+
+## RPC KEY INSERTION COMMANDS (Run on validator-02)
+
+# Insert Aura key (block production)
+curl -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"author_insertKey","params":["aura","double clever athlete birth notable evil type shrug off ready notable rose","0xe037fd8212784724ab6601c6d24f56fbdfb3f8e0f35da6e619140b4ab8f2da08"],"id":1}' \
+  http://localhost:9944
+
+# Insert GRANDPA key (finality)
+curl -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"author_insertKey","params":["gran","elder true eagle furnace waste decorate sheriff resource arena rescue gorilla exile","0x7797c660892e54fb822c1261cfec0a18118de0f21175e74c4da6b44255d9d7bc"],"id":1}' \
+  http://localhost:9944
+
+## CHAIN SPEC ENTRY (Add to "initialAuthorities" in chain spec)
+[
+  "5H8hDUbjKqYjB3X333NDCqnYzmcNjLNpX9xHfpTUF1Y3bhHx",     // Aura (Sr25519)
+  "5EmWeBxn2fumE41e3mnQf6znus8N5s8ZgHqCVhJyRi63rHzQ"   // GRANDPA (Ed25519)
+]
+
+⚠️  SECURITY WARNING:
+• NEVER share these keys publicly
+• NEVER commit to git (already .gitignored)
+• Store securely in password manager or vault
+• Backup encrypted to multiple locations

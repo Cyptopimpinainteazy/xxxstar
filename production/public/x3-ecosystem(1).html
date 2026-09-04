@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3-VM | The Atomic DeFi Ecosystem</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&family=Manrope:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --white:#FAFAF8;--black:#0C0C0C;
+  --g1:#00FF87;--g2:#0066FF;
+  --accent:#FF4D00;
+  --warm:#F5F0E8;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--white);color:var(--black);font-family:'Manrope',sans-serif;overflow-x:hidden;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:var(--white);border-bottom:1px solid rgba(0,0,0,.08);padding:18px 80px;display:flex;justify-content:space-between;align-items:center;}
+.logo{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;letter-spacing:-1px;}
+.logo .x{color:var(--g2);}
+.logo .num{color:var(--black);}
+.nav-links{display:flex;gap:36px;align-items:center;}
+.nav-links a{color:rgba(0,0,0,.5);text-decoration:none;font-family:'Syne Mono',monospace;font-size:12px;letter-spacing:1px;transition:.2s;}
+.nav-links a:hover{color:var(--black);}
+.nav-pill{background:var(--black);color:var(--white)!important;padding:10px 24px;border-radius:40px;}
+.nav-pill:hover{background:var(--g2)!important;}
+
+/* HERO */
+.hero{padding:160px 80px 120px;position:relative;overflow:hidden;}
+.hero-bg-circle{position:absolute;width:900px;height:900px;border-radius:50%;background:radial-gradient(circle,rgba(0,102,255,.07),transparent);top:-300px;right:-200px;pointer-events:none;}
+.hero-bg-circle2{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,135,.06),transparent);bottom:-100px;left:200px;pointer-events:none;}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(0,102,255,.08);border:1px solid rgba(0,102,255,.2);padding:8px 16px;border-radius:40px;font-family:'Syne Mono',monospace;font-size:11px;color:var(--g2);letter-spacing:2px;margin-bottom:40px;}
+.hero-tag-dot{width:6px;height:6px;border-radius:50%;background:var(--g1);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(52px,7vw,100px);font-weight:800;line-height:.95;letter-spacing:-3px;margin-bottom:32px;max-width:900px;}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--g2),var(--g1));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hero-lead{font-size:20px;color:rgba(0,0,0,.55);line-height:1.7;max-width:620px;margin-bottom:56px;font-weight:300;}
+.hero-lead strong{color:var(--black);font-weight:600;}
+.hero-actions{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.btn-solid{background:var(--black);color:var(--white);padding:16px 40px;border-radius:40px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.5px;text-decoration:none;transition:.3s;}
+.btn-solid:hover{background:var(--g2);transform:translateY(-2px);}
+.btn-ghost{color:rgba(0,0,0,.5);font-family:'Syne',sans-serif;font-size:15px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:8px;transition:.2s;}
+.btn-ghost:hover{color:var(--black);}
+.hero-stats{display:flex;gap:80px;margin-top:80px;padding-top:60px;border-top:1px solid rgba(0,0,0,.08);}
+.hs{display:flex;flex-direction:column;gap:4px;}
+.hs-val{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;letter-spacing:-2px;}
+.hs-val.blue{color:var(--g2);}
+.hs-val.green{color:#00A651;}
+.hs-val.orange{color:var(--accent);}
+.hs-label{font-family:'Syne Mono',monospace;font-size:11px;color:rgba(0,0,0,.4);letter-spacing:2px;text-transform:uppercase;}
+
+/* MARQUEE */
+.marquee{background:var(--black);padding:18px 0;overflow:hidden;}
+.marquee-inner{display:flex;gap:60px;animation:marquee 25s linear infinite;white-space:nowrap;}
+.mi{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1px;text-transform:uppercase;}
+.mi.hi{color:var(--g1);}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* FEATURES */
+.features{padding:140px 80px;background:var(--warm);}
+.features-header{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:end;margin-bottom:80px;}
+.feat-h{font-family:'Syne',sans-serif;font-size:clamp(40px,5vw,64px);font-weight:800;letter-spacing:-2px;line-height:1.05;}
+.feat-h em{font-style:normal;color:var(--g2);}
+.feat-lead{font-size:16px;color:rgba(0,0,0,.5);line-height:1.8;font-weight:300;}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.feat-card{background:var(--white);padding:48px 36px;transition:.3s;border-radius:0;position:relative;overflow:hidden;}
+.feat-card::before{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--g2),var(--g1));transform:scaleX(0);transform-origin:left;transition:.4s;}
+.feat-card:hover::before{transform:scaleX(1);}
+.feat-card:hover{background:var(--black);color:var(--white);}
+.feat-card:hover .feat-icon-bg{background:rgba(255,255,255,.1);}
+.feat-card:hover .feat-body{color:rgba(255,255,255,.55);}
+.feat-icon-bg{width:52px;height:52px;background:rgba(0,102,255,.08);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:24px;transition:.3s;}
+.feat-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:12px;letter-spacing:-0.5px;}
+.feat-body{font-size:14px;color:rgba(0,0,0,.5);line-height:1.7;transition:.3s;}
+.feat-tag{margin-top:20px;font-family:'Syne Mono',monospace;font-size:10px;color:var(--g2);letter-spacing:2px;}
+
+/* CHAIN COMPARISON */
+.compare{padding:140px 80px;}
+.compare-h{font-family:'Syne',sans-serif;font-size:clamp(40px,5vw,64px);font-weight:800;letter-spacing:-2px;margin-bottom:12px;}
+.compare-sub{font-size:16px;color:rgba(0,0,0,.45);margin-bottom:60px;}
+.compare-bar{display:grid;grid-template-columns:200px 1fr 1fr 1fr;gap:0;border:1px solid rgba(0,0,0,.1);overflow:hidden;border-radius:12px;}
+.cb-head{font-family:'Syne Mono',monospace;font-size:11px;letter-spacing:2px;padding:16px 24px;text-transform:uppercase;}
+.cb-head.x3{background:var(--g2);color:#fff;}
+.cb-head.eth{background:rgba(98,126,234,.1);color:#627eea;}
+.cb-head.sol{background:rgba(153,69,255,.1);color:#9945ff;}
+.compare-row{display:contents;}
+.cb-key{padding:20px 24px;font-family:'Syne Mono',monospace;font-size:12px;color:rgba(0,0,0,.4);border-top:1px solid rgba(0,0,0,.06);background:rgba(0,0,0,.02);}
+.cb-val{padding:20px 24px;font-size:14px;font-weight:500;border-top:1px solid rgba(0,0,0,.06);}
+.cb-val.best{color:var(--g2);font-weight:700;}
+.cb-val.mid{color:var(--accent);}
+.cb-val.slow{color:rgba(0,0,0,.35);}
+
+/* PROCESS */
+.process{padding:140px 80px;background:var(--black);color:var(--white);}
+.process-h{font-family:'Syne',sans-serif;font-size:clamp(40px,5vw,64px);font-weight:800;letter-spacing:-2px;margin-bottom:12px;}
+.process-sub{font-size:16px;color:rgba(255,255,255,.35);margin-bottom:80px;}
+.process-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:40px;}
+.ps{position:relative;padding-left:24px;}
+.ps::before{content:'';position:absolute;left:0;top:12px;width:2px;height:calc(100% - 12px);background:rgba(255,255,255,.07);}
+.ps-num{font-family:'Syne Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--g1);margin-bottom:16px;}
+.ps-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin-bottom:12px;letter-spacing:-0.5px;}
+.ps-body{font-size:14px;color:rgba(255,255,255,.45);line-height:1.7;}
+.ps-code{margin-top:20px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);padding:12px 16px;border-radius:8px;font-family:'Syne Mono',monospace;font-size:11px;color:rgba(255,255,255,.5);line-height:1.7;}
+.ps-code .c{color:var(--g1);}
+
+/* ECOSYSTEM */
+.ecosystem{padding:140px 80px;background:var(--warm);}
+.eco-h{font-family:'Syne',sans-serif;font-size:clamp(40px,5vw,64px);font-weight:800;letter-spacing:-2px;margin-bottom:64px;}
+.eco-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px;}
+.eco-card{background:var(--white);border-radius:16px;padding:48px;border:1px solid rgba(0,0,0,.06);transition:.3s;cursor:pointer;}
+.eco-card:hover{border-color:var(--g2);transform:translateY(-4px);box-shadow:0 24px 80px rgba(0,102,255,.08);}
+.eco-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;}
+.eco-emoji{font-size:36px;}
+.eco-badge{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:2px;padding:6px 14px;background:rgba(0,102,255,.08);color:var(--g2);border-radius:40px;}
+.eco-card-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;letter-spacing:-1px;margin-bottom:12px;}
+.eco-card-body{font-size:14px;color:rgba(0,0,0,.5);line-height:1.7;}
+.eco-card-footer{margin-top:32px;padding-top:24px;border-top:1px solid rgba(0,0,0,.06);display:flex;gap:24px;}
+.eco-stat{display:flex;flex-direction:column;gap:2px;}
+.eco-stat-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--g2);}
+.eco-stat-label{font-family:'Syne Mono',monospace;font-size:10px;color:rgba(0,0,0,.35);letter-spacing:2px;text-transform:uppercase;}
+
+/* FINAL CTA */
+.final-cta{padding:180px 80px;text-align:center;background:var(--black);position:relative;overflow:hidden;}
+.cta-glow{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,102,255,.3),transparent);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+.final-h{font-family:'Syne',sans-serif;font-size:clamp(52px,8vw,110px);font-weight:800;letter-spacing:-4px;color:var(--white);line-height:.9;margin-bottom:32px;position:relative;}
+.final-h em{font-style:normal;background:linear-gradient(90deg,var(--g2),var(--g1));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.final-sub{font-size:20px;color:rgba(255,255,255,.4);max-width:500px;margin:0 auto 48px;position:relative;}
+.final-btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;}
+.fbn-primary{background:linear-gradient(135deg,var(--g2),var(--g1));color:var(--black);padding:18px 48px;border-radius:40px;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;text-decoration:none;transition:.3s;letter-spacing:-0.5px;}
+.fbn-primary:hover{transform:translateY(-3px);box-shadow:0 24px 60px rgba(0,102,255,.4);}
+.fbn-sec{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);padding:18px 48px;border-radius:40px;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;text-decoration:none;border:1px solid rgba(255,255,255,.1);transition:.3s;}
+.fbn-sec:hover{background:rgba(255,255,255,.12);color:var(--white);}
+
+footer{background:var(--black);border-top:1px solid rgba(255,255,255,.06);padding:40px 80px;display:flex;justify-content:space-between;align-items:center;color:rgba(255,255,255,.25);font-family:'Syne Mono',monospace;font-size:11px;letter-spacing:1px;}
+footer a{color:rgba(255,255,255,.3);text-decoration:none;transition:.2s;}
+footer a:hover{color:var(--g1);}
+footer .flinks{display:flex;gap:32px;}
+
+@media(max-width:900px){
+  nav{padding:16px 24px;}
+  .nav-links{display:none;}
+  .hero{padding:100px 24px 80px;}
+  .hero-stats{flex-direction:column;gap:32px;}
+  .features,.compare,.process,.ecosystem,.final-cta{padding:80px 24px;}
+  .features-header{grid-template-columns:1fr;}
+  .features-grid,.process-steps,.eco-grid{grid-template-columns:1fr;}
+  .compare-bar{grid-template-columns:1fr;}
+  footer{flex-direction:column;gap:16px;text-align:center;padding:32px 24px;}
+  .flinks{flex-wrap:wrap;justify-content:center;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><span class="x">X</span><span class="num">3</span>-VM</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#compare">Compare</a>
+    <a href="#process">How It Works</a>
+    <a href="#ecosystem">Ecosystem</a>
+    <a href="#" class="nav-pill">Get Started</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg-circle"></div>
+  <div class="hero-bg-circle2"></div>
+  <div class="hero-tag"><div class="hero-tag-dot"></div>Now live on testnet</div>
+  <h1>The Atomic Layer<br>DeFi Has Been<br><em>Waiting For.</em></h1>
+  <p class="hero-lead">
+    X3-VM coordinates trustless swaps across <strong>Ethereum, Solana, and X3 Chain</strong> simultaneously — using HTLC contracts, zero-fee flashloans, and sub-200ms finality. One atomic truth across three ecosystems.
+  </p>
+  <div class="hero-actions">
+    <a href="#process" class="btn-solid">See How It Works</a>
+    <a href="#ecosystem" class="btn-ghost">Explore the Ecosystem →</a>
+  </div>
+  <div class="hero-stats">
+    <div class="hs"><span class="hs-val blue">~200ms</span><span class="hs-label">X3 Chain Finality</span></div>
+    <div class="hs"><span class="hs-val green">0.00%</span><span class="hs-label">Min Flashloan Fee</span></div>
+    <div class="hs"><span class="hs-val orange">3</span><span class="hs-label">Chains, One Trade</span></div>
+    <div class="hs"><span class="hs-val blue">100%</span><span class="hs-label">Atomic Guarantee</span></div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee">
+  <div class="marquee-inner">
+    <span class="mi hi">X3-VM</span><span class="mi">·</span><span class="mi">ATOMIC SWAPS</span><span class="mi">·</span><span class="mi hi">ZERO FEE FLASHLOANS</span><span class="mi">·</span><span class="mi">HTLC SECURED</span><span class="mi">·</span><span class="mi hi">EVM + SVM + X3</span><span class="mi">·</span><span class="mi">200MS FINALITY</span><span class="mi">·</span><span class="mi hi">TRUSTLESS</span><span class="mi">·</span><span class="mi">NO BRIDGES</span><span class="mi">·</span><span class="mi hi">NO CUSTODIANS</span><span class="mi">·</span><span class="mi">COMITV2</span><span class="mi">·</span>
+    <span class="mi hi">X3-VM</span><span class="mi">·</span><span class="mi">ATOMIC SWAPS</span><span class="mi">·</span><span class="mi hi">ZERO FEE FLASHLOANS</span><span class="mi">·</span><span class="mi">HTLC SECURED</span><span class="mi">·</span><span class="mi hi">EVM + SVM + X3</span><span class="mi">·</span><span class="mi">200MS FINALITY</span><span class="mi">·</span><span class="mi hi">TRUSTLESS</span><span class="mi">·</span><span class="mi">NO BRIDGES</span><span class="mi">·</span><span class="mi hi">NO CUSTODIANS</span><span class="mi">·</span><span class="mi">COMITV2</span><span class="mi">·</span>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="features-header">
+    <h2 class="feat-h">Everything you need.<br><em>Nothing you don't.</em></h2>
+    <p class="feat-lead">X3-VM is built from first principles: every component exists because atomic cross-chain execution demands it. No bloat. No trust assumptions. No single points of failure.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feat-card">
+      <div class="feat-icon-bg">🔐</div>
+      <div class="feat-title">HTLC Security</div>
+      <p class="feat-body">Hash Time-Locked Contracts with SHA-256 bind both sides of every trade. Funds release only when the correct preimage is revealed — or automatically refund after timeout.</p>
+      <div class="feat-tag">SHA-256 // TIMELOCK-BASED</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon-bg">⚡</div>
+      <div class="feat-title">Flashloan Execution</div>
+      <p class="feat-body">Borrow, swap, and repay in a single transaction on every chain. 6 providers, zero minimum fees available. The FlashloanPlanner auto-selects optimal source per asset.</p>
+      <div class="feat-tag">6 PROVIDERS // 0% MIN FEE</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon-bg">🌐</div>
+      <div class="feat-title">X3 Coordination</div>
+      <p class="feat-body">The x3-kernel's submitComitV2 mechanism dispatches signed payloads to EVM and SVM from a single X3 transaction. True cross-VM coordination without bridges or oracles.</p>
+      <div class="feat-tag">COMITV2 // NO BRIDGES</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon-bg">👁</div>
+      <div class="feat-title">Relayer Network</div>
+      <p class="feat-body">Off-chain watchers monitor HTLC events across all chains. When secret S is revealed on one chain, relayers propagate the claim to the other within milliseconds.</p>
+      <div class="feat-tag">EVENT-DRIVEN // MEV-PROTECTED</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon-bg">🔄</div>
+      <div class="feat-title">Fail-Safe Refunds</div>
+      <p class="feat-body">Zero partial fills. If any leg fails or times out, both chains auto-refund. The timelocks are staggered (T_E > T_S + Δ) to ensure the slower chain always has a claim window.</p>
+      <div class="feat-tag">T_S=1H // T_E=2H</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon-bg">🏦</div>
+      <div class="feat-title">Inventory Vaults</div>
+      <p class="feat-body">X3-lang vault contracts hold pre-funded collateral per chain. Authorized-only access, real-time PnL tracking, and auto-rebalancing ensure capital is always available.</p>
+      <div class="feat-tag">MAX 50% LOAN RATIO</div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARE -->
+<section class="compare" id="compare">
+  <h2 class="compare-h">X3 leads. Others follow.</h2>
+  <p class="compare-sub">Finality, fees, and features — X3 Chain dominates where it matters.</p>
+  <div class="compare-bar">
+    <div style="background:rgba(0,0,0,.03);border-right:1px solid rgba(0,0,0,.08);"></div>
+    <div class="cb-head x3">X3 CHAIN</div>
+    <div class="cb-head eth">ETHEREUM</div>
+    <div class="cb-head sol">SOLANA</div>
+
+    <div class="cb-key">Finality</div>
+    <div class="cb-val best">~200ms</div>
+    <div class="cb-val slow">~60 seconds</div>
+    <div class="cb-val mid">~400ms</div>
+
+    <div class="cb-key">Runtime</div>
+    <div class="cb-val best">WASM (x3-lang)</div>
+    <div class="cb-val">EVM (Solidity)</div>
+    <div class="cb-val">BPF (Anchor)</div>
+
+    <div class="cb-key">Min Flash Fee</div>
+    <div class="cb-val best">0.00%</div>
+    <div class="cb-val mid">0.05% (Aave)</div>
+    <div class="cb-val best">0.00% (Kamino)</div>
+
+    <div class="cb-key">Crypto Hostcalls</div>
+    <div class="cb-val best">SHA-256, Keccak, secp256k1, ed25519</div>
+    <div class="cb-val">keccak256, ecrecover</div>
+    <div class="cb-val">SHA-256</div>
+
+    <div class="cb-key">TPS Target</div>
+    <div class="cb-val best">10,000+</div>
+    <div class="cb-val slow">~15–30</div>
+    <div class="cb-val mid">~50,000</div>
+
+    <div class="cb-key">MEV Resistance</div>
+    <div class="cb-val best">Encrypted mempool (planned)</div>
+    <div class="cb-val slow">Low (public mempool)</div>
+    <div class="cb-val mid">Medium</div>
+
+    <div class="cb-key">Cross-VM Dispatch</div>
+    <div class="cb-val best">submitComitV2 (native)</div>
+    <div class="cb-val slow">None (bridge required)</div>
+    <div class="cb-val slow">None (bridge required)</div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section class="process" id="process">
+  <h2 class="process-h">Four phases.</h2>
+  <p class="process-sub">From secret generation to profit collection. Every step is trustless.</p>
+  <div class="process-steps">
+    <div class="ps">
+      <div class="ps-num">01 / SETUP</div>
+      <div class="ps-title">Generate the Secret</div>
+      <p class="ps-body">Compute secret S and hash H=sha256(S). Set staggered timelocks on both chains. Pre-fund inventory vaults with collateral.</p>
+      <div class="ps-code">
+        <div><span class="c">S</span> = random_bytes(32)</div>
+        <div><span class="c">H</span> = sha256(S)</div>
+        <div><span class="c">T_S</span> = now + 3600</div>
+        <div><span class="c">T_E</span> = now + 7200</div>
+      </div>
+    </div>
+    <div class="ps">
+      <div class="ps-num">02 / LOCK</div>
+      <div class="ps-title">Deploy HTLCs</div>
+      <p class="ps-body">Create hash-locked contracts on both chains with the same H. Wait for confirmations. Funds are locked but not moved.</p>
+      <div class="ps-code">
+        <div><span class="c">svm</span>.createHTLC(H, T_S)</div>
+        <div><span class="c">evm</span>.createHTLC(H, T_E)</div>
+        <div>await confirmations</div>
+      </div>
+    </div>
+    <div class="ps">
+      <div class="ps-num">03 / FLASH</div>
+      <div class="ps-title">Execute Flash Legs</div>
+      <p class="ps-body">Both chains fire their flashloan→swap→repay sequence. One transaction each. If either reverts, no secret is released.</p>
+      <div class="ps-code">
+        <div><span class="c">kamino</span>.flashBorrow(1M)</div>
+        <div><span class="c">jupiter</span>.swap(USDC→SOL)</div>
+        <div><span class="c">kamino</span>.flashRepay(1M)</div>
+      </div>
+    </div>
+    <div class="ps">
+      <div class="ps-num">04 / CLAIM</div>
+      <div class="ps-title">Reveal and Collect</div>
+      <p class="ps-body">Both legs succeed. Initiator reveals S on Solana. Relayer claims the Ethereum side. Profit secured on both chains.</p>
+      <div class="ps-code">
+        <div><span class="c">svm</span>.claimHTLC(id, S)</div>
+        <div><span class="c">// emit HtlcClaimed(S)</span></div>
+        <div><span class="c">evm</span>.claimHTLC(id, S)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ECOSYSTEM -->
+<section class="ecosystem" id="ecosystem">
+  <h2 class="eco-h">The X3-VM Ecosystem</h2>
+  <div class="eco-grid">
+    <div class="eco-card">
+      <div class="eco-card-top">
+        <div class="eco-emoji">⚡</div>
+        <span class="eco-badge">EVM</span>
+      </div>
+      <div class="eco-card-title">Ethereum Integration</div>
+      <p class="eco-card-body">AtlasHTLC.sol with full Aave V3 and Balancer V2 flashloan support. nonReentrant guards, 12-block confirmation requirement, and keccak256 hash verification.</p>
+      <div class="eco-card-footer">
+        <div class="eco-stat"><div class="eco-stat-val">0.00%</div><div class="eco-stat-label">Balancer Fee</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">12</div><div class="eco-stat-label">Confirms</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">~60s</div><div class="eco-stat-label">Finality</div></div>
+      </div>
+    </div>
+    <div class="eco-card">
+      <div class="eco-card-top">
+        <div class="eco-emoji">🌊</div>
+        <span class="eco-badge">SVM</span>
+      </div>
+      <div class="eco-card-title">Solana Integration</div>
+      <p class="eco-card-body">Anchor-based HTLC with Kamino (0%) and MarginFi (0%) flashloan support. Jupiter routing for optimal swaps, Clock-based timelock verification, and 5-block confirmation window.</p>
+      <div class="eco-card-footer">
+        <div class="eco-stat"><div class="eco-stat-val">0.00%</div><div class="eco-stat-label">Kamino Fee</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">5</div><div class="eco-stat-label">Confirms</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">~400ms</div><div class="eco-stat-label">Finality</div></div>
+      </div>
+    </div>
+    <div class="eco-card">
+      <div class="eco-card-top">
+        <div class="eco-emoji">🔮</div>
+        <span class="eco-badge">X3VM</span>
+      </div>
+      <div class="eco-card-title">X3 Chain Coordinator</div>
+      <p class="eco-card-body">x3-lang WASM contracts running on x3vm, orchestrated by the X3-kernel's submitComitV2. GPU-accelerated hostcalls for SHA-256, Keccak, and elliptic curve operations.</p>
+      <div class="eco-card-footer">
+        <div class="eco-stat"><div class="eco-stat-val">~200ms</div><div class="eco-stat-label">Finality</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">10K+</div><div class="eco-stat-label">TPS</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">WASM</div><div class="eco-stat-label">Runtime</div></div>
+      </div>
+    </div>
+    <div class="eco-card">
+      <div class="eco-card-top">
+        <div class="eco-emoji">👁</div>
+        <span class="eco-badge">RELAYER</span>
+      </div>
+      <div class="eco-card-title">Watcher & Relayer Network</div>
+      <p class="eco-card-body">Off-chain relayers monitor HTLC events across all three chains. When S is emitted on SVM, relayers fire the EVM claim via ComitV2. Watchdog also monitors deadlines and triggers refunds if needed.</p>
+      <div class="eco-card-footer">
+        <div class="eco-stat"><div class="eco-stat-val">3</div><div class="eco-stat-label">Chains Watched</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">MEV</div><div class="eco-stat-label">Protected</div></div>
+        <div class="eco-stat"><div class="eco-stat-val">AUTO</div><div class="eco-stat-label">Refund</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="cta-glow"></div>
+  <h2 class="final-h">Start building<br>on <em>X3-VM.</em></h2>
+  <p class="final-sub">Testnet is live. Contracts are deployed. The atomic future of DeFi is here — and it's waiting for builders.</p>
+  <div class="final-btns">
+    <a href="#" class="fbn-primary">Launch on Testnet</a>
+    <a href="#" class="fbn-sec">Read the Docs</a>
+  </div>
+</section>
+
+<footer>
+  <div>© 2025 X3-VM · TRUST-MINIMIZED CROSS-CHAIN EXECUTION</div>
+  <div class="flinks">
+    <a href="#">Docs</a>
+    <a href="#">GitHub</a>
+    <a href="#">Discord</a>
+    <a href="#">Whitepaper</a>
+    <a href="#">Audit Reports</a>
+    <a href="#">Validator Program</a>
+  </div>
+</footer>
+
+<script>
+const obs=new IntersectionObserver(entries=>{entries.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>{e.target.style.opacity='1';e.target.style.transform='translateY(0)';},i*80);}});},{threshold:.05});
+document.querySelectorAll('.feat-card,.eco-card,.ps,.compare-row').forEach(el=>{el.style.opacity='0';el.style.transform='translateY(20px)';el.style.transition='opacity .6s ease,transform .6s ease';obs.observe(el);});
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+// token_launchpad.x3 - Token Launchpad with Presales, Vesting, Whitelist, Auction, Liquidity Seed
+//
+// @version("1.0.0")
+// @audit
+
+contract TokenLaunchpad {
+    // Platform configuration
+    const PLATFORM_FEE_BPS: u256 = 250;       // 2.5% platform fee
+    const VESTING_DURATION: u256 = 2592000;    // 30 days in seconds
+    const MIN_PRESALE_AMOUNT: u256 = 0.01 ether;
+    const MAX_PRESALE_AMOUNT: u256 = 100 ether;
+    const AUCTION_MIN_BID: u256 = 0.1 ether;
+
+    // Storage
+    address owner;
+    mapping(address => PresaleInfo) presales;
+    mapping(address => mapping(address => VestingSchedule)) vesting_schedules;
+    mapping(address => bool) whitelist;
+    mapping(address => AuctionInfo) auctions;
+    u256 presale_counter;
+    u256 auction_counter;
+
+    // Structs
+    struct PresaleInfo {
+        u256 id;
+        address token;
+        address beneficiary;
+        u256 soft_cap;
+        u256 hard_cap;
+        u256 start_time;
+        u256 end_time;
+        u256 total_raised;
+        u256 token_price;
+        bool finalized;
+    }
+
+    struct VestingSchedule {
+        u256 total_amount;
+        u256 released_amount;
+        u256 start_time;
+        u256 cliff_duration;
+        u256 vesting_duration;
+        u256 tokens_per_second;
+    }
+
+    struct AuctionInfo {
+        u256 id;
+        address token;
+        u256 start_price;
+        u256 reserve_price;
+        u256 start_time;
+        u256 end_time;
+        u256 highest_bid;
+        address highest_bidder;
+        bool settled;
+    }
+
+    // Events
+    event PresaleCreated(address indexed token, address indexed beneficiary, u256 hard_cap, u256 token_price);
+    event TokensClaimed(address indexed user, address indexed token, u256 amount);
+    event WhitelistUpdated(address indexed user, bool status);
+    event AuctionStarted(address indexed token, u256 start_price, u256 reserve_price);
+    event BidPlaced(address indexed bidder, u256 amount);
+    event AuctionSettled(address indexed winner, u256 amount);
+    event LiquiditySeeded(address indexed pool, u256 amount);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== PRESALE FUNCTIONS =====
+
+    fn create_presale(
+        token: address,
+        beneficiary: address,
+        soft_cap: u256,
+        hard_cap: u256,
+        duration: u256,
+        token_price: u256
+    ) -> u256 {
+        require(msg.sender == owner, "Only owner");
+        require(hard_cap > soft_cap, "Hard cap must exceed soft cap");
+        require(duration >= 86400, "Min 1 day duration");
+        require(duration <= 2592000, "Max 30 days duration");
+        require(token_price > 0, "Price must be > 0");
+
+        presale_counter = presale_counter + 1;
+        presales[token] = PresaleInfo {
+            id: presale_counter,
+            token: token,
+            beneficiary: beneficiary,
+            soft_cap: soft_cap,
+            hard_cap: hard_cap,
+            start_time: block.timestamp,
+            end_time: block.timestamp + duration,
+            total_raised: 0,
+            token_price: token_price,
+            finalized: false,
+        };
+
+        emit PresaleCreated(token, beneficiary, hard_cap, token_price);
+        return presale_counter;
+    }
+
+    fn participate_presale(token: address) {
+        let presale = presales[token];
+        require(presale.id != 0, "Presale not found");
+        require(block.timestamp >= presale.start_time, "Not started");
+        require(block.timestamp <= presale.end_time, "Ended");
+        require(!presale.finalized, "Already finalized");
+        require(whitelist[msg.sender], "Not whitelisted");
+
+        let contribution = msg.value;
+        require(contribution >= MIN_PRESALE_AMOUNT, "Below minimum");
+        require(contribution <= MAX_PRESALE_AMOUNT, "Above maximum");
+        require(presale.total_raised + contribution <= presale.hard_cap, "Hard cap reached");
+
+        presales[token].total_raised = presales[token].total_raised + contribution;
+
+        // Calculate tokens owed
+        let tokens_owed = contribution * presale.token_price / 1 ether;
+        let schedule = VestingSchedule {
+            total_amount: tokens_owed,
+            released_amount: 0,
+            start_time: block.timestamp,
+            cliff_duration: 604800,  // 7 days
+            vesting_duration: VESTING_DURATION,
+            tokens_per_second: tokens_owed / VESTING_DURATION,
+        };
+        vesting_schedules[token][msg.sender] = schedule;
+    }
+
+    fn finalize_presale(token: address) {
+        let presale = presales[token];
+        require(msg.sender == presale.beneficiary, "Only beneficiary");
+        require(block.timestamp > presale.end_time, "Not ended");
+        require(!presale.finalized, "Already finalized");
+
+        if presale.total_raised >= presale.soft_cap {
+            // Success - transfer raised funds to beneficiary
+            presales[token].finalized = true;
+            transfer(presale.beneficiary, presale.total_raised);
+        } else {
+            // Soft cap not reached - allow refunds
+            presales[token].finalized = true;
+        }
+    }
+
+    // ===== CLAIM TOKENS =====
+
+    fn claim_tokens(token: address) -> u256 {
+        let schedule = vesting_schedules[token][msg.sender];
+        require(schedule.total_amount > 0, "No vesting schedule");
+        require(block.timestamp >= schedule.start_time + schedule.cliff_duration, "Cliff not met");
+
+        let elapsed = block.timestamp - schedule.start_time;
+        let vested = elapsed * schedule.tokens_per_second;
+        if vested > schedule.total_amount {
+            vested = schedule.total_amount;
+        }
+
+        let claimable = vested - schedule.released_amount;
+        require(claimable > 0, "Nothing to claim");
+
+        vesting_schedules[token][msg.sender].released_amount = schedule.released_amount + claimable;
+        emit TokensClaimed(msg.sender, token, claimable);
+        return claimable;
+    }
+
+    // ===== VESTING SCHEDULE =====
+
+    fn vesting_schedule(token: address, user: address) -> VestingSchedule {
+        return vesting_schedules[token][user];
+    }
+
+    fn get_vested_amount(token: address, user: address) -> u256 {
+        let schedule = vesting_schedules[token][user];
+        if schedule.total_amount == 0 {
+            return 0;
+        }
+        if block.timestamp < schedule.start_time + schedule.cliff_duration {
+            return 0;
+        }
+        let elapsed = block.timestamp - schedule.start_time;
+        let vested = elapsed * schedule.tokens_per_second;
+        if vested > schedule.total_amount {
+            return schedule.total_amount;
+        }
+        return vested;
+    }
+
+    // ===== WHITELIST =====
+
+    fn whitelist_check(user: address) -> bool {
+        return whitelist[user];
+    }
+
+    fn add_to_whitelist(user: address) {
+        require(msg.sender == owner, "Only owner");
+        whitelist[user] = true;
+        emit WhitelistUpdated(user, true);
+    }
+
+    fn remove_from_whitelist(user: address) {
+        require(msg.sender == owner, "Only owner");
+        whitelist[user] = false;
+        emit WhitelistUpdated(user, false);
+    }
+
+    fn batch_add_whitelist(users: address[]) {
+        require(msg.sender == owner, "Only owner");
+        for user in users {
+            whitelist[user] = true;
+            emit WhitelistUpdated(user, true);
+        }
+    }
+
+    // ===== AUCTION SALE =====
+
+    fn start_auction(
+        token: address,
+        start_price: u256,
+        reserve_price: u256,
+        duration: u256
+    ) -> u256 {
+        require(msg.sender == owner, "Only owner");
+        require(start_price > reserve_price, "Start > reserve");
+        require(duration >= 3600, "Min 1 hour");
+        require(duration <= 604800, "Max 7 days");
+
+        auction_counter = auction_counter + 1;
+        auctions[token] = AuctionInfo {
+            id: auction_counter,
+            token: token,
+            start_price: start_price,
+            reserve_price: reserve_price,
+            start_time: block.timestamp,
+            end_time: block.timestamp + duration,
+            highest_bid: 0,
+            highest_bidder: address(0),
+            settled: false,
+        };
+
+        emit AuctionStarted(token, start_price, reserve_price);
+        return auction_counter;
+    }
+
+    fn place_bid(token: address) {
+        let auction = auctions[token];
+        require(auction.id != 0, "Auction not found");
+        require(block.timestamp < auction.end_time, "Auction ended");
+        require(!auction.settled, "Already settled");
+
+        let bid_amount = msg.value;
+        require(bid_amount >= AUCTION_MIN_BID, "Below min bid");
+        require(bid_amount > auction.highest_bid, "Bid too low");
+
+        // Refund previous highest bidder
+        if auction.highest_bidder != address(0) {
+            transfer(auction.highest_bidder, auction.highest_bid);
+        }
+
+        auctions[token].highest_bid = bid_amount;
+        auctions[token].highest_bidder = msg.sender;
+        emit BidPlaced(msg.sender, bid_amount);
+    }
+
+    fn settle_auction(token: address) {
+        let auction = auctions[token];
+        require(block.timestamp >= auction.end_time, "Not ended");
+        require(!auction.settled, "Already settled");
+
+        auctions[token].settled = true;
+
+        if auction.highest_bid >= auction.reserve_price {
+            // Auction succeeded
+            let fee = platform_fee_calculation(auction.highest_bid);
+            let proceeds = auction.highest_bid - fee;
+            transfer(owner, fee);
+            transfer(auction.highest_bidder, proceeds);
+            emit AuctionSettled(auction.highest_bidder, auction.highest_bid);
+        } else {
+            // Reserve not met - refund highest bidder
+            if auction.highest_bidder != address(0) {
+                transfer(auction.highest_bidder, auction.highest_bid);
+            }
+        }
+    }
+
+    // ===== LIQUIDITY SEED =====
+
+    fn seed_liquidity(pool: address, token_a: address, token_b: address, amount_a: u256, amount_b: u256) {
+        require(msg.sender == owner, "Only owner");
+        require(amount_a > 0 && amount_b > 0, "Amounts must be > 0");
+
+        call(token_a, "approve", (pool, amount_a));
+        call(token_b, "approve", (pool, amount_b));
+        call(pool, "addLiquidity", (token_a, token_b, amount_a, amount_b, 0, 0, msg.sender, block.timestamp + 300));
+
+        emit LiquiditySeeded(pool, amount_a + amount_b);
+    }
+
+    // ===== PLATFORM FEE =====
+
+    fn platform_fee_calculation(amount: u256) -> u256 {
+        return amount * PLATFORM_FEE_BPS / 10000;
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_presale_info(token: address) -> PresaleInfo {
+        return presales[token];
+    }
+
+    fn get_auction_info(token: address) -> AuctionInfo {
+        return auctions[token];
+    }
+
+    fn get_platform_fee_bps() -> u256 {
+        return PLATFORM_FEE_BPS;
+    }
+}

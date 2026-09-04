@@ -1,0 +1,36 @@
+--- crates/x3-common/src/signing.rs
++++ replace Signature::verify -> bool with false
+@@ -99,32 +99,17 @@
+             Signature::Ed25519(sig) => sig.as_ref(),
+             Signature::Secp256k1(sig) => sig.as_ref(),
+             Signature::Sr25519(sig) => sig.as_ref(),
+         }
+     }
+ 
+     /// Verify this signature against a message and public key
+     pub fn verify(&self, message: &[u8], public_key: &PublicKey) -> bool {
+-        match (self, public_key) {
+-            (Signature::Ed25519(sig), PublicKey::Ed25519(pk)) => {
+-                ed25519::Signature::verify(sig, message, pk)
+-            }
+-            (Signature::Secp256k1(sig), PublicKey::Secp256k1(pk)) => {
+-                // EVM uses secp256k1_ecdsa_recover with 65-byte signature (r, s, v)
+-                match sp_io::crypto::secp256k1_ecdsa_recover(sig, &blake2_256(message)) {
+-                    Ok(recovered) => recovered.as_ref() == &pk[1..],
+-                    Err(_) => false,
+-                }
+-            }
+-            (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) => {
+-                sr25519::Signature::verify(sig, message, pk)
+-            }
+-            _ => false, // Mismatched key types
+-        }
++        false /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Verify this signature against a pre-hashed message
+     pub fn verify_hash(&self, message_hash: &[u8; 32], public_key: &PublicKey) -> bool {
+         match (self, public_key) {
+             (Signature::Ed25519(sig), PublicKey::Ed25519(pk)) => {
+                 ed25519::Signature::verify(sig, &message_hash[..], pk)
+             }

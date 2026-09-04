@@ -1,0 +1,344 @@
+// cross_chain_payout_app.x3 - Cross-Chain Payout App that sends funds to any chain via swap router
+//
+// @version("1.0.0")
+// @audit
+
+contract CrossChainPayout {
+    // Configuration constants
+    const PLATFORM_FEE_BPS: u256 = 50;          // 0.5% platform fee
+    const MIN_PAYOUT: u256 = 0.01 ether;
+    const MAX_PAYOUT: u256 = 1000 ether;
+    const ROUTE_TIMEOUT: u256 = 3600;           // 1 hour timeout
+    const MAX_ROUTE_HOPS: u256 = 4;
+    const SLIPPAGE_BPS: u256 = 100;             // 1% default slippage
+
+    // Storage
+    address owner;
+    mapping(u256 => Payout) payouts;
+    mapping(u256 => RouteEstimate) route_cache;
+    mapping(bytes32 => bool) used_nonces;
+    mapping(string => ChainConfig) supported_chains;
+    u256 payout_counter;
+    u256 total_payouts_processed;
+    u256 total_volume;
+
+    // Structs
+    struct Payout {
+        u256 id;
+        address sender;
+        string source_chain;
+        string source_asset;
+        string target_chain;
+        string target_asset;
+        address recipient;
+        u256 amount;
+        u256 min_output;
+        u256 route_fee;
+        u256 platform_fee;
+        string status;  // created, routed, executing, completed, failed, refunded
+        u256 created_at;
+        u256 completed_at;
+        string tx_hash;
+    }
+
+    struct RouteEstimate {
+        u256 payout_id;
+        string[] route_path;
+        u256 estimated_output;
+        u256 estimated_gas;
+        u256 bridge_fee;
+        u256 total_fee;
+        u256 estimated_time;
+        u256 slippage;
+    }
+
+    struct ChainConfig {
+        string name;
+        u256 chain_id;
+        address bridge_adapter;
+        address swap_router;
+        bool supported;
+        u256 min_confirmations;
+    }
+
+    // Events
+    event PayoutCreated(u256 indexed payout_id, address indexed sender, string target_chain, u256 amount);
+    event RouteEstimated(u256 indexed payout_id, u256 estimated_output, u256 total_fee);
+    event PayoutExecuted(u256 indexed payout_id, string tx_hash, u256 final_amount);
+    event PayoutStatusUpdated(u256 indexed payout_id, string status);
+    event PayoutFailed(u256 indexed payout_id, string reason);
+    event RouteFeeCalculated(u256 indexed payout_id, u256 bridge_fee, u256 platform_fee);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== CREATE PAYOUT =====
+
+    fn create_payout(
+        source_chain: string,
+        source_asset: string,
+        target_chain: string,
+        target_asset: string,
+        recipient: address,
+        min_output: u256
+    ) -> u256 {
+        require(supported_chains[source_chain].supported, "Source chain not supported");
+        require(supported_chains[target_chain].supported, "Target chain not supported");
+        require(recipient != address(0), "Invalid recipient");
+        require(msg.value >= MIN_PAYOUT, "Below minimum payout");
+        require(msg.value <= MAX_PAYOUT, "Above maximum payout");
+        require(min_output > 0, "Min output must be > 0");
+
+        let platform_fee = msg.value * PLATFORM_FEE_BPS / 10000;
+        let net_amount = msg.value - platform_fee;
+
+        payout_counter = payout_counter + 1;
+        payouts[payout_counter] = Payout {
+            id: payout_counter,
+            sender: msg.sender,
+            source_chain: source_chain,
+            source_asset: source_asset,
+            target_chain: target_chain,
+            target_asset: target_asset,
+            recipient: recipient,
+            amount: net_amount,
+            min_output: min_output,
+            route_fee: 0,
+            platform_fee: platform_fee,
+            status: "created",
+            created_at: block.timestamp,
+            completed_at: 0,
+            tx_hash: "",
+        };
+
+        // Collect platform fee
+        transfer(owner, platform_fee);
+
+        emit PayoutCreated(payout_counter, msg.sender, target_chain, msg.value);
+        return payout_counter;
+    }
+
+    // ===== ESTIMATE ROUTE =====
+
+    fn estimate_route(payout_id: u256) -> RouteEstimate {
+        let payout = payouts[payout_id];
+        require(payout.id != 0, "Payout not found");
+        require(payout.status == "created", "Invalid status");
+
+        let source_config = supported_chains[payout.source_chain];
+        let target_config = supported_chains[payout.target_chain];
+
+        // Build route path
+        let route_path: string[] = [];
+        let bridge_fee: u256 = 0;
+        let estimated_gas: u256 = 0;
+
+        if payout.source_chain == payout.target_chain {
+            // Same chain - direct transfer
+            route_path.push("direct_transfer");
+            estimated_gas = 21000;
+            bridge_fee = 0;
+        } else {
+            // Cross-chain - use bridge
+            route_path.push(payout.source_chain + "." + payout.source_asset);
+            route_path.push("bridge:" + payout.source_chain + "->" + payout.target_chain);
+            route_path.push(payout.target_chain + "." + payout.target_asset);
+
+            // Estimate bridge fee
+            bridge_fee = _estimate_bridge_fee(payout.source_chain, payout.target_chain, payout.amount);
+            estimated_gas = _estimate_gas(payout.source_chain, payout.target_chain);
+        }
+
+        let total_fee = bridge_fee + payout.platform_fee;
+        let estimated_output = payout.amount - bridge_fee;
+        let slippage = estimated_output * SLIPPAGE_BPS / 10000;
+
+        let estimate = RouteEstimate {
+            payout_id: payout_id,
+            route_path: route_path,
+            estimated_output: estimated_output,
+            estimated_gas: estimated_gas,
+            bridge_fee: bridge_fee,
+            total_fee: total_fee,
+            estimated_time: _estimate_time(payout.source_chain, payout.target_chain),
+            slippage: slippage,
+        };
+
+        route_cache[payout_id] = estimate;
+        payouts[payout_id].status = "routed";
+        payouts[payout_id].route_fee = bridge_fee;
+
+        emit RouteEstimated(payout_id, estimated_output, total_fee);
+        return estimate;
+    }
+
+    // ===== EXECUTE PAYOUT =====
+
+    fn execute_payout(payout_id: u256) -> string {
+        let payout = payouts[payout_id];
+        require(payout.id != 0, "Payout not found");
+        require(payout.status == "routed" || payout.status == "created", "Invalid status");
+
+        let estimate = route_cache[payout_id];
+        let final_amount = estimate.estimated_output;
+        require(final_amount >= payout.min_output, "Slippage exceeded");
+
+        payouts[payout_id].status = "executing";
+
+        let tx_hash: string;
+        let source_config = supported_chains[payout.source_chain];
+        let target_config = supported_chains[payout.target_chain];
+
+        if payout.source_chain == payout.target_chain {
+            // Same chain transfer
+            tx_hash = _execute_direct_transfer(payout.recipient, final_amount);
+        } else {
+            // Cross-chain via bridge adapter
+            tx_hash = _execute_cross_chain(
+                source_config.bridge_adapter,
+                target_config.bridge_adapter,
+                payout.recipient,
+                payout.target_asset,
+                final_amount
+            );
+        }
+
+        payouts[payout_id].status = "completed";
+        payouts[payout_id].completed_at = block.timestamp;
+        payouts[payout_id].tx_hash = tx_hash;
+
+        total_payouts_processed = total_payouts_processed + 1;
+        total_volume = total_volume + payout.amount;
+
+        emit PayoutExecuted(payout_id, tx_hash, final_amount);
+        return tx_hash;
+    }
+
+    // ===== GET PAYOUT STATUS =====
+
+    fn get_payout_status(payout_id: u256) -> string {
+        return payouts[payout_id].status;
+    }
+
+    fn get_payout(payout_id: u256) -> Payout {
+        return payouts[payout_id];
+    }
+
+    fn get_payouts_by_sender(sender: address) -> Payout[] {
+        let user_payouts: Payout[] = [];
+        for i in 1..payout_counter + 1 {
+            if payouts[i].sender == sender {
+                user_payouts.push(payouts[i]);
+            }
+        }
+        return user_payouts;
+    }
+
+    fn refund_payout(payout_id: u256) {
+        let payout = payouts[payout_id];
+        require(payout.status == "failed" || payout.status == "created", "Cannot refund");
+        require(msg.sender == payout.sender || msg.sender == owner, "Not authorized");
+
+        payouts[payout_id].status = "refunded";
+        transfer(payout.sender, payout.amount);
+        emit PayoutStatusUpdated(payout_id, "refunded");
+    }
+
+    // ===== CALCULATE ROUTE FEE =====
+
+    fn calculate_route_fee(source_chain: string, target_chain: string, amount: u256) -> u256 {
+        let bridge_fee = _estimate_bridge_fee(source_chain, target_chain, amount);
+        let platform_fee = amount * PLATFORM_FEE_BPS / 10000;
+        return bridge_fee + platform_fee;
+    }
+
+    fn _estimate_bridge_fee(source: string, target: string, amount: u256) -> u256 {
+        if source == target {
+            return 0;
+        }
+        // Bridge fee scales with amount and chain pair
+        let base_fee = amount * 10 / 10000; // 0.1% base bridge fee
+        let chain_premium: u256 = 0;
+
+        if source == "ethereum" || target == "ethereum" {
+            chain_premium = amount * 5 / 10000; // 0.05% premium for Ethereum
+        }
+
+        return base_fee + chain_premium;
+    }
+
+    fn _estimate_gas(source: string, target: string) -> u256 {
+        if source == target {
+            return 21000;
+        }
+        return 150000; // Estimated gas for bridge operation
+    }
+
+    fn _estimate_time(source: string, target: string) -> u256 {
+        if source == target {
+            return 60; // seconds
+        }
+        return 600; // ~10 minutes for cross-chain
+    }
+
+    fn _execute_direct_transfer(recipient: address, amount: u256) -> string {
+        transfer(recipient, amount);
+        return "direct_tx_" + to_string(block.timestamp);
+    }
+
+    fn _execute_cross_chain(
+        source_adapter: address,
+        target_adapter: address,
+        recipient: address,
+        target_asset: string,
+        amount: u256
+    ) -> string {
+        // Call bridge adapter to execute cross-chain transfer
+        let result = call(source_adapter, "bridge", (target_adapter, recipient, target_asset, amount));
+        return result;
+    }
+
+    // ===== CHAIN MANAGEMENT =====
+
+    fn add_chain(name: string, chain_id: u256, bridge_adapter: address, swap_router: address, min_confirmations: u256) {
+        require(msg.sender == owner, "Only owner");
+        supported_chains[name] = ChainConfig {
+            name: name,
+            chain_id: chain_id,
+            bridge_adapter: bridge_adapter,
+            swap_router: swap_router,
+            supported: true,
+            min_confirmations: min_confirmations,
+        };
+    }
+
+    fn remove_chain(name: string) {
+        require(msg.sender == owner, "Only owner");
+        supported_chains[name].supported = false;
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_route_estimate(payout_id: u256) -> RouteEstimate {
+        return route_cache[payout_id];
+    }
+
+    fn get_total_volume() -> u256 {
+        return total_volume;
+    }
+
+    fn get_total_payouts() -> u256 {
+        return total_payouts_processed;
+    }
+
+    fn is_chain_supported(chain: string) -> bool {
+        return supported_chains[chain].supported;
+    }
+
+    // Helper
+    fn to_string(value: u256) -> string {
+        return string(value);
+    }
+}

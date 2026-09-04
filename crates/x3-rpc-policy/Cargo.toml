@@ -1,0 +1,27 @@
+[package]
+name = "x3-rpc-policy"
+version = "0.1.0"
+authors = ["X3 Chain Core Team <core@x3-chain.io>"]
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Provider health scoring types and constants for the X3 Chain RPC operational policy. no_std compatible; consumed by the node, solvency sidecar, and sidecar services."
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# Workspace alias for parity-scale-codec.
+# max-encoded-len is added here because the workspace default omits it but
+# MaxEncodedLen is required by the ProviderHealthScore and ProviderConfig types.
+codec      = { workspace = true, default-features = false, features = ["max-encoded-len"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-std     = { workspace = true, default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "sp-std/std",
+]

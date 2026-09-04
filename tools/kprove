@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SELF_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0")"
+HOST_KPROVE="$(command -v kprove || true)"
+
+if [[ -n "$HOST_KPROVE" ]]; then
+  HOST_KPROVE_PATH="$(readlink -f "$HOST_KPROVE" 2>/dev/null || realpath "$HOST_KPROVE")"
+  if [[ "$HOST_KPROVE_PATH" != "$SELF_PATH" ]]; then
+    exec "$HOST_KPROVE" "$@"
+  fi
+fi
+
+if [[ -x "./tools/k/bin/kprove" ]]; then
+  exec ./tools/k/bin/kprove "$@"
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "kprove unavailable: neither host kprove, local tools/k/bin/kprove, nor docker found" >&2
+  exit 127
+fi
+
+workspace="${PWD}"
+exec docker run --rm \
+  -v "$workspace":/work \
+  -w /work \
+  runtimeverificationinc/kframework-k:ubuntu-jammy-7.1.320 \
+  /bin/sh -lc 'kprove "$@"' _ "$@"

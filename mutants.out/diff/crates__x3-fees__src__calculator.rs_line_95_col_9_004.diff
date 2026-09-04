@@ -1,0 +1,23 @@
+--- crates/x3-fees/src/calculator.rs
++++ replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((false, 1))
+@@ -87,19 +87,17 @@
+     ///
+     /// Returns (profitable: bool, net_profit: i128)
+     pub fn estimate_profitability(
+         &self,
+         params: &ExecutionParams,
+         reputation: &AgentReputation,
+         expected_profit: Amount,
+     ) -> Result<(bool, i128), FeeError> {
+-        let fees = self.calculate(params, reputation)?;
+-        let net = expected_profit as i128 - fees.total as i128;
+-        Ok((net > 0, net))
++        Ok((false, 1)) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Calculate the minimum profit needed for an execution to break even.
+     pub fn break_even_profit(
+         &self,
+         params: &ExecutionParams,
+         reputation: &AgentReputation,
+     ) -> Result<Amount, FeeError> {

@@ -1,0 +1,1379 @@
+{
+  "schema_version": "launchops-artifact-fields/v1",
+  "generated_at": "2026-05-30T11:04:54.181145032+00:00",
+  "artifacts": [
+    {
+      "file": "audit_report.md",
+      "kind": "audit_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "blockers.json",
+      "kind": "blockers",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "severity",
+          "type_name": "string",
+          "required": true,
+          "description": "Blocker severity level.",
+          "enum_values": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "name": "id",
+          "type_name": "string",
+          "required": true,
+          "description": "Normalized requirement identifier."
+        },
+        {
+          "name": "module",
+          "type_name": "string",
+          "required": true,
+          "description": "Classified module for the blocker.",
+          "enum_values": [
+            "consensus",
+            "cross_vm",
+            "bridge",
+            "universal_asset_kernel",
+            "dex",
+            "gpu_validator",
+            "wallet_explorer",
+            "launch_ops",
+            "security",
+            "ops",
+            "docs",
+            "unknown"
+          ]
+        },
+        {
+          "name": "source_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Markdown source file for the blocker requirement."
+        },
+        {
+          "name": "line",
+          "type_name": "integer",
+          "required": true,
+          "description": "1-based line number in the source file."
+        },
+        {
+          "name": "reason",
+          "type_name": "string",
+          "required": true,
+          "description": "Human-readable blocker explanation."
+        }
+      ]
+    },
+    {
+      "file": "deep_red_flags.json",
+      "kind": "deep_red_flags",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "severity",
+          "type_name": "string",
+          "required": true,
+          "description": "Deep audit severity level.",
+          "enum_values": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "name": "flag_type",
+          "type_name": "string",
+          "required": true,
+          "description": "Stable drift or audit flag type identifier."
+        },
+        {
+          "name": "files",
+          "type_name": "array<string>",
+          "required": true,
+          "description": "Files implicated by the audit finding."
+        },
+        {
+          "name": "reason",
+          "type_name": "string",
+          "required": true,
+          "description": "Human-readable explanation of the audit finding."
+        },
+        {
+          "name": "required_evidence",
+          "type_name": "array<string>",
+          "required": true,
+          "description": "Evidence expected to clear or justify the finding."
+        }
+      ]
+    },
+    {
+      "file": "drift_report.json",
+      "kind": "drift_report",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "baseline_branch",
+          "type_name": "string",
+          "required": true,
+          "description": "Git baseline branch used for drift comparison."
+        },
+        {
+          "name": "changed_files",
+          "type_name": "object",
+          "required": true,
+          "description": "Changed file sets grouped by category.",
+          "nested_fields": [
+            {
+              "name": "docs",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed markdown and documentation files."
+            },
+            {
+              "name": "code",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed production code files."
+            },
+            {
+              "name": "tests",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed test files."
+            },
+            {
+              "name": "consensus",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed consensus-critical files."
+            },
+            {
+              "name": "bridge",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed bridge or relayer files."
+            },
+            {
+              "name": "cross_vm",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed cross-VM files."
+            },
+            {
+              "name": "dex",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed DEX files."
+            },
+            {
+              "name": "gpu",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed GPU validator files."
+            },
+            {
+              "name": "ops",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed operational or launch files."
+            },
+            {
+              "name": "mainnet_config",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Changed genesis, chain spec, or mainnet config files."
+            }
+          ]
+        },
+        {
+          "name": "drift_flags",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Detected drift findings from the git diff and evidence rules."
+        }
+      ]
+    },
+    {
+      "file": "feature_matrix.json",
+      "kind": "feature_matrix",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "feature",
+          "type_name": "string",
+          "required": true,
+          "description": "Normalized feature or requirement id."
+        },
+        {
+          "name": "module",
+          "type_name": "string",
+          "required": true,
+          "description": "Classified module for this feature.",
+          "enum_values": [
+            "consensus",
+            "cross_vm",
+            "bridge",
+            "universal_asset_kernel",
+            "dex",
+            "gpu_validator",
+            "wallet_explorer",
+            "launch_ops",
+            "security",
+            "ops",
+            "docs",
+            "unknown"
+          ]
+        },
+        {
+          "name": "source_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Markdown source file where the feature requirement was parsed."
+        },
+        {
+          "name": "status",
+          "type_name": "string",
+          "required": true,
+          "description": "Derived feature implementation status.",
+          "enum_values": [
+            "missing",
+            "specified_only",
+            "partial",
+            "implemented",
+            "tested",
+            "verified",
+            "blocked"
+          ]
+        },
+        {
+          "name": "risk",
+          "type_name": "string",
+          "required": true,
+          "description": "Assigned risk level for the feature.",
+          "enum_values": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "name": "code_evidence",
+          "type_name": "array<string>",
+          "required": true,
+          "description": "Matching code file paths or snippets supporting implementation evidence."
+        },
+        {
+          "name": "test_evidence",
+          "type_name": "array<string>",
+          "required": true,
+          "description": "Matching test file paths or snippets supporting validation evidence."
+        },
+        {
+          "name": "score",
+          "type_name": "integer",
+          "required": true,
+          "description": "Risk-adjusted feature score."
+        }
+      ]
+    },
+    {
+      "file": "final_report.md",
+      "kind": "final_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "frontend_route_allowlist.json",
+      "kind": "frontend_route_allowlist",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "generated_at",
+          "type_name": "string(datetime)",
+          "required": true,
+          "description": "UTC timestamp when the route allowlist was generated."
+        },
+        {
+          "name": "source_consumer_contracts_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Source consumer contracts artifact used to derive the allowlist."
+        },
+        {
+          "name": "routes",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Per-route direct-read RPC allowlist for the disposable frontend shell.",
+          "nested_fields": [
+            {
+              "name": "route_id",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend shell route id."
+            },
+            {
+              "name": "route_label",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend shell route label."
+            },
+            {
+              "name": "rationale",
+              "type_name": "string",
+              "required": true,
+              "description": "Explanation for why the allowlist is scoped the way it is."
+            },
+            {
+              "name": "allowed_methods",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Direct-read RPC methods allowed for that route."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "frontend_route_allowlist.md",
+      "kind": "frontend_route_allowlist_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "gates.json",
+      "kind": "gates",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "id",
+          "type_name": "string",
+          "required": true,
+          "description": "Stable gate identifier."
+        },
+        {
+          "name": "name",
+          "type_name": "string",
+          "required": true,
+          "description": "Human-readable gate name."
+        },
+        {
+          "name": "status",
+          "type_name": "string",
+          "required": true,
+          "description": "Gate evaluation result.",
+          "enum_values": [
+            "pass",
+            "fail",
+            "warn",
+            "skipped"
+          ]
+        },
+        {
+          "name": "required",
+          "type_name": "boolean",
+          "required": true,
+          "description": "Whether this gate blocks readiness when failing."
+        },
+        {
+          "name": "weight",
+          "type_name": "integer",
+          "required": true,
+          "description": "Configured gate weight."
+        },
+        {
+          "name": "source",
+          "type_name": "string",
+          "required": true,
+          "description": "Primary evaluation source such as a command or artifact name."
+        },
+        {
+          "name": "reason",
+          "type_name": "string|null",
+          "required": true,
+          "description": "Optional failure or warning explanation."
+        }
+      ]
+    },
+    {
+      "file": "readiness.json",
+      "kind": "readiness",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "generated_at",
+          "type_name": "string(datetime)",
+          "required": true,
+          "description": "UTC timestamp when readiness was computed."
+        },
+        {
+          "name": "scan_score",
+          "type_name": "number",
+          "required": true,
+          "description": "Readiness score from markdown and evidence scanning before runtime multipliers."
+        },
+        {
+          "name": "final_readiness",
+          "type_name": "number",
+          "required": true,
+          "description": "Final readiness score after verify and audit multipliers are applied."
+        },
+        {
+          "name": "status",
+          "type_name": "string",
+          "required": true,
+          "description": "Overall readiness label such as BLOCKED or READY-like status."
+        },
+        {
+          "name": "module_breakdown",
+          "type_name": "object<string,number>",
+          "required": true,
+          "description": "Per-module readiness percentages."
+        },
+        {
+          "name": "totals",
+          "type_name": "object",
+          "required": true,
+          "description": "Aggregated markdown and requirement counts from scan.",
+          "nested_fields": [
+            {
+              "name": "total_md_files",
+              "type_name": "integer",
+              "required": true,
+              "description": "Markdown files scanned after include/exclude filtering."
+            },
+            {
+              "name": "total_requirements",
+              "type_name": "integer",
+              "required": true,
+              "description": "Deduplicated requirement count used in scoring."
+            },
+            {
+              "name": "complete_items",
+              "type_name": "integer",
+              "required": true,
+              "description": "Count of requirements marked complete."
+            },
+            {
+              "name": "partial_items",
+              "type_name": "integer",
+              "required": true,
+              "description": "Count of requirements marked partial."
+            },
+            {
+              "name": "blocked_items",
+              "type_name": "integer",
+              "required": true,
+              "description": "Count of requirements explicitly marked blocker."
+            },
+            {
+              "name": "needs_test_items",
+              "type_name": "integer",
+              "required": true,
+              "description": "Count of requirements marked as needing tests."
+            },
+            {
+              "name": "raw_requirements",
+              "type_name": "integer",
+              "required": true,
+              "description": "Pre-dedup total requirement count parsed from markdown."
+            },
+            {
+              "name": "duplicates_collapsed",
+              "type_name": "integer",
+              "required": true,
+              "description": "Number of duplicate requirements removed during deduplication."
+            }
+          ]
+        },
+        {
+          "name": "multipliers",
+          "type_name": "object",
+          "required": true,
+          "description": "Verify and audit multiplier inputs used to derive final readiness.",
+          "nested_fields": [
+            {
+              "name": "command_multiplier",
+              "type_name": "number",
+              "required": true,
+              "description": "Penalty derived from configured command execution results."
+            },
+            {
+              "name": "gate_multiplier",
+              "type_name": "number",
+              "required": true,
+              "description": "Penalty derived from required gate failures."
+            },
+            {
+              "name": "red_flag_multiplier",
+              "type_name": "number",
+              "required": true,
+              "description": "Penalty derived from red-flag severity counts."
+            },
+            {
+              "name": "audit_multiplier",
+              "type_name": "number",
+              "required": true,
+              "description": "Penalty derived from drift and audit findings."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "red_flags.json",
+      "kind": "red_flags",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "severity",
+          "type_name": "string",
+          "required": true,
+          "description": "Red-flag severity level.",
+          "enum_values": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "name": "file",
+          "type_name": "string",
+          "required": true,
+          "description": "File containing the risky pattern."
+        },
+        {
+          "name": "line",
+          "type_name": "integer",
+          "required": true,
+          "description": "1-based line number containing the match."
+        },
+        {
+          "name": "pattern",
+          "type_name": "string",
+          "required": true,
+          "description": "Detected risky token or expression."
+        },
+        {
+          "name": "reason",
+          "type_name": "string",
+          "required": true,
+          "description": "Human-readable explanation of why the pattern matters."
+        }
+      ]
+    },
+    {
+      "file": "report.md",
+      "kind": "scan_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "requirement_conflicts.json",
+      "kind": "requirement_conflicts",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "severity",
+          "type_name": "string",
+          "required": true,
+          "description": "Conflict severity level.",
+          "enum_values": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "name": "conflict_type",
+          "type_name": "string",
+          "required": true,
+          "description": "Conflict classifier such as conflicting_requirement."
+        },
+        {
+          "name": "requirement_a",
+          "type_name": "object",
+          "required": true,
+          "description": "First requirement involved in the conflict.",
+          "nested_fields": [
+            {
+              "name": "file",
+              "type_name": "string",
+              "required": true,
+              "description": "Source markdown file for the first requirement."
+            },
+            {
+              "name": "line",
+              "type_name": "integer",
+              "required": true,
+              "description": "1-based line number for the first requirement."
+            },
+            {
+              "name": "text",
+              "type_name": "string",
+              "required": true,
+              "description": "Original markdown requirement text."
+            },
+            {
+              "name": "status",
+              "type_name": "string",
+              "required": true,
+              "description": "Serialized requirement status label."
+            },
+            {
+              "name": "module",
+              "type_name": "string",
+              "required": true,
+              "description": "Serialized module label for the first requirement."
+            }
+          ]
+        },
+        {
+          "name": "requirement_b",
+          "type_name": "object",
+          "required": true,
+          "description": "Second requirement involved in the conflict.",
+          "nested_fields": [
+            {
+              "name": "file",
+              "type_name": "string",
+              "required": true,
+              "description": "Source markdown file for the second requirement."
+            },
+            {
+              "name": "line",
+              "type_name": "integer",
+              "required": true,
+              "description": "1-based line number for the second requirement."
+            },
+            {
+              "name": "text",
+              "type_name": "string",
+              "required": true,
+              "description": "Original markdown requirement text."
+            },
+            {
+              "name": "status",
+              "type_name": "string",
+              "required": true,
+              "description": "Serialized requirement status label."
+            },
+            {
+              "name": "module",
+              "type_name": "string",
+              "required": true,
+              "description": "Serialized module label for the second requirement."
+            }
+          ]
+        },
+        {
+          "name": "reason",
+          "type_name": "string",
+          "required": true,
+          "description": "Human-readable conflict explanation."
+        }
+      ]
+    },
+    {
+      "file": "rpc_consumer_contracts.json",
+      "kind": "rpc_consumer_contracts",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "generated_at",
+          "type_name": "string(datetime)",
+          "required": true,
+          "description": "UTC timestamp when the consumer contract split was generated."
+        },
+        {
+          "name": "source_matrix_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Source LaunchOps matrix artifact used to derive the consumer split."
+        },
+        {
+          "name": "frontend_safe_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of methods considered safe for direct frontend reads."
+        },
+        {
+          "name": "sidecar_only_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of methods that should remain behind sidecar or adapter ownership."
+        },
+        {
+          "name": "mock_only_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of methods that remain mock-only or deferred."
+        },
+        {
+          "name": "frontend_safe_methods",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Methods currently considered safe for direct frontend reads.",
+          "nested_fields": [
+            {
+              "name": "method",
+              "type_name": "string",
+              "required": true,
+              "description": "RPC method name."
+            },
+            {
+              "name": "registration_count",
+              "type_name": "integer",
+              "required": true,
+              "description": "Number of raw register_method entries collapsed into this consumer contract entry."
+            },
+            {
+              "name": "bucket",
+              "type_name": "string",
+              "required": true,
+              "description": "Most conservative ownership bucket after duplicate collapse.",
+              "enum_values": [
+                "runtime_backed",
+                "node_local_adapter",
+                "placeholder"
+              ]
+            },
+            {
+              "name": "frontend_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend integration mode."
+            },
+            {
+              "name": "sidecar_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Sidecar integration mode."
+            },
+            {
+              "name": "ownership_note",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Optional note when mixed ownership is expected rather than anomalous."
+            },
+            {
+              "name": "runtime_trait_hints",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Runtime API trait hints preserved after duplicate collapse."
+            },
+            {
+              "name": "node_local_signals",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Node-local signals preserved after duplicate collapse."
+            },
+            {
+              "name": "notes",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Conservative notes attached to the consumer contract entry."
+            }
+          ]
+        },
+        {
+          "name": "sidecar_only_methods",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Methods that should remain behind sidecar or adapter ownership.",
+          "nested_fields": [
+            {
+              "name": "method",
+              "type_name": "string",
+              "required": true,
+              "description": "RPC method name."
+            },
+            {
+              "name": "registration_count",
+              "type_name": "integer",
+              "required": true,
+              "description": "Number of raw register_method entries collapsed into this consumer contract entry."
+            },
+            {
+              "name": "bucket",
+              "type_name": "string",
+              "required": true,
+              "description": "Most conservative ownership bucket after duplicate collapse.",
+              "enum_values": [
+                "runtime_backed",
+                "node_local_adapter",
+                "placeholder"
+              ]
+            },
+            {
+              "name": "frontend_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend integration mode."
+            },
+            {
+              "name": "sidecar_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Sidecar integration mode."
+            },
+            {
+              "name": "ownership_note",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Optional note when mixed ownership is expected rather than anomalous."
+            },
+            {
+              "name": "runtime_trait_hints",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Runtime API trait hints preserved after duplicate collapse."
+            },
+            {
+              "name": "node_local_signals",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Node-local signals preserved after duplicate collapse."
+            },
+            {
+              "name": "notes",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Conservative notes attached to the consumer contract entry."
+            }
+          ]
+        },
+        {
+          "name": "mock_only_methods",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Methods that remain mock-only or deferred in the current build.",
+          "nested_fields": [
+            {
+              "name": "method",
+              "type_name": "string",
+              "required": true,
+              "description": "RPC method name."
+            },
+            {
+              "name": "registration_count",
+              "type_name": "integer",
+              "required": true,
+              "description": "Number of raw register_method entries collapsed into this consumer contract entry."
+            },
+            {
+              "name": "bucket",
+              "type_name": "string",
+              "required": true,
+              "description": "Most conservative ownership bucket after duplicate collapse.",
+              "enum_values": [
+                "runtime_backed",
+                "node_local_adapter",
+                "placeholder"
+              ]
+            },
+            {
+              "name": "frontend_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend integration mode."
+            },
+            {
+              "name": "sidecar_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Sidecar integration mode."
+            },
+            {
+              "name": "ownership_note",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Optional note when mixed ownership is expected rather than anomalous."
+            },
+            {
+              "name": "runtime_trait_hints",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Runtime API trait hints preserved after duplicate collapse."
+            },
+            {
+              "name": "node_local_signals",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Node-local signals preserved after duplicate collapse."
+            },
+            {
+              "name": "notes",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Conservative notes attached to the consumer contract entry."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "rpc_consumer_contracts.md",
+      "kind": "rpc_consumer_contracts_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "rpc_contract_matrix.json",
+      "kind": "rpc_contract_matrix",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "generated_at",
+          "type_name": "string(datetime)",
+          "required": true,
+          "description": "UTC timestamp when the RPC contract matrix was generated."
+        },
+        {
+          "name": "rpc_source_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Node RPC source file parsed for register_method calls."
+        },
+        {
+          "name": "runtime_backed_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of RPC methods classified as runtime-backed."
+        },
+        {
+          "name": "node_local_adapter_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of RPC methods classified as node-local adapters."
+        },
+        {
+          "name": "placeholder_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of RPC methods classified as placeholders."
+        },
+        {
+          "name": "duplicate_registration_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of duplicate RPC registration flags in the matrix."
+        },
+        {
+          "name": "bucket_drift_count",
+          "type_name": "integer",
+          "required": true,
+          "description": "Number of bucket drift flags where runtime-backed behavior is mixed with node-local ownership."
+        },
+        {
+          "name": "flags",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Matrix-level anomaly flags such as duplicate registrations or bucket drift.",
+          "nested_fields": [
+            {
+              "name": "category",
+              "type_name": "string",
+              "required": true,
+              "description": "Flag category.",
+              "enum_values": [
+                "duplicate_registration",
+                "bucket_drift"
+              ]
+            },
+            {
+              "name": "severity",
+              "type_name": "string",
+              "required": true,
+              "description": "Flag severity.",
+              "enum_values": [
+                "warn",
+                "high"
+              ]
+            },
+            {
+              "name": "method",
+              "type_name": "string",
+              "required": true,
+              "description": "RPC method name attached to the flag."
+            },
+            {
+              "name": "line_refs",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Source file and line references related to the flag."
+            },
+            {
+              "name": "reason",
+              "type_name": "string",
+              "required": true,
+              "description": "Human-readable explanation of the anomaly."
+            }
+          ]
+        },
+        {
+          "name": "methods",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Per-method contract classification for frontend and sidecar consumers.",
+          "nested_fields": [
+            {
+              "name": "method",
+              "type_name": "string",
+              "required": true,
+              "description": "RPC method name."
+            },
+            {
+              "name": "source_file",
+              "type_name": "string",
+              "required": true,
+              "description": "Relative source file containing the method registration."
+            },
+            {
+              "name": "line",
+              "type_name": "integer",
+              "required": true,
+              "description": "1-based line number of the register_method call."
+            },
+            {
+              "name": "bucket",
+              "type_name": "string",
+              "required": true,
+              "description": "Contract ownership bucket.",
+              "enum_values": [
+                "runtime_backed",
+                "node_local_adapter",
+                "placeholder"
+              ]
+            },
+            {
+              "name": "runtime_calls",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Runtime API method calls detected inside the RPC handler."
+            },
+            {
+              "name": "runtime_trait_hints",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Runtime API trait impls that own the detected runtime calls."
+            },
+            {
+              "name": "node_local_signals",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Detected node-local services or orchestration signals used by the handler."
+            },
+            {
+              "name": "placeholder_reason",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Reason the handler is considered a placeholder when applicable."
+            },
+            {
+              "name": "ownership_note",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Optional note when mixed ownership is expected rather than anomalous."
+            },
+            {
+              "name": "frontend_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend integration guidance derived from the bucket and method shape."
+            },
+            {
+              "name": "sidecar_consumer_mode",
+              "type_name": "string",
+              "required": true,
+              "description": "Sidecar integration guidance derived from the bucket and method shape."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "rpc_contract_matrix.md",
+      "kind": "rpc_contract_matrix_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "runtime_rpc_inventory.json",
+      "kind": "runtime_rpc_inventory",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "generated_at",
+          "type_name": "string(datetime)",
+          "required": true,
+          "description": "UTC timestamp when the inventory was generated."
+        },
+        {
+          "name": "runtime_source_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Runtime source file parsed for impl_runtime_apis traits."
+        },
+        {
+          "name": "rpc_source_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Node RPC source file paired with the runtime inventory."
+        },
+        {
+          "name": "runtime_traits",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Runtime API trait impls discovered in live code.",
+          "nested_fields": [
+            {
+              "name": "trait_name",
+              "type_name": "string",
+              "required": true,
+              "description": "Fully qualified runtime API trait name as parsed from the impl block."
+            },
+            {
+              "name": "source_file",
+              "type_name": "string",
+              "required": true,
+              "description": "Relative source file containing the impl block."
+            },
+            {
+              "name": "impl_line",
+              "type_name": "integer",
+              "required": true,
+              "description": "1-based line number where the impl block starts."
+            },
+            {
+              "name": "cfg_guard",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Optional cfg guard directly attached to the impl block."
+            },
+            {
+              "name": "methods",
+              "type_name": "array<object>",
+              "required": true,
+              "description": "Methods discovered inside the runtime API impl block.",
+              "nested_fields": [
+                {
+                  "name": "name",
+                  "type_name": "string",
+                  "required": true,
+                  "description": "Method name."
+                },
+                {
+                  "name": "line",
+                  "type_name": "integer",
+                  "required": true,
+                  "description": "1-based line number where the method starts."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "sidecar_adapter_backlog.json",
+      "kind": "sidecar_adapter_backlog",
+      "format": "json",
+      "shape": "object",
+      "fields": [
+        {
+          "name": "generated_at",
+          "type_name": "string(datetime)",
+          "required": true,
+          "description": "UTC timestamp when the sidecar adapter backlog was generated."
+        },
+        {
+          "name": "source_consumer_contracts_file",
+          "type_name": "string",
+          "required": true,
+          "description": "Source consumer contracts artifact used to derive the backlog."
+        },
+        {
+          "name": "backlog",
+          "type_name": "array<object>",
+          "required": true,
+          "description": "Sidecar-owned RPC methods grouped against the frontend route they block or support.",
+          "nested_fields": [
+            {
+              "name": "route_id",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend shell route id most directly affected by the missing sidecar adapter."
+            },
+            {
+              "name": "route_label",
+              "type_name": "string",
+              "required": true,
+              "description": "Frontend shell route label."
+            },
+            {
+              "name": "method",
+              "type_name": "string",
+              "required": true,
+              "description": "RPC method that remains sidecar-owned."
+            },
+            {
+              "name": "backlog_reason",
+              "type_name": "string",
+              "required": true,
+              "description": "Human-readable reason this method belongs in the sidecar backlog."
+            },
+            {
+              "name": "ownership_note",
+              "type_name": "string|null",
+              "required": false,
+              "description": "Optional note when mixed ownership is expected rather than anomalous."
+            },
+            {
+              "name": "notes",
+              "type_name": "array<string>",
+              "required": true,
+              "description": "Additional carry-forward notes from the consumer contract entry."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "sidecar_adapter_backlog.md",
+      "kind": "sidecar_adapter_backlog_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    },
+    {
+      "file": "stale_docs.json",
+      "kind": "stale_docs",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "file",
+          "type_name": "string",
+          "required": true,
+          "description": "Markdown file considered stale."
+        },
+        {
+          "name": "linked_code",
+          "type_name": "array<string>",
+          "required": true,
+          "description": "Code files linked to the document by evidence search."
+        },
+        {
+          "name": "severity",
+          "type_name": "string",
+          "required": true,
+          "description": "Staleness severity level.",
+          "enum_values": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "name": "reason",
+          "type_name": "string",
+          "required": true,
+          "description": "Human-readable explanation of why the doc is stale."
+        }
+      ]
+    },
+    {
+      "file": "test_results.json",
+      "kind": "test_results",
+      "format": "json",
+      "shape": "array<object>",
+      "fields": [
+        {
+          "name": "name",
+          "type_name": "string",
+          "required": true,
+          "description": "Configured command id."
+        },
+        {
+          "name": "command",
+          "type_name": "string",
+          "required": true,
+          "description": "Shell command executed."
+        },
+        {
+          "name": "status",
+          "type_name": "string",
+          "required": true,
+          "description": "Execution outcome for the command.",
+          "enum_values": [
+            "passed",
+            "failed",
+            "skipped",
+            "missing_tool"
+          ]
+        },
+        {
+          "name": "exit_code",
+          "type_name": "integer|null",
+          "required": true,
+          "description": "Exit code when the command was executed."
+        },
+        {
+          "name": "duration_ms",
+          "type_name": "integer",
+          "required": true,
+          "description": "Execution duration in milliseconds."
+        },
+        {
+          "name": "stdout_excerpt",
+          "type_name": "string",
+          "required": true,
+          "description": "Bounded excerpt of stdout for diagnostics."
+        },
+        {
+          "name": "stderr_excerpt",
+          "type_name": "string",
+          "required": true,
+          "description": "Bounded excerpt of stderr for diagnostics."
+        }
+      ]
+    },
+    {
+      "file": "verify_report.md",
+      "kind": "verify_report",
+      "format": "markdown",
+      "shape": "text/markdown",
+      "fields": []
+    }
+  ]
+}

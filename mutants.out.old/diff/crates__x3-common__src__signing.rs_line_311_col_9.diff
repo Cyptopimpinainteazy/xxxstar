@@ -1,0 +1,21 @@
+--- crates/x3-common/src/signing.rs
++++ replace <impl Signer for Secp256k1Signer>::public_key -> PublicKey with Default::default()
+@@ -303,17 +303,17 @@
+         use secp256k1::Message;
+ 
+         let message = Message::from_digest_slice(message_hash).unwrap();
+         let signature = sign_secp256k1_message(&self.secret_key, &message);
+         Signature::Secp256k1(signature)
+     }
+ 
+     fn public_key(&self) -> PublicKey {
+-        PublicKey::Secp256k1(self.public_key)
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ fn sign_secp256k1_message(secret_key: &[u8; 32], message: &secp256k1::Message) -> [u8; 65] {
+     let secp = secp256k1::Secp256k1::new();
+     let secret_key = secp256k1::SecretKey::from_slice(secret_key).unwrap();
+     let signature = secp.sign_ecdsa_recoverable(message, &secret_key);
+     let (recovery_id, compact) = signature.serialize_compact();

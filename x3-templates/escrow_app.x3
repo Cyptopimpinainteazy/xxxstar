@@ -1,0 +1,285 @@
+// escrow_app.x3 - Escrow with Milestone Payments, Dispute Resolver
+//
+// @version("1.0.0")
+// @audit
+
+contract EscrowApp {
+    // Configuration constants
+    const PLATFORM_FEE_BPS: u256 = 100;         // 1% platform fee
+    const MAX_MILESTONES: u256 = 10;
+    const DISPUTE_RESOLUTION_TIME: u256 = 604800; // 7 days
+    const MIN_ESCROW_AMOUNT: u256 = 0.01 ether;
+    const MAX_ESCROW_AMOUNT: u256 = 10000 ether;
+
+    // Storage
+    address owner;
+    mapping(u256 => Escrow) escrows;
+    mapping(u256 => Dispute) disputes;
+    mapping(address => bool) arbiters;
+    u256 escrow_counter;
+    u256 dispute_counter;
+
+    // Structs
+    struct Milestone {
+        string description;
+        u256 amount;
+        u256 release_time;
+        bool released;
+        bool approved;
+    }
+
+    struct Escrow {
+        u256 id;
+        address payer;
+        address payee;
+        address arbiter;
+        u256 total_amount;
+        u256 released_amount;
+        u256 platform_fee;
+        Milestone[MAX_MILESTONES] milestones;
+        u256 milestone_count;
+        u256 current_milestone;
+        bool active;
+        bool completed;
+        u256 created_at;
+    }
+
+    struct Dispute {
+        u256 id;
+        u256 escrow_id;
+        address raised_by;
+        string reason;
+        u256 raised_at;
+        u256 resolution_deadline;
+        bool resolved;
+        address resolved_by;
+        string resolution;
+    }
+
+    // Events
+    event EscrowCreated(u256 indexed escrow_id, address indexed payer, address indexed payee, u256 amount);
+    event MilestoneReleased(u256 indexed escrow_id, u256 milestone_index, u256 amount);
+    event MilestoneApproved(u256 indexed escrow_id, u256 milestone_index);
+    event DisputeRaised(u256 indexed dispute_id, u256 indexed escrow_id, address raised_by);
+    event DisputeResolved(u256 indexed dispute_id, string resolution);
+    event FundsReleased(u256 indexed escrow_id, address indexed recipient, u256 amount);
+    event ArbiterAdded(address indexed arbiter);
+    event ArbiterRemoved(address indexed arbiter);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+        arbiters[owner] = true;
+    }
+
+    // ===== CREATE ESCROW =====
+
+    fn create_escrow(
+        payee: address,
+        arbiter: address,
+        milestone_descriptions: string[],
+        milestone_amounts: u256[]
+    ) -> u256 {
+        require(payee != address(0), "Invalid payee");
+        require(arbiters[arbiter], "Invalid arbiter");
+        require(milestone_descriptions.len() == milestone_amounts.len(), "Mismatched arrays");
+        require(milestone_descriptions.len() > 0, "At least 1 milestone");
+        require(milestone_descriptions.len() <= MAX_MILESTONES, "Too many milestones");
+
+        let total: u256 = 0;
+        for i in 0..milestone_amounts.len() {
+            total = total + milestone_amounts[i];
+        }
+        require(total >= MIN_ESCROW_AMOUNT, "Below minimum");
+        require(total <= MAX_ESCROW_AMOUNT, "Above maximum");
+        require(msg.value >= total, "Insufficient deposit");
+
+        let fee = total * PLATFORM_FEE_BPS / 10000;
+        let net_amount = total - fee;
+
+        escrow_counter = escrow_counter + 1;
+        let escrow = Escrows[escrow_counter];
+
+        escrow.id = escrow_counter;
+        escrow.payer = msg.sender;
+        escrow.payee = payee;
+        escrow.arbiter = arbiter;
+        escrow.total_amount = total;
+        escrow.released_amount = 0;
+        escrow.platform_fee = fee;
+        escrow.milestone_count = milestone_descriptions.len();
+        escrow.current_milestone = 0;
+        escrow.active = true;
+        escrow.completed = false;
+        escrow.created_at = block.timestamp;
+
+        for i in 0..milestone_descriptions.len() {
+            escrow.milestones[i] = Milestone {
+                description: milestone_descriptions[i],
+                amount: milestone_amounts[i],
+                release_time: 0,
+                released: false,
+                approved: false,
+            };
+        }
+
+        escrows[escrow_counter] = escrow;
+        emit EscrowCreated(escrow_counter, msg.sender, payee, total);
+        return escrow_counter;
+    }
+
+    // ===== RELEASE MILESTONE =====
+
+    fn release_milestone(escrow_id: u256, milestone_index: u256) {
+        let escrow = escrows[escrow_id];
+        require(escrow.active, "Escrow not active");
+        require(!escrow.completed, "Already completed");
+        require(msg.sender == escrow.payer, "Only payer");
+        require(milestone_index < escrow.milestone_count, "Invalid milestone");
+        require(milestone_index == escrow.current_milestone, "Wrong order");
+        require(!escrow.milestones[milestone_index].released, "Already released");
+
+        let milestone = escrow.milestones[milestone_index];
+        escrows[escrow_id].milestones[milestone_index].released = true;
+        escrows[escrow_id].milestones[milestone_index].release_time = block.timestamp;
+        escrows[escrow_id].released_amount = escrow.released_amount + milestone.amount;
+        escrows[escrow_id].current_milestone = escrow.current_milestone + 1;
+
+        // Transfer milestone payment to payee
+        transfer(escrow.payee, milestone.amount);
+
+        emit MilestoneReleased(escrow_id, milestone_index, milestone.amount);
+
+        // Check if all milestones released
+        if escrow.current_milestone >= escrow.milestone_count {
+            escrows[escrow_id].completed = true;
+            escrows[escrow_id].active = false;
+            // Transfer platform fee
+            transfer(owner, escrow.platform_fee);
+        }
+    }
+
+    fn approve_milestone(escrow_id: u256, milestone_index: u256) {
+        let escrow = escrows[escrow_id];
+        require(msg.sender == escrow.payee, "Only payee");
+        require(milestone_index < escrow.milestone_count, "Invalid milestone");
+        require(escrow.milestones[milestone_index].released, "Not yet released");
+        require(!escrow.milestones[milestone_index].approved, "Already approved");
+
+        escrows[escrow_id].milestones[milestone_index].approved = true;
+        emit MilestoneApproved(escrow_id, milestone_index);
+    }
+
+    // ===== RAISE DISPUTE =====
+
+    fn raise_dispute(escrow_id: u256, reason: string) -> u256 {
+        let escrow = escrows[escrow_id];
+        require(escrow.active, "Escrow not active");
+        require(msg.sender == escrow.payer || msg.sender == escrow.payee, "Not party to escrow");
+
+        dispute_counter = dispute_counter + 1;
+        disputes[dispute_counter] = Dispute {
+            id: dispute_counter,
+            escrow_id: escrow_id,
+            raised_by: msg.sender,
+            reason: reason,
+            raised_at: block.timestamp,
+            resolution_deadline: block.timestamp + DISPUTE_RESOLUTION_TIME,
+            resolved: false,
+            resolved_by: address(0),
+            resolution: "",
+        };
+
+        emit DisputeRaised(dispute_counter, escrow_id, msg.sender);
+        return dispute_counter;
+    }
+
+    // ===== RESOLVE DISPUTE =====
+
+    fn resolve_dispute(dispute_id: u256, resolution: string, refund_payer: bool) {
+        let dispute = disputes[dispute_id];
+        require(!dispute.resolved, "Already resolved");
+        require(arbiters[msg.sender], "Not an arbiter");
+
+        let escrow = escrows[dispute.escrow_id];
+        require(escrow.active, "Escrow not active");
+
+        disputes[dispute_id].resolved = true;
+        disputes[dispute_id].resolved_by = msg.sender;
+        disputes[dispute_id].resolution = resolution;
+
+        if refund_payer {
+            // Refund remaining to payer
+            let remaining = escrow.total_amount - escrow.released_amount;
+            if remaining > 0 {
+                transfer(escrow.payer, remaining);
+            }
+        } else {
+            // Release remaining to payee
+            let remaining = escrow.total_amount - escrow.released_amount;
+            if remaining > 0 {
+                transfer(escrow.payee, remaining);
+            }
+        }
+
+        // Transfer platform fee
+        transfer(owner, escrow.platform_fee);
+
+        escrows[dispute.escrow_id].active = false;
+        escrows[dispute.escrow_id].completed = true;
+
+        emit DisputeResolved(dispute_id, resolution);
+    }
+
+    // ===== RELEASE FUNDS =====
+
+    fn release_funds(escrow_id: u256) {
+        let escrow = escrows[escrow_id];
+        require(escrow.active, "Escrow not active");
+        require(msg.sender == escrow.payer, "Only payer");
+
+        let remaining = escrow.total_amount - escrow.released_amount;
+        require(remaining > 0, "No remaining funds");
+
+        escrows[escrow_id].active = false;
+        escrows[escrow_id].completed = true;
+
+        // Release remaining to payee
+        transfer(escrow.payee, remaining);
+        transfer(owner, escrow.platform_fee);
+
+        emit FundsReleased(escrow_id, escrow.payee, remaining);
+    }
+
+    // ===== ARBITER MANAGEMENT =====
+
+    fn add_arbiter(arbiter: address) {
+        require(msg.sender == owner, "Only owner");
+        arbiters[arbiter] = true;
+        emit ArbiterAdded(arbiter);
+    }
+
+    fn remove_arbiter(arbiter: address) {
+        require(msg.sender == owner, "Only owner");
+        arbiters[arbiter] = false;
+        emit ArbiterRemoved(arbiter);
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_escrow(escrow_id: u256) -> Escrow {
+        return escrows[escrow_id];
+    }
+
+    fn get_dispute(dispute_id: u256) -> Dispute {
+        return disputes[dispute_id];
+    }
+
+    fn get_milestone(escrow_id: u256, milestone_index: u256) -> Milestone {
+        return escrows[escrow_id].milestones[milestone_index];
+    }
+
+    fn is_arbiter(addr: address) -> bool {
+        return arbiters[addr];
+    }
+}

@@ -1,0 +1,315 @@
+{
+  "evm": {
+    "mainnet": [
+      {
+        "id": "ethereum",
+        "name": "Ethereum Mainnet",
+        "chainId": 1,
+        "rpcs": [
+          "https://eth.llamarpc.com",
+          "https://rpc.ankr.com/eth",
+          "https://cloudflare-eth.com",
+          "https://ethereum-rpc.publicnode.com",
+          "https://mainnet.gateway.tenderly.co",
+          "https://eth.drpc.org"
+        ]
+      },
+      {
+        "id": "bsc",
+        "name": "BNB Smart Chain",
+        "chainId": 56,
+        "rpcs": [
+          "https://bsc-dataseed.binance.org",
+          "https://bsc-dataseed1.defibit.io",
+          "https://bsc-dataseed1.ninicoin.io",
+          "https://bsc-rpc.publicnode.com",
+          "https://rpc.ankr.com/bsc"
+        ]
+      },
+      {
+        "id": "polygon",
+        "name": "Polygon PoS",
+        "chainId": 137,
+        "rpcs": [
+          "https://polygon-rpc.com",
+          "https://rpc-mainnet.matic.network",
+          "https://matic-mainnet.chainstacklabs.com",
+          "https://rpc-mainnet.maticvigil.com",
+          "https://rpc.ankr.com/polygon"
+        ]
+      },
+      {
+        "id": "arbitrum",
+        "name": "Arbitrum One",
+        "chainId": 42161,
+        "rpcs": [
+          "https://arb1.arbitrum.io/rpc",
+          "https://arbitrum-one-rpc.publicnode.com",
+          "https://rpc.ankr.com/arbitrum"
+        ]
+      },
+      {
+        "id": "optimism",
+        "name": "Optimism",
+        "chainId": 10,
+        "rpcs": [
+          "https://mainnet.optimism.io",
+          "https://optimism-rpc.publicnode.com",
+          "https://rpc.ankr.com/optimism"
+        ]
+      },
+      {
+        "id": "base",
+        "name": "Base",
+        "chainId": 8453,
+        "rpcs": [
+          "https://mainnet.base.org",
+          "https://base-rpc.publicnode.com",
+          "https://rpc.ankr.com/base"
+        ]
+      },
+      {
+        "id": "avalanche",
+        "name": "Avalanche C-Chain",
+        "chainId": 43114,
+        "rpcs": [
+          "https://api.avax.network/ext/bc/C/rpc",
+          "https://avalanche-c-chain-rpc.publicnode.com",
+          "https://rpc.ankr.com/avalanche"
+        ]
+      },
+      {
+        "id": "fantom",
+        "name": "Fantom Opera",
+        "chainId": 250,
+        "rpcs": [
+          "https://rpc.ftm.tools",
+          "https://fantom-rpc.publicnode.com",
+          "https://rpc.ankr.com/fantom"
+        ]
+      },
+      {
+        "id": "zksync",
+        "name": "zkSync Era",
+        "chainId": 324,
+        "rpcs": [
+          "https://mainnet.era.zksync.io",
+          "https://zksync-mainnet.blockpi.network/v1/public"
+        ]
+      },
+      {
+        "id": "linea",
+        "name": "Linea",
+        "chainId": 59144,
+        "rpcs": [
+          "https://rpc.linea.build",
+          "https://linea-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "scroll",
+        "name": "Scroll",
+        "chainId": 534352,
+        "rpcs": [
+          "https://rpc.scroll.io",
+          "https://scroll-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "celo",
+        "name": "Celo",
+        "chainId": 42220,
+        "rpcs": [
+          "https://forno.celo.org",
+          "https://rpc.ankr.com/celo"
+        ]
+      },
+      {
+        "id": "gnosis",
+        "name": "Gnosis Chain",
+        "chainId": 100,
+        "rpcs": [
+          "https://rpc.gnosischain.com",
+          "https://gnosis-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "moonbeam",
+        "name": "Moonbeam",
+        "chainId": 1284,
+        "rpcs": [
+          "https://rpc.api.moonbeam.network",
+          "https://moonbeam-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "manta",
+        "name": "Manta Pacific",
+        "chainId": 169,
+        "rpcs": [
+          "https://pacific-rpc.manta.network/http",
+          "https://manta-pacific-rpc.publicnode.com"
+        ]
+      }
+    ],
+    "testnet": [
+      {
+        "id": "ethereum-sepolia",
+        "name": "Ethereum Sepolia",
+        "chainId": 11155111,
+        "rpcs": [
+          "https://rpc.sepolia.org",
+          "https://rpc.ankr.com/eth_sepolia",
+          "https://sepolia.drpc.org"
+        ]
+      },
+      {
+        "id": "bsc-testnet",
+        "name": "BSC Testnet",
+        "chainId": 97,
+        "rpcs": [
+          "https://data-seed-prebsc-1-s1.binance.org:8545",
+          "https://bsc-testnet-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "polygon-amoy",
+        "name": "Polygon Amoy Testnet",
+        "chainId": 80002,
+        "rpcs": [
+          "https://rpc-amoy.polygon.technology",
+          "https://polygon-amoy-bor-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "arbitrum-sepolia",
+        "name": "Arbitrum Sepolia",
+        "chainId": 421614,
+        "rpcs": [
+          "https://sepolia-rollup.arbitrum.io/rpc",
+          "https://arbitrum-sepolia-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "optimism-sepolia",
+        "name": "Optimism Sepolia",
+        "chainId": 11155420,
+        "rpcs": [
+          "https://sepolia.optimism.io",
+          "https://optimism-sepolia-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "base-sepolia",
+        "name": "Base Sepolia",
+        "chainId": 84532,
+        "rpcs": [
+          "https://sepolia.base.org",
+          "https://base-sepolia-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "avalanche-fuji",
+        "name": "Avalanche Fuji Testnet",
+        "chainId": 43113,
+        "rpcs": [
+          "https://api.avax-test.network/ext/bc/C/rpc"
+        ]
+      },
+      {
+        "id": "zksync-sepolia-testnet",
+        "name": "zkSync Sepolia Testnet",
+        "chainId": 300,
+        "rpcs": [
+          "https://sepolia.era.zksync.dev",
+          "https://zksync-sepolia.drpc.org"
+        ]
+      },
+      {
+        "id": "linea-sepolia",
+        "name": "Linea Sepolia",
+        "chainId": 59141,
+        "rpcs": [
+          "https://rpc.sepolia.linea.build",
+          "https://linea-sepolia-rpc.publicnode.com"
+        ]
+      },
+      {
+        "id": "scroll-sepolia-testnet",
+        "name": "Scroll Sepolia Testnet",
+        "chainId": 534351,
+        "rpcs": [
+          "https://sepolia-rpc.scroll.io"
+        ]
+      }
+    ]
+  },
+  "svm": {
+    "mainnet": [
+      {
+        "id": "solana",
+        "name": "Solana Mainnet",
+        "rpcs": [
+          "https://api.mainnet-beta.solana.com",
+          "https://solana-api.projectserum.com",
+          "https://solana-rpc.projectserum.com",
+          "https://solana-mainnet.phantom.app",
+          "https://rpc.ankr.com/solana"
+        ]
+      },
+      {
+        "id": "neon-evm-mainnet",
+        "name": "Neon EVM Mainnet",
+        "rpcs": [
+          "https://neon-proxy-mainnet.solana.p2p.org",
+          "https://neon-mainnet.drpc.org"
+        ]
+      }
+    ],
+    "testnet": [
+      {
+        "id": "solana-testnet",
+        "name": "Solana Testnet",
+        "rpcs": [
+          "https://api.testnet.solana.com",
+          "https://solana-testnet.phantom.app"
+        ]
+      },
+      {
+        "id": "solana-devnet",
+        "name": "Solana Devnet",
+        "rpcs": [
+          "https://api.devnet.solana.com",
+          "https://solana-devnet.phantom.app"
+        ]
+      },
+      {
+        "id": "neon-evm-testnet",
+        "name": "Neon EVM Testnet",
+        "rpcs": [
+          "https://testnet.neonevm.org"
+        ]
+      }
+    ]
+  },
+  "substrate": {
+    "mainnet": [
+      {
+        "id": "x3chain",
+        "name": "X3 Chain Mainnet",
+        "rpcs": [
+          "wss://rpc.atlassphere.io"
+        ]
+      }
+    ],
+    "testnet": [
+      {
+        "id": "x3chain",
+        "name": "X3 Chain Testnet",
+        "rpcs": [
+          "wss://testnet.x3chain.io:9944"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+--- crates/x3-fees/src/lib.rs
++++ replace PriceVector::canonical -> Self with Default::default()
+@@ -371,24 +371,17 @@
+     pub storage_read: u128,
+     /// Price per storage write
+     pub storage_write: u128,
+ }
+ 
+ impl PriceVector {
+     /// Create a new price vector with default values (canonical X3 tokenomics)
+     pub fn canonical() -> Self {
+-        Self {
+-            cpu_per_million: 1_000,  // 0.001 token per 1M cycles
+-            gpu_per_million: 10_000, // 0.01 token per 1M GPU cycles
+-            memory_per_kb: 100,      // 0.0001 token per KB
+-            io_op: 10,               // 0.00001 token per IO
+-            storage_read: 50,        // 0.00005 token per read
+-            storage_write: 200,      // 0.0002 token per write
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Compute total fee for a given resource usage and price vector
+ pub fn compute_fee(resources: &ResourceVector, prices: &PriceVector) -> u128 {
+     let cpu_cost = (resources.cpu_cycles as u128)
+         .saturating_mul(prices.cpu_per_million)
+         .saturating_div(1_000_000);

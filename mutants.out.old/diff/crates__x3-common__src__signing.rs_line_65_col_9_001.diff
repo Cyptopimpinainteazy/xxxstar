@@ -1,0 +1,36 @@
+--- crates/x3-common/src/signing.rs
++++ replace PublicKey::to_evm_address -> [u8; 20] with [1; 20]
+@@ -57,32 +57,17 @@
+             PublicKey::Ed25519(pk) => pk.as_ref(),
+             PublicKey::Secp256k1(pk) => pk.as_ref(),
+             PublicKey::Sr25519(pk) => pk.as_ref(),
+         }
+     }
+ 
+     /// Convert to EVM address (keccak256 hash of uncompressed pubkey)
+     pub fn to_evm_address(&self) -> [u8; 20] {
+-        match self {
+-            PublicKey::Secp256k1(pk) => {
+-                // For secp256k1, use the last 20 bytes of keccak256(uncompressed_pubkey)
+-                let hash = keccak_256(pk);
+-                let mut addr = [0u8; 20];
+-                addr.copy_from_slice(&hash[12..]);
+-                addr
+-            }
+-            _ => {
+-                // For other schemes, use blake2_256 and take last 20 bytes
+-                let hash = blake2_256(self.as_bytes());
+-                let mut addr = [0u8; 20];
+-                addr.copy_from_slice(&hash[12..]);
+-                addr
+-            }
+-        }
++        [1; 20] /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Signature wrapper for different signature schemes
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub enum Signature {
+     /// ed25519 signature (64 bytes)
+     Ed25519(ed25519::Signature),

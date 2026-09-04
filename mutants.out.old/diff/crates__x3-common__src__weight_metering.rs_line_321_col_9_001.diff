@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace GasMeter::consumed -> u64 with 1
+@@ -313,17 +313,17 @@
+ 
+     /// Get remaining gas
+     pub fn remaining(&self) -> u64 {
+         self.limit.saturating_sub(self.consumed)
+     }
+ 
+     /// Get consumed gas
+     pub fn consumed(&self) -> u64 {
+-        self.consumed
++        1 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Get the limit
+     pub fn limit(&self) -> u64 {
+         self.limit
+     }
+ 
+     /// Reset the meter

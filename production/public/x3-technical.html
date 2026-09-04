@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3-VM | Technical Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--bg:#0D1117;--green:#39FF14;--amber:#FFB700;--red:#FF4444;--blue:#58A6FF;--purple:#BC8CFF;--panel:#161B22;--border:#21262D;--muted:#8B949E;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:#E6EDF3;font-family:'IBM Plex Mono',monospace;overflow-x:hidden;}
+
+/* MATRIX RAIN */
+canvas#matrix{position:fixed;top:0;left:0;opacity:.04;pointer-events:none;z-index:0;}
+
+/* TOP BAR */
+.topbar{background:var(--panel);border-bottom:1px solid var(--border);padding:10px 40px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);position:fixed;top:0;left:0;right:0;z-index:100;}
+.topbar-left{display:flex;gap:24px;}
+.topbar-status{display:flex;align-items:center;gap:6px;}
+.status-dot{width:8px;height:8px;border-radius:50%;}
+.dot-green{background:var(--green);box-shadow:0 0 8px var(--green);}
+.dot-amber{background:var(--amber);}
+.dot-red{background:var(--red);}
+
+/* SIDEBAR NAV */
+.sidebar{position:fixed;left:0;top:40px;bottom:0;width:260px;background:var(--panel);border-right:1px solid var(--border);padding:32px 0;z-index:90;overflow-y:auto;}
+.sidebar-logo{padding:0 24px 32px;border-bottom:1px solid var(--border);}
+.sidebar-logo .logo-text{font-family:'VT323',monospace;font-size:28px;color:var(--green);letter-spacing:4px;}
+.sidebar-logo .logo-sub{font-size:10px;color:var(--muted);letter-spacing:2px;margin-top:4px;}
+.nav-section{padding:24px 24px 8px;font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 24px;color:var(--muted);text-decoration:none;font-size:12px;transition:.2s;border-left:2px solid transparent;}
+.nav-item:hover,.nav-item.active{color:var(--green);border-left-color:var(--green);background:rgba(57,255,20,.04);}
+.nav-item .ni-num{font-size:10px;color:rgba(255,255,255,.2);width:20px;}
+.nav-item .ni-dot{width:6px;height:6px;border-radius:50%;background:var(--border);}
+.nav-item:hover .ni-dot,.nav-item.active .ni-dot{background:var(--green);}
+
+/* MAIN CONTENT */
+main{margin-left:260px;margin-top:40px;padding:60px;position:relative;z-index:1;min-height:100vh;}
+
+/* SECTION HEADER */
+.doc-section{margin-bottom:80px;opacity:0;transform:translateX(-20px);transition:opacity .6s ease,transform .6s ease;}
+.doc-section.visible{opacity:1;transform:translateX(0);}
+.section-anchor{display:block;height:80px;margin-top:-80px;pointer-events:none;}
+.breadcrumb{font-size:11px;color:var(--muted);margin-bottom:16px;letter-spacing:2px;}
+.breadcrumb span{color:var(--green);}
+h2.doc-h{font-family:'VT323',monospace;font-size:52px;color:#fff;letter-spacing:4px;margin-bottom:8px;line-height:1;}
+h2.doc-h .hl{color:var(--green);}
+.doc-tagline{font-size:13px;color:var(--muted);margin-bottom:40px;line-height:1.6;max-width:640px;}
+hr.doc-hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+
+/* CODE BLOCKS */
+.code-block{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:24px 0;}
+.code-header{background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;}
+.code-title{font-size:11px;color:var(--muted);letter-spacing:2px;}
+.code-lang{font-size:10px;color:var(--amber);padding:2px 8px;background:rgba(255,183,0,.1);border-radius:4px;letter-spacing:1px;}
+.code-body{padding:24px;overflow-x:auto;}
+.code-body pre{font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.8;}
+.g{color:var(--green);}
+.a{color:var(--amber);}
+.r{color:var(--red);}
+.b{color:var(--blue);}
+.p{color:var(--purple);}
+.m{color:var(--muted);}
+.w{color:#E6EDF3;}
+
+/* SPEC TABLE */
+.spec-table{width:100%;border-collapse:collapse;margin:24px 0;}
+.spec-table th{text-align:left;padding:10px 16px;font-size:10px;letter-spacing:3px;color:var(--muted);border-bottom:2px solid var(--border);text-transform:uppercase;}
+.spec-table td{padding:14px 16px;font-size:12px;border-bottom:1px solid var(--border);line-height:1.5;}
+.spec-table tr:last-child td{border-bottom:none;}
+.spec-table tr:hover td{background:rgba(255,255,255,.02);}
+td.key{color:var(--muted);}
+td.val{color:#fff;}
+td.val.good{color:var(--green);}
+td.val.warn{color:var(--amber);}
+td.val.crit{color:var(--red);}
+
+/* CALLOUT BOXES */
+.callout{border-radius:6px;padding:20px 24px;margin:24px 0;display:flex;gap:16px;align-items:flex-start;font-size:13px;line-height:1.7;}
+.callout.success{background:rgba(57,255,20,.06);border-left:3px solid var(--green);}
+.callout.warning{background:rgba(255,183,0,.06);border-left:3px solid var(--amber);}
+.callout.danger{background:rgba(255,68,68,.06);border-left:3px solid var(--red);}
+.callout.info{background:rgba(88,166,255,.06);border-left:3px solid var(--blue);}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:2px;}
+.callout-text{color:rgba(255,255,255,.7);}
+.callout-text strong{color:#fff;}
+
+/* STATE MACHINE */
+.state-machine{display:flex;align-items:center;gap:0;margin:32px 0;flex-wrap:wrap;gap:8px;}
+.state-node{background:var(--panel);border:1px solid var(--border);padding:12px 20px;border-radius:6px;font-size:12px;text-align:center;position:relative;transition:.3s;}
+.state-node:hover{border-color:var(--green);color:var(--green);}
+.state-node .sn-label{font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:2px;}
+.state-node .sn-name{font-weight:600;}
+.state-node.active{border-color:var(--green);background:rgba(57,255,20,.05);}
+.state-arrow{color:var(--muted);font-size:20px;padding:0 4px;}
+.state-arrow.cond{color:var(--amber);}
+
+/* GRID CARDS */
+.spec-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0;}
+.spec-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:24px;transition:.3s;}
+.spec-card:hover{border-color:rgba(57,255,20,.3);}
+.sc-label{font-size:10px;letter-spacing:3px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;}
+.sc-val{font-family:'VT323',monospace;font-size:36px;color:var(--green);line-height:1;}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* TEST VECTORS */
+.test-vec{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:6px;margin:24px 0;overflow:hidden;}
+.test-header{background:var(--panel);padding:12px 20px;display:flex;justify-content:space-between;font-size:11px;}
+.test-name{color:var(--blue);letter-spacing:2px;}
+.test-status{color:var(--green);}
+.test-status.fail{color:var(--red);}
+.test-body{padding:20px;font-size:12px;line-height:1.9;}
+
+/* FAILURE TABLE */
+.failure-row{display:grid;grid-template-columns:180px 1fr 120px;border-bottom:1px solid var(--border);}
+.failure-row:last-child{border-bottom:none;}
+.fr-threat{padding:16px 20px;font-size:12px;color:var(--red);display:flex;align-items:center;}
+.fr-desc{padding:16px 20px;font-size:12px;color:var(--muted);line-height:1.6;border-left:1px solid var(--border);border-right:1px solid var(--border);}
+.fr-status{padding:16px 20px;display:flex;align-items:center;justify-content:center;font-size:10px;letter-spacing:2px;}
+.fr-ok{color:var(--green);}
+.fr-partial{color:var(--amber);}
+
+/* FOOTER */
+footer{margin-left:260px;padding:32px 60px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+footer a{color:var(--muted);text-decoration:none;transition:.2s;}
+footer a:hover{color:var(--green);}
+
+/* TERMINAL BLINK */
+.blink{animation:blink .7s step-end infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+@media(max-width:900px){
+  .sidebar{display:none;}
+  main,footer{margin-left:0;padding:40px 20px;}
+  .spec-cards{grid-template-columns:1fr 1fr;}
+  .state-machine{flex-direction:column;}
+  .failure-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-status"><div class="status-dot dot-green"></div><span>x3-testnet: ONLINE</span></div>
+    <div class="topbar-status"><div class="status-dot dot-amber"></div><span>evm-goerli: SYNCING</span></div>
+    <div class="topbar-status"><div class="status-dot dot-green"></div><span>svm-devnet: ONLINE</span></div>
+  </div>
+  <div>X3-VM TECHNICAL DOCS v0.9.1 <span class="blink">_</span></div>
+</div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-text">X3-VM</div>
+    <div class="logo-sub">// TECHNICAL REFERENCE</div>
+  </div>
+  <div class="nav-section">Overview</div>
+  <a href="#overview" class="nav-item active"><div class="ni-dot"></div>Architecture Overview</a>
+  <a href="#state" class="nav-item"><div class="ni-dot"></div>State Machine</a>
+  <a href="#specs" class="nav-item"><div class="ni-dot"></div>Chain Specifications</a>
+
+  <div class="nav-section">Contracts</div>
+  <a href="#htlc" class="nav-item"><div class="ni-dot"></div>HTLC Design</a>
+  <a href="#flashloan" class="nav-item"><div class="ni-dot"></div>Flashloan Adapter</a>
+  <a href="#vault" class="nav-item"><div class="ni-dot"></div>Inventory Vault</a>
+
+  <div class="nav-section">Execution</div>
+  <a href="#comit" class="nav-item"><div class="ni-dot"></div>ComitV2 Kernel</a>
+  <a href="#relayer" class="nav-item"><div class="ni-dot"></div>Relayer Design</a>
+  <a href="#nonce" class="nav-item"><div class="ni-dot"></div>Nonce & Timeouts</a>
+
+  <div class="nav-section">Security</div>
+  <a href="#attacks" class="nav-item"><div class="ni-dot"></div>Attack Vectors</a>
+  <a href="#tests" class="nav-item"><div class="ni-dot"></div>Test Vectors</a>
+  <a href="#ci" class="nav-item"><div class="ni-dot"></div>CI/CD Pipeline</a>
+</aside>
+
+<!-- MAIN -->
+<main>
+
+  <!-- OVERVIEW -->
+  <div class="doc-section" id="overview">
+    <a class="section-anchor"></a>
+    <div class="breadcrumb">x3-vm / <span>architecture-overview</span></div>
+    <h2 class="doc-h"><span class="hl">X3-VM</span><br>CROSS-CHAIN ATOMIC<br>COORDINATOR</h2>
+    <p class="doc-tagline">A trust-minimized atomic swap system coordinating Ethereum (EVM), Solana (SVM), and X3 Chain (WASM) through Hash Time-Locked Contracts, flashloan execution, and X3-kernel's ComitV2 cross-VM dispatch mechanism.</p>
+
+    <div class="spec-cards">
+      <div class="spec-card"><div class="sc-label">X3 Finality</div><div class="sc-val">200ms</div><div class="sc-sub">Flash finality target</div></div>
+      <div class="spec-card"><div class="sc-label">Chains</div><div class="sc-val">3</div><div class="sc-sub">EVM + SVM + X3VM</div></div>
+      <div class="spec-card"><div class="sc-label">Partial Fills</div><div class="sc-val">ZERO</div><div class="sc-sub">Atomic or full refund</div></div>
+    </div>
+
+    <div class="callout info">
+      <div class="callout-icon">ℹ</div>
+      <div class="callout-text"><strong>Design principle:</strong> The initiator funds two HTLCs with a common hash H=sha256(S). Flashloan legs execute atomically per-chain. Revealing S on one chain triggers claim on the other via relayer. If any leg fails — S is never revealed — both chains refund after their respective timelocks.</div>
+    </div>
+
+    <hr class="doc-hr">
+
+    <div class="code-block">
+      <div class="code-header"><span class="code-title">SYSTEM TOPOLOGY</span><span class="code-lang">ASCII</span></div>
+      <div class="code-body"><pre>
+<span class="g">Initiator / Coordinator</span>
+         │
+         ├──<span class="b">──── X3 Chain (x3-kernel)</span>
+         │              │
+         │     submitComitV2(evm_payload)
+         │     submitComitV2(svm_payload)
+         │              │
+         ├──<span class="a">──────────── Ethereum (EVM)</span>
+         │              │  createHTLC(H, T_E)
+         │              │  flashLoan → swap → repay
+         │              │  claimHTLC(S)     ← relayer
+         │              │
+         └──<span class="p">──────────── Solana (SVM)</span>
+                        │  createHTLC(H, T_S)
+                        │  flashBorrow → swap → repay
+                        │  claimHTLC(S)     ← initiator reveals
+
+<span class="m">              T_S = now+1h (Solana short timelock)</span>
+<span class="m">              T_E = now+2h (Ethereum long timelock)</span>
+<span class="m">              T_E > T_S + Δ  [safety invariant]</span>
+      </pre></div>
+    </div>
+  </div>
+
+  <!-- STATE MACHINE -->
+  <div class="doc-section" id="state">
+    <a class="section-anchor"></a>
+    <div class="breadcrumb">x3-vm / contracts / <span>state-machine</span></div>
+    <h2 class="doc-h">STATE<br><span class="hl">MACHINE</span></h2>
+    <p class="doc-tagline">The coordinator follows a deterministic four-phase state machine. Any deviation triggers the abort path with automatic refunds.</p>
+
+    <div class="state-machine">
+      <div class="state-node active"><div class="sn-label">PHASE 0</div><div class="sn-name">SETUP</div></div>
+      <div class="state-arrow">→</div>
+      <div class="state-node"><div class="sn-label">PHASE 1</div><div class="sn-name">HTLC LOCK</div></div>
+      <div class="state-arrow">→</div>
+      <div class="state-node"><div class="sn-label">PHASE 2</div><div class="sn-name">FLASH EXEC</div></div>
+      <div class="state-arrow cond">→[success]</div>
+      <div class="state-node"><div class="sn-label">PHASE 3</div><div class="sn-name">CLAIM</div></div>
+      <div class="state-arrow">→</div>
+      <div class="state-node active"><div class="sn-label">TERMINAL</div><div class="sn-name">SETTLED</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--muted);">
+      <span>PHASE 2</span>
+      <span style="color:var(--red);">→[failure]</span>
+      <div class="state-node" style="padding:8px 16px;font-size:11px;border-color:var(--red);"><div class="sn-name" style="color:var(--red);">ABORT → REFUND</div></div>
+    </div>
+
+    <hr class="doc-hr">
+
+    <div class="code-block">
+      <div class="code-header"><span class="code-title">COORDINATOR PSEUDOCODE</span><span class="code-lang">X3-LANG</span></div>
+      <div class="code-body"><pre><span class="m">// Phase 0: Setup</span>
+<span class="b">let</span> S = <span class="g">random_bytes(32)</span>;
+<span class="b">let</span> H = <span class="g">sha256(S)</span>;
+<span class="b">let</span> T_S = <span class="a">now()</span> + <span class="p">3600</span>;   <span class="m">// Solana: 1 hour</span>
+<span class="b">let</span> T_E = <span class="a">now()</span> + <span class="p">7200</span>;   <span class="m">// Ethereum: 2 hours</span>
+
+<span class="m">// Phase 1: Lock HTLCs</span>
+<span class="b">let</span> id_S = <span class="g">svm.createHTLC(recipient, H, T_S, USDC, 100_000)</span>;
+<span class="b">let</span> id_E = <span class="g">evm.createHTLC(recipient, H, T_E, USDC, 99_950)</span>;
+<span class="g">wait_confirmations(svm_id, 5)</span>;
+<span class="g">wait_confirmations(evm_id, 12)</span>;
+
+<span class="m">// Phase 2: Execute flash legs (atomic per-chain)</span>
+<span class="b">let</span> svm_ok = <span class="r">try</span> { <span class="g">svm.kamino_flash_arb(USDC, 1_000_000)</span> };
+<span class="b">let</span> evm_ok = <span class="r">try</span> { <span class="g">evm.balancer_flash_arb(USDC, 1_000_000)</span> };
+
+<span class="m">// Phase 3: Claim or Abort</span>
+<span class="b">if</span> svm_ok && evm_ok {
+  <span class="g">svm.claimHTLC(id_S, S)</span>;      <span class="m">// reveals S on-chain</span>
+  <span class="g">relayer.relay_claim(id_E, S)</span>; <span class="m">// claims EVM side</span>
+} <span class="b">else</span> {
+  <span class="m">// Wait for timeouts — both HTLCs auto-refund</span>
+  <span class="g">svm.refundHTLC(id_S)</span>; <span class="m">// after T_S</span>
+  <span class="g">evm.refundHTLC(id_E)</span>; <span class="m">// after T_E</span>
+}</pre></div>
+    </div>
+  </div>
+
+  <!-- SPECS -->
+  <div class="doc-section" id="specs">
+    <a class="section-anchor"></a>
+    <div class="breadcrumb">x3-vm / <span>chain-specifications</span></div>
+    <h2 class="doc-h">CHAIN<br><span class="hl">SPECS</span></h2>
+    <p class="doc-tagline">Comparative specification table for all three integrated virtual machines.</p>
+    <table class="spec-table">
+      <thead><tr><th>Feature</th><th>X3 Chain</th><th>Ethereum</th><th>Solana</th></tr></thead>
+      <tbody>
+        <tr><td class="key">Runtime</td><td class="val good">WASM (x3-lang)</td><td class="val">EVM (Solidity)</td><td class="val">BPF (Anchor/Rust)</td></tr>
+        <tr><td class="key">Finality</td><td class="val good">~200–400ms</td><td class="val warn">~60 seconds</td><td class="val good">~400ms</td></tr>
+        <tr><td class="key">TX Type</td><td class="val">submitComitV2</td><td class="val">EOA-signed TX</td><td class="val">Atomic multi-ix</td></tr>
+        <tr><td class="key">Fee Model</td><td class="val">Weight-based</td><td class="val warn">Gas (volatile)</td><td class="val good">Compute units (low)</td></tr>
+        <tr><td class="key">Crypto Hostcalls</td><td class="val good">SHA-256, Keccak, secp256k1, ed25519</td><td class="val">keccak256, ecrecover</td><td class="val">SHA-256 (program)</td></tr>
+        <tr><td class="key">Reorg Risk</td><td class="val good">Minimal (flash finality)</td><td class="val warn">12 confirms needed</td><td class="val">5 confirms needed</td></tr>
+        <tr><td class="key">Reentrancy</td><td class="val warn">Possible (WASM calls)</td><td class="val warn">nonReentrant guard</td><td class="val good">Minimal risk</td></tr>
+        <tr><td class="key">Clock Source</td><td class="val">Substrate Timestamp</td><td class="val warn">block.timestamp (±15s)</td><td class="val">Clock::get().unix_timestamp</td></tr>
+        <tr><td class="key">Confirms Needed</td><td class="val good">Flash final</td><td class="val warn">12 blocks</td><td class="val">5 blocks</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ATTACKS -->
+  <div class="doc-section" id="attacks">
+    <a class="section-anchor"></a>
+    <div class="breadcrumb">x3-vm / security / <span>attack-vectors</span></div>
+    <h2 class="doc-h">ATTACK<br><span class="hl">VECTORS</span></h2>
+    <p class="doc-tagline">Exhaustive threat model analysis with mitigation status.</p>
+
+    <div class="callout warning">
+      <div class="callout-icon">⚠</div>
+      <div class="callout-text"><strong>MEV / Front-running:</strong> Secret S is kept off-chain until both flashlegs confirm success. Private relay (Flashbots) and X3 encrypted mempool prevent transaction ordering attacks. Verify <code>sha256(secret) == hash_lock</code> on-chain.</div>
+    </div>
+    <div class="callout success">
+      <div class="callout-icon">✓</div>
+      <div class="callout-text"><strong>Partial Fill Prevention:</strong> Atomic executor guarantees either full cross-chain execution or complete abort. No partial state is possible. If EVM leg reverts, SVM leg's funds remain locked in HTLC until T_S timeout refund.</div>
+    </div>
+    <div class="callout success">
+      <div class="callout-icon">✓</div>
+      <div class="callout-text"><strong>Oracle Manipulation:</strong> System uses AMM pool prices (TWAP) exclusively. Trade sizes limited to &lt;5% of pool depth. No reliance on centralized price feeds for execution logic.</div>
+    </div>
+    <div class="callout danger">
+      <div class="callout-icon">!</div>
+      <div class="callout-text"><strong>X3-VM Runtime Risk:</strong> As an emerging WASM runtime, x3vm bugs could be catastrophic. Mitigation: multi-sig recovery, contract kill-switch, GPU verification layer, and formal spec validation. Monitor x3-kernel verifiers for payload/proof mismatches.</div>
+    </div>
+  </div>
+
+  <!-- TEST VECTORS -->
+  <div class="doc-section" id="tests">
+    <a class="section-anchor"></a>
+    <div class="breadcrumb">x3-vm / security / <span>test-vectors</span></div>
+    <h2 class="doc-h">TEST<br><span class="hl">VECTORS</span></h2>
+    <p class="doc-tagline">Concrete test vectors for integration and fuzz testing across all three chains.</p>
+
+    <div class="test-vec">
+      <div class="test-header"><span class="test-name">TEST_001 // HAPPY_PATH_FULL_SWAP</span><span class="test-status">● PASS</span></div>
+      <div class="test-body">
+        <div><span class="m">Secret    :</span> <span class="g">S = 0xabc123...deadbeef (32 bytes)</span></div>
+        <div><span class="m">Hash      :</span> <span class="g">H = sha256(S) = 0x7f3a...</span></div>
+        <div><span class="m">HTLC-SVM  :</span> <span class="b">Lock 100 USDC, T_S = epoch+3600</span></div>
+        <div><span class="m">HTLC-EVM  :</span> <span class="b">Lock 1 ETH equiv, T_E = epoch+7200</span></div>
+        <div><span class="m">Flash-SVM :</span> <span class="a">Borrow 100k USDC (Kamino 0%), swap +5 USDC profit</span></div>
+        <div><span class="m">Flash-EVM :</span> <span class="a">Borrow 100k USDC (Balancer 0%), swap +5 USDC profit</span></div>
+        <div><span class="m">Claim     :</span> <span class="g">svm.claimHTLC(S) at t &lt; T_S → emit HtlcClaimed(S)</span></div>
+        <div><span class="m">Relay     :</span> <span class="g">evm.claimHTLC(S) within relay window</span></div>
+        <div><span class="m">Expected  :</span> <span class="g">Initiator: +10 USDC profit total. Pools: fully repaid. HTLCs: claimed.</span></div>
+      </div>
+    </div>
+
+    <div class="test-vec">
+      <div class="test-header"><span class="test-name">TEST_002 // WRONG_PREIMAGE_CLAIM</span><span class="test-status">● PASS</span></div>
+      <div class="test-body">
+        <div><span class="m">Action  :</span> <span class="r">claimHTLC(id, 0xdeadbeef_WRONG)</span></div>
+        <div><span class="m">Expected:</span> <span class="r">REVERT: InvalidSecret — sha256(wrong) ≠ hash_lock</span></div>
+        <div><span class="m">State   :</span> <span class="g">HTLC unchanged. Funds remain locked.</span></div>
+      </div>
+    </div>
+
+    <div class="test-vec">
+      <div class="test-header"><span class="test-name">TEST_003 // EARLY_REFUND_BLOCKED</span><span class="test-status">● PASS</span></div>
+      <div class="test-body">
+        <div><span class="m">Action  :</span> <span class="r">refundHTLC(id) at t &lt; T_S</span></div>
+        <div><span class="m">Expected:</span> <span class="r">REVERT: TooEarly — block_time() &lt; timelock</span></div>
+        <div><span class="m">After T_S:</span> <span class="g">refundHTLC(id) at t ≥ T_S → PASS, funds returned to sender</span></div>
+      </div>
+    </div>
+
+    <div class="test-vec">
+      <div class="test-header"><span class="test-name">TEST_004 // ABORT_ON_FAILED_LEG</span><span class="test-status">● PASS</span></div>
+      <div class="test-body">
+        <div><span class="m">Scenario :</span> EVM flash succeeds, SVM flash reverts (insufficient liquidity)</div>
+        <div><span class="m">Expected :</span> <span class="g">No secret revealed. SVM TX reverts completely (atomic). EVM TX reverts.</span></div>
+        <div><span class="m">Recovery :</span> <span class="g">After T_S: refundHTLC on SVM. After T_E: refundHTLC on EVM.</span></div>
+        <div><span class="m">Net loss :</span> <span class="a">Gas fees only. Zero principal loss.</span></div>
+      </div>
+    </div>
+
+    <div class="test-vec">
+      <div class="test-header"><span class="test-name">TEST_005 // FLASHLOAN_ATOMICITY</span><span class="test-status">● PASS</span></div>
+      <div class="test-body">
+        <div><span class="m">Setup   :</span> Borrow 1000 USDC from Balancer (0% fee)</div>
+        <div><span class="m">Swap    :</span> USDC → ETH → USDC, profit +10 USDC</div>
+        <div><span class="m">Repay   :</span> Approve Vault for 1000 USDC, return</div>
+        <div><span class="m">Expected:</span> <span class="g">Pool balance unchanged. Caller: +10 USDC. 1 TX.</span></div>
+        <div><span class="m">Fail sim:</span> <span class="r">Short repay (999 USDC) → entire TX reverts. Pool sees no loan.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CI/CD -->
+  <div class="doc-section" id="ci">
+    <a class="section-anchor"></a>
+    <div class="breadcrumb">x3-vm / testing / <span>ci-cd-pipeline</span></div>
+    <h2 class="doc-h">CI/<span class="hl">CD</span><br>PIPELINE</h2>
+    <p class="doc-tagline">Multi-chain test infrastructure covering unit, integration, fuzz, and formal verification stages.</p>
+    <div class="code-block">
+      <div class="code-header"><span class="code-title">CI PIPELINE CONFIG</span><span class="code-lang">YAML</span></div>
+      <div class="code-body"><pre><span class="b">stages</span>:
+  - <span class="g">x3_unit</span>        <span class="m"># x3-lang contracts, x3-compiler tests</span>
+  - <span class="a">evm_test</span>       <span class="m"># Hardhat/Foundry, forked mainnet (Balancer/Aave)</span>
+  - <span class="p">anchor_test</span>    <span class="m"># anchor test (Kamino/MarginFi/Solend mocks)</span>
+  - <span class="g">integration</span>    <span class="m"># Cross-chain Goerli + Devnet + X3 testnet</span>
+  - <span class="a">fuzz</span>           <span class="m"># HTLC logic, timelock boundaries, secret formats</span>
+  - <span class="r">static_analysis</span><span class="m"># Slither (EVM), Anchor lint, X3 formal spec</span>
+  - <span class="b">staging_deploy</span> <span class="m"># Deploy + measure gas/latency</span>
+
+<span class="b">checks</span>:
+  - <span class="m">Wrong secret → revert</span>
+  - <span class="m">Early refund → revert</span>
+  - <span class="m">Flash repay short → revert (full TX abort)</span>
+  - <span class="m">Timelock expiry → refund success</span>
+  - <span class="m">Cross-chain secret relay → claim success</span>
+  - <span class="m">Gas underflow / fee spike simulation</span></pre></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>X3-VM TECHNICAL DOCUMENTATION — v0.9.1</span>
+  <span>
+    <a href="#">GitHub</a> &nbsp;·&nbsp;
+    <a href="#">Discord</a> &nbsp;·&nbsp;
+    <a href="#">Audit Reports</a> &nbsp;·&nbsp;
+    <a href="#">Whitepaper</a>
+  </span>
+</footer>
+
+<script>
+// Matrix rain
+const canvas=document.getElementById('matrix'),ctx=canvas.getContext('2d');
+canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+const cols=Math.floor(canvas.width/20);const drops=Array(cols).fill(1);
+function draw(){ctx.fillStyle='rgba(13,17,23,.05)';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#39FF14';ctx.font='14px IBM Plex Mono';drops.forEach((y,i)=>{const ch=String.fromCharCode(0x30A0+Math.random()*96);ctx.fillText(ch,i*20,y*20);if(y*20>canvas.height&&Math.random()>.975)drops[i]=0;drops[i]++;});}
+setInterval(draw,50);
+
+// Scroll spy
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');const id=e.target.id;document.querySelectorAll('.nav-item').forEach(n=>{n.classList.remove('active');if(n.getAttribute('href')==='#'+id)n.classList.add('active');});}});},{threshold:.1});
+document.querySelectorAll('.doc-section').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

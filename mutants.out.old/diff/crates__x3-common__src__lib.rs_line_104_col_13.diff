@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "const" in Keyword::parse
+@@ -96,17 +96,17 @@
+             "enum" => Some(Self::Enum),
+             "match" => Some(Self::Match),
+             "true" => Some(Self::True),
+             "false" => Some(Self::False),
+             "atomic" => Some(Self::Atomic),
+             "emit" => Some(Self::Emit),
+             "agent" => Some(Self::Agent),
+             "context" => Some(Self::Context),
+-            "const" => Some(Self::Const),
++             /* ~ changed by cargo-mutants ~ */
+             "in" => Some(Self::In),
+             _ => None,
+         }
+     }
+ }
+ 
+ /// Error returned when a keyword does not match a known value.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]

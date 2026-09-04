@@ -1,0 +1,46 @@
+X3 ProofForge v1.0.0 - Executable Truth Layer
+Workspace: .
+
+🔍 Gap Gate: mainnet readiness
+
+Found 113 gaps
+Total gaps found: 113
+
+By type:
+  G3: 15
+  G1: 29
+  G5: 13
+  G10: 24
+  G2: 32
+
+S0 gaps (critical): 24
+Mainnet blockers: 113
+Testnet blockers: 45
+
+S0 Gaps (CRITICAL):
+  [asset-kernel] G10: S0 gap: supply conservation missing
+  [bridge] G10: S0 gap: replay protection missing
+  [bridge] G10: S0 gap: finality verification missing
+  [atomic] G10: S0 gap: cross-VM rollback missing
+  [runtime] G10: S0 gap: migration proof missing
+  [governance] G10: S0 gap: governance bypass missing
+  [x3vm] G10: S0 gap: determinism missing
+  [flashloan] G10: S0 gap: repay-or-revert missing
+  [contracts] G10: S0 gap: EVM/SVM parity missing
+  [proofforge] G10: Claim x3.asset_kernel.supply_conservation has no receipt
+  [proofforge] G10: Claim x3.bridge.replay_protection has no receipt
+  [proofforge] G10: Claim x3.bridge.finality_verification has no receipt
+  [proofforge] G10: Claim x3.atomic.one_terminal_state has no receipt
+  [proofforge] G10: Claim x3.atomic.rollback_safety has no receipt
+  [proofforge] G10: Claim x3.flashloan.repay_or_revert has no receipt
+  [proofforge] G10: Claim x3.x3vm.determinism has no receipt
+  [proofforge] G10: Claim x3.x3lang.compiler_reproducibility has no receipt
+  [proofforge] G10: Claim x3.contracts.evm_svm_parity has no receipt
+  [proofforge] G10: Claim x3.governance.proof_gated_upgrade has no receipt
+  [proofforge] G10: Claim x3.gpu.cpu_gpu_parity has no receipt
+  [proofforge] G10: Claim x3.onboarding.developer_first_value has no receipt
+  [proofforge] G10: Claim x3.funding.milestone_receipts has no receipt
+  [proofforge] G10: Claim x3.evolution.no_regression has no receipt
+  [proofforge] G10: Claim x3.proofforge.receipt_integrity has no receipt
+
+✗ mainnet gate FAILED

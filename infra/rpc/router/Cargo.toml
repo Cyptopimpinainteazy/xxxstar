@@ -1,0 +1,73 @@
+[package]
+name = "x3-rpc-router"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain Team"]
+description = "X3 Mainnet Protocol-Aware Multi-Chain RPC Gateway Router"
+license = "Apache-2.0"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# HTTP server + JSON-RPC
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "request-id", "limit"] }
+hyper = { version = "1", features = ["client", "http1", "http2"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+
+# WebSocket
+tokio-tungstenite = "0.21"
+tungstenite = "0.21"
+
+# Prometheus metrics
+prometheus = { version = "0.13", features = ["process"] }
+lazy_static = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Configuration
+figment = { version = "0.10", features = ["yaml", "toml", "env"] }
+
+# UUIDs for request tracing
+uuid = { version = "1", features = ["v4"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+tokio-stream = "0.1"
+
+# Regex for method wildcard matching
+regex = "1"
+
+# Hashing / crypto
+sha2 = "0.10"
+hex = "0.4"
+
+# Redis client for shared cache
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"], optional = true }
+
+# X3 RPC policy types (local path — must match workspace)
+x3-rpc-policy = { path = "../../../crates/x3-rpc-policy" }
+
+[features]
+default = ["redis-cache"]
+redis-cache = ["dep:redis"]
+
+[[bin]]
+name = "x3-rpc-router"
+path = "src/main.rs"

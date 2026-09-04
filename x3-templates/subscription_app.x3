@@ -1,0 +1,337 @@
+// subscription_app.x3 - Subscription App with Monthly Billing, Streaming Payments, Cancel Anytime
+//
+// @version("1.0.0")
+// @audit
+
+contract SubscriptionApp {
+    // Configuration constants
+    const PLATFORM_FEE_BPS: u256 = 100;         // 1% platform fee
+    const MONTHLY_PERIOD: u256 = 2592000;       // 30 days in seconds
+    const GRACE_PERIOD: u256 = 604800;          // 7 days grace period
+    const MAX_SUBSCRIBERS: u256 = 100000;
+    const STREAM_INTERVAL: u256 = 86400;        // 1 day streaming interval
+
+    // Storage
+    address owner;
+    mapping(address => Subscription) subscriptions;
+    mapping(address => Plan) plans;
+    mapping(address => StreamingPayment) streams;
+    u256 plan_counter;
+    u256 active_subscribers;
+
+    // Structs
+    struct Plan {
+        u256 id;
+        string name;
+        u256 price;
+        u256 duration;
+        string[] features;
+        bool active;
+    }
+
+    struct Subscription {
+        u256 plan_id;
+        address subscriber;
+        u256 start_time;
+        u256 next_billing;
+        u256 end_time;
+        u256 total_paid;
+        bool auto_renew;
+        bool active;
+        u256 last_payment_time;
+    }
+
+    struct StreamingPayment {
+        address sender;
+        address recipient;
+        u256 rate_per_second;
+        u256 deposited_amount;
+        u256 withdrawn_amount;
+        u256 start_time;
+        u256 end_time;
+        bool active;
+    }
+
+    // Events
+    event Subscribed(address indexed user, u256 plan_id, u256 amount);
+    event SubscriptionCancelled(address indexed user, u256 plan_id);
+    event PaymentProcessed(address indexed user, u256 amount, u256 next_billing);
+    event SubscriptionRenewed(address indexed user, u256 plan_id, u256 amount);
+    event PlanCreated(u256 plan_id, string name, u256 price);
+    event StreamStarted(address indexed sender, address indexed recipient, u256 rate);
+    event StreamPayment(address indexed sender, address indexed recipient, u256 amount);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== SUBSCRIBE =====
+
+    fn subscribe(plan_id: u256) {
+        let plan = plans[plan_id];
+        require(plan.id != 0, "Plan not found");
+        require(plan.active, "Plan not active");
+        require(msg.value >= plan.price, "Insufficient payment");
+        require(active_subscribers < MAX_SUBSCRIBERS, "Max subscribers reached");
+
+        let sub = subscriptions[msg.sender];
+        if sub.active {
+            // Upgrade existing subscription
+            require(sub.plan_id != plan_id, "Already on this plan");
+            let remaining_value = sub.total_paid * (sub.end_time - block.timestamp) / (sub.end_time - sub.start_time);
+            let upgrade_cost = plan.price - remaining_value;
+            require(msg.value >= upgrade_cost, "Insufficient upgrade payment");
+        }
+
+        let start = block.timestamp;
+        let next_billing = start + plan.duration;
+        let end = next_billing;
+
+        subscriptions[msg.sender] = Subscription {
+            plan_id: plan_id,
+            subscriber: msg.sender,
+            start_time: start,
+            next_billing: next_billing,
+            end_time: end,
+            total_paid: msg.value,
+            auto_renew: true,
+            active: true,
+            last_payment_time: start,
+        };
+
+        if !sub.active {
+            active_subscribers = active_subscribers + 1;
+        }
+
+        // Process platform fee
+        let fee = msg.value * PLATFORM_FEE_BPS / 10000;
+        transfer(owner, fee);
+
+        emit Subscribed(msg.sender, plan_id, msg.value);
+    }
+
+    // ===== CANCEL SUBSCRIPTION =====
+
+    fn cancel_subscription() {
+        let sub = subscriptions[msg.sender];
+        require(sub.active, "No active subscription");
+
+        subscriptions[msg.sender].auto_renew = false;
+        subscriptions[msg.sender].end_time = block.timestamp;
+        subscriptions[msg.sender].active = false;
+        active_subscribers = active_subscribers - 1;
+
+        // Calculate refund for unused time
+        if sub.start_time < sub.end_time && block.timestamp < sub.next_billing {
+            let unused = sub.next_billing - block.timestamp;
+            let refund = sub.total_paid * unused / (sub.next_billing - sub.start_time);
+            if refund > 0 {
+                transfer(msg.sender, refund);
+            }
+        }
+
+        emit SubscriptionCancelled(msg.sender, sub.plan_id);
+    }
+
+    // ===== PROCESS PAYMENT =====
+
+    fn process_payment(user: address) -> u256 {
+        let sub = subscriptions[user];
+        require(sub.active, "No active subscription");
+        require(block.timestamp >= sub.next_billing, "Not yet due");
+
+        let plan = plans[sub.plan_id];
+        let amount = plan.price;
+
+        // Try to auto-charge (in production, this would use a payment gateway)
+        // For now, the user must have approved tokens or sent ETH
+        require(msg.value >= amount, "Insufficient payment");
+
+        let fee = amount * PLATFORM_FEE_BPS / 10000;
+        transfer(owner, fee);
+
+        subscriptions[user].next_billing = sub.next_billing + plan.duration;
+        subscriptions[user].end_time = sub.next_billing + plan.duration;
+        subscriptions[user].total_paid = sub.total_paid + amount;
+        subscriptions[user].last_payment_time = block.timestamp;
+
+        emit PaymentProcessed(user, amount, subscriptions[user].next_billing);
+        return amount;
+    }
+
+    // ===== GET SUBSCRIPTION STATUS =====
+
+    fn get_subscription_status(user: address) -> Subscription {
+        let sub = subscriptions[user];
+
+        // Check if expired past grace period
+        if sub.active && block.timestamp > sub.end_time + GRACE_PERIOD {
+            subscriptions[user].active = false;
+            active_subscribers = active_subscribers - 1;
+            return subscriptions[user];
+        }
+
+        return sub;
+    }
+
+    fn is_subscription_active(user: address) -> bool {
+        let sub = subscriptions[user];
+        if !sub.active {
+            return false;
+        }
+        if block.timestamp > sub.end_time + GRACE_PERIOD {
+            return false;
+        }
+        return true;
+    }
+
+    fn get_time_remaining(user: address) -> u256 {
+        let sub = subscriptions[user];
+        if !sub.active {
+            return 0;
+        }
+        if block.timestamp >= sub.end_time {
+            return 0;
+        }
+        return sub.end_time - block.timestamp;
+    }
+
+    // ===== RENEW SUBSCRIPTION =====
+
+    fn renew_subscription() -> u256 {
+        let sub = subscriptions[msg.sender];
+        require(sub.active || block.timestamp <= sub.end_time + GRACE_PERIOD, "Subscription expired");
+
+        let plan = plans[sub.plan_id];
+        require(plan.active, "Plan no longer active");
+
+        let amount = plan.price;
+        require(msg.value >= amount, "Insufficient payment");
+
+        let fee = amount * PLATFORM_FEE_BPS / 10000;
+        transfer(owner, fee);
+
+        let new_end: u256;
+        if sub.active && block.timestamp < sub.end_time {
+            // Extend from current end
+            new_end = sub.end_time + plan.duration;
+        } else {
+            // Restart from now
+            new_end = block.timestamp + plan.duration;
+        }
+
+        subscriptions[msg.sender].next_billing = new_end;
+        subscriptions[msg.sender].end_time = new_end;
+        subscriptions[msg.sender].total_paid = sub.total_paid + amount;
+        subscriptions[msg.sender].active = true;
+        subscriptions[msg.sender].auto_renew = true;
+        subscriptions[msg.sender].last_payment_time = block.timestamp;
+
+        if !sub.active {
+            active_subscribers = active_subscribers + 1;
+        }
+
+        emit SubscriptionRenewed(msg.sender, sub.plan_id, amount);
+        return new_end;
+    }
+
+    // ===== STREAMING PAYMENTS =====
+
+    fn start_stream(recipient: address, rate_per_second: u256, duration: u256) {
+        require(rate_per_second > 0, "Rate must be > 0");
+        require(duration >= 86400, "Min 1 day");
+        require(duration <= 31536000, "Max 1 year");
+
+        let total_cost = rate_per_second * duration;
+        require(msg.value >= total_cost, "Insufficient deposit");
+
+        streams[msg.sender] = StreamingPayment {
+            sender: msg.sender,
+            recipient: recipient,
+            rate_per_second: rate_per_second,
+            deposited_amount: msg.value,
+            withdrawn_amount: 0,
+            start_time: block.timestamp,
+            end_time: block.timestamp + duration,
+            active: true,
+        };
+
+        emit StreamStarted(msg.sender, recipient, rate_per_second);
+    }
+
+    fn withdraw_stream(sender: address) -> u256 {
+        let stream = streams[sender];
+        require(stream.active, "Stream not active");
+        require(msg.sender == stream.recipient, "Not recipient");
+
+        let elapsed = block.timestamp - stream.start_time;
+        if elapsed > stream.end_time - stream.start_time {
+            elapsed = stream.end_time - stream.start_time;
+        }
+
+        let earned = elapsed * stream.rate_per_second;
+        let withdrawable = earned - stream.withdrawn_amount;
+        require(withdrawable > 0, "Nothing to withdraw");
+
+        streams[sender].withdrawn_amount = stream.withdrawn_amount + withdrawable;
+        transfer(msg.sender, withdrawable);
+
+        emit StreamPayment(sender, msg.sender, withdrawable);
+        return withdrawable;
+    }
+
+    fn cancel_stream(sender: address) {
+        let stream = streams[sender];
+        require(stream.active, "Stream not active");
+        require(msg.sender == stream.sender || msg.sender == stream.recipient, "Not party to stream");
+
+        streams[sender].active = false;
+
+        // Refund remaining to sender
+        let remaining = stream.deposited_amount - stream.withdrawn_amount;
+        if remaining > 0 {
+            transfer(stream.sender, remaining);
+        }
+    }
+
+    // ===== PLAN MANAGEMENT =====
+
+    fn create_plan(name: string, price: u256, duration: u256, features: string[]) -> u256 {
+        require(msg.sender == owner, "Only owner");
+        require(price > 0, "Price must be > 0");
+        require(duration >= 604800, "Min 7 days");
+
+        plan_counter = plan_counter + 1;
+        plans[plan_counter] = Plan {
+            id: plan_counter,
+            name: name,
+            price: price,
+            duration: duration,
+            features: features,
+            active: true,
+        };
+
+        emit PlanCreated(plan_counter, name, price);
+        return plan_counter;
+    }
+
+    fn deactivate_plan(plan_id: u256) {
+        require(msg.sender == owner, "Only owner");
+        plans[plan_id].active = false;
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_plan(plan_id: u256) -> Plan {
+        return plans[plan_id];
+    }
+
+    fn get_active_subscriber_count() -> u256 {
+        return active_subscribers;
+    }
+
+    fn get_stream(sender: address) -> StreamingPayment {
+        return streams[sender];
+    }
+}

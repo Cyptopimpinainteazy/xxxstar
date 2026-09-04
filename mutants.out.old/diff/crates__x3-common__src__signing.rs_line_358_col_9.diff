@@ -1,0 +1,23 @@
+--- crates/x3-common/src/signing.rs
++++ replace Sr25519Signer::from_secret_key -> Self with Default::default()
+@@ -350,19 +350,17 @@
+     pub fn from_seed(seed: &[u8; 32]) -> Self {
+         let pair = sr25519::Pair::from_seed(seed);
+         let public_key = pair.public();
+         Self { pair, public_key }
+     }
+ 
+     /// Create a signer from a secret key (32 bytes)
+     pub fn from_secret_key(secret: &[u8; 32]) -> Self {
+-        let pair = sr25519::Pair::from_seed(secret);
+-        let public_key = pair.public();
+-        Self { pair, public_key }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ impl Signer for Sr25519Signer {
+     fn key_type(&self) -> KeyType {
+         KeyType::Sr25519
+     }
+ 

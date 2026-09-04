@@ -1,0 +1,337 @@
+// trading_bot_vault.x3 - Trading Bot Vault with Strategy Deposits, Performance Fees, Risk Caps
+//
+// @version("1.0.0")
+// @audit
+
+contract TradingBotVault {
+    // Configuration constants
+    const PERFORMANCE_FEE_BPS: u256 = 2000;     // 20% performance fee
+    const MANAGEMENT_FEE_BPS: u256 = 200;       // 2% annual management fee
+    const MAX_RISK_SCORE: u256 = 100;           // Max risk score (0-100)
+    const MIN_DEPOSIT: u256 = 1 ether;
+    const MAX_LEVERAGE: u256 = 30000;           // 3x in basis points
+    const HIGH_WATER_MARK: bool = true;         // Only fee on new profits
+
+    // Storage
+    address owner;
+    mapping(u256 => Strategy) strategies;
+    mapping(address => mapping(u256 => InvestorPosition)) investor_positions;
+    mapping(address => u256[]) investor_strategies;
+    u256 strategy_counter;
+    u256 total_value_locked;
+
+    // Structs
+    struct Strategy {
+        u256 id;
+        string name;
+        string description;
+        address manager;
+        u256 risk_score;
+        u256 max_cap;
+        u256 current_value;
+        u256 high_water_mark;
+        u256 total_deposits;
+        u256 total_withdrawals;
+        u256 performance_fee_earned;
+        u256 management_fee_earned;
+        u256 leverage_bps;
+        bool active;
+        u256 created_at;
+        u256 last_fee_collection;
+    }
+
+    struct InvestorPosition {
+        u256 strategy_id;
+        address investor;
+        u256 shares;
+        u256 cost_basis;
+        u256 deposited_amount;
+        u256 withdrawn_amount;
+        u256 last_value;
+        u256 entry_timestamp;
+    }
+
+    struct VaultInfo {
+        u256 total_value;
+        u256 total_deposits;
+        u256 total_withdrawals;
+        u256 total_fees;
+        u256 investor_count;
+        u256 risk_score;
+    }
+
+    // Events
+    event StrategyCreated(u256 indexed strategy_id, string name, address manager);
+    event DepositMade(u256 indexed strategy_id, address indexed investor, u256 amount, u256 shares);
+    event WithdrawalProcessed(u256 indexed strategy_id, address indexed investor, u256 amount, u256 shares_burned);
+    event PerformanceFeeCharged(u256 indexed strategy_id, u256 amount);
+    event ManagementFeeCharged(u256 indexed strategy_id, u256 amount);
+    event RiskScoreUpdated(u256 indexed strategy_id, u256 old_score, u256 new_score);
+    event VaultValueUpdated(u256 indexed strategy_id, u256 new_value);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== DEPOSIT STRATEGY =====
+
+    fn deposit_strategy(strategy_id: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        require(strategy.id != 0, "Strategy not found");
+        require(strategy.active, "Strategy not active");
+        require(msg.value >= MIN_DEPOSIT, "Below minimum deposit");
+        require(strategy.current_value + msg.value <= strategy.max_cap, "Max cap reached");
+
+        // Calculate shares using current value
+        let shares: u256;
+        if strategy.current_value == 0 || strategy.total_deposits == 0 {
+            shares = msg.value;
+        } else {
+            shares = msg.value * strategy.total_deposits / strategy.current_value;
+        }
+
+        // Update strategy state
+        strategies[strategy_id].current_value = strategy.current_value + msg.value;
+        strategies[strategy_id].total_deposits = strategy.total_deposits + msg.value;
+
+        // Update investor position
+        let position = investor_positions[msg.sender][strategy_id];
+        let new_shares = position.shares + shares;
+        let new_cost = position.cost_basis + msg.value;
+
+        investor_positions[msg.sender][strategy_id] = InvestorPosition {
+            strategy_id: strategy_id,
+            investor: msg.sender,
+            shares: new_shares,
+            cost_basis: new_cost,
+            deposited_amount: position.deposited_amount + msg.value,
+            withdrawn_amount: position.withdrawn_amount,
+            last_value: msg.value,
+            entry_timestamp: block.timestamp,
+        };
+
+        // Track investor strategies
+        if position.shares == 0 {
+            investor_strategies[msg.sender].push(strategy_id);
+        }
+
+        total_value_locked = total_value_locked + msg.value;
+        emit DepositMade(strategy_id, msg.sender, msg.value, shares);
+        return shares;
+    }
+
+    // ===== WITHDRAW =====
+
+    fn withdraw(strategy_id: u256, share_amount: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        require(strategy.id != 0, "Strategy not found");
+
+        let position = investor_positions[msg.sender][strategy_id];
+        require(position.shares >= share_amount, "Insufficient shares");
+        require(share_amount > 0, "Amount must be > 0");
+
+        // Calculate withdrawal value
+        let withdrawal_value = share_amount * strategy.current_value / strategy.total_deposits;
+
+        // Apply performance fee if applicable
+        let performance_fee: u256 = 0;
+        if withdrawal_value > position.cost_basis * share_amount / position.shares {
+            let profit = withdrawal_value - (position.cost_basis * share_amount / position.shares);
+            performance_fee = calculate_performance_fee(strategy_id, profit);
+        }
+
+        // Apply management fee
+        let management_fee = withdrawal_value * MANAGEMENT_FEE_BPS * (block.timestamp - strategy.last_fee_collection) / (365 * 86400 * 10000);
+
+        let total_fees = performance_fee + management_fee;
+        let net_withdrawal = withdrawal_value - total_fees;
+
+        // Update state
+        let remaining_shares = position.shares - share_amount;
+        let remaining_cost = position.cost_basis * remaining_shares / position.shares;
+
+        investor_positions[msg.sender][strategy_id] = InvestorPosition {
+            strategy_id: strategy_id,
+            investor: msg.sender,
+            shares: remaining_shares,
+            cost_basis: remaining_cost,
+            deposited_amount: position.deposited_amount,
+            withdrawn_amount: position.withdrawn_amount + net_withdrawal,
+            last_value: net_withdrawal,
+            entry_timestamp: position.entry_timestamp,
+        };
+
+        strategies[strategy_id].current_value = strategy.current_value - withdrawal_value;
+        strategies[strategy_id].total_withdrawals = strategy.total_withdrawals + net_withdrawal;
+        strategies[strategy_id].performance_fee_earned = strategy.performance_fee_earned + performance_fee;
+        strategies[strategy_id].management_fee_earned = strategy.management_fee_earned + management_fee;
+        strategies[strategy_id].last_fee_collection = block.timestamp;
+
+        total_value_locked = total_value_locked - withdrawal_value;
+
+        // Transfer funds
+        if total_fees > 0 {
+            transfer(strategy.manager, total_fees);
+        }
+        transfer(msg.sender, net_withdrawal);
+
+        emit WithdrawalProcessed(strategy_id, msg.sender, net_withdrawal, share_amount);
+        return net_withdrawal;
+    }
+
+    // ===== CALCULATE PERFORMANCE FEE =====
+
+    fn calculate_performance_fee(strategy_id: u256, profit: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        if profit <= 0 {
+            return 0;
+        }
+
+        if HIGH_WATER_MARK {
+            // Only charge fee on profits above high water mark
+            let new_value = strategy.current_value + profit;
+            if new_value <= strategy.high_water_mark {
+                return 0;
+            }
+            let fee_base = new_value - strategy.high_water_mark;
+            let fee = fee_base * PERFORMANCE_FEE_BPS / 10000;
+            strategies[strategy_id].high_water_mark = new_value;
+            return fee;
+        }
+
+        let fee = profit * PERFORMANCE_FEE_BPS / 10000;
+        emit PerformanceFeeCharged(strategy_id, fee);
+        return fee;
+    }
+
+    fn collect_management_fees(strategy_id: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        require(msg.sender == strategy.manager, "Only manager");
+
+        let time_elapsed = block.timestamp - strategy.last_fee_collection;
+        let annual_fee = strategy.current_value * MANAGEMENT_FEE_BPS / 10000;
+        let fee_due = annual_fee * time_elapsed / 31536000;
+
+        if fee_due > 0 {
+            strategies[strategy_id].management_fee_earned = strategy.management_fee_earned + fee_due;
+            strategies[strategy_id].last_fee_collection = block.timestamp;
+            transfer(strategy.manager, fee_due);
+            emit ManagementFeeCharged(strategy_id, fee_due);
+        }
+
+        return fee_due;
+    }
+
+    // ===== GET VAULT VALUE =====
+
+    fn get_vault_value(strategy_id: u256) -> u256 {
+        return strategies[strategy_id].current_value;
+    }
+
+    fn get_vault_info(strategy_id: u256) -> VaultInfo {
+        let strategy = strategies[strategy_id];
+        let investor_count: u256 = 0;
+        for addr in investor_strategies {
+            if investor_positions[addr][strategy_id].shares > 0 {
+                investor_count = investor_count + 1;
+            }
+        }
+
+        return VaultInfo {
+            total_value: strategy.current_value,
+            total_deposits: strategy.total_deposits,
+            total_withdrawals: strategy.total_withdrawals,
+            total_fees: strategy.performance_fee_earned + strategy.management_fee_earned,
+            investor_count: investor_count,
+            risk_score: strategy.risk_score,
+        };
+    }
+
+    fn get_position(strategy_id: u256, investor: address) -> InvestorPosition {
+        return investor_positions[investor][strategy_id];
+    }
+
+    // ===== GET RISK SCORE =====
+
+    fn get_risk_score(strategy_id: u256) -> u256 {
+        let strategy = strategies[strategy_id];
+        return strategy.risk_score;
+    }
+
+    fn calculate_risk_score(leverage_bps: u256, volatility: u256, concentration: u256) -> u256 {
+        let score: u256 = 0;
+
+        // Leverage risk (0-40 points)
+        let leverage_risk = leverage_bps * 40 / MAX_LEVERAGE;
+        score = score + leverage_risk;
+
+        // Volatility risk (0-30 points)
+        let vol_risk = volatility * 30 / 100;
+        score = score + vol_risk;
+
+        // Concentration risk (0-30 points)
+        let conc_risk = concentration * 30 / 100;
+        score = score + conc_risk;
+
+        if score > MAX_RISK_SCORE {
+            return MAX_RISK_SCORE;
+        }
+        return score;
+    }
+
+    // ===== STRATEGY MANAGEMENT =====
+
+    fn create_strategy(
+        name: string,
+        description: string,
+        max_cap: u256,
+        risk_score: u256,
+        leverage_bps: u256
+    ) -> u256 {
+        require(msg.sender == owner, "Only owner");
+        require(risk_score <= MAX_RISK_SCORE, "Risk score too high");
+        require(leverage_bps <= MAX_LEVERAGE, "Leverage too high");
+        require(max_cap > 0, "Max cap must be > 0");
+
+        strategy_counter = strategy_counter + 1;
+        strategies[strategy_counter] = Strategy {
+            id: strategy_counter,
+            name: name,
+            description: description,
+            manager: msg.sender,
+            risk_score: risk_score,
+            max_cap: max_cap,
+            current_value: 0,
+            high_water_mark: 0,
+            total_deposits: 0,
+            total_withdrawals: 0,
+            performance_fee_earned: 0,
+            management_fee_earned: 0,
+            leverage_bps: leverage_bps,
+            active: true,
+            created_at: block.timestamp,
+            last_fee_collection: block.timestamp,
+        };
+
+        emit StrategyCreated(strategy_counter, name, msg.sender);
+        return strategy_counter;
+    }
+
+    fn update_risk_score(strategy_id: u256, new_score: u256) {
+        require(msg.sender == owner, "Only owner");
+        require(new_score <= MAX_RISK_SCORE, "Risk score too high");
+
+        let old_score = strategies[strategy_id].risk_score;
+        strategies[strategy_id].risk_score = new_score;
+        emit RiskScoreUpdated(strategy_id, old_score, new_score);
+    }
+
+    fn get_strategy(strategy_id: u256) -> Strategy {
+        return strategies[strategy_id];
+    }
+
+    fn get_total_value_locked() -> u256 {
+        return total_value_locked;
+    }
+}

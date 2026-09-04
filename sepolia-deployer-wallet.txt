@@ -1,0 +1,7 @@
+Sepolia Deployer Wallet
+======================
+Address:     0x9d9ec23e0e7330d52d787bbd8d6e2689f7f41239
+Private Key: 0xabafbdf9a6a56841706cf4e862410fdb4cf4f301d74f5a4cc905d5a22b56a22b
+
+WARNING: Testnet key only. Never use on mainnet.
+Fund at: https://sepoliafaucet.com/

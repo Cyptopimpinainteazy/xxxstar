@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# release-provenance.yml — X3 Mainnet Release Pipeline
+#
+# Creates signed release artifacts with attestation, checksums, and SBOM.
+# Triggered only on version tags (v0.4.0-rc.1, v1.0.0, etc.)
+#
+# Outputs:
+#   - x3-chain-node binary (Linux x86_64)
+#   - x3-chain-node.sha256 checksum
+#   - x3-chain-runtime.wasm (compressed)
+#   - SBOM (CycloneDX JSON)
+#   - GitHub artifact attestations
+# ─────────────────────────────────────────────────────────────────────────────
+name: x3 release-provenance
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (must already exist)"
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  BINARY: x3-chain-node
+  RUNTIME_WASM: x3_chain_runtime.compact.wasm
+
+permissions:
+  id-token: write   # For artifact attestations
+  contents: write   # For creating releases
+
+jobs:
+  # ── Deterministic Build ────────────────────────────────────────────────
+  build:
+    name: "Deterministic build + attestation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-build
+
+      - name: Set release version
+        id: version
+        run: |
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      # ── Build node binary ──
+      - name: Build node binary (release)
+        run: cargo build --release -p x3-chain-node
+
+      # ── Build runtime WASM ──
+      - name: Build runtime WASM
+        run: cargo build --release -p x3-chain-runtime --features std
+
+      # ── Locate WASM blob ──
+      - name: Locate WASM blob
+        id: wasm
+        run: |
+          WASM=$(find target/release/wbuild -name "${RUNTIME_WASM}" 2>/dev/null || echo "")
+          if [[ -z "$WASM" ]]; then
+            echo "wasm_path=" >> "$GITHUB_OUTPUT"
+          else
+            echo "wasm_path=$WASM" >> "$GITHUB_OUTPUT"
+            gzip -k -9 "$WASM"
+            echo "wasm_gz=${WASM}.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Generate checksums ──
+      - name: Generate SHA256 checksums
+        run: |
+          sha256sum target/release/${BINARY} > target/release/${BINARY}.sha256
+          if [[ -n "${{ steps.wasm.outputs.wasm_path }}" ]]; then
+            sha256sum "${{ steps.wasm.outputs.wasm_path }}" >> target/release/${BINARY}.sha256
+            sha256sum "${{ steps.wasm.outputs.wasm_gz }}" >> target/release/${BINARY}.sha256
+          fi
+          cat target/release/${BINARY}.sha256
+
+      # ── Generate SBOM ──
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          cargo install cargo-cyclonedx --locked -q
+          cargo cyclonedx -p x3-chain-node --output target/release/
+          echo "SBOM created"
+
+      # ── Attest artifacts ──
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            target/release/${{ env.BINARY }}
+            target/release/${{ env.BINARY }}.sha256
+            target/${{ env.RUNTIME_WASM }}*.gz
+
+      # ── Upload release artifacts ──
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "X3 ${{ steps.version.outputs.tag }}"
+          body: |
+            ## X3 ${{ steps.version.outputs.tag }}
+
+            ### Artifacts
+            - `${{ env.BINARY }}` — Pre-built Linux x86_64 node binary
+            - `${{ env.BINARY }}.sha256` — SHA256 checksums
+            - `${{ env.RUNTIME_WASM }}.gz` — Runtime WASM blob (if published)
+            - SBOM (CycloneDX JSON)
+
+            ### Install
+            ```bash
+            # Download and verify
+            wget https://github.com/Cyptopimpinainteazy/xxxstar/releases/download/${{ steps.version.outputs.tag }}/${{ env.BINARY }}
+            wget https://github.com/Cyptopimpinainteazy/xxxstar/releases/download/${{ steps.version.outputs.tag }}/${{ env.BINARY }}.sha256
+            sha256sum -c ${{ env.BINARY }}.sha256
+            chmod +x ${{ env.BINARY }}
+            sudo ./${{ env.BINARY }}
+            ```
+          files: |
+            target/release/${{ env.BINARY }}
+            target/release/${{ env.BINARY }}.sha256
+            ${{ steps.wasm.outputs.wasm_path }}
+            ${{ steps.wasm.outputs.wasm_gz }}
+            target/release/*.cdx.json
+          draft: true
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') }}

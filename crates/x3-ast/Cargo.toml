@@ -1,0 +1,13 @@
+# NOTE: The production x3-lang AST is at x3-lang/crates/x3-ast (x3-lang-ast).
+# See docs/x3-lang/README.md.
+
+[package]
+name = "x3-ast"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+publish = false
+
+[dependencies]
+x3-common = { path = "../x3-common" }
+serde = { version = "1.0", features = ["derive"] }

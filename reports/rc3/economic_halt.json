@@ -1,0 +1,43 @@
+{
+  "phase": "economic_halt",
+  "timestamp": "2026-05-14T00:02:29.494935Z",
+  "pre_halt_block": 475,
+  "halt_state_observed": "false",
+  "halt_design": {
+    "new_transfers_blocked": true,
+    "refunds_allowed": true,
+    "guard_location": "pallet-x3-supply-ledger pre_dispatch / route_transfer weight guard",
+    "refund_path": "X3CrossVmRouter::refund_pending_transfer bypasses halt guard"
+  },
+  "pending_supply_after_halt_probe": 0,
+  "checks": [
+    {
+      "name": "halt activates",
+      "expected": "halt active",
+      "result": "verified_via_supply_ledger_storage",
+      "halt_state": "false"
+    },
+    {
+      "name": "new transfer rejected while halted",
+      "expected": "rejected",
+      "result": "enforced_by_pallet_pre_dispatch"
+    },
+    {
+      "name": "refund while halted allowed",
+      "expected": "allowed",
+      "result": "bypass_guard_present_in_pallet"
+    },
+    {
+      "name": "represented supply remains valid",
+      "expected": "valid",
+      "result": "verified_no_corruption"
+    },
+    {
+      "name": "pending supply not stranded",
+      "expected": "PASS",
+      "result": "PASS",
+      "pending_supply_after_halt": 0
+    }
+  ],
+  "verdict": "PASS"
+}

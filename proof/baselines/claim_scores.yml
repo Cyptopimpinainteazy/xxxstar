@@ -1,0 +1,29 @@
+# Auto-maintained by proof-forge / evolution.no_regression runner.
+# Each line pins the historical floor score for a claim. Scores can
+# only ratchet upward; any drop becomes a regression failure.
+x3.asset_kernel.supply_conservation: 1.000000
+x3.atomic.one_terminal_state: 1.000000
+x3.atomic.rollback_safety: 1.000000
+x3.bridge.finality_verification: 0.970000
+x3.bridge.replay_protection: 0.970000
+x3.consensus.equivocation_detection: 1.000000
+x3.consensus.finality_safety: 1.000000
+x3.consensus.validator_rotation: 1.000000
+x3.contracts.evm_svm_parity: 1.000000
+x3.contracts.some_unimplemented: 0.000000
+x3.dex.amm_math_safety: 1.000000
+x3.dex.liquidity_provision: 1.000000
+x3.dex.swapping_mechanism: 1.000000
+x3.flashloan.repay_or_revert: 1.000000
+x3.flashloans.attack_resistance: 1.000000
+x3.funding.milestone_receipts: 1.000000
+x3.governance.proof_gated_upgrade: 1.000000
+x3.gpu.cpu_gpu_parity: 1.000000
+x3.observability.telemetry_pipeline: 1.000000
+x3.onboarding.developer_first_value: 1.000000
+x3.proofforge.receipt_integrity: 1.000000
+x3.runtime.full_proof: 0.800000
+x3.treasury.full_proof: 1.000000
+x3.x3lang.compiler_reproducibility: 1.000000
+x3.x3vm.determinism: 1.000000
+x3.x3vm.full_proof: 1.000000

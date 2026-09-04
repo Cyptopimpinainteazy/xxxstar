@@ -1,0 +1,109 @@
+{
+  "_comment": "Gate 14: per-method contract fingerprints for .launchops/rpc_consumer_contracts.json. Any change to a method's bucket, consumer modes, trait hints, node-local signals, or notes fails CI. Totals are pinned exactly. Regenerate with UPDATE_BASELINE=1 and fill accepted_reason for each change.",
+  "methods": [
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "9fa8841c9486ed02",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_backupWallet",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "3ff7a7df2183eb26",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_createWallet",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "eb6c6e6c382b82d2",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_getBalance",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "7104a02c8991fbef",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_getNetworks",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "cc8c2432e90390db",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_getTransactions",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "bb843c1add967b1a",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_getWalletStatus",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "3c8f5125dc5ab704",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_importWallet",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "99f632d711b43800",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_listWallets",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "9ef2bfa8b366406a",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_setNetwork",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "6de9609b4488cc4f",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_signTransaction",
+      "sidecar_consumer_mode": "orchestrate"
+    },
+    {
+      "accepted_reason": "",
+      "bucket": "node_local_adapter",
+      "fingerprint": "ab5cb9e97bf64964",
+      "frontend_consumer_mode": "adapter_only",
+      "group": "sidecar_only_methods",
+      "method": "wallet_submitTransaction",
+      "sidecar_consumer_mode": "orchestrate"
+    }
+  ],
+  "totals": {
+    "frontend_safe_count": 0,
+    "mock_only_count": 0,
+    "sidecar_only_count": 11
+  }
+}

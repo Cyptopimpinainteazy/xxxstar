@@ -1,0 +1,28 @@
+--- crates/x3-common/src/signing.rs
++++ replace Signer::account_id -> String with "xyzzy".into()
+@@ -153,24 +153,17 @@
+     /// Sign a pre-hashed message (32 bytes)
+     fn sign_hash(&self, message_hash: &[u8; 32]) -> Signature;
+ 
+     /// Get the public key
+     fn public_key(&self) -> PublicKey;
+ 
+     /// Get the account ID (SS58 encoded for Substrate, hex for EVM/SVM)
+     fn account_id(&self) -> String {
+-        match self.public_key() {
+-            PublicKey::Ed25519(pk) => pk.to_ss58check(),
+-            PublicKey::Secp256k1(pk) => {
+-                let hash = keccak_256(&pk);
+-                format!("0x{}", hex::encode(&hash[12..]))
+-            }
+-            PublicKey::Sr25519(pk) => pk.to_ss58check(),
+-        }
++        "xyzzy".into() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// ed25519 signer for SVM/Cosmos
+ #[derive(Clone)]
+ pub struct Ed25519Signer {
+     pair: ed25519::Pair,
+     public_key: ed25519::Public,

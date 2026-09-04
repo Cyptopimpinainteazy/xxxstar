@@ -1,0 +1,38 @@
+╔════════════════════════════════════════════════╗
+║       P4 Performance Baseline Measurement      ║
+║           (CPU Reference Implementation)       ║
+╚════════════════════════════════════════════════╝
+
+Measuring CPU baseline for signature verification...
+  Operations: 1000
+  Time: 1.21 ms
+  Throughput: 825339 sig/sec
+  Per-signature: 0.001 ms
+
+Measuring CPU baseline for PoH hashing...
+  Hashes: 100000
+  Time: 59.30 ms
+  Throughput: 1686411 hash/sec
+  Per-hash: 0.000593 ms
+
+Measuring CPU baseline for transaction validation...
+  Transactions: 1000
+  Time: 0.83 ms
+  Throughput: 1201193 tx/sec
+  Per-transaction: 0.001 ms
+
+╔════════════════════════════════════════════════╗
+║              BASELINE SUMMARY                  ║
+╠════════════════════════════════════════════════╣
+║ Sig Verify:              825339 sig/sec   ║
+║ PoH Hashing:            1686411 hash/sec  ║
+║ TX Validation:          1201193 tx/sec    ║
+╠════════════════════════════════════════════════╣
+║              GPU TARGETS (Expected)            ║
+╠════════════════════════════════════════════════╣
+║ Sig Verify:          500,000 sig/sec (25x)   ║
+║ PoH Hashing:      50,000,000 hash/sec (16x)  ║
+║ TX Validation:      100,000 tx/sec (10x)     ║
+╠════════════════════════════════════════════════╣
+║ OVERALL SPEEDUP: 250x (400 TPS → 100k+ TPS)  ║
+╚════════════════════════════════════════════════╝

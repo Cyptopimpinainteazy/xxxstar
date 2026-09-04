@@ -1,0 +1,143 @@
+# Release Gates Policy
+version: "1.0.0"
+
+# Gate definitions
+gates:
+  testnet:
+    name: "Testnet Release Gate"
+    description: "Minimum requirements for testnet deployment"
+    threshold_score: 0.85
+    required_claims_verified:
+      - x3.bridge.replay_protection
+      - x3.bridge.finality_verification
+      - x3.flashloan.repay_or_revert
+      - x3.atomic.rollback_safety
+    max_t6_todos: 0
+    max_t7_todos: 0
+    max_t8_todos: 0
+    max_t9_todos: 0
+    max_s0_gaps: 0
+    required_tests_passing: true
+    
+  mainnet:
+    name: "Mainnet Release Gate"
+    description: "Strict requirements for mainnet launch"
+    threshold_score: 0.95
+    required_claims_verified:
+      - x3.asset_kernel.supply_conservation
+      - x3.bridge.replay_protection
+      - x3.bridge.finality_verification
+      - x3.atomic.one_terminal_state
+      - x3.atomic.rollback_safety
+      - x3.flashloan.repay_or_revert
+      - x3.x3vm.determinism
+      - x3.x3lang.compiler_reproducibility
+      - x3.contracts.evm_svm_parity
+      - x3.governance.proof_gated_upgrade
+      - x3.proofforge.receipt_integrity
+    max_t5_todos: 0
+    max_t6_todos: 0
+    max_t7_todos: 0
+    max_t8_todos: 0
+    max_t9_todos: 0
+    max_s0_gaps: 0
+    max_s1_gaps: 0
+    required_tests_passing: true
+    required_security_audit: true
+    required_chaos_testing: true
+
+# Proof level requirements
+proof_levels:
+  L0:
+    name: "No proof"
+    score: 0.0
+    
+  L1:
+    name: "Unit tests only"
+    score: 0.3
+    requirements:
+      - unit_tests_passing
+    
+  L2:
+    name: "Unit + integration tests"
+    score: 0.5
+    requirements:
+      - unit_tests_passing
+      - integration_tests_passing
+    
+  L3:
+    name: "Unit + integration + invariant tests"
+    score: 0.7
+    requirements:
+      - unit_tests_passing
+      - integration_tests_passing
+      - invariant_tests_passing
+    
+  L4:
+    name: "L3 + negative tests"
+    score: 0.8
+    requirements:
+      - unit_tests_passing
+      - integration_tests_passing
+      - invariant_tests_passing
+      - negative_tests_passing
+    
+  L5:
+    name: "L4 + fuzz tests"
+    score: 0.9
+    requirements:
+      - unit_tests_passing
+      - integration_tests_passing
+      - invariant_tests_passing
+      - negative_tests_passing
+      - fuzz_tests_passing
+    
+  L6:
+    name: "L5 + formal proof"
+    score: 1.0
+    requirements:
+      - unit_tests_passing
+      - integration_tests_passing
+      - invariant_tests_passing
+      - negative_tests_passing
+      - fuzz_tests_passing
+      - formal_proof_verified
+
+# Receipt requirements
+receipt_requirements:
+  freshness_window_hours: 24
+  required_bindings:
+    - commit_hash
+    - command_run
+    - artifact_hash
+    - policy_hash
+    - relevant_files
+    - timestamp
+    - result
+    - limitations
+  stale_triggers:
+    - code_change_in_scope
+    - policy_change
+    - dependency_change
+    - test_change
+
+# Blocker criteria
+blocker_criteria:
+  critical:
+    - S0 gap exists
+    - T6+ TODO in critical path
+    - Critical claim FAILED
+    - Critical claim STALE
+    - Production mock/fake detected
+    - Security test failing
+    
+  major:
+    - S1 gap exists
+    - T5 TODO in critical path
+    - Important claim UNVERIFIED
+    - Test coverage below 80%
+    
+  minor:
+    - Documentation gaps
+    - Non-critical test gaps
+    - T3-T4 TODOs

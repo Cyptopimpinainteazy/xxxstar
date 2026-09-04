@@ -1,0 +1,93 @@
+{
+  "benchmarks": [
+    {
+      "operation": "SHA-256",
+      "mode": "CPU (hashlib)",
+      "batch_size": 200000,
+      "iterations": 5,
+      "avg_time_ms": 117.09,
+      "ops_per_sec": 1708027
+    },
+    {
+      "operation": "Ed25519 sig verify",
+      "mode": "CPU (PyNaCl/libsodium)",
+      "batch_size": 10000,
+      "iterations": 5,
+      "avg_time_ms": 693.44,
+      "ops_per_sec": 14421
+    },
+    {
+      "operation": "PoH (SHA-256 chain)",
+      "mode": "CPU (hashlib)",
+      "num_chains": 64,
+      "chain_length": 50000,
+      "total_hashes": 3200000,
+      "iterations": 3,
+      "avg_time_ms": 1874.83,
+      "ops_per_sec": 1706824
+    },
+    {
+      "operation": "Keccak-256",
+      "mode": "CPU (hashlib.sha3_256)",
+      "batch_size": 200000,
+      "iterations": 5,
+      "avg_time_ms": 189.23,
+      "ops_per_sec": 1056930
+    },
+    {
+      "operation": "secp256k1 ECDSA verify",
+      "mode": "CPU (cryptography/OpenSSL)",
+      "batch_size": 5000,
+      "iterations": 3,
+      "avg_time_ms": 1970.44,
+      "ops_per_sec": 2538
+    },
+    {
+      "count": 500000,
+      "iterations": 5,
+      "avg_time_ms": 49.573647999204695,
+      "throughput_hashes_per_sec": 10086003.757641992,
+      "gpu_available": true,
+      "operation": "SHA-256 GPU",
+      "mode": "GPU (CUDA)"
+    },
+    {
+      "num_chains": 2048,
+      "chain_length": 2000,
+      "total_hashes": 4096000,
+      "iterations": 5,
+      "avg_time_ms": 7.68821539968485,
+      "throughput_hashes_per_sec": 532763429.1005817,
+      "gpu_available": true,
+      "operation": "PoH GPU",
+      "mode": "GPU (CUDA)"
+    },
+    {
+      "batch_size": 10000,
+      "iterations": 10,
+      "avg_time_ms": 125.37641049784726,
+      "throughput_sigs_per_sec": 79759.82052996886,
+      "gpu_available": true,
+      "multi_gpu": true,
+      "operation": "Ed25519 GPU",
+      "mode": "GPU (CUDA)"
+    },
+    {
+      "operation": "Keccak-256 GPU",
+      "mode": "GPU (CUDA)",
+      "batch_size": 500000,
+      "iterations": 5,
+      "avg_time_ms": 10.0,
+      "ops_per_sec": 49980425
+    },
+    {
+      "operation": "secp256k1 GPU",
+      "mode": "GPU (CUDA)",
+      "batch_size": 10000,
+      "iterations": 5,
+      "avg_time_ms": 86.49,
+      "ops_per_sec": 115617
+    }
+  ],
+  "timestamp": "2026-02-09T23:03:06"
+}

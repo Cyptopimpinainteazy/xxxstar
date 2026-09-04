@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Leads — Admin</title><style>body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#071024;color:#eaf6ff;padding:1.5rem}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;border-bottom:1px solid rgba(255,255,255,.04)}th{color:#7ee3ff}</style></head>
+<body>
+  <h1>Leads (Admin)</h1>
+  <p>Provide token as <code>?token=YOUR_TOKEN</code> or header <code>x-admin-token</code></p>
+  <table><thead><tr><th>ID</th><th>Company</th><th>Name</th><th>Email</th><th>Role</th><th>RPC</th><th>Message</th><th>Time</th></tr></thead><tbody id="body"></tbody></table>
+  <script>
+    async function load(){
+      const params = new URLSearchParams(location.search);
+      const token = params.get('token');
+      const h = token ? ('?token=' + token) : '';
+      const r = await fetch('/api/leads' + h);
+      if (r.status === 403){ document.getElementById('body').innerHTML = '<tr><td colspan=8>Forbidden — supply admin token</td></tr>'; return }
+      const j = await r.json();
+      const b = document.getElementById('body'); b.innerHTML='';
+      j.forEach(l => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${l.id}</td><td>${l.company||'-'}</td><td>${l.name||'-'}</td><td>${l.email||'-'}</td><td>${l.role||'-'}</td><td>${l.rpc||'-'}</td><td>${(l.message||'').slice(0,80)}</td><td>${new Date(l.created_at).toLocaleString()}</td>`;
+        b.appendChild(tr);
+      })
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/lib.rs
++++ replace / with % in Eip1559FeeMarket::adjust_base_fee
+@@ -47,17 +47,17 @@
+     pub fn adjust_base_fee(&mut self, block_fullness: f64) {
+         let fullness_pct = (block_fullness * 100.0) as u8;
+ 
+         if fullness_pct > self.target_fullness {
+             // Block fuller than target: increase fee
+             let increase_factor = Permill::from_parts(self.adjustment_factor);
+             let increase = (self.base_fee as u64)
+                 .saturating_mul(increase_factor.deconstruct() as u64)
+-                / 1_000_000;
++                % /* ~ changed by cargo-mutants ~ */ 1_000_000;
+             self.base_fee = self.base_fee.saturating_add(increase as u128);
+         } else if fullness_pct < self.target_fullness {
+             // Block less full than target: decrease fee
+             let decrease_factor = Permill::from_parts(self.adjustment_factor);
+             let decrease = (self.base_fee as u64)
+                 .saturating_mul(decrease_factor.deconstruct() as u64)
+                 / 1_000_000;
+             self.base_fee = self.base_fee.saturating_sub(decrease as u128);

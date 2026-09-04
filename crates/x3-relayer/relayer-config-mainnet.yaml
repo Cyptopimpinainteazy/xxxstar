@@ -1,0 +1,123 @@
+# ===================================================================
+# X3 Bridge Relayer - Mainnet Production Configuration
+# ===================================================================
+
+x3:
+  # X3 Runtime RPC endpoint (usually behind load balancer)
+  rpc_url: "https://your-x3-mainnet-rpc.example.com:9933"
+  
+  # Relayer account (treasury or governance-approved address)
+  relayer_account: "YOUR_MAINNET_RELAYER_ACCOUNT"
+  
+  # Relayer account seed phrase is forbidden for mainnet-like configs.
+  # Mainnet signing must use custody-service backed key material.
+  relayer_seed_phrase: null
+
+  # Custody-service key ID used for relayer signing authority.
+  relayer_custody_key_id: "custody://x3-mainnet/relayer"
+
+evm_chains:
+  - name: "Ethereum Mainnet"
+    chain_id: 1
+    x3_domain_id: 200
+    
+    # Primary RPC (Alchemy recommended)
+    rpc_endpoint: "https://eth-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY"
+    
+    # Fallback RPC (Infura)
+    fallback_rpc: "https://mainnet.infura.io/v3/YOUR_INFURA_KEY"
+    
+    # Backup RPC (QuickNode)
+    backup_rpc: "https://mainnet.quicknode.pro/?token=YOUR_QUICKNODE_KEY"
+    
+    # State root contract address (deployed by governance)
+    state_root_contract: "0xYOUR_STATE_ROOT_CONTRACT_ADDRESS"
+    
+    # Finality threshold (64 blocks = ~15 minutes for safety)
+    # Note: Changed from testnet (12) to mainnet (64) for higher safety
+    finality_threshold: 64
+    
+    # Block poll interval (13000ms = 1 block time at 13s/block)
+    block_poll_interval_ms: 13000
+    
+    # Maximum concurrent RPC requests
+    # Production: 10 (conservative to avoid rate limiting)
+    max_concurrent_requests: 10
+
+svm_clusters:
+  - name: "Solana Mainnet"
+    cluster_name: "mainnet-beta"
+    x3_domain_id: 501
+    
+    # Primary RPC (QuickNode recommended)
+    rpc_endpoint: "https://mainnet.quicknode.pro/?token=YOUR_QUICKNODE_KEY"
+    
+    # Fallback RPC (Helius)
+    fallback_rpc: "https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_KEY"
+    
+    # Backup RPC (Triton/Public)
+    backup_rpc: "https://api.mainnet-beta.solana.com"
+    
+    # Finality threshold (128 slots = ~50 seconds for confirmed finality)
+    # Note: Changed from testnet (32) to mainnet (128) for higher safety
+    finality_threshold: 128
+    
+    # Slot poll interval (6000ms = 6 seconds)
+    # More frequent than testnet due to higher load
+    slot_poll_interval_ms: 6000
+    
+    # Maximum concurrent requests (higher for Solana's fast finality)
+    max_concurrent_requests: 50
+
+submission:
+  # Batch size (group multiple proofs per submission)
+  # Production: 5 (balance between throughput and latency)
+  batch_size: 5
+  
+  # Submission timeout (120s = double testnet for network variability)
+  timeout_secs: 120
+  
+  # Maximum retry attempts for transient failures
+  # Production: 5 (higher than testnet for better resilience)
+  max_retries: 5
+  
+  # Retry backoff base in milliseconds (exponential: 1s → 2s → 4s → 8s → 16s)
+  retry_backoff_ms: 1000
+
+governance:
+  # Bridge pause polling interval (check every 30s instead of 5s)
+  # Production: Lower frequency to reduce RPC calls
+  poll_interval_secs: 30
+  
+  # Enable graceful shutdown on SIGINT (recommended for production)
+  enable_graceful_shutdown: true
+
+logging:
+  # Log level (info for production, debug for troubleshooting)
+  # Can be overridden: export X3_LOG_LEVEL=debug
+  level: "info"
+  
+  # Log format (default for human readability)
+  format: "default"
+
+# ===================================================================
+# Advanced Configuration (Optional Tuning)
+# ===================================================================
+
+advanced:
+  # Proof deduplication cache size (in proofs)
+  # Prevents re-submission of identical proofs
+  dedup_cache_size: 10000
+  
+  # Metrics persistence (optional, for long-running instances)
+  # Database: PostgreSQL for metrics storage
+  # Endpoint: postgresql://user:pass@metrics-db.example.com:5432/x3_metrics
+  metrics_db_url: null
+  
+  # Health check endpoint (optional)
+  # Useful for load balancers and Kubernetes liveness probes
+  health_check_port: 9999
+  health_check_path: "/health"
+  
+  # Profiling (disabled in production)
+  enable_profiling: false

@@ -1,0 +1,16 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="solGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00bfa5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00897b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Puzzle pieces -->
+  <path d="M28 28h28v12q-6 0-6 6t6 6v18H28Z" fill="url(#solGrad)" opacity="0.7"/>
+  <path d="M56 28h28q0 6 6 6t6-6h4v36H72v-6q0-6-6-6t-6 6v6H56Z" fill="url(#solGrad)" opacity="0.85"/>
+  <path d="M28 70h28v6q0 6 6 6t6-6v-6h32v36H28Z" fill="url(#solGrad)" opacity="0.6"/>
+  <!-- Center connector dots -->
+  <circle cx="64" cy="64" r="4" fill="url(#solGrad)"/>
+  <circle cx="48" cy="48" r="3" fill="url(#solGrad)" opacity="0.5"/>
+  <circle cx="80" cy="80" r="3" fill="url(#solGrad)" opacity="0.5"/>
+</svg>

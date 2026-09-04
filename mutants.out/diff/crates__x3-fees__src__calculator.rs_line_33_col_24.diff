@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/calculator.rs
++++ replace == with != in FeeCalculator::calculate
+@@ -25,17 +25,17 @@
+     /// This is the primary entry point. Call this BEFORE execution to
+     /// determine the fee, which is then locked.
+     pub fn calculate(
+         &self,
+         params: &ExecutionParams,
+         reputation: &AgentReputation,
+     ) -> Result<FeeVector, FeeError> {
+         // Validate parameters
+-        if params.legs == 0 {
++        if params.legs != /* ~ changed by cargo-mutants ~ */ 0 {
+             return Err(FeeError::ZeroLegs);
+         }
+ 
+         // 1. Base fee
+         let base_fee = self.curve.base_fee();
+ 
+         // 2. Complexity fee
+         let complexity_fee = self.curve.complexity_fee(params.legs, params.state_touches);

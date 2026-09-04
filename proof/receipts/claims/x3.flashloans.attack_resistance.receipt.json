@@ -1,0 +1,59 @@
+{
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "command_run": "x3-proof verify x3.flashloans.attack_resistance",
+  "artifact_hash": "33c541ae76a52683fb871d13a7f9be2f095859b36cf8d1c6962efcc1ab337c92",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "crates/x3-flashloan/src/lib.rs",
+    "crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs",
+    "crates/x3-flashloan/src/tests/attack_reentrancy.rs",
+    "crates/x3-flashloan/src/tests/attack_repayment_bypass.rs",
+    "X3-contracts/shared/parity-core/src/lib.rs",
+    "X3-contracts/shared/parity-core/tests/parity_vectors.rs",
+    "X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json"
+  ],
+  "timestamp": "2026-05-02T01:54:27.950767688Z",
+  "result": {
+    "claim_id": "x3.flashloans.attack_resistance",
+    "claim": "Flashloan attack resistance",
+    "status": "verified",
+    "proof_level": "P6",
+    "edge_case_level": "E7",
+    "hack_level": "H8",
+    "operator_level": "I6",
+    "degraded_level": "D5",
+    "files_inspected": [
+      "crates/x3-flashloan/src/lib.rs",
+      "crates/x3-flashloan/src/tests/attack_oracle_manipulation.rs",
+      "crates/x3-flashloan/src/tests/attack_reentrancy.rs",
+      "crates/x3-flashloan/src/tests/attack_repayment_bypass.rs",
+      "X3-contracts/shared/parity-core/src/lib.rs",
+      "X3-contracts/shared/parity-core/tests/parity_vectors.rs",
+      "X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json"
+    ],
+    "commands_run": [
+      "cargo test -p x3-flashloan attack_ -- --nocapture",
+      "cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors"
+    ],
+    "passed_checks": [
+      "flash_loan_oracle_manipulation_fails passed",
+      "flash_loan_reentrancy_rejected passed",
+      "flash_loan_repayment_bypass_reverts passed",
+      "X3-contracts parity vectors (flashloan/repay_or_revert) ok"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "parity_vector_harness": "ok",
+      "expected_attack_tests": "3",
+      "passed_attack_tests": "3",
+      "failed_attack_tests": "0"
+    },
+    "timestamp": "2026-05-02T01:54:27.945091741Z",
+    "duration_ms": 1952
+  },
+  "limitations": [],
+  "binding_hash": "9fc55fb40365df577a18c6382892956cef39baf7dd829b4847349863feeb0d28"
+}

@@ -1,0 +1,9 @@
+    it('should classify network errors', () => {
+      const error = new Error('Network error occurred');
+      const classified = classifyError(error);
+
+      expect(
+        classified.code === ErrorCode.NETWORK_ERROR || 
+        classified.code === ErrorCode.OFFLINE
+      ).toBe(true);
+    });

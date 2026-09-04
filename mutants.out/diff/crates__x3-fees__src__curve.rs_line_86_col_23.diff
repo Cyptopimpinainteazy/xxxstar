@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace == with != in FeeCurve::reputation_discount
+@@ -78,17 +78,17 @@
+         let age_factor = if reputation.age_blocks >= 1000 {
+             100u64 // Full credit
+         } else if reputation.age_blocks >= 100 {
+             50u64 // Half credit
+         } else {
+             0u64 // No credit — too new
+         };
+ 
+-        if age_factor == 0 {
++        if age_factor != /* ~ changed by cargo-mutants ~ */ 0 {
+             return 0;
+         }
+ 
+         // Raw discount = success_rate (as fraction) × age_factor / 100
+         let raw_discount_bps = (success_bps as u64 * age_factor) / (100 * slash_penalty);
+         let capped_bps = std::cmp::min(
+             raw_discount_bps as u32,
+             self.config.max_reputation_discount_bps,

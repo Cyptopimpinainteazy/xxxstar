@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ replace <impl Add for Span>::add -> Self::Output with Default::default()
+@@ -31,17 +31,17 @@
+         }
+     }
+ }
+ 
+ impl Add for Span {
+     type Output = Self;
+ 
+     fn add(self, rhs: Self) -> Self::Output {
+-        self.merge(rhs)
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Literals that can appear inside the language.
+ #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+ pub enum Literal {
+     Integer(i64),
+     Float(f64),

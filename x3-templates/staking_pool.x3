@@ -1,0 +1,229 @@
+// staking_pool.x3 - Staking Pool with Rewards, Lockups, Multipliers, Claim Logic
+//
+// @version("1.0.0")
+// @audit
+
+contract StakingPool {
+    // Configuration constants
+    const REWARD_RATE_BPS: u256 = 1500;        // 15% annual base rate
+    const BONUS_MULTIPLIER_BPS: u256 = 200;    // 2x multiplier for max lockup
+    const MIN_STAKE: u256 = 10 ether;
+    const MAX_STAKE: u256 = 100000 ether;
+    const LOCKUP_30_DAYS: u256 = 2592000;
+    const LOCKUP_90_DAYS: u256 = 7776000;
+    const LOCKUP_180_DAYS: u256 = 15552000;
+    const LOCKUP_365_DAYS: u256 = 31536000;
+    const EARLY_WITHDRAWAL_PENALTY_BPS: u256 = 500; // 5% penalty
+
+    // Storage
+    address owner;
+    address reward_token;
+    address staking_token;
+    u256 total_staked;
+    u256 reward_pool;
+    u256 reward_per_token_stored;
+    mapping(address => Staker) stakers;
+    mapping(address => u256) rewards;
+
+    // Structs
+    struct Staker {
+        u256 staked_amount;
+        u256 lockup_duration;
+        u256 lockup_end;
+        u256 reward_debt;
+        u256 multiplier;
+        u256 last_stake_time;
+    }
+
+    struct StakerInfo {
+        u256 staked_amount;
+        u256 lockup_duration;
+        u256 lockup_end;
+        u256 multiplier;
+        u256 pending_rewards;
+        u256 last_stake_time;
+    }
+
+    // Events
+    event Staked(address indexed user, u256 amount, u256 lockup_duration, u256 multiplier);
+    event Unstaked(address indexed user, u256 amount, u256 penalty);
+    event RewardsClaimed(address indexed user, u256 amount);
+    event RewardPoolFunded(address indexed funder, u256 amount);
+
+    // Constructor
+    fn constructor(_staking_token: address, _reward_token: address) {
+        owner = msg.sender;
+        staking_token = _staking_token;
+        reward_token = _reward_token;
+    }
+
+    // ===== STAKE =====
+
+    fn stake(amount: u256, lockup_days: u256) {
+        require(amount >= MIN_STAKE, "Below minimum stake");
+        require(amount <= MAX_STAKE, "Above maximum stake");
+
+        // Determine lockup duration and multiplier
+        let lockup_duration: u256;
+        let multiplier: u256;
+
+        if lockup_days <= 30 {
+            lockup_duration = LOCKUP_30_DAYS;
+            multiplier = 10000; // 1x
+        } else if lockup_days <= 90 {
+            lockup_duration = LOCKUP_90_DAYS;
+            multiplier = 12000; // 1.2x
+        } else if lockup_days <= 180 {
+            lockup_duration = LOCKUP_180_DAYS;
+            multiplier = 15000; // 1.5x
+        } else {
+            lockup_duration = LOCKUP_365_DAYS;
+            multiplier = 20000; // 2x
+        }
+
+        // Update reward debt before changing stake
+        let staker = stakers[msg.sender];
+        if staker.staked_amount > 0 {
+            let earned = calculate_rewards(msg.sender);
+            rewards[msg.sender] = rewards[msg.sender] + earned;
+        }
+
+        // Transfer tokens from user
+        call(staking_token, "transferFrom", (msg.sender, address(this), amount));
+
+        // Update staker info
+        stakers[msg.sender] = Staker {
+            staked_amount: staker.staked_amount + amount,
+            lockup_duration: lockup_duration,
+            lockup_end: block.timestamp + lockup_duration,
+            reward_debt: staker.staked_amount + amount,
+            multiplier: multiplier,
+            last_stake_time: block.timestamp,
+        };
+
+        total_staked = total_staked + amount;
+        emit Staked(msg.sender, amount, lockup_duration, multiplier);
+    }
+
+    // ===== UNSTAKE =====
+
+    fn unstake(amount: u256) {
+        let staker = stakers[msg.sender];
+        require(staker.staked_amount >= amount, "Insufficient staked");
+        require(amount > 0, "Amount must be > 0");
+
+        // Calculate penalty for early withdrawal
+        let penalty: u256 = 0;
+        if block.timestamp < staker.lockup_end {
+            penalty = amount * EARLY_WITHDRAWAL_PENALTY_BPS / 10000;
+        }
+
+        // Update rewards before withdrawal
+        let earned = calculate_rewards(msg.sender);
+        rewards[msg.sender] = rewards[msg.sender] + earned;
+
+        let withdraw_amount = amount - penalty;
+
+        // Update staker state
+        stakers[msg.sender].staked_amount = staker.staked_amount - amount;
+        stakers[msg.sender].reward_debt = staker.staked_amount - amount;
+        total_staked = total_staked - amount;
+
+        // Transfer staked tokens minus penalty
+        call(staking_token, "transfer", (msg.sender, withdraw_amount));
+
+        // Add penalty to reward pool
+        if penalty > 0 {
+            reward_pool = reward_pool + penalty;
+        }
+
+        emit Unstaked(msg.sender, amount, penalty);
+    }
+
+    // ===== CLAIM REWARDS =====
+
+    fn claim_rewards() -> u256 {
+        let reward_amount = rewards[msg.sender];
+        let earned = calculate_rewards(msg.sender);
+        let total_reward = reward_amount + earned;
+
+        require(total_reward > 0, "No rewards to claim");
+        require(reward_pool >= total_reward, "Insufficient reward pool");
+
+        // Reset rewards
+        rewards[msg.sender] = 0;
+        stakers[msg.sender].reward_debt = stakers[msg.sender].staked_amount;
+        reward_pool = reward_pool - total_reward;
+
+        // Transfer reward tokens
+        call(reward_token, "transfer", (msg.sender, total_reward));
+
+        emit RewardsClaimed(msg.sender, total_reward);
+        return total_reward;
+    }
+
+    // ===== CALCULATE REWARDS =====
+
+    fn calculate_rewards(user: address) -> u256 {
+        let staker = stakers[user];
+        if staker.staked_amount == 0 {
+            return 0;
+        }
+
+        let time_staked = block.timestamp - staker.last_stake_time;
+        let annual_reward = staker.staked_amount * REWARD_RATE_BPS / 10000;
+        let reward_per_second = annual_reward / 31536000; // seconds per year
+        let base_reward = time_staked * reward_per_second;
+
+        // Apply multiplier
+        let weighted_reward = base_reward * staker.multiplier / 10000;
+
+        // Subtract already accounted rewards
+        let pending = weighted_reward - staker.reward_debt;
+        if pending > weighted_reward {
+            return 0;
+        }
+        return pending;
+    }
+
+    // ===== GET STAKER INFO =====
+
+    fn get_staker_info(user: address) -> StakerInfo {
+        let staker = stakers[user];
+        let pending = calculate_rewards(user) + rewards[user];
+
+        return StakerInfo {
+            staked_amount: staker.staked_amount,
+            lockup_duration: staker.lockup_duration,
+            lockup_end: staker.lockup_end,
+            multiplier: staker.multiplier,
+            pending_rewards: pending,
+            last_stake_time: staker.last_stake_time,
+        };
+    }
+
+    fn get_total_staked() -> u256 {
+        return total_staked;
+    }
+
+    fn get_reward_pool() -> u256 {
+        return reward_pool;
+    }
+
+    fn get_apy() -> u256 {
+        if total_staked == 0 {
+            return 0;
+        }
+        let annual_rewards = total_staked * REWARD_RATE_BPS / 10000;
+        return annual_rewards * 10000 / total_staked;
+    }
+
+    // ===== ADMIN =====
+
+    fn fund_reward_pool(amount: u256) {
+        require(msg.sender == owner, "Only owner");
+        call(reward_token, "transferFrom", (msg.sender, address(this), amount));
+        reward_pool = reward_pool + amount;
+        emit RewardPoolFunded(msg.sender, amount);
+    }
+}

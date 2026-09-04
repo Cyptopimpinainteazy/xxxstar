@@ -1,0 +1,28 @@
+--- crates/x3-fees/src/lib.rs
++++ replace ResourceVector::saturating_add -> Self with Default::default()
+@@ -330,24 +330,17 @@
+             io_ops: 0,
+             storage_reads: 0,
+             storage_writes: 0,
+         }
+     }
+ 
+     /// Sum two resource vectors (for aggregation)
+     pub fn saturating_add(&self, other: &Self) -> Self {
+-        Self {
+-            cpu_cycles: self.cpu_cycles.saturating_add(other.cpu_cycles),
+-            gpu_cycles: self.gpu_cycles.saturating_add(other.gpu_cycles),
+-            memory_bytes: self.memory_bytes.saturating_add(other.memory_bytes),
+-            io_ops: self.io_ops.saturating_add(other.io_ops),
+-            storage_reads: self.storage_reads.saturating_add(other.storage_reads),
+-            storage_writes: self.storage_writes.saturating_add(other.storage_writes),
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Check if this vector exceeds declared limits
+     pub fn exceeds(&self, limits: &ResourceVector) -> bool {
+         self.cpu_cycles > limits.cpu_cycles
+             || self.gpu_cycles > limits.gpu_cycles
+             || self.memory_bytes > limits.memory_bytes
+             || self.io_ops > limits.io_ops

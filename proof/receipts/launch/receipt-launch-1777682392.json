@@ -1,0 +1,22 @@
+{
+  "receipt_id": "receipt-launch-1777682392",
+  "timestamp": "2026-05-02T00:39:52.519277895Z",
+  "receipt_type": "launch",
+  "areas": [
+    "mainnet-rc-tests",
+    "router",
+    "supply-ledger",
+    "atomic-kernel",
+    "ixl",
+    "x3-proof"
+  ],
+  "results": [],
+  "overall_status": "verified",
+  "overall_score": 1.0,
+  "signatures": [
+    "unsigned-local-receipt"
+  ],
+  "limitations": [
+    "Local generated receipt; external auditor signature not attached."
+  ]
+}

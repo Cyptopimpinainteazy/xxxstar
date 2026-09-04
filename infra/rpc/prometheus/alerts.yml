@@ -1,0 +1,148 @@
+# X3 RPC Gateway — Prometheus Alert Rules
+# Mainnet-critical alerting rules for the RPC infrastructure.
+
+groups:
+  - name: rpc-mainnet
+    rules:
+      # ── Error rate ────────────────────────────────────────────────
+      - alert: RpcHighErrorRate
+        expr: rate(rpc_errors_total[5m]) / rate(rpc_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          component: rpc-gateway
+        annotations:
+          summary: "RPC error rate above 1%"
+          description: "RPC error rate is {{ $value | humanizePercentage }} over the last 5 minutes. Total requests: {{ with query \"rate(rpc_requests_total[5m])\" }}{{ . | first | value | humanize }}{{ end }}/s"
+
+      # ── Stale upstream — general block lag ────────────────────────
+      - alert: RpcStaleUpstream
+        expr: rpc_upstream_block_lag > 2
+        for: 30s
+        labels:
+          severity: critical
+          component: upstream-health
+        annotations:
+          summary: "RPC upstream {{ $labels.upstream }} on {{ $labels.chain }} is stale"
+          description: "Block lag is {{ $value }} blocks. Chain: {{ $labels.chain }}. Upstream: {{ $labels.upstream }}"
+
+      # ── Wrong chain ────────────────────────────────────────────────
+      - alert: RpcWrongChain
+        expr: increase(rpc_wrong_chain_total[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          component: upstream-health
+        annotations:
+          summary: "RPC upstream returned wrong chain data"
+          description: "Upstream {{ $labels.upstream }} on chain {{ $labels.chain }} returned wrong chain data. Hard-failing this upstream."
+
+      # ── P95 latency high ──────────────────────────────────────────
+      - alert: RpcP95LatencyHigh
+        expr: histogram_quantile(0.95, rate(rpc_request_duration_seconds_bucket[5m])) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "RPC p95 latency above 250ms"
+          description: "p95 latency for {{ $labels.chain }}/{{ $labels.method }} is {{ $value }}s. Threshold: 250ms"
+
+      # ── P99 latency critical ──────────────────────────────────────
+      - alert: RpcP99LatencyCritical
+        expr: histogram_quantile(0.99, rate(rpc_request_duration_seconds_bucket[5m])) > 0.75
+        for: 3m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "RPC p99 latency above 750ms"
+          description: "p99 latency for {{ $labels.chain }}/{{ $labels.method }} is {{ $value }}s. Threshold: 750ms"
+
+      # ── No healthy upstreams ──────────────────────────────────────
+      - alert: RpcNoHealthyUpstreams
+        expr: rpc_healthy_upstreams == 0
+        for: 10s
+        labels:
+          severity: critical
+          component: upstream-health
+        annotations:
+          summary: "No healthy RPC upstreams for chain {{ $labels.chain }}"
+          description: "Chain {{ $labels.chain }} has zero healthy upstreams. All requests to this chain will fail."
+
+      # ── Low healthy upstream count ────────────────────────────────
+      - alert: RpcLowHealthyUpstreams
+        expr: rpc_healthy_upstreams < 2
+        for: 1m
+        labels:
+          severity: warning
+          component: upstream-health
+        annotations:
+          summary: "Only {{ $value }} healthy upstream(s) for chain {{ $labels.chain }}"
+          description: "Chain {{ $labels.chain }} has only {{ $value }} healthy upstream(s). Failover capacity is degraded."
+
+      # ── Quorum mismatch ────────────────────────────────────────────
+      - alert: RpcQuorumMismatch
+        expr: increase(rpc_quorum_mismatch_total[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          component: data-integrity
+        annotations:
+          summary: "Quorum mismatch detected on {{ $labels.chain }}/{{ $labels.method }}"
+          description: "Multiple upstreams returned different results for {{ $labels.method }} on {{ $labels.chain }}. Possible data integrity issue."
+
+      # ── High failover rate ─────────────────────────────────────────
+      - alert: RpcHighFailoverRate
+        expr: rate(rpc_failover_total[10m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: upstream-health
+        annotations:
+          summary: "Elevated failover rate on {{ $labels.chain }}"
+          description: "Failover events happening at {{ $value }}/s on chain {{ $labels.chain }}. Check upstream health."
+
+      # ── Transaction broadcast failure ─────────────────────────────
+      - alert: RpcTxBroadcastFailure
+        expr: rate(rpc_tx_broadcast_total{result="failure"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: transaction-broadcast
+        annotations:
+          summary: "Transaction broadcast failures on {{ $labels.chain }}"
+          description: "Transaction broadcast is failing on chain {{ $labels.chain }}. Check upstream tx endpoints."
+
+      # ── Rate limiting active ───────────────────────────────────────
+      - alert: RpcRateLimitingActive
+        expr: rate(rpc_rate_limited_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Elevated rate limiting — {{ $value }}/s requests being rate-limited"
+          description: "More than 10 req/s being rate-limited. Possible abuse or misconfigured client."
+
+      # ── Auth failure spike ─────────────────────────────────────────
+      - alert: RpcAuthFailureSpike
+        expr: rate(rpc_auth_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Auth failure spike — {{ $value }}/s"
+          description: "Increased rate of authentication failures. Possible unauthorized access attempts."
+
+      # ── WebSocket connection flood ─────────────────────────────────
+      - alert: RpcWsConnectionFlood
+        expr: rpc_ws_connections > 500
+        for: 2m
+        labels:
+          severity: warning
+          component: websocket
+        annotations:
+          summary: "High WebSocket connection count: {{ $value }}"
+          description: "Active WebSocket connections exceeded 500. Check for connection leaks or abuse."

@@ -1,0 +1,45 @@
+--- crates/x3-common/src/lib.rs
++++ replace Keyword::parse -> Option<Self> with None
+@@ -75,41 +75,17 @@
+     Agent,
+     Context,
+     Const,
+     In,
+ }
+ 
+ impl Keyword {
+     pub fn parse(src: &str) -> Option<Self> {
+-        match src {
+-            "fn" => Some(Self::Fn),
+-            "let" => Some(Self::Let),
+-            "mut" => Some(Self::Mut),
+-            "if" => Some(Self::If),
+-            "else" => Some(Self::Else),
+-            "while" => Some(Self::While),
+-            "loop" => Some(Self::Loop),
+-            "for" => Some(Self::For),
+-            "return" => Some(Self::Return),
+-            "break" => Some(Self::Break),
+-            "continue" => Some(Self::Continue),
+-            "struct" => Some(Self::Struct),
+-            "enum" => Some(Self::Enum),
+-            "match" => Some(Self::Match),
+-            "true" => Some(Self::True),
+-            "false" => Some(Self::False),
+-            "atomic" => Some(Self::Atomic),
+-            "emit" => Some(Self::Emit),
+-            "agent" => Some(Self::Agent),
+-            "context" => Some(Self::Context),
+-            "const" => Some(Self::Const),
+-            "in" => Some(Self::In),
+-            _ => None,
+-        }
++        None /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Error returned when a keyword does not match a known value.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub struct KeywordParseError;
+ 
+ impl fmt::Display for KeywordParseError {

@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Sessions — Admin</title><style>body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#071024;color:#eaf6ff;padding:1.5rem}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;border-bottom:1px solid rgba(255,255,255,.04)}th{color:#7ee3ff}</style></head>
+<body>
+  <h1>Sessions (Admin)</h1>
+  <p>Provide token as <code>?token=YOUR_TOKEN</code> or header <code>x-admin-token</code></p>
+  <table><thead><tr><th>Job</th><th>Company</th><th>RPC</th><th>TPS</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody id="body"></tbody></table>
+  <script>
+    async function load(){
+      const params = new URLSearchParams(location.search);
+      const token = params.get('token');
+      const h = token ? ('?token=' + token) : '';
+      const r = await fetch('/api/sessions' + h);
+      if (r.status === 403){ document.getElementById('body').innerHTML = '<tr><td colspan=7>Forbidden — supply admin token</td></tr>'; return }
+      const j = await r.json();
+      const b = document.getElementById('body'); b.innerHTML='';
+      j.forEach(l => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${l.jobId}</td><td>${l.company_id||'-'}</td><td>${l.rpc||'-'}</td><td>${l.evm_tps||'-'}</td><td>${l.start_ts?new Date(l.start_ts).toLocaleString():'-'}</td><td>${l.end_ts?new Date(l.end_ts).toLocaleString():'-'}</td><td>${l.status||'-'}</td>`;
+        b.appendChild(tr);
+      })
+    }
+    load(); setInterval(load, 5000);
+  </script>
+</body>
+</html>

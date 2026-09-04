@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "atomic" in Keyword::parse
+@@ -92,17 +92,17 @@
+             "return" => Some(Self::Return),
+             "break" => Some(Self::Break),
+             "continue" => Some(Self::Continue),
+             "struct" => Some(Self::Struct),
+             "enum" => Some(Self::Enum),
+             "match" => Some(Self::Match),
+             "true" => Some(Self::True),
+             "false" => Some(Self::False),
+-            "atomic" => Some(Self::Atomic),
++             /* ~ changed by cargo-mutants ~ */
+             "emit" => Some(Self::Emit),
+             "agent" => Some(Self::Agent),
+             "context" => Some(Self::Context),
+             "const" => Some(Self::Const),
+             "in" => Some(Self::In),
+             _ => None,
+         }
+     }
