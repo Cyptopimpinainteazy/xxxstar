@@ -1,0 +1,23 @@
+--- crates/x3-common/src/signing.rs
++++ delete match arm (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) in Signature::verify_hash
+@@ -129,19 +129,17 @@
+                 ed25519::Signature::verify(sig, &message_hash[..], pk)
+             }
+             (Signature::Secp256k1(sig), PublicKey::Secp256k1(pk)) => {
+                 match sp_io::crypto::secp256k1_ecdsa_recover(sig, message_hash) {
+                     Ok(recovered) => recovered.as_ref() == &pk[1..],
+                     Err(_) => false,
+                 }
+             }
+-            (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) => {
+-                sr25519::Signature::verify(sig, &message_hash[..], pk)
+-            }
++             /* ~ changed by cargo-mutants ~ */
+             _ => false,
+         }
+     }
+ }
+ 
+ /// Trait for cryptographic signing
+ pub trait Signer: Send + Sync {
+     /// Get the key type for this signer

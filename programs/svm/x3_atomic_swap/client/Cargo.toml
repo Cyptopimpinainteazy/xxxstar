@@ -1,0 +1,25 @@
+[package]
+name = "x3-svm-client"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Live X3 Atomic Swap HTLC broadcaster for Solana devnet (real signing + RPC submit)"
+publish = false
+
+[dependencies]
+solana-sdk = "=3.0.0"
+solana-rpc-client = "=3.0.0"
+solana-client = "=3.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+
+[lib]
+name = "x3_svm_client"
+crate-type = ["lib"]
+
+# Standalone root: this live client is intentionally kept OUT of the X3 root
+# workspace (which excludes programs/svm/*) exactly like the BPF program and
+# the deploy script, so requesting real devnet submits can never pollute the
+# no_std member/dependency graph.
+[workspace]

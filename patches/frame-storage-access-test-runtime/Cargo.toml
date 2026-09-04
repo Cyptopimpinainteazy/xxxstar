@@ -1,0 +1,39 @@
+[package]
+name = "frame-storage-access-test-runtime"
+description = "A runtime for testing storage access on block validation"
+version = "0.6.0"
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2021"
+build = "build.rs"
+license = "Apache-2.0"
+homepage = "https://paritytech.github.io/polkadot-sdk/"
+repository = "https://github.com/paritytech/polkadot-sdk"
+publish = false
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.6.5", features = ["derive"], default-features = false }
+cumulus-pallet-parachain-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false, optional = true }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-state-machine = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+sp-trie = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
+
+[build-dependencies]
+substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", optional = true, default-features = true }
+
+[features]
+default = ["std"]
+no_std = []
+std = [
+	"codec/std",
+	"cumulus-pallet-parachain-system/std",
+	"sp-core/std",
+	"sp-runtime/std",
+	"sp-state-machine/std",
+	"sp-trie/std",
+	"substrate-wasm-builder",
+]
+runtime-benchmarks = [
+	"cumulus-pallet-parachain-system/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+]

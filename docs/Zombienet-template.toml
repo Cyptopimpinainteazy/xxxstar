@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Zombienet Network Configuration — X3 Multi-Node Staging Testnet
+#
+# This config defines an ephemeral N-validator testnet for CI and staging.
+# Usage:
+#   zombienet spawn docs/Zombienet-template.toml
+#   zombienet test docs/Zombienet-template.toml path/to/smoke-test.zndsl
+# ─────────────────────────────────────────────────────────────────────────────
+[settings]
+timeout = 600
+provider = "native"  # "native" or "kubernetes"
+
+[relaychain]
+default_command = "./target/release/x3-chain-node"
+chain = "x3-local3-raw"
+
+[[relaychain.nodes]]
+name = "alice"
+validator = true
+
+[[relaychain.nodes]]
+name = "bob"
+validator = true
+
+[[relaychain.nodes]]
+name = "charlie"
+validator = true
+
+[[relaychain.nodes]]
+name = "dave"
+validator = true
+
+# ── Optional: add more validators for stress testing ─────────────────────
+# [[relaychain.nodes]]
+# name = "eve"
+# validator = true
+
+# [[relaychain.nodes]]
+# name = "ferdi"
+# validator = true
+
+# [[relaychain.nodes]]
+# name = "gavin"
+# validator = true
+
+# ── Built-in test definitions ────────────────────────────────────────────
+# These are referenced by Zombienet test files (.zndsl)
+[[tests]]
+name = "finality-smoke"
+script = "tests/zombienet/finality-smoke.zndsl"
+
+[[tests]]
+name = "block-production"
+script = "tests/zombienet/block-production.zndsl"
+
+[[tests]]
+name = "runtime-upgrade-dry-run"
+script = "tests/zombienet/runtime-upgrade-dry-run.zndsl"

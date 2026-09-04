@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/reputation.rs
++++ replace >= with < in ReputationScore::compute
+@@ -25,17 +25,17 @@
+         let success_rate_bps = rep.success_rate_bps();
+ 
+         let age_factor = if rep.age_blocks >= 1000 {
+             100
+         } else if rep.age_blocks >= 500 {
+             75
+         } else if rep.age_blocks >= 100 {
+             50
+-        } else if rep.age_blocks >= 10 {
++        } else if rep.age_blocks < /* ~ changed by cargo-mutants ~ */ 10 {
+             25
+         } else {
+             0
+         };
+ 
+         let slash_penalty = 2u32.saturating_pow(rep.slashes.min(10) as u32);
+ 
+         // Composite: (success_rate × age_factor) / (100 × slash_penalty)

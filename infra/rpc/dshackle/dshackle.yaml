@@ -1,0 +1,141 @@
+# X3 RPC — Dshackle Configuration
+# Protocol-aware multi-chain RPC proxy by DRPC.
+# Dshackle handles the EVM chains; Solana, Bitcoin, and X3 are routed
+# by the custom x3-rpc-router.
+#
+# Docs: https://github.com/drpcorg/dshackle
+
+version: v1
+port: 2449
+health_check:
+  interval: 15s
+  timeout: 5s
+  unhealthy_threshold: 3
+  healthy_threshold: 2
+
+tls:
+  enabled: false                        # HAProxy handles TLS
+
+proxy:
+  host: 0.0.0.0
+  port: 8545
+  max_connections: 10000
+  max_batch_size: 100
+  request_timeout: 30s
+
+  routes:
+    - id: ethereum-mainnet
+      blockchain: ethereum
+      upstreams:
+        - id: eth-local-reth
+          role: PRIMARY
+          connection:
+            ethereum:
+              rpc:
+                url: "http://localhost:8545"
+                timeout: 15s
+        - id: eth-drpc
+          role: PRIMARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://lb.drpc.live/evm/ethereum/${DRPC_KEY}"
+                timeout: 15s
+        - id: eth-ankr
+          role: SECONDARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://rpc.ankr.com/eth/${ANKR_KEY}"
+                timeout: 15s
+      validation:
+        chain_id: 1
+        block_freshness: 2              # max blocks behind
+
+    - id: base-mainnet
+      blockchain: ethereum
+      upstreams:
+        - id: base-drpc
+          role: PRIMARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://lb.drpc.live/evm/base/${DRPC_KEY}"
+                timeout: 15s
+        - id: base-ankr
+          role: SECONDARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://rpc.ankr.com/base/${ANKR_KEY}"
+                timeout: 15s
+      validation:
+        chain_id: 8453
+        block_freshness: 2
+
+    - id: arbitrum-mainnet
+      blockchain: ethereum
+      upstreams:
+        - id: arb-drpc
+          role: PRIMARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://lb.drpc.live/evm/arbitrum/${DRPC_KEY}"
+                timeout: 15s
+        - id: arb-ankr
+          role: SECONDARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://rpc.ankr.com/arbitrum/${ANKR_KEY}"
+                timeout: 15s
+      validation:
+        chain_id: 42161
+        block_freshness: 2
+
+    - id: polygon-mainnet
+      blockchain: ethereum
+      upstreams:
+        - id: polygon-drpc
+          role: PRIMARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://lb.drpc.live/evm/polygon/${DRPC_KEY}"
+                timeout: 15s
+        - id: polygon-ankr
+          role: SECONDARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://rpc.ankr.com/polygon/${ANKR_KEY}"
+                timeout: 15s
+      validation:
+        chain_id: 137
+        block_freshness: 4
+
+    - id: bsc-mainnet
+      blockchain: ethereum
+      upstreams:
+        - id: bsc-drpc
+          role: PRIMARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://lb.drpc.live/evm/bsc/${DRPC_KEY}"
+                timeout: 15s
+        - id: bsc-ankr
+          role: SECONDARY
+          connection:
+            ethereum:
+              rpc:
+                url: "https://rpc.ankr.com/bsc/${ANKR_KEY}"
+                timeout: 15s
+      validation:
+        chain_id: 56
+        block_freshness: 3
+
+  # Substrate route handled by x3-rpc-router, not Dshackle
+  # Solana route handled by x3-rpc-router, not Dshackle
+  # Bitcoin route handled by x3-rpc-router, not Dshackle

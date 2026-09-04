@@ -1,0 +1,36 @@
+[package]
+name = "pallet-northern-swarm"
+version = "0.1.0"
+edition = "2021"
+description = "Northern Swarm on-chain registry v2: executor stake, task assignment, result hash commit, slash/reward."
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "frame-support/std",
+    "frame-system/std",
+    "scale-info/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "serde/std",
+]
+runtime-benchmarks = []
+try-runtime = ["frame-support/try-runtime"]
+
+[dependencies]
+codec       = { workspace = true, features = ["derive"] }
+scale-info  = { workspace = true, features = ["derive"] }
+frame-support = { workspace = true }
+frame-system  = { workspace = true }
+sp-runtime    = { workspace = true }
+sp-std        = { workspace = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+
+[dev-dependencies]
+sp-io   = { workspace = true }
+sp-core = { workspace = true }

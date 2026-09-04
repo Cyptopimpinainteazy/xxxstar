@@ -1,0 +1,26 @@
+--- crates/x3-fees/src/curve.rs
++++ replace FeeCurve::capital_fee -> Amount with Default::default()
+@@ -42,22 +42,17 @@
+     /// Calculate the capital fee using log₂ scaling.
+     ///
+     /// ```text
+     /// CapitalFee = coefficient × log₂(capital + 1)
+     /// ```
+     ///
+     /// The +1 prevents log(0). Large capital pays more, but sub-linearly.
+     pub fn capital_fee(&self, capital: Amount) -> Amount {
+-        if capital == 0 {
+-            return 0;
+-        }
+-        // log₂(capital) ≈ 128 - leading_zeros for u128
+-        let log2 = 127u32.saturating_sub(capital.leading_zeros());
+-        self.config.capital_coefficient.saturating_mul(log2 as u128)
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Calculate the reputation discount.
+     ///
+     /// ```text
+     /// Discount = min(success_rate × age_factor, max_discount)
+     /// ```
+     ///

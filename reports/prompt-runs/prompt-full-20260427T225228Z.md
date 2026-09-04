@@ -1,0 +1,266 @@
+# X3 Full-Stack Build Execution Prompt (No Missing Features)
+
+Use this exact prompt with your coding agent to force a complete, verifiable full-stack build for X3 v0.4 scope.
+
+---
+
+You are an execution agent working inside the X3 repository. Your job is to **build the full stack end-to-end with no silent omissions**.
+
+## 0) Mission and output contract
+
+Mission:
+- Implement and wire all feature modules listed in section 3.
+- Ensure runtime integration is real (not placeholder references).
+- Ensure tests and gates prove behavior.
+- Do not claim completion unless the verification checklist passes.
+
+Output contract (mandatory):
+1. Apply code changes directly in the repo.
+2. At the end, produce a machine-readable completion report at `reports/full_stack_build_report.json`.
+3. Also produce a human report at `reports/full_stack_build_report.md`.
+4. If any module cannot be completed, mark it `blocked` with root cause, exact file paths, and minimal next action.
+
+No fake completion. No "done" without proof.
+
+## 1) Hard rules
+
+1. No stubs in production paths:
+- Do not leave `todo!()`, `unimplemented!()`, panic-driven control flow, or fake-return placeholders in shipping paths.
+
+2. No silent skips:
+- If a requirement cannot be delivered, stop and report blocker details.
+
+3. No test weakening:
+- Do not remove assertions to get green.
+- Fix root causes.
+
+4. Preserve consensus/runtime safety:
+- Treat `runtime`, `pallets`, `node`, bridge, router, supply ledger paths as high-risk.
+- Use minimal, auditable patches for those areas.
+
+5. Build evidence-first:
+- Every implemented module must have compile proof, wiring proof, and test proof.
+
+## 2) Execution strategy
+
+Execute in this order (fail-closed between phases):
+1. Baseline inventory and wiring audit
+2. Core missing modules implementation
+3. Runtime + router + kernel wiring
+4. Launch-gate and readiness hardening
+5. Full verification suite
+6. Final evidence report generation
+
+## 3) Required module matrix (full-stack target)
+
+You must deliver all items below. For each, include:
+- implementation files
+- integration wiring files
+- tests
+- verification evidence in final report
+
+### 3.1 Core protocol layers
+
+1. `x3-packet-standard`
+- Required capabilities:
+  - packet id/domain separation
+  - sequence and replay protection
+  - ack handling
+  - timeout handling
+  - refund path
+  - commitment/proof hash lifecycle
+- Required files (at minimum):
+  - `crates/x3-packet-standard/Cargo.toml`
+  - `crates/x3-packet-standard/src/lib.rs`
+  - `crates/x3-packet-standard/src/packet.rs`
+  - `crates/x3-packet-standard/src/replay.rs`
+  - `crates/x3-packet-standard/src/timeout.rs`
+  - `crates/x3-packet-standard/src/proof.rs`
+  - tests + property tests + fuzz targets
+
+2. `x3-ixl`
+- Required capabilities:
+  - instruction types/opcodes
+  - planner
+  - interpreter
+  - receipt generation
+  - rollback semantics
+  - verifier path
+- Required files (at minimum):
+  - `crates/x3-ixl/Cargo.toml`
+  - `crates/x3-ixl/src/lib.rs`
+  - `crates/x3-ixl/src/instruction.rs`
+  - `crates/x3-ixl/src/planner.rs`
+  - `crates/x3-ixl/src/interpreter.rs`
+  - `crates/x3-ixl/src/receipt.rs`
+  - `crates/x3-ixl/src/rollback.rs`
+  - `crates/x3-ixl/src/verifier.rs`
+  - tests + property tests + fuzz targets
+
+### 3.2 Runtime and pallet integration
+
+3. Cross-VM router integration
+- Wire packet + IXL into `pallets/x3-cross-vm-router` real call path.
+- Keep internal-only constraints explicit if external gateway remains gated.
+- Required files:
+  - `pallets/x3-cross-vm-router/src/lib.rs`
+  - `pallets/x3-cross-vm-router/src/tests.rs`
+  - `pallets/x3-cross-vm-router/src/runtime_api.rs`
+
+4. Kernel and supply path hardening
+- Ensure kernel/atomic kernel/supply ledger invariants are enforced with tests.
+- Resolve TODO/FIXME in critical health paths or explicitly block release with proof.
+- Required files:
+  - `pallets/x3-atomic-kernel/src/lib.rs`
+  - `pallets/x3-atomic-kernel/src/tests.rs`
+  - `pallets/x3-supply-ledger/src/lib.rs`
+  - `pallets/x3-supply-ledger/src/tests.rs`
+
+5. Runtime wiring completeness
+- Ensure all required pallets/crates are actually wired in runtime and feature flags.
+- Required files:
+  - `runtime/Cargo.toml`
+  - `runtime/src/lib.rs`
+
+### 3.3 Supporting product layers
+
+6. Liquidity layer consolidation (`x3-liquidity-core`)
+- Implement or wrap required spot-settlement path with tests.
+
+7. Universal contracts facade (`x3-universal-contracts`)
+- Provide developer-facing action/intent SDK facade without duplicating core logic.
+
+8. External gateway (`x3-external-liquidity-gateway`)
+- Implement adapters and attestation/refund path.
+- If not launch-enabled, keep feature-gated but fully implemented and testable.
+
+9. Integrated services (`x3-integrated-services`)
+- Deliver coherent wrappers for oracle/risk/automation/keeper routes.
+
+10. Parallel executor (`x3-parallel-executor`)
+- Implement deterministic design with serial-equivalence tests.
+
+11. AppZone factory (`x3-appzone-factory`)
+- Implement CLI + template/deploy/registry path.
+
+12. PQ integration (`x3-pq` or equivalent integration path)
+- Integrate post-quantum functionality into identity/key path with tests.
+
+13. Readiness reporting (`x3-readiness-report`)
+- Remove hardcoded status.
+- Implement real collectors and tri-state truthfulness.
+- Must not claim ready when data is unavailable.
+
+## 4) CI and launch-gate requirements
+
+All must pass:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo check --workspace --all-targets
+cargo test --workspace --lib --tests -- --test-threads=1
+```
+
+Critical package tests (minimum):
+
+```bash
+cargo test -p x3-packet-standard
+cargo test -p x3-ixl
+cargo test -p x3-readiness-report
+cargo test -p pallet-x3-cross-vm-router --lib
+cargo test -p pallet-x3-supply-ledger
+cargo test -p pallet-x3-atomic-kernel
+cargo test -p pallet-x3-asset-registry
+```
+
+Hazard gate and suppression policy:
+
+```bash
+bash launch-gates/validate-embarrassment-suppressions.sh launch-gates/embarrassment-suppressions.conf
+STRICT=1 STRICT_P2=1 BLOCK_P2_CATEGORIES='DEV LOCALHOST' \
+SUPPRESSIONS_FILE='launch-gates/embarrassment-suppressions.conf' \
+SCAN_PATHS='crates/x3-packet-standard crates/x3-ixl crates/x3-readiness-report pallets/x3-cross-vm-router' \
+bash launch-gates/embarrassment-scan.sh
+```
+
+Evidence summary generation:
+
+```bash
+bash launch-gates/summarize-embarrassment-evidence.sh launch-gates/evidence/ci launch-gates/evidence/ci/embarrassment-evidence-summary.md
+```
+
+## 5) Required tests beyond unit tests
+
+Mandatory before final completion:
+1. Property tests for packet replay/timeout/refund + IXL rollback determinism.
+2. Fuzz targets for packet decode/replay + IXL instruction path.
+3. E2E integration for internal atomic route (happy + failure paths).
+4. Fault-injection tests for timeout/refund/replay rejection.
+5. Runtime wiring test proving route reaches intended ledger/state transitions.
+
+## 6) Definition of done (strict)
+
+Task is done only when all are true:
+1. All module entries in section 3 are implemented or explicitly marked blocked with root cause.
+2. Runtime/pallet wiring is present and tested.
+3. Commands in section 4 pass.
+4. Required tests in section 5 pass.
+5. No production-path placeholders remain.
+6. Report files created:
+- `reports/full_stack_build_report.json`
+- `reports/full_stack_build_report.md`
+
+## 7) Final report schema (JSON)
+
+Write `reports/full_stack_build_report.json` with this structure:
+
+```json
+{
+  "timestamp_utc": "string",
+  "git_head": "string",
+  "overall_status": "complete|partial|blocked",
+  "modules": [
+    {
+      "name": "x3-packet-standard",
+      "status": "complete|partial|blocked",
+      "files_changed": ["path"],
+      "wiring_paths": ["path"],
+      "tests_added_or_updated": ["path"],
+      "verification": {
+        "build": "pass|fail",
+        "tests": "pass|fail",
+        "notes": "string"
+      },
+      "blocker": {
+        "reason": "string",
+        "next_action": "string"
+      }
+    }
+  ],
+  "ci_gate": {
+    "fmt": "pass|fail",
+    "clippy": "pass|fail",
+    "check": "pass|fail",
+    "tests": "pass|fail",
+    "hazard_scan": "pass|fail"
+  },
+  "open_risks": [
+    {
+      "severity": "P0|P1|P2",
+      "description": "string",
+      "owner": "string"
+    }
+  ]
+}
+```
+
+## 8) Mandatory behavior during execution
+
+1. Work module-by-module and keep an explicit checklist.
+2. Do not skip modules because they are hard.
+3. If blocked, produce precise blocker proof with paths and failing command outputs.
+4. Prefer minimal, production-real patches over broad refactors.
+5. Keep consensus/runtime safety first.
+
+Now execute.

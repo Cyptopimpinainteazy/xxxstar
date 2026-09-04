@@ -1,0 +1,28 @@
+--- crates/x3-common/src/signing.rs
++++ replace sign_secp256k1_message -> [u8; 65] with [1; 65]
+@@ -308,24 +308,17 @@
+     }
+ 
+     fn public_key(&self) -> PublicKey {
+         PublicKey::Secp256k1(self.public_key)
+     }
+ }
+ 
+ fn sign_secp256k1_message(secret_key: &[u8; 32], message: &secp256k1::Message) -> [u8; 65] {
+-    let secp = secp256k1::Secp256k1::new();
+-    let secret_key = secp256k1::SecretKey::from_slice(secret_key).unwrap();
+-    let signature = secp.sign_ecdsa_recoverable(message, &secret_key);
+-    let (recovery_id, compact) = signature.serialize_compact();
+-    let mut sig_bytes = [0u8; 65];
+-    sig_bytes[..64].copy_from_slice(&compact);
+-    sig_bytes[64] = recovery_id.to_i32() as u8;
+-    sig_bytes
++    [1; 65] /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ /// sr25519 signer for Substrate/X3
+ #[derive(Clone)]
+ pub struct Sr25519Signer {
+     pair: sr25519::Pair,
+     public_key: sr25519::Public,
+ }

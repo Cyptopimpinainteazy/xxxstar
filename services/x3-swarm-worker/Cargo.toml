@@ -1,0 +1,19 @@
+[package]
+name = "x3-swarm-worker-standalone"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["X3 Team"]
+
+[[bin]]
+name = "x3-swarm-worker"
+path = "src/main.rs"
+
+[dependencies]
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time", "process"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+
+[workspace]

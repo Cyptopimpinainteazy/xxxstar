@@ -1,0 +1,31 @@
+# X3 Router Configuration
+
+# Ollama connection
+ollama_host: "http://localhost:11434"
+
+# Router settings
+router_port: 11435
+default_model: "lojak/cryptomaster"
+routing_mode: "keyword"  # "keyword" (fast) or "llm" (future: uses a small model to classify)
+
+# Logging
+log_routing: true
+log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# Reviewer pass
+reviewer_pass: false  # If true, send output to reviewer model after primary (doubles latency)
+
+# Classification
+min_score_threshold: 0  # Minimum keyword score to override default model
+registry_path: "model_registry.yaml"  # Path to model registry (relative to this file)
+
+# CORS
+cors_origins:
+  - "*"
+cors_methods:
+  - "GET"
+  - "POST"
+  - "OPTIONS"
+cors_headers:
+  - "Content-Type"
+  - "X-X3-Model"

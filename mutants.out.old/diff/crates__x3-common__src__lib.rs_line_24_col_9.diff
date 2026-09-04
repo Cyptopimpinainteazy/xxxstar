@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ replace Span::dummy -> Self with Default::default()
+@@ -16,17 +16,17 @@
+ 
+ impl Span {
+     pub const fn new(start: usize, end: usize) -> Self {
+         Self { start, end }
+     }
+ 
+     /// Create a dummy span for testing purposes.
+     pub const fn dummy() -> Self {
+-        Self { start: 0, end: 0 }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     pub fn merge(self, other: Span) -> Self {
+         Self {
+             start: self.start.min(other.start),
+             end: self.end.max(other.end),
+         }
+     }

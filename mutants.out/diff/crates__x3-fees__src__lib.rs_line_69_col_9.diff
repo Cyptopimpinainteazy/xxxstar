@@ -1,0 +1,23 @@
+--- crates/x3-fees/src/lib.rs
++++ replace Eip1559FeeMarket::split_fee -> (u128, u128) with (0, 0)
+@@ -61,19 +61,17 @@
+                 .saturating_mul(decrease_factor.deconstruct() as u64)
+                 / 1_000_000;
+             self.base_fee = self.base_fee.saturating_sub(decrease as u128);
+         }
+     }
+ 
+     /// Split fee: 70% burn, 30% to validators
+     pub fn split_fee(&self, total_fee: u128) -> (u128, u128) {
+-        let burn = (total_fee * 70) / 100;
+-        let validator = total_fee - burn;
+-        (burn, validator)
++        (0, 0) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Commit-reveal proof for MEV protection
+ #[derive(Clone, Debug)]
+ pub struct CommitRevealProof {
+     /// BLAKE2-256 hash of transaction data
+     pub commit_hash: [u8; 32],

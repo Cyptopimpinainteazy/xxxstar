@@ -1,0 +1,17 @@
+[package]
+name = "x3-bitcoin-vault"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Bitcoin vault with threshold multisig, UTXO tracking, and SPV verification"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+sha2 = { workspace = true }
+ripemd = "0.1"
+hex = { workspace = true }
+scale-info = { workspace = true }
+codec = { workspace = true }

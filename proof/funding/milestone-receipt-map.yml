@@ -1,0 +1,112 @@
+# X3 funding → milestone → deliverable → proof receipt linkage.
+#
+# Authoritative map consumed by proof-forge (verify_funding) and
+# formal-proofs/tla/funding/MilestoneReceipts.tla.
+#
+# Contract enforced by the runner:
+#   • At least one milestone.
+#   • Every milestone has unique id, non-empty deliverable, funding_ask_usd > 0,
+#     and a receipt path that exists.
+#   • Every referenced receipt must itself have result.status == "verified".
+#
+# Adding a new funding ask: append a milestone, run the deliverable to VERIFIED
+# in proof-forge, then re-run `x3-proof verify x3.funding.milestone_receipts`.
+
+milestones:
+  - id: M1.asset-kernel-supply-safety
+    funding_ask_usd: 60000
+    deliverable: >
+      Conservation-safe asset kernel: cryptographic proof that no minting,
+      double-spend, or balance drift can occur, with adversarial supply tests.
+    receipt: proof/receipts/claims/x3.asset_kernel.supply_conservation.receipt.json
+
+  - id: M2.atomic-cross-vm-state
+    funding_ask_usd: 75000
+    deliverable: >
+      Atomic cross-VM execution: terminal-state uniqueness and failure-rollback
+      safety enforced across EVM and SVM lanes.
+    receipt: proof/receipts/claims/x3.atomic.one_terminal_state.receipt.json
+
+  - id: M3.atomic-rollback-safety
+    funding_ask_usd: 35000
+    deliverable: >
+      Rollback-safety harness proving no partial commit can survive a reverted
+      cross-VM atomic transaction.
+    receipt: proof/receipts/claims/x3.atomic.rollback_safety.receipt.json
+
+  - id: M4.bridge-finality-verification
+    funding_ask_usd: 90000
+    deliverable: >
+      Bridge finality verification: light-client / receipt verification of
+      foreign-chain finality before crediting on X3.
+    receipt: proof/receipts/claims/x3.bridge.finality_verification.receipt.json
+
+  - id: M5.bridge-replay-protection
+    funding_ask_usd: 45000
+    deliverable: >
+      Bridge replay protection: nonce/digest gating that makes a replayed
+      cross-chain message un-credit-able.
+    receipt: proof/receipts/claims/x3.bridge.replay_protection.receipt.json
+
+  - id: M6.evm-svm-parity
+    funding_ask_usd: 80000
+    deliverable: >
+      EVM ↔ SVM byte-for-byte parity engine with a vector-driven harness so
+      both VMs produce identical state transitions on shared inputs.
+    receipt: proof/receipts/claims/x3.contracts.evm_svm_parity.receipt.json
+
+  - id: M7.flashloan-repay-or-revert
+    funding_ask_usd: 40000
+    deliverable: >
+      Flash-loan settlement invariant: every loan either repays in the same
+      atomic envelope or the entire envelope reverts.
+    receipt: proof/receipts/claims/x3.flashloan.repay_or_revert.receipt.json
+
+  - id: M8.flashloan-attack-resistance
+    funding_ask_usd: 70000
+    deliverable: >
+      Adversarial flash-loan suite that proves resistance to known DeFi
+      attack patterns (re-entrancy, oracle pump, sandwich, drain).
+    receipt: proof/receipts/claims/x3.flashloans.attack_resistance.receipt.json
+
+  - id: M9.governance-proof-gated-upgrade
+    funding_ask_usd: 55000
+    deliverable: >
+      Proof-gated runtime upgrades: no on-chain code change can land without
+      a passing proof-forge receipt referenced in the upgrade proposal.
+    receipt: proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json
+
+  - id: M10.gpu-cpu-parity
+    funding_ask_usd: 65000
+    deliverable: >
+      Cross-implementation parity: GPU and CPU execution paths produce
+      bit-identical results on shared inputs (validator portability).
+    receipt: proof/receipts/claims/x3.gpu.cpu_gpu_parity.receipt.json
+
+  - id: M11.developer-onboarding-ttfv
+    funding_ask_usd: 25000
+    deliverable: >
+      Measured developer time-to-first-value harness: a fresh clone can
+      build proof-forge and verify two real claims under a wall-clock budget.
+    receipt: proof/receipts/claims/x3.onboarding.developer_first_value.receipt.json
+
+  - id: M12.proofforge-receipt-integrity
+    funding_ask_usd: 50000
+    deliverable: >
+      Receipt-integrity guarantee: tamper of any receipt field invalidates the
+      receipt's signature so consumers cannot be fooled by edited proofs.
+    receipt: proof/receipts/claims/x3.proofforge.receipt_integrity.receipt.json
+
+  - id: M13.x3lang-compiler-reproducibility
+    funding_ask_usd: 45000
+    deliverable: >
+      X3-Lang compiler reproducibility: identical sources produce identical
+      compiled artifacts across hosts and runs.
+    receipt: proof/receipts/claims/x3.x3lang.compiler_reproducibility.receipt.json
+
+  - id: M14.x3vm-determinism
+    funding_ask_usd: 60000
+    deliverable: >
+      X3-VM determinism: identical inputs always produce identical outputs and
+      identical state transitions across nodes.
+    receipt: proof/receipts/claims/x3.x3vm.determinism.receipt.json

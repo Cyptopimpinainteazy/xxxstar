@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace FeeCurve::x3_optimization_discount -> Amount with Default::default()
+@@ -94,17 +94,17 @@
+             self.config.max_reputation_discount_bps,
+         );
+ 
+         (gross_fee * capped_bps as u128) / 10000
+     }
+ 
+     /// Apply the X3 optimization discount for native X3-lang code.
+     pub fn x3_optimization_discount(&self, gross_fee: Amount) -> Amount {
+-        (gross_fee * self.config.x3_optimization_discount_bps as u128) / 10000
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Apply the external bot penalty for non-X3 code.
+     pub fn external_bot_penalty(&self, gross_fee: Amount) -> Amount {
+         let penalty_bps = self.config.external_bot_penalty_bps.saturating_sub(10000);
+         (gross_fee * penalty_bps as u128) / 10000
+     }
+ 

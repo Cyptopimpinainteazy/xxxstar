@@ -1,0 +1,38 @@
+[relaychain]
+default_command = "../target/release/x3-node"
+default_args = ["--no-telemetry", "--no-prometheus"]
+chain = "local"
+
+[[relaychain.nodes]]
+name = "alice"
+validator = true
+
+[[relaychain.nodes]]
+name = "bob"
+validator = true
+
+[[relaychain.nodes]]
+name = "charlie"
+validator = true
+
+[[relaychain.nodes]]
+name = "dave"
+validator = true
+
+[[relaychain.nodes]]
+name = "eve"
+validator = true
+
+[[relaychain.nodes]]
+name = "ferdie"
+validator = true
+
+[[relaychain.nodes]]
+name = "grace"
+validator = true
+
+[[relaychain.nodes]]
+name = "rpc-node"
+validator = false
+rpc_port = 9944
+ws_port = 9945

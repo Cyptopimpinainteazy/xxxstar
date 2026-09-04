@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "mut" in Keyword::parse
+@@ -78,17 +78,17 @@
+     In,
+ }
+ 
+ impl Keyword {
+     pub fn parse(src: &str) -> Option<Self> {
+         match src {
+             "fn" => Some(Self::Fn),
+             "let" => Some(Self::Let),
+-            "mut" => Some(Self::Mut),
++             /* ~ changed by cargo-mutants ~ */
+             "if" => Some(Self::If),
+             "else" => Some(Self::Else),
+             "while" => Some(Self::While),
+             "loop" => Some(Self::Loop),
+             "for" => Some(Self::For),
+             "return" => Some(Self::Return),
+             "break" => Some(Self::Break),
+             "continue" => Some(Self::Continue),

@@ -1,0 +1,31 @@
+--- crates/x3-fees/src/calculator.rs
++++ replace FeeCalculator::compare_x3_vs_external -> Result<(Amount, Amount, Amount), FeeError> with Ok((Default::default(), Default::default(), Default::default()))
+@@ -109,27 +109,17 @@
+ 
+     /// Compare the fee between an X3-optimized and external bot execution.
+     /// Returns (x3_fee, external_fee, savings).
+     pub fn compare_x3_vs_external(
+         &self,
+         params: &ExecutionParams,
+         reputation: &AgentReputation,
+     ) -> Result<(Amount, Amount, Amount), FeeError> {
+-        let mut x3_params = params.clone();
+-        x3_params.x3_optimized = true;
+-        let x3_fees = self.calculate(&x3_params, reputation)?;
+-
+-        let mut ext_params = params.clone();
+-        ext_params.x3_optimized = false;
+-        let ext_fees = self.calculate(&ext_params, reputation)?;
+-
+-        let savings = ext_fees.total.saturating_sub(x3_fees.total);
+-
+-        Ok((x3_fees.total, ext_fees.total, savings))
++        Ok((Default::default(), Default::default(), Default::default())) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Get the underlying fee curve.
+     pub fn curve(&self) -> &FeeCurve {
+         &self.curve
+     }
+ }
+ 

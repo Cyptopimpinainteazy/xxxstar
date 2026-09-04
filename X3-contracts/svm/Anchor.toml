@@ -1,0 +1,33 @@
+[toolchain]
+anchor_version = "0.30.1"
+solana_version = "1.18.17"
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+x3_core = "X3CoreFL11111111111111111111111111111111111"
+x3_vm_erc20 = "X3VmERC201111111111111111111111111111111112"
+x3_external_gateway = "X3ExtGate1111111111111111111111111111111113"
+x3_kernel_bridge = "X3KernBri1111111111111111111111111111111114"
+x3_receipt_verifier = "X3RecptVr1111111111111111111111111111111115"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[workspace]
+members = [
+    "programs/x3_core",
+    "programs/x3_vm_erc20",
+    "programs/x3_external_gateway",
+    "programs/x3_kernel_bridge",
+    "programs/x3_receipt_verifier",
+]

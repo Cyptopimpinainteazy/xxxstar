@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X3STAR — If You Had Invested</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Archivo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050E07;--card:#0A1A0D;--panel:#0F2214;
+  --green:#00C853;--green2:#69F0AE;--green3:#B9F6CA;
+  --gold:#FFD54F;--gold2:#FFF176;
+  --white:#F1FFF4;--muted:rgba(241,255,244,0.35);--dim:rgba(0,200,83,0.06);
+  --border:rgba(0,200,83,0.15);
+  --body:'Archivo',sans-serif;--display:'Cormorant Garamond',serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--white);font-family:var(--body);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(0,100,30,0.2),transparent),
+  radial-gradient(ellipse 30% 40% at 80% 80%,rgba(0,200,83,0.04),transparent);}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;height:58px;display:flex;align-items:center;
+  padding:0 40px;background:rgba(5,14,7,0.97);border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);}
+.logo{font-family:var(--display);font-size:22px;font-style:italic;font-weight:600;
+  letter-spacing:2px;color:var(--green2);margin-right:auto;}
+.nav-right{display:flex;gap:12px;}
+.nav-btn{padding:9px 24px;border-radius:6px;font-size:11px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;border:none;
+  font-family:var(--body);transition:all 0.2s;}
+.nb-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.nb-ghost:hover{border-color:var(--green);color:var(--green);}
+.nb-solid{background:var(--green);color:#000;}
+.nb-solid:hover{background:var(--green2);box-shadow:0 0 20px rgba(0,200,83,0.3);}
+
+/* HERO */
+.hero{text-align:center;padding:70px 40px 50px;position:relative;z-index:1;}
+.h-eyebrow{font-size:11px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px;}
+.h-title{font-family:var(--display);font-size:clamp(48px,7vw,96px);
+  font-style:italic;font-weight:600;line-height:0.95;margin-bottom:16px;
+  background:linear-gradient(180deg,var(--white) 0%,var(--green2) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.h-sub{font-size:16px;color:var(--muted);max-width:500px;margin:0 auto 40px;line-height:1.6;}
+
+/* INPUT BAR */
+.input-bar{display:flex;align-items:center;justify-content:center;gap:0;
+  max-width:520px;margin:0 auto 60px;
+  background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.ib-prefix{padding:0 16px;font-size:20px;color:var(--green);font-weight:700;
+  border-right:1px solid var(--border);}
+.ib-input{flex:1;background:transparent;border:none;outline:none;
+  padding:18px 16px;font-size:22px;font-weight:700;color:var(--white);
+  font-family:var(--display);font-style:italic;}
+.ib-input::placeholder{color:rgba(241,255,244,0.2);}
+.ib-btn{padding:0 28px;background:var(--green);color:#000;border:none;
+  font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  cursor:pointer;height:100%;font-family:var(--body);transition:all 0.2s;min-width:120px;}
+.ib-btn:hover{background:var(--green2);}
+
+/* ROUNDS GRID */
+.rounds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:16px;max-width:1100px;margin:0 auto;padding:0 40px 40px;position:relative;z-index:1;}
+
+/* ROUND CARD */
+.round-card{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:28px;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;}
+.round-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:0;transition:opacity 0.3s;}
+.round-card:hover::before{opacity:1;}
+.round-card:hover{transform:translateY(-4px);border-color:rgba(0,200,83,0.3);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+.round-card.past{opacity:0.9;}
+.round-card.current{border-color:var(--gold);background:linear-gradient(135deg,#0A1A0D,#12200A);}
+.round-card.current::before{opacity:1;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+
+.rc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;}
+.rc-round{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);}
+.rc-badge{font-size:9px;font-weight:700;letter-spacing:1.5px;padding:3px 10px;
+  border-radius:100px;text-transform:uppercase;}
+.rb-closed{background:rgba(255,255,255,0.06);color:var(--muted);border:1px solid rgba(255,255,255,0.08);}
+.rb-live{background:rgba(255,213,79,0.15);color:var(--gold);border:1px solid rgba(255,213,79,0.3);
+  animation:livePulse 2s infinite;}
+@keyframes livePulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 12px rgba(255,213,79,0.3)}}
+
+.rc-price{font-family:var(--display);font-size:14px;font-style:italic;color:var(--muted);
+  margin-bottom:4px;}
+.rc-result{font-family:var(--display);font-size:52px;font-weight:700;
+  line-height:1;margin-bottom:4px;}
+.rc-result.positive{background:linear-gradient(135deg,var(--green),var(--green2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.rc-result.future{background:linear-gradient(135deg,var(--gold),var(--gold2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.rc-invested{font-size:12px;color:var(--muted);margin-bottom:16px;}
+
+.rc-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.rcs-item{background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;text-align:center;}
+.rcs-val{font-family:var(--display);font-size:16px;font-weight:700;line-height:1;}
+.rcs-key{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-top:3px;}
+
+.rc-cta{margin-top:16px;width:100%;padding:13px;background:var(--green);color:#000;
+  border:none;border-radius:8px;font-size:11px;font-weight:800;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;font-family:var(--body);transition:all 0.2s;}
+.rc-cta:hover{background:var(--green2);}
+.rc-cta.gold-btn{background:linear-gradient(135deg,var(--gold),#FFB300);color:#000;}
+.rc-cta.gold-btn:hover{box-shadow:0 0 20px rgba(255,213,79,0.4);}
+
+/* SHARE CARD MODAL */
+.modal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.85);
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.modal.show{display:flex;}
+.share-card{background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:0;width:480px;overflow:hidden;}
+.sc-preview{background:linear-gradient(135deg,#0A1A0D,#031008);padding:40px;
+  text-align:center;border-bottom:1px solid var(--border);}
+.scp-eyebrow{font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+.scp-amount{font-family:var(--display);font-size:72px;font-weight:700;font-style:italic;
+  background:linear-gradient(135deg,var(--green),var(--green2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;margin-bottom:8px;}
+.scp-label{font-size:14px;color:var(--muted);margin-bottom:24px;}
+.scp-stats{display:flex;justify-content:center;gap:32px;}
+.scp-stat{text-align:center;}
+.scp-sval{font-family:var(--display);font-size:22px;font-weight:700;}
+.scp-skey{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:3px;}
+.sc-actions{padding:24px;}
+.sca-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:16px;}
+.share-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.sb-tw{padding:12px;background:rgba(29,155,240,0.15);border:1px solid rgba(29,155,240,0.3);
+  color:#1D9BF0;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-family:var(--body);}
+.sb-tw:hover{background:rgba(29,155,240,0.25);}
+.sb-copy{padding:12px;background:var(--dim);border:1px solid var(--border);
+  color:var(--muted);border-radius:8px;font-size:11px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-family:var(--body);}
+.sb-copy:hover{color:var(--white);}
+.sb-close{width:100%;padding:12px;background:transparent;border:1px solid rgba(255,255,255,0.08);
+  color:var(--muted);border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--body);}
+
+/* BOTTOM */
+.bottom-section{max-width:1100px;margin:0 auto;padding:20px 40px 80px;position:relative;z-index:1;}
+.bs-title{font-family:var(--display);font-size:32px;font-style:italic;margin-bottom:8px;}
+.bs-sub{font-size:14px;color:var(--muted);margin-bottom:24px;}
+.price-path{display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:8px;}
+.pp-item{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+.pp-node{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:var(--display);font-size:14px;font-weight:700;
+  border:2px solid;}
+.pp-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-top:6px;text-align:center;}
+.pp-arrow{font-size:20px;color:var(--border);flex-shrink:0;margin:0 4px;padding-bottom:20px;}
+.pp-done .pp-node{background:rgba(0,200,83,0.15);border-color:var(--green);color:var(--green);}
+.pp-live .pp-node{background:rgba(255,213,79,0.15);border-color:var(--gold);color:var(--gold);}
+.pp-next .pp-node{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:var(--muted);}
+</style>
+  <script src="js/x3-nav-loader.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="logo">X3STAR Investment Calculator</div>
+  <div class="nav-right">
+    <button class="nav-btn nb-ghost" onclick="location.href='x3star-roi-calculator.html'">Node ROI →</button>
+    <button class="nav-btn nb-solid" onclick="location.href='x3star-token-presale.html'">Buy Round III</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="h-eyebrow">The X3STAR Investment Calculator</div>
+  <h1 class="h-title">If you had invested...</h1>
+  <p class="h-sub">See exactly what any dollar amount put into any previous X3STAR round would be worth today — and what Round III could become.</p>
+  <div class="input-bar">
+    <div class="ib-prefix">$</div>
+    <input type="number" class="ib-input" id="inv-amount" placeholder="10,000" value="10000" oninput="recalcAll()">
+    <button class="ib-btn" onclick="recalcAll()">Calculate</button>
+  </div>
+</div>
+
+<!-- ROUNDS GRID -->
+<div class="rounds-grid" id="rounds-grid">
+  <!-- populated by JS -->
+</div>
+
+<!-- PRICE PATH -->
+<div class="bottom-section">
+  <h2 class="bs-title">The X3STAR price journey</h2>
+  <p class="bs-sub">Every round has multiplied early believers. Round III investors enter at $0.075.</p>
+  <div class="price-path">
+    <div class="pp-item pp-done"><div class="pp-node">$0.01</div><div class="pp-label">Seed<br>Q4 2023</div></div>
+    <div class="pp-arrow">→</div>
+    <div class="pp-item pp-done"><div class="pp-node">$0.03</div><div class="pp-label">Private I<br>Q1 2024</div></div>
+    <div class="pp-arrow">→</div>
+    <div class="pp-item pp-done"><div class="pp-node">$0.05</div><div class="pp-label">Series A<br>Q2 2024</div></div>
+    <div class="pp-arrow">→</div>
+    <div class="pp-item pp-live"><div class="pp-node">$0.075</div><div class="pp-label">Round III<br>Live Now</div></div>
+    <div class="pp-arrow">→</div>
+    <div class="pp-item pp-next"><div class="pp-node">$0.12</div><div class="pp-label">Public Sale<br>Q2 2025</div></div>
+    <div class="pp-arrow">→</div>
+    <div class="pp-item pp-next"><div class="pp-node">$?</div><div class="pp-label">CEX Listing<br>Q2 2025</div></div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="share-card">
+    <div class="sc-preview">
+      <div class="scp-eyebrow">If I had invested $<span id="sm-invested">10,000</span> in X3STAR <span id="sm-round">Seed Round</span></div>
+      <div class="scp-amount" id="sm-value">$84,200</div>
+      <div class="scp-label">would be my portfolio value today</div>
+      <div class="scp-stats">
+        <div class="scp-stat"><div class="scp-sval" style="color:var(--green)" id="sm-roi">+742%</div><div class="scp-skey">ROI</div></div>
+        <div class="scp-stat"><div class="scp-sval" id="sm-x">8.4×</div><div class="scp-skey">Multiple</div></div>
+        <div class="scp-stat"><div class="scp-sval" style="color:var(--gold)" id="sm-price">$0.0842</div><div class="scp-skey">X3S Today</div></div>
+      </div>
+    </div>
+    <div class="sc-actions">
+      <div class="sca-sub">Share your what-if result and tag us</div>
+      <div class="share-btns">
+        <button class="sb-tw" onclick="shareTwitter()">𝕏 Share on Twitter</button>
+        <button class="sb-copy" id="copy-btn" onclick="copyResult()">📋 Copy Text</button>
+      </div>
+      <button class="sb-close" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const X3S_NOW=0.0842;
+const rounds=[
+  {id:'seed',name:'Seed Round',date:'Q4 2023',price:0.010,status:'closed',
+   desc:'The earliest believers. Entry at $0.010 — the absolute ground floor.'},
+  {id:'private1',name:'Private Round I',date:'Q1 2024',price:0.030,status:'closed',
+   desc:'First institutional entry at $0.030. Still 65% below today\'s testnet price.'},
+  {id:'seriesa',name:'Series A',date:'Q2 2024',price:0.050,status:'closed',
+   desc:'$10.5M raised at $0.050. Testnet milestone hit. Now up 68% to today\'s price.'},
+  {id:'round3',name:'Round III',date:'Live Now',price:0.075,status:'live',
+   desc:'Final prefunding round before public listing. 73.5% filled. 46 Genesis nodes left.'},
+  {id:'public',name:'Public Sale',date:'Q2 2025',price:0.120,status:'next',
+   desc:'Projected public sale price. Enter now at $0.075 — 37.5% below next round.'},
+  {id:'cex',name:'CEX Listing Target',date:'Q2 2025',price:0.250,status:'projected',
+   desc:'Analyst target based on comparable L1 launches. Not guaranteed — illustrative only.'},
+];
+
+function fmt(n){
+  if(n>=1e6)return'$'+(n/1e6).toFixed(2)+'M';
+  if(n>=1e3)return'$'+Math.round(n).toLocaleString();
+  return'$'+n.toFixed(2);
+}
+
+let currentModal={};
+
+function recalcAll(){
+  const inv=parseFloat(document.getElementById('inv-amount').value)||10000;
+  document.getElementById('rounds-grid').innerHTML='';
+  rounds.forEach(r=>document.getElementById('rounds-grid').appendChild(makeRoundCard(r,inv)));
+}
+
+function makeRoundCard(r,inv){
+  const tokens=inv/r.price;
+  const nowVal=tokens*X3S_NOW;
+  const profit=nowVal-inv;
+  const roi=((nowVal-inv)/inv*100);
+  const mult=(nowVal/inv).toFixed(1);
+  const isLive=r.status==='live';
+  const isNext=r.status==='next'||r.status==='projected';
+
+  // For future rounds, show projected
+  const displayVal=isNext?fmt(tokens*r.price*(r.price===0.12?2.1:5)):fmt(nowVal);
+  const displayRoi=isNext?'+'+(r.price===0.12?110:430)+'% projected':'+'+Math.round(roi)+'%';
+  const displayMult=isNext?(r.price===0.12?'2.1×':'5×'):mult+'×';
+  const isPositive=nowVal>inv||isNext;
+
+  const div=document.createElement('div');
+  div.className='round-card'+(r.status==='closed'?' past':'')+(isLive?' current':'');
+  div.innerHTML=`
+    <div class="rc-head">
+      <div>
+        <div class="rc-round">${r.name}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">${r.date}</div>
+      </div>
+      <div class="rc-badge ${isLive?'rb-live':'rb-closed'}">${isLive?'● LIVE':r.status==='closed'?'CLOSED':r.status.toUpperCase()}</div>
+    </div>
+    <div class="rc-price">$${fmt(inv).replace('$','')} at $${r.price.toFixed(3)}/X3S = ${Math.round(tokens).toLocaleString()} tokens</div>
+    <div class="rc-result ${isPositive?'positive':'future'}">${displayVal}</div>
+    <div class="rc-invested">${isNext?'Projected value at listing':'Today\'s value at $'+X3S_NOW+'/X3S'}</div>
+    <div class="rc-stats">
+      <div class="rcs-item"><div class="rcs-val" style="color:var(--green)">${displayRoi}</div><div class="rcs-key">Return</div></div>
+      <div class="rcs-item"><div class="rcs-val">${displayMult}</div><div class="rcs-key">Multiple</div></div>
+      <div class="rcs-item"><div class="rcs-val" style="color:var(--muted)">${r.price==='closed'?'Closed':r.status==='closed'?'Closed':r.status==='live'?'Open':'Pending'}</div><div class="rcs-key">Status</div></div>
+    </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin:12px 0;">${r.desc}</p>
+    ${isLive?`<button class="rc-cta gold-btn" onclick="location.href='x3star-token-presale.html'">Buy Round III Now — $0.075 →</button>`
+      :isNext?`<button class="rc-cta" style="background:rgba(0,200,83,0.1);border:1px solid var(--border);color:var(--green);" onclick="location.href='x3star-token-presale.html'">Enter Round III at $0.075 instead →</button>`
+      :`<button class="rc-cta" onclick='showShare(${JSON.stringify({name:r.name,inv,val:displayVal,roi:displayRoi,mult:displayMult})})'>📤 Share This Result</button>`}
+  `;
+  return div;
+}
+
+function showShare(data){
+  currentModal=data;
+  document.getElementById('sm-invested').textContent=parseFloat(document.getElementById('inv-amount').value||10000).toLocaleString();
+  document.getElementById('sm-round').textContent=data.name;
+  document.getElementById('sm-value').textContent=data.val;
+  document.getElementById('sm-roi').textContent=data.roi;
+  document.getElementById('sm-x').textContent=data.mult;
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+function shareTwitter(){
+  const inv=document.getElementById('inv-amount').value||10000;
+  const txt=`If I had invested $${parseInt(inv).toLocaleString()} in the X3STAR ${currentModal.name}, I'd have ${currentModal.val} today (${currentModal.roi})\n\nRound III is still open at $0.075 — next round is $0.12\n\nhttps://x3star.io/?ref=calc\n#X3STAR #Crypto`;
+  window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(txt),'_blank');
+}
+function copyResult(){
+  const inv=document.getElementById('inv-amount').value||10000;
+  const txt=`If I had invested $${parseInt(inv).toLocaleString()} in the X3STAR ${currentModal.name}, I'd have ${currentModal.val} today (${currentModal.roi})\n\nRound III is open at $0.075 → https://x3star.io`;
+  navigator.clipboard?.writeText(txt);
+  document.getElementById('copy-btn').textContent='✓ Copied!';
+  setTimeout(()=>document.getElementById('copy-btn').textContent='📋 Copy Text',2000);
+}
+
+recalcAll();
+</script>
+<script src="js/x3-live-data.js"></script>
+</body>
+</html>

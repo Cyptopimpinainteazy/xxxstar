@@ -1,0 +1,72 @@
+{
+  "keccak256_gpu_batch_1024": {
+    "tps": 1450494,
+    "batch": 1024,
+    "ms_per_batch": 0.71
+  },
+  "keccak256_gpu_batch_4096": {
+    "tps": 9895199,
+    "batch": 4096,
+    "ms_per_batch": 0.41
+  },
+  "keccak256_gpu_batch_16384": {
+    "tps": 15668760,
+    "batch": 16384,
+    "ms_per_batch": 1.05
+  },
+  "keccak256_gpu_batch_65536": {
+    "tps": 33009426,
+    "batch": 65536,
+    "ms_per_batch": 1.99
+  },
+  "sha256_gpu_batch_1024": {
+    "tps": 4306797,
+    "batch": 1024,
+    "ms_per_batch": 0.24
+  },
+  "sha256_gpu_batch_4096": {
+    "tps": 16550966,
+    "batch": 4096,
+    "ms_per_batch": 0.25
+  },
+  "sha256_gpu_batch_16384": {
+    "tps": 25617047,
+    "batch": 16384,
+    "ms_per_batch": 0.64
+  },
+  "sha256_gpu_batch_65536": {
+    "tps": 50543604,
+    "batch": 65536,
+    "ms_per_batch": 1.3
+  },
+  "secp256k1_gpu_batch_256": {
+    "tps": 8563,
+    "batch": 256,
+    "ms_per_batch": 29.9
+  },
+  "secp256k1_gpu_batch_1024": {
+    "tps": 37794,
+    "batch": 1024,
+    "ms_per_batch": 27.09
+  },
+  "secp256k1_gpu_batch_4096": {
+    "tps": 89659,
+    "batch": 4096,
+    "ms_per_batch": 45.68
+  },
+  "ed25519_gpu_batch_1024": {
+    "tps": 27542,
+    "batch": 1024,
+    "ms_per_batch": 37.18
+  },
+  "ed25519_gpu_batch_4096": {
+    "tps": 82717,
+    "batch": 4096,
+    "ms_per_batch": 49.52
+  },
+  "ed25519_gpu_batch_16384": {
+    "tps": 113759,
+    "batch": 16384,
+    "ms_per_batch": 144.02
+  }
+}

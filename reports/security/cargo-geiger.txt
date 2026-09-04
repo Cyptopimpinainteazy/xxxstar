@@ -1,0 +1,1 @@
+manifest path `/home/x3star/Desktop/xxxstar-main/Cargo.toml` is a virtual manifest, but this command requires running against an actual package in this workspace

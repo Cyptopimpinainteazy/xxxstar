@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace FeeCurve::config -> &FeeConfig with Box::leak(Box::new(Default::default()))
+@@ -118,17 +118,17 @@
+     pub fn cross_chain_surcharge(&self, hops: u32) -> Amount {
+         self.config
+             .cross_chain_surcharge
+             .saturating_mul(hops as u128)
+     }
+ 
+     /// Get the fee configuration.
+     pub fn config(&self) -> &FeeConfig {
+-        &self.config
++        Box::leak(Box::new(Default::default())) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     #[test]

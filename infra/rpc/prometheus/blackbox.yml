@@ -1,0 +1,48 @@
+# Prometheus Blackbox Exporter Configuration
+# External probes for the X3 RPC Gateway.
+# Monitors from outside the infrastructure — catches gateway-level failures
+# that internal scraping might miss.
+
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [200, 204]
+      headers:
+        Host: rpc.x3-chain.io
+      fail_if_ssl: false
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+      preferred_ip_protocol: ip4
+
+  http_post_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body: '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
+      valid_status_codes: [200]
+      fail_if_ssl: false
+      fail_if_not_ssl: true
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+
+  websocket:
+    prober: http
+    timeout: 15s
+    http:
+      method: GET
+      headers:
+        Upgrade: websocket
+        Connection: upgrade
+      valid_status_codes: [101]
+      fail_if_not_ssl: true

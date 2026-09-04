@@ -1,0 +1,69 @@
+# X3 Test Tool Stack Configuration
+# Integration points for all testing tools
+
+[rust]
+# Core Rust/substrate testing tools
+tools = [
+    { name = "cargo-audit",   pkg = "cargo-audit",     version = "0.22.2", purpose = "CVE scanning" },
+    { name = "cargo-deny",    pkg = "cargo-deny",      version = "0.19.8", purpose = "License + advisory policy" },
+    { name = "cargo-mutants", pkg = "cargo-mutants",   version = "27.1.0", purpose = "Mutation testing" },
+    { name = "cargo-fuzz",    pkg = "cargo-fuzz",      version = "latest", purpose = "Coverage-guided fuzzing" },
+    { name = "cargo-nextest", pkg = "cargo-nextest",   version = "latest", purpose = "Next-gen test runner" },
+    { name = "cargo-geiger",  pkg = "cargo-geiger",    version = "latest", purpose = "Unsafe Rust auditing" },
+    { name = "cargo-llvm-cov",pkg = "cargo-llvm-cov",  version = "latest", purpose = "LLVM coverage reports" },
+    { name = "subwasm",       pkg = "subwasm",         version = "latest", purpose = "Runtime WASM inspection" },
+    { name = "aderyn",        pkg = "aderyn",          version = "latest", purpose = "Solidity static analysis" },
+    { name = "kani",          pkg = "kani-verifier",   version = "latest", purpose = "Bounded model checking" },
+]
+
+[dev_dependencies]
+# Crates to add as dev-dependencies for specific testing
+loom = { version = "0.7", purpose = "Concurrency interleaving tests" }
+shuttle = { version = "0.7", purpose = "Randomized async concurrency tests" }
+litesvm = { version = "0.1", purpose = "In-process SVM testing" }
+solana-program-test = { version = "1.18", purpose = "SBF program tests" }
+
+[evm]
+foundry_version = "latest"
+solidity_version = "0.8.20"
+
+[python]
+slither = { pip_package = "slither-analyzer" }
+
+[chaos]
+toxiproxy_version = "2.9.0"
+k6_version = "0.54.0"
+
+[substrate]
+try_runtime = { source = "workspace dep: frame-try-runtime" }
+frame_benchmarking = { source = "workspace dep: frame-benchmarking" }
+
+[ci_gates]
+# Each gate corresponds to a CI workflow step
+gates = [
+    { id = 0,  name = "compile",     command = "cargo check --workspace" },
+    { id = 1,  name = "unit",        command = "cargo test --workspace" },
+    { id = 2,  name = "coverage",    command = "cargo llvm-cov nextest --workspace --lcov --output-path lcov.info" },
+    { id = 3,  name = "security",    command = "cargo audit && cargo deny check" },
+    { id = 4,  name = "mutations",   command = "cargo mutants -p x3-asset-kernel -p x3-atomic-trade" },
+    { id = 5,  name = "fuzz",        command = "cargo fuzz run bridge_message_decode" },
+    { id = 6,  name = "substrate",   command = "try-runtime on-runtime-upgrade --checks all" },
+    { id = 7,  name = "evm",         command = "forge test && slither ." },
+    { id = 8,  name = "integration", command = "zombienet test tools/test-tool-stack/zombienet/x3-finality-smoke.zndsl" },
+    { id = 9,  name = "release",     command = "srtool build && subwasm diff" },
+]
+
+[p0_invariants]
+# Must-run invariants across multiple tool layers
+invariants = [
+    "canonical_supply == native + evm + svm + external_locked + pending",
+    "Atomic swap either fully commits or fully rolls back",
+    "Nonce cannot be reused across VM domains",
+    "Bridge message cannot execute twice",
+    "Finalized block numbers only move forward",
+    "Pending reservation survives restart",
+    "Runtime migration preserves balances and asset IDs",
+    "Same transaction replay gives same result",
+    "Max values do not overflow fees, shares, balances, weights",
+    "Governance emergency halt cannot steal funds",
+]

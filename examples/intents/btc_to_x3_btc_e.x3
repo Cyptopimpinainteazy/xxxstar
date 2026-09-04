@@ -1,0 +1,17 @@
+// X3 intent: bridge BTC to wrapped BTC.e on X3
+intent btc_bridge {
+    from btc.BTC amount 100000000 receiver bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq
+    to x3.BTC.e receiver bob.x3
+    
+    require finality btc >= 6
+    require proof btc.spv_proof
+    require max_fee <= 5000
+    
+    route {
+        best
+        allow "x3.btc-bridge"
+    }
+    
+    timeout 6h
+    on_fail refund_source
+}

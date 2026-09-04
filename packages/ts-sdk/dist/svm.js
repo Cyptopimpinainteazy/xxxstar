@@ -1,0 +1,409 @@
+"use strict";
+/**
+ * SVM (Solana VM) utilities for X3 Chain SDK
+ *
+ * Provides encoding, decoding, and conversion utilities for SVM interaction.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ASSOCIATED_TOKEN_PROGRAM_ID = exports.TOKEN_PROGRAM_ID = exports.SYSTEM_PROGRAM_ID = void 0;
+exports.isValidPubkey = isValidPubkey;
+exports.pubkeyToBytes = pubkeyToBytes;
+exports.bytesToPubkey = bytesToPubkey;
+exports.zeroPubkey = zeroPubkey;
+exports.accountIdToPubkey = accountIdToPubkey;
+exports.pubkeyToAccountId = pubkeyToAccountId;
+exports.findProgramAddress = findProgramAddress;
+exports.encodeCompactU16 = encodeCompactU16;
+exports.decodeCompactU16 = decodeCompactU16;
+exports.encodeInstruction = encodeInstruction;
+exports.encodeInstructionData = encodeInstructionData;
+exports.encodeU8 = encodeU8;
+exports.encodeU16 = encodeU16;
+exports.encodeU32 = encodeU32;
+exports.encodeU64 = encodeU64;
+exports.decodeU64 = decodeU64;
+exports.encodeString = encodeString;
+exports.encodeVec = encodeVec;
+exports.encodeOption = encodeOption;
+exports.encodeSystemTransfer = encodeSystemTransfer;
+exports.encodeTokenTransfer = encodeTokenTransfer;
+exports.createTransferAccounts = createTransferAccounts;
+exports.anchorDiscriminator = anchorDiscriminator;
+exports.anchorAccountDiscriminator = anchorAccountDiscriminator;
+const util_1 = require("@polkadot/util");
+const util_crypto_1 = require("@polkadot/util-crypto");
+const errors_1 = require("./errors");
+const constants_1 = require("./constants");
+const utils_1 = require("./utils");
+// =============================================================================
+// Pubkey Utilities
+// =============================================================================
+/**
+ * Validate a Solana pubkey
+ */
+function isValidPubkey(pubkey) {
+    if ((0, util_1.isHex)(pubkey)) {
+        const bytes = (0, util_1.hexToU8a)(pubkey);
+        return bytes.length === constants_1.SOLANA_PUBKEY_LENGTH;
+    }
+    // Check if base58 encoded (32-44 chars typically)
+    if (pubkey.length >= 32 && pubkey.length <= 44) {
+        // Base58 character set validation
+        const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
+        return base58Regex.test(pubkey);
+    }
+    return false;
+}
+/**
+ * Convert pubkey to bytes
+ */
+function pubkeyToBytes(pubkey) {
+    if ((0, util_1.isHex)(pubkey)) {
+        const bytes = (0, util_1.hexToU8a)(pubkey);
+        if (bytes.length !== constants_1.SOLANA_PUBKEY_LENGTH) {
+            throw new errors_1.ValidationError('pubkey', `Pubkey must be ${constants_1.SOLANA_PUBKEY_LENGTH} bytes`, bytes.length);
+        }
+        return bytes;
+    }
+    // Base58 decode for Solana-style pubkeys
+    const decoded = (0, utils_1.base58DecodeSolana)(pubkey);
+    if (decoded.length !== constants_1.SOLANA_PUBKEY_LENGTH) {
+        throw new errors_1.ValidationError('pubkey', `Pubkey must be ${constants_1.SOLANA_PUBKEY_LENGTH} bytes after decode`, decoded.length);
+    }
+    return decoded;
+}
+/**
+ * Convert bytes to pubkey
+ */
+function bytesToPubkey(bytes) {
+    if (bytes.length !== constants_1.SOLANA_PUBKEY_LENGTH) {
+        throw new errors_1.ValidationError('bytes', `Pubkey bytes must be ${constants_1.SOLANA_PUBKEY_LENGTH}`, bytes.length);
+    }
+    return (0, util_1.u8aToHex)(bytes);
+}
+/**
+ * Create a zero pubkey (system program)
+ */
+function zeroPubkey() {
+    return (0, util_1.u8aToHex)(new Uint8Array(constants_1.SOLANA_PUBKEY_LENGTH));
+}
+/**
+ * Convert Substrate AccountId to Solana pubkey
+ */
+function accountIdToPubkey(accountId) {
+    if ((0, util_1.isHex)(accountId)) {
+        const bytes = (0, util_1.hexToU8a)(accountId);
+        if (bytes.length === constants_1.ACCOUNT_ID_LENGTH) {
+            return (0, util_1.u8aToHex)(bytes);
+        }
+    }
+    throw new errors_1.ValidationError('accountId', 'Invalid AccountId format');
+}
+/**
+ * Convert Solana pubkey to Substrate AccountId
+ */
+function pubkeyToAccountId(pubkey) {
+    const bytes = pubkeyToBytes(pubkey);
+    return (0, util_1.u8aToHex)(bytes);
+}
+/**
+ * Derive program address (PDA)
+ * Uses SHA256 seed hashing; curve validation is intentionally simplified.
+ */
+function findProgramAddress(seeds, programId) {
+    const programBytes = pubkeyToBytes(programId);
+    for (let bump = 255; bump >= 0; bump--) {
+        const allSeeds = [...seeds, new Uint8Array([bump])];
+        const hash = simpleHash(programBytes, allSeeds);
+        // Check if on curve (ed25519)
+        // A point is on the ed25519 curve if its high bit is 0 (little-endian)
+        // For PDA derivation, we need to check if the hash represents a valid ed25519 point
+        const highBitSet = (hash[31] & 0x80) !== 0;
+        if (highBitSet) {
+            // Point is not on curve, continue to next bump
+            continue;
+        }
+        return {
+            address: (0, util_1.u8aToHex)(hash),
+            bump,
+        };
+    }
+    throw new Error('Unable to find valid PDA');
+}
+// =============================================================================
+// Instruction Encoding
+// =============================================================================
+/**
+ * Encode a compact u16 length
+ */
+function encodeCompactU16(value) {
+    if (value < 0 || value > 65535) {
+        throw new errors_1.ValidationError('value', 'Compact u16 out of range', value);
+    }
+    if (value < 128) {
+        return new Uint8Array([value]);
+    }
+    else if (value < 16384) {
+        return new Uint8Array([
+            (value & 0x7f) | 0x80,
+            value >> 7,
+        ]);
+    }
+    else {
+        return new Uint8Array([
+            (value & 0x7f) | 0x80,
+            ((value >> 7) & 0x7f) | 0x80,
+            value >> 14,
+        ]);
+    }
+}
+/**
+ * Decode a compact u16 length
+ */
+function decodeCompactU16(bytes, offset = 0) {
+    let value = 0;
+    let shift = 0;
+    let len = 0;
+    while (offset + len < bytes.length) {
+        const byte = bytes[offset + len];
+        value |= (byte & 0x7f) << shift;
+        len++;
+        if ((byte & 0x80) === 0) {
+            break;
+        }
+        shift += 7;
+        if (len > 3) {
+            throw new errors_1.ValidationError('bytes', 'Invalid compact u16 encoding');
+        }
+    }
+    return {
+        value,
+        bytes: bytes.slice(offset, offset + len),
+    };
+}
+/**
+ * Encode an instruction
+ */
+function encodeInstruction(instruction) {
+    const parts = [];
+    // Program ID index (we'll use 0 as placeholder - real encoding needs account list)
+    parts.push(new Uint8Array([0]));
+    // Account indices (compact array)
+    parts.push(encodeCompactU16(instruction.accounts.length));
+    for (const _account of instruction.accounts) {
+        // Account index placeholder
+        parts.push(new Uint8Array([0]));
+    }
+    // Data (compact array)
+    parts.push(encodeCompactU16(instruction.data.length));
+    parts.push(instruction.data);
+    // Combine all parts
+    const totalLength = parts.reduce((sum, p) => sum + p.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const part of parts) {
+        result.set(part, offset);
+        offset += part.length;
+    }
+    return result;
+}
+/**
+ * Encode instruction data with discriminator
+ */
+function encodeInstructionData(discriminator, params) {
+    const disc = discriminator instanceof Uint8Array
+        ? discriminator
+        : new Uint8Array(discriminator);
+    const totalLength = disc.length + params.reduce((sum, p) => sum + p.length, 0);
+    const result = new Uint8Array(totalLength);
+    result.set(disc, 0);
+    let offset = disc.length;
+    for (const param of params) {
+        result.set(param, offset);
+        offset += param.length;
+    }
+    return result;
+}
+// =============================================================================
+// Data Type Encoding
+// =============================================================================
+/**
+ * Encode a u8
+ */
+function encodeU8(value) {
+    if (value < 0 || value > 255) {
+        throw new errors_1.ValidationError('value', 'u8 out of range', value);
+    }
+    return new Uint8Array([value]);
+}
+/**
+ * Encode a u16 (little-endian)
+ */
+function encodeU16(value) {
+    if (value < 0 || value > 65535) {
+        throw new errors_1.ValidationError('value', 'u16 out of range', value);
+    }
+    return new Uint8Array([value & 0xff, value >> 8]);
+}
+/**
+ * Encode a u32 (little-endian)
+ */
+function encodeU32(value) {
+    if (value < 0 || value > 0xffffffff) {
+        throw new errors_1.ValidationError('value', 'u32 out of range', value);
+    }
+    return new Uint8Array([
+        value & 0xff,
+        (value >> 8) & 0xff,
+        (value >> 16) & 0xff,
+        (value >> 24) & 0xff,
+    ]);
+}
+/**
+ * Encode a u64 (little-endian)
+ */
+function encodeU64(value) {
+    if (value < 0n || value >= 2n ** 64n) {
+        throw new errors_1.ValidationError('value', 'u64 out of range', value);
+    }
+    const bytes = new Uint8Array(8);
+    let remaining = value;
+    for (let i = 0; i < 8; i++) {
+        bytes[i] = Number(remaining & 0xffn);
+        remaining = remaining >> 8n;
+    }
+    return bytes;
+}
+/**
+ * Decode a u64 (little-endian)
+ */
+function decodeU64(bytes) {
+    if (bytes.length !== 8) {
+        throw new errors_1.ValidationError('bytes', 'u64 must be 8 bytes', bytes.length);
+    }
+    let value = 0n;
+    for (let i = 7; i >= 0; i--) {
+        value = (value << 8n) | BigInt(bytes[i]);
+    }
+    return value;
+}
+/**
+ * Encode a string (with length prefix)
+ */
+function encodeString(str) {
+    const encoder = new TextEncoder();
+    const strBytes = encoder.encode(str);
+    // 4-byte length prefix (u32 little-endian)
+    const length = encodeU32(strBytes.length);
+    const result = new Uint8Array(4 + strBytes.length);
+    result.set(length, 0);
+    result.set(strBytes, 4);
+    return result;
+}
+/**
+ * Encode a vector/array
+ */
+function encodeVec(items, encodeItem) {
+    const encoded = items.map(encodeItem);
+    // 4-byte length prefix
+    const length = encodeU32(items.length);
+    const dataLength = encoded.reduce((sum, e) => sum + e.length, 0);
+    const result = new Uint8Array(4 + dataLength);
+    result.set(length, 0);
+    let offset = 4;
+    for (const item of encoded) {
+        result.set(item, offset);
+        offset += item.length;
+    }
+    return result;
+}
+/**
+ * Encode an optional value
+ */
+function encodeOption(value, encodeValue) {
+    if (value === null || value === undefined) {
+        return new Uint8Array([0]); // None
+    }
+    const encoded = encodeValue(value);
+    const result = new Uint8Array(1 + encoded.length);
+    result[0] = 1; // Some
+    result.set(encoded, 1);
+    return result;
+}
+// =============================================================================
+// Common Program Interfaces
+// =============================================================================
+/**
+ * System program ID
+ */
+exports.SYSTEM_PROGRAM_ID = zeroPubkey();
+/**
+ * Token program ID (SPL Token)
+ */
+exports.TOKEN_PROGRAM_ID = '0x' + '06ddf6e1d765a193d9cbe146ceeb79ac1cb485ed5f5b37913a8cf5857eff00a9';
+/**
+ * Associated Token program ID
+ */
+exports.ASSOCIATED_TOKEN_PROGRAM_ID = '0x' + '8c97258f4e2489f1bb3d1029148e0d830b5a1399daff1084048e7bd8dbe9f859';
+/**
+ * Encode a transfer instruction (System program)
+ */
+function encodeSystemTransfer(amount) {
+    // System program transfer discriminator: 2 (u32)
+    return encodeInstructionData(encodeU32(2), [encodeU64(amount)]);
+}
+/**
+ * Encode a SPL Token transfer instruction
+ */
+function encodeTokenTransfer(amount) {
+    // SPL Token transfer discriminator: 3
+    return encodeInstructionData([3], [encodeU64(amount)]);
+}
+/**
+ * Create account metas for a transfer
+ */
+function createTransferAccounts(from, to) {
+    return [
+        { pubkey: from, isSigner: true, isWritable: true },
+        { pubkey: to, isSigner: false, isWritable: true },
+    ];
+}
+// =============================================================================
+// Anchor Discriminator
+// =============================================================================
+/**
+ * Compute Anchor instruction discriminator
+ * Discriminator is first 8 bytes of SHA256("global:<instruction_name>")
+ */
+function anchorDiscriminator(instructionName) {
+    const input = `global:${instructionName}`;
+    const hash = (0, util_crypto_1.sha256AsU8a)(new TextEncoder().encode(input));
+    return hash.slice(0, 8);
+}
+/**
+ * Compute Anchor account discriminator
+ * Discriminator is first 8 bytes of SHA256("account:<AccountName>")
+ */
+function anchorAccountDiscriminator(accountName) {
+    const input = `account:${accountName}`;
+    const hash = (0, util_crypto_1.sha256AsU8a)(new TextEncoder().encode(input));
+    return hash.slice(0, 8);
+}
+// =============================================================================
+// Private Utilities
+// =============================================================================
+/**
+ * Hash seeds + programId with SHA256 for PDA derivation
+ */
+function simpleHash(programId, seeds) {
+    const combined = new Uint8Array(programId.length + seeds.reduce((sum, s) => sum + s.length, 0));
+    let offset = 0;
+    combined.set(programId, offset);
+    offset += programId.length;
+    for (const seed of seeds) {
+        combined.set(seed, offset);
+        offset += seed.length;
+    }
+    return (0, util_crypto_1.sha256AsU8a)(combined);
+}
+//# sourceMappingURL=svm.js.map

@@ -1,0 +1,2 @@
+[console_scripts]
+ccgv = cross_chain_gpu_validator.cli:main

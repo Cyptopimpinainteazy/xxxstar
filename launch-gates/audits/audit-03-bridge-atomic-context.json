@@ -1,0 +1,32 @@
+{
+  "audit_type": "bridge_atomic_security",
+  "attack_vectors": [
+    "replay_attacks",
+    "partial_settlement",
+    "timeout_abuse",
+    "nonce_reuse",
+    "finality_bypass",
+    "governance_attack",
+    "supply_manipulation",
+    "signature_forgery",
+    "timing_attacks",
+    "cross_vm_desync"
+  ],
+  "critical_pallets": [
+    "pallet-bridge",
+    "x3-atomic-router", 
+    "x3-cross-vm-router",
+    "settlement"
+  ],
+  "files_to_audit": [
+    "pallets/pallet-bridge/src/lib.rs",
+    "pallets/x3-atomic-router/src/lib.rs",
+    "pallets/x3-cross-vm-router/src/lib.rs",
+    "pallets/settlement/src/lib.rs"
+  ],
+  "test_files": [
+    "pallets/pallet-bridge/src/tests.rs",
+    "pallets/x3-atomic-router/src/tests.rs",
+    "pallets/settlement/src/tests.rs"
+  ]
+}

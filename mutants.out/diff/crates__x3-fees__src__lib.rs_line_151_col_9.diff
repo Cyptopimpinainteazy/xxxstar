@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/lib.rs
++++ replace SlashingInsuranceFund::file_claim with ()
+@@ -143,17 +143,17 @@
+         let contribution = (slash_amount as u64)
+             .saturating_mul(self.contribution_rate.deconstruct() as u64)
+             / 1_000_000;
+         self.pool_balance = self.pool_balance.saturating_add(contribution as u128);
+     }
+ 
+     /// File new claim (e.g., validator recovery)
+     pub fn file_claim(&mut self, claim_id: String, amount: u128) {
+-        self.claims.insert(claim_id, amount);
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Process claim approval or denial
+     pub fn process_claim(&mut self, claim_id: &str, approve: bool) -> bool {
+         if let Some(amount) = self.claims.remove(claim_id) {
+             if approve && self.pool_balance >= amount {
+                 self.pool_balance = self.pool_balance.saturating_sub(amount);
+                 self.approved_claims.insert(claim_id.to_string(), amount);

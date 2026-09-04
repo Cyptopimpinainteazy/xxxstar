@@ -1,0 +1,130 @@
+{
+  "block": 51,
+  "code_hash": "0xbd01e00178f65b6c5a908847c7f9f0d8ca1513cfa77bc1c4e00ebb68bec69759",
+  "finalized": "0x3f609c4be10ac826be5c4425967ff36e6b47cad218176a732a7eb1e8806704e0",
+  "headers": [
+    {
+      "finalized_head": "0x9b78c18e51b148fb92ff88156422904efd98b7a182d051c186b32608370a5386",
+      "header": {
+        "digest": {
+          "logs": [
+            "0x066175726120d5f91f1202000000",
+            "0x05617572610101385b4e94ae791daa6ab271bdc7f6deef146a786dedc687506840581ee9b6450f1d324245d70bf99067664429b9ca7e00fc69a3816d18493f3b204e91e3f1bd85"
+          ]
+        },
+        "extrinsicsRoot": "0xad688c94f6c83cbdc79ab59a0b9ad684e08c1e9cd4dc93ba4b6847454b728f35",
+        "number": "0x1f",
+        "parentHash": "0x7cf5779e6602a2294882f04cddeaf96c54253ee7e522fbe5e8a94875529710bf",
+        "stateRoot": "0xb5205c7e86cc5aed2c71ea6259dcccf767334b44d8495157211296017e6e3983"
+      }
+    },
+    {
+      "finalized_head": "0x350db17f4d5f6a3791a92152a9fae30d82fb3d3b10701f52ef3982d25f44b1b1",
+      "header": {
+        "digest": {
+          "logs": [
+            "0x066175726120dff91f1202000000",
+            "0x056175726101010ca3c8229543f0c22930225a7b3d03a55ae2f5e57deb75848f6d0ca56661fc03edf7e574403d167fc8a9d0f427b7d7d2d11f528c4859dd900a1f2f8aba749785"
+          ]
+        },
+        "extrinsicsRoot": "0x043eaa3a0a95c36f7c4b1b3464bafc994269f698b2ab6534fe45ba35dd210578",
+        "number": "0x29",
+        "parentHash": "0x12ecff15af760b98dcbd979c56d1a25005e321d54b3dbbdfe884936bd4c05b9c",
+        "stateRoot": "0x19587f30513cfec8e40e923e137c94221c3c539ad07d8a95e4e891c3044d78d6"
+      }
+    }
+  ],
+  "new_commit": "419011ae8db43f9a71dfa12aef913e6baacfa0ea",
+  "new_ref": "HEAD",
+  "old_commit": "5a45ce4dbfc26cfd25ecb9e1c5ce88f63bac7106",
+  "old_ref": "x3-atomic-star-rc2-internal-settlement-smoke",
+  "peers": 2,
+  "runtime_version": {
+    "apis": [
+      ["0xdf6acb689907609b", 5],
+      ["0xab3c0572291feb8b", 1],
+      ["0xfbc577b9d747efd6", 1],
+      ["0xd2bc9897eed08f15", 3],
+      ["0xfbb6f67195cd4d67", 1],
+      ["0xada7e9c48441a11a", 1],
+      ["0xdd718d5cc53262d4", 1],
+      ["0xed99c5acb25eedf5", 3],
+      ["0x40fe3ad401f8959a", 6],
+      ["0xbc9d89904f5b923f", 1],
+      ["0x37c8bb1350a9a2a8", 4],
+      ["0xf3ff14d5ab527059", 3],
+      ["0x37e397fc7c91f5e4", 2],
+      ["0xf7d800f3e08fc689", 1],
+      ["0xfedda405e90ae979", 1],
+      ["0x1465bdedeceda484", 1]
+    ],
+    "authoringVersion": 1,
+    "implName": "x3-chain",
+    "implVersion": 1,
+    "specName": "x3-chain",
+    "specVersion": 9,
+    "stateVersion": 1,
+    "systemVersion": 1,
+    "transactionVersion": 1
+  },
+  "supply_snapshot": {
+    "checks": {
+      "external_bridges_disabled": true,
+      "external_locked_zero": true,
+      "pending_zero": true,
+      "represented_equals_canonical": true
+    },
+    "raw": {
+      "can_refund_while_halted": {
+        "method": "X3SupplyLedger_can_refund_while_halted",
+        "raw": null
+      },
+      "canonical_supply": {
+        "decoded": 0,
+        "method": "X3SupplyLedger_canonical_supply",
+        "raw": null,
+        "source": "ledger_aggregation"
+      },
+      "economic_halt_active": {
+        "method": "X3SupplyLedger_economic_halt_active",
+        "raw": null
+      },
+      "external_bridges": {
+        "enabled": false,
+        "raw": null,
+        "storage_key": "0x5c8bba1ae6ae932cde6d575ca73a0300f95eb8b2b1c4cb8c6ea303ad65e68bd5"
+      },
+      "external_locked_supply": {
+        "decoded": 0,
+        "method": "X3SupplyLedger_external_locked_supply",
+        "raw": null,
+        "source": "ledger_aggregation"
+      },
+      "ledger_aggregation": {
+        "canonical_supply": 0,
+        "decoded_count": 0,
+        "external_locked_supply": 0,
+        "key_count": 0,
+        "pending_supply": 0,
+        "represented_supply": 0,
+        "storage_prefix": "0xe68816776ab8f9e1d6f0616c1fac27576c1e62731b97c13e674f65c633d59d5c"
+      },
+      "pending_supply": {
+        "decoded": 0,
+        "method": "X3SupplyLedger_pending_supply",
+        "raw": null,
+        "source": "ledger_aggregation"
+      },
+      "represented_supply": {
+        "decoded": 0,
+        "method": "X3SupplyLedger_represented_supply",
+        "raw": null,
+        "source": "ledger_aggregation"
+      },
+      "would_reject_transfer": {
+        "method": "X3SupplyLedger_would_reject_transfer",
+        "raw": null
+      }
+    }
+  }
+}

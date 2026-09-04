@@ -1,0 +1,32 @@
+--- crates/x3-fees/src/lib.rs
++++ replace SlashingInsuranceFund::process_claim -> bool with true
+@@ -148,28 +148,17 @@
+ 
+     /// File new claim (e.g., validator recovery)
+     pub fn file_claim(&mut self, claim_id: String, amount: u128) {
+         self.claims.insert(claim_id, amount);
+     }
+ 
+     /// Process claim approval or denial
+     pub fn process_claim(&mut self, claim_id: &str, approve: bool) -> bool {
+-        if let Some(amount) = self.claims.remove(claim_id) {
+-            if approve && self.pool_balance >= amount {
+-                self.pool_balance = self.pool_balance.saturating_sub(amount);
+-                self.approved_claims.insert(claim_id.to_string(), amount);
+-                true
+-            } else {
+-                self.claims.insert(claim_id.to_string(), amount); // re-insert if denied
+-                false
+-            }
+-        } else {
+-            false
+-        }
++        true /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Complete Economic Engine orchestration
+ #[derive(Clone, Debug)]
+ pub struct EconomicEngine {
+     pub fee_market: Eip1559FeeMarket,
+     pub mev_protection: CommitRevealProof,

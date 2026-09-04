@@ -1,0 +1,229 @@
+hooks:
+  pre_task:
+    description: "Runs before any implementation starts. Define scope, acceptance, and risk."
+    required_sections:
+      - Scope Lock
+      - Acceptance Criteria
+      - Blast Radius Map
+      - Agent Routing
+      - Canonical Path
+      - Priority Stack
+      - Stop Conditions
+    file: pre-task.md
+
+  on_cross_vm_change:
+    description: "Triggered whenever a task touches Cross-VM, X3IR, EVM, SVM, atomicity, or settlement."
+    trigger_keywords:
+      - cross-vm
+      - x3ir
+      - evm
+      - svm
+      - atomic
+      - settlement
+      - vm adapter
+      - dual-vm
+      - multi-domain
+      - interop
+    required_agents:
+      - cross-vm-architect
+      - invariant-test-engineer
+      - security-redteam
+    required_skills:
+      - cross-vm-trace
+      - atomic-settlement-invariants
+      - replay-timeout-safety
+      - canonical-path-reachability
+    required_output:
+      - Cross-VM Architecture Check
+      - State Transition Trace
+      - Invariant Test Plan
+      - Security Review
+
+  on_bridge_change:
+    description: "Triggered whenever a task touches bridge, settlement, HTLC, proof, relayer, lock/mint/burn/release, timeout, nonce."
+    trigger_keywords:
+      - bridge
+      - htlc
+      - relayer
+      - proof
+      - finality
+      - lock
+      - mint
+      - burn
+      - release
+      - timeout
+      - nonce
+      - settlement
+      - atomic swap
+    required_agents:
+      - bridge-settlement-auditor
+      - invariant-test-engineer
+      - security-redteam
+    required_tests:
+      - replay test
+      - timeout test
+      - invalid proof test
+      - duplicate nonce test
+      - rollback/refund test
+      - funds invariant test
+    required_output:
+      - Bridge Settlement Audit
+      - Replay + Timeout Safety Check
+      - Atomic Settlement Invariant Check
+      - Security Review
+
+  on_runtime_change:
+    description: "Triggered whenever a task touches pallet, runtime, dispatch, extrinsic, storage, event, balance, supply, treasury, staking."
+    trigger_keywords:
+      - pallet
+      - runtime
+      - dispatch
+      - extrinsic
+      - storage
+      - event
+      - error
+      - balance
+      - supply
+      - treasury
+      - staking
+      - state transition
+    required_agents:
+      - runtime-integrator
+      - invariant-test-engineer
+      - security-redteam
+    required_checks:
+      - storage version check
+      - event/error check
+      - invariant check
+      - reachability check
+      - no panic in error paths
+      - no unwrap in core code
+    required_output:
+      - Runtime Integration Check
+      - Invariant Test Plan
+      - Security Review
+
+  on_compiler_change:
+    description: "Triggered whenever a task touches parser, ast, lexer, typechecker, x3ir, emitter, compiler, syntax."
+    trigger_keywords:
+      - parser
+      - ast
+      - lexer
+      - typechecker
+      - x3ir
+      - emitter
+      - compiler
+      - syntax
+      - language
+      - grammar
+    required_agents:
+      - x3ir-compiler-agent
+      - runtime-integrator (if runtime dispatch changes)
+      - invariant-test-engineer (if operation affects state/supply)
+    required_checks:
+      - parser test (valid syntax)
+      - parser negative test (invalid syntax)
+      - AST lowering test
+      - X3IR emission test
+      - end-to-end compiler path test
+    required_output:
+      - Compiler Pipeline Check
+      - Runtime Integration Check (if applicable)
+      - Invariant Test Plan (if applicable)
+
+  post_edit:
+    description: "Runs after code changes. Validate, scan for issues, classify missing work."
+    required_sections:
+      - Evidence Gate
+      - Validation Results
+      - Stub/Mock/Fake Scan
+      - Regression Gate
+      - Test Integrity Gate
+      - Reachability Check
+      - Task Ledger (FIXABLE_NOW / BLOCKED / DEFERRED / etc.)
+    file: post-edit.md
+
+  pre_commit:
+    description: "Runs before commit. Ensure all validation passes and score is applied."
+    required_sections:
+      - Changed Files
+      - Validation Commands (and results)
+      - Regression Results
+      - Score Cap Applied
+      - Completion Scoreboard
+      - Still Missing
+      - FIXABLE_NOW Items (if any remain, do not commit)
+    file: pre-commit.md
+
+  pre_merge:
+    description: "Runs before merge. Ensure CI passes, migrations are safe, no conflicts."
+    required_sections:
+      - CI Matrix (all checks passing)
+      - Migration Compatibility
+      - Parallel Merge Gate
+      - Spec Drift Gate
+      - Release Notes Draft
+      - Mainnet Safety Gate (if applicable)
+      - Handoff Pack
+    file: pre-merge.md
+
+  release_gate:
+    description: "Runs before release candidate or mainnet claim. Final gating."
+    required_agents:
+      - release-closer
+      - invariant-test-engineer
+      - security-redteam
+      - supervisorForFinalApproval
+    required_sections:
+      - Invariant Test Results
+      - Security Abuse Case Results
+      - Stress/Performance Results (if HIGH/CRITICAL risk)
+      - Rollback Plan
+      - Mainnet Safety Gate
+      - Release Status (LOCAL ONLY / DEVNET / TESTNET / AUDIT / MAINNET CANDIDATE / MAINNET READY)
+    file: release-gate.md
+
+gates_always_applied:
+  - context-drift-gate
+  - handoff-pack-gate
+  - stop-condition-gate
+  - state-transition-trace-gate
+  - golden-path-ugly-path-gate
+  - config-reality-gate
+  - parallel-merge-gate
+  - spec-drift-gate
+  - determinism-gate
+  - work-chunking-gate
+  - duplicate-work-detection-gate
+  - canonical-path-gate
+  - dead-code-reachability-gate
+  - artifact-proof-gate
+  - auto-ticket-generation-gate
+  - agent-memory-update-gate
+  - build-reconciliation-gate
+  - red-team-diff-gate
+  - priority-stack-gate
+  - timebox-escalation-gate
+  - cost-complexity-gate
+  - minimal-viable-proof-gate
+  - data-contract-gate
+  - versioning-gate
+  - no-magic-constants-gate
+  - error-taxonomy-gate
+  - feature-flag-gate
+  - mainnet-safety-gate
+
+critical_blockers:
+  - "P0 items unresolved"
+  - "FIXABLE_NOW items remain"
+  - "Required tests fail"
+  - "Reachability not proven"
+  - "Mainnet claim without required evidence"
+  - "Secrets found in code or logs"
+  - "Panic on user input"
+
+approval_required_by:
+  - supervisor (for routing and approval)
+  - primary_agent (domain specialist)
+  - all_supporting_agents (if HIGH or CRITICAL risk)
+  - release_closer (for mainnet claims)

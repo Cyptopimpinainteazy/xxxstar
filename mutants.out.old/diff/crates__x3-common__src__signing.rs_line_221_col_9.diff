@@ -1,0 +1,22 @@
+--- crates/x3-common/src/signing.rs
++++ replace <impl Signer for Ed25519Signer>::sign_hash -> Signature with Default::default()
+@@ -213,18 +213,17 @@
+     }
+ 
+     fn sign(&self, message: &[u8]) -> Signature {
+         let signature = self.pair.sign(message);
+         Signature::Ed25519(signature)
+     }
+ 
+     fn sign_hash(&self, message_hash: &[u8; 32]) -> Signature {
+-        let signature = self.pair.sign(message_hash);
+-        Signature::Ed25519(signature)
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     fn public_key(&self) -> PublicKey {
+         PublicKey::Ed25519(self.public_key)
+     }
+ }
+ 
+ /// secp256k1 signer for EVM

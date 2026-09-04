@@ -1,0 +1,76 @@
+# X3 Relayer Configuration for Bridge-Enabled Public Testnet
+# Targets: Sepolia EVM testnet + Solana testnet
+#
+# ALL secrets and provider URLs are injected via environment variables.
+# No dev accounts, zero addresses, or placeholder API keys in this file.
+# For local staging, set the env vars to staging values.
+# For public testnet, set the env vars to real testnet values.
+#
+# Required env vars:
+#   X3_RPC_URL              — X3 node RPC endpoint
+#   X3_RELAYER_ACCOUNT      — Relayer account address (not dev/Alice)
+#   X3_RELAYER_SEED_PHRASE  — Relayer account seed phrase (or X3_RELAYER_CUSTODY_KEY_ID)
+#   EVM_SEPOLIA_RPC         — Sepolia RPC endpoint (e.g. Infura, Alchemy, self-hosted)
+#   EVM_STATE_ROOT_CONTRACT — Deployed X3ExternalGateway contract address on Sepolia
+#   SVM_RPC_ENDPOINT        — Solana testnet RPC endpoint
+
+# X3 Runtime Configuration
+x3:
+  # X3 RPC endpoint (must be accessible and fully synced)
+  rpc_url: "${X3_RPC_URL}"
+  
+  # Relayer account — MUST be a real testnet custody account, NOT a well-known dev key.
+  # Set via X3_RELAYER_ACCOUNT env var.
+  relayer_account: "${X3_RELAYER_ACCOUNT}"
+  
+  # Seed phrase (store securely, never commit). Alternative: custody key ID.
+  # Set via X3_RELAYER_SEED_PHRASE or X3_RELAYER_CUSTODY_KEY_ID env var.
+  # relayer_seed_phrase: "${X3_RELAYER_SEED_PHRASE}"
+  # relayer_custody_key_id: "${X3_RELAYER_CUSTODY_KEY_ID}"
+
+# EVM Chains Configuration
+evm_chains:
+  - name: "Sepolia Testnet"
+    chain_id: 11155111
+    x3_domain_id: 200
+    rpc_endpoint: "${EVM_SEPOLIA_RPC}"
+    state_root_contract: "${EVM_STATE_ROOT_CONTRACT}"
+    finality_threshold: 12        # 12 blocks ≈ 3 minutes on Sepolia (12s blocks)
+    block_poll_interval_ms: 13000  # Poll every 13 seconds
+    max_concurrent_requests: 5
+
+# SVM (Solana) Clusters Configuration
+svm_clusters:
+  - name: "Solana Testnet"
+    cluster_name: "testnet"
+    x3_domain_id: 501
+    rpc_endpoint: "${SVM_RPC_ENDPOINT}"
+    finality_threshold: 32        # 32 slots ≈ 12.8 seconds (400ms per slot)
+    slot_poll_interval_ms: 15000  # Poll every 15 seconds
+    max_concurrent_requests: 5
+
+  - name: "Solana Devnet"
+    cluster_name: "solana-devnet"
+    x3_domain_id: 502
+    rpc_endpoint: "${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
+    finality_threshold: 32
+    slot_poll_interval_ms: 15000
+    max_concurrent_requests: 10
+    htlc_program_id: "${SOLANA_HTLC_PROGRAM_ID}"
+
+# Submission Configuration
+submission:
+  batch_size: 1                # Submit proofs one at a time (avoid batching for testnet)
+  timeout_secs: 60             # Wait up to 60 seconds for RPC response
+  max_retries: 3               # Retry up to 3 times on RPC failure
+  retry_backoff_ms: 1000       # Wait 1 second between retries
+
+# Governance Configuration
+governance:
+  poll_interval_secs: 5        # Check bridge pause status every 5 seconds
+  enable_graceful_shutdown: true
+
+# Logging Configuration
+logging:
+  level: "info"                # Log level: debug, info, warn, error
+  format: "default"            # Log format: default or json

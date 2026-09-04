@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MSG_FILE="$1"
+MSG="$(head -n1 "$MSG_FILE")"
+
+if ! echo "$MSG" | grep -Eq '^\[[a-z0-9._-]+\] .+; tests: .+'; then
+  echo "commit message must match: [area] description; tests: <command>" >&2
+  exit 1
+fi

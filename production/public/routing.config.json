@@ -1,0 +1,244 @@
+{
+  "$schema": "./schemas/routing.schema.json",
+  "version": "1.0.0",
+  "domains": {
+    "org": {
+      "url": "https://x3-chain.org",
+      "type": "web",
+      "description": "Primary public web gateway - production site + all web apps"
+    },
+    "net": {
+      "url": "https://x3-chain.net",
+      "type": "desktop",
+      "description": "Desktop build target - Tauri apps distribution"
+    }
+  },
+  "apps": {
+    "hub": {
+      "name": "X3 Chain Hub",
+      "route": "/",
+      "entry": "site/index.html",
+      "build": "site/",
+      "domain": ["org", "net"],
+      "type": "static",
+      "category": "Infrastructure",
+      "description": "Unified app hub - all 13 frontends in one place",
+      "icon": "⬡"
+    },
+    "x3-desktop": {
+      "name": "X3 Combat Arena",
+      "route": "/desktop/",
+      "entry": "apps/x3-desktop/index.html",
+      "build": "apps/x3-desktop/dist/",
+      "domain": ["net"],
+      "type": "tauri",
+      "category": "Desktop",
+      "description": "Tauri desktop app with 3D arena, validators, swarm, supply, cross-VM, governance panels",
+      "icon": "🎮",
+      "tauri": {
+        "config": "apps/x3-desktop/src-tauri/tauri.conf.json",
+        "devPort": 1420,
+        "identifier": "com.x3chain.combat-arena"
+      }
+    },
+    "tauri-os": {
+      "name": "X3 Atomic Star OS",
+      "route": "/os/",
+      "entry": "apps/tauri-os/index.html",
+      "build": "apps/tauri-os/dist/",
+      "domain": ["net"],
+      "type": "tauri",
+      "category": "Desktop",
+      "description": "Full desktop operating system experience for X3 Chain",
+      "icon": "🖥️",
+      "tauri": {
+        "config": "apps/tauri-os/tauri.conf.json",
+        "devPort": 1421,
+        "identifier": "io.x3atomicstar.os"
+      }
+    },
+    "inferstructor": {
+      "name": "Inferstructor Dashboard",
+      "route": "/inferstructor/",
+      "entry": "apps/inferstructor-dashboard/index.html",
+      "build": "apps/inferstructor-dashboard/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Infrastructure",
+      "description": "GPU validator admin with TPS leaderboard and orchestra controls",
+      "icon": "⚡",
+      "vite": { "port": 5174 }
+    },
+    "intelligence": {
+      "name": "X3 Intelligence",
+      "route": "/intelligence/",
+      "entry": "apps/x3-intelligence/index.html",
+      "build": "apps/x3-intelligence/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Trading & DeFi",
+      "description": "Arbitrage control surface with floor analytics and intent matching",
+      "icon": "🧠",
+      "vite": { "port": 5173 }
+    },
+    "validators": {
+      "name": "Validator Globe",
+      "route": "/validators/",
+      "entry": "apps/validators/index.html",
+      "build": "apps/validators/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Validators",
+      "description": "3D globe visualization of validator nodes with live RPC polling",
+      "icon": "🌐",
+      "vite": { "port": 5175 }
+    },
+    "wallet": {
+      "name": "X3 Wallet",
+      "route": "/wallet/",
+      "entry": "apps/wallet/index.html",
+      "build": "apps/wallet/.next/",
+      "domain": ["org", "net"],
+      "type": "nextjs",
+      "category": "Trading & DeFi",
+      "description": "Multi-chain cryptocurrency wallet with Polkadex launchpad",
+      "icon": "💼",
+      "next": { "port": 3000 }
+    },
+    "dex": {
+      "name": "X3 DEX",
+      "route": "/dex/",
+      "entry": "apps/dex/index.html",
+      "build": "apps/dex/.next/",
+      "domain": ["org", "net"],
+      "type": "nextjs",
+      "category": "Trading & DeFi",
+      "description": "Decentralized exchange interface",
+      "icon": "🔄",
+      "next": { "port": 3001 }
+    },
+    "dashboard": {
+      "name": "Modular Dashboard",
+      "route": "/dashboard/",
+      "entry": "apps/dashboard/index.html",
+      "build": "apps/dashboard/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Analytics",
+      "description": "Extensible 50+ panel modular dashboard system",
+      "icon": "📊"
+    },
+    "infra-dashboard": {
+      "name": "Infra Dashboard",
+      "route": "/infra-dashboard/",
+      "entry": "infra-structure/dashboard/index.html",
+      "build": "infra-structure/dashboard/dist/",
+      "domain": ["org", "net"],
+      "type": "tauri",
+      "category": "Infrastructure",
+      "description": "Infrastructure monitoring and blockchain explorer",
+      "icon": "🔧",
+      "tauri": {
+        "config": "infra-structure/dashboard/src-tauri/tauri.conf.json",
+        "devPort": 5174,
+        "identifier": "com.inferstructor.dashboard"
+      }
+    },
+    "tps": {
+      "name": "TPS Monitor",
+      "route": "/tps/",
+      "entry": "infra/blockchain-tps/public/index.html",
+      "build": "infra/blockchain-tps/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Infrastructure",
+      "description": "Blockchain transactions-per-second monitoring and leaderboard",
+      "icon": "📈"
+    },
+    "phase5": {
+      "name": "Phase 5 Governance",
+      "route": "/governance/",
+      "entry": "phase5_panel/index.html",
+      "build": "phase5_panel/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Infrastructure",
+      "description": "AST node heatmap, rollback events, and node votes from md_supervisor",
+      "icon": "🏛️"
+    },
+    "site-pages": {
+      "name": "X3 Landing & Pages",
+      "route": "/site/",
+      "entry": "production/public/index.html",
+      "build": "production/public/",
+      "domain": ["org"],
+      "type": "static",
+      "category": "Site Pages",
+      "description": "Marketing landing page and 40+ specialized blockchain dashboard pages",
+      "icon": "🚀"
+    },
+    "explorer": {
+      "name": "X3 Explorer",
+      "route": "/explorer/",
+      "entry": "apps/explorer/index.html",
+      "build": "apps/explorer/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Infrastructure",
+      "description": "Blockchain explorer for X3 Chain",
+      "icon": "🔍"
+    },
+    "funding": {
+      "name": "X3 Funding Portal",
+      "route": "/funding/",
+      "entry": "apps/x3-funding/index.html",
+      "build": "apps/x3-funding/dist/",
+      "domain": ["org", "net"],
+      "type": "react",
+      "category": "Infrastructure",
+      "description": "Grant funding portal with real FEATURE_REGISTRY.toml data, Three.js background, sponsor pages, bounty board, and grant match tool",
+      "icon": "💰",
+      "vite": { "port": 1440 }
+    }
+  },
+  "shared": {
+    "components": {
+      "path": "apps/shared/",
+      "exports": ["ChainStatusBanner", "ConnectionStatus", "WalletButton"],
+      "quantumUi": [
+        "AnimatedSphere", "AuroraBorealis", "Cube3D", "CyberGrid",
+        "DataVisualizers", "FloatingParticles", "GhostText", "GlitchText",
+        "GooeyMarquee", "HolographicCard", "LiquidMetal", "MatrixRain",
+        "NoiseOverlay", "ParticleVortex", "PosterArtCard", "RainbowBorder",
+        "SceneNavigation", "TiltCard3D", "VHSRetroCard", "XRayScanner"
+      ]
+    },
+    "hooks": ["useWalletConnection", "useChainSubscription"],
+    "providers": ["ChainProvider"],
+    "styles": "apps/shared/styles/quantum-ui.css",
+    "config": "apps/shared/config/chain.ts"
+  },
+  "services": {
+    "rpc": {
+      "testnet": "http://rpc.testnet.x3-chain.io:9944",
+      "mainnet": "https://rpc.x3-chain.io",
+      "wsTestnet": "wss://testnet.x3star.net",
+      "wsMainnet": "wss://ws.x3star.net"
+    },
+    "swarmApi": "http://127.0.0.1:8787",
+    "mdSupervisor": "ws://localhost:8765",
+    "ipfs": "http://127.0.0.1:5001"
+  },
+  "build": {
+    "org": {
+      "type": "static-spa",
+      "outDir": "dist/org/",
+      "strategy": "subdirectory-per-app"
+    },
+    "net": {
+      "type": "tauri-bundle",
+      "outDir": "dist/net/",
+      "strategy": "standalone-per-app"
+    }
+  }
+}

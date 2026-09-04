@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "context" in Keyword::parse
+@@ -95,17 +95,17 @@
+             "struct" => Some(Self::Struct),
+             "enum" => Some(Self::Enum),
+             "match" => Some(Self::Match),
+             "true" => Some(Self::True),
+             "false" => Some(Self::False),
+             "atomic" => Some(Self::Atomic),
+             "emit" => Some(Self::Emit),
+             "agent" => Some(Self::Agent),
+-            "context" => Some(Self::Context),
++             /* ~ changed by cargo-mutants ~ */
+             "const" => Some(Self::Const),
+             "in" => Some(Self::In),
+             _ => None,
+         }
+     }
+ }
+ 
+ /// Error returned when a keyword does not match a known value.

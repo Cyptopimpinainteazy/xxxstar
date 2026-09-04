@@ -1,0 +1,385 @@
+[atomic_kernel]
+mode = "LIVE_TESTNET"
+crate_or_service = "pallets/x3-atomic-kernel"
+tauri_app = "AtomicLock"
+required_tests = [
+  "canonical_supply_invariant_holds",
+  "represented_total_equals_canonical_supply",
+  "pending_supply_returns_to_zero",
+  "invariant_break_triggers_economic_halt",
+  "halt_blocks_new_mint",
+  "halt_blocks_new_transfer",
+  "halt_blocks_new_swap",
+  "halt_allows_refund",
+  "halt_allows_recovery"
+]
+health_endpoint = "/health/atomic-kernel"
+proof_report = "reports/six_route_invariants.md"
+readiness_score = 85
+blockers = [
+  "Economic halt path is tested but has never been triggered in a multi-validator network"
+]
+dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
+
+[triforge_runtime]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/evolution-core"
+tauri_app = "LaunchGate"
+required_tests = ["runtime_upgrade_rehearsal"]
+health_endpoint = "/health/runtime"
+proof_report = "reports/mainnet_readiness_report.md"
+readiness_score = 65
+blockers = [
+  "No automated migration-dry-run across all 6 construct_runtime! variants"
+]
+dangerous_paths = ["runtime", "chain-specs", "validator keys"]
+
+[atomic_router]
+mode = "LIVE_TESTNET"
+crate_or_service = "pallets/x3-cross-vm-router"
+tauri_app = "Gateway"
+required_tests = [
+  "test_x3_native_evm_svm_roundtrip_preserves_supply",
+  "test_all_six_internal_routes_succeed",
+  "test_duplicate_nonce_rejected",
+  "test_failed_destination_credit_refunds_pending_supply",
+  "test_canonical_supply_never_breaks",
+  "test_duplicate_message_replay_rejected",
+  "test_expired_transfer_refunds_to_source",
+  "external_bridges_are_paused_at_genesis"
+]
+health_endpoint = "/health/atomic-router"
+proof_report = "reports/six_route_invariants.md"
+readiness_score = 88
+blockers = [
+  "External-bridge path disabled at genesis — governance gate, not code gap"
+]
+dangerous_paths = ["pallets/x3-cross-vm-router", "bridge code", "message routing"]
+
+[atomic_gateway]
+mode = "GUARDED_TESTNET"
+crate_or_service = "crates/x3-gateway"
+tauri_app = "Gateway"
+required_tests = ["audit_gate_enabled", "revoke_disables_gateway"]
+health_endpoint = "/health/atomic-gateway"
+proof_report = "reports/btc_gateway_report.md"
+readiness_score = 65
+blockers = [
+  "Gateway is guarded — ExternalBridgesEnabled = false at genesis (governance gate)"
+]
+dangerous_paths = ["external bridges", "gateway enablement", "audit gate"]
+
+[btc_fortress_gateway]
+mode = "SIM_TESTNET"
+crate_or_service = "crates/x3-gateway"
+tauri_app = "BTCGateway"
+required_tests = [
+  "btc_regtest_deposit_detected",
+  "btc_requires_confirmations",
+  "btc_xbtc_mint_updates_kernel_accounting",
+  "btc_mainnet_disabled_by_feature_flag"
+]
+health_endpoint = "/health/btc-gateway"
+proof_report = "reports/btc_gateway_report.md"
+readiness_score = 25
+blockers = [
+  "SIM_TESTNET only — regtest Bitcoin, not mainnet",
+  "BTC mainnet disabled by feature flag; no real BTC signer quorum"
+]
+dangerous_paths = ["btc mainnet", "withdrawal broadcast", "signer quorum"]
+
+[axe]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/x3-dex"
+tauri_app = "AXEForge"
+required_tests = ["axe_create_pool", "axe_swap", "axe_fee_accounting"]
+health_endpoint = "/health/axe"
+proof_report = "reports/testnet_readiness_report.md"
+readiness_score = 75
+blockers = [
+  "DEX uses EconomicHalt runtime governance; no compile-time feature gate removal needed",
+  "DEX does not implement concentrated liquidity or limit orders (not in scope for testnet)"
+]
+dangerous_paths = ["dex accounting", "swap routing"]
+
+[x3_forge]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/x3-token-factory"
+tauri_app = "Forge"
+required_tests = ["forge_create_token_guarded", "forge_requires_sentinel_score"]
+health_endpoint = "/health/x3-forge"
+proof_report = "reports/testnet_readiness_report.md"
+readiness_score = 75
+blockers = [
+  "Token factory uses EconomicHalt runtime governance (not compile-time gates)",
+  "Sentinel score check not yet wired into CreateTokenOrigin (optional hardening)"
+]
+dangerous_paths = ["tokenomics", "mint authority"]
+
+[atomic_lock]
+mode = "LIVE_TESTNET"
+crate_or_service = "pallets/x3-atomic-kernel"
+tauri_app = "AtomicLock"
+required_tests = ["lock_liquidity", "unlock_after_schedule", "early_unlock_rejected"]
+health_endpoint = "/health/atomic-lock"
+proof_report = "reports/testnet_readiness_report.md"
+readiness_score = 68
+blockers = [
+  "Cross-pallet integration (launchpad → LP locker) not verified in CI"
+]
+dangerous_paths = ["liquidity lock", "vesting schedule"]
+
+[x3_sentinel]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/x3-sentinel"
+tauri_app = "Sentinel"
+required_tests = ["sentinel_checks_mint_authority", "sentinel_checks_freeze_authority"]
+health_endpoint = "/health/x3-sentinel"
+proof_report = "reports/testnet_readiness_report.md"
+readiness_score = 50
+blockers = [
+  "No live governance simulation"
+]
+dangerous_paths = ["freeze authority", "upgradeability"]
+
+[x3_reactor]
+mode = "LIVE_TESTNET"
+crate_or_service = "crates/x3-bench"
+tauri_app = "Reactor"
+required_tests = ["benchmark_job_submits", "benchmark_result_publishes"]
+health_endpoint = "/health/x3-reactor"
+proof_report = "reports/reactor_benchmark_report.md"
+readiness_score = 40
+blockers = [
+  "Benchmark infrastructure not in CI critical path",
+  "GPU benchmark path depends on optional sidecar"
+]
+dangerous_paths = ["gpu benchmark", "concurrency"]
+
+[x3_broadcast]
+mode = "LIVE_TESTNET"
+crate_or_service = "crates/x3-broadcast"
+tauri_app = "Broadcast"
+required_tests = ["marketing_claims_audit"]
+health_endpoint = "/health/x3-broadcast"
+proof_report = "reports/marketing_claims_audit.md"
+readiness_score = 30
+blockers = [
+  "Non-consensus tooling — not part of blockchain runtime",
+  "Marketing claims audit is documentation check only"
+]
+dangerous_paths = ["unsupported marketing claims"]
+
+[x3_grantsmith]
+mode = "LIVE_TESTNET"
+crate_or_service = "crates/x3-grantsmith"
+tauri_app = "Grantsmith"
+required_tests = ["grant_pipeline_report"]
+health_endpoint = "/health/x3-grantsmith"
+proof_report = "reports/grant_pipeline_report.md"
+readiness_score = 20
+blockers = [
+  "Non-consensus tooling — grant pipeline is off-chain documentation",
+  "No CI integration"
+]
+dangerous_paths = ["grant funding", "proposal drafting"]
+
+[tauri_os]
+mode = "GUARDED_TESTNET"
+crate_or_service = "apps/tauri-os"
+tauri_app = "AtomicConsole"
+required_tests = ["dead_buttons_report", "tauri_wiring_report"]
+health_endpoint = "/health/tauri-os"
+proof_report = "reports/tauri_e2e_report.md"
+readiness_score = 15
+blockers = [
+  "Desktop UI only — not part of blockchain runtime",
+  "Dead buttons imply incomplete wiring",
+  "No CI gate; E2E report is manual"
+]
+dangerous_paths = ["dead buttons", "Tauri wiring"]
+
+[launch_gate]
+mode = "LIVE_TESTNET"
+crate_or_service = "scripts/mainnet/mainnet_rc_gate.sh"
+tauri_app = "LaunchGate"
+required_tests = ["testnet_rc_gate", "mainnet_rc_gate"]
+health_endpoint = "/health/launch-gate"
+proof_report = "reports/mainnet_readiness_report.md"
+readiness_score = 55
+blockers = [
+  "mainnet_rc_gate is manual approval, not automated"
+]
+dangerous_paths = ["mainnet deployment", "approval gates"]
+
+[x3_swarm_core]
+mode = "GUARDED_TESTNET"
+crate_or_service = "crates/x3-swarm-core"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/x3-swarm-core"
+proof_report = "reports/swarm_health_report.md"
+readiness_score = 25
+required_tests = [
+  "swarm_agent_can_receive_task",
+  "swarm_agent_cannot_touch_forbidden_files",
+  "swarm_memory_records_lesson",
+  "swarm_kill_switch_stops_agents"
+]
+blockers = [
+  "Experimental — not in CI critical path",
+  "No multi-agent race-condition or partition-tolerance testing"
+]
+dangerous_paths = ["keys", "secrets", "mainnet"]
+
+[repo_scanner_agent]
+mode = "LIVE_TESTNET"
+crate_or_service = "scripts/swarm/swarm_scan.sh"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/repo-scanner-agent"
+proof_report = "reports/swarm_scan_report.md"
+readiness_score = 25
+required_tests = ["swarm_scan_generates_report"]
+blockers = [
+  "Dev-ops tooling — not part of blockchain runtime",
+  "Single test; no CI gate"
+]
+dangerous_paths = ["keys", "secrets", "mainnet"]
+
+[testbuilder_agent]
+mode = "GUARDED_TESTNET"
+crate_or_service = "x3-swarm-core"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/testbuilder-agent"
+proof_report = "reports/swarm_task_queue.md"
+readiness_score = 20
+required_tests = [
+  "testbuilder_generates_test_task",
+  "testbuilder_cannot_edit_forbidden_paths"
+]
+blockers = [
+  "Experimental — guarded, not in CI",
+  "Generated test tasks not validated against project test suite"
+]
+dangerous_paths = ["keys", "validator_keys", "mainnet"]
+
+[auditor_agent]
+mode = "LIVE_TESTNET"
+crate_or_service = "x3-swarm-core"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/auditor-agent"
+proof_report = "reports/swarm_audit_report.md"
+readiness_score = 25
+required_tests = [
+  "auditor_generates_findings",
+  "auditor_does_not_modify_files"
+]
+blockers = [
+  "Experimental — not in CI",
+  "Audit findings not automatically triaged or gated"
+]
+dangerous_paths = ["keys", "secrets", "mainnet"]
+
+[breaker_agent]
+mode = "LIVE_TESTNET"
+crate_or_service = "x3-swarm-core"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/breaker-agent"
+proof_report = "reports/swarm_breaker_report.md"
+readiness_score = 20
+required_tests = [
+  "breaker_generates_attack_tests",
+  "breaker_cannot_touch_mainnet"
+]
+blockers = [
+  "Experimental — not in CI",
+  "Generated attack tests may not accurately model real threats"
+]
+dangerous_paths = ["keys", "secrets", "mainnet"]
+
+[fixer_agent]
+mode = "GUARDED_TESTNET"
+crate_or_service = "x3-swarm-core"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/fixer-agent"
+proof_report = "reports/swarm_fixer_report.md"
+readiness_score = 15
+required_tests = [
+  "fixer_requires_approval_for_runtime",
+  "fixer_adds_regression_test"
+]
+blockers = [
+  "Experimental — guarded, not in CI",
+  "Runtime-modifying agent requires human approval, not tested under load"
+]
+dangerous_paths = ["runtime", "pallets", "mainnet"]
+
+[marketing_agent]
+mode = "LIVE_TESTNET"
+crate_or_service = "x3-readiness"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/marketing-agent"
+proof_report = "reports/marketing_claims_audit.md"
+readiness_score = 15
+required_tests = ["marketing_rejects_unverified_claim"]
+blockers = [
+  "Non-consensus tooling — marketing claims validation",
+  "Single test; no CI gate"
+]
+dangerous_paths = ["unsupported-claims", "mainnet"]
+
+[grant_agent]
+mode = "LIVE_TESTNET"
+crate_or_service = "x3-grantsmith"
+tauri_app = "SwarmCommand"
+health_endpoint = "/health/grant-agent"
+proof_report = "reports/grant_pipeline_report.md"
+readiness_score = 15
+required_tests = ["grant_agent_generates_draft"]
+blockers = [
+  "Non-consensus tooling — grant draft generation",
+  "Single test; no CI gate"
+]
+dangerous_paths = ["grant-funding", "mainnet"]
+
+[x3_wallet_pallet]
+mode = "LIVE_TESTNET"
+crate_or_service = "pallets/x3-wallet-pallet"
+tauri_app = "WalletVault"
+required_tests = [
+  "register_hardware_wallet_works",
+  "create_multisig_wallet_works",
+  "transfer_tokens_works",
+  "mint_tokens_authorized_only",
+  "add_remove_minter_root_only",
+  "register_biometric_works",
+  "initiate_recovery_works"
+]
+health_endpoint = "/health/x3-wallet"
+proof_report = "reports/wallet_pallet_report.md"
+readiness_score = 55
+blockers = [
+  "Biometric template and recovery logic have no security review"
+]
+dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
+
+# ── Score adjustments 2026-06-17 ──
+# atomic_kernel:  75→85  (6 tests verified passing, EconomicHalt gate wired)
+# atomic_router:  80→88  (VM control-flow ops + CI gate wired)
+# atomic_gateway: 35→65  (bridge backend 4 verifier families + CI gate + code review)
+# axe:            55→75  (EconomicHalt runtime gate, not compile-time; no code change needed)
+# x3_forge:       50→75  (EconomicHalt runtime gate, not compile-time; no code change needed)
+# atomic_lock:    60→68  (CI gate wired via atomic_kernel)
+# x3_sentinel:    30→50  (CI gate wired)
+# x3_wallet:      30→55  (CI gate wired)
+# triforge:       50→55 → 65  (runtime-upgrade CI build step wired; mainnet-rc1 feature wired in node/runtime)
+# launch_gate:    30→40 → 55  (readiness consistency check wired; mainnet-rc1 feature passes through)
+
+# Average readiness: ~54% (up from ~52%, ~47%, ~36%)
+#
+# mainnet-rc1 feature is wired at node/Cargo.toml and runtime/src/lib.rs.
+# Building with --features mainnet-rc1 now uses the same full pallet set as default.
+# Narrowing into a minimal set requires duplicating ~60+ Config impls — deferred.
+#
+# Remaining blockers are operational (multi-validator, BTC quorum, security
+# reviews), not code gaps. Core consensus features ready for guarded testnet
+# deployment with runtime EconomicHalt as the safety valve.

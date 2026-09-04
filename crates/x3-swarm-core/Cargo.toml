@@ -1,0 +1,31 @@
+[package]
+name = "x3-swarm-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["X3 Team"]
+description = "Core swarm orchestration primitives for X3 Atomic Star"
+repository = "https://github.com/Cyptopimpinainteazy/X3_ATOMIC_STAR"
+
+# Standalone workspace root for the X3 swarm crates (core + api + worker).
+# This marks this subtree as its own cargo workspace so the swarm crates build
+# and test independently WITHOUT being pulled into the parent substrate
+# workspace at the repo root (whose full resolve currently fails on an
+# unrelated node/ sc-consensus-grandpa 0.40.0-vs-0.40.1 git drift). See
+# reports/swarm_build_report.md. Kept out of ../workspace members deliberately.
+[workspace]
+members = [
+    "services/x3-swarm-api",
+    "services/x3-swarm-worker",
+]
+resolver = "2"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1.0", features = ["rt", "time"] }
+async-trait = "0.1"
+tracing = "0.1"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"

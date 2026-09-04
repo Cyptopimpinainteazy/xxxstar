@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "struct" in Keyword::parse
+@@ -87,17 +87,17 @@
+             "if" => Some(Self::If),
+             "else" => Some(Self::Else),
+             "while" => Some(Self::While),
+             "loop" => Some(Self::Loop),
+             "for" => Some(Self::For),
+             "return" => Some(Self::Return),
+             "break" => Some(Self::Break),
+             "continue" => Some(Self::Continue),
+-            "struct" => Some(Self::Struct),
++             /* ~ changed by cargo-mutants ~ */
+             "enum" => Some(Self::Enum),
+             "match" => Some(Self::Match),
+             "true" => Some(Self::True),
+             "false" => Some(Self::False),
+             "atomic" => Some(Self::Atomic),
+             "emit" => Some(Self::Emit),
+             "agent" => Some(Self::Agent),
+             "context" => Some(Self::Context),

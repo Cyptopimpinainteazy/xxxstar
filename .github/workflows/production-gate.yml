@@ -1,0 +1,26 @@
+name: production-gate
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master, develop ]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Guard
+        run: make guard
+      - name: Test (core + pallets)
+        run: make test-all-pallets
+      - name: Audit (invariants + readiness + consistency)
+        run: make audit
+      - name: Node Build Verification (mainnet-rc1)
+        run: make test-node-build
+      - name: Mainnet Check
+        run: make mainnet-check

@@ -1,0 +1,17 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="promGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff5722;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d84315;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Flame / fire icon for Prometheus -->
+  <path d="M64 16 Q74 36 78 48 Q84 40 88 48 Q96 64 84 80 L80 88 Q72 96 64 96 Q56 96 48 88 L44 80 Q32 64 40 48 Q44 40 50 48 Q54 36 64 16Z" fill="none" stroke="url(#promGrad)" stroke-width="3"/>
+  <!-- Inner flame -->
+  <path d="M64 40 Q70 52 72 60 Q76 56 78 60 Q82 68 74 76 Q70 80 64 80 Q58 80 54 76 Q46 68 50 60 Q52 56 56 60 Q58 52 64 40Z" fill="url(#promGrad)" opacity="0.4"/>
+  <!-- Base plate -->
+  <rect x="40" y="96" width="48" height="8" rx="4" fill="url(#promGrad)" opacity="0.7"/>
+  <!-- Signal waves -->
+  <path d="M24 52 Q20 64 24 76" fill="none" stroke="url(#promGrad)" stroke-width="2" opacity="0.4"/>
+  <path d="M104 52 Q108 64 104 76" fill="none" stroke="url(#promGrad)" stroke-width="2" opacity="0.4"/>
+</svg>

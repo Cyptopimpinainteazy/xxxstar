@@ -1,0 +1,2 @@
+[console_scripts]
+x3-chain = x3_chain_sdk.cli:main

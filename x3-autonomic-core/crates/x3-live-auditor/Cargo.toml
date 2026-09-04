@@ -1,0 +1,21 @@
+[package]
+name = "x3-live-auditor"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Public Chain Team"]
+description = "Live auditing system for X3 Autonomic Core - monitors invariants and health in real-time"
+
+[dependencies]
+parity-scale-codec = { version = "3.6", features = ["derive", "bit-vec"] }
+scale-info = { version = "2.10", default-features = false, features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+jsonrpsee = { version = "0.20", features = ["client-core", "server"] }
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+x3-autonomic-types = { path = "../x3-autonomic-types" }
+
+[dev-dependencies]
+tokio-test = "0.4"

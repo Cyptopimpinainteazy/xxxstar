@@ -1,0 +1,16 @@
+// X3 intent: swap USDC for X3 token, all within the X3 chain
+intent x3_swap {
+    from x3.USDC amount 100000 receiver alice.x3
+    to x3.X3 receiver alice.x3
+    
+    require slippage <= 1%
+    require max_fee <= 100
+    
+    route {
+        best
+        allow "x3.dex"
+    }
+    
+    timeout 10m
+    on_fail refund_source
+}

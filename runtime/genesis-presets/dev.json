@@ -1,0 +1,119 @@
+{
+  "system": {
+    "code": "0x"
+  },
+  "balances": {
+    "balances": [
+      [
+        "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+        1000000000000000000000000
+      ],
+      [
+        "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+        1000000000000000000000000
+      ],
+      [
+        "5FLSigC9HGRKVhB9FiEo4Y3oUs6TEjAAZFDxdYT1WNdcNkA6",
+        1000000000000000000000000
+      ],
+      [
+        "5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy",
+        1000000000000000000000000
+      ],
+      [
+        "5HGjWAeFDJFCWMcjOKwMwwzPDqMvmKQCJpNhauJbxQxvBpZN",
+        1000000000000000000000000
+      ],
+      [
+        "5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL",
+        1000000000000000000000000
+      ]
+    ]
+  },
+  "aura": {
+    "authorities": [
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    ]
+  },
+  "grandpa": {
+    "authorities": [
+      ["5FA9nQDVg267DEd8m1ZypXLBnvN7SFxYwV7ndqSYGiN9TTpu", 1]
+    ]
+  },
+  "atlasKernel": {
+    "assets": [
+      [0, "0x5833", 12],
+      [1, "0x455448", 18],
+      [2, "0x534f4c", 9],
+      [3, "0x55534443", 6],
+      [1000, "0x5833", 18]
+    ],
+    "authorities": [
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    ],
+    "authorizedAccounts": [
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    ],
+    "evmEscrow": "0x0000000000000000000000000000000000000000",
+    "svmEscrow": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+  },
+  "council": {
+    "members": [
+      "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+    ]
+  },
+  "governance": {},
+  "treasury": {
+    "initialSigners": []
+  },
+  "x3Coin": {
+    "teamAllocations": [],
+    "ecosystemAllocations": [],
+    "liquidityAllocations": []
+  },
+  "session": {
+    "keys": []
+  },
+  "x3Verifier": {
+    "verificationEnabled": true,
+    "initialExecutors": []
+  },
+  "x3Invariants": {
+    "maxSupply": 1000000000000000000000000000,
+    "maxAgents": 10000,
+    "maxProposalDepth": 100,
+    "haltOnViolation": true,
+    "constitutionHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "x3CrosschainGateway": {
+    "initialAssets": "0x00",
+    "initialRoutes": "0x00"
+  },
+  "evolutionCore": {
+    "evolutionEnabled": true,
+    "autoEvolutionEnabled": false,
+    "initialParams": {
+      "gasMultiplier": 100,
+      "evmWeightPct": 50,
+      "svmWeightPct": 50,
+      "jitThreshold": 100,
+      "maxParallel": 4,
+      "mevSmoothFactor": 10
+    },
+    "aiAgents": []
+  },
+  "depinMarketplace": {
+    "paused": false
+  },
+  "privateExecution": {
+    "enabled": false
+  },
+  "x3DappHub": {},
+  "x3FlashLoan": {
+    "initialPoolBalance": 0
+  },
+  "evm": {
+    "accounts": {}
+  },
+  "ethereum": {}
+}

@@ -1,0 +1,34 @@
+--- crates/x3-common/src/signing.rs
++++ replace Secp256k1Signer::generate -> Self with Default::default()
+@@ -232,30 +232,17 @@
+ pub struct Secp256k1Signer {
+     secret_key: [u8; 32],
+     public_key: [u8; 65],
+ }
+ 
+ impl Secp256k1Signer {
+     /// Generate a new secp256k1 keypair
+     pub fn generate() -> Self {
+-        use secp256k1::{rand::thread_rng, Secp256k1};
+-
+-        let secp = Secp256k1::new();
+-        let (secret_key, public_key) = secp.generate_keypair(&mut thread_rng());
+-        let secret_key = secret_key.secret_bytes();
+-        let public_key = public_key.serialize_uncompressed();
+-
+-        let mut pk = [0u8; 65];
+-        pk.copy_from_slice(&public_key);
+-
+-        Self {
+-            secret_key,
+-            public_key: pk,
+-        }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Create a signer from a secret key (32 bytes)
+     pub fn from_secret_key(secret: &[u8; 32]) -> Result<Self, &'static str> {
+         use secp256k1::{Secp256k1, SecretKey};
+ 
+         let secp = Secp256k1::new();
+         let secret_key = SecretKey::from_slice(secret).map_err(|_| "Invalid secret key")?;

@@ -1,0 +1,22 @@
+--- crates/x3-fees/src/calculator.rs
++++ replace FeeCalculator::break_even_profit -> Result<Amount, FeeError> with Ok(Default::default())
+@@ -98,18 +98,17 @@
+     }
+ 
+     /// Calculate the minimum profit needed for an execution to break even.
+     pub fn break_even_profit(
+         &self,
+         params: &ExecutionParams,
+         reputation: &AgentReputation,
+     ) -> Result<Amount, FeeError> {
+-        let fees = self.calculate(params, reputation)?;
+-        Ok(fees.total)
++        Ok(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Compare the fee between an X3-optimized and external bot execution.
+     /// Returns (x3_fee, external_fee, savings).
+     pub fn compare_x3_vs_external(
+         &self,
+         params: &ExecutionParams,
+         reputation: &AgentReputation,

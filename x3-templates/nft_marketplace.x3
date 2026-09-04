@@ -1,0 +1,347 @@
+// nft_marketplace.x3 - NFT Marketplace with Minting, Auctions, Royalties, Collections, Cross-Chain Wrapping
+//
+// @version("1.0.0")
+// @audit
+
+contract NFTMarketplace {
+    // Platform configuration
+    const PLATFORM_FEE_BPS: u256 = 200;        // 2% platform fee
+    const ROYALTY_BPS: u256 = 500;             // 5% default royalty
+    const MIN_AUCTION_DURATION: u256 = 3600;   // 1 hour
+    const MAX_AUCTION_DURATION: u256 = 604800; // 7 days
+    const MIN_BID_INCREMENT: u256 = 100;       // 1% in basis points
+
+    // Storage
+    address owner;
+    mapping(u256 => NFT) nfts;
+    mapping(u256 => Collection) collections;
+    mapping(u256 => Auction) auctions;
+    mapping(address => mapping(address => u256)) royalties_owed;
+    mapping(u256 => WrappedNFT) wrapped_nfts;
+    u256 nft_counter;
+    u256 collection_counter;
+    u256 auction_counter;
+    u256 wrap_counter;
+
+    // Structs
+    struct NFT {
+        u256 id;
+        u256 collection_id;
+        address creator;
+        address owner;
+        string metadata_uri;
+        u256 royalty_bps;
+        bool listed;
+        u256 list_price;
+    }
+
+    struct Collection {
+        u256 id;
+        string name;
+        string symbol;
+        address creator;
+        u256 total_supply;
+    }
+
+    struct Auction {
+        u256 id;
+        u256 nft_id;
+        address seller;
+        address nft_address;
+        u256 start_price;
+        u256 reserve_price;
+        u256 start_time;
+        u256 end_time;
+        address highest_bidder;
+        u256 highest_bid;
+        bool settled;
+    }
+
+    struct WrappedNFT {
+        u256 id;
+        u256 original_nft_id;
+        string source_chain;
+        string target_chain;
+        address original_owner;
+        address wrapped_contract;
+        u256 wrapped_token_id;
+        bool unwrapped;
+    }
+
+    // Events
+    event NFTMinted(u256 indexed nft_id, address indexed creator, u256 collection_id);
+    event NFTListed(u256 indexed nft_id, u256 price);
+    event NFTSold(u256 indexed nft_id, address indexed buyer, u256 price);
+    event AuctionCreated(u256 indexed auction_id, u256 indexed nft_id, u256 start_price);
+    event BidPlaced(u256 indexed auction_id, address indexed bidder, u256 amount);
+    event AuctionSettled(u256 indexed auction_id, address indexed winner, u256 amount);
+    event RoyaltyPaid(address indexed creator, address indexed token, u256 amount);
+    event NFTWrapped(u256 indexed wrap_id, string source_chain, string target_chain);
+    event NFTUnwrapped(u256 indexed wrap_id);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== MINT NFT =====
+
+    fn mint_nft(collection_id: u256, metadata_uri: string, royalty_bps: u256) -> u256 {
+        let collection = collections[collection_id];
+        require(collection.id != 0, "Collection not found");
+
+        nft_counter = nft_counter + 1;
+        let royalty = royalty_bps;
+        if royalty == 0 {
+            royalty = ROYALTY_BPS;
+        }
+        require(royalty <= 1000, "Max 10% royalty");
+
+        nfts[nft_counter] = NFT {
+            id: nft_counter,
+            collection_id: collection_id,
+            creator: msg.sender,
+            owner: msg.sender,
+            metadata_uri: metadata_uri,
+            royalty_bps: royalty,
+            listed: false,
+            list_price: 0,
+        };
+
+        collections[collection_id].total_supply = collections[collection_id].total_supply + 1;
+        emit NFTMinted(nft_counter, msg.sender, collection_id);
+        return nft_counter;
+    }
+
+    fn create_collection(name: string, symbol: string) -> u256 {
+        collection_counter = collection_counter + 1;
+        collections[collection_counter] = Collection {
+            id: collection_counter,
+            name: name,
+            symbol: symbol,
+            creator: msg.sender,
+            total_supply: 0,
+        };
+        return collection_counter;
+    }
+
+    fn list_nft(nft_id: u256, price: u256) {
+        let nft = nfts[nft_id];
+        require(nft.id != 0, "NFT not found");
+        require(nft.owner == msg.sender, "Not owner");
+        require(price > 0, "Price must be > 0");
+
+        nfts[nft_id].listed = true;
+        nfts[nft_id].list_price = price;
+        emit NFTListed(nft_id, price);
+    }
+
+    fn buy_nft(nft_id: u256) {
+        let nft = nfts[nft_id];
+        require(nft.id != 0, "NFT not found");
+        require(nft.listed, "Not listed");
+        require(msg.value >= nft.list_price, "Insufficient payment");
+
+        let price = nft.list_price;
+        let fee = price * PLATFORM_FEE_BPS / 10000;
+        let royalty_amount = price * nft.royalty_bps / 10000;
+        let seller_proceeds = price - fee - royalty_amount;
+
+        // Transfer platform fee
+        transfer(owner, fee);
+
+        // Transfer royalty to creator
+        if royalty_amount > 0 {
+            transfer(nft.creator, royalty_amount);
+            emit RoyaltyPaid(nft.creator, address(0), royalty_amount);
+        }
+
+        // Transfer proceeds to seller
+        transfer(nft.owner, seller_proceeds);
+
+        // Update ownership
+        nfts[nft_id].owner = msg.sender;
+        nfts[nft_id].listed = false;
+        nfts[nft_id].list_price = 0;
+
+        emit NFTSold(nft_id, msg.sender, price);
+    }
+
+    // ===== CREATE AUCTION =====
+
+    fn create_auction(
+        nft_id: u256,
+        nft_address: address,
+        start_price: u256,
+        reserve_price: u256,
+        duration: u256
+    ) -> u256 {
+        let nft = nfts[nft_id];
+        require(nft.id != 0, "NFT not found");
+        require(nft.owner == msg.sender, "Not owner");
+        require(start_price > 0, "Start price > 0");
+        require(reserve_price > 0, "Reserve price > 0");
+        require(duration >= MIN_AUCTION_DURATION, "Min duration");
+        require(duration <= MAX_AUCTION_DURATION, "Max duration");
+
+        auction_counter = auction_counter + 1;
+        auctions[auction_counter] = Auction {
+            id: auction_counter,
+            nft_id: nft_id,
+            seller: msg.sender,
+            nft_address: nft_address,
+            start_price: start_price,
+            reserve_price: reserve_price,
+            start_time: block.timestamp,
+            end_time: block.timestamp + duration,
+            highest_bidder: address(0),
+            highest_bid: 0,
+            settled: false,
+        };
+
+        emit AuctionCreated(auction_counter, nft_id, start_price);
+        return auction_counter;
+    }
+
+    // ===== PLACE BID =====
+
+    fn place_bid(auction_id: u256) {
+        let auction = auctions[auction_id];
+        require(auction.id != 0, "Auction not found");
+        require(block.timestamp < auction.end_time, "Auction ended");
+        require(!auction.settled, "Already settled");
+
+        let bid_amount = msg.value;
+        require(bid_amount >= auction.start_price, "Below start price");
+
+        if auction.highest_bid > 0 {
+            let min_bid = auction.highest_bid + (auction.highest_bid * MIN_BID_INCREMENT / 10000);
+            require(bid_amount >= min_bid, "Bid too low");
+
+            // Refund previous bidder
+            transfer(auction.highest_bidder, auction.highest_bid);
+        }
+
+        auctions[auction_id].highest_bid = bid_amount;
+        auctions[auction_id].highest_bidder = msg.sender;
+        emit BidPlaced(auction_id, msg.sender, bid_amount);
+    }
+
+    // ===== SETTLE AUCTION =====
+
+    fn settle_auction(auction_id: u256) {
+        let auction = auctions[auction_id];
+        require(block.timestamp >= auction.end_time, "Not ended");
+        require(!auction.settled, "Already settled");
+
+        auctions[auction_id].settled = true;
+
+        if auction.highest_bid >= auction.reserve_price {
+            // Auction succeeded
+            let fee = auction.highest_bid * PLATFORM_FEE_BPS / 10000;
+            let royalty = auction.highest_bid * nfts[auction.nft_id].royalty_bps / 10000;
+            let seller_proceeds = auction.highest_bid - fee - royalty;
+
+            transfer(owner, fee);
+            if royalty > 0 {
+                transfer(nfts[auction.nft_id].creator, royalty);
+                emit RoyaltyPaid(nfts[auction.nft_id].creator, address(0), royalty);
+            }
+            transfer(auction.seller, seller_proceeds);
+
+            // Transfer NFT to winner
+            nfts[auction.nft_id].owner = auction.highest_bidder;
+            emit AuctionSettled(auction_id, auction.highest_bidder, auction.highest_bid);
+        } else {
+            // Reserve not met - return NFT to seller
+            if auction.highest_bidder != address(0) {
+                transfer(auction.highest_bidder, auction.highest_bid);
+            }
+        }
+    }
+
+    // ===== PAY ROYALTY =====
+
+    fn pay_royalty(creator: address, token: address, sale_price: u256) -> u256 {
+        let royalty_amount = sale_price * ROYALTY_BPS / 10000;
+        require(royalty_amount > 0, "No royalty due");
+
+        royalties_owed[creator][token] = royalties_owed[creator][token] + royalty_amount;
+        emit RoyaltyPaid(creator, token, royalty_amount);
+        return royalty_amount;
+    }
+
+    fn claim_royalties(creator: address, token: address) -> u256 {
+        let amount = royalties_owed[creator][token];
+        require(amount > 0, "Nothing to claim");
+
+        royalties_owed[creator][token] = 0;
+        transfer(creator, amount);
+        return amount;
+    }
+
+    // ===== WRAP NFT (Cross-Chain) =====
+
+    fn wrap_nft(
+        nft_id: u256,
+        source_chain: string,
+        target_chain: string,
+        wrapped_contract: address
+    ) -> u256 {
+        let nft = nfts[nft_id];
+        require(nft.id != 0, "NFT not found");
+        require(nft.owner == msg.sender, "Not owner");
+        require(source_chain != target_chain, "Same chain");
+
+        // Lock the NFT in contract
+        nfts[nft_id].owner = address(this);
+
+        wrap_counter = wrap_counter + 1;
+        wrapped_nfts[wrap_counter] = WrappedNFT {
+            id: wrap_counter,
+            original_nft_id: nft_id,
+            source_chain: source_chain,
+            target_chain: target_chain,
+            original_owner: msg.sender,
+            wrapped_contract: wrapped_contract,
+            wrapped_token_id: 0,
+            unwrapped: false,
+        };
+
+        // Call bridge to mint wrapped NFT on target chain
+        call(wrapped_contract, "mint", (msg.sender, nft.metadata_uri));
+
+        emit NFTWrapped(wrap_counter, source_chain, target_chain);
+        return wrap_counter;
+    }
+
+    fn unwrap_nft(wrap_id: u256) {
+        let wrapped = wrapped_nfts[wrap_id];
+        require(wrapped.id != 0, "Wrap not found");
+        require(!wrapped.unwrapped, "Already unwrapped");
+        require(msg.sender == wrapped.original_owner, "Not original owner");
+
+        wrapped_nfts[wrap_id].unwrapped = true;
+        nfts[wrapped.original_nft_id].owner = msg.sender;
+
+        emit NFTUnwrapped(wrap_id);
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_nft(nft_id: u256) -> NFT {
+        return nfts[nft_id];
+    }
+
+    fn get_auction(auction_id: u256) -> Auction {
+        return auctions[auction_id];
+    }
+
+    fn get_collection(collection_id: u256) -> Collection {
+        return collections[collection_id];
+    }
+
+    fn get_wrapped_nft(wrap_id: u256) -> WrappedNFT {
+        return wrapped_nfts[wrap_id];
+    }
+}

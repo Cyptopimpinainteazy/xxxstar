@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X3STAR — Blockchain Ecosystem Control Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/x3-site-nav.css">
+  <style>
+    :root {
+      --bg: #0a0e27;
+      --bg2: #0d1225;
+      --border: rgba(217, 188, 121, 0.22);
+      --gold: #d9bc79;
+      --cyan: #00c9a7;
+      --text: #f4f7fb;
+      --muted: #8a95ab;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Hero Section */
+    header {
+      padding-top: 120px;
+      padding-bottom: 80px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(10, 14, 39, 0.5) 0%, transparent 100%);
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(28px, 6vw, 52px);
+      font-weight: 800;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff1c2, #00c9a7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline {
+      font-size: 16px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 60px;
+      flex-wrap: wrap;
+    }
+
+    .quick-btn {
+      padding: 12px 24px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(217, 188, 121, 0.1), rgba(0, 201, 167, 0.08));
+      color: var(--text);
+      text-decoration: none;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 220ms ease;
+    }
+
+    .quick-btn:hover {
+      background: linear-gradient(135deg, rgba(217, 188, 121, 0.2), rgba(0, 201, 167, 0.15));
+      transform: translateY(-2px);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Categories Grid */
+    .categories {
+      display: grid;
+      gap: 60px;
+      margin: 80px 0;
+    }
+
+    .category {
+      display: grid;
+      gap: 16px;
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .category-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .category-divider {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--gold), transparent);
+    }
+
+    .category-count {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .pages-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .page-card {
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(13, 18, 37, 0.8), rgba(13, 18, 37, 0.4));
+      text-decoration: none;
+      color: var(--text);
+      transition: all 220ms ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .page-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0, 201, 167, 0.1), transparent);
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+
+    .page-card:hover {
+      border-color: rgba(0, 201, 167, 0.4);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0, 201, 167, 0.1);
+    }
+
+    .page-card:hover::before {
+      opacity: 1;
+    }
+
+    .page-card-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .page-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+      letter-spacing: 0.1em;
+    }
+
+    .page-description {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Live Data Section */
+    .live-data {
+      margin: 80px 0;
+      padding: 40px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(13, 18, 37, 0.6), rgba(7, 10, 15, 0.4));
+      backdrop-filter: blur(18px);
+    }
+
+    .live-data-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: var(--cyan);
+    }
+
+    .live-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px;
+    }
+
+    .metric {
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      border: 1px solid rgba(217, 188, 121, 0.12);
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--gold);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 100px;
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .footer-link {
+      color: var(--text);
+      text-decoration: none;
+      transition: color 220ms ease;
+    }
+
+    .footer-link:hover {
+      color: var(--gold);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header {
+        padding-top: 80px;
+        padding-bottom: 60px;
+      }
+
+      .pages-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .category-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .category-divider {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>🌐 X3STAR</h1>
+      <p class="tagline">Blockchain Ecosystem Control Center — Navigate the complete X3 platform infrastructure, governance, capital, and market intelligence from a single hub.</p>
+
+      <div class="quick-actions">
+        <a href="/x3star-dashboard.html" class="quick-btn">📊 Dashboard</a>
+        <a href="/x3star-admin-dashboard.html" class="quick-btn">⚙️ Admin</a>
+        <a href="/test-rpc-connection.html" class="quick-btn">🔗 RPC Test</a>
+        <a href="https://x3star.org" class="quick-btn" target="_blank">🖥️ Desktop App</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Overview Category -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-title">📍 Overview</div>
+        <div class="category-divider"></div>
+        <div class="category-count">5 pages</div>
+      </div>
+      <div class="pages-grid">
+        <a href="/x3star-landing.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Landing</div>
+            <div class="page-description">Public homepage and live traction.</div>
+          </div>
+        </a>
+        <a href="/x3star-dashboard.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Dashboard</div>
+            <div class="page-description">High-level telemetry and capital view.</div>
+          </div>
+        </a>
+        <a href="/x3star-spine.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">The Spine</div>
+            <div class="page-description">Narrative architecture and origin story.</div>
+          </div>
+        </a>
+        <a href="/x3star-ecosystem-heartbeat.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Heartbeat</div>
+            <div class="page-description">Live ecosystem flow snapshot.</div>
+          </div>
+        </a>
+        <a href="/x3star-mission-terminal.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Mission Terminal</div>
+            <div class="page-description">Milestone and launch timeline.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Operations Category -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-title">🔧 Operations</div>
+        <div class="category-divider"></div>
+        <div class="category-count">7 pages</div>
+      </div>
+      <div class="pages-grid">
+        <a href="/x3star-network-pulse.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Network Pulse</div>
+            <div class="page-description">Validator map, throughput, and live feed.</div>
+          </div>
+        </a>
+        <a href="/x3star-node-health.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Node Health</div>
+            <div class="page-description">Operator telemetry and heartbeat status.</div>
+          </div>
+        </a>
+        <a href="/x3star-governance.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Governance</div>
+            <div class="page-description">DAO proposals and treasury status.</div>
+          </div>
+        </a>
+        <a href="/x3star-staking.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Staking</div>
+            <div class="page-description">Pools, APY, and locked capital.</div>
+          </div>
+        </a>
+        <a href="/x3star-transparency-ledger.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Ledger</div>
+            <div class="page-description">Treasury and funding transparency.</div>
+          </div>
+        </a>
+        <a href="/x3star-proof-wall.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Proof Wall</div>
+            <div class="page-description">Operator reservation proof feed.</div>
+          </div>
+        </a>
+        <a href="/x3star-operator-war-room.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">War Room</div>
+            <div class="page-description">Operator-facing network console.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Capital Category -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-title">💰 Capital</div>
+        <div class="category-divider"></div>
+        <div class="category-count">12 pages</div>
+      </div>
+      <div class="pages-grid">
+        <a href="/x3star-token-presale.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Token Presale</div>
+            <div class="page-description">Round metrics and sale entry point.</div>
+          </div>
+        </a>
+        <a href="/x3star-validator-presale.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Validator Presale</div>
+            <div class="page-description">Genesis, Star, and Lite node tiers.</div>
+          </div>
+        </a>
+        <a href="/x3star-scarcity-clock.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Scarcity Clock</div>
+            <div class="page-description">Close velocity and sellout estimate.</div>
+          </div>
+        </a>
+        <a href="/x3star-slot-tracker.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Slot Tracker</div>
+            <div class="page-description">Genesis slot allocation grid.</div>
+          </div>
+        </a>
+        <a href="/x3star-fundraise-thermometer.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Thermometer</div>
+            <div class="page-description">Round progress and reservation feed.</div>
+          </div>
+        </a>
+        <a href="/x3star-social-proof-wall.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Social Proof</div>
+            <div class="page-description">Capital inflow wall and purchase stream.</div>
+          </div>
+        </a>
+        <a href="/x3star-investor-relations.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Investor Relations</div>
+            <div class="page-description">Institutional funnel and contact form.</div>
+          </div>
+        </a>
+        <a href="/x3star-kyc-onboarding.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">KYC Onboarding</div>
+            <div class="page-description">Application intake workflow.</div>
+          </div>
+        </a>
+        <a href="/x3star-roi-calculator.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">ROI Calculator</div>
+            <div class="page-description">Allocation and operator outcome math.</div>
+          </div>
+        </a>
+        <a href="/x3star-if-you-invested.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">If You Invested</div>
+            <div class="page-description">Retroactive presale outcome explainer.</div>
+          </div>
+        </a>
+        <a href="/x3star-if-you-had.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">If You Had</div>
+            <div class="page-description">Historical operator return framing.</div>
+          </div>
+        </a>
+        <a href="/x3star-portfolio.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Portfolio</div>
+            <div class="page-description">Holdings and raise-facing overview.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Market Category -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-title">📈 Market</div>
+        <div class="category-divider"></div>
+        <div class="category-count">6 pages</div>
+      </div>
+      <div class="pages-grid">
+        <a href="/x3star-whale-tracker.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Whale Tracker</div>
+            <div class="page-description">Large wallet activity and net flow.</div>
+          </div>
+        </a>
+        <a href="/x3star-tokenomics-warroom.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Tokenomics</div>
+            <div class="page-description">Supply, vesting, burns, and unlocks.</div>
+          </div>
+        </a>
+        <a href="/x3star-arbitrage-engine.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Arbitrage Engine</div>
+            <div class="page-description">Kernel story and benchmark-backed throughput.</div>
+          </div>
+        </a>
+        <a href="/x3star-competitor-graveyard.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Competitor Graveyard</div>
+            <div class="page-description">Comparison narrative and failure cases.</div>
+          </div>
+        </a>
+        <a href="/x3star-leaderboard-arena.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Leaderboard Arena</div>
+            <div class="page-description">Ranking and community competition surfaces.</div>
+          </div>
+        </a>
+        <a href="/x3star-hall-of-fame.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Hall of Fame</div>
+            <div class="page-description">Top contributors and operator recognition.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Ecosystem Category -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-title">🌍 Ecosystem</div>
+        <div class="category-divider"></div>
+        <div class="category-count">5 pages</div>
+      </div>
+      <div class="pages-grid">
+        <a href="/x3star-affiliate.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Affiliate</div>
+            <div class="page-description">Partner intake and referral applications.</div>
+          </div>
+        </a>
+        <a href="/x3star-grant-hub.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Grant Hub</div>
+            <div class="page-description">Ecosystem grant directory and targets.</div>
+          </div>
+        </a>
+        <a href="/x3star-grant-mission-control.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Grant Mission Control</div>
+            <div class="page-description">Grant submission and status surface.</div>
+          </div>
+        </a>
+        <a href="/x3star-bounty-board.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Bounty Board</div>
+            <div class="page-description">Open work and contributor rewards.</div>
+          </div>
+        </a>
+        <a href="/x3star-barter-exchange.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Barter Exchange</div>
+            <div class="page-description">Deal room for compute and services.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Benchmarks Category -->
+    <div class="category">
+      <div class="category-header">
+        <div class="category-title">📊 Benchmarks</div>
+        <div class="category-divider"></div>
+        <div class="category-count">5 pages</div>
+      </div>
+      <div class="pages-grid">
+        <a href="/chainbench-pro.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">RPC Report</div>
+            <div class="page-description">Saved RPC validation artifact.</div>
+          </div>
+        </a>
+        <a href="/chainbench-ultimate.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Overview</div>
+            <div class="page-description">Suite overview and live network snapshot.</div>
+          </div>
+        </a>
+        <a href="/chainbench-ultimate(1).html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Overview Alt</div>
+            <div class="page-description">Alternate overview variant.</div>
+          </div>
+        </a>
+        <a href="/blockchain-stress-test.html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Stress Artifact</div>
+            <div class="page-description">Saved throughput stress artifact.</div>
+          </div>
+        </a>
+        <a href="/blockchain-stress-test(1).html" class="page-card">
+          <div class="page-card-content">
+            <div class="page-title">Stress Artifact Alt</div>
+            <div class="page-description">Alternate stress artifact variant.</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Live Data Section -->
+    <div class="live-data">
+      <div class="live-data-title">🔗 Live Network Metrics</div>
+      <div class="live-metrics">
+        <div class="metric">
+          <div class="metric-label">Current Block</div>
+          <div class="metric-value" id="block-height">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Network Status</div>
+          <div class="metric-value" id="network-status">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Connected Peers</div>
+          <div class="metric-value" id="peer-count">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Last Update</div>
+          <div class="metric-value" id="last-update">—</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-links">
+        <a href="https://x3star.org" class="footer-link" target="_blank">🖥️ Desktop App</a>
+        <a href="/x3star-whitepaper.html" class="footer-link">📄 Whitepaper</a>
+        <a href="https://github.com" class="footer-link" target="_blank">💻 GitHub</a>
+        <a href="https://discord.com" class="footer-link" target="_blank">💬 Discord</a>
+      </div>
+      <p>&copy; 2026 X3STAR. All rights reserved. | <a href="https://x3star.net" style="color: var(--muted); text-decoration: none;">x3star.net</a></p>
+    </div>
+  </footer>
+
+  <script src="js/x3-nav-loader.js"></script>
+  <script src="js/x3-live-data.js"></script>
+  <script>
+    // Fetch live blockchain data
+    async function updateLiveData() {
+      try {
+        const response = await fetch('http://localhost:9933', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'chain_getHeader', params: [] })
+        });
+        const data = await response.json();
+
+        if (data.result) {
+          const blockNum = parseInt(data.result.number, 16);
+          document.getElementById('block-height').textContent = `#${blockNum.toLocaleString()}`;
+          document.getElementById('network-status').textContent = '✓ Active';
+          document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        } else {
+          document.getElementById('network-status').textContent = '✗ Unavailable';
+        }
+      } catch (e) {
+        document.getElementById('network-status').textContent = '✗ Offline';
+      }
+    }
+
+    // Update on load and every 10 seconds
+    updateLiveData();
+    setInterval(updateLiveData, 10000);
+  </script>
+</body>
+</html>

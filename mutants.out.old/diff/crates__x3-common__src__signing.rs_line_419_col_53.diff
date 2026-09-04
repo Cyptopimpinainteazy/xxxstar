@@ -1,0 +1,21 @@
+--- crates/x3-common/src/signing.rs
++++ replace == with != in verify_signature
+@@ -411,17 +411,17 @@
+             if signature.len() != 65 || public_key.len() != 65 {
+                 return false;
+             }
+             let mut sig = [0u8; 65];
+             sig.copy_from_slice(signature);
+             let mut pk = [0u8; 64];
+             pk.copy_from_slice(&public_key[1..]); // skip 0x04 prefix
+             match sp_io::crypto::secp256k1_ecdsa_recover(&sig, &blake2_256(message)) {
+-                Ok(recovered) => recovered.as_ref() == pk.as_ref(),
++                Ok(recovered) => recovered.as_ref() != /* ~ changed by cargo-mutants ~ */ pk.as_ref(),
+                 Err(_) => false,
+             }
+         }
+         KeyType::Sr25519 => {
+             if signature.len() != 64 || public_key.len() != 32 {
+                 return false;
+             }
+             let sig = sr25519::Signature::from_raw({

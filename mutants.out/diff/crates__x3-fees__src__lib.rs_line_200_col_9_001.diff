@@ -1,0 +1,36 @@
+--- crates/x3-fees/src/lib.rs
++++ replace EconomicEngine::process_transaction -> (u128, u128) with (0, 1)
+@@ -192,32 +192,17 @@
+             total_burned: 0,
+             total_staked_rewards: 0,
+         }
+     }
+ 
+     /// Process transaction with fees and MEV protection
+     pub fn process_transaction(&mut self, tx_data: Vec<u8>, block_fullness: f64) -> (u128, u128) {
+         // Adjust fee market based on block fullness
+-        self.fee_market.adjust_base_fee(block_fullness);
+-
+-        // Create commit-reveal proof
+-        let proof = CommitRevealProof::new(tx_data, vec![]);
+-        self.mev_protection = proof;
+-
+-        // Calculate fee and split
+-        let total_fee = self.fee_market.base_fee;
+-        let (burned, validator_reward) = self.fee_market.split_fee(total_fee);
+-
+-        // Track statistics
+-        self.total_fees_collected = self.total_fees_collected.saturating_add(total_fee);
+-        self.total_burned = self.total_burned.saturating_add(burned);
+-        self.total_staked_rewards = self.total_staked_rewards.saturating_add(validator_reward);
+-
+-        (burned, validator_reward)
++        (0, 1) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Slash validator and contribute to insurance
+     pub fn slash_validator(&mut self, amount: u128) {
+         self.insurance_fund.contribute_from_slash(amount);
+     }
+ }
+ 

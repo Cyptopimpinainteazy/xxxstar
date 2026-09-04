@@ -1,0 +1,189 @@
+# Tertiary Lane Configuration (Node C)
+# Role: Regional failover + CPU degraded mode
+
+lane:
+  id: tertiary
+  name: "Tertiary Lane C (Regional Failover)"
+  role: tertiary
+  priority: 3
+  region: us-west-2a  # Different region
+  
+hardware:
+  gpus:
+    count: 2
+    model: "NVIDIA A100 40GB"
+    memory_per_gpu: "40GB"
+    cuda_version: "12.3"
+    devices: [0, 1]
+    
+  cpu:
+    model: "AMD EPYC 7543"
+    cores: 64
+    threads: 128
+    
+  memory:
+    total: "512GB"
+    huge_pages: true
+    numa_aware: true
+    
+  storage:
+    type: "NVMe SSD RAID1"
+    devices: 4
+    capacity_per_device: "1.92TB"
+    mount_point: "/data/acceleration"
+    
+  network:
+    bandwidth: "100Gbps"
+    mtu: 9000
+    interfaces:
+      - name: eth0
+        ip: 10.1.1.10
+        role: primary
+
+gpu_config:
+  # Tertiary keeps kernels compiled but not always resident
+  preload_kernels: false  # Load on demand to save power
+  kernel_dir: "/opt/ccgv/kernels"
+  kernels:
+    - secp256k1_batch
+    - keccak256_batch
+    - sha256_batch
+    - ed25519_verify
+    
+  memory_management:
+    pinned: true
+    preallocate: false  # Allocate when activated
+    cache_size: "32GB"
+    
+  stream_config:
+    streams_per_gpu: 16
+    async_execution: true
+    priority_streams: 4
+    
+  monitoring:
+    nvidia_smi_interval: 5  # Less frequent
+    temperature_threshold: 80
+    power_limit: 300
+    memory_threshold: 95
+
+tertiary_mode:
+  # Activated only when primary + shadow both fail
+  activation_trigger: "cascade_failure"
+  warm_up_time_ms: 500  # Time to load GPU state
+  degraded_mode_enabled: true
+  cpu_fallback_enabled: true
+
+performance:
+  # Tertiary has lower targets - handles failover gracefully
+  target_tps: 5_000_000  # 25% of primary (still 77× Solana)
+  max_latency_ms: 5.0   # Higher latency acceptable
+  batch_size: 5000
+  prefetch_batches: 2
+  
+  # CPU fallback mode when GPU unavailable
+  cpu_mode:
+    enabled: true
+    target_tps: 300_000  # 4.6× Solana - still useful
+    max_latency_ms: 10.0
+    
+health_check:
+  enabled: true
+  interval: 10  # Less frequent - not actively serving
+  endpoints:
+    - http://localhost:9000/health
+  metrics:
+    - gpu_utilization
+    - cpu_utilization
+    - memory_usage
+    - kernel_execution_time
+  thresholds:
+    gpu_utilization_min: 10
+    cpu_utilization_max: 80  # CPU fallback uses more CPU
+    memory_usage_max: 90
+    kernel_timeout_ms: 100
+
+failover:
+  enabled: true
+  mode: "regional_failover"
+  promotion_trigger: "primary_and_shadow_failure"
+  promotion_time_target_ms: 50  # Slower than shadow (cross-region)
+  health_score_threshold: 0.3
+  
+  # Tertiary is last line of defense
+  promotion_targets: []  # No further failover
+  
+  degradation_strategy:
+    - gpu_acceleration
+    - cpu_fallback
+    - external_validator_native
+
+signer:
+  mode: "remote"
+  authority: "http://signer-service:8080"
+  acquire_on_promotion: true
+  lock_mechanism: "etcd"
+  lock_ttl: 30
+  heartbeat_interval: 10
+
+toll_booth:
+  enabled: true
+  endpoint: "http://toll-booth:7000"
+  passive_mode: true
+  notify_degraded_mode: true  # Alert validators of degraded performance
+  
+chains:
+  solana:
+    enabled: true
+    rpc_endpoints:
+      - https://api.devnet.solana.com
+    adapter: "svm_validator"
+    gpu_acceleration: true
+    cpu_fallback: true
+    
+  ethereum:
+    enabled: true
+    rpc_endpoints:
+      - https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
+    adapter: "evm_validator"
+    gpu_acceleration: true
+    cpu_fallback: true
+    
+  arbitrum:
+    enabled: true
+    rpc_endpoints:
+      - https://arb1.arbitrum.io/rpc
+    adapter: "evm_validator"
+    gpu_acceleration: true
+    cpu_fallback: true
+    
+  zksync:
+    enabled: true
+    rpc_endpoints:
+      - https://mainnet.era.zksync.io
+    adapter: "evm_validator"
+    gpu_acceleration: true
+    cpu_fallback: true
+
+replication:
+  # Tertiary syncs state snapshots periodically
+  source: "primary"
+  method: "snapshot"
+  sync_interval: 60  # seconds
+  lag_tolerance_ms: 5000  # More relaxed
+  verify_hash: true
+
+logging:
+  level: INFO
+  format: json
+  output: /var/log/ccgv/tertiary_lane.log
+  rotation:
+    max_size: 500MB
+    max_age: 7d
+    
+metrics:
+  enabled: true
+  port: 9093
+  exporters:
+    - prometheus
+    - json
+  flush_interval: 30

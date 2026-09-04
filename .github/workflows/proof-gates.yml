@@ -1,0 +1,552 @@
+name: ProofForge Gates - Automated Proof Verification
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    # Run proof-all daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      gate_type:
+        description: 'Gate to run: pre-commit, s0, s1, testnet, mainnet, all'
+        type: choice
+        options:
+          - all
+          - pre-commit
+          - s0
+          - s1
+          - testnet
+          - mainnet
+        required: true
+        default: 'all'
+
+concurrency:
+  group: proofgates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # PRE-COMMIT GATE: Runs on every push/PR
+  pre-commit-gate:
+    name: Pre-Commit Gate - Claim Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'pre-commit' || github.event.inputs.gate_type == 's0' || github.event.inputs.gate_type == 's1')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: target
+          cache-all-crates: true
+
+      - name: Build ProofForge
+        run: |
+          cd target 2>/dev/null || cargo build -p proof-forge --release
+          if [ ! -f target/release/x3-proof ]; then
+            cargo build -p proof-forge --release
+          fi
+
+      - name: Receipt Schema Gate
+        run: |
+          chmod +x scripts/proof/*.sh
+          bash scripts/proof/verify-receipts.sh
+
+      - name: Claim Registry Status Gate
+        run: |
+          bash scripts/proof/check-claim-status.sh
+
+      - name: Status-Doc Truth Lint Gate
+        run: |
+          set -euo pipefail
+          chmod +x scripts/proof/lint-status-doc-truth.sh
+          bash scripts/proof/lint-status-doc-truth.sh
+
+      - name: EVM or SVM Parity Gate
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors
+
+      - name: Minimal Stack Replay and Failure Gate
+        run: |
+          set -euo pipefail
+          bash scripts/test-minimal-stack-replay-failure.sh
+
+      - name: GPU or CPU Determinism Benchmark Gate
+        run: |
+          set -euo pipefail
+          bash scripts/test-gpu-cpu-determinism-benchmark-gate.sh
+
+      - name: Runtime No-Op Wiring Guard
+        run: |
+          set -euo pipefail
+          ! rg -n "type CrossChainProofVerifier\\s*=\\s*pallet_x3_kernel::NoopProofVerifier|type Settlement\\s*=\\s*pallet_atomic_trade_engine::NoOpSettlementBridge|type CrossChainValidator\\s*=\\s*pallet_x3_settlement_engine::bridge_integration::NoOpCrossChainValidator" runtime/src/lib.rs
+
+      - name: Run Proof Scan
+        id: scan
+        run: |
+          set -euo pipefail
+          ./target/release/x3-proof scan-claims 2>&1 | tee precommit-scan-results.txt
+
+      - name: Check AI Patch Firewall
+        id: ai-patch
+        run: |
+          set -euo pipefail
+          ./target/release/x3-proof ai-patch-firewall 2>&1 | tee precommit-ai-firewall-results.txt
+
+      - name: Report Pre-Commit Results
+        if: always()
+        run: |
+          echo "### 🔍 Pre-Commit Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Claim Scan Step:** ${{ steps.scan.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**AI Patch Firewall Step:** ${{ steps.ai-patch.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Read logs/artifacts for detailed findings." >> $GITHUB_STEP_SUMMARY
+
+  # S0 SECURITY GATE: Runs on PR and main branch
+  s0-security-gate:
+    name: S0 Security Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 's0')
+    needs: pre-commit-gate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release 2>&1 | tail -5
+
+      - name: Run S0 Security Gate
+        id: s0-gate
+        run: |
+          set -uo pipefail
+          ./target/release/x3-proof security-gate -v 2>&1 | tee s0-gate-results.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "gate_result=$EXIT_CODE" >> $GITHUB_OUTPUT
+          exit $EXIT_CODE
+
+      - name: Comment S0 Results on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('s0-gate-results.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### 🔒 S0 Security Gate Results\n\`\`\`\n${results}\n\`\`\``
+            });
+
+      - name: Report S0 Artifact Path
+        if: always()
+        run: |
+          echo "S0 results file: s0-gate-results.txt" >> $GITHUB_STEP_SUMMARY
+
+  # S1 SECURITY GATE: Runs on PR and main branch
+  s1-security-gate:
+    name: S1 Security Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 's1')
+    needs: pre-commit-gate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release 2>&1 | tail -5
+
+      - name: Run Extended Security Checks
+        id: s1-checks
+        run: |
+          set -euo pipefail
+          echo "=== S1 Security Gate - Extended Verification ==="
+          echo ""
+          echo "✓ Checking consensus robustness..."
+          ./target/release/x3-proof prove consensus --strict 2>&1 | tee s1-consensus-results.txt
+          echo ""
+          echo "✓ Checking bridge security..."
+          ./target/release/x3-proof prove bridge --strict 2>&1 | tee s1-bridge-results.txt
+          echo ""
+          echo "✓ Checking runtime integrity..."
+          ./target/release/x3-proof prove runtime --strict 2>&1 | tee s1-runtime-results.txt
+
+      - name: Report S1 Results
+        if: always()
+        run: |
+          echo "### 🔐 S1 Security Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Extended Checks Step:** ${{ steps.s1-checks.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "See s1 step logs for consensus/bridge/runtime outputs." >> $GITHUB_STEP_SUMMARY
+
+  # TESTNET READINESS GATE
+  testnet-gate:
+    name: Testnet Readiness Gate (≥0.85)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'testnet'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release 2>&1 | tail -5
+
+      - name: Run Testnet Gate
+        id: testnet
+        run: |
+          set -euo pipefail
+          echo "=== Testnet Readiness Gate ===" 
+          ./target/release/x3-proof testnet-gate -v 2>&1 | tee testnet-gate-results.txt
+          
+          VERDICT=$(grep -i "VERDICT" testnet-gate-results.txt | head -1 || true)
+          SCORE=$(grep -oP 'Score:\\s*\\K[0-9.]+' testnet-gate-results.txt | head -1 || true)
+          echo "testnet_verdict=$VERDICT" >> $GITHUB_OUTPUT
+          echo "testnet_score=$SCORE" >> $GITHUB_OUTPUT
+
+      - name: Report Testnet Artifact Path
+        if: always()
+        run: |
+          echo "Testnet results file: testnet-gate-results.txt" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report Testnet Status
+        run: |
+          echo "### 🧪 Testnet Readiness Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Step Outcome:** ${{ steps.testnet.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Verdict:** ${{ steps.testnet.outputs.testnet_verdict }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Score:** ${{ steps.testnet.outputs.testnet_score }}" >> $GITHUB_STEP_SUMMARY
+
+  # MAINNET READINESS GATE: Only on release tags
+  mainnet-gate:
+    name: Mainnet Readiness Gate (≥0.95)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'mainnet'))
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release 2>&1 | tail -5
+
+      - name: Run Mainnet Gate
+        id: mainnet
+        run: |
+          set -uo pipefail
+          echo "=== Mainnet Readiness Gate ===" 
+          ./target/release/x3-proof mainnet-gate --fail-hard 2>&1 | tee mainnet-gate-results.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          VERDICT=$(grep -i "VERDICT" mainnet-gate-results.txt | head -1 || true)
+          SCORE=$(grep -oP 'Score:\\s*\\K[0-9.]+' mainnet-gate-results.txt | head -1 || true)
+          echo "mainnet_verdict=$VERDICT" >> $GITHUB_OUTPUT
+          echo "mainnet_score=$SCORE" >> $GITHUB_OUTPUT
+          
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ Mainnet readiness verified"
+          else
+            echo "❌ Mainnet readiness BLOCKED"
+          fi
+          exit $EXIT_CODE
+
+      - name: Report Mainnet Artifact Path
+        if: always()
+        run: |
+          echo "Mainnet results file: mainnet-gate-results.txt" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report Mainnet Status
+        if: always()
+        run: |
+          echo "### 🚀 Mainnet Readiness Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Step Outcome:** ${{ steps.mainnet.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.mainnet.outputs.mainnet_verdict }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Score:** ${{ steps.mainnet.outputs.mainnet_score }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create Release Notes
+        if: success()
+        run: |
+          {
+            echo "## ProofForge Mainnet Release v$(git describe --tags)"
+            echo ""
+            echo "### Proof Verification Status"
+            cat mainnet-gate-results.txt
+            echo ""
+            echo "### Deployment Instructions"
+            echo "This release has passed all mainnet readiness gates and is approved for production deployment."
+          } > RELEASE_NOTES.md
+
+      - name: Report Release Notes Path
+        if: success()
+        run: |
+          echo "Release notes file: RELEASE_NOTES.md" >> $GITHUB_STEP_SUMMARY
+
+  # DAILY PROOF RUN: Scheduled daily execution
+  daily-proof-run:
+    name: Daily Proof Verification Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.gate_type == 'all')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release 2>&1 | tail -5
+
+      - name: Run Complete Proof Suite
+        id: prove-all
+        run: |
+          echo "=== Daily Proof Verification Run ===" 
+          ./target/release/x3-proof prove-all -v 2>&1 | tee daily-proof-results.txt
+          
+          # Extract summary statistics
+          SCORE=$(grep -oP 'Score:\s*\K[0-9.]+' daily-proof-results.txt | head -1)
+          STATUS=$(grep -oP 'Status:\s*\K\w+' daily-proof-results.txt | head -1)
+          
+          echo "overall_score=$SCORE" >> $GITHUB_OUTPUT
+          echo "overall_status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Generate Dashboard Export
+        run: |
+          ./target/release/x3-proof dashboard --output daily-dashboard.json -v
+          cat daily-dashboard.json | jq '.' > /tmp/dashboard-formatted.json
+          cp /tmp/dashboard-formatted.json daily-dashboard.json
+
+      - name: Report Daily Result Paths
+        run: |
+          echo "Daily results: daily-proof-results.txt" >> $GITHUB_STEP_SUMMARY
+          echo "Daily dashboard: daily-dashboard.json" >> $GITHUB_STEP_SUMMARY
+
+      - name: Publish Dashboard Metrics
+        run: |
+          echo "### 📊 Daily Proof Verification Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Score:** ${{ steps.prove-all.outputs.overall_score }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.prove-all.outputs.overall_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "See uploaded artifacts for full module/test breakdown." >> $GITHUB_STEP_SUMMARY
+
+  # GITHUB PAGES DASHBOARD PUBLICATION
+  publish-dashboard:
+    name: Publish Dashboard to GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'push')
+    needs: [pre-commit-gate, s0-security-gate, s1-security-gate, testnet-gate]
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build ProofForge
+        run: cargo build -p proof-forge --release 2>&1 | tail -5
+
+      - name: Generate Dashboard
+        run: |
+          mkdir -p dashboard-data
+          
+          # Generate main dashboard
+          ./target/release/x3-proof dashboard --output dashboard-data/proof-score.json -v
+          
+          # Capture timestamp
+          echo "{\"generated_at\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}" > dashboard-data/metadata.json
+
+      - name: Create Dashboard HTML
+        run: |
+          cat > dashboard-data/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>X3 ProofForge Dashboard</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1419; color: #e1e8ed; padding: 20px; }
+              .container { max-width: 1200px; margin: 0 auto; }
+              header { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #38444d; }
+              h1 { font-size: 2em; margin-bottom: 5px; color: #1da1f2; }
+              .subtitle { color: #aab8c2; font-size: 0.9em; }
+              .panel { background: #192734; border: 1px solid #38444d; border-radius: 8px; padding: 20px; margin: 20px 0; }
+              .label { color: #aab8c2; font-size: 0.85em; text-transform: uppercase; margin-bottom: 8px; }
+              .value { font-size: 1.2em; font-weight: 600; color: #1da1f2; }
+              pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #111820; border: 1px solid #38444d; border-radius: 8px; padding: 16px; margin-top: 12px; }
+              footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #38444d; color: #657786; font-size: 0.85em; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <header>
+                <h1>🔐 X3 ProofForge Dashboard</h1>
+                <p class="subtitle">Generated from live proof gate outputs</p>
+              </header>
+
+              <div class="panel">
+                <div class="label">Generated At (UTC)</div>
+                <div class="value" id="generated-at">loading...</div>
+              </div>
+
+              <div class="panel">
+                <div class="label">Raw Dashboard JSON</div>
+                <pre id="payload">loading...</pre>
+              </div>
+
+              <footer>
+                <p>Last updated: <span id="timestamp"></span></p>
+                <p>X3 ProofForge v1.0.0 • Automated Proof Verification System</p>
+              </footer>
+            </div>
+            <script>
+              document.getElementById('timestamp').textContent = new Date().toLocaleString();
+              Promise.all([
+                fetch('./metadata.json').then((r) => r.json()),
+                fetch('./proof-score.json').then((r) => r.json()),
+              ]).then(([meta, score]) => {
+                document.getElementById('generated-at').textContent = meta.generated_at || 'unknown';
+                document.getElementById('payload').textContent = JSON.stringify(score, null, 2);
+              }).catch((err) => {
+                document.getElementById('generated-at').textContent = 'unavailable';
+                document.getElementById('payload').textContent = `Failed to load dashboard JSON: ${err}`;
+              });
+            </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Prepare Pages Content
+        run: |
+          echo "proofforge.x3.dev" > dashboard-data/CNAME
+
+      - name: Deploy to gh-pages branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd dashboard-data
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: update ProofForge dashboard (${GITHUB_SHA})"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin HEAD:gh-pages
+
+      - name: Create GitHub Pages Index
+        run: |
+          SCORE=$(jq -r '.score // .overall_score // "unknown"' dashboard-data/proof-score.json 2>/dev/null || echo "unknown")
+          STATUS=$(jq -r '.status // .overall_status // "unknown"' dashboard-data/proof-score.json 2>/dev/null || echo "unknown")
+          echo "## 📊 ProofForge Dashboard Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Dashboard available at: https://proofforge.x3.dev" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Latest Metrics:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Overall Score: $SCORE" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: $STATUS" >> $GITHUB_STEP_SUMMARY
+
+  # FINAL SUMMARY AND NOTIFICATIONS
+  workflow-summary:
+    name: Workflow Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    needs: [pre-commit-gate, s0-security-gate, s1-security-gate, testnet-gate]
+    
+    steps:
+      - name: Determine Overall Status
+        run: |
+          {
+            echo "## ✅ ProofForge CI/CD Pipeline Complete"
+            echo ""
+            echo "### Gate Results"
+            echo "- Pre-Commit Gate: ${{ needs.pre-commit-gate.result }}"
+            echo "- S0 Security Gate: ${{ needs.s0-security-gate.result }}"
+            echo "- S1 Security Gate: ${{ needs.s1-security-gate.result }}"
+            echo "- Testnet Gate: ${{ needs.testnet-gate.result }}"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "- Manual gate selection: ${{ github.event.inputs.gate_type }}"
+            fi
+            echo ""
+            echo "### Deployment Status"
+            echo "- Testnet gate result above determines readiness."
+            echo "- Mainnet gate executes only on release tags."
+            echo ""
+            echo "### Next Steps"
+            echo "1. Merge this PR to main branch"
+            echo "2. For testnet: Deploy from develop branch"
+            echo "3. For mainnet: Create release tag (e.g., v1.0.0)"
+          } >> $GITHUB_STEP_SUMMARY

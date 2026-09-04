@@ -1,0 +1,21 @@
+--- crates/x3-common/src/signing.rs
++++ replace == with != in Signature::verify
+@@ -106,17 +106,17 @@
+     pub fn verify(&self, message: &[u8], public_key: &PublicKey) -> bool {
+         match (self, public_key) {
+             (Signature::Ed25519(sig), PublicKey::Ed25519(pk)) => {
+                 ed25519::Signature::verify(sig, message, pk)
+             }
+             (Signature::Secp256k1(sig), PublicKey::Secp256k1(pk)) => {
+                 // EVM uses secp256k1_ecdsa_recover with 65-byte signature (r, s, v)
+                 match sp_io::crypto::secp256k1_ecdsa_recover(sig, &blake2_256(message)) {
+-                    Ok(recovered) => recovered.as_ref() == &pk[1..],
++                    Ok(recovered) => recovered.as_ref() != /* ~ changed by cargo-mutants ~ */ &pk[1..],
+                     Err(_) => false,
+                 }
+             }
+             (Signature::Sr25519(sig), PublicKey::Sr25519(pk)) => {
+                 sr25519::Signature::verify(sig, message, pk)
+             }
+             _ => false, // Mismatched key types
+         }

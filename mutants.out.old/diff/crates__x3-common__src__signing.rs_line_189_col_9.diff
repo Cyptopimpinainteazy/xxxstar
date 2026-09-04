@@ -1,0 +1,24 @@
+--- crates/x3-common/src/signing.rs
++++ replace Ed25519Signer::from_phrase -> Result<Self, &'static str> with Ok(Default::default())
+@@ -181,20 +181,17 @@
+     pub fn generate() -> Self {
+         let (pair, _, _) = ed25519::Pair::generate_with_phrase(None);
+         let public_key = pair.public();
+         Self { pair, public_key }
+     }
+ 
+     /// Create a signer from a seed phrase
+     pub fn from_phrase(phrase: &str, password: Option<&str>) -> Result<Self, &'static str> {
+-        let (pair, _) =
+-            ed25519::Pair::from_phrase(phrase, password).map_err(|_| "Invalid seed phrase")?;
+-        let public_key = pair.public();
+-        Ok(Self { pair, public_key })
++        Ok(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Create a signer from a raw seed (32 bytes)
+     pub fn from_seed(seed: &[u8; 32]) -> Self {
+         let pair = ed25519::Pair::from_seed(seed);
+         let public_key = pair.public();
+         Self { pair, public_key }
+     }

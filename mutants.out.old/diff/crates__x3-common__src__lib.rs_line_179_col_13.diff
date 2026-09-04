@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm TokenKind::Symbol(sym) in TokenKind::symbol
+@@ -171,17 +171,17 @@
+     Symbol(Symbol),
+     Literal(Literal),
+     Eof,
+ }
+ 
+ impl TokenKind {
+     pub fn symbol(&self) -> Option<Symbol> {
+         match self {
+-            TokenKind::Symbol(sym) => Some(*sym),
++             /* ~ changed by cargo-mutants ~ */
+             _ => None,
+         }
+     }
+ }
+ 
+ /// A token plus its span.
+ #[derive(Clone, Debug, PartialEq)]
+ pub struct Token {

@@ -1,0 +1,149 @@
+name: X3 Benchmark Regression Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'benches/**'
+      - 'crates/x3-atomic-swap/**'
+      - 'crates/x3-dex/**'
+      - 'crates/x3-bridge-adapters/**'
+      - 'crates/x3-vm/**'
+      - 'crates/x3-rpc/**'
+      - 'pallets/**/src/**'
+      - 'runtime/src/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'benches/**'
+      - 'crates/x3-atomic-swap/**'
+      - 'crates/x3-dex/**'
+      - 'crates/x3-bridge-adapters/**'
+      - 'crates/x3-vm/**'
+      - 'crates/x3-rpc/**'
+      - 'pallets/**/src/**'
+      - 'runtime/src/**'
+  schedule:
+    - cron: '0 4 * * *'  # Daily at 4am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  criterion-benchmarks:
+    name: Criterion Microbenchmarks
+    runs-on: [self-hosted, x3-benchmark]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+
+      - name: Run Criterion benchmarks
+        run: |
+          cd benches
+          cargo bench --bench atomic_swap_bench -- --output-format bencher 2>&1 | tee ../reports/benchmarks/atomic_swap_bench.txt || true
+          cargo bench --bench dex_route_bench -- --output-format bencher 2>&1 | tee ../reports/benchmarks/dex_route_bench.txt || true
+          cargo bench --bench bridge_proof_bench -- --output-format bencher 2>&1 | tee ../reports/benchmarks/bridge_proof_bench.txt || true
+          cargo bench --bench vm_dispatch_bench -- --output-format bencher 2>&1 | tee ../reports/benchmarks/vm_dispatch_bench.txt || true
+          cargo bench --bench rpc_encoding_bench -- --output-format bencher 2>&1 | tee ../reports/benchmarks/rpc_encoding_bench.txt || true
+          cargo bench --bench signature_verify_bench -- --output-format bencher 2>&1 | tee ../reports/benchmarks/signature_verify_bench.txt || true
+
+      - name: Download baseline
+        id: baseline
+        run: |
+          if [ -f "reports/benchmarks/x3-benchmark-baseline.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate benchmark report
+        run: |
+          pip install --quiet psutil || true
+          python scripts/benchmark_report.py \
+            --criterion-dir target/criterion \
+            ${{ steps.baseline.outputs.exists == 'true' && '--baseline reports/benchmarks/x3-benchmark-baseline.json' || '' }}
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-benchmark-report
+          path: reports/benchmarks/x3-benchmark-report-*.json
+
+      - name: Check regression gate
+        run: |
+          REPORT=$(ls -t reports/benchmarks/x3-benchmark-report-*.json | head -1)
+          VERDICT=$(jq -r '.verdict' "$REPORT")
+          REGRESSIONS=$(jq -r '.regressions | length' "$REPORT")
+
+          echo "Benchmark verdict: $VERDICT"
+          echo "Regressions: $REGRESSIONS"
+
+          if [ "$VERDICT" = "fail" ]; then
+            echo "::error::Benchmark regression gate FAILED. $REGRESSIONS regression(s) detected."
+            echo "::group::Regression Details"
+            jq '.regressions' "$REPORT"
+            echo "::endgroup::"
+            exit 1
+          else
+            echo "::notice::Benchmark regression gate PASSED."
+          fi
+
+  pallet-weight-check:
+    name: Pallet Weight Consistency Check
+    runs-on: [self-hosted, x3-benchmark]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Build node with benchmarks
+        run: cargo build -p node --release --features runtime-benchmarks 2>&1 | tail -20
+
+      - name: Check for placeholder weights
+        run: |
+          echo "Scanning for placeholder weights in runtime..."
+          PLACEHOLDER_COUNT=$(grep -r "Weight::from_parts(0" runtime/src/weights/ 2>/dev/null | wc -l || echo "0")
+          TODO_COUNT=$(grep -r "TODO" runtime/src/weights/ 2>/dev/null | wc -l || echo "0")
+
+          echo "Placeholder weights: $PLACEHOLDER_COUNT"
+          echo "TODO markers: $TODO_COUNT"
+
+          if [ "$PLACEHOLDER_COUNT" -gt 0 ]; then
+            echo "::warning::$PLACEHOLDER_COUNT placeholder weights found in runtime. Run benchmark_pallet_weights.sh."
+          fi
+
+          if [ "$TODO_COUNT" -gt 0 ]; then
+            echo "::warning::$TODO_COUNT TODO markers in weight files. Fill in real weights before mainnet."
+          fi
+
+      - name: Report weight file coverage
+        run: |
+          echo "Weight files present:"
+          ls -la runtime/src/weights/ 2>/dev/null || echo "  (no weight files found)"
+          echo ""
+          echo "Expected pallets: $(grep -c ':' scripts/benchmark_pallet_weights.sh 2>/dev/null || echo '?')"

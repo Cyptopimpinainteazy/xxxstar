@@ -1,0 +1,21 @@
+--- crates/x3-common/src/signing.rs
++++ replace <impl Signer for Secp256k1Signer>::key_type -> KeyType with Default::default()
+@@ -282,17 +282,17 @@
+         let mut secret_array = [0u8; 32];
+         secret_array.copy_from_slice(&secret);
+         Self::from_secret_key(&secret_array)
+     }
+ }
+ 
+ impl Signer for Secp256k1Signer {
+     fn key_type(&self) -> KeyType {
+-        KeyType::Secp256k1
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     fn sign(&self, message: &[u8]) -> Signature {
+         use secp256k1::Message;
+ 
+         let message_hash = blake2_256(message);
+         let message = Message::from_digest_slice(&message_hash).unwrap();
+         let signature = sign_secp256k1_message(&self.secret_key, &message);

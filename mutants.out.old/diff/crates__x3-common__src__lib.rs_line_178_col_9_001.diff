@@ -1,0 +1,24 @@
+--- crates/x3-common/src/lib.rs
++++ replace TokenKind::symbol -> Option<Symbol> with Some(Default::default())
+@@ -170,20 +170,17 @@
+     Keyword(Keyword),
+     Symbol(Symbol),
+     Literal(Literal),
+     Eof,
+ }
+ 
+ impl TokenKind {
+     pub fn symbol(&self) -> Option<Symbol> {
+-        match self {
+-            TokenKind::Symbol(sym) => Some(*sym),
+-            _ => None,
+-        }
++        Some(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// A token plus its span.
+ #[derive(Clone, Debug, PartialEq)]
+ pub struct Token {
+     pub kind: TokenKind,
+     pub span: Span,

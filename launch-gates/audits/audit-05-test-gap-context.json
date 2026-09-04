@@ -1,0 +1,25 @@
+{
+  "audit_type": "test_gap_analysis",
+  "critical_behaviors": [
+    "replay_resistance - same TX cannot execute twice",
+    "partial_execution_failure - partial failures roll back completely",
+    "rollback_guarantee - failed transactions are fully reverted",
+    "finality_settlement - settled blocks cannot be reverted",
+    "bridge_timeout_handling - timeouts prevent permanent locks",
+    "storage_overflow_protection - storage limits are enforced",
+    "boundary_amount_testing - edge values (0, max_u128, etc) handled",
+    "invalid_input_rejection - malformed inputs rejected",
+    "governance_gates - unauthorized calls are rejected",
+    "validator_equivocation - double-signing is punished",
+    "mempool_frontrun_protection - ordering is fair",
+    "safe_migration - runtime upgrades don't lose data",
+    "fresh_machine_bootstrap - clean state initialization",
+    "multi_node_launch - consensus in 3-node network"
+  ],
+  "test_files_to_review": [
+    "integration-tests/**/*.rs",
+    "pallets/**/tests.rs",
+    "tests/**/*.rs",
+    "tests_core/**/*.rs"
+  ]
+}

@@ -1,0 +1,5 @@
+{
+    "test": "test_paused_asset_rejects_transfers",
+    "result": "NOT_RUN",
+    "reason": "not run because live runtime upgrade did not pass"
+}

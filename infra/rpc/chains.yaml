@@ -1,0 +1,269 @@
+# X3 Mainnet RPC — Chain Routing Configuration
+# Canonical chain definitions for the protocol-aware RPC router.
+# Every upstream is validated against the values declared here (chain ID,
+# network magic, finality tag).  Mismatch = hard-fail, not degraded.
+
+chains:
+  ethereum:
+    kind: evm
+    chain_id: 1
+    network: mainnet
+    finality: finalized
+    max_block_lag: 2
+    require_archive_for:
+      - eth_getLogs                    # large-range historical queries
+      - trace_*                        # all trace methods
+      - debug_traceTransaction
+      - debug_traceBlockByNumber
+      - debug_traceBlockByHash
+      - eth_getStorageAt               # historical state at old blocks
+      - eth_getProof                   # Merkle proofs need archive
+    blocked_methods:
+      - personal_*
+      - admin_*
+      - miner_*
+      - debug_setHead
+      - txpool_*
+      - eth_sign
+      - eth_signTransaction
+      - eth_signTypedData
+      - eth_signTypedData_v4
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      require_nonce_guard: true
+      require_chain_id_check: true
+      retry_delay_ms: 750
+    quorum:
+      enabled: true
+      min_agreement: 2
+      check_methods:
+        - eth_chainId
+        - eth_blockNumber
+        - eth_getBalance             # sample a known address
+    default_cache_ttl_ms:
+      eth_chainId: 3600000            # 1 hour
+      eth_blockNumber: 500            # 500 ms — tight for freshness
+      eth_getBlockByNumber_recent: 3000
+      eth_getBlockByNumber_old: 3600000
+      eth_getLogs_historical: 300000
+      eth_call_latest: 1000
+      eth_getBalance_latest: 2000
+
+  base:
+    kind: evm
+    chain_id: 8453
+    network: mainnet
+    finality: unsafe                   # OP-stack: no finality tag; use block confirmations
+    max_block_lag: 2
+    require_archive_for: []
+    blocked_methods:
+      - personal_*
+      - admin_*
+      - miner_*
+      - debug_setHead
+      - txpool_*
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      require_nonce_guard: true
+    quorum:
+      enabled: false                   # fewer independent upstreams for L2s
+    default_cache_ttl_ms:
+      eth_chainId: 3600000
+      eth_blockNumber: 1000
+      eth_call_latest: 1500
+
+  arbitrum:
+    kind: evm
+    chain_id: 42161
+    network: mainnet
+    finality: finalized
+    max_block_lag: 2
+    require_archive_for: []
+    blocked_methods:
+      - personal_*
+      - admin_*
+      - miner_*
+      - debug_setHead
+      - txpool_*
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      require_nonce_guard: true
+    quorum:
+      enabled: false
+    default_cache_ttl_ms:
+      eth_chainId: 3600000
+      eth_blockNumber: 1000
+      eth_call_latest: 1500
+
+  polygon:
+    kind: evm
+    chain_id: 137
+    network: mainnet
+    finality: finalized
+    max_block_lag: 4                   # Polygon can drift a bit more
+    require_archive_for: []
+    blocked_methods:
+      - personal_*
+      - admin_*
+      - miner_*
+      - debug_setHead
+      - txpool_*
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      require_nonce_guard: true
+    quorum:
+      enabled: false
+    default_cache_ttl_ms:
+      eth_chainId: 3600000
+      eth_blockNumber: 1500
+      eth_call_latest: 2000
+
+  bsc:
+    kind: evm
+    chain_id: 56
+    network: mainnet
+    finality: finalized
+    max_block_lag: 3
+    require_archive_for: []
+    blocked_methods:
+      - personal_*
+      - admin_*
+      - miner_*
+      - debug_setHead
+      - txpool_*
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      require_nonce_guard: true
+    quorum:
+      enabled: false
+    default_cache_ttl_ms:
+      eth_chainId: 3600000
+      eth_blockNumber: 1500
+      eth_call_latest: 2000
+
+  solana:
+    kind: solana
+    cluster: mainnet-beta
+    max_slot_lag: 5
+    websocket_sticky: true
+    ws_max_subscriptions_per_client: 20
+    ws_subscription_timeout_seconds: 300
+    require_private_for:
+      - getProgramAccounts             # heavy scan method
+      - getMultipleAccounts            # large batch fetch
+      - getSignaturesForAddress        # historical scan
+    blocked_methods:
+      - requestAirdrop
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      preflight: true
+      max_retries: 2
+      require_fresh_blockhash: true
+      blockhash_max_age_slots: 150
+    quorum:
+      enabled: true
+      min_agreement: 2
+      check_methods:
+        - getHealth
+        - getSlot
+        - getLatestBlockhash
+    default_cache_ttl_ms:
+      getHealth: 10000
+      getSlot: 400                     # 400 ms — Solana slots are fast
+      getLatestBlockhash: 0            # NEVER cache — used for tx signing
+      getBlock: 2000
+      getBalance: 3000
+      getAccountInfo: 2000
+
+  bitcoin:
+    kind: bitcoin
+    network: main
+    require_local_first: true
+    max_header_lag: 1
+    health_method: getblockchaininfo
+    blocked_methods:
+      - stop
+      - setban
+      - addnode
+      - disconnectnode
+      - walletpassphrase
+      - walletpassphrasechange
+      - dumpprivkey
+      - importprivkey
+      - dumpwallet
+      - encryptwallet
+      - setnetworkactive
+    safe_public:
+      - getblockchaininfo
+      - getblockcount
+      - getblockhash
+      - getblock
+      - getrawtransaction
+      - estimatesmartfee
+      - getmempoolinfo
+      - gettxout
+      - getnetworkinfo
+    tx_broadcast:
+      mode: primary_only
+      max_upstreams: 1
+      require_local_first: true
+    quorum:
+      enabled: true
+      min_agreement: 2
+      check_methods:
+        - getblockchaininfo
+        - getblockcount
+        - getbestblockhash
+    default_cache_ttl_ms:
+      getblockchaininfo: 30000
+      getblockcount: 10000
+      getblockhash: 3600000
+      getblock_old: 3600000
+      estimatesmartfee: 60000
+
+  x3:
+    kind: x3
+    network: mainnet
+    max_finalized_lag: 1
+    require_quorum_for:
+      - x3_getAtomicRoute
+      - x3_getProof
+      - x3_getFinalizedState
+      - x3_getSettlementStatus
+      - x3_verifyBridgeDeposit
+    blocked_methods:
+      - author_*
+      - offchain_*
+    safe_public:
+      - x3_getHealth
+      - x3_getFinalizedHead
+      - x3_getBlock
+      - x3_getBalance
+      - x3_getTransaction
+      - x3_getAtomicRoute
+      - x3_getProof
+      - x3_getFinalizedState
+      - x3_submitExtrinsic
+      - x3_getBridgeStatus
+    tx_broadcast:
+      mode: controlled_fanout
+      max_upstreams: 2
+      require_nonce_guard: true
+    quorum:
+      enabled: true
+      min_agreement: 2
+      check_methods:
+        - x3_getHealth
+        - x3_getFinalizedHead
+    default_cache_ttl_ms:
+      x3_getHealth: 5000
+      x3_getFinalizedHead: 1000
+      x3_getBlock_recent: 2000
+      x3_getBalance: 3000
+      x3_getProof: 0                  # NEVER cache proofs — they expire

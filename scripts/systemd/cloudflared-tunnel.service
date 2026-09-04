@@ -1,0 +1,17 @@
+[Unit]
+Description=Cloudflare Tunnel for X3
+After=network.target x3-desktop.service x3fronend.service
+Wants=x3-desktop.service x3fronend.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+ExecStart=/usr/bin/env cloudflared --config %h/Desktop/X3_ATOMIC_STAR/infra/cloudflare-tunnel/config.yml tunnel run atlas-sphere
+StandardOutput=journal
+StandardError=journal
+KillMode=process
+
+[Install]
+WantedBy=default.target

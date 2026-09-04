@@ -1,0 +1,22 @@
+--- crates/x3-fees/src/lib.rs
++++ replace CommitRevealProof::verify -> bool with true
+@@ -94,18 +94,17 @@
+             tx_data,
+             commit_height: 0,
+             signature,
+         }
+     }
+ 
+     /// Verify commit hash matches data
+     pub fn verify(&self) -> bool {
+-        let hash = blake2_256(&self.tx_data);
+-        hash == self.commit_hash
++        true /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ fn blake2_256(data: &[u8]) -> [u8; 32] {
+     sp_core::hashing::blake2_256(data)
+ }
+ 
+ /// Slashing insurance fund state

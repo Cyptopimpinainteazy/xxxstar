@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: cross-chain-gpu-validator
+Version: 0.1.0
+Summary: Cross-chain GPU validator stack for Solana and Ethereum testnets.
+Author: X3 Chain
+License: Apache-2.0
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: redis>=5.0.0
+Requires-Dist: pycryptodome>=3.19.0

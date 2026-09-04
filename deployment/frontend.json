@@ -1,0 +1,131 @@
+{
+  "$schema": "../schemas/deployment.schema.json",
+  "version": "1.0.0",
+  "generated": "2026-06-19T00:00:00Z",
+
+  "targets": {
+    "org": {
+      "domain": "x3-chain.org",
+      "type": "static-web",
+      "provider": "cloudflare-pages",
+      "rootDir": "dist/org/",
+      "routes": {
+        "/*": "index.html",
+        "/intelligence/*": "apps/x3-intelligence/dist/",
+        "/validators/*": "apps/validators/dist/",
+        "/wallet/*": "apps/wallet/.next/",
+        "/dex/*": "apps/dex/.next/",
+        "/dashboard/*": "apps/dashboard/dist/",
+        "/inferstructor/*": "apps/inferstructor-dashboard/dist/",
+        "/infra-dashboard/*": "infra-structure/dashboard/dist/",
+        "/tps/*": "infra/blockchain-tps/dist/",
+        "/governance/*": "phase5_panel/dist/",
+        "/explorer/*": "apps/explorer/dist/",
+        "/site/*": "production/public/",
+        "/desktop/*": "apps/x3-desktop/dist/"
+      },
+      "rewrites": [
+        { "pattern": "/api/*", "url": "http://rpc.x3-chain.io:9944/{}" },
+        { "pattern": "/ws/*", "url": "wss://ws.x3star.net/{}" }
+      ],
+      "headers": {
+        "/*": {
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY",
+          "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws://localhost:* http://localhost:* wss://rpc.x3-chain.io https://rpc.x3-chain.io; frame-src 'none'"
+        }
+      }
+    },
+
+    "net": {
+      "domain": "x3-chain.net",
+      "type": "tauri-desktop",
+      "apps": [
+        {
+          "name": "x3-desktop",
+          "identifier": "com.x3chain.combat-arena",
+          "bundleDir": "apps/x3-desktop/src-tauri/target/release/bundle/",
+          "buildCommand": "cd apps/x3-desktop && npm run tauri:build",
+          "icon": "apps/x3-desktop/src-tauri/icons/"
+        },
+        {
+          "name": "tauri-os",
+          "identifier": "io.x3atomicstar.os",
+          "bundleDir": "apps/tauri-os/src-tauri/target/release/bundle/",
+          "buildCommand": "cd apps/tauri-os && npm run tauri:build",
+          "icon": "apps/tauri-os/src-tauri/icons/"
+        },
+        {
+          "name": "inferstructor-dashboard",
+          "identifier": "com.inferstructor.dashboard",
+          "bundleDir": "apps/inferstructor-dashboard/src-tauri/target/release/bundle/",
+          "buildCommand": "cd apps/inferstructor-dashboard && npm run tauri:build"
+        },
+        {
+          "name": "infra-dashboard",
+          "identifier": "com.x3chain.infra-dashboard",
+          "bundleDir": "infra-structure/dashboard/src-tauri/target/release/bundle/",
+          "buildCommand": "cd infra-structure/dashboard && npm run tauri:build"
+        }
+      ],
+
+      "signing": {
+        "macOS": {
+          "identity": "Developer ID Application: X3 Chain (ABCD1234)"
+        },
+        "windows": {
+          "certificatePath": "./certs/windows.p12",
+          "timestampUrl": "http://timestamp.digicert.com"
+        }
+      },
+
+      "updater": {
+        "active": true,
+        "endpoints": ["https://updates.x3-chain.net/{{target}}/{{current_version}}"],
+        "dialog": true,
+        "pubkey": "x3-updater-pubkey-2026"
+      }
+    }
+  },
+
+  "buildPipeline": {
+    "stages": [
+      {
+        "name": "shared-lib",
+        "command": "cd apps/shared && npm run build",
+        "description": "Build shared component library first"
+      },
+      {
+        "name": "react-apps",
+        "parallel": [
+          "cd apps/x3-desktop && npm run build",
+          "cd apps/validators && npm run build",
+          "cd apps/x3-intelligence && npm run build",
+          "cd apps/inferstructor-dashboard && npm run build",
+          "cd apps/dashboard && npm run build",
+          "cd infra-structure/dashboard && npm run build",
+          "cd phase5_panel && npm run build"
+        ]
+      },
+      {
+        "name": "nextjs-apps",
+        "parallel": [
+          "cd apps/wallet && npm run build",
+          "cd apps/dex && npm run build"
+        ]
+      },
+      {
+        "name": "static-assets",
+        "command": "mkdir -p dist/org && cp -r site/* dist/org/ && cp -r production/public/* dist/org/site/",
+        "description": "Copy static HTML assets to deployment output"
+      },
+      {
+        "name": "tauri-bundles",
+        "parallel": [
+          "cd apps/x3-desktop && npm run tauri:build",
+          "cd apps/tauri-os && npm run tauri:build"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,2 @@
+      Loaded 1123 security advisories (from /home/x3star/.cargo/advisory-db)
+    Scanning Cargo.lock for vulnerabilities (1897 crate dependencies)

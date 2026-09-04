@@ -1,0 +1,26 @@
+[package]
+name = "x3-universal-contracts"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "X3 Universal Contracts SDK — developer-facing facade over x3-intent, x3-ixl, and x3-packet-standard."
+
+# This crate is an SDK-layer entry point.  It compiles only with std (uses
+# thiserror, serde, and x3-intent which depend on std).  It is NOT wired into
+# the WASM runtime — use the runtime pallets directly for on-chain logic.
+
+[dependencies]
+x3-intent = { path = "../x3-intent" }
+x3-ixl = { path = "../x3-ixl" }
+x3-packet-standard = { path = "../x3-packet-standard" }
+x3-proof = { path = "../x3-proof" }
+x3-fees = { path = "../x3-fees" }
+x3-slash = { path = "../x3-slash" }
+sp-core = { workspace = true, default-features = false }
+
+serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
+thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"

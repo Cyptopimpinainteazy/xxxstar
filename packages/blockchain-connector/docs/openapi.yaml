@@ -1,0 +1,765 @@
+openapi: "3.1.0"
+info:
+  title: X3 Chain — Blockchain Connector Service API
+  version: "0.1.0"
+  description: |
+    Enterprise-grade REST + WebSocket API for connecting to 40+ blockchains,
+    running test benchmarks (latency, throughput, reorg, GPU, pool), managing
+    billing plans, and streaming real-time chain events.
+  contact:
+    name: X3 Chain Team
+  license:
+    name: Apache-2.0
+
+servers:
+  - url: http://localhost:4100
+    description: Local development
+  - url: https://api.atlassphere.io/v1
+    description: Production
+
+tags:
+  - name: Chains
+    description: Browse supported blockchains
+  - name: Connectors
+    description: Create & manage live chain connections
+  - name: Blocks
+    description: Query blocks & transactions
+  - name: Tests
+    description: Run benchmarks & test profiles
+  - name: Billing
+    description: Billing plans, accounts & usage
+  - name: Health
+    description: Service health & readiness
+  - name: WebSocket
+    description: Real-time event subscriptions
+
+paths:
+  # ── Health ──────────────────────────────────────────────
+  /health:
+    get:
+      operationId: healthCheck
+      tags: [Health]
+      summary: Service health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheck"
+
+  /readiness:
+    get:
+      operationId: readinessCheck
+      tags: [Health]
+      summary: Readiness probe (K8s)
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready: { type: boolean }
+
+  # ── Chains ──────────────────────────────────────────────
+  /chains:
+    get:
+      operationId: listChains
+      tags: [Chains]
+      summary: List all supported blockchains
+      parameters:
+        - name: family
+          in: query
+          schema: { type: string, enum: [evm, bitcoin, solana, cosmos, substrate, near, other] }
+        - name: network
+          in: query
+          schema: { type: string, enum: [mainnet, testnet, devnet, regtest, local] }
+        - name: gpuAccelerated
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Chain list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChainListResponse"
+
+  /chains/{chainId}:
+    get:
+      operationId: getChain
+      tags: [Chains]
+      summary: Get chain details
+      parameters:
+        - name: chainId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Chain descriptor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ChainDescriptor"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /chains/families:
+    get:
+      operationId: listFamilies
+      tags: [Chains]
+      summary: List chain families with counts
+      responses:
+        "200":
+          description: Family breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: integer }
+
+  # ── Connectors ──────────────────────────────────────────
+  /connectors:
+    get:
+      operationId: listConnectors
+      tags: [Connectors]
+      summary: List active connectors
+      responses:
+        "200":
+          description: Connector list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ConnectorList"
+
+    post:
+      operationId: createConnector
+      tags: [Connectors]
+      summary: Create a new connector to a blockchain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConnectorRequest"
+      responses:
+        "201":
+          description: Connector created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ConnectorInstance"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Connector already exists for this chain
+        "429":
+          $ref: "#/components/responses/RateLimit"
+
+  /connectors/{connectorId}:
+    get:
+      operationId: getConnector
+      tags: [Connectors]
+      summary: Get connector details & live metrics
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Connector details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ConnectorInstance"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: deleteConnector
+      tags: [Connectors]
+      summary: Disconnect and remove a connector
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /connectors/{connectorId}/metrics:
+    get:
+      operationId: getConnectorMetrics
+      tags: [Connectors]
+      summary: Get latest metrics for a connector
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Live metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_ConnectorMetrics"
+
+  # ── Blocks & Transactions ───────────────────────────────
+  /connectors/{connectorId}/blocks/latest:
+    get:
+      operationId: getLatestBlock
+      tags: [Blocks]
+      summary: Get the latest block from a connector
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Latest block
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_Block"
+
+  /connectors/{connectorId}/blocks/{blockId}:
+    get:
+      operationId: getBlock
+      tags: [Blocks]
+      summary: Get a block by number or hash
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: blockId
+          in: path
+          required: true
+          description: Block number or hash
+          schema: { type: string }
+      responses:
+        "200":
+          description: Block data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_Block"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /connectors/{connectorId}/transactions/{txHash}:
+    get:
+      operationId: getTransaction
+      tags: [Blocks]
+      summary: Get a transaction by hash
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: txHash
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Transaction data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_Transaction"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Tests & Benchmarks ──────────────────────────────────
+  /tests/profiles:
+    get:
+      operationId: listTestProfiles
+      tags: [Tests]
+      summary: List available test profiles
+      responses:
+        "200":
+          description: Test profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TestProfile"
+
+  /tests/run:
+    post:
+      operationId: runTest
+      tags: [Tests]
+      summary: Start a test run against a connector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunTestRequest"
+      responses:
+        "202":
+          description: Test queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_TestRun"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimit"
+
+  /tests/runs:
+    get:
+      operationId: listTestRuns
+      tags: [Tests]
+      summary: List test runs
+      parameters:
+        - name: connectorId
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [queued, running, completed, failed, cancelled] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          description: Test runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TestRun"
+
+  /tests/runs/{runId}:
+    get:
+      operationId: getTestRun
+      tags: [Tests]
+      summary: Get test run details
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Test run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse_TestRun"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Billing ─────────────────────────────────────────────
+  /billing/plans:
+    get:
+      operationId: listPlans
+      tags: [Billing]
+      summary: List available billing plans
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BillingPlan"
+
+  /billing/account:
+    get:
+      operationId: getAccount
+      tags: [Billing]
+      summary: Get current billing account
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── WebSocket ───────────────────────────────────────────
+  /ws:
+    get:
+      operationId: websocketConnect
+      tags: [WebSocket]
+      summary: "WebSocket endpoint — upgrade to subscribe to chain events"
+      description: |
+        After upgrade, send JSON subscription frames:
+        ```json
+        { "action": "subscribe", "connectorId": "conn_xyz", "events": ["block", "tx", "reorg"] }
+        ```
+        Server pushes `EventEnvelope` frames.
+      responses:
+        "101":
+          description: Switching Protocols
+
+# ─── Components ───────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimit:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+      headers:
+        X-RateLimit-Limit:
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          schema: { type: integer }
+        X-RateLimit-Reset:
+          schema: { type: integer }
+        Retry-After:
+          schema: { type: integer }
+
+  schemas:
+    # ── Generic ───────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        message: { type: string }
+        code: { type: string }
+
+    ApiResponse_ChainDescriptor:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/ChainDescriptor" }
+        error: { type: string }
+        requestId: { type: string }
+        durationMs: { type: number }
+
+    ApiResponse_ConnectorInstance:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/ConnectorInstance" }
+        error: { type: string }
+        requestId: { type: string }
+
+    ApiResponse_ConnectorList:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/ConnectorInstance" }
+
+    ApiResponse_ConnectorMetrics:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/ConnectorMetrics" }
+
+    ApiResponse_Block:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/Block" }
+
+    ApiResponse_Transaction:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/Transaction" }
+
+    ApiResponse_TestRun:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data: { $ref: "#/components/schemas/TestRun" }
+
+    # ── Chain ─────────────────────────────────────────────
+    ChainDescriptor:
+      type: object
+      required: [id, name, family, network, nativeCurrency, chainId, available]
+      properties:
+        id: { type: string, example: "ethereum" }
+        name: { type: string, example: "Ethereum Mainnet" }
+        family: { type: string, enum: [evm, bitcoin, solana, cosmos, substrate, near, other] }
+        network: { type: string, enum: [mainnet, testnet, devnet, regtest, local] }
+        nativeCurrency:
+          type: object
+          properties:
+            name: { type: string }
+            symbol: { type: string }
+            decimals: { type: integer }
+        chainId: { oneOf: [{ type: integer }, { type: string }] }
+        defaultRpcUrls: { type: array, items: { type: string } }
+        defaultWsUrls: { type: array, items: { type: string } }
+        explorerUrl: { type: string, format: uri }
+        available: { type: boolean }
+        avgBlockTimeSeconds: { type: number }
+        consensus: { type: string }
+        signatureAlgorithm: { type: string }
+        hashAlgorithm: { type: string }
+        gpuAccelerated: { type: boolean }
+
+    ChainListResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/ChainDescriptor" }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+            families: { type: object, additionalProperties: { type: integer } }
+
+    # ── Connector ─────────────────────────────────────────
+    ConnectorInstance:
+      type: object
+      required: [id, chain, status, metrics, createdAt]
+      properties:
+        id: { type: string }
+        chain: { $ref: "#/components/schemas/ChainDescriptor" }
+        status: { type: string, enum: [connecting, connected, syncing, degraded, disconnected, error] }
+        metrics: { $ref: "#/components/schemas/ConnectorMetrics" }
+        createdAt: { type: string, format: date-time }
+        error: { type: string }
+
+    ConnectorMetrics:
+      type: object
+      properties:
+        blockHeight: { type: integer }
+        tps: { type: number }
+        latencyMs: { type: number }
+        peerCount: { type: integer }
+        totalRequests: { type: integer }
+        totalErrors: { type: integer }
+        uptimeSeconds: { type: number }
+        gasPrice: { type: string }
+        hashRate: { type: string }
+
+    CreateConnectorRequest:
+      type: object
+      required: [chainId]
+      properties:
+        chainId: { type: string, description: "Chain ID from the registry" }
+        rpcUrl: { type: string, description: "Custom RPC endpoint (overrides default)" }
+        wsUrl: { type: string, description: "Custom WebSocket endpoint" }
+        apiKey: { type: string, description: "API key for the RPC provider" }
+        options:
+          type: object
+          properties:
+            timeout: { type: integer, default: 30000, description: "Request timeout (ms)" }
+            autoRefresh: { type: boolean, default: true }
+            refreshInterval: { type: integer, default: 15000, description: "Metrics refresh interval (ms)" }
+
+    # ── Block & Transaction ───────────────────────────────
+    Block:
+      type: object
+      properties:
+        number: { type: integer }
+        hash: { type: string }
+        parentHash: { type: string }
+        timestamp: { type: integer }
+        transactionCount: { type: integer }
+        size: { type: integer }
+        gasUsed: { type: string }
+        gasLimit: { type: string }
+        miner: { type: string }
+        difficulty: { type: string }
+        totalDifficulty: { type: string }
+        extraData: { type: string }
+        raw: { type: object }
+
+    Transaction:
+      type: object
+      properties:
+        hash: { type: string }
+        blockNumber: { type: integer }
+        blockHash: { type: string }
+        from: { type: string }
+        to: { type: string }
+        value: { type: string }
+        fee: { type: string }
+        gasPrice: { type: string }
+        gasUsed: { type: string }
+        nonce: { type: integer }
+        status: { type: string, enum: [confirmed, pending, failed] }
+        timestamp: { type: integer }
+        raw: { type: object }
+
+    # ── Tests ─────────────────────────────────────────────
+    TestProfile:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        estimatedDuration: { type: integer }
+        tests:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+              description: { type: string }
+
+    RunTestRequest:
+      type: object
+      required: [connectorId, profileId]
+      properties:
+        connectorId: { type: string }
+        profileId: { type: string }
+        customEndpoint: { type: string }
+        options:
+          type: object
+          properties:
+            timeout: { type: integer }
+            iterations: { type: integer }
+
+    TestRun:
+      type: object
+      properties:
+        id: { type: string }
+        connectorId: { type: string }
+        profileId: { type: string }
+        status: { type: string, enum: [queued, running, completed, failed, cancelled] }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestResult"
+        summary:
+          $ref: "#/components/schemas/TestSummary"
+        error: { type: string }
+
+    TestResult:
+      type: object
+      properties:
+        testId: { type: string }
+        testName: { type: string }
+        passed: { type: boolean }
+        durationMs: { type: number }
+        metrics: { type: object }
+        error: { type: string }
+
+    TestSummary:
+      type: object
+      properties:
+        totalTests: { type: integer }
+        passed: { type: integer }
+        failed: { type: integer }
+        totalDurationMs: { type: number }
+        overallScore: { type: number }
+        grade: { type: string, enum: ["A+", A, B, C, D, F] }
+
+    # ── Billing ───────────────────────────────────────────
+    BillingPlan:
+      type: object
+      properties:
+        tier: { type: string, enum: [free, bronze, silver, gold, enterprise] }
+        name: { type: string }
+        priceUsd: { type: number }
+        maxConnectors: { type: integer }
+        maxRequestsPerMonth: { type: integer }
+        maxWsConnections: { type: integer }
+        slaPercent: { type: number }
+        features: { type: array, items: { type: string } }
+
+    BillingAccount:
+      type: object
+      properties:
+        id: { type: string }
+        tier: { type: string }
+        usage:
+          type: object
+          properties:
+            requests: { type: integer }
+            connectors: { type: integer }
+            wsMinutes: { type: number }
+        stripeCustomerId: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    # ── WebSocket Events ──────────────────────────────────
+    EventEnvelope:
+      type: object
+      required: [type, chainId, timestamp]
+      properties:
+        type: { type: string, enum: [block, tx, log, validator_update, reorg, error] }
+        chainId: { type: string }
+        connectorId: { type: string }
+        timestamp: { type: string, format: date-time }
+        data: { type: object }
+        metadata:
+          type: object
+          properties:
+            sequence: { type: integer }
+
+    # ── Health ────────────────────────────────────────────
+    HealthCheck:
+      type: object
+      properties:
+        status: { type: string, enum: [healthy, degraded, unhealthy] }
+        version: { type: string }
+        uptime: { type: number }
+        connectors:
+          type: object
+          properties:
+            total: { type: integer }
+            connected: { type: integer }
+            degraded: { type: integer }
+        chains:
+          type: object
+          properties:
+            supported: { type: integer }
+            families: { type: integer }
+        timestamp: { type: string, format: date-time }

@@ -1,0 +1,12 @@
+{
+  "blocks_after_upgrade": "PASS",
+  "external_bridges_disabled": "PASS",
+  "external_locked_supply_zero": "PASS",
+  "finality_after_upgrade": "PASS",
+  "pending_supply_zero": "PASS",
+  "represented_supply_equals_canonical_supply": "PASS",
+  "represented_supply_equals_canonical_supply_alt": "NOT_RUN",
+  "pending_supply_zero_alt": "NOT_RUN",
+  "blocks_after_upgrade_alt": "FAIL",
+  "finality_after_upgrade_alt": "FAIL"
+}

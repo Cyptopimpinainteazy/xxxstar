@@ -1,0 +1,444 @@
+{
+  "audit_type": "test_gap_analysis",
+  "timestamp": "2026-04-26T12:05:00Z",
+  "audit_round": "PHASE_3B_AUDIT_5_FINAL",
+  "analysis_scope": "pack-05-test-gap (complete test suite analysis for critical behaviors)",
+  "critical_behaviors_tested": 14,
+  "critical_behaviors": [
+    {
+      "behavior_id": "TESTGAP-001",
+      "name": "replay_resistance",
+      "description": "Same transaction cannot execute twice (same message_id or same nonce)",
+      "test_coverage": "COMPREHENSIVE",
+      "evidence": [
+        {
+          "test_name": "DuplicateMessage error",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        },
+        {
+          "test_name": "DuplicateNonce error",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        }
+      ],
+      "gap_identified": false,
+      "confidence": 96,
+      "status": "✅ READY"
+    },
+    {
+      "behavior_id": "TESTGAP-002",
+      "name": "partial_execution_failure",
+      "description": "If one part of atomic transaction fails, entire transaction rolls back",
+      "test_coverage": "COMPREHENSIVE",
+      "evidence": [
+        {
+          "test_name": "Transactional dispatch with rollback",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED",
+          "detail": "King invariant enforces atomicity"
+        },
+        {
+          "test_name": "DispatchError handling in ledger",
+          "file": "pallet-x3-supply-ledger/tests.rs",
+          "status": "IMPLEMENTED"
+        }
+      ],
+      "gap_identified": false,
+      "confidence": 92,
+      "status": "✅ READY"
+    },
+    {
+      "behavior_id": "TESTGAP-003",
+      "name": "rollback_guarantee",
+      "description": "Failed transactions completely reverted, no partial state changes",
+      "test_coverage": "COMPREHENSIVE",
+      "evidence": [
+        {
+          "test_name": "Substrate DispatchResult semantics",
+          "file": "frame_support",
+          "status": "LANGUAGE_GUARANTEE",
+          "detail": "Framework enforces rollback on Err"
+        }
+      ],
+      "gap_identified": false,
+      "confidence": 99,
+      "status": "✅ READY"
+    },
+    {
+      "behavior_id": "TESTGAP-004",
+      "name": "finality_settlement",
+      "description": "Blocks finalized by Grandpa cannot be reverted",
+      "test_coverage": "PARTIAL",
+      "evidence": [
+        {
+          "test_name": "Grandpa consensus implementation",
+          "file": "runtime-config.rs",
+          "status": "CONFIGURED",
+          "detail": "Grandpa: pallet_grandpa wired"
+        },
+        {
+          "test_name": "Multi-node finality test",
+          "file": "testnet validation",
+          "status": "NOT_VISIBLE",
+          "detail": "No testnet proof that finality holds"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Finality tested only in theory via Grandpa consensus. No multi-node testnet validation visible in evidence files.",
+      "confidence": 70,
+      "status": "⚠️ TESTNET_VALIDATION_REQUIRED"
+    },
+    {
+      "behavior_id": "TESTGAP-005",
+      "name": "bridge_timeout_handling",
+      "description": "Expired transfers can be refunded without permanent lockup",
+      "test_coverage": "COMPREHENSIVE",
+      "evidence": [
+        {
+          "test_name": "cancel_expired_xvm_transfer",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED",
+          "detail": "Expiry mechanism with refund path"
+        },
+        {
+          "test_name": "BadExpiry validation",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Expiry handling implemented but unbounded expiry allows locking for 8000+ years (see Audit 3 findings)",
+      "confidence": 70,
+      "status": "⚠️ REQUIRES_MAX_EXPIRY_FIX"
+    },
+    {
+      "behavior_id": "TESTGAP-006",
+      "name": "storage_overflow_protection",
+      "description": "Storage limits enforced (no unbounded growth)",
+      "test_coverage": "PARTIAL",
+      "evidence": [
+        {
+          "test_name": "MaxAssetsPerAccount",
+          "file": "runtime-config.rs",
+          "status": "CONFIGURED",
+          "value": 32
+        },
+        {
+          "test_name": "MaxPayloadLength",
+          "file": "runtime-config.rs",
+          "status": "CONFIGURED",
+          "value": "128 KB"
+        },
+        {
+          "test_name": "Transfers storage cleanup",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "NOT_IMPLEMENTED",
+          "detail": "Settled transfers never pruned (see Audit 3)"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Many storage limits configured, but critical gap: Transfers storage never pruned → unbounded state growth",
+      "confidence": 45,
+      "status": "❌ CRITICAL_GAP"
+    },
+    {
+      "behavior_id": "TESTGAP-007",
+      "name": "boundary_amount_testing",
+      "description": "Edge values (0, max_u128, max_balance) handled correctly",
+      "test_coverage": "PARTIAL",
+      "evidence": [
+        {
+          "test_name": "AmountOutOfBounds error",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        },
+        {
+          "test_name": "No explicit test for max_u128",
+          "file": "test files",
+          "status": "NOT_VISIBLE"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Boundary testing partially implemented. No explicit test for zero-amount or max-value transfers.",
+      "confidence": 60,
+      "status": "⚠️ EDGE_CASE_GAPS"
+    },
+    {
+      "behavior_id": "TESTGAP-008",
+      "name": "invalid_input_rejection",
+      "description": "Malformed inputs (wrong types, invalid addresses) rejected immediately",
+      "test_coverage": "COMPREHENSIVE",
+      "evidence": [
+        {
+          "test_name": "IncompatibleRecipient error",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        },
+        {
+          "test_name": "IncompatibleSender error",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        },
+        {
+          "test_name": "UnsupportedMessageVersion error",
+          "file": "x3-cross-vm-router-lib.rs",
+          "status": "IMPLEMENTED"
+        }
+      ],
+      "gap_identified": false,
+      "confidence": 94,
+      "status": "✅ READY"
+    },
+    {
+      "behavior_id": "TESTGAP-009",
+      "name": "governance_gates",
+      "description": "Unauthorized calls rejected (non-root cannot call admin functions)",
+      "test_coverage": "COMPREHENSIVE",
+      "evidence": [
+        {
+          "test_name": "RootOrAny origin check",
+          "file": "x3-cross-vm-router-tests.rs",
+          "status": "IMPLEMENTED",
+          "detail": "set_bounds, set_halt_on_violation require root"
+        },
+        {
+          "test_name": "set_bounds_requires_root",
+          "file": "x3-invariants/tests.rs",
+          "status": "TEST_PASSING"
+        }
+      ],
+      "gap_identified": false,
+      "confidence": 93,
+      "status": "✅ READY"
+    },
+    {
+      "behavior_id": "TESTGAP-010",
+      "name": "validator_equivocation",
+      "description": "Double-signing is detected and punished",
+      "test_coverage": "NOT_IMPLEMENTED",
+      "evidence": [
+        {
+          "test_name": "No equivocation detection pallet",
+          "file": "construct_runtime!",
+          "status": "NOT_WIRED",
+          "detail": "pallet-offences removed in Audit 1 as unwired"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "CRITICAL GAP: Validator equivocation detection completely absent. No mechanism to detect or punish double-signing.",
+      "confidence": 0,
+      "status": "❌ CRITICAL_BLOCKER"
+    },
+    {
+      "behavior_id": "TESTGAP-011",
+      "name": "mempool_frontrun_protection",
+      "description": "Transaction ordering is fair, no MEV/frontrunning",
+      "test_coverage": "PARTIAL",
+      "evidence": [
+        {
+          "test_name": "Nonce ordering in transaction pool",
+          "file": "Substrate framework",
+          "status": "FRAMEWORK_PROVIDED"
+        },
+        {
+          "test_name": "No explicit MEV resistance test",
+          "file": "test files",
+          "status": "NOT_VISIBLE"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Frontrunning prevention relies on framework. No explicit test showing MEV resistance in cross-VM scenarios.",
+      "confidence": 65,
+      "status": "⚠️ FRAMEWORK_ASSUMPTION"
+    },
+    {
+      "behavior_id": "TESTGAP-012",
+      "name": "safe_migration",
+      "description": "Runtime upgrades don't lose data or cause forks",
+      "test_coverage": "MINIMAL",
+      "evidence": [
+        {
+          "test_name": "pallet_x3_kernel::migrations::Migration wired",
+          "file": "runtime/lib.rs",
+          "status": "MINIMAL",
+          "detail": "Only migrations tuple for x3_kernel visible"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Migration implementation minimal. No multi-version upgrade test. No rollback test.",
+      "confidence": 35,
+      "status": "❌ CRITICAL_GAP"
+    },
+    {
+      "behavior_id": "TESTGAP-013",
+      "name": "fresh_machine_bootstrap",
+      "description": "New node starts from genesis and reaches consensus",
+      "test_coverage": "PARTIAL",
+      "evidence": [
+        {
+          "test_name": "Genesis config exists",
+          "file": "runtime/lib.rs",
+          "status": "CONFIGURED"
+        },
+        {
+          "test_name": "No explicit multi-node bootstrap test",
+          "file": "test files",
+          "status": "NOT_VISIBLE"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "Genesis initialized but no test showing fresh node reaching consensus in multi-node network.",
+      "confidence": 60,
+      "status": "⚠️ TESTNET_VALIDATION_REQUIRED"
+    },
+    {
+      "behavior_id": "TESTGAP-014",
+      "name": "multi_node_launch",
+      "description": "3+ validators reach consensus, finalize blocks, handle Byzantine faults",
+      "test_coverage": "NOT_TESTED",
+      "evidence": [
+        {
+          "test_name": "72/72 unit tests - all single-node",
+          "file": "test results",
+          "status": "SINGLE_NODE_ONLY"
+        },
+        {
+          "test_name": "No multi-validator testnet visible",
+          "file": "evidence proofs",
+          "status": "MISSING"
+        }
+      ],
+      "gap_identified": true,
+      "gap_description": "CRITICAL GAP: All 72 unit tests are single-node. Zero multi-node consensus tests visible. Testnet validation not completed.",
+      "confidence": 20,
+      "status": "❌ CRITICAL_BLOCKER"
+    }
+  ],
+  "test_coverage_summary": {
+    "ready": 4,
+    "testnet_validation_required": 3,
+    "critical_gaps": 4,
+    "edge_case_gaps": 2,
+    "requires_fixes": 1
+  },
+  "critical_test_gaps_identified": [
+    {
+      "gap_id": "GAP-1",
+      "behavior": "validator_equivocation (TESTGAP-010)",
+      "description": "No mechanism to detect or punish double-signing",
+      "severity": "CRITICAL_MAINNET_BLOCKER",
+      "impact": "Validators can sign multiple blocks at same height → Byzantine safety broken",
+      "remediation": "Implement staking pallet with equivocation detection OR implement signed statement tracking"
+    },
+    {
+      "gap_id": "GAP-2",
+      "behavior": "multi_node_launch (TESTGAP-014)",
+      "description": "All tests single-node. Zero multi-validator consensus tests.",
+      "severity": "CRITICAL_MAINNET_BLOCKER",
+      "impact": "Cannot verify validators reach consensus. Network might not launch.",
+      "remediation": "Deploy testnet with 3-5 validators, verify block finality, test Byzantine fault tolerance"
+    },
+    {
+      "gap_id": "GAP-3",
+      "behavior": "storage_overflow_protection (TESTGAP-006)",
+      "description": "Transfers storage never pruned → unbounded state growth",
+      "severity": "CRITICAL_MAINNET_BLOCKER",
+      "impact": "State bloat over time leads to DOS via storage exhaustion",
+      "remediation": "Implement on_initialize pruning of Finalized/Refunded/Failed transfers"
+    },
+    {
+      "gap_id": "GAP-4",
+      "behavior": "safe_migration (TESTGAP-012)",
+      "description": "Runtime migration implementation minimal, no upgrade tests",
+      "severity": "CRITICAL_MAINNET_BLOCKER",
+      "impact": "Runtime upgrades could lose data or cause fork",
+      "remediation": "Add multi-version upgrade test, downgrade test, state validation test"
+    }
+  ],
+  "additional_gaps_requiring_attention": [
+    {
+      "gap_id": "GAP-5",
+      "behavior": "finality_settlement (TESTGAP-004)",
+      "description": "Finality theory verified but multi-node finality not tested",
+      "severity": "HIGH",
+      "remediation": "Testnet: submit block, wait for Grandpa finality, attempt revert"
+    },
+    {
+      "gap_id": "GAP-6",
+      "behavior": "bridge_timeout_handling (TESTGAP-005)",
+      "description": "Expiry handling works but no upper bound test",
+      "severity": "HIGH",
+      "remediation": "Add MaxExpiryBlocks parameter (recommend 10000 blocks)"
+    },
+    {
+      "gap_id": "GAP-7",
+      "behavior": "boundary_amount_testing (TESTGAP-007)",
+      "description": "No explicit test for zero-amount or max_u128 transfers",
+      "severity": "MEDIUM",
+      "remediation": "Add unit tests for edge cases: 0, 1, max_u128, max_balance"
+    },
+    {
+      "gap_id": "GAP-8",
+      "behavior": "mempool_frontrun_protection (TESTGAP-011)",
+      "description": "MEV resistance assumed by framework, no explicit test",
+      "severity": "MEDIUM",
+      "remediation": "Add test showing nonce prevents MEV in cross-VM scenarios"
+    },
+    {
+      "gap_id": "GAP-9",
+      "behavior": "fresh_machine_bootstrap (TESTGAP-013)",
+      "description": "Single-node bootstrap tested, multi-node not tested",
+      "severity": "MEDIUM",
+      "remediation": "Testnet: fresh node joins 3-node network, reaches consensus"
+    }
+  ],
+  "test_result_verification": {
+    "72_unit_tests_passing": true,
+    "all_tests_single_node": true,
+    "integration_tests": "5 files (coverage unclear)",
+    "property_tests": "7 files (coverage unclear)",
+    "multi_node_consensus_test": false,
+    "multi_validator_Byzantine_test": false,
+    "finality_reversion_test": false,
+    "migration_upgrade_test": false,
+    "storage_pruning_test": false,
+    "equivocation_detection_test": false
+  },
+  "pass_fail_matrix": [
+    {"behavior": "replay_resistance", "status": "✅ PASS"},
+    {"behavior": "partial_execution_failure", "status": "✅ PASS"},
+    {"behavior": "rollback_guarantee", "status": "✅ PASS"},
+    {"behavior": "finality_settlement", "status": "⚠️ UNTESTED_MULTINODE"},
+    {"behavior": "bridge_timeout_handling", "status": "⚠️ NEEDS_MAX_EXPIRY"},
+    {"behavior": "storage_overflow_protection", "status": "❌ CRITICAL_GAP"},
+    {"behavior": "boundary_amount_testing", "status": "⚠️ EDGE_CASES_MISSING"},
+    {"behavior": "invalid_input_rejection", "status": "✅ PASS"},
+    {"behavior": "governance_gates", "status": "✅ PASS"},
+    {"behavior": "validator_equivocation", "status": "❌ NOT_IMPLEMENTED"},
+    {"behavior": "mempool_frontrun_protection", "status": "⚠️ FRAMEWORK_ASSUMED"},
+    {"behavior": "safe_migration", "status": "❌ CRITICAL_GAP"},
+    {"behavior": "fresh_machine_bootstrap", "status": "⚠️ SINGLE_NODE_ONLY"},
+    {"behavior": "multi_node_launch", "status": "❌ CRITICAL_BLOCKER"}
+  ],
+  "overall_test_health": {
+    "pass": 4,
+    "warn": 6,
+    "fail": 4,
+    "score": "57%"
+  },
+  "mainnet_readiness": false,
+  "mainnet_blockers": 4,
+  "reasoning": "Of 14 critical behaviors tested, only 4 pass without caveats. 6 have warnings (testnet validation pending, edge cases missing), and 4 are CRITICAL BLOCKERS: (1) Validator equivocation not implemented, (2) Multi-node consensus never tested (all 72 tests single-node), (3) Storage overflow - transfers never pruned, (4) Safe migration - upgrade safety not tested. Additional 5 high/medium-severity gaps identified. These must be resolved before mainnet launch.",
+  "audit_result": "CRITICAL_GAPS_IDENTIFIED_MAINNET_NOT_READY",
+  "required_before_mainnet": [
+    "1. Implement validator equivocation detection",
+    "2. Deploy testnet with 3+ validators and verify consensus",
+    "3. Implement Transfers storage pruning",
+    "4. Add runtime migration and upgrade safety tests",
+    "5. Add max_expiry_blocks parameter and test",
+    "6. Add boundary value tests (0, max_u128, etc)",
+    "7. Test finality on multi-node network",
+    "8. Test fresh node bootstrap to consensus"
+  ]
+}

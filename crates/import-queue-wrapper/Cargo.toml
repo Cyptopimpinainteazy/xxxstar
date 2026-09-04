@@ -1,0 +1,24 @@
+[package]
+name = "import-queue-wrapper"
+version = "0.1.0"
+edition = "2021"
+description = "Transaction import queue wrapper with parallel processing and GPU verification"
+license = "Apache-2.0"
+repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
+keywords = ["blockchain", "queue", "parallel", "gpu", "verification"]
+
+[dependencies]
+anyhow = { version = "1.0", default-features = false }
+blake3 = { version = "1.0", default-features = false }
+serde = { version = "1.0", features = ["derive"], default-features = false }
+serde_json = { version = "1.0", default-features = false }
+tracing = { version = "0.1", default-features = false }
+tokio = { version = "1.0", features = ["sync", "time", "rt"], default-features = false }
+uuid = { version = "1.0", features = ["v4"], default-features = false }
+once_cell = { version = "1.0", default-features = false }
+rand = { version = "0.8", default-features = false }
+parallel-proposer = { path = "../parallel-proposer" }
+gpu-sig-verifier = { path = "../gpu-sig-verifier" }
+[dev-dependencies]
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"], default-features = false }
+serde_json = { version = "1.0", default-features = false }

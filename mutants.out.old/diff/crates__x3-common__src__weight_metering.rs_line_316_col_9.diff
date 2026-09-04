@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace GasMeter::remaining -> u64 with 0
+@@ -308,17 +308,17 @@
+             return Err(WeightError::BudgetExceeded(total, budget));
+         }
+         self.consumed = total;
+         Ok(())
+     }
+ 
+     /// Get remaining gas
+     pub fn remaining(&self) -> u64 {
+-        self.limit.saturating_sub(self.consumed)
++        0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Get consumed gas
+     pub fn consumed(&self) -> u64 {
+         self.consumed
+     }
+ 
+     /// Get the limit

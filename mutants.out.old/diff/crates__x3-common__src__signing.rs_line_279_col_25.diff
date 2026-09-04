@@ -1,0 +1,21 @@
+--- crates/x3-common/src/signing.rs
++++ replace != with == in Secp256k1Signer::from_hex_secret
+@@ -271,17 +271,17 @@
+             secret_key: sk,
+             public_key: pk,
+         })
+     }
+ 
+     /// Create a signer from a hex-encoded secret key
+     pub fn from_hex_secret(hex: &str) -> Result<Self, &'static str> {
+         let secret = hex::decode(hex).map_err(|_| "Invalid hex")?;
+-        if secret.len() != 32 {
++        if secret.len() == /* ~ changed by cargo-mutants ~ */ 32 {
+             return Err("Secret key must be 32 bytes");
+         }
+         let mut secret_array = [0u8; 32];
+         secret_array.copy_from_slice(&secret);
+         Self::from_secret_key(&secret_array)
+     }
+ }
+ 

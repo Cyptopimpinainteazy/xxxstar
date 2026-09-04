@@ -1,0 +1,32 @@
+[package]
+name = "x3-bench"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Benchmark runner for X3 compiler optimizer"
+
+[[bin]]
+name = "x3-bench"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+csv = "1.2"
+prettytable = "0.10"
+chrono = "0.4"
+hex = "0.4"
+log = "0.4"
+env_logger = "0.10"
+
+# X3 workspace crates
+x3-parser = { path = "../x3-parser" }
+x3-ast = { path = "../x3-ast" }
+x3-hir = { path = "../x3-hir" }
+x3-mir = { path = "../x3-mir" }
+x3-opt = { path = "../x3-opt" }
+x3-backend = { path = "../x3-backend" }
+x3-vm = { path = "../x3-vm" }
+x3-common = { path = "../x3-common" }
+x3-typeck = { path = "../x3-typeck" }

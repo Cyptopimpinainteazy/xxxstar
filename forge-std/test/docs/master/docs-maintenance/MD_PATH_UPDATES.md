@@ -1,0 +1,48 @@
+# MD Path Updates
+
+- `PASS_A_COMPLETE.txt`
+- `docs/root/README.md`
+- `COMMIT_MESSAGE_PHASE4.txt`
+- `DOCUMENTATION_INDEX.md`
+- `MD_CONSOLIDATION_LOG.md`
+- `PHASE6_BUILD_REPORT.txt`
+- `deployment/DEPLOYMENT_READY.sh`
+- `docs/docs/deployment/DAY_MINUS_1_COMPLETE.md`
+- `docs/docs/deployment/DEPLOYMENT_STATUS.md`
+- `docs/docs/root/README.md`
+- `docs/reports/EPIC1-EXECUTION-MASTER.md`
+- `docs/reports/TODO.md`
+- `docs/reports/IMPLEMENTATION_VERIFICATION.md`
+- `docs/reports/PHASE4_DOCUMENTATION_INDEX.md`
+- `docs/reports/PHASE6_DOCUMENTATION_INDEX.md`
+- `docs/reports/X3_SPHERE_STATUS.md`
+- `docs/reports/TESTNET_ROADMAP.md`
+- `docs/reports/TESTNET_ANNOUNCEMENT.md`
+- `docs/reports/TESTNET_QUICKSTART.md`
+- `docs/reports/QUICK_REFERENCE_LOOP_PACK.md`
+- `docs/reports/LOOP_PACK_V1_FRAMEWORK.md`
+- `docs/reports/TESTNET_DOCS_PACKAGE.md`
+- `docs/reports/X3_docs/runbooks/getting-started/QUICK_START.md`
+- `docs/reports/INTEGRATION_COMPILATION_GUIDE.md`
+- `docs/reports/VALIDATION_FACT_SHEET.md`
+- `docs/reports/docs/runbooks/deployment/DEPLOYMENT_CHECKLIST.md`
+- `docs/reports/QUICK_REFERENCE_LOOP_PACK_V1.md`
+- `docs/reports/ACCOMPLISHMENTS.md`
+- `docs/reports/X3_DEPLOYMENT_INDEX.md`
+- `docs/reports/MERGE_CHECKLIST.md`
+- `docs/runbooks/getting-started/QUICK_START.md`
+- `docs/reports/DEVELOPER_TOOLS.md`
+- `docs/reports/docs/runbooks/getting-started/QUICK_REFERENCE.md`
+- `docs/reports/BLOCKCHAIN_INTEGRATION_PHASE4.md`
+- `docs/reports/WASM_BUILD_FIXED.md`
+- `docs/reports/MERGE_PROJECT_docs/root/README.md`
+- `docs/reports/X3_MILESTONE_TRACKING.md`
+- `docs/reports/OPTIMIZATION_PASS_A_STATUS.md`
+- `docs/reports/TESTNET_DEPLOYMENT_CHECKLIST_OPENSPEC.md`
+- `docs/reports/DELIVERABLES_MANIFEST.md`
+- `docs/reports/COND_FOLD_INDEX.md`
+- `docs/ops/STALE_PATH_SWEEP.md`
+- `docs/bmad/index.md`
+- `crates/vibe-bmad/echo | tr '\n' '\r' | awk '{for(i=0;i<20;i++) print ""}'/.bmad/bmb/workflows-legacy/create-module/instructions.md`
+- `crates/vibe-bmad/echo | tr '\n' '\r' | awk '{for(i=0;i<20;i++) print ""}'/.bmad/bmb/workflows-legacy/create-module/docs/root/README.md`
+- `crates/vibe-bmad/echo | tr '\n' '\r' | awk '{for(i=0;i<20;i++) print ""}'/.bmad/bmb/workflows-legacy/create-module/checklist.md`

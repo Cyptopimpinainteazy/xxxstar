@@ -1,0 +1,650 @@
+{
+  "_comment": "Pin of runtime_rpc_inventory.json. Per-trait fingerprint over {trait_name, source_file, cfg_guard, method_names sorted, method_count}. Line numbers excluded.",
+  "totals": {
+    "total_traits": 80,
+    "traits_with_methods": 15,
+    "total_methods": 83
+  },
+  "traits": [
+    {
+      "trait_name": "crate::fraud_proofs::pallet::pallet::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "f1bdda71985cb0e8",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "frame_system::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "0d6b4dc751ffcd57",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 1,
+      "fingerprint": "07ed80c87505d928",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_agent_accounts::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "b076e7b8fcad3b73",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_agent_memory::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "3e2490b841bbaed4",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_atomic_trade_engine::AtomicTradeEngineApi<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 6,
+      "fingerprint": "d8cb298e2df6f0df",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_atomic_trade_engine::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "01ddef861db10c64",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_aura::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "32aa9df4d5926e85",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_balances::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "dfb7148216a99dff",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_collective::Config<CouncilCollective>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "bfbe5f3da9cf4a26",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_cross_chain_validator::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "b566acc1231c610b",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_depin_marketplace::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "55a2597bc9fb1759",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_ethereum::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": "#[cfg(feature = \"frontier\")]",
+      "method_count": 0,
+      "fingerprint": "3f9c3aa720a3bedd",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_evm::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": "#[cfg(feature = \"frontier\")]",
+      "method_count": 0,
+      "fingerprint": "db8177b8790ba15f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_evolution_core::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "e96b2400cfcc80f1",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_evolution_core::runtime_api::EvolutionCoreApi<Block, AccountId, BlockNumber>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 6,
+      "fingerprint": "19eedc7ceb2b34f5",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_governance::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "d0e73085c8fd291a",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_grandpa::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "c338ec3bbc0a7aef",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_meme_overlord::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "8f5da1f7da2ae387",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_offences::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "869bb4e3341508a0",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_preimage::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "5616097dbd4082c8",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_private_execution::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "3c3bf32f3a73f729",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_scheduler::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "0556bff4854cca3f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_session::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "152eb0fe338bf727",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_session::historical::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "5d3f97ddf6e3305c",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_sudo::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": "#[cfg(feature = \"dev\")]",
+      "method_count": 0,
+      "fingerprint": "93aeb076b3322ad5",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_svm_runtime::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "236df348e36e7dc3",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_swarm::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "696f704a1afdebd5",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_timestamp::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "60e2fcea842f2784",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_transaction_payment::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "e41c7c2263746ddc",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 4,
+      "fingerprint": "61bb32f480e21105",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_treasury::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "107e5ccfe22cea60",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_account_registry::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "f97b25b173b15aec",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_agent_law::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "27b9eeab2f487650",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_asset_registry::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "a4acdac80e591395",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_atomic_kernel::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "b715f2f07dccaebc",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_auction::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "68867da44e5816ba",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_automation::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "272f79a3d77e4b2f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_coin::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "e73472093851a2b8",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_compute_market::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "cbb73004e1f91c09",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_consensus::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "8e79f93f31136d4a",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_cross_vm_router::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "5788e97c5766b3a4",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_custody::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "13e29b86a3719a24",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_da::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "5ac107b9f30faf4b",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_dapp_hub::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "435683da8ccb0dbc",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_dex::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "a7974ac90aec3234",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_domain_registry::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "3dc55407e130e22f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_domain_registry::runtime_api::X3DomainRegistryApi<Block, AccountId>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 3,
+      "fingerprint": "a72433f7fd77c27b",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_flashloan::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "9ef4adef4594540e",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_invariants::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "08e0f6bb37bdd12f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_inventory::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "1530ee0cf62bf01a",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_jury_anchor::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "e378060f8cb8530e",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 33,
+      "fingerprint": "bfe1cb159ea325d8",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_kernel::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "58737c0d26fe37b2",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_launchpad::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "7206e88598149c7c",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_oracle::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "43dd89d183b9650f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_partner::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "eb15e73371cecf46",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_rebalance::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "b48a649a9f460883",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_reconciliation::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "21a3a8568e5d725f",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_reservation::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "cf39f097b3859471",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_sequencer::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "b632c7ea5325d915",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_settlement_engine::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "eac8f5501bad50ee",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_slash::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "c26f030b729002fd",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_solvency::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "963afa0da3a95666",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_supply_ledger::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "52f62809058ae178",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_token_factory::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "456e7bc0e71b3ac1",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_treasury_policy::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "fc05ab35ec0f26d4",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_verifier::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "8aa31eb09ab44409",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_verifier::runtime_api::X3VerifierApi<Block, AccountId, Balance, BlockNumber>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 8,
+      "fingerprint": "3b3273d284863881",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_vrf::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "524cb8bafcd008b3",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_wallet_pallet::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "c6c5606a0a6ff9ba",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "pallet_x3_wrapped::Config",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 0,
+      "fingerprint": "e3106c4cd99ffb09",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_api::Core<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 3,
+      "fingerprint": "9327203ecf097289",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_api::Metadata<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 3,
+      "fingerprint": "2549e6510c08ebf5",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_block_builder::BlockBuilder<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 4,
+      "fingerprint": "b323a1089ef3054d",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_consensus_aura::AuraApi<Block, sp_consensus_aura::sr25519::AuthorityId>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 2,
+      "fingerprint": "25e0f322bbecdd78",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_consensus_grandpa::GrandpaApi<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 4,
+      "fingerprint": "14775bb838752ac8",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_genesis_builder::GenesisBuilder<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 3,
+      "fingerprint": "cfc8cb71a80b8ac1",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_session::SessionKeys<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 2,
+      "fingerprint": "46ad3135950a7b4b",
+      "accepted_reason": ""
+    },
+    {
+      "trait_name": "sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>",
+      "source_file": "runtime/src/lib.rs",
+      "cfg_guard": null,
+      "method_count": 1,
+      "fingerprint": "79cdfd2d33f471c0",
+      "accepted_reason": ""
+    }
+  ]
+}

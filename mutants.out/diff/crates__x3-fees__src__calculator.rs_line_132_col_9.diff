@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/calculator.rs
++++ replace FeeCalculator::curve -> &FeeCurve with Box::leak(Box::new(Default::default()))
+@@ -124,17 +124,17 @@
+ 
+         let savings = ext_fees.total.saturating_sub(x3_fees.total);
+ 
+         Ok((x3_fees.total, ext_fees.total, savings))
+     }
+ 
+     /// Get the underlying fee curve.
+     pub fn curve(&self) -> &FeeCurve {
+-        &self.curve
++        Box::leak(Box::new(Default::default())) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     fn new_agent() -> AgentReputation {

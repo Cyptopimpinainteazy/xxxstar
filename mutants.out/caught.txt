@@ -1,0 +1,94 @@
+crates/x3-fees/src/lib.rs:48:9: replace Eip1559FeeMarket::adjust_base_fee with ()
+crates/x3-fees/src/lib.rs:48:44: replace * with + in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:48:44: replace * with / in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:50:25: replace > with == in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:50:25: replace > with < in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:55:17: replace / with % in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:55:17: replace / with * in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:57:32: replace < with == in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:57:32: replace < with > in Eip1559FeeMarket::adjust_base_fee
+crates/x3-fees/src/lib.rs:69:9: replace Eip1559FeeMarket::split_fee -> (u128, u128) with (0, 0)
+crates/x3-fees/src/lib.rs:69:9: replace Eip1559FeeMarket::split_fee -> (u128, u128) with (0, 1)
+crates/x3-fees/src/lib.rs:69:9: replace Eip1559FeeMarket::split_fee -> (u128, u128) with (1, 0)
+crates/x3-fees/src/lib.rs:69:9: replace Eip1559FeeMarket::split_fee -> (u128, u128) with (1, 1)
+crates/x3-fees/src/lib.rs:69:37: replace / with % in Eip1559FeeMarket::split_fee
+crates/x3-fees/src/lib.rs:69:37: replace / with * in Eip1559FeeMarket::split_fee
+crates/x3-fees/src/lib.rs:69:31: replace * with + in Eip1559FeeMarket::split_fee
+crates/x3-fees/src/lib.rs:69:31: replace * with / in Eip1559FeeMarket::split_fee
+crates/x3-fees/src/lib.rs:70:35: replace - with + in Eip1559FeeMarket::split_fee
+crates/x3-fees/src/lib.rs:70:35: replace - with / in Eip1559FeeMarket::split_fee
+crates/x3-fees/src/lib.rs:102:9: replace CommitRevealProof::verify -> bool with true
+crates/x3-fees/src/lib.rs:102:9: replace CommitRevealProof::verify -> bool with false
+crates/x3-fees/src/lib.rs:103:14: replace == with != in CommitRevealProof::verify
+crates/x3-fees/src/lib.rs:108:5: replace blake2_256 -> [u8; 32] with [0; 32]
+crates/x3-fees/src/lib.rs:108:5: replace blake2_256 -> [u8; 32] with [1; 32]
+crates/x3-fees/src/lib.rs:143:9: replace SlashingInsuranceFund::contribute_from_slash with ()
+crates/x3-fees/src/lib.rs:145:13: replace / with % in SlashingInsuranceFund::contribute_from_slash
+crates/x3-fees/src/lib.rs:145:13: replace / with * in SlashingInsuranceFund::contribute_from_slash
+crates/x3-fees/src/lib.rs:151:9: replace SlashingInsuranceFund::file_claim with ()
+crates/x3-fees/src/lib.rs:156:9: replace SlashingInsuranceFund::process_claim -> bool with true
+crates/x3-fees/src/lib.rs:156:9: replace SlashingInsuranceFund::process_claim -> bool with false
+crates/x3-fees/src/lib.rs:157:24: replace && with || in SlashingInsuranceFund::process_claim
+crates/x3-fees/src/lib.rs:157:45: replace >= with < in SlashingInsuranceFund::process_claim
+crates/x3-fees/src/lib.rs:200:9: replace EconomicEngine::process_transaction -> (u128, u128) with (0, 0)
+crates/x3-fees/src/lib.rs:200:9: replace EconomicEngine::process_transaction -> (u128, u128) with (0, 1)
+crates/x3-fees/src/lib.rs:200:9: replace EconomicEngine::process_transaction -> (u128, u128) with (1, 0)
+crates/x3-fees/src/lib.rs:200:9: replace EconomicEngine::process_transaction -> (u128, u128) with (1, 1)
+crates/x3-fees/src/lib.rs:220:9: replace EconomicEngine::slash_validator with ()
+crates/x3-fees/src/lib.rs:350:9: replace ResourceVector::exceeds -> bool with false
+crates/x3-fees/src/lib.rs:351:13: replace || with && in ResourceVector::exceeds
+crates/x3-fees/src/lib.rs:350:25: replace > with == in ResourceVector::exceeds
+crates/x3-fees/src/lib.rs:350:25: replace > with < in ResourceVector::exceeds
+crates/x3-fees/src/lib.rs:392:5: replace compute_fee -> u128 with 0
+crates/x3-fees/src/lib.rs:392:5: replace compute_fee -> u128 with 1
+crates/x3-fees/src/calculator.rs:33:24: replace == with != in FeeCalculator::calculate
+crates/x3-fees/src/calculator.rs:95:9: replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((true, 0))
+crates/x3-fees/src/calculator.rs:95:9: replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((true, 1))
+crates/x3-fees/src/calculator.rs:95:9: replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((true, -1))
+crates/x3-fees/src/calculator.rs:95:9: replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((false, 0))
+crates/x3-fees/src/calculator.rs:95:9: replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((false, 1))
+crates/x3-fees/src/calculator.rs:95:9: replace FeeCalculator::estimate_profitability -> Result<(bool, i128), FeeError> with Ok((false, -1))
+crates/x3-fees/src/calculator.rs:96:43: replace - with + in FeeCalculator::estimate_profitability
+crates/x3-fees/src/calculator.rs:97:17: replace > with == in FeeCalculator::estimate_profitability
+crates/x3-fees/src/calculator.rs:97:17: replace > with < in FeeCalculator::estimate_profitability
+crates/x3-fees/src/calculator.rs:117:9: replace FeeCalculator::compare_x3_vs_external -> Result<(Amount, Amount, Amount), FeeError> with Ok((Default::default(), Default::default(), Default::default()))
+crates/x3-fees/src/curve.rs:26:9: replace FeeCurve::base_fee -> Amount with Default::default()
+crates/x3-fees/src/curve.rs:38:9: replace FeeCurve::complexity_fee -> Amount with Default::default()
+crates/x3-fees/src/curve.rs:38:36: replace * with + in FeeCurve::complexity_fee
+crates/x3-fees/src/curve.rs:38:36: replace * with / in FeeCurve::complexity_fee
+crates/x3-fees/src/curve.rs:50:9: replace FeeCurve::capital_fee -> Amount with Default::default()
+crates/x3-fees/src/curve.rs:50:20: replace == with != in FeeCurve::capital_fee
+crates/x3-fees/src/curve.rs:67:9: replace FeeCurve::reputation_discount -> Amount with Default::default()
+crates/x3-fees/src/curve.rs:70:24: replace < with > in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:78:51: replace >= with < in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:80:41: replace >= with < in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:86:23: replace == with != in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:91:66: replace / with % in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:91:66: replace / with * in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:91:52: replace * with / in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:91:73: replace * with + in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:91:73: replace * with / in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:97:42: replace / with % in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:97:42: replace / with * in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:97:20: replace * with + in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:97:20: replace * with / in FeeCurve::reputation_discount
+crates/x3-fees/src/curve.rs:102:72: replace / with * in FeeCurve::x3_optimization_discount
+crates/x3-fees/src/curve.rs:113:9: replace FeeCurve::flashloan_premium -> Amount with Default::default()
+crates/x3-fees/src/curve.rs:114:43: replace / with % in FeeCurve::flashloan_premium
+crates/x3-fees/src/curve.rs:114:20: replace * with / in FeeCurve::flashloan_premium
+crates/x3-fees/src/curve.rs:119:9: replace FeeCurve::cross_chain_surcharge -> Amount with Default::default()
+crates/x3-fees/src/reputation.rs:43:59: replace / with % in ReputationScore::compute
+crates/x3-fees/src/reputation.rs:43:59: replace / with * in ReputationScore::compute
+crates/x3-fees/src/reputation.rs:43:38: replace * with + in ReputationScore::compute
+crates/x3-fees/src/reputation.rs:43:38: replace * with / in ReputationScore::compute
+crates/x3-fees/src/reputation.rs:43:66: replace * with / in ReputationScore::compute
+crates/x3-fees/src/reputation.rs:57:9: replace ReputationScore::qualifies_for_discount -> bool with true
+crates/x3-fees/src/reputation.rs:57:9: replace ReputationScore::qualifies_for_discount -> bool with false
+crates/x3-fees/src/reputation.rs:57:30: replace > with == in ReputationScore::qualifies_for_discount
+crates/x3-fees/src/reputation.rs:57:30: replace > with < in ReputationScore::qualifies_for_discount
+crates/x3-fees/src/reputation.rs:57:56: replace >= with < in ReputationScore::qualifies_for_discount
+crates/x3-fees/src/types.rs:105:9: replace AgentReputation::success_rate_bps -> u32 with 0
+crates/x3-fees/src/types.rs:105:9: replace AgentReputation::success_rate_bps -> u32 with 1
+crates/x3-fees/src/types.rs:105:36: replace + with * in AgentReputation::success_rate_bps
+crates/x3-fees/src/types.rs:106:18: replace == with != in AgentReputation::success_rate_bps
+crates/x3-fees/src/types.rs:109:43: replace / with % in AgentReputation::success_rate_bps

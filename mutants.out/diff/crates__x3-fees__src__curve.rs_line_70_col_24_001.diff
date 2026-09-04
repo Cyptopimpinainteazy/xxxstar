@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/curve.rs
++++ replace < with > in FeeCurve::reputation_discount
+@@ -62,17 +62,17 @@
+     /// ```
+     ///
+     /// Reputation reduces cost but is capped. New agents pay full price.
+     /// Slashed agents lose their discount.
+     pub fn reputation_discount(&self, gross_fee: Amount, reputation: &AgentReputation) -> Amount {
+         let success_bps = reputation.success_rate_bps();
+ 
+         // No discount if success rate is below 50%
+-        if success_bps < 5000 {
++        if success_bps > /* ~ changed by cargo-mutants ~ */ 5000 {
+             return 0;
+         }
+ 
+         // Slash penalty: each slash halves the discount
+         let slash_penalty = 2u64.saturating_pow(reputation.slashes as u32);
+ 
+         // Age factor: agents need at least 100 blocks of history
+         let age_factor = if reputation.age_blocks >= 1000 {

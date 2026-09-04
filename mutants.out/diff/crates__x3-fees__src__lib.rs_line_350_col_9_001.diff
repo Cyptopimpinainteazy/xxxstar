@@ -1,0 +1,26 @@
+--- crates/x3-fees/src/lib.rs
++++ replace ResourceVector::exceeds -> bool with false
+@@ -342,22 +342,17 @@
+             io_ops: self.io_ops.saturating_add(other.io_ops),
+             storage_reads: self.storage_reads.saturating_add(other.storage_reads),
+             storage_writes: self.storage_writes.saturating_add(other.storage_writes),
+         }
+     }
+ 
+     /// Check if this vector exceeds declared limits
+     pub fn exceeds(&self, limits: &ResourceVector) -> bool {
+-        self.cpu_cycles > limits.cpu_cycles
+-            || self.gpu_cycles > limits.gpu_cycles
+-            || self.memory_bytes > limits.memory_bytes
+-            || self.io_ops > limits.io_ops
+-            || self.storage_reads > limits.storage_reads
+-            || self.storage_writes > limits.storage_writes
++        false /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Price vector - unit costs for each resource type
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct PriceVector {
+     /// Price per million CPU cycles
+     pub cpu_per_million: u128,

@@ -1,0 +1,11 @@
+{
+  "name": "x3star-placeholder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-subdomain placeholder server for x3star.net",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}

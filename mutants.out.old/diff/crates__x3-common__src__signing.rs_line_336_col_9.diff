@@ -1,0 +1,23 @@
+--- crates/x3-common/src/signing.rs
++++ replace Sr25519Signer::generate -> Self with Default::default()
+@@ -328,19 +328,17 @@
+ pub struct Sr25519Signer {
+     pair: sr25519::Pair,
+     public_key: sr25519::Public,
+ }
+ 
+ impl Sr25519Signer {
+     /// Generate a new sr25519 keypair
+     pub fn generate() -> Self {
+-        let (pair, _, _) = sr25519::Pair::generate_with_phrase(None);
+-        let public_key = pair.public();
+-        Self { pair, public_key }
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Create a signer from a seed phrase
+     pub fn from_phrase(phrase: &str, password: Option<&str>) -> Result<Self, &'static str> {
+         let (pair, _) =
+             sr25519::Pair::from_phrase(phrase, password).map_err(|_| "Invalid seed phrase")?;
+         let public_key = pair.public();
+         Ok(Self { pair, public_key })

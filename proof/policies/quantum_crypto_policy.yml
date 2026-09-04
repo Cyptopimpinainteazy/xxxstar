@@ -1,0 +1,123 @@
+# Quantum Cryptography Policy
+# Requirements for quantum-resistant cryptographic algorithms
+
+quantum_resistance:
+  status: "PLANNING"
+  target: "Post-Quantum Cryptography (PQC) ready by mainnet"
+  
+  algorithms:
+    signature:
+      current:
+        - algorithm: "ECDSA (secp256k1)"
+          quantum_resistant: false
+          security_level: "Pre-quantum: 128-bit, Post-quantum: 0-bit"
+          migration_path: "Dilithium3"
+      
+      target:
+        - algorithm: "Dilithium3"
+          quantum_resistant: true
+          security_level: "NIST Level 3 (~196-bit classical)"
+          standard: "NIST FIPS 204"
+          implementation: "pqcrypto-dilithium"
+    
+    key_exchange:
+      current:
+        - algorithm: "ECDH (Curve25519)"
+          quantum_resistant: false
+          security_level: "Pre-quantum: 128-bit, Post-quantum: 0-bit"
+          migration_path: "Kyber768"
+      
+      target:
+        - algorithm: "Kyber768"
+          quantum_resistant: true
+          security_level: "NIST Level 3 (~192-bit classical)"
+          standard: "NIST FIPS 203"
+          implementation: "pqcrypto-kyber"
+    
+    hashing:
+      current:
+        - algorithm: "SHA-256"
+          quantum_resistant: true
+          security_level: "Pre-quantum: 128-bit, Post-quantum: 64-bit (Grover)"
+          note: "SHA-256 remains quantum-resistant with appropriate output length"
+      
+      target:
+        - algorithm: "SHA-3 (Keccak-256)"
+          quantum_resistant: true
+          security_level: "Pre-quantum: 128-bit, Post-quantum: 64-bit (Grover)"
+          standard: "NIST FIPS 202"
+
+  migration_strategy:
+    phase_1:
+      name: "Hybrid Mode"
+      description: "Support both classical and PQC algorithms"
+      timeline: "Testnet launch"
+      requirements:
+        - implement_pqc_algorithms
+        - support_dual_signature_verification
+        - maintain_backward_compatibility
+    
+    phase_2:
+      name: "PQC Preferred"
+      description: "Encourage PQC adoption, maintain classical support"
+      timeline: "6 months post-mainnet"
+      requirements:
+        - pqc_default_for_new_keys
+        - classical_keys_marked_deprecated
+        - migration_tools_available
+    
+    phase_3:
+      name: "PQC Only"
+      description: "Remove classical algorithm support"
+      timeline: "12-18 months post-mainnet"
+      requirements:
+        - all_keys_migrated_to_pqc
+        - classical_algorithm_support_removed
+        - full_pqc_validation
+
+  implementation_requirements:
+    libraries:
+      - name: "pqcrypto-rust"
+        version: ">=0.17"
+        crates:
+          - pqcrypto-dilithium
+          - pqcrypto-kyber
+          - pqcrypto-sphincsplus
+      
+      - name: "oqs-rust"
+        version: ">=0.9"
+        description: "Open Quantum Safe bindings for Rust"
+    
+    testing:
+      - unit_tests_for_all_pqc_operations
+      - interop_testing_with_classical_systems
+      - performance_benchmarks
+      - fuzzing_of_pqc_implementations
+    
+    auditing:
+      - external_cryptographic_audit_required
+      - nist_compliance_verification
+      - side_channel_analysis
+
+  performance_considerations:
+    signature_sizes:
+      - ECDSA: "64-65 bytes"
+      - Dilithium3: "3293 bytes"
+      - impact: "50x increase, managed via compression and batching"
+    
+    verification_time:
+      - ECDSA: "~0.5ms"
+      - Dilithium3: "~0.2ms"
+      - impact: "Faster verification offsets signature size"
+    
+    key_sizes:
+      - ECDSA_public: "33 bytes"
+      - Dilithium3_public: "1952 bytes"
+      - impact: "60x increase, requires storage optimization"
+
+  proof_requirements:
+    - pqc_algorithms_correctly_implemented
+    - no_known_vulnerabilities_in_pqc_libs
+    - hybrid_mode_maintains_security
+    - migration_path_tested
+    - performance_acceptable_for_mainnet

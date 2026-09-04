@@ -1,0 +1,20 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="quantumGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9d4edd;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6a0dad;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Superposition box 1 -->
+  <rect x="24" y="40" width="32" height="32" rx="4" fill="url(#quantumGrad)" opacity="0.7"/>
+  <!-- Superposition box 2 (offset) -->
+  <rect x="28" y="44" width="32" height="32" rx="4" fill="url(#quantumGrad)" opacity="0.5"/>
+  <!-- Superposition box 3 (offset more) -->
+  <rect x="72" y="40" width="32" height="32" rx="4" fill="url(#quantumGrad)" opacity="0.7"/>
+  <!-- Superposition box 4 (offset) -->
+  <rect x="76" y="44" width="32" height="32" rx="4" fill="url(#quantumGrad)" opacity="0.5"/>
+  <!-- Entanglement line -->
+  <line x1="56" y1="56" x2="72" y2="56" stroke="#9d4edd" stroke-width="2" opacity="0.6" stroke-dasharray="4,2"/>
+  <!-- Quantum dot -->
+  <circle cx="64" cy="80" r="6" fill="#9d4edd"/>
+</svg>

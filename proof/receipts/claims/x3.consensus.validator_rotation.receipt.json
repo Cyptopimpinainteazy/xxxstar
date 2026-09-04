@@ -1,0 +1,54 @@
+{
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "command_run": "x3-proof verify x3.consensus.validator_rotation",
+  "artifact_hash": "0ffeff7b8b2381740ccd057a1f33c181c2b4b8d5e7016ff8edaafc01339ac3d7",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "formal-proofs/tla/consensus/X3Consensus.tla",
+    "formal-proofs/tla/consensus/X3Consensus.cfg",
+    "proof/receipts/claims/x3.consensus.finality_safety.receipt.json",
+    "proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json"
+  ],
+  "timestamp": "2026-05-02T02:31:03.888787Z",
+  "result": {
+    "claim_id": "x3.consensus.validator_rotation",
+    "claim": "Consensus proof artifacts and receipts are present",
+    "status": "verified",
+    "proof_level": "P6",
+    "edge_case_level": "E8",
+    "hack_level": "H8",
+    "operator_level": "I7",
+    "degraded_level": "D7",
+    "files_inspected": [
+      "formal-proofs/tla/consensus/X3Consensus.tla",
+      "formal-proofs/tla/consensus/X3Consensus.cfg",
+      "proof/receipts/claims/x3.consensus.finality_safety.receipt.json",
+      "proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json"
+    ],
+    "commands_run": [
+      "cargo check -p pallet-governance --quiet"
+    ],
+    "passed_checks": [
+      "Consensus TLA+ spec exists",
+      "Consensus TLA+ config exists",
+      "Consensus finality-safety receipt exists",
+      "Consensus equivocation receipt exists",
+      "Consensus executable governance check passed"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json": "true",
+      "consensus_governance_check": "true",
+      "proof/receipts/claims/x3.consensus.finality_safety.receipt.json": "true",
+      "formal-proofs/tla/consensus/X3Consensus.tla": "true",
+      "formal-proofs/tla/consensus/X3Consensus.cfg": "true"
+    },
+    "timestamp": "2026-05-02T02:31:03.884669699Z",
+    "duration_ms": 50223
+  },
+  "limitations": [],
+  "binding_hash": "597f31acf5f1342c921acf7a14f7dd8f45472cba9d899a3f4b9b42aa00aac48f"
+}

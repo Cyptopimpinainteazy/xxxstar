@@ -1,0 +1,484 @@
+# X3 ProofGate: Feature Proof Requirements
+# Every feature below requires proof tiers to score
+# No proof = no points
+# Highest proof level determines the score cap
+
+proof_tiers:
+  code_exists:           10  # exists only in docs/comments
+  code_created:          25  # code files present
+  wired:                 35  # integrated into runtime/API
+  compiles:              45  # cargo check passes
+  unit_tested:           55  # cargo test passes
+  integration_tested:    70  # integration tests pass
+  fuzz_invariant:        85  # fuzz/chaos tests pass
+  testnet_proven:        95  # multi-node testnet proves it
+  audit_approved:       100  # external audit or formal proof
+
+features:
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Runtime & Pallets (12% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: runtime_core
+    name: Runtime Core
+    category: runtime
+    weight: 12
+    criticality: P0
+    required_files:
+      - runtime/src/lib.rs
+      - runtime/src/config.rs
+    required_commands:
+      - cargo check -p x3-runtime
+      - cargo test -p x3-runtime
+    required_proofs:
+      - compiles
+      - unit_tested
+    hard_fail_if_missing:
+      - compiles
+    proof_evidence:
+      - claim: "Runtime compiles without mocks"
+        command: "cargo check -p x3-runtime"
+        file: "evidence/cargo-check-runtime.log"
+      - claim: "Core runtime tests pass"
+        command: "cargo test -p x3-runtime"
+        file: "evidence/cargo-test-runtime.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Consensus & Finality (12% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: flash_finality
+    name: Flash-Finality (Sub-second consensus)
+    category: consensus
+    weight: 12
+    criticality: P0
+    required_files:
+      - pallets/x3-finality-oracle/src/lib.rs
+      - pallets/x3-finality-oracle/src/tests.rs
+    required_commands:
+      - cargo test -p x3-finality-oracle --lib
+    required_proofs:
+      - wired
+      - unit_tested
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Finality oracle wired into runtime"
+        command: "grep -r 'FinalityOracle' runtime/src/lib.rs"
+        file: "evidence/wiring-finality.log"
+      - claim: "Consensus tests pass"
+        command: "cargo test -p x3-finality-oracle"
+        file: "evidence/cargo-test-finality.log"
+      - claim: "Multi-node testnet produces sub-second finality"
+        command: "./scripts/start-local-testnet.sh && ./scripts/testnet-measure-finality.sh"
+        file: "evidence/testnet-finality-results.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Universal Asset Kernel (15% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: universal_asset_kernel
+    name: Universal Asset Kernel
+    category: asset_kernel
+    weight: 15
+    criticality: P0
+    required_files:
+      - pallets/x3-supply-ledger/src/lib.rs
+      - pallets/x3-supply-ledger/src/tests_s0_1.rs
+    required_commands:
+      - cargo check -p pallet-x3-supply-ledger
+      - cargo test -p pallet-x3-supply-ledger
+    required_proofs:
+      - wired
+      - unit_tested
+      - invariant_tested
+      - canonical_supply_tested
+    hard_fail_if_missing:
+      - canonical_supply_tested
+    proof_evidence:
+      - claim: "Asset kernel wired into construct_runtime!"
+        command: "grep -A5 'X3SupplyLedger' runtime/src/lib.rs"
+        file: "evidence/wiring-supply-ledger.log"
+      - claim: "Canonical supply invariant tested"
+        command: "cargo test -p pallet-x3-supply-ledger canonical_supply"
+        file: "evidence/test-canonical-supply.log"
+      - claim: "Asset minting/burning conserves supply"
+        command: "cargo test -p pallet-x3-supply-ledger preserves_invariant"
+        file: "evidence/test-mint-burn.log"
+
+  - id: canonical_supply_conservation
+    name: Canonical Supply Conservation (Invariant)
+    category: asset_kernel
+    weight: 3
+    criticality: P0
+    required_files:
+      - pallets/x3-supply-ledger/src/supply_verification.rs
+    required_proofs:
+      - invariant_tested
+    hard_fail_if_missing:
+      - invariant_tested
+    proof_evidence:
+      - claim: "Canonical supply equals sum of all ledgers"
+        command: "cargo test -p pallet-x3-supply-ledger canonical_supply"
+        file: "evidence/test-invariant-canonical-supply.log"
+      - claim: "Supply conserved across VM boundaries"
+        command: "cargo test -p x3-bridge test_supply_conservation_cross_vm"
+        file: "evidence/test-supply-conservation.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Atomic Cross-VM Execution (18% weight) ⭐ CRITICAL
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: atomic_execution_core
+    name: Atomic Execution Engine
+    category: atomic_execution
+    weight: 15
+    criticality: P0
+    required_files:
+      - crates/x3-atomic-trade/src/lib.rs
+      - crates/x3-atomic-trade/src/tests.rs
+    required_commands:
+      - cargo test -p x3-atomic-trade
+    required_proofs:
+      - wired
+      - unit_tested
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Atomic swap engine wired"
+        command: "grep -r 'AtomicTrade' runtime/src/lib.rs"
+        file: "evidence/wiring-atomic.log"
+      - claim: "Basic atomic swap works"
+        command: "cargo test -p x3-atomic-trade test_swap_success"
+        file: "evidence/test-atomic-swap-success.log"
+
+  - id: atomic_rollback_proof
+    name: Atomic Swap Rollback (CRITICAL)
+    category: atomic_execution
+    weight: 2
+    criticality: P0
+    required_files:
+      - crates/x3-atomic-trade/src/rollback.rs
+      - crates/x3-atomic-trade/tests/test_rollback.rs
+    required_commands:
+      - cargo test -p x3-atomic-trade test_rollback_on_failure
+      - cargo test -p x3-atomic-trade test_rollback_on_timeout
+    required_proofs:
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Rollback proof: Remote VM failure returns funds"
+        command: "cargo test -p x3-atomic-trade test_rollback_on_remote_failure"
+        file: "evidence/test-rollback-remote-failure.log"
+      - claim: "Rollback proof: Timeout after 1 hour releases collateral"
+        command: "cargo test -p x3-atomic-trade test_rollback_on_timeout"
+        file: "evidence/test-rollback-timeout.log"
+      - claim: "Rollback proof: Multi-node testnet proves rollback"
+        command: "./scripts/testnet-atomic-rollback-demo.sh"
+        file: "evidence/testnet-rollback-demo.log"
+
+  - id: atomic_replay_protection
+    name: Atomic Replay Protection (CRITICAL)
+    category: atomic_execution
+    weight: 1
+    criticality: P0
+    required_files:
+      - crates/x3-atomic-trade/src/nonce.rs
+      - crates/x3-atomic-trade/tests/test_replay.rs
+    required_commands:
+      - cargo test -p x3-atomic-trade test_replay_rejected
+    required_proofs:
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Same nonce twice rejected"
+        command: "cargo test -p x3-atomic-trade test_replay_same_nonce"
+        file: "evidence/test-replay-nonce.log"
+      - claim: "Same message hash rejected after restart"
+        command: "./scripts/testnet-replay-after-restart.sh"
+        file: "evidence/test-replay-restart.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Bridge Security (15% weight) ⭐ CRITICAL
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: bridge_core
+    name: Bridge Core (EVM/SVM/External)
+    category: bridge
+    weight: 10
+    criticality: P0
+    required_files:
+      - crates/x3-bridge/src/lib.rs
+      - crates/x3-bridge/src/tests.rs
+    required_commands:
+      - cargo check -p x3-bridge
+      - cargo test -p x3-bridge
+    required_proofs:
+      - wired
+      - unit_tested
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Bridge wired into runtime"
+        command: "grep -r 'XBridge' runtime/src/lib.rs"
+        file: "evidence/wiring-bridge.log"
+      - claim: "Bridge lock/unlock works"
+        command: "cargo test -p x3-bridge test_lock_unlock"
+        file: "evidence/test-bridge-lock-unlock.log"
+
+  - id: bridge_replay_protection
+    name: Bridge Replay Protection (CRITICAL)
+    category: bridge
+    weight: 3
+    criticality: P0
+    required_files:
+      - crates/x3-bridge/src/replay.rs
+      - crates/x3-bridge/tests/test_replay.rs
+    required_commands:
+      - cargo test -p x3-bridge test_no_replay
+    required_proofs:
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Bridge message cannot execute twice"
+        command: "cargo test -p x3-bridge test_replay_message_rejected"
+        file: "evidence/test-bridge-replay.log"
+      - claim: "Chain-ID included in replay guard"
+        command: "grep -n 'chain_id' crates/x3-bridge/src/replay.rs"
+        file: "evidence/bridge-chain-id-check.log"
+
+  - id: bridge_timeout_handling
+    name: Bridge Timeout & Recovery (CRITICAL)
+    category: bridge
+    weight: 2
+    criticality: P0
+    required_files:
+      - crates/x3-bridge/src/timeout.rs
+      - crates/x3-bridge/tests/test_timeout.rs
+    required_commands:
+      - cargo test -p x3-bridge test_timeout_recovery
+    required_proofs:
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Bridge message timeout refunds locked assets"
+        command: "cargo test -p x3-bridge test_timeout_refund_assets"
+        file: "evidence/test-bridge-timeout-refund.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: DEX & Liquidity (8% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: dex_core
+    name: DEX Core
+    category: dex
+    weight: 8
+    criticality: P1
+    required_files:
+      - pallets/x3-dex-router/src/lib.rs
+      - pallets/x3-dex-router/tests/test_dex.rs
+    required_commands:
+      - cargo test -p x3-dex-router
+    required_proofs:
+      - wired
+      - unit_tested
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "DEX router wired into runtime"
+        command: "grep -r 'XDexRouter' runtime/src/lib.rs"
+        file: "evidence/wiring-dex.log"
+      - claim: "DEX swap succeeds"
+        command: "cargo test -p x3-dex-router test_swap_success"
+        file: "evidence/test-dex-swap.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Governance (6% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: governance_core
+    name: Governance & Launch Gates
+    category: governance
+    weight: 6
+    criticality: P1
+    required_files:
+      - pallets/x3-governance/src/lib.rs
+    required_commands:
+      - cargo test -p x3-governance
+    required_proofs:
+      - wired
+      - unit_tested
+    hard_fail_if_missing:
+      - unit_tested
+    proof_evidence:
+      - claim: "Governance pallet wired"
+        command: "grep -r 'XGovernance' runtime/src/lib.rs"
+        file: "evidence/wiring-governance.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Validator Operations (6% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: validator_launch
+    name: Validator Launch & Setup
+    category: validator_ops
+    weight: 6
+    criticality: P0
+    required_files:
+      - scripts/validator-setup.sh
+      - node/src/chain_spec.rs
+    required_commands:
+      - ./scripts/validator-setup.sh --dry-run
+      - cargo run --release -- --generate-node-key
+    required_proofs:
+      - code_exists
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Fresh machine can build and run validator"
+        command: "./launch-gates/fresh-machine.sh"
+        file: "evidence/fresh-machine.log"
+      - claim: "Validator generates keys without errors"
+        command: "cargo run --release -- --generate-node-key 2>&1"
+        file: "evidence/validator-keygen.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Observability & Monitoring (4% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: observability_metrics
+    name: Metrics & Monitoring
+    category: observability
+    weight: 4
+    criticality: P1
+    required_files:
+      - node/src/metrics.rs
+    required_commands:
+      - grep -r "prometheus" node/src/
+    required_proofs:
+      - code_exists
+      - integration_tested
+    hard_fail_if_missing:
+      - integration_tested
+    proof_evidence:
+      - claim: "Prometheus metrics exported"
+        command: "cargo test -p x3-node test_metrics_export"
+        file: "evidence/test-metrics.log"
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # CATEGORY: Documentation & Code Drift (4% weight)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  
+  - id: docs_and_drift
+    name: Documentation & Code Alignment
+    category: docs
+    weight: 4
+    criticality: P2
+    required_files:
+      - "*.md"
+    required_commands:
+      - "./launch-gates/check-docs-drift.sh"
+    required_proofs:
+      - code_exists
+    hard_fail_if_missing: []
+    proof_evidence:
+      - claim: "Documentation reflects actual code"
+        command: "./launch-gates/check-docs-drift.sh"
+        file: "evidence/docs-drift-report.log"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HARD FAIL GATES (Any of these failing = MAINNET STATUS = FAIL)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+hard_fail_gates:
+  - gate: bridge_has_replay_test
+    severity: P0
+    description: "Bridge must have replay protection test"
+    blocking: true
+    
+  - gate: atomic_has_rollback_test
+    severity: P0
+    description: "Atomic execution must prove rollback works"
+    blocking: true
+    
+  - gate: canonical_supply_tested
+    severity: P0
+    description: "Canonical supply invariant must be tested"
+    blocking: true
+    
+  - gate: runtime_compiles
+    severity: P0
+    description: "Runtime must compile without mocks"
+    blocking: true
+    
+  - gate: fresh_machine_works
+    severity: P0
+    description: "Fresh machine must build node and run validator"
+    blocking: true
+    
+  - gate: multi_node_testnet_passes
+    severity: P0
+    description: "Local multi-node testnet must pass"
+    blocking: true
+    
+  - gate: no_production_hazards
+    severity: P0
+    description: "No panic/unwrap/expect in critical paths"
+    blocking: true
+    
+  - gate: chain_spec_complete
+    severity: P0
+    description: "Chain spec must have all required fields"
+    blocking: true
+    
+  - gate: validator_launch_proven
+    severity: P0
+    description: "Validator launch must be reproducible from docs"
+    blocking: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCORE CALCULATION RULES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+scoring_rules:
+  - rule: "A feature cannot score higher than its highest proof tier"
+    example: "Has beautiful code but no integration test? Max 55%"
+    
+  - rule: "All P0 hard fail gates must pass for PASS status"
+    example: "One P0 fails = overall status FAIL (even if score is 85%)"
+    
+  - rule: "Category score = weighted average of feature scores"
+    
+  - rule: "Overall score = weighted average of category scores"
+    
+  - rule: "P0 blocker older than 7 days = -5% global penalty"
+    
+  - rule: "P0 blocker older than 14 days = forced release freeze"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAINNET READY CRITERIA (ALL must be true)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+mainnet_ready_criteria:
+  - overall_score: ">= 95"
+  - all_categories: ">= 90"
+  - p0_blockers: "== 0"
+  - p1_blockers: ">= 3"
+  - bridge_safety: ">= 95"
+  - wiring_audit: "== 100"
+  - fresh_machine: "PASS"
+  - multi_node_testnet: "PASS"
+  - all_hard_fails: "PASS"
+  - testnet_stable_hours: ">= 72"
+  - validator_onboarding: "REPRODUCIBLE"
+  - benchmarks_exist: "ALL_CRITICAL_EXTRINSICS"
+  - no_production_hazards: "PASS"

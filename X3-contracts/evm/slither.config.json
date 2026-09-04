@@ -1,0 +1,16 @@
+{
+    "detectors_to_exclude": [
+        "timestamp",
+        "low-level-calls",
+        "reentrancy-benign",
+        "reentrancy-no-eth",
+        "reentrancy-events",
+        "reentrancy-balance",
+        "calls-loop",
+        "arbitrary-send-eth",
+        "assembly",
+        "pragma",
+        "solc-version",
+        "missing-zero-check"
+    ]
+}

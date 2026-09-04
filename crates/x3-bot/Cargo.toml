@@ -1,0 +1,30 @@
+[package]
+name = "x3-bot"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "☢️ World's Fastest Profitable Bot — Nuclear Edition. No mock data. Async Rust."
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+ethers = { version = "2.0", features = ["ws", "rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+config = "0.13"
+envy = "0.4"
+anyhow = "1.0"
+axum = "0.7"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json", "env-filter"] }
+prometheus = "0.13"
+lazy_static = "1.4"
+async-trait = "0.1"
+futures = "0.3"
+url = "2.3"
+atomic-swap-orchestrator = { path = "../atomic-swap-orchestrator" }
+x3-vm = { path = "../x3-vm" }
+hex = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"

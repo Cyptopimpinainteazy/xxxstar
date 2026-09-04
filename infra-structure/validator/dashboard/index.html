@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>X3 Chain – Multi-Chain GPU Validator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="header">
+        <h1>X3 Chain – Multi-Chain GPU Validator</h1>
+        <p>Live metrics across EVM, SVM, Cosmos &amp; Substrate chains · <span id="gpu_count">0</span> GPUs active</p>
+      </section>
+
+      <!-- Row 1: Throughput -->
+      <section class="grid">
+        <div class="card">
+          <h2>Chain Throughput</h2>
+          <div class="metric" id="svm_tps">0</div>
+          <div class="label">Solana TPS</div>
+          <div class="metric" id="evm_tps">0</div>
+          <div class="label">EVM TPS</div>
+          <div class="metric" id="cosmos_tps">0</div>
+          <div class="label">Cosmos TPS</div>
+          <div class="metric" id="substrate_tps">0</div>
+          <div class="label">Substrate TPS</div>
+        </div>
+        <div class="card">
+          <h2>Total Validated</h2>
+          <div class="metric large" id="total_tx">0</div>
+          <div class="label">Transactions</div>
+          <div class="metric" id="chains_active">0</div>
+          <div class="label">Active Chains</div>
+        </div>
+
+        <!-- Row 2: GPU utilization -->
+        <div class="card highlight">
+          <h2>GPU Utilization</h2>
+          <div id="gpu_bars"></div>
+          <div class="metric" id="gpu_avg_util">0%</div>
+          <div class="label">Average Utilization</div>
+          <div class="metric" id="gpu_vram_used">0 / 0 MB</div>
+          <div class="label">VRAM Used / Total</div>
+        </div>
+        <div class="card highlight">
+          <h2>GPU Crypto Ops/sec</h2>
+          <div class="metric" id="secp256k1_ops">0</div>
+          <div class="label">secp256k1 verify</div>
+          <div class="metric" id="keccak256_ops">0</div>
+          <div class="label">Keccak-256 hash</div>
+          <div class="metric" id="ed25519_ops">0</div>
+          <div class="label">Ed25519 verify</div>
+          <div class="metric" id="sha256_ops">0</div>
+          <div class="label">SHA-256 hash</div>
+        </div>
+
+        <!-- Row 3: Gas & Atomic Swap -->
+        <div class="card">
+          <h2>Gas Savings</h2>
+          <div class="metric accent" id="gas_savings_pct">0%</div>
+          <div class="label">Reduction vs CPU</div>
+          <div class="metric" id="gas_baseline">0</div>
+          <div class="label">Baseline (CPU)</div>
+          <div class="metric" id="gas_optimized">0</div>
+          <div class="label">Optimized (GPU)</div>
+        </div>
+        <div class="card">
+          <h2>Atomic Swaps</h2>
+          <div class="metric" id="success_rate">0%</div>
+          <div class="label">Success Rate</div>
+          <div class="metric" id="rollbacks">0</div>
+          <div class="label">Rollbacks</div>
+          <div class="metric" id="pending_swaps">0</div>
+          <div class="label">Pending</div>
+        </div>
+
+        <!-- Row 4: Swarm & Health -->
+        <div class="card">
+          <h2>Swarm Compute</h2>
+          <div class="metric" id="swarm_tasks">0</div>
+          <div class="label">Running Tasks</div>
+          <div class="metric" id="swarm_queued">0</div>
+          <div class="label">Queued</div>
+          <div class="metric" id="swarm_preemptions">0</div>
+          <div class="label">Preemptions</div>
+        </div>
+        <div class="card">
+          <h2>System Health</h2>
+          <div class="metric" id="gpu_health">unknown</div>
+          <div class="label">GPU Status</div>
+          <div class="metric" id="svm_rpc">0 ms</div>
+          <div class="label">SVM RPC Latency</div>
+          <div class="metric" id="evm_rpc">0 ms</div>
+          <div class="label">EVM RPC Latency</div>
+        </div>
+      </section>
+
+      <section class="footer">
+        <div id="timestamp">Last update: --</div>
+        <div id="uptime">Uptime: --</div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

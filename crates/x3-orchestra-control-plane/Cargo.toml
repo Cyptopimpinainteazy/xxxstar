@@ -1,0 +1,25 @@
+[package]
+name = "x3-orchestra-control-plane"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Off-chain orchestra control plane for intents, approvals, vote windows, and evidence lineage"
+
+[dependencies]
+anyhow = { workspace = true, default-features = true }
+async-trait = "0.1"
+axum = "0.7"
+clap = { version = "4.5", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true }
+sled = "0.34"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros", "time"] }
+tracing = { workspace = true, default-features = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3.13"
+tokio = { workspace = true, features = ["full"] }

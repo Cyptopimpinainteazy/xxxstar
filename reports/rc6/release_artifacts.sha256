@@ -1,0 +1,9 @@
+commit 2a9e86c11f3de536061f4f28f76bfaba9065ce2c
+452945833ae3f3e5a5c6525a67029e5edf40bb6021fe07815580bbb2f3a072c9  /home/lojak/Desktop/X3_ATOMIC_STAR/target/release/x3-chain-node
+e83c920d3f0763673ca98a0905beca8283f197a427211181c5c173ec29017652  /home/lojak/Desktop/X3_ATOMIC_STAR/chain-specs/x3-public-testnet-plain.json
+498e46acebece0768493b77a31d265151df59101e89a18f6465bfd3842119e16  /home/lojak/Desktop/X3_ATOMIC_STAR/chain-specs/x3-public-testnet-raw.json
+43000d54a6922d0c6822150b5ec3d03b89b30667170d0b24f17d28fddbaf7dd6  /home/lojak/Desktop/X3_ATOMIC_STAR/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.compressed.wasm
+550f5bfe7098648fae8cf779f881f2237dce396906411789dcebb66f499f6f2f  /home/lojak/Desktop/X3_ATOMIC_STAR/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.compact.wasm
+550f5bfe7098648fae8cf779f881f2237dce396906411789dcebb66f499f6f2f  /home/lojak/Desktop/X3_ATOMIC_STAR/target/release/wbuild/x3-chain-runtime/x3_chain_runtime.wasm
+550f5bfe7098648fae8cf779f881f2237dce396906411789dcebb66f499f6f2f  /home/lojak/Desktop/X3_ATOMIC_STAR/target/release/wbuild/x3-chain-runtime/target/wasm32-unknown-unknown/release/deps/x3_chain_runtime.wasm
+550f5bfe7098648fae8cf779f881f2237dce396906411789dcebb66f499f6f2f  /home/lojak/Desktop/X3_ATOMIC_STAR/target/release/wbuild/x3-chain-runtime/target/wasm32-unknown-unknown/release/x3_chain_runtime.wasm

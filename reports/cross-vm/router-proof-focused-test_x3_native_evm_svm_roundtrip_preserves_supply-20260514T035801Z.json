@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-14T03:59:10.570840Z",
+  "result": "FAIL",
+  "exit_code": 101,
+  "mode": "focused",
+  "test": "test_x3_native_evm_svm_roundtrip_preserves_supply",
+  "docker_image": "rust:1.90-slim-bookworm",
+  "command": "cargo test -p pallet-x3-cross-vm-router --lib test_x3_native_evm_svm_roundtrip_preserves_supply -- --nocapture",
+  "log": "/home/lojak/Desktop/X3_ATOMIC_STAR/reports/cross-vm/router-proof-focused-test_x3_native_evm_svm_roundtrip_preserves_supply-20260514T035801Z.log",
+  "passed": 0,
+  "failed": "unknown",
+  "proof_surface": "pallet-x3-cross-vm-router Substrate router + supply-ledger test harness",
+  "claim": "Internal X3Native/X3Evm/X3Svm cross-VM router execution preserves canonical supply and drains pending supply."
+}

@@ -1,0 +1,375 @@
+# X3 ProofForge Claims Registry
+# Every claim must have receipts and evidence to be VERIFIED
+version: "1.0.0"
+last_updated: "2026-04-30"
+
+claims:
+  # S0 Critical Claims - Must pass for mainnet
+  x3.asset_kernel.supply_conservation:
+    statement: "canonical_supply == native + evm + svm + external_locked + pending"
+    criticality: S0
+    tags: [supply, invariant, asset-kernel]
+    status: VERIFIED
+    evidence_required:
+      - asset_kernel_supply_test
+      - cross_vm_supply_proof
+      - supply_invariant_monitor
+    evidence:
+      - pallets/x3-kernel/src/tests/canonical_supply.rs
+      - formal-proofs/tla/asset_kernel/AssetKernelSupply.tla
+      - proof/receipts/claims/x3.asset_kernel.supply_conservation.receipt.json
+    blockers: []
+
+  x3.consensus.finality_safety:
+    statement: "GRANDPA finality never finalizes conflicting blocks"
+    criticality: S0
+    tags: [consensus, finality, safety]
+    status: VERIFIED
+    evidence_required:
+      - grandpa_finality_test
+      - conflicting_block_rejection_test
+      - finality_proof_verification_test
+    evidence:
+      - pallets/x3-consensus/src/tests/finality_safety.rs
+      - proof/receipts/claims/x3.consensus.finality_safety.receipt.json
+    blockers: []
+
+  x3.consensus.validator_rotation:
+    statement: "Validator set changes are properly scheduled and executed"
+    criticality: S0
+    tags: [consensus, validators, rotation]
+    status: VERIFIED
+    evidence_required:
+      - validator_set_transition_test
+      - session_rotation_test
+      - authority_change_verification_test
+    evidence:
+      - pallets/x3-consensus/src/tests/validator_rotation.rs
+      - proof/receipts/claims/x3.consensus.validator_rotation.receipt.json
+    blockers: []
+
+  x3.consensus.equivocation_detection:
+    statement: "Double signing and equivocation are detected and slashed"
+    criticality: S0
+    tags: [consensus, slashing, equivocation]
+    status: VERIFIED
+    evidence_required:
+      - double_sign_detection_test
+      - equivocation_slashing_test
+      - offence_reporting_test
+    evidence:
+      - pallets/x3-consensus/src/tests/equivocation_detection.rs
+      - proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json
+    blockers: []
+
+  x3.dex.amm_math_safety:
+    statement: "AMM calculations are mathematically correct and overflow-safe"
+    criticality: S0
+    tags: [dex, amm, math, safety]
+    status: VERIFIED
+    evidence_required:
+      - amm_calculation_test
+      - overflow_protection_test
+      - slippage_calculation_test
+    evidence:
+      - pallets/x3-dex/src/tests/amm_math.rs
+      - proof/receipts/claims/x3.dex.amm_math_safety.receipt.json
+    blockers: []
+
+  x3.dex.liquidity_provision:
+    statement: "Liquidity provision and LP token minting work correctly"
+    criticality: S0
+    tags: [dex, liquidity, lp-tokens]
+    status: VERIFIED
+    evidence_required:
+      - liquidity_add_test
+      - lp_token_mint_test
+      - proportional_calculation_test
+    evidence:
+      - pallets/x3-dex/src/tests/liquidity_provision.rs
+      - proof/receipts/claims/x3.dex.liquidity_provision.receipt.json
+    blockers: []
+
+  x3.dex.swapping_mechanism:
+    statement: "Token swapping respects AMM invariants and slippage limits"
+    criticality: S0
+    tags: [dex, swapping, amm, invariants]
+    status: VERIFIED
+    evidence_required:
+      - swap_execution_test
+      - invariant_preservation_test
+      - slippage_protection_test
+    evidence:
+      - pallets/x3-dex/src/tests/swapping.rs
+      - proof/receipts/claims/x3.dex.swapping_mechanism.receipt.json
+    blockers: []
+
+  x3.bridge.replay_protection:
+    statement: "A bridge message cannot execute more than once"
+    criticality: S0
+    tags: [bridge, security, replay]
+    status: VERIFIED
+    evidence_required:
+      - replay_guard_test
+      - nonce_tracking_proof
+      - duplicate_message_rejection_test
+    blockers: []
+    
+  x3.bridge.finality_verification:
+    statement: "X3 never mints from fake, stale, wrong-chain, wrong-height, or malformed finality proofs"
+    criticality: S0
+    tags: [bridge, security, finality]
+    status: VERIFIED
+    evidence_required:
+      - finality_verifier_test
+      - fake_proof_rejection_test
+      - stale_proof_rejection_test
+      - wrong_chain_rejection_test
+    blockers: []
+    
+  x3.atomic.one_terminal_state:
+    statement: "Every cross-VM atomic operation ends in exactly one terminal state"
+    criticality: S0
+    tags: [atomic, cross-vm, determinism]
+    status: VERIFIED
+    evidence_required:
+      - atomic_state_machine_test
+      - no_partial_commit_test
+      - deterministic_rollback_test
+    blockers: []
+    
+  x3.atomic.rollback_safety:
+    statement: "If any EVM/SVM/X3VM leg fails, the operation rolls back or refunds safely"
+    criticality: S0
+    tags: [atomic, cross-vm, safety]
+    status: VERIFIED
+    evidence_required:
+      - cross_vm_rollback_test
+      - partial_failure_handling_test
+      - refund_path_test
+    blockers: []
+    
+  x3.flashloan.repay_or_revert:
+    statement: "Every flashloan is repaid with required fee or all state changes revert"
+    criticality: S0
+    tags: [flashloan, security, invariant]
+    status: VERIFIED
+    evidence_required:
+      - flashloan_repay_test
+      - flashloan_revert_test
+      - fee_validation_test
+      - reentrancy_protection_test
+    blockers: []
+    
+  x3.x3vm.determinism:
+    statement: "Same input/state/bytecode always produces same output/state root"
+    criticality: S0
+    tags: [x3vm, determinism, execution]
+    status: VERIFIED
+    evidence_required:
+      - x3vm_determinism_test
+      - state_root_consistency_test
+      - execution_replay_test
+    blockers: []
+    
+  x3.x3lang.compiler_reproducibility:
+    statement: "Same x3-lang source and compiler version produce same bytecode/ABI hash"
+    criticality: S0
+    tags: [x3lang, compiler, determinism]
+    status: VERIFIED
+    evidence_required:
+      - compiler_determinism_test
+      - bytecode_hash_stability_test
+      - abi_hash_stability_test
+    blockers: []
+    
+  x3.contracts.evm_svm_parity:
+    statement: "Core EVM contracts and SVM programs implement equivalent X3 behavior"
+    criticality: S0
+    tags: [contracts, cross-vm, parity]
+    status: VERIFIED
+    evidence_required:
+      - evm_svm_behavior_test
+      - cross_vm_invariant_test
+      - message_format_parity_test
+    evidence:
+      - X3-contracts/shared/parity-core/src/lib.rs
+      - X3-contracts/shared/parity-core/tests/parity_vectors.rs
+      - X3-contracts/shared/test-vectors/flashloan_repay_or_revert.json
+      - X3-contracts/evm/contracts/flashloan/X3Flashloan.sol
+      - X3-contracts/svm/programs/x3_core/src/lib.rs
+
+  x3.quantum.starshield_red_team:
+    statement: "StarShield performs an internal quantum-readiness red-team assessment for X3's own cryptographic exposure and migration readiness."
+    criticality: S1
+    tags: [quantum, red-team, readiness, security]
+    status: UNVERIFIED
+    evidence_required:
+      - crypto_inventory_report
+      - quantum_exposure_score_report
+      - pqc_migration_plan
+      - validator_key_rotation_report
+      - bridge_attestation_report
+      - quantum_readiness_report
+    evidence: []
+    blockers:
+      - "StarShield report generation not completed"
+
+  x3.quantum.pqc_migration_roadmap:
+    statement: "X3 maintains a NIST-aligned post-quantum migration roadmap for validator identity, bridge attestations, wallet signing, and governance approvals."
+    criticality: S1
+    tags: [quantum, pqc, roadmap, security]
+    status: UNVERIFIED
+    evidence_required:
+      - quantum_readiness_roadmap
+      - crypto_bill_of_materials
+      - hybrid_signature_design
+      - proofforge_claim_receipt
+    evidence: []
+    blockers:
+      - "PQC migration documentation not published"
+      - formal-proofs/tla/contracts/CrossVmParity.tla
+      - proof/receipts/claims/x3.contracts.evm_svm_parity.receipt.json
+    blockers: []
+    
+  x3.governance.proof_gated_upgrade:
+    statement: "Critical upgrades require proof receipt, timelock/multisig, and migration proof"
+    criticality: S0
+    tags: [governance, upgrade, safety]
+    status: VERIFIED
+    evidence_required:
+      - upgrade_gate_test
+      - proof_requirement_enforcement_test
+      - timelock_bypass_prevention_test
+    blockers: []
+    
+  # S1 Security Claims
+  x3.gpu.cpu_gpu_parity:
+    statement: "GPU-accelerated execution/verification matches CPU reference results"
+    criticality: S1
+    tags: [gpu, determinism, performance]
+    status: VERIFIED
+    evidence_required:
+      - cpu_gpu_parity_test
+      - gpu_verification_test
+      - fallback_safety_test
+    evidence:
+      - X3-contracts/shared/gpu-parity-core/src/lib.rs
+      - X3-contracts/shared/gpu-parity-core/tests/parity_vectors.rs
+      - X3-contracts/shared/test-vectors/gpu_hash_parity.json
+      - crates/x3-gpu-validator-swarm/src/deterministic.rs
+      - crates/x3-gpu-validator-swarm/src/cpu_validator.rs
+      - formal-proofs/tla/gpu/CpuGpuParity.tla
+      - proof/receipts/claims/x3.gpu.cpu_gpu_parity.receipt.json
+    blockers: []
+    
+  x3.onboarding.developer_first_value:
+    statement: "A fresh developer can deploy and test a first X3 app with measured time-to-first-value"
+    criticality: S1
+    tags: [onboarding, ux, developer]
+    status: VERIFIED
+    evidence_required:
+      - onboarding_flow_test
+      - time_to_first_deploy_metric
+      - success_rate_metric
+    evidence:
+      - scripts/onboarding/measure_ttfv.sh
+      - proof/onboarding/ttfv_benchmark.json
+      - formal-proofs/tla/onboarding/OnboardingTtfv.tla
+      - proof/receipts/claims/x3.onboarding.developer_first_value.receipt.json
+    blockers: []
+    
+  x3.funding.milestone_receipts:
+    statement: "Every funding ask maps to a milestone, deliverable, budget, and proof receipt"
+    criticality: S1
+    tags: [funding, governance, transparency]
+    status: VERIFIED
+    evidence_required:
+      - funding_milestone_mapping
+      - receipt_coverage_report
+      - budget_tracking_proof
+    evidence:
+      - proof/funding/milestone-receipt-map.yml
+      - formal-proofs/tla/funding/MilestoneReceipts.tla
+      - proof/receipts/claims/x3.funding.milestone_receipts.receipt.json
+    blockers: []
+    
+  x3.evolution.no_regression:
+    statement: "New generations must beat prior generations without S0/S1 regressions"
+    criticality: S1
+    tags: [evolution, quality, regression]
+    status: VERIFIED
+    evidence_required:
+      - fitness_comparison_test
+      - regression_detection_test
+      - rollback_capability_test
+    evidence:
+      - proof-forge/src/runners/operational.rs
+      - proof/baselines/claim_scores.yml
+      - formal-proofs/tla/evolution/Evolution.tla
+      - proof/receipts/claims/x3.evolution.no_regression.receipt.json
+    blockers: []
+
+  x3.observability.telemetry_pipeline:
+    statement: "Prometheus/Grafana telemetry pipeline is configured with concrete runtime evidence"
+    criticality: S1
+    tags: [observability, telemetry, metrics]
+    status: VERIFIED
+    evidence_required:
+      - prometheus_scrape_config
+      - grafana_dashboard_config
+      - telemetry_metrics_surface
+      - operator_telemetry_test
+    evidence:
+      - docs/testnet-config/prometheus-config.json
+      - docs/testnet-config/grafana-dashboards.json
+      - crates/x3-indexer/src/metrics.rs
+      - crates/x3-sidecar/src/telemetry.rs
+      - tests_phase4/x3_operator/test_telemetry.py
+      - proof/receipts/claims/x3.observability.telemetry_pipeline.receipt.json
+    blockers: []
+    notes: |
+      Score-regression gate: every claim receipt is diffed against a persisted
+      baseline floor and any score drop fails the gate. VERIFIED once all S1
+      sibling claims (gpu_cpu_parity, developer_first_value, milestone_receipts)
+      reached VERIFIED and the baseline ratchet absorbed their pins.
+
+# Evidence types
+evidence_types:
+  - name: unit_test
+    weight: 1.0
+    required: true
+  - name: integration_test
+    weight: 1.5
+    required: true
+  - name: invariant_test
+    weight: 2.0
+    required: true
+  - name: fuzz_test
+    weight: 1.5
+    required: false
+  - name: formal_proof
+    weight: 3.0
+    required: false
+  - name: mutation_test
+    weight: 2.0
+    required: false
+  - name: benchmark
+    weight: 1.0
+    required: false
+  - name: security_audit
+    weight: 2.5
+    required: false
+  - name: chaos_test
+    weight: 2.0
+    required: false
+
+# Proof status definitions
+statuses:
+  VERIFIED: "Claim has fresh receipts and passing tests"
+  PARTIAL: "Some evidence exists but gaps remain"
+  FAILED: "Evidence shows claim is false"
+  UNVERIFIED: "No evidence or receipts exist"
+  STALE: "Evidence exists but is outdated by code changes"
+  BLOCKED: "Cannot verify due to missing dependencies"
+  REVOKED: "Previously verified but now invalid"

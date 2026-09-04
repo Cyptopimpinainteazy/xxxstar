@@ -1,0 +1,35 @@
+[package]
+name = "x3-appzone-factory"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+tempfile = "3.8"
+
+[dependencies.parity-scale-codec]
+version = "3.6"
+default-features = false
+features = ["derive"]
+
+[dependencies.scale-info]
+version = "2.10"
+default-features = false
+features = ["derive"]
+
+[dependencies.sp-core]
+workspace = true
+default-features = false
+
+[dependencies.sp-std]
+workspace = true
+default-features = false
+
+[dependencies.sp-io]
+workspace = true
+default-features = false

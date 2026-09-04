@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/reputation.rs
++++ replace / with % in ReputationScore::discount_bps
+@@ -58,17 +58,17 @@
+     }
+ 
+     /// Get the discount percentage in basis points.
+     pub fn discount_bps(&self, max_discount_bps: u32) -> u32 {
+         if !self.qualifies_for_discount() {
+             return 0;
+         }
+         // Scale composite score to max discount
+-        let raw_discount = (self.composite_score as u64 * max_discount_bps as u64) / 10000;
++        let raw_discount = (self.composite_score as u64 * max_discount_bps as u64) % /* ~ changed by cargo-mutants ~ */ 10000;
+         (raw_discount as u32).min(max_discount_bps)
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 

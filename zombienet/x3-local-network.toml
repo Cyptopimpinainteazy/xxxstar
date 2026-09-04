@@ -1,0 +1,19 @@
+[relaychain]
+default_command = "./target/release/x3-chain-node"
+default_args = ["--alice"]
+chain = "local"
+
+  [[relaychain.nodes]]
+  name = "alice"
+  validator = true
+  args = ["--alice", "--port", "30333", "--rpc-port", "9944"]
+
+  [[relaychain.nodes]]
+  name = "bob"
+  validator = true
+  args = ["--bob", "--port", "30334", "--rpc-port", "9945"]
+
+  [[relaychain.nodes]]
+  name = "charlie"
+  validator = true
+  args = ["--charlie", "--port", "30335", "--rpc-port", "9946"]

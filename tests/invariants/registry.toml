@@ -1,0 +1,680 @@
+# Invariant Registry for X3 / X3 Chain
+# Format:
+# id = "LAYER-COMPONENT-NNN"
+# description = "Human readable description"
+# severity = "CRITICAL|HIGH|MEDIUM|LOW"
+# layer = "LANG|VM|PALLET|CONSENSUS|SWARM|AI|API|FRONTEND|INFRA|GOVERNANCE"
+# tested_by = ["tests/path.rs::test_name", ...]
+# property = "Optional formal predicate"
+
+[[invariant]]
+id = "CHAIN-CONSENSUS-001"
+description = "State root after replaying all blocks from genesis must be identical to current state root"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["tests/e2e/chain-lifecycle::full_replay_state_root", "tests/e2e/state_root_replay::chain_replay_matches_state_root"]
+property = "replay(genesis, blocks) -> state_root == node_state_root"
+
+[[invariant]]
+id = "LANG-COMPILE-001"
+description = "Identical source code produces identical bytecode hash across platforms"
+severity = "CRITICAL"
+layer = "LANG"
+tested_by = ["tests/unit/x3-lang/compiler/test_deterministic_compilation::compile_idempotent"]
+property = "forall s: hash(compile(s)) is constant across runs"
+
+[[invariant]]
+id = "PALLET-TRADE-001"
+description = "AMM constant product invariant k = x * y is maintained within rounding tolerance after every swap"
+severity = "CRITICAL"
+layer = "PALLET"
+tested_by = ["pallets/atomic-trade-engine/src/tests.rs::events_are_emitted_correctly", "tests/integration/settlement-flow::amm_invariant_checks"]
+property = "forall swap: |x' * y' - x * y| <= epsilon"
+
+[[invariant]]
+id = "VM-EXEC-001"
+description = "Same bytecode with same inputs produces identical outputs and state changes on any compliant node"
+severity = "CRITICAL"
+layer = "VM"
+tested_by = ["tests/unit/x3-lang/vm/test_vm_determinism.rs::vm_replay_bit_exact"]
+property = "execute(bytecode, input, entropy) deterministic => identical trace"
+
+# Add the minimal set required for Phase 1 (more to be added later)
+[[invariant]]
+id = "CHAIN-STATE-001"
+description = "Total supply of native token is conserved across all state transitions"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["pallets/treasury/src/tests.rs::treasury_balance_conservation"]
+property = "sum(balances) == initial_supply + minted - burned"
+
+[[invariant]]
+id = "PALLET-SETTLE-001"
+description = "Settlement escrow locks funds atomically before cross-chain execution"
+severity = "CRITICAL"
+layer = "PALLET"
+tested_by = ["pallets/x3-settlement-engine/src/tests.rs::escrow_lifecycle"]
+property = "lock -> escrowed && reserved == amount"
+
+[[invariant]]
+id = "FRONTEND-TELEMETRY-001"
+description = "Telemetry stream updates propagate to the UI hook state"
+severity = "MEDIUM"
+layer = "FRONTEND"
+tested_by = ["apps/x3-desktop/tests/unit/telemetryStream.test.tsx::useTelemetryStream"]
+
+[[invariant]]
+id = "FRONTEND-TELEMETRY-002"
+description = "Live telemetry panel renders loading and error states safely"
+severity = "MEDIUM"
+layer = "FRONTEND"
+tested_by = ["apps/x3-desktop/tests/unit/liveTelemetryPanel.test.tsx::LiveTelemetryPanel"]
+
+[[invariant]]
+id = "INFRA-CCGV-001"
+description = "GPU batch hashing matches CPU reference"
+severity = "HIGH"
+layer = "INFRA"
+tested_by = ["tests/cross_chain_gpu_validator/test_gpu_parity.py::test_keccak_batch_matches_cpu_reference"]
+
+[[invariant]]
+id = "INFRA-CCGV-002"
+description = "Atomic swaps commit only when both chains validate"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = ["tests/cross_chain_gpu_validator/test_atomic_invariant.py::test_atomic_commit_requires_both_sides", "tests/cross_chain_gpu_validator/test_atomic_invariant.py::test_atomic_rollback_on_failure"]
+
+[[invariant]]
+id = "INFRA-CCGV-003"
+description = "Benchmark reports include combined TPS metrics"
+severity = "MEDIUM"
+layer = "INFRA"
+tested_by = ["tests/cross_chain_gpu_validator/test_benchmark_report.py::test_benchmark_report"]
+
+[[invariant]]
+id = "INFRA-CCGV-004"
+description = "Metrics snapshots expose required fields"
+severity = "LOW"
+layer = "INFRA"
+tested_by = ["tests/cross_chain_gpu_validator/test_metrics.py::test_metrics_snapshot_fields"]
+
+[[invariant]]
+id = "API-POLKAWALLET-001"
+description = "Polkawallet plugin registers all x3chain runtime types and exposes all 9 service classes"
+severity = "HIGH"
+layer = "API"
+tested_by = ["packages/polkawallet-plugin/tests/plugin.test.ts::X3ChainCustomTypes", "packages/polkawallet-plugin/tests/plugin.test.ts::Package exports"]
+property = "init(plugin) => kernel, settlement, trades, domains, verifier, governance, treasury, svm, x3vm all accessible"
+
+[[invariant]]
+id = "API-POLKAWALLET-002"
+description = "Bridge adapter discovers valid routes between X3 and all supported external chains"
+severity = "HIGH"
+layer = "API"
+tested_by = ["packages/polkawallet-bridge-adapter/tests/bridge.test.ts::route discovery"]
+property = "forall (src, dst) in supported_pairs: getRoutes(src, dst).length > 0"
+
+[[invariant]]
+id = "API-POLKAWALLET-003"
+description = "TS SDK x3 clients correctly construct extrinsics for settlement, trades, domains, and verifier pallets"
+severity = "HIGH"
+layer = "API"
+tested_by = ["packages/ts-sdk/tests/x3.test.ts::X3SettlementClient", "packages/ts-sdk/tests/x3.test.ts::X3AtomicTradeClient", "packages/ts-sdk/tests/x3.test.ts::X3DomainClient", "packages/ts-sdk/tests/x3.test.ts::X3VerifierClient"]
+property = "client.method(args) produces correct extrinsic targeting runtime pallet"
+
+[[invariant]]
+id = "API-TS-SDK-001"
+description = "TypeScript SDK can connect to a live X3 node and perform basic RPC queries (chain info, block number, balance, nonce)"
+severity = "HIGH"
+layer = "API"
+tested_by = ["packages/ts-sdk/tests/live.integration.test.ts::connects to live node and queries basic RPCs"]
+property = "connect(endpoint) && getChainInfo() && getBlockNumber() && getBalance() succeed when node reachable"
+
+# ──────────────────────────────────────────────────────────────────
+# DEPIN-GPU-001: DePIN GPU Marketplace
+# Proposal: openspec/changes/DEPIN-GPU-001/proposal.md
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "DEPIN-MARKET-001"
+description = "Block-building work always preempts marketplace jobs within 2ms"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["tests/depin/test_preemption.rs::preemption_within_deadline"]
+property = "preempt_latency <= 2ms"
+
+[[invariant]]
+id = "DEPIN-MARKET-002"
+description = "Revenue split exactly matches configured BPS (validator + burn + staker = 10000)"
+severity = "CRITICAL"
+layer = "PALLET"
+tested_by = ["pallets/depin-marketplace/src/tests.rs::revenue_split_conservation"]
+property = "validator_share + burn_share + staker_share == total_revenue"
+
+[[invariant]]
+id = "DEPIN-MARKET-003"
+description = "Customer escrow is locked before job assignment and released only on completion or timeout"
+severity = "CRITICAL"
+layer = "PALLET"
+tested_by = ["pallets/depin-marketplace/src/tests.rs::escrow_lifecycle"]
+property = "lock(escrow) -> assigned -> (complete|timeout) -> release(escrow)"
+
+[[invariant]]
+id = "DEPIN-MARKET-004"
+description = "Sandboxed GPU workloads cannot access host memory outside allocated VRAM region"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = ["tests/depin/test_sandbox.rs::memory_isolation"]
+property = "forall rental_job: accessible_memory ⊆ allocated_vram_region"
+
+[[invariant]]
+id = "DEPIN-MARKET-005"
+description = "Provider stake is slashed on verified job failure"
+severity = "HIGH"
+layer = "PALLET"
+tested_by = ["pallets/depin-marketplace/src/tests.rs::slash_on_failure"]
+property = "job_failed && verified => provider.stake -= slash_amount"
+
+# ──────────────────────────────────────────────────────────────────
+# EXEC-PREDICT-002: Predictive Parallel Execution with On-Device ML
+# Proposal: openspec/changes/EXEC-PREDICT-002/proposal.md
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "EXEC-PREDICT-001"
+description = "Prediction inference latency is ≤0.5ms for batches up to 10K transactions"
+severity = "HIGH"
+layer = "CONSENSUS"
+tested_by = ["crates/contention-predictor/benches/inference_latency.rs::latency_under_budget"]
+property = "predict(batch_10k).latency <= 500μs"
+
+[[invariant]]
+id = "EXEC-PREDICT-002"
+description = "Fallback to serial execution when prediction confidence is below threshold"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["crates/contention-predictor/tests/fallback.rs::low_confidence_serial"]
+property = "confidence < threshold => serial_execution"
+
+[[invariant]]
+id = "EXEC-PREDICT-003"
+description = "Shard groups are disjoint — no transaction appears in multiple shards"
+severity = "CRITICAL"
+layer = "VM"
+tested_by = ["crates/contention-predictor/tests/shard_planner.rs::shards_disjoint"]
+property = "forall i,j where i≠j: shard[i] ∩ shard[j] = ∅"
+
+[[invariant]]
+id = "EXEC-PREDICT-004"
+description = "Predicted execution produces identical state root to serial execution"
+severity = "CRITICAL"
+layer = "VM"
+tested_by = ["tests/integration/predictive_exec.rs::parallel_matches_serial"]
+property = "state_root(parallel_sharded) == state_root(serial)"
+
+[[invariant]]
+id = "EXEC-PREDICT-005"
+description = "Model weights are loaded only from governance-approved hash"
+severity = "HIGH"
+layer = "CONSENSUS"
+tested_by = ["crates/contention-predictor/tests/model_integrity.rs::reject_unapproved_weights"]
+property = "load_model(weights) => hash(weights) in approved_set"
+
+# ──────────────────────────────────────────────────────────────────
+# PRIV-ENCLAVE-003: Embedded Private Execution Environments
+# Proposal: openspec/changes/PRIV-ENCLAVE-003/proposal.md
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "PRIV-EXEC-001"
+description = "Private TX content is never exposed in plaintext outside the enclave"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["tests/private_execution/test_confidentiality.rs::no_plaintext_leak"]
+property = "forall private_tx: plaintext only inside attested enclave memory"
+
+[[invariant]]
+id = "PRIV-EXEC-002"
+description = "Encrypted state diff when applied produces identical state to public execution of same TX"
+severity = "CRITICAL"
+layer = "VM"
+tested_by = ["tests/private_execution/test_correctness.rs::private_matches_public"]
+property = "apply(decrypt(encrypted_diff)) == apply(public_execute(tx))"
+
+[[invariant]]
+id = "PRIV-EXEC-003"
+description = "No single validator can decrypt a private TX alone (threshold t-of-n required)"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["crates/confidential-gpu/tests/threshold.rs::single_share_insufficient"]
+property = "decrypt(ciphertext, [share]) fails when |[share]| < t"
+
+[[invariant]]
+id = "PRIV-EXEC-004"
+description = "Enclave attestation is verified before validator joins confidential set"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = ["pallets/private-execution/src/tests.rs::reject_unattested"]
+property = "register_confidential(validator) requires valid_attestation(validator)"
+
+[[invariant]]
+id = "PRIV-EXEC-005"
+description = "Private execution premium fee is correctly collected and split"
+severity = "HIGH"
+layer = "PALLET"
+tested_by = ["pallets/private-execution/src/tests.rs::fee_premium_accounting"]
+property = "fee_collected == base_fee * (1 + premium_bps / 10000)"
+
+[[invariant]]
+id = "PRIV-EXEC-006"
+description = "Regional finality latency increase from private execution is ≤1ms"
+severity = "HIGH"
+layer = "CONSENSUS"
+tested_by = ["tests/private_execution/benches/latency.rs::finality_overhead"]
+property = "finality_latency(private) - finality_latency(public) <= 1ms"
+
+# ──────────────────────────────────────────────────────────────────
+# FRONTEND DATA INTEGRITY
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "FRONTEND-DEMO-001"
+description = "Every catch block that uses demo/static data must call dataIntegrity.reportDemoFallback() — no silent fallback allowed"
+severity = "CRITICAL"
+layer = "FRONTEND"
+tested_by = [
+  ".github/workflows/mainnet-gating.yml::frontend-integrity::verify-demo-fallback-calls-reportDemoFallback",
+  "apps/x3-intelligence/tests/__tests__/FloorDashboard.test.tsx",
+  "apps/x3-intelligence/tests/__tests__/IntentsPage.test.tsx",
+]
+property = "forall catch_block using demo_data: reportDemoFallback() is called"
+
+[[invariant]]
+id = "FRONTEND-DEMO-002"
+description = "DemoDataBanner renders and is visible whenever DataSourceState != LIVE_VERIFIED and != LIVE_UNVERIFIED"
+severity = "CRITICAL"
+layer = "FRONTEND"
+tested_by = [
+  "apps/x3-intelligence/src/components/DemoDataBanner.tsx",
+  ".github/workflows/mainnet-gating.yml::frontend-integrity",
+]
+property = "state in {DEMO_FALLBACK, DEGRADED, REORG_DETECTED, INCONSISTENT, UNAVAILABLE} => DemoDataBanner visible"
+
+[[invariant]]
+id = "FRONTEND-INTEGRITY-001"
+description = "DataSourceState machine transitions are monotonic toward alert states on RPC failure — it never silently clears"
+severity = "HIGH"
+layer = "FRONTEND"
+tested_by = ["apps/x3-intelligence/src/services/dataIntegrity.ts"]
+property = "reportDemoFallback() => state == DEMO_FALLBACK until reportLive() called for all pages"
+
+# ──────────────────────────────────────────────────────────────────
+# SECURITY AUDIT TOOLING
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "SECURITY-SLITHER-001"
+description = "No high or medium severity Slither findings in any EVM contract"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  ".github/workflows/mainnet-gating.yml::static-analysis::slither",
+  "tests/security/slither.config.json",
+]
+property = "slither(contracts/**) => findings.high == 0 && findings.medium == 0"
+
+[[invariant]]
+id = "SECURITY-SEMGREP-001"
+description = "Zero custom Semgrep rule violations across the entire codebase"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  ".github/workflows/mainnet-gating.yml::static-analysis::semgrep",
+  "tests/security/semgrep/x3-security-rules.yml",
+]
+property = "semgrep(., x3-security-rules.yml) => results == []"
+
+[[invariant]]
+id = "SECURITY-FUZZ-001"
+description = "Echidna: all property functions hold after 500k+ transaction sequences"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "tests/security/contracts/InvariantProperties.sol::echidna_total_supply_conserved",
+  "tests/security/contracts/InvariantProperties.sol::echidna_atomic_commit_or_revert",
+  "tests/security/contracts/InvariantProperties.sol::echidna_no_reentrancy_window",
+  "tests/security/contracts/InvariantProperties.sol::echidna_gas_accounting_bounded",
+  ".github/workflows/mainnet-gating.yml::property-fuzzing",
+]
+property = "forall seq of len<=100: all echidna_ properties hold"
+
+[[invariant]]
+id = "SECURITY-FUZZ-002"
+description = "Foundry invariant suite passes at depth=500 runs=10000: supply conserved, no partial commit, no reentrancy"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "tests/security/contracts/CrossVMAtomicity.t.sol::invariant_supplyConserved",
+  "tests/security/contracts/CrossVMAtomicity.t.sol::invariant_noPartialCommit",
+  "tests/security/contracts/CrossVMAtomicity.t.sol::invariant_noReentrancyWindow",
+  ".github/workflows/mainnet-gating.yml::foundry-fuzz",
+]
+property = "forge invariant(CrossVMAtomicityTest, depth=500, runs=10000) => all invariants hold"
+
+# ──────────────────────────────────────────────────────────────────
+# GPU DETERMINISM (extends INFRA-CCGV-001)
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "GPU-DET-001"
+description = "GPU execution path matches CPU reference VM bit-for-bit on state root, receipt root, and gas used"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = [
+  "tests/chaos/gpu_determinism_test.rs::gpu_determinism::test_gpu_matches_cpu_state_root",
+  "tests/chaos/gpu_determinism_test.rs::gpu_determinism::test_gpu_matches_cpu_receipt_root",
+  "tests/chaos/gpu_determinism_test.rs::gpu_determinism::test_gpu_matches_cpu_gas_used",
+  ".github/workflows/mainnet-gating.yml::determinism",
+]
+property = "forall block: gpu_execute(block).state_root == cpu_execute(block).state_root"
+
+[[invariant]]
+id = "GPU-DET-002"
+description = "GPU execution is deterministic across restarts — same seed always produces same state root"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = [
+  "tests/chaos/gpu_determinism_test.rs::gpu_determinism::test_gpu_deterministic_across_restarts",
+  "tests/chaos/gpu_determinism_test.rs::gpu_determinism::test_multi_block_consistency",
+]
+property = "forall payload, n>=2: gpu_execute(payload)[0] == gpu_execute(payload)[n]"
+
+[[invariant]]
+id = "GPU-DET-003"
+description = "After any GPU execution boundary, no partial cross-VM state write exists and no cross-VM call remains active"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = [
+  "tests/chaos/gpu_determinism_test.rs::gpu_determinism::test_no_partial_state_after_execution",
+]
+property = "forall block: gpu_execute(block).partial_state_written == false && .cross_vm_active == false"
+
+[[invariant]]
+id = "GPU-DET-004"
+description = "No floating-point arithmetic anywhere in consensus-critical execution paths (pallets/**, x3-lang/vm/**, runtime/**)"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = [
+  ".github/workflows/mainnet-gating.yml::determinism::verify-no-floats",
+  "tests/security/semgrep/x3-security-rules.yml::x3-no-float-in-consensus",
+]
+property = "grep(f32|f64, consensus_paths) == 0"
+
+# ──────────────────────────────────────────────────────────────────
+# MAINNET GATE
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "MAINNET-GATE-001"
+description = "All jobs in the mainnet-gating.yml CI workflow must pass before any release/mainnet branch is merged"
+severity = "CRITICAL"
+layer = "INFRA"
+tested_by = [
+  ".github/workflows/mainnet-gating.yml::mainnet-decision",
+]
+property = "merge(release/mainnet) => all(mainnet-gating jobs) == success"
+
+# ──────────────────────────────────────────────────────────────────
+# WITNESS ENCODING — Deterministic Scheduler Fraud Proofs
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "WITNESS-CANON-001"
+description = "A SchedulerWitnessV1 with tx_ids or access lists that are not strictly-increasing lexicographically must be rejected by decode_and_validate"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/tests/fraud_proofs_witness_v1.rs::canon_001_unsorted_tx_ids_rejected",
+  "runtime/tests/fraud_proofs_witness_v1.rs::canon_001_duplicate_tx_ids_rejected",
+  "runtime/tests/fraud_proofs_witness_v1.rs::canon_001_unsorted_access_list_rejected",
+  "runtime/tests/fraud_proofs_witness_v1.rs::canon_001_duplicate_access_key_rejected",
+]
+property = "forall w1, w2 encoding same logical witness: exactly one passes decode_and_validate"
+
+[[invariant]]
+id = "WITNESS-CANON-002"
+description = "Identical SchedulerWitnessV1 bytes produce identical scheduler_commitment on all nodes"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/tests/fraud_proofs_witness_v1.rs::canon_002_commitments_are_deterministic",
+  "runtime/tests/fraud_proofs_witness_v1.rs::canon_002_different_tx_sets_produce_different_commitments",
+]
+property = "forall w: compute_commitments(w) is a pure deterministic function of w.encode()"
+
+[[invariant]]
+id = "WITNESS-BOUNDS-001"
+description = "Witnesses exceeding MAX_WITNESS_BYTES, MAX_ACCESSES_PER_TX, or MAX_TXS_PER_BLOCK are rejected before recomputation"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/tests/fraud_proofs_witness_v1.rs::bounds_001_witness_too_large_rejected",
+  "runtime/tests/fraud_proofs_witness_v1.rs::bounds_001_access_count_exceeded_rejected",
+  "runtime/tests/fraud_proofs_witness_v1.rs::bounds_001_tx_count_overflow_rejected",
+]
+property = "decode_and_validate(bytes, _, max_tx) rejects when len(bytes) > MAX_WITNESS_BYTES || any access_count > MAX_ACCESSES_PER_TX || tx_count > max_tx"
+
+[[invariant]]
+id = "WITNESS-GRAPH-001"
+description = "Canonical conflict-graph encoding is identical for witnesses with the same tx_ids and access_lists"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/tests/fraud_proofs_witness_v1.rs::graph_001_same_access_pattern_produces_same_graph_commitment",
+  "runtime/tests/fraud_proofs_witness_v1.rs::graph_001_no_conflicts_produces_empty_graph",
+]
+property = "graph_commitment(w1) == graph_commitment(w2) iff w1.tx_ids == w2.tx_ids && w1.access_lists == w2.access_lists"
+
+[[invariant]]
+id = "WITNESS-ORDER-001"
+description = "Kahn topological sort with tx_id ascending tie-break produces a unique, deterministic execution order for any DAG derived from a valid witness"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/tests/fraud_proofs_witness_v1.rs::order_001_fully_conflicting_witness_order_is_deterministic",
+  "runtime/tests/fraud_proofs_witness_v1.rs::order_001_no_conflict_witness_order_is_deterministic",
+  "runtime/tests/fraud_proofs_witness_v1.rs::order_001_different_conflict_pattern_different_order",
+]
+property = "forall valid w: canonical_order(w) is total and deterministic; distinct conflict DAGs produce distinct order_commitments"
+
+
+[[invariant]]
+id = "FRAUD-PROOF-001"
+description = "A proposer that publishes an invalid scheduler_commitment must be slashable via a valid FraudProofV1"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/verifier.rs::tests::valid_proof_detects_mismatch",
+]
+property = "verify_scheduler_mismatch_v1(proof, disputed) == Ok(_) when recomputed != disputed.scheduler_commitment"
+
+[[invariant]]
+id = "FRAUD-PROOF-002"
+description = "Fraud proof verification is fully deterministic: same inputs produce identical Ok/Err and proof_id across all nodes"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/verifier.rs::tests::verification_is_deterministic",
+  "runtime/src/fraud_proofs/verifier.rs::tests::proof_id_is_stable",
+]
+property = "forall proof,disputed: verify(proof,disputed) is referentially transparent"
+
+[[invariant]]
+id = "FRAUD-PROOF-003"
+description = "A non-fraudulent proof (recomputed == observed) must never result in a slash"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/verifier.rs::tests::non_fraudulent_proof_rejected",
+]
+property = "verify_scheduler_mismatch_v1(proof, disputed) == Err(NotFraudulent) when recomputed == observed"
+
+# ──────────────────────────────────────────────────────────────────
+# COMMITTEE SELECTION — Deterministic VRF-style validator subset
+# Module: runtime/src/fraud_proofs/committee.rs
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "COMMITTEE-SELECT-001"
+description = "Committee selection is deterministic: identical (eligible, seed, k) always produces identical output"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/committee.rs::tests::deterministic_same_seed",
+  "runtime/tests/fraud_proofs_proptest.rs::prop_committee_deterministic",
+]
+property = "forall eligible, seed, k: select_committee(eligible, seed, k) == select_committee(eligible, seed, k)"
+
+[[invariant]]
+id = "COMMITTEE-SELECT-002"
+description = "Committee contains no duplicate validators"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/committee.rs::tests::no_duplicates_in_selection",
+  "runtime/tests/fraud_proofs_proptest.rs::prop_committee_no_duplicates",
+]
+property = "forall result: |set(result)| == |result|"
+
+[[invariant]]
+id = "COMMITTEE-SELECT-003"
+description = "Committee size equals min(k, |eligible|)"
+severity = "HIGH"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/committee.rs::tests::output_length_is_min_k_n",
+  "runtime/tests/fraud_proofs_proptest.rs::prop_committee_size",
+]
+property = "forall eligible, k: |select_committee(eligible, seed, k)| == min(k, |eligible|)"
+
+# ──────────────────────────────────────────────────────────────────
+# FREEZE HOOKS — AI/scheduler circuit breaker
+# Module: runtime/src/fraud_proofs/freeze.rs
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "FREEZE-001"
+description = "Freezing disables AI/scheduler paths without halting block production"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/freeze.rs::tests::engage_sets_flags",
+  "runtime/src/fraud_proofs/freeze.rs::tests::encode_decode_roundtrip",
+]
+property = "engage(state) => state.is_consensus_frozen() && block_production_unaffected"
+
+[[invariant]]
+id = "FREEZE-002"
+description = "Once frozen, only a governance origin can unfreeze"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/freeze.rs::tests::disengage_clears_flags",
+  "runtime/src/fraud_proofs/pallet.rs::tests::default_freeze_state_not_frozen",
+]
+property = "disengage requires GovernanceOrigin; all other callers are rejected"
+
+# ──────────────────────────────────────────────────────────────────
+# STARTUP GATE — Pre-consensus determinism validation
+# Module: runtime/src/fraud_proofs/startup_gate.rs
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "STARTUP-GATE-001"
+description = "A validator must pass all CPU scheduler test vectors before joining consensus"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/startup_gate.rs::tests::gate_passes_with_reference_scheduler",
+]
+property = "run_startup_gate() == Ok(()) for any compliant CPU-reference scheduler build"
+
+[[invariant]]
+id = "STARTUP-GATE-002"
+description = "Startup gate output is idempotent (repeated calls return the same result)"
+severity = "HIGH"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/startup_gate.rs::tests::gate_is_deterministic",
+]
+property = "run_startup_gate() is referentially transparent"
+
+# ──────────────────────────────────────────────────────────────────
+# FRAUD-PROOF PALLET — Replay protection and extrinsic dispatch
+# Module: runtime/src/fraud_proofs/pallet.rs
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "FRAUD-PROOF-PALLET-001"
+description = "proof_id is stable: same proof + block hash always produces the same ID"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/src/fraud_proofs/pallet.rs::tests::proof_id_is_stable",
+]
+property = "forall proof, hash: compute_proof_id(proof, hash) is constant across calls"
+
+[[invariant]]
+id = "FRAUD-PROOF-PALLET-002"
+description = "Duplicate proof submissions are rejected (replay protection)"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "runtime/tests/fraud_proofs_proptest.rs::prop_no_duplicate_proof_accepted",
+]
+property = "ProofsSeen contains proof_id => submit_fraud_proof => Err(DuplicateProof)"
+# Proposal: openspec/changes/TESTNET-ARCH-001/proposal.md
+# ──────────────────────────────────────────────────────────────────
+
+[[invariant]]
+id = "INFRA-TESTNET-001"
+description = "Bootnode is reachable and each validator reaches >= 3 peers within 2 minutes of start"
+severity = "HIGH"
+layer = "INFRA"
+tested_by = [
+  "scripts/testnet/status-7-validators.sh::peer_count_threshold",
+  "deployment/manage-testnet.sh::check_peers",
+]
+property = "forall validator v: peers(v) >= 3 within 120s of boot"
+
+[[invariant]]
+id = "INFRA-TESTNET-002"
+description = "Finality keeps progressing with no stalls > 2x target block time under nominal load"
+severity = "CRITICAL"
+layer = "CONSENSUS"
+tested_by = [
+  "scripts/testnet/status-7-validators.sh::finality_progress",
+]
+property = "forall windows w: finality_lag(w) <= 2 * target_block_time"
+
+[[invariant]]
+id = "INFRA-TESTNET-003"
+description = "Telemetry pipeline ingests validator metrics and Grafana dashboards load"
+severity = "MEDIUM"
+layer = "INFRA"
+tested_by = [
+  "scripts/testnet/run-chainbench-stack.sh::telemetry_stack_health",
+  "docker-compose.monitoring.yml::grafana_up",
+]
+property = "prometheus_scrape_ok && grafana_dashboard_ok"
+
+[[invariant]]
+id = "INFRA-TESTNET-004"
+description = "Baseline load test sustains configured TPS for 20 minutes with <= 1% error rate"
+severity = "HIGH"
+layer = "INFRA"
+tested_by = [
+  "scripts/testnet/load-remarks-tps.js::baseline_load_20m",
+  "scripts/testnet/run-multiprocess-load.py::baseline_load_20m",
+]
+property = "tps >= target && error_rate <= 0.01 for 20m"

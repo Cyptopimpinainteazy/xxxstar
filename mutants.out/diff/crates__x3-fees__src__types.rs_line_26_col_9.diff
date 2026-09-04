@@ -1,0 +1,25 @@
+--- crates/x3-fees/src/types.rs
++++ replace FeeVector::compute_total with ()
+@@ -18,21 +18,17 @@
+     pub reputation_discount: Amount,
+     /// Total fee after all components.
+     pub total: Amount,
+ }
+ 
+ impl FeeVector {
+     /// Compute the total fee (base + complexity + capital - reputation).
+     pub fn compute_total(&mut self) {
+-        let gross = self
+-            .base_fee
+-            .saturating_add(self.complexity_fee)
+-            .saturating_add(self.capital_fee);
+-        self.total = gross.saturating_sub(self.reputation_discount);
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Parameters describing the execution for fee calculation.
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ExecutionParams {
+     /// Number of execution legs (e.g., swap hops).
+     pub legs: u32,

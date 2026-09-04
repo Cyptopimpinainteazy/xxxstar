@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "agent" in Keyword::parse
+@@ -94,17 +94,17 @@
+             "continue" => Some(Self::Continue),
+             "struct" => Some(Self::Struct),
+             "enum" => Some(Self::Enum),
+             "match" => Some(Self::Match),
+             "true" => Some(Self::True),
+             "false" => Some(Self::False),
+             "atomic" => Some(Self::Atomic),
+             "emit" => Some(Self::Emit),
+-            "agent" => Some(Self::Agent),
++             /* ~ changed by cargo-mutants ~ */
+             "context" => Some(Self::Context),
+             "const" => Some(Self::Const),
+             "in" => Some(Self::In),
+             _ => None,
+         }
+     }
+ }
+ 

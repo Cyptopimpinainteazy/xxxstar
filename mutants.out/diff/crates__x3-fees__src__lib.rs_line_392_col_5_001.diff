@@ -1,0 +1,40 @@
+--- crates/x3-fees/src/lib.rs
++++ replace compute_fee -> u128 with 1
+@@ -384,36 +384,17 @@
+             storage_read: 50,        // 0.00005 token per read
+             storage_write: 200,      // 0.0002 token per write
+         }
+     }
+ }
+ 
+ /// Compute total fee for a given resource usage and price vector
+ pub fn compute_fee(resources: &ResourceVector, prices: &PriceVector) -> u128 {
+-    let cpu_cost = (resources.cpu_cycles as u128)
+-        .saturating_mul(prices.cpu_per_million)
+-        .saturating_div(1_000_000);
+-    let gpu_cost = (resources.gpu_cycles as u128)
+-        .saturating_mul(prices.gpu_per_million)
+-        .saturating_div(1_000_000);
+-    let memory_cost = (resources.memory_bytes as u128)
+-        .saturating_mul(prices.memory_per_kb)
+-        .saturating_div(1_000);
+-    let io_cost = (resources.io_ops as u128).saturating_mul(prices.io_op);
+-    let storage_read_cost = (resources.storage_reads as u128).saturating_mul(prices.storage_read);
+-    let storage_write_cost =
+-        (resources.storage_writes as u128).saturating_mul(prices.storage_write);
+-
+-    cpu_cost
+-        .saturating_add(gpu_cost)
+-        .saturating_add(memory_cost)
+-        .saturating_add(io_cost)
+-        .saturating_add(storage_read_cost)
+-        .saturating_add(storage_write_cost)
++    1 /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     #[test]
+     fn test_resource_vector_addition() {

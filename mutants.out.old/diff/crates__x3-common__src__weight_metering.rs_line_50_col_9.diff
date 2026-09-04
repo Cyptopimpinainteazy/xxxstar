@@ -1,0 +1,46 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace <impl sp_std::fmt::Display for WeightError>::fmt -> sp_std::fmt::Result with Ok(Default::default())
+@@ -42,42 +42,17 @@
+     /// Operation cost exceeded budget
+     BudgetExceeded(u64, u64),
+     /// Invalid weight configuration
+     InvalidConfig(String),
+ }
+ 
+ impl sp_std::fmt::Display for WeightError {
+     fn fmt(&self, f: &mut sp_std::fmt::Formatter<'_>) -> sp_std::fmt::Result {
+-        match self {
+-            WeightError::ComputeLimitExceeded(consumed, limit) => {
+-                write!(
+-                    f,
+-                    "Compute unit limit exceeded: consumed {} > limit {}",
+-                    consumed, limit
+-                )
+-            }
+-            WeightError::GasLimitExceeded(consumed, limit) => {
+-                write!(
+-                    f,
+-                    "Gas limit exceeded: consumed {} > limit {}",
+-                    consumed, limit
+-                )
+-            }
+-            WeightError::BudgetExceeded(consumed, budget) => {
+-                write!(
+-                    f,
+-                    "Budget exceeded: consumed {} > budget {}",
+-                    consumed, budget
+-                )
+-            }
+-            WeightError::InvalidConfig(msg) => {
+-                write!(f, "Invalid weight configuration: {}", msg)
+-            }
+-        }
++        Ok(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Result type for weight operations
+ pub type WeightResult<T> = Result<T, WeightError>;
+ 
+ /// Configuration for weight metering
+ #[derive(Debug, Clone, PartialEq, Eq)]

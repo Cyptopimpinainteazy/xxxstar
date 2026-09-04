@@ -1,0 +1,446 @@
+openapi: 3.0.0
+info:
+  title: "Jury Blockchain Anchoring API"
+  description: "REST API for jury decision management and blockchain anchoring - Phase 5"
+  version: "1.0.0"
+  contact:
+    name: "X3 Chain Team"
+    url: "https://x3-chain.io"
+  license:
+    name: "MIT"
+    url: "https://opensource.org/licenses/MIT"
+
+servers:
+  - url: "http://localhost:8080"
+    description: "Local development"
+  - url: "https://api.jury-anchoring.prod"
+    description: "Production"
+
+paths:
+  /api/health:
+    get:
+      summary: "Health check endpoint"
+      description: "Returns system health status"
+      operationId: "getHealth"
+      tags:
+        - "Health"
+      responses:
+        '200':
+          description: "System is healthy"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["healthy", "degraded", "unhealthy"]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+
+  /api/sessions:
+    post:
+      summary: "Create new jury session"
+      operationId: "createSession"
+      tags:
+        - "Sessions"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["topic", "description"]
+              properties:
+                topic:
+                  type: string
+                  description: "Session topic"
+                  example: "Capital allocation decision"
+                description:
+                  type: string
+                  description: "Detailed description"
+                  example: "Vote on $5M funding allocation"
+                metadata:
+                  type: object
+                  description: "Optional metadata"
+      responses:
+        '201':
+          description: "Session created"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    get:
+      summary: "List all sessions"
+      operationId: "listSessions"
+      tags:
+        - "Sessions"
+      parameters:
+        - name: status
+          in: query
+          description: "Filter by status"
+          schema:
+            type: string
+            enum: ["pending", "finalized", "anchored"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: "List of sessions"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+
+  /api/sessions/{sessionId}:
+    get:
+      summary: "Get session details"
+      operationId: "getSession"
+      tags:
+        - "Sessions"
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Session details"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/sessions/{sessionId}/votes:
+    post:
+      summary: "Submit vote from juror"
+      operationId: "submitVote"
+      tags:
+        - "Votes"
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["juror_id", "vote", "reasoning"]
+              properties:
+                juror_id:
+                  type: string
+                  description: "Juror identifier"
+                vote:
+                  type: string
+                  enum: ["yes", "no", "abstain"]
+                  description: "Vote choice"
+                reasoning:
+                  type: string
+                  description: "Vote reasoning/justification"
+                confidence:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                  description: "Confidence level (0-100)"
+      responses:
+        '202':
+          description: "Vote accepted"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    get:
+      summary: "Get all votes for session"
+      operationId: "getSessionVotes"
+      tags:
+        - "Votes"
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "List of votes"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vote'
+
+  /api/sessions/{sessionId}/finalize:
+    post:
+      summary: "Finalize decision and compute hash"
+      operationId: "finalizeDecision"
+      tags:
+        - "Decisions"
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["result"]
+              properties:
+                result:
+                  type: string
+                  enum: ["approve", "reject", "defer"]
+                notes:
+                  type: string
+                  description: "Optional decision notes"
+      responses:
+        '200':
+          description: "Decision finalized"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+
+  /api/sessions/{sessionId}/anchor:
+    post:
+      summary: "Anchor decision to blockchain"
+      operationId: "anchorDecision"
+      tags:
+        - "Decisions"
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: "Anchoring started"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tx_hash:
+                    type: string
+                    description: "Transaction hash on blockchain"
+                  status:
+                    type: string
+                    enum: ["pending", "confirmed", "failed"]
+                  block:
+                    type: integer
+                    description: "Block number when confirmed"
+
+  /api/sessions/{sessionId}/verify:
+    get:
+      summary: "Verify decision on blockchain"
+      operationId: "verifyDecision"
+      tags:
+        - "Verification"
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Verification result"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  verified:
+                    type: boolean
+                  decision_hash:
+                    type: string
+                  block_number:
+                    type: integer
+                  tx_hash:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/metrics:
+    get:
+      summary: "Prometheus metrics endpoint"
+      operationId: "getMetrics"
+      tags:
+        - "Monitoring"
+      responses:
+        '200':
+          description: "Prometheus metrics"
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    Session:
+      type: object
+      required: ["id", "topic", "status", "created_at"]
+      properties:
+        id:
+          type: string
+          description: "Session ID"
+        topic:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: ["pending", "finalized", "anchored", "failed"]
+        created_at:
+          type: string
+          format: date-time
+        finalized_at:
+          type: string
+          format: date-time
+        anchored_at:
+          type: string
+          format: date-time
+        decision_hash:
+          type: string
+          description: "Blake3 hash of finalized decision"
+        tx_hash:
+          type: string
+          description: "Blockchain transaction hash"
+        vote_count:
+          type: integer
+        result:
+          type: string
+          enum: ["approve", "reject", "defer", null]
+
+    Vote:
+      type: object
+      required: ["id", "juror_id", "vote"]
+      properties:
+        id:
+          type: string
+        session_id:
+          type: string
+        juror_id:
+          type: string
+        vote:
+          type: string
+          enum: ["yes", "no", "abstain"]
+        reasoning:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 100
+        submitted_at:
+          type: string
+          format: date-time
+
+    Decision:
+      type: object
+      required: ["id", "session_id", "hash"]
+      properties:
+        id:
+          type: string
+        session_id:
+          type: string
+        result:
+          type: string
+          enum: ["approve", "reject", "defer"]
+        hash:
+          type: string
+          description: "Blake3 hash of decision"
+        vote_count:
+          type: integer
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 100
+        finalized_at:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: "Invalid request"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              details:
+                type: string
+
+    NotFound:
+      description: "Resource not found"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+    ServerError:
+      description: "Internal server error"
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              request_id:
+                type: string
+
+tags:
+  - name: "Health"
+    description: "System health monitoring"
+  - name: "Sessions"
+    description: "Jury session management"
+  - name: "Votes"
+    description: "Juror voting"
+  - name: "Decisions"
+    description: "Decision finalization and anchoring"
+  - name: "Verification"
+    description: "On-chain verification"
+  - name: "Monitoring"
+    description: "Prometheus metrics"

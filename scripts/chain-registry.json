@@ -1,0 +1,8 @@
+{
+  "chains": [
+    { "id": 1, "name": "Chain1", "rpc": "<RPC_ENDPOINT_1>", "treasury": "<TREASURY_WALLET_1>" },
+    { "id": 2, "name": "Chain2", "rpc": "<RPC_ENDPOINT_2>", "treasury": "<TREASURY_WALLET_2>" },
+    // ...
+    { "id": 103, "name": "Chain103", "rpc": "<RPC_ENDPOINT_103>", "treasury": "<TREASURY_WALLET_103>" }
+  ]
+}

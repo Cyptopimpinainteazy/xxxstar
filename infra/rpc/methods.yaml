@@ -1,0 +1,237 @@
+# X3 Mainnet RPC — Method Allow/Block/Archive Policy
+# Every RPC method must be explicitly classified. Any method not listed here is denied.
+# Wildcards: trailing `_*` matches all methods with that prefix.
+
+evm:
+  safe_public:
+    - eth_chainId
+    - eth_netVersion
+    - eth_blockNumber
+    - eth_getBlockByNumber
+    - eth_getBlockByHash
+    - eth_getTransactionByHash
+    - eth_getTransactionReceipt
+    - eth_getTransactionCount
+    - eth_getBalance
+    - eth_getCode
+    - eth_getStorageAt
+    - eth_call
+    - eth_estimateGas
+    - eth_feeHistory
+    - eth_gasPrice
+    - eth_maxPriorityFeePerGas
+    - eth_getLogs
+    - eth_getProof
+    - eth_createAccessList
+    - eth_subscribe
+    - eth_unsubscribe
+    - net_version
+    - net_listening
+    - net_peerCount
+    - web3_clientVersion
+    - web3_sha3
+
+  tx_methods:
+    - eth_sendRawTransaction
+    - eth_sendTransaction              # only if local signer is authorized
+
+  archive_only:
+    - eth_getLogs                      # large-range historical queries
+    - trace_block
+    - trace_transaction
+    - trace_call
+    - trace_callMany
+    - trace_filter
+    - trace_get
+    - trace_replayBlockTransactions
+    - trace_replayTransaction
+    - debug_traceTransaction
+    - debug_traceBlockByNumber
+    - debug_traceBlockByHash
+    - debug_traceCall
+
+  blocked:
+    - personal_*
+    - admin_*
+    - miner_*
+    - debug_setHead
+    - debug_db_*
+    - txpool_*
+    - eth_sign
+    - eth_signTransaction
+    - eth_signTypedData
+    - eth_signTypedData_v1
+    - eth_signTypedData_v3
+    - eth_signTypedData_v4
+    - eth_submitHashrate
+    - eth_submitWork
+
+solana:
+  safe_public:
+    - getHealth
+    - getSlot
+    - getBlock
+    - getBlockHeight
+    - getBlockProduction
+    - getBlockCommitment
+    - getBlocks
+    - getBlocksWithLimit
+    - getEpochInfo
+    - getEpochSchedule
+    - getGenesisHash
+    - getLatestBlockhash
+    - getBalance
+    - getAccountInfo
+    - getMultipleAccounts
+    - getProgramAccounts
+    - getTokenAccountBalance
+    - getTokenAccountsByDelegate
+    - getTokenAccountsByOwner
+    - getTokenLargestAccounts
+    - getTokenSupply
+    - getTransaction
+    - getTransactionCount
+    - getSignaturesForAddress
+    - getVersion
+    - getVoteAccounts
+    - getMinimumBalanceForRentExemption
+    - simulateTransaction
+    - isBlockhashValid
+
+  tx_methods:
+    - sendTransaction
+
+  archive_only:
+    - getBlock                       # blocks older than 1 week
+    - getSignaturesForAddress        # historical queries
+    - getProgramAccounts             # heavy scan method
+
+  blocked:
+    - requestAirdrop
+
+bitcoin:
+  safe_public:
+    - getblockchaininfo
+    - getblockcount
+    - getblockhash
+    - getblock
+    - getblockheader
+    - getrawtransaction
+    - getrawmempool
+    - getmempoolinfo
+    - gettxout
+    - gettxoutsetinfo
+    - estimatesmartfee
+    - estimaterawfee
+    - getnetworkinfo
+    - getnettotals
+    - getdifficulty
+    - getbestblockhash
+    - getchaintips
+    - getchaintxstats
+    - getmemoryinfo
+    - decoderawtransaction
+    - decodescript
+    - verifychain
+    - verifytxoutproof
+    - getzmqnotifications
+
+  tx_methods:
+    - sendrawtransaction
+    - testmempoolaccept
+
+  blocked:
+    - stop
+    - setban
+    - listbanned
+    - clearbanned
+    - addnode
+    - disconnectnode
+    - setnetworkactive
+    - walletpassphrase
+    - walletpassphrasechange
+    - walletlock
+    - encryptwallet
+    - dumpprivkey
+    - importprivkey
+    - dumpwallet
+    - importwallet
+    - backupwallet
+    - restorewallet
+    - getwalletinfo
+    - listwallets
+    - createwallet
+    - loadwallet
+    - unloadwallet
+    - getaddressesbylabel
+    - getbalance
+    - getnewaddress
+    - getrawchangeaddress
+    - getreceivedbyaddress
+    - getreceivedbylabel
+    - gettransaction
+    - listtransactions
+    - listunspent
+    - sendmany
+    - sendtoaddress
+    - settxfee
+    - signmessage
+    - signrawtransactionwithwallet
+    - walletprocesspsbt
+    - getaddressinfo
+    - getdescriptorinfo
+    - deriveaddresses
+    - generatetoaddress
+    - generate
+    - setgenerate
+    - preciousblock
+    - invalidateblock
+    - reconsiderblock
+    - prioritisetransaction
+
+x3:
+  safe_public:
+    - x3_getHealth
+    - x3_getFinalizedHead
+    - x3_getBlock
+    - x3_getBlockByHash
+    - x3_getBalance
+    - x3_getTransaction
+    - x3_getTransactionReceipt
+    - x3_getAtomicRoute
+    - x3_getProof
+    - x3_getFinalizedState
+    - x3_getBridgeStatus
+    - x3_getSettlementStatus
+    - x3_getValidatorSet
+    - x3_getEpochInfo
+    - x3_getFeeInfo
+    - x3_estimateFee
+    - x3_getStorage
+    - x3_getConstants
+    - x3_getMetadata
+    - x3_getEvents
+    - x3_verifyBridgeDeposit
+    - x3_getChainSpec
+    - x3_getRuntimeVersion
+    - x3_getNetworkState
+
+  tx_methods:
+    - x3_submitExtrinsic
+
+  admin_authenticated:
+    - author_submitExtrinsic
+    - author_pendingExtrinsics
+    - author_removeExtrinsic
+    - author_rotateKeys
+    - author_insertKey
+    - author_hasKey
+    - author_hasSessionKeys
+
+  blocked:
+    - author_*
+    - offchain_*
+    - system_*
+    - grandpa_*
+    - babe_*
+    - beefy_*

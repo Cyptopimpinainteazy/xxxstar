@@ -1,0 +1,25 @@
+--- crates/x3-common/src/signing.rs
++++ replace PublicKey::as_bytes -> &[u8] with Vec::leak(vec![0])
+@@ -48,21 +48,17 @@
+             PublicKey::Ed25519(_) => KeyType::Ed25519,
+             PublicKey::Secp256k1(_) => KeyType::Secp256k1,
+             PublicKey::Sr25519(_) => KeyType::Sr25519,
+         }
+     }
+ 
+     /// Get the raw bytes of the public key
+     pub fn as_bytes(&self) -> &[u8] {
+-        match self {
+-            PublicKey::Ed25519(pk) => pk.as_ref(),
+-            PublicKey::Secp256k1(pk) => pk.as_ref(),
+-            PublicKey::Sr25519(pk) => pk.as_ref(),
+-        }
++        Vec::leak(vec![0]) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Convert to EVM address (keccak256 hash of uncompressed pubkey)
+     pub fn to_evm_address(&self) -> [u8; 20] {
+         match self {
+             PublicKey::Secp256k1(pk) => {
+                 // For secp256k1, use the last 20 bytes of keccak256(uncompressed_pubkey)
+                 let hash = keccak_256(pk);

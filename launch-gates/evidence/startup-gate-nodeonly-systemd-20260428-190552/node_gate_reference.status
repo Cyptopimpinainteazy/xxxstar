@@ -1,0 +1,4 @@
+result=PASS
+exit_code=0
+duration_sec=95
+log_file=node_gate_reference.log

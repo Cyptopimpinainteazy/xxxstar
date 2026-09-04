@@ -1,0 +1,19 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="swapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00b0ff;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Circular arrows -->
+  <path d="M40 44 A30 30 0 0 1 88 44" fill="none" stroke="url(#swapGrad)" stroke-width="3.5"/>
+  <polygon points="88,38 96,44 88,50" fill="url(#swapGrad)"/>
+  <path d="M88 84 A30 30 0 0 1 40 84" fill="none" stroke="url(#swapGrad)" stroke-width="3.5"/>
+  <polygon points="40,78 32,84 40,90" fill="url(#swapGrad)"/>
+  <!-- Token A -->
+  <circle cx="40" cy="64" r="14" fill="none" stroke="url(#swapGrad)" stroke-width="2.5" opacity="0.7"/>
+  <text x="40" y="69" text-anchor="middle" fill="url(#swapGrad)" font-size="14" font-weight="bold">A</text>
+  <!-- Token B -->
+  <circle cx="88" cy="64" r="14" fill="none" stroke="url(#swapGrad)" stroke-width="2.5" opacity="0.7"/>
+  <text x="88" y="69" text-anchor="middle" fill="url(#swapGrad)" font-size="14" font-weight="bold">B</text>
+</svg>

@@ -1,0 +1,180 @@
+# Toll Booth Configuration
+# Role: Access control, SLA enforcement, traffic shaping
+
+service:
+  name: "Inferstructor Toll Booth"
+  version: "1.0.0"
+  port: 7000
+  
+access_control:
+  enabled: true
+  authentication:
+    method: "api_key"  # or "jwt", "mTLS"
+    key_header: "X-Validator-Key"
+    validate_signature: true
+    
+  authorization:
+    sla_tier_required: true
+    ip_whitelist_enabled: false
+    rate_limit_per_ip: 10000  # requests/sec
+
+# ALL TIERS UNCAPPED — validators run at full GPU speed
+sla_tiers:
+  basic:
+    max_tps: unlimited
+    max_latency_ms: 5.0
+    failover_priority: 3
+    cost_per_million_tx: 10  # USD
+    features:
+      - gpu_acceleration
+      - deterministic_results
+    
+  pro:
+    max_tps: unlimited
+    max_latency_ms: 1.0
+    failover_priority: 2
+    cost_per_million_tx: 50
+    features:
+      - gpu_acceleration
+      - deterministic_results
+      - priority_lane_access
+      - health_dashboard
+    
+  enterprise:
+    max_tps: unlimited
+    max_latency_ms: 0.5
+    failover_priority: 1
+    cost_per_million_tx: 200
+    features:
+      - gpu_acceleration
+      - deterministic_results
+      - priority_lane_access
+      - health_dashboard
+      - dedicated_lane_slice
+      - custom_sla
+      - 24/7_support
+
+traffic_shaping:
+  enabled: true
+  algorithm: "token_bucket"
+  
+  congestion_management:
+    detect_congestion: true
+    congestion_threshold: 0.9  # 90% lane utilization
+    actions:
+      - route_to_secondary_lane
+      - throttle_basic_tier
+      - notify_validators
+    
+  load_balancing:
+    strategy: "least_latency"  # or "round_robin", "weighted"
+    health_aware: true
+    avoid_unhealthy_lanes: true
+
+lane_routing:
+  # Map validators to lanes based on SLA + health
+  routing_rules:
+    - condition: "tier == enterprise && lane_primary.healthy"
+      target: primary
+      
+    - condition: "tier == enterprise && lane_primary.unhealthy"
+      target: shadow
+      
+    - condition: "tier == pro && lane_primary.utilization < 0.8"
+      target: primary
+      
+    - condition: "tier == pro && lane_primary.utilization >= 0.8"
+      target: shadow
+      
+    - condition: "tier == basic"
+      target: [shadow, tertiary]  # Route basic to backup lanes
+      
+  failover_cascade:
+    primary_failure: shadow
+    shadow_failure: tertiary
+    tertiary_failure: notify_validator_fallback
+
+metering:
+  enabled: true
+  granularity: "per_request"
+  metrics:
+    - validator_id
+    - sla_tier
+    - chain
+    - request_count
+    - tps
+    - latency
+    - lane_used
+    - cost
+    
+  export:
+    interval: 60  # seconds
+    destinations:
+      - prometheus
+      - billing_service
+      - analytics_db
+
+health_monitoring:
+  lanes:
+    primary:
+      endpoint: "http://10.0.1.10:9091/metrics"
+      weight: 1.0
+      
+    shadow:
+      endpoint: "http://10.0.2.10:9092/metrics"
+      weight: 1.0
+      
+    tertiary:
+      endpoint: "http://10.1.1.10:9093/metrics"
+      weight: 0.5  # Lower weight - degraded
+      
+  health_score:
+    formula: |
+      (gpu_utilization * 0.3) +
+      (response_time_inverse * 0.3) +
+      (error_rate_inverse * 0.2) +
+      (queue_depth_inverse * 0.2)
+    
+    thresholds:
+      healthy: 0.7
+      degraded: 0.3
+      unhealthy: 0.0
+
+validator_notification:
+  enabled: true
+  channels:
+    - webhook
+    - websocket
+    
+  events:
+    - lane_failover
+    - degraded_mode_active
+    - congestion_detected
+    - sla_limit_approaching
+    
+api:
+  endpoints:
+    - path: /accelerate
+      method: POST
+      auth: required
+      rate_limit: true
+      
+    - path: /health
+      method: GET
+      auth: optional
+      public: true
+      
+    - path: /metrics
+      method: GET
+      auth: required
+      role: admin
+
+logging:
+  level: INFO
+  format: json
+  output: /var/log/ccgv/toll_booth.log
+  
+metrics:
+  port: 7001
+  exporters:
+    - prometheus

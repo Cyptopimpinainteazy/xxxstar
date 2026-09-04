@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "programs/x3_core",
+    "programs/x3_vm_erc20",
+    "programs/x3_external_gateway",
+    "programs/x3_kernel_bridge",
+    "programs/x3_receipt_verifier",
+]
+
+

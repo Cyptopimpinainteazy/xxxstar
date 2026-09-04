@@ -1,0 +1,223 @@
+version: '3.8'
+
+services:
+  secrets-mcp:
+    image: vault:1.13.0
+    container_name: x3-secrets-mcp
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "x3-dev-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    volumes:
+      - secrets_data:/vault/data
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  fs-mcp:
+    image: x3/mcp-filesystem:latest
+    container_name: x3-fs-mcp
+    ports:
+      - "8080:8080"
+    environment:
+      REPO_ROOT: "/workspace"
+      MAX_FILE_SIZE_MB: "32"
+    volumes:
+      - ../:/workspace
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+    depends_on:
+      secrets-mcp:
+        condition: service_healthy
+
+  git-mcp:
+    image: x3/mcp-git:latest
+    container_name: x3-git-mcp
+    ports:
+      - "9418:9418"
+      - "8081:8081"
+    environment:
+      GIT_USER: "x3-bot"
+    volumes:
+      - ../:/repo
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/status"]
+      interval: 10s
+      timeout: 3s
+    depends_on:
+      fs-mcp:
+        condition: service_healthy
+
+  docker-mcp:
+    image: x3/mcp-docker:latest
+    container_name: x3-docker-mcp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 3s
+    depends_on:
+      fs-mcp:
+        condition: service_healthy
+
+  exec-mcp:
+    image: x3/mcp-exec:latest
+    container_name: x3-exec-mcp
+    ports:
+      - "8443:8443"
+    environment:
+      TIME_LIMIT_SEC: "30"
+      MEM_LIMIT_MB: "512"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443/v1/ping"]
+      interval: 5s
+      timeout: 2s
+    depends_on:
+      fs-mcp:
+        condition: service_healthy
+
+  db-mcp:
+    image: postgres:15
+    container_name: x3-db-mcp
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: "x3"
+      POSTGRES_USER: "x3"
+      POSTGRES_PASSWORD: "x3_password"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U x3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  x3-node-mcp:
+    image: x3/x3-chain-node:dev
+    container_name: x3-node-mcp
+    ports:
+      - "9933:9933"
+      - "9944:9944"
+    environment:
+      NODE_ENV: "dev"
+    volumes:
+      - node_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9933/health"]
+      interval: 10s
+      timeout: 3s
+    depends_on:
+      secrets-mcp:
+        condition: service_healthy
+      db-mcp:
+        condition: service_healthy
+
+  rpc-router-mcp:
+    image: x3/mcp-rpc-router:latest
+    container_name: x3-rpc-router-mcp
+    ports:
+      - "8060:8060"
+    environment:
+      ROUTE_POLICY: "latency-first"
+      ETHEREUM_MAINNET_RPC: "https://eth-mainnet.public.blastapi.io"
+      POLYGON_MAINNET_RPC: "https://polygon-rpc.com"
+    depends_on:
+      x3-node-mcp:
+        condition: service_healthy
+
+  web3-evm-mcp:
+    image: x3/mcp-web3-evm:latest
+    container_name: x3-web3-evm-mcp
+    ports:
+      - "8545:8545"
+    environment:
+      DEFAULT_RPC: "http://localhost:8545"
+    volumes:
+      - ../:/workspace
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545/rpc/health"]
+      interval: 5s
+      timeout: 2s
+    depends_on:
+      exec-mcp:
+        condition: service_healthy
+      fs-mcp:
+        condition: service_healthy
+      docker-mcp:
+        condition: service_healthy
+      git-mcp:
+        condition: service_healthy
+      rpc-router-mcp:
+        condition: service_healthy
+
+  svm-mcp:
+    image: x3/mcp-svm:latest
+    container_name: x3-svm-mcp
+    ports:
+      - "8899:8899"
+    volumes:
+      - ../:/workspace
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8899/health"]
+      interval: 10s
+      timeout: 3s
+    depends_on:
+      exec-mcp:
+        condition: service_healthy
+      fs-mcp:
+        condition: service_healthy
+      git-mcp:
+        condition: service_healthy
+      rpc-router-mcp:
+        condition: service_healthy
+
+  wallet-mcp:
+    image: x3/mcp-wallet:latest
+    container_name: x3-wallet-mcp
+    ports:
+      - "8444:8444"
+    environment:
+      WALLET_API_ALLOWLIST: "127.0.0.1"
+    depends_on:
+      fs-mcp:
+        condition: service_healthy
+      git-mcp:
+        condition: service_healthy
+
+  explorer-mcp:
+    image: x3/mcp-explorer:latest
+    container_name: x3-explorer-mcp
+    ports:
+      - "4000:4000"
+    depends_on:
+      rpc-router-mcp:
+        condition: service_healthy
+      db-mcp:
+        condition: service_healthy
+
+  logging-mcp:
+    image: x3/mcp-logging:latest
+    container_name: x3-logging-mcp
+    ports:
+      - "9200:9200"
+
+  monitoring-mcp:
+    image: prom/prometheus:latest
+    container_name: x3-monitoring-mcp
+    ports:
+      - "9090:9090"
+    depends_on:
+      logging-mcp:
+        condition: service_healthy
+
+volumes:
+  secrets_data:
+  db_data:
+  node_data:

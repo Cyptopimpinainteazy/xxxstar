@@ -1,0 +1,163 @@
+# Cross-VM Execution Attack Scenarios
+# Security tests for cross-VM router and atomic execution
+
+scenarios:
+  - id: CROSSVM_001
+    name: "Cross-VM Reentrancy"
+    category: reentrancy
+    severity: CATASTROPHIC
+    description: "Attacker uses cross-VM call to reenter and manipulate state"
+    
+    setup:
+      - evm_contract_holds_user_funds
+      - svm_program_controlled_by_attacker
+      - user_initiates_withdrawal_from_evm
+    
+    attack:
+      - user_calls_evm_withdraw_function
+      - evm_contract_calls_svm_program_via_cross_vm_router
+      - svm_program_calls_back_to_evm_contract
+      - nested_call_attempts_second_withdrawal
+      - attacker_tries_to_drain_contract
+    
+    expected_behavior:
+      - cross_vm_reentrancy_guard_active
+      - callback_from_svm_to_evm_blocked_during_execution
+      - second_withdrawal_rejected
+      - original_withdrawal_completes_safely
+    
+    proof_requirements:
+      - unit_test: test_cross_vm_reentrancy_guard
+      - integration_test: test_cross_vm_callback_prevention
+      - adversarial_test: test_nested_cross_vm_attacks
+    
+    related_claims:
+      - x3.cross_vm_router.reentrancy_protection
+      - x3.atomic_execution.state_integrity
+  
+  - id: CROSSVM_002
+    name: "Partial Cross-VM Commit"
+    category: atomicity
+    severity: CATASTROPHIC
+    description: "Attacker causes partial state commit across VMs"
+    
+    setup:
+      - user_swaps_tokens_on_evm_dex
+      - swap_requires_cross_vm_call_to_svm
+      - svm_side_modifies_liquidity_pool
+    
+    attack:
+      - attacker_triggers_failure_condition_mid_execution
+      - evm_state_committed
+      - svm_state_fails_to_commit
+      - system_in_inconsistent_state
+    
+    expected_behavior:
+      - atomic_execution_engine_detects_partial_failure
+      - evm_state_changes_rolled_back
+      - svm_state_changes_rolled_back
+      - entire_transaction_reverted
+      - one_terminal_state_achieved
+    
+    proof_requirements:
+      - integration_test: test_cross_vm_atomicity
+      - integration_test: test_partial_failure_rollback
+      - invariant_test: test_no_partial_commits
+    
+    related_claims:
+      - x3.atomic_execution.commit_correctness
+      - x3.atomic_execution.one_terminal_state
+  
+  - id: CROSSVM_003
+    name: "Cross-VM Gas Exhaustion"
+    category: dos
+    severity: HIGH
+    description: "Attacker exhausts gas during cross-VM call"
+    
+    setup:
+      - user_calls_evm_contract_with_limited_gas
+      - contract_makes_cross_vm_call_to_svm
+      - svm_program_performs_expensive_computation
+    
+    attack:
+      - attacker_provides_insufficient_gas
+      - svm_execution_runs_out_of_gas_mid_operation
+      - evm_waiting_for_svm_response
+    
+    expected_behavior:
+      - out_of_gas_error_propagated_from_svm_to_evm
+      - evm_contract_handles_error_gracefully
+      - partial_state_changes_rolled_back
+      - user_funds_safe
+    
+    proof_requirements:
+      - unit_test: test_cross_vm_gas_propagation
+      - integration_test: test_out_of_gas_handling
+      - fuzz_test: test_gas_exhaustion_scenarios
+    
+    related_claims:
+      - x3.cross_vm_router.gas_metering
+      - x3.cross_vm_router.error_propagation
+  
+  - id: CROSSVM_004
+    name: "VM Isolation Breach"
+    category: isolation
+    severity: CATASTROPHIC
+    description: "Attacker attempts to access EVM memory from SVM"
+    
+    setup:
+      - evm_contract_stores_sensitive_data_in_memory
+      - svm_program_called_via_cross_vm_router
+      - attacker_controls_svm_program
+    
+    attack:
+      - svm_program_attempts_to_read_evm_memory_addresses
+      - svm_program_tries_to_modify_evm_storage_directly
+      - svm_program_attempts_to_call_evm_internal_functions
+    
+    expected_behavior:
+      - vm_isolation_layer_blocks_direct_memory_access
+      - storage_access_only_via_approved_interfaces
+      - unauthorized_calls_rejected
+      - evm_memory_integrity_maintained
+    
+    proof_requirements:
+      - unit_test: test_vm_memory_isolation
+      - integration_test: test_cross_vm_access_controls
+      - adversarial_test: test_vm_escape_attempts
+    
+    related_claims:
+      - x3.vm_isolation.memory_protection
+      - x3.cross_vm_router.security_boundary
+  
+  - id: CROSSVM_005
+    name: "Cross-VM Event Spoofing"
+    category: event_integrity
+    severity: HIGH
+    description: "Attacker spoofs events from cross-VM call"
+    
+    setup:
+      - dapp_frontend_listens_for_cross_vm_events
+      - user_initiates_cross_vm_transaction
+      - attacker_monitors_event_stream
+    
+    attack:
+      - attacker_injects_fake_cross_vm_success_event
+      - frontend_believes_transaction_succeeded
+      - user_acts_on_false_event_information
+      - actual_transaction_failed_on_svm_side
+    
+    expected_behavior:
+      - events_cryptographically_signed_by_vm_runtime
+      - frontend_validates_event_signatures
+      - fake_events_rejected_by_validation
+      - only_authentic_events_displayed_to_user
+    
+    proof_requirements:
+      - integration_test: test_cross_vm_event_authentication
+      - integration_test: test_fake_event_rejection
+      - e2e_test: test_frontend_event_validation
+    
+    related_claims:
+      - x3.cross_vm_router.event_integrity
+      - x3.contracts.event_schema

@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace GasMeter::reset with ()
+@@ -323,17 +323,17 @@
+ 
+     /// Get the limit
+     pub fn limit(&self) -> u64 {
+         self.limit
+     }
+ 
+     /// Reset the meter
+     pub fn reset(&mut self) {
+-        self.consumed = 0;
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Unified weight meter that tracks both compute units and gas
+ #[derive(Debug, Clone)]
+ pub struct WeightMeter {
+     /// Compute unit meter
+     compute: ComputeMeter,

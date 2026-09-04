@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace > with >= in ComputeMeter::consume_with_budget
+@@ -244,17 +244,17 @@
+             return Err(WeightError::ComputeLimitExceeded(self.consumed, self.limit));
+         }
+         Ok(())
+     }
+ 
+     /// Consume compute units with a budget check
+     pub fn consume_with_budget(&mut self, units: u64, budget: u64) -> WeightResult<()> {
+         let total = self.consumed.saturating_add(units);
+-        if total > budget {
++        if total >= /* ~ changed by cargo-mutants ~ */ budget {
+             return Err(WeightError::BudgetExceeded(total, budget));
+         }
+         self.consumed = total;
+         Ok(())
+     }
+ 
+     /// Get remaining units
+     pub fn remaining(&self) -> u64 {

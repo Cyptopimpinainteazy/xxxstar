@@ -1,0 +1,68 @@
+[package]
+name = "cross-chain-position-manager"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Chain Team"]
+description = "Universal Cross-Chain Position Manager for X3 Chain"
+license = "MIT"
+
+[dependencies]
+# Core dependencies
+parity-scale-codec = { workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-std = { workspace = true, default-features = false }
+sp-core = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+serde = { workspace = true, optional = true, default-features = false, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# External chains integration
+x3-external-chains = { path = "../external-chains" }
+custody-service = { path = "../custody-service" }
+x3-evolution = { path = "../x3-evolution" }
+
+# Async and networking
+tokio = { workspace = true, features = ["full"], optional = true }
+async-trait = { version = "0.1", optional = true }
+futures = { workspace = true }
+
+# Data structures and storage
+dashmap = { version = "5.0", optional = true }
+parking_lot = "0.12"
+priority-queue = "1.2"
+
+# Cryptographic and hash functions
+blake3 = "1.4"
+sha2 = "0.10"
+hex = "0.4"
+
+# Time and scheduling
+chrono = { version = "0.4", features = ["serde"], optional = true }
+tokio-cron-scheduler = { version = "0.9", optional = true }
+
+# Cross-chain messaging
+libp2p = { version = "0.50", features = ["tcp", "quic", "noise"], optional = true }
+
+[dev-dependencies]
+tempfile = "3.0"
+criterion = "0.5"
+proptest = "1.0"
+
+[features]
+default = ["std", "tokio", "serde_json"]
+std = []
+tokio = ["dep:async-trait", "dep:chrono", "dep:tokio-cron-scheduler", "dep:tokio"]
+serde_json = ["dep:serde_json", "dep:serde"]
+parallel = []
+libp2p = ["dep:libp2p", "dep:async-trait"]
+memdb = ["dep:dashmap"]
+# Enable all async features
+full = ["tokio", "serde_json", "memdb", "libp2p"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

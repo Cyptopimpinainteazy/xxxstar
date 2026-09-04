@@ -1,0 +1,27 @@
+[package]
+name = "x3-autonomic-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["X3 Public Chain Team"]
+description = "CLI tool for X3 Autonomic Core"
+
+[[bin]]
+name = "x3-autonomic"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+x3-autonomic-types = { path = "../x3-autonomic-types" }
+x3-live-auditor = { path = "../x3-live-auditor" }
+x3-shadow-runner = { path = "../x3-shadow-runner" }
+x3-regression-engine = { path = "../x3-regression-engine" }
+x3-benchmark-oracle = { path = "../x3-benchmark-oracle" }
+x3-judge-agent = { path = "../x3-judge-agent" }
+
+[dev-dependencies]
+tokio-test = "0.4"

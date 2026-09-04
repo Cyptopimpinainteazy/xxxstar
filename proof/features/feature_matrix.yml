@@ -1,0 +1,1477 @@
+# X3 Feature Matrix
+# Comprehensive registry of all X3 blockchain features
+# A feature is BUILT only if it has ALL of:
+#   1. Registry entry
+#   2. Implementation files
+#   3. Public API/extrinsic/contract/CLI/UI wiring
+#   4. Runtime or app wiring
+#   5. Unit tests
+#   6. Integration tests
+#   7. Negative/failure tests
+#   8. Proof receipt (fresh)
+#   9. No critical TODO/stub/mock
+#   10. Docs updated
+#   11. Dashboard/report visibility
+
+features:
+  # ============================================================================
+  # CORE CHAIN (11 features)
+  # ============================================================================
+  - id: x3.runtime
+    name: X3 Runtime Core
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: runtime
+    docs:
+      - runtime/README.md
+    code:
+      - runtime/src/lib.rs
+    wiring:
+      - "construct_runtime! macro includes all pallets"
+      - "runtime builds and produces WASM"
+    tests:
+      unit:
+        - runtime_compiles
+        - runtime_metadata_valid
+      integration:
+        - runtime_upgrade_works
+      negative:
+        - runtime_upgrade_without_proof_rejected
+    proof_commands:
+      - cargo build -p x3-runtime
+      - cargo test -p x3-runtime
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - no_critical_todos
+
+  - id: x3.consensus
+    name: Consensus Mechanism
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: consensus
+    docs:
+      - docs/consensus.md
+    code:
+      - node/src/service.rs
+      - pallets/x3-consensus/src/lib.rs
+    wiring:
+      - "node service includes consensus"
+      - "block production enabled"
+    tests:
+      unit:
+        - consensus_round_works
+      integration:
+        - multi_validator_consensus
+      negative:
+        - malformed_block_rejected
+    proof_commands:
+      - cargo test consensus
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.finality
+    name: Finality Gadget
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: consensus
+    docs:
+      - docs/finality.md
+    code:
+      - node/src/service.rs
+    wiring:
+      - "finality gadget initialized"
+    tests:
+      unit:
+        - finality_works
+      integration:
+        - finality_across_validators
+      negative:
+        - fake_finality_rejected
+    proof_commands:
+      - cargo test finality
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - fake_finality_rejected_test_exists
+
+  - id: x3.validator_set
+    name: Validator Set Management
+    required_for: mainnet
+    criticality: critical
+    owner_area: staking
+    docs:
+      - docs/validators.md
+    code:
+      - pallets/staking/src/lib.rs
+    wiring:
+      - "validator set pallet in runtime"
+    tests:
+      unit:
+        - validator_selection
+      integration:
+        - validator_rotation
+      negative:
+        - invalid_validator_rejected
+    proof_commands:
+      - cargo test -p pallet-staking
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.block_production
+    name: Block Production
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: consensus
+    docs:
+      - docs/block-production.md
+    code:
+      - node/src/service.rs
+    wiring:
+      - "block production service enabled"
+    tests:
+      unit:
+        - block_production_works
+      integration:
+        - blocks_produced_continuously
+      negative:
+        - invalid_block_rejected
+    proof_commands:
+      - cargo test block_production
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.fee_market
+    name: Fee Market
+    required_for: mainnet
+    criticality: critical
+    owner_area: transaction-payment
+    docs:
+      - docs/fees.md
+    code:
+      - pallets/transaction-payment/src/lib.rs
+    wiring:
+      - "transaction payment in runtime"
+    tests:
+      unit:
+        - fee_calculation
+      integration:
+        - fee_market_adjusts
+      negative:
+        - zero_fee_rejected
+    proof_commands:
+      - cargo test -p pallet-transaction-payment
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.accounts
+    name: Account System
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: system
+    docs:
+      - docs/accounts.md
+    code:
+      - pallets/system/src/lib.rs
+    wiring:
+      - "system pallet in runtime"
+    tests:
+      unit:
+        - account_creation
+      integration:
+        - account_lifecycle
+      negative:
+        - invalid_account_rejected
+    proof_commands:
+      - cargo test -p frame-system
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.balances
+    name: Balance System
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: balances
+    docs:
+      - docs/balances.md
+    code:
+      - pallets/balances/src/lib.rs
+    wiring:
+      - "balances pallet in runtime"
+    tests:
+      unit:
+        - balance_transfer
+      integration:
+        - balance_conservation
+      negative:
+        - negative_balance_rejected
+        - double_spend_rejected
+    proof_commands:
+      - cargo test -p pallet-balances
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+
+  - id: x3.events
+    name: Event System
+    required_for: mainnet
+    criticality: critical
+    owner_area: system
+    docs:
+      - docs/events.md
+    code:
+      - runtime/src/lib.rs
+    wiring:
+      - "event emission enabled"
+    tests:
+      unit:
+        - event_emission
+      integration:
+        - events_across_pallets
+      negative:
+        - malformed_event_rejected
+    proof_commands:
+      - cargo test events
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.errors
+    name: Error Handling System
+    required_for: mainnet
+    criticality: critical
+    owner_area: system
+    docs:
+      - docs/errors.md
+    code:
+      - runtime/src/lib.rs
+    wiring:
+      - "error types defined"
+    tests:
+      unit:
+        - error_propagation
+      integration:
+        - errors_across_pallets
+      negative:
+        - error_recovery
+    proof_commands:
+      - cargo test errors
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.genesis_config
+    name: Genesis Configuration
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: node
+    docs:
+      - docs/genesis.md
+    code:
+      - node/src/chain_spec.rs
+    wiring:
+      - "genesis config builds"
+    tests:
+      unit:
+        - genesis_builds
+      integration:
+        - genesis_produces_valid_state
+      negative:
+        - invalid_genesis_rejected
+    proof_commands:
+      - cargo test chain_spec
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  # ============================================================================
+  # UNIVERSAL ASSET KERNEL (8 features)
+  # ============================================================================
+  - id: x3.asset_kernel
+    name: Universal Asset Kernel
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/asset-kernel.md
+      - pallets/x3-kernel/README.md
+    code:
+      - pallets/x3-kernel/src/lib.rs
+      - crates/x3-asset-kernel/src/lib.rs
+    wiring:
+      - "x3-kernel pallet in runtime"
+      - "canonical supply callable"
+      - "asset registry reachable"
+    tests:
+      unit:
+        - supply_conservation
+        - asset_mapping_unique
+      integration:
+        - evm_svm_asset_roundtrip
+      negative:
+        - double_mint_rejected
+        - duplicate_asset_mapping_rejected
+        - failed_bridge_no_supply_leak
+      fuzz:
+        - asset_kernel_supply_fuzz
+    proof_commands:
+      - cargo test -p pallet-x3-kernel
+      - cargo test supply_conservation
+      - x3-proof claim prove x3.asset_kernel.supply_conservation
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+      - receipt_fresh
+      - no_critical_todos
+
+  - id: x3.canonical_supply
+    name: Canonical Supply Tracker
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/canonical-supply.md
+    code:
+      - pallets/x3-kernel/src/supply.rs
+    wiring:
+      - "supply tracker in asset kernel"
+    tests:
+      unit:
+        - canonical_supply_tracking
+      integration:
+        - supply_across_vms
+      negative:
+        - supply_inflation_rejected
+    proof_commands:
+      - cargo test canonical_supply
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+
+  - id: x3.asset_registry
+    name: Asset Registry
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/asset-registry.md
+    code:
+      - pallets/x3-kernel/src/registry.rs
+    wiring:
+      - "asset registry in runtime"
+    tests:
+      unit:
+        - asset_registration
+      integration:
+        - cross_vm_asset_lookup
+      negative:
+        - duplicate_registration_rejected
+    proof_commands:
+      - cargo test asset_registry
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.asset_mapping
+    name: Cross-VM Asset Mapping
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/asset-mapping.md
+    code:
+      - pallets/x3-kernel/src/mapping.rs
+    wiring:
+      - "asset mapping in kernel"
+    tests:
+      unit:
+        - asset_mapping_unique
+      integration:
+        - evm_svm_mapping
+      negative:
+        - conflicting_mapping_rejected
+    proof_commands:
+      - cargo test asset_mapping
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.mint_burn_controller
+    name: Mint/Burn Controller
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/mint-burn.md
+    code:
+      - pallets/x3-kernel/src/mint_burn.rs
+    wiring:
+      - "mint/burn controller in kernel"
+    tests:
+      unit:
+        - mint_burn_operations
+      integration:
+        - cross_vm_mint_burn
+      negative:
+        - unauthorized_mint_rejected
+        - double_mint_rejected
+    proof_commands:
+      - cargo test mint_burn
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+
+  - id: x3.external_locked_accounting
+    name: External Locked Asset Accounting
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/external-locked.md
+    code:
+      - pallets/x3-kernel/src/external_locked.rs
+    wiring:
+      - "external locked tracking in kernel"
+    tests:
+      unit:
+        - external_locked_tracking
+      integration:
+        - locked_supply_conservation
+      negative:
+        - locked_asset_leak_rejected
+    proof_commands:
+      - cargo test external_locked
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.pending_transfer_accounting
+    name: Pending Transfer Accounting
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/pending-transfer.md
+    code:
+      - pallets/x3-kernel/src/pending_transfer.rs
+    wiring:
+      - "pending transfer tracking in kernel"
+    tests:
+      unit:
+        - pending_transfer_tracking
+      integration:
+        - pending_supply_conservation
+      negative:
+        - stuck_pending_transfer_rejected
+    proof_commands:
+      - cargo test pending_transfer
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.supply_invariant_guard
+    name: Supply Invariant Guard
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: asset-kernel
+    docs:
+      - docs/supply-invariant.md
+    code:
+      - pallets/x3-kernel/src/invariant.rs
+    wiring:
+      - "invariant guard in kernel"
+    tests:
+      unit:
+        - invariant_checking
+      integration:
+        - invariant_across_operations
+      negative:
+        - invariant_violation_caught
+    proof_commands:
+      - cargo test supply_invariant
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+
+  # ============================================================================
+  # VM STACK (16 features)
+  # ============================================================================
+  - id: x3.x3vm
+    name: X3VM Core
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3vm
+    docs:
+      - crates/x3-vm/README.md
+    code:
+      - crates/x3-vm/src/lib.rs
+    wiring:
+      - "x3vm runtime integration"
+    tests:
+      unit:
+        - x3vm_execution
+      integration:
+        - x3vm_determinism
+      negative:
+        - invalid_bytecode_rejected
+    proof_commands:
+      - cargo test -p x3-vm
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3vm_bytecode
+    name: X3VM Bytecode Format
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3vm
+    docs:
+      - docs/x3vm-bytecode.md
+    code:
+      - crates/x3-vm/src/bytecode.rs
+    wiring:
+      - "bytecode parser in x3vm"
+    tests:
+      unit:
+        - bytecode_parsing
+      integration:
+        - bytecode_execution
+      negative:
+        - malformed_bytecode_rejected
+    proof_commands:
+      - cargo test bytecode
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3vm_gas_metering
+    name: X3VM Gas Metering
+    required_for: mainnet
+    criticality: critical
+    owner_area: x3vm
+    docs:
+      - docs/x3vm-gas.md
+    code:
+      - crates/x3-vm/src/gas.rs
+    wiring:
+      - "gas metering in x3vm"
+    tests:
+      unit:
+        - gas_calculation
+      integration:
+        - gas_limits_enforced
+      negative:
+        - out_of_gas_reverts
+    proof_commands:
+      - cargo test gas
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3vm_storage
+    name: X3VM Storage Interface
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3vm
+    docs:
+      - docs/x3vm-storage.md
+    code:
+      - crates/x3-vm/src/storage.rs
+    wiring:
+      - "storage interface in x3vm"
+    tests:
+      unit:
+        - storage_operations
+      integration:
+        - storage_persistence
+      negative:
+        - storage_collision_rejected
+    proof_commands:
+      - cargo test storage
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3vm_events
+    name: X3VM Event Emission
+    required_for: mainnet
+    criticality: critical
+    owner_area: x3vm
+    docs:
+      - docs/x3vm-events.md
+    code:
+      - crates/x3-vm/src/events.rs
+    wiring:
+      - "event emission in x3vm"
+    tests:
+      unit:
+        - event_emission
+      integration:
+        - events_captured
+      negative:
+        - malformed_event_rejected
+    proof_commands:
+      - cargo test -p x3-vm events
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3vm_revert
+    name: X3VM Revert Mechanism
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3vm
+    docs:
+      - docs/x3vm-revert.md
+    code:
+      - crates/x3-vm/src/revert.rs
+    wiring:
+      - "revert mechanism in x3vm"
+    tests:
+      unit:
+        - revert_works
+      integration:
+        - state_rollback_on_revert
+      negative:
+        - failed_contract_reverts
+    proof_commands:
+      - cargo test revert
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3vm_cpu_gpu_parity
+    name: X3VM CPU/GPU Parity
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: gpu
+    docs:
+      - docs/cpu-gpu-parity.md
+    code:
+      - crates/x3-vm/src/gpu.rs
+    wiring:
+      - "GPU execution path exists"
+    tests:
+      unit:
+        - cpu_gpu_same_result
+      integration:
+        - deterministic_state_root
+      negative:
+        - divergent_results_rejected
+    proof_commands:
+      - cargo test cpu_gpu_parity
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+      - receipt_fresh
+
+  - id: x3.evm_adapter
+    name: EVM Adapter
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: evm
+    docs:
+      - crates/evm-integration/README.md
+    code:
+      - crates/evm-integration/src/lib.rs
+    wiring:
+      - "EVM adapter in runtime"
+    tests:
+      unit:
+        - evm_execution
+      integration:
+        - evm_contract_deployment
+      negative:
+        - invalid_evm_bytecode_rejected
+    proof_commands:
+      - cargo test -p evm-integration
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.svm_adapter
+    name: SVM Adapter
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: svm
+    docs:
+      - crates/svm-integration/README.md
+    code:
+      - crates/svm-integration/src/lib.rs
+    wiring:
+      - "SVM adapter in runtime"
+    tests:
+      unit:
+        - svm_execution
+      integration:
+        - svm_program_deployment
+      negative:
+        - invalid_svm_program_rejected
+    proof_commands:
+      - cargo test -p svm-integration
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.cross_vm_router
+    name: Cross-VM Router
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: cross-vm
+    docs:
+      - pallets/x3-cross-vm-router/README.md
+    code:
+      - pallets/x3-cross-vm-router/src/lib.rs
+    wiring:
+      - "cross-vm router in runtime"
+    tests:
+      unit:
+        - vm_routing
+      integration:
+        - evm_to_svm_call
+        - svm_to_evm_call
+      negative:
+        - invalid_vm_call_rejected
+    proof_commands:
+      - cargo test -p pallet-x3-cross-vm-router
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.evm_precompiles
+    name: EVM Precompiles
+    required_for: mainnet
+    criticality: critical
+    owner_area: evm
+    docs:
+      - docs/evm-precompiles.md
+    code:
+      - crates/evm-integration/src/precompiles.rs
+    wiring:
+      - "precompiles in EVM adapter"
+    tests:
+      unit:
+        - precompile_execution
+      integration:
+        - precompile_gas_cost
+      negative:
+        - invalid_precompile_input_rejected
+    proof_commands:
+      - cargo test precompiles
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.svm_syscalls
+    name: SVM Syscalls
+    required_for: mainnet
+    criticality: critical
+    owner_area: svm
+    docs:
+      - docs/svm-syscalls.md
+    code:
+      - crates/svm-integration/src/syscalls.rs
+    wiring:
+      - "syscalls in SVM adapter"
+    tests:
+      unit:
+        - syscall_execution
+      integration:
+        - syscall_integration
+      negative:
+        - invalid_syscall_rejected
+    proof_commands:
+      - cargo test syscalls
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.vm_isolation
+    name: VM Isolation Layer
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: cross-vm
+    docs:
+      - docs/vm-isolation.md
+    code:
+      - crates/x3-vm/src/isolation.rs
+    wiring:
+      - "isolation layer in VM stack"
+    tests:
+      unit:
+        - vm_isolation
+      integration:
+        - cross_vm_isolation
+      negative:
+        - vm_escape_rejected
+    proof_commands:
+      - cargo test isolation
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.vm_state_transition
+    name: VM State Transition
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3vm
+    docs:
+      - docs/vm-state-transition.md
+    code:
+      - crates/x3-vm/src/state.rs
+    wiring:
+      - "state transition in x3vm"
+    tests:
+      unit:
+        - state_transition
+      integration:
+        - deterministic_state
+      negative:
+        - invalid_transition_rejected
+    proof_commands:
+      - cargo test state_transition
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.vm_fallback
+    name: VM Fallback Mechanism
+    required_for: mainnet
+    criticality: critical
+    owner_area: cross-vm
+    docs:
+      - docs/vm-fallback.md
+    code:
+      - pallets/x3-cross-vm-router/src/fallback.rs
+    wiring:
+      - "fallback in cross-vm router"
+    tests:
+      unit:
+        - fallback_triggered
+      integration:
+        - fallback_recovery
+      negative:
+        - fallback_loop_rejected
+    proof_commands:
+      - cargo test fallback
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.vm_metering
+    name: Cross-VM Metering
+    required_for: mainnet
+    criticality: critical
+    owner_area: cross-vm
+    docs:
+      - docs/vm-metering.md
+    code:
+      - pallets/x3-cross-vm-router/src/metering.rs
+    wiring:
+      - "metering in cross-vm router"
+    tests:
+      unit:
+        - cross_vm_gas_tracking
+      integration:
+        - metering_accuracy
+      negative:
+        - out_of_gas_cross_vm_rejected
+    proof_commands:
+      - cargo test metering
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  # ============================================================================
+  # X3-LANG (9 features)
+  # ============================================================================
+  - id: x3.x3lang_parser
+    name: x3-lang Parser
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/docs/parser.md
+    code:
+      - crates/x3-compiler/src/parser.rs
+    wiring:
+      - "parser in compiler"
+    tests:
+      unit:
+        - parser_works
+      integration:
+        - parse_complex_contract
+      negative:
+        - invalid_syntax_rejected
+    proof_commands:
+      - cargo test -p x3-compiler parser
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_typechecker
+    name: x3-lang Type Checker
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/docs/typechecker.md
+    code:
+      - crates/x3-compiler/src/typechecker.rs
+    wiring:
+      - "type checker in compiler"
+    tests:
+      unit:
+        - typechecker_works
+      integration:
+        - type_inference
+      negative:
+        - type_mismatch_rejected
+    proof_commands:
+      - cargo test typechecker
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_compiler
+    name: x3-lang Compiler
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/README.md
+    code:
+      - crates/x3-compiler/src/lib.rs
+    wiring:
+      - "compiler builds"
+    tests:
+      unit:
+        - compiler_works
+      integration:
+        - compile_to_bytecode
+      negative:
+        - compilation_error_reported
+    proof_commands:
+      - cargo test -p x3-compiler
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_ir
+    name: x3-lang IR
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/docs/ir.md
+    code:
+      - crates/x3-compiler/src/ir.rs
+    wiring:
+      - "IR in compiler"
+    tests:
+      unit:
+        - ir_generation
+      integration:
+        - ir_optimization
+      negative:
+        - invalid_ir_rejected
+    proof_commands:
+      - cargo test ir
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_optimizer
+    name: x3-lang Optimizer
+    required_for: testnet
+    criticality: high
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/docs/optimizer.md
+    code:
+      - crates/x3-compiler/src/optimizer.rs
+    wiring:
+      - "optimizer in compiler"
+    tests:
+      unit:
+        - optimization_works
+      integration:
+        - optimized_bytecode_smaller
+      negative:
+        - optimization_preserves_semantics
+    proof_commands:
+      - cargo test optimizer
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_bytecode_generator
+    name: x3-lang Bytecode Generator
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/docs/codegen.md
+    code:
+      - crates/x3-compiler/src/codegen.rs
+    wiring:
+      - "codegen in compiler"
+    tests:
+      unit:
+        - bytecode_generation
+      integration:
+        - bytecode_executes
+      negative:
+        - invalid_bytecode_not_generated
+    proof_commands:
+      - cargo test codegen
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_abi_generator
+    name: x3-lang ABI Generator
+    required_for: mainnet
+    criticality: critical
+    owner_area: x3lang
+    docs:
+      - crates/x3-compiler/docs/abi.md
+    code:
+      - crates/x3-compiler/src/abi.rs
+    wiring:
+      - "ABI generator in compiler"
+    tests:
+      unit:
+        - abi_generation
+      integration:
+        - abi_matches_contract
+      negative:
+        - invalid_abi_rejected
+    proof_commands:
+      - cargo test abi
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_stdlib
+    name: x3-lang Standard Library
+    required_for: mainnet
+    criticality: critical
+    owner_area: x3lang
+    docs:
+      - crates/x3-stdlib/README.md
+    code:
+      - crates/x3-stdlib/src/lib.rs
+    wiring:
+      - "stdlib available to contracts"
+    tests:
+      unit:
+        - stdlib_functions
+      integration:
+        - stdlib_in_contract
+      negative:
+        - stdlib_error_handling
+    proof_commands:
+      - cargo test -p x3-stdlib
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.x3lang_contract_templates
+    name: x3-lang Contract Templates
+    required_for: testnet
+    criticality: medium
+    owner_area: x3lang
+    docs:
+      - templates/README.md
+    code:
+      - templates/src/
+    wiring:
+      - "templates available via CLI"
+    tests:
+      unit:
+        - template_compiles
+      integration:
+        - template_deploys
+      negative:
+        - template_validation
+    proof_commands:
+      - cargo test templates
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  # ============================================================================
+  # X3-CONTRACTS (8 features)
+  # ============================================================================
+  - id: x3.contracts.evm_core
+    name: EVM Contract Core
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: contracts
+    docs:
+      - X3-contracts/evm/README.md
+    code:
+      - X3-contracts/evm/contracts/core/
+    wiring:
+      - "EVM contracts deployable"
+    tests:
+      unit:
+        - evm_contract_tests
+      integration:
+        - evm_contract_deployment
+      negative:
+        - evm_contract_revert
+    proof_commands:
+      - cd X3-contracts/evm && forge test
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.contracts.svm_core
+    name: SVM Program Core
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: contracts
+    docs:
+      - X3-contracts/svm/README.md
+    code:
+      - X3-contracts/svm/programs/
+    wiring:
+      - "SVM programs deployable"
+    tests:
+      unit:
+        - svm_program_tests
+      integration:
+        - svm_program_deployment
+      negative:
+        - svm_program_error
+    proof_commands:
+      - cd X3-contracts/svm && anchor test
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.contracts.shared_specs
+    name: Shared Contract Specs
+    required_for: mainnet
+    criticality: critical
+    owner_area: contracts
+    docs:
+      - X3-contracts/shared/specs/
+    code:
+      - X3-contracts/shared/specs/
+    wiring:
+      - "specs referenced by both EVM and SVM"
+    tests:
+      unit:
+        - spec_validation
+      integration:
+        - cross_vm_spec_compliance
+      negative:
+        - spec_violation_caught
+    proof_commands:
+      - cargo test specs
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.contracts.evm_svm_parity
+    name: EVM/SVM Parity Tests
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: contracts
+    docs:
+      - X3-contracts/shared/specs/parity.md
+    code:
+      - X3-contracts/shared/test-vectors/
+    wiring:
+      - "parity tests run in CI"
+    tests:
+      unit:
+        - evm_svm_parity
+      integration:
+        - cross_vm_parity
+      negative:
+        - parity_violation_caught
+    proof_commands:
+      - cargo test parity
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - receipt_fresh
+
+  - id: x3.contracts.deployment
+    name: Contract Deployment System
+    required_for: mainnet
+    criticality: critical
+    owner_area: contracts
+    docs:
+      - X3-contracts/evm/script/README.md
+    code:
+      - X3-contracts/evm/script/deploy/
+      - X3-contracts/svm/migrations/
+    wiring:
+      - "deployment scripts work"
+    tests:
+      unit:
+        - deployment_dry_run
+      integration:
+        - deployment_e2e
+      negative:
+        - deployment_failure_handling
+    proof_commands:
+      - forge script deploy
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.contracts.upgrade
+    name: Contract Upgrade System
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: contracts
+    docs:
+      - X3-contracts/evm/script/upgrade.md
+    code:
+      - X3-contracts/evm/script/upgrade/
+    wiring:
+      - "upgrade scripts work"
+    tests:
+      unit:
+        - upgrade_simulation
+      integration:
+        - upgrade_e2e
+      negative:
+        - upgrade_failure_rollback
+    proof_commands:
+      - forge script upgrade
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.contracts.event_schema
+    name: Contract Event Schema
+    required_for: mainnet
+    criticality: critical
+    owner_area: contracts
+    docs:
+      - X3-contracts/shared/schemas/events.md
+    code:
+      - X3-contracts/shared/schemas/
+    wiring:
+      - "event schema validated"
+    tests:
+      unit:
+        - event_schema_validation
+      integration:
+        - cross_vm_event_decoding
+      negative:
+        - invalid_event_rejected
+    proof_commands:
+      - cargo test event_schema
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+
+  - id: x3.contracts.security
+    name: Contract Security Framework
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: contracts
+    docs:
+      - X3-contracts/evm/contracts/security/
+    code:
+      - X3-contracts/evm/contracts/security/
+    wiring:
+      - "security contracts deployed"
+    tests:
+      unit:
+        - security_controls
+      integration:
+        - security_enforcement
+      negative:
+        - security_breach_rejected
+    proof_commands:
+      - forge test --match-path test/security
+    built_when:
+      - code_exists
+      - wired
+      - tests_pass
+      - negative_tests_pass
+
+  # ============================================================================
+  # Remaining areas abbreviated for space...
+  # (Bridge/Interop: 19 features, Atomic: 8, DEX: 10, Flashloan: 8, 
+  #  Launchpad: 8, Governance: 8, Oracle: 9, GPU: 12, ProofForge: 18,
+  #  Frontend: 11, DevOps: 11)
+  # Total: 200+ features
+  # ============================================================================
+
+  # Placeholder entries for remaining features (to be fully expanded)
+  - id: x3.bridge
+    name: Bridge Core
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: bridge
+    docs: [crates/x3-bridge/README.md]
+    code: [crates/x3-bridge/src/lib.rs]
+    wiring: ["bridge pallet in runtime"]
+    tests:
+      unit: [bridge_message_processing]
+      integration: [bridge_e2e]
+      negative: [replay_attack_rejected, fake_finality_rejected]
+    proof_commands: [cargo test -p x3-bridge]
+    built_when: [code_exists, wired, tests_pass, negative_tests_pass, receipt_fresh]
+
+  - id: x3.atomic_execution
+    name: Atomic Execution Engine
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: atomic
+    docs: [pallets/x3-atomic-kernel/README.md]
+    code: [pallets/x3-atomic-kernel/src/lib.rs]
+    wiring: ["atomic kernel in runtime"]
+    tests:
+      unit: [atomic_commit, atomic_rollback]
+      integration: [cross_vm_atomic]
+      negative: [partial_commit_rejected, rollback_failure_caught]
+    proof_commands: [cargo test -p pallet-x3-atomic-kernel]
+    built_when: [code_exists, wired, tests_pass, negative_tests_pass]
+
+  - id: x3.flashloan
+    name: Flashloan System
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: flashloan
+    docs: [pallets/x3-flashloan/README.md]
+    code: [pallets/x3-flashloan/src/lib.rs]
+    wiring: ["flashloan pallet in runtime"]
+    tests:
+      unit: [flashloan_borrow_repay]
+      integration: [flashloan_e2e]
+      negative: [theft_attempt_rejected, no_repay_reverts]
+    proof_commands: [cargo test -p pallet-x3-flashloan]
+    built_when: [code_exists, wired, tests_pass, negative_tests_pass, receipt_fresh]
+
+  - id: x3.dex
+    name: DEX Core
+    required_for: mainnet
+    criticality: critical
+    owner_area: dex
+    docs: [pallets/x3-dex/README.md]
+    code: [pallets/x3-dex/src/lib.rs]
+    wiring: ["DEX pallet in runtime"]
+    tests:
+      unit: [pool_creation, swap]
+      integration: [dex_e2e]
+      negative: [slippage_protection, price_manipulation_rejected]
+    proof_commands: [cargo test -p pallet-x3-dex]
+    built_when: [code_exists, wired, tests_pass]
+
+  - id: x3.governance
+    name: Governance System
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: governance
+    docs: [pallets/governance/README.md]
+    code: [pallets/governance/src/lib.rs]
+    wiring: ["governance pallet in runtime"]
+    tests:
+      unit: [proposal_creation, voting]
+      integration: [governance_e2e]
+      negative: [unauthorized_proposal_rejected, proof_gate_enforced]
+    proof_commands: [cargo test -p pallet-governance]
+    built_when: [code_exists, wired, tests_pass, negative_tests_pass, receipt_fresh]
+
+  - id: x3.proofforge_cli
+    name: ProofForge CLI
+    required_for: mainnet
+    criticality: catastrophic
+    owner_area: proofforge
+    docs: [proof-forge/README.md]
+    code: [proof-forge/src/main.rs]
+    wiring: ["x3-proof binary builds"]
+    tests:
+      unit: [cli_parsing]
+      integration: [cli_e2e]
+      negative: [invalid_command_rejected]
+    proof_commands: [cargo test -p proof-forge]
+    built_when: [code_exists, wired, tests_pass]
+
+  - id: x3.dashboard
+    name: Dashboard UI
+    required_for: testnet
+    criticality: high
+    owner_area: frontend
+    docs: [dashboard/README.md]
+    code: [dashboard/src/]
+    wiring: ["dashboard accessible"]
+    tests:
+      unit: [component_tests]
+      integration: [dashboard_e2e]
+      negative: [error_handling]
+    proof_commands: [npm test]
+    built_when: [code_exists, wired, tests_pass]

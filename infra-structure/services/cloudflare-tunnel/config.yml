@@ -1,0 +1,96 @@
+# ============================================================================
+# Cloudflare Tunnel Configuration — x3star.net
+# ============================================================================
+# All subdomains route through a single Node.js placeholder server on :7000
+# until their real services are deployed. Services with dedicated ports
+# (RPC, WS, API) keep direct routing.
+# ============================================================================
+
+tunnel: 6c118620-18cf-4795-80a8-6d44d37aecaa
+credentials-file: /home/lojak/.cloudflared/6c118620-18cf-4795-80a8-6d44d37aecaa.json
+
+ingress:
+  # ── Root — X3 Desktop (Vite) ────────────────────────────────────────
+  - hostname: x3star.net
+    service: http://localhost:5173
+    originRequest: { noTLSVerify: true }
+  - hostname: www.x3star.net
+    service: http://localhost:5173
+    originRequest: { noTLSVerify: true }
+
+  # ── Direct service ports (bypass placeholder) ─────────────────────────
+  - hostname: rpc.x3star.net
+    service: http://localhost:9933
+  - hostname: ws.x3star.net
+    service: http://localhost:9944
+  - hostname: api.x3star.net
+    service: http://localhost:8080
+
+  # ── Blockchain TPS test app (dedicated) ────────────────────────────────
+  - hostname: blockchain-tps-go.x3star.net
+    service: http://localhost:3010
+
+  # ── All subdomain sites → placeholder server on :7000 ─────────────────
+  - hostname: ai.x3star.net
+    service: http://localhost:7000
+  - hostname: chat.x3star.net
+    service: http://localhost:7000
+  - hostname: social.x3star.net
+    service: http://localhost:7000
+  - hostname: trading.x3star.net
+    service: http://localhost:7000
+  - hostname: adult.x3star.net
+    service: http://localhost:7000
+  - hostname: crypto.x3star.net
+    service: http://localhost:7000
+  - hostname: blockchain.x3star.net
+    service: http://localhost:7000
+  - hostname: testnet.x3star.net
+    service: http://localhost:7000
+  - hostname: ide.x3star.net
+    service: http://localhost:7000
+  - hostname: marketplace.x3star.net
+    service: http://localhost:7000
+  - hostname: pool.x3star.net
+    service: http://localhost:7000
+  - hostname: swarm.x3star.net
+    service: http://localhost:7000
+  - hostname: docs.x3star.net
+    service: http://localhost:7000
+  - hostname: infura.x3star.net
+    service: http://localhost:7000
+  - hostname: validator.x3star.net
+    service: http://localhost:7000
+  - hostname: gpu-validator.x3star.net
+    service: http://localhost:7000
+  - hostname: x-change.x3star.net
+    service: http://localhost:7000
+  - hostname: testing.x3star.net
+    service: http://localhost:7000
+  - hostname: test.x3star.net
+    service: http://localhost:7000
+  - hostname: blockexplorer.x3star.net
+    service: http://localhost:7000
+  - hostname: xplorer.x3star.net
+    service: http://localhost:7000
+  - hostname: xxx.x3star.net
+    service: http://localhost:7000
+  - hostname: cam.x3star.net
+    service: http://localhost:7000
+  - hostname: wallet.x3star.net
+    service: http://localhost:7000
+  - hostname: casino.x3star.net
+    service: http://localhost:7000
+  - hostname: blog.x3star.net
+    service: http://localhost:7000
+  - hostname: xxxchange.x3star.net
+    service: http://localhost:7000
+  - hostname: pics.x3star.net
+    service: http://localhost:7000
+  - hostname: vibecode.x3star.net
+    service: http://localhost:7000
+  - hostname: explorer.x3star.net
+    service: http://localhost:7000
+
+  # ── Catch-all ──────────────────────────────────────────────────────────
+  - service: http_status:404

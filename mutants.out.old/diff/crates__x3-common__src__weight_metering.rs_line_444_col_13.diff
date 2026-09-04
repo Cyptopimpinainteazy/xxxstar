@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ delete match arm Operation::Sign(key_type) | Operation::Verify(key_type) in Operation::key_type
+@@ -436,17 +436,17 @@
+     /// Transaction
+     Transaction,
+ }
+ 
+ impl Operation {
+     /// Get the key type for signing/verification operations
+     pub fn key_type(&self) -> KeyType {
+         match self {
+-            Operation::Sign(key_type) | Operation::Verify(key_type) => *key_type,
++             /* ~ changed by cargo-mutants ~ */
+             _ => KeyType::Ed25519, // Default for non-key operations
+         }
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;

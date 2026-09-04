@@ -1,0 +1,45 @@
+[package]
+name = "pallet-x3-account-registry"
+version = "0.1.0"
+authors = ["X3 Chain Core Team <core@x3-chain.io>"]
+description = "X3 universal account registry — on-chain account registration, nonce tracking, and identity anchoring for all X3 VM contexts."
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+parity-scale-codec = { workspace = true, default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+sp-core = { workspace = true, default-features = false }
+sp-io = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+serde = { workspace = true, optional = true, features = ["derive"] }
+
+[dev-dependencies]
+sp-io = { workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+parity-scale-codec = { workspace = true, features = ["derive"] }
+
+[features]
+default = ["std"]
+std = [
+    "frame-support/std",
+    "frame-system/std",
+    "parity-scale-codec/std",
+    "scale-info/std",
+    "sp-core/std",
+    "sp-io/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "serde",
+    "serde/std",
+]
+runtime-benchmarks = ["frame-support/runtime-benchmarks", "frame-system/runtime-benchmarks"]
+try-runtime = ["frame-support/try-runtime", "frame-system/try-runtime"]

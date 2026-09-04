@@ -1,0 +1,246 @@
+{
+  "dashboard": {
+    "title": "X3 Chain — Benchmark Dashboard",
+    "uid": "x3-benchmark",
+    "tags": ["x3", "benchmark", "performance"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Criterion Bench — Atomic Swap (ns/op)",
+        "type": "bargauge",
+        "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "x3_bench_atomic_swap_mean_ns",
+            "legendFormat": "mean",
+            "refId": "A"
+          },
+          {
+            "expr": "x3_bench_atomic_swap_p95_ns",
+            "legendFormat": "p95",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "ns", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5000}, {"color": "red", "value": 20000}] } }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Criterion Bench — DEX Route (ns/op)",
+        "type": "bargauge",
+        "gridPos": { "x": 8, "y": 0, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "x3_bench_dex_route_mean_ns",
+            "legendFormat": "mean",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "ns", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10000}, {"color": "red", "value": 50000}] } }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Criterion Bench — Bridge Proof Verify (ns/op)",
+        "type": "bargauge",
+        "gridPos": { "x": 16, "y": 0, "w": 8, "h": 6 },
+        "targets": [
+          {
+            "expr": "x3_bench_bridge_proof_mean_ns",
+            "legendFormat": "mean",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "ns", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50000}, {"color": "red", "value": 200000}] } }
+        }
+      },
+      {
+        "id": 4,
+        "title": "RPC Latency — eth_call (ms)",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(eth_call_latency_seconds_sum[1m]) / rate(eth_call_latency_seconds_count[1m])",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(eth_call_latency_seconds_bucket[1m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(eth_call_latency_seconds_bucket[1m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "s", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.2}, {"color": "red", "value": 0.5}] } }
+        }
+      },
+      {
+        "id": 5,
+        "title": "RPC Latency — x3_quoteMultiVmSwap (ms)",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(x3_quote_multivm_latency_seconds_bucket[1m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(x3_quote_multivm_latency_seconds_bucket[1m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(x3_quote_multivm_latency_seconds_bucket[1m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "s", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1.0}, {"color": "red", "value": 2.0}] } }
+        }
+      },
+      {
+        "id": 6,
+        "title": "RPC Throughput (requests/sec)",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(rpc_requests_total[1m])",
+            "legendFormat": "total RPS",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(rpc_errors_total[1m])",
+            "legendFormat": "error rate",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "reqps" }
+        }
+      },
+      {
+        "id": 7,
+        "title": "WebSocket Connections",
+        "type": "stat",
+        "gridPos": { "x": 12, "y": 14, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "ws_connections_active",
+            "legendFormat": "active",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "short" }
+        }
+      },
+      {
+        "id": 8,
+        "title": "WS Reconnects",
+        "type": "stat",
+        "gridPos": { "x": 18, "y": 14, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "rate(ws_reconnects_total[1m])",
+            "legendFormat": "reconnect/min",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "short", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5}, {"color": "red", "value": 20}] } }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Block Production — Finality Lag (ms)",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "x3_finality_lag_ms",
+            "legendFormat": "finality lag",
+            "refId": "A"
+          },
+          {
+            "expr": "x3_finality_lag_p99_ms",
+            "legendFormat": "p99 lag",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "ms", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 4000}, {"color": "red", "value": 12000}] } }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Block Import Time (ms)",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(x3_block_import_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(x3_block_import_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "s", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.5}, {"color": "red", "value": 2.0}] } }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Benchmark Regression Heatmap",
+        "type": "table",
+        "gridPos": { "x": 0, "y": 30, "w": 24, "h": 6 },
+        "targets": [
+          {
+            "expr": "x3_bench_regression_score",
+            "legendFormat": "{{metric}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Verdict",
+        "type": "stat",
+        "gridPos": { "x": 0, "y": 36, "w": 24, "h": 4 },
+        "targets": [
+          {
+            "expr": "x3_bench_verdict",
+            "legendFormat": "verdict",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": "1", "text": "✅ PASS"},
+              {"type": "value", "value": "0", "text": "❌ FAIL"}
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

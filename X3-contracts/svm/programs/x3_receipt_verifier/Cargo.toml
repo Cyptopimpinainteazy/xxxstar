@@ -1,0 +1,21 @@
+[package]
+name = "x3-receipt-verifier"
+version = "0.1.0"
+description = "X3 receipt verifier — Ed25519 quorum signature verification via Solana native syscalls"
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "x3_receipt_verifier"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.30.1"

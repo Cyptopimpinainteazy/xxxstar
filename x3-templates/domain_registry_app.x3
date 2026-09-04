@@ -1,0 +1,373 @@
+// domain_registry_app.x3 - .x3 Domain Registry with Renewals, Auctions
+//
+// @version("1.0.0")
+// @audit
+
+contract DomainRegistry {
+    // Configuration constants
+    const REGISTRATION_FEE: u256 = 0.1 ether;    // Base annual fee
+    const PREMIUM_THRESHOLD: u256 = 4;           // Domains <= 4 chars are premium
+    const PREMIUM_MULTIPLIER: u256 = 10;         // 10x for premium domains
+    const MAX_REGISTRATION_YEARS: u256 = 10;
+    const MIN_REGISTRATION_YEARS: u256 = 1;
+    const GRACE_PERIOD: u256 = 7776000;          // 90 days grace period
+    const AUCTION_MIN_BID: u256 = 0.5 ether;
+    const AUCTION_DURATION: u256 = 604800;       // 7 days
+    const AUCTION_EXTENSION: u256 = 3600;        // 1 hour extension on last bid
+    const PLATFORM_FEE_BPS: u256 = 250;         // 2.5% auction fee
+    const MAX_DOMAIN_LENGTH: u256 = 64;
+    const MIN_DOMAIN_LENGTH: u256 = 2;
+
+    // Storage
+    address owner;
+    mapping(bytes32 => Domain) domains;
+    mapping(bytes32 => Auction) domain_auctions;
+    mapping(address => bytes32[]) user_domains;
+    mapping(string => bool) reserved_names;
+    u256 total_domains_registered;
+    u256 total_revenue;
+
+    // Structs
+    struct Domain {
+        bytes32 name_hash;
+        string name;
+        address owner;
+        address resolver;
+        u256 registration_time;
+        u256 expiration_time;
+        u256 last_renewal_time;
+        bool active;
+        string target_address;  // Resolved address
+    }
+
+    struct Auction {
+        bytes32 domain_hash;
+        string domain_name;
+        address seller;
+        u256 start_price;
+        u256 reserve_price;
+        u256 start_time;
+        u256 end_time;
+        address highest_bidder;
+        u256 highest_bid;
+        bool settled;
+        u256 extension_deadline;
+    }
+
+    // Events
+    event DomainRegistered(string indexed name, address indexed owner, u256 expiration);
+    event DomainRenewed(string indexed name, u256 new_expiration, u256 fee);
+    event AuctionStarted(string indexed name, u256 start_price, u256 end_time);
+    event BidPlaced(string indexed name, address indexed bidder, u256 amount);
+    event AuctionSettled(string indexed name, address indexed winner, u256 amount);
+    event DomainResolved(string indexed name, string target_address);
+    event DomainTransferred(string indexed name, address indexed from, address indexed to);
+
+    // Constructor
+    fn constructor() {
+        owner = msg.sender;
+    }
+
+    // ===== REGISTER DOMAIN =====
+
+    fn register_domain(name: string, years: u256, resolver: address) -> bytes32 {
+        require(bytes(name).len() >= MIN_DOMAIN_LENGTH, "Name too short");
+        require(bytes(name).len() <= MAX_DOMAIN_LENGTH, "Name too long");
+        require(years >= MIN_REGISTRATION_YEARS, "Min 1 year");
+        require(years <= MAX_REGISTRATION_YEARS, "Max 10 years");
+        require(_is_valid_domain(name), "Invalid domain characters");
+        require(!reserved_names[name], "Domain reserved");
+
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        require(domain.name_hash == bytes32(0) || !domain.active, "Domain taken");
+        require(block.timestamp > domain.expiration_time + GRACE_PERIOD, "In grace period");
+
+        // Calculate fee
+        let fee = _calculate_registration_fee(name, years);
+        require(msg.value >= fee, "Insufficient fee");
+
+        let expiration = block.timestamp + (years * 31536000);
+
+        domains[name_hash] = Domain {
+            name_hash: name_hash,
+            name: name,
+            owner: msg.sender,
+            resolver: resolver,
+            registration_time: block.timestamp,
+            expiration_time: expiration,
+            last_renewal_time: block.timestamp,
+            active: true,
+            target_address: "",
+        };
+
+        user_domains[msg.sender].push(name_hash);
+        total_domains_registered = total_domains_registered + 1;
+        total_revenue = total_revenue + fee;
+
+        // Refund overpayment
+        if msg.value > fee {
+            transfer(msg.sender, msg.value - fee);
+        }
+
+        emit DomainRegistered(name, msg.sender, expiration);
+        return name_hash;
+    }
+
+    // ===== RENEW DOMAIN =====
+
+    fn renew_domain(name: string, years: u256) {
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        require(domain.active, "Domain not active");
+        require(msg.sender == domain.owner, "Not domain owner");
+        require(years >= MIN_REGISTRATION_YEARS, "Min 1 year");
+        require(years <= MAX_REGISTRATION_YEARS, "Max 10 years");
+
+        let fee = _calculate_registration_fee(name, years);
+        require(msg.value >= fee, "Insufficient fee");
+
+        let new_expiration: u256;
+        if block.timestamp > domain.expiration_time {
+            // Renew from now
+            new_expiration = block.timestamp + (years * 31536000);
+        } else {
+            // Extend from current expiration
+            new_expiration = domain.expiration_time + (years * 31536000);
+        }
+
+        domains[name_hash].expiration_time = new_expiration;
+        domains[name_hash].last_renewal_time = block.timestamp;
+        total_revenue = total_revenue + fee;
+
+        if msg.value > fee {
+            transfer(msg.sender, msg.value - fee);
+        }
+
+        emit DomainRenewed(name, new_expiration, fee);
+    }
+
+    // ===== START AUCTION =====
+
+    fn start_auction(name: string, start_price: u256, reserve_price: u256) -> bytes32 {
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        require(domain.active, "Domain not registered");
+        require(msg.sender == domain.owner, "Not domain owner");
+        require(start_price >= AUCTION_MIN_BID, "Start price too low");
+        require(reserve_price >= start_price, "Reserve >= start");
+        require(domain_auctions[name_hash].domain_hash == bytes32(0) || 
+                domain_auctions[name_hash].settled, "Auction exists");
+
+        domain_auctions[name_hash] = Auction {
+            domain_hash: name_hash,
+            domain_name: name,
+            seller: msg.sender,
+            start_price: start_price,
+            reserve_price: reserve_price,
+            start_time: block.timestamp,
+            end_time: block.timestamp + AUCTION_DURATION,
+            highest_bidder: address(0),
+            highest_bid: 0,
+            settled: false,
+            extension_deadline: 0,
+        };
+
+        emit AuctionStarted(name, start_price, block.timestamp + AUCTION_DURATION);
+        return name_hash;
+    }
+
+    // ===== PLACE BID =====
+
+    fn place_bid(name: string) {
+        let name_hash = keccak256(bytes(name));
+        let auction = domain_auctions[name_hash];
+        require(auction.domain_hash != bytes32(0), "Auction not found");
+        require(!auction.settled, "Already settled");
+
+        // Check if auction has ended
+        if block.timestamp >= auction.end_time {
+            require(block.timestamp < auction.end_time + AUCTION_EXTENSION, "Auction ended");
+        }
+
+        let bid_amount = msg.value;
+        require(bid_amount >= auction.start_price, "Below start price");
+        require(bid_amount > auction.highest_bid, "Bid too low");
+
+        // Extend auction if bid placed near end
+        let new_end_time = auction.end_time;
+        if block.timestamp + AUCTION_EXTENSION > auction.end_time {
+            new_end_time = block.timestamp + AUCTION_EXTENSION;
+        }
+
+        // Refund previous highest bidder
+        if auction.highest_bidder != address(0) {
+            transfer(auction.highest_bidder, auction.highest_bid);
+        }
+
+        domain_auctions[name_hash].highest_bid = bid_amount;
+        domain_auctions[name_hash].highest_bidder = msg.sender;
+        domain_auctions[name_hash].end_time = new_end_time;
+
+        emit BidPlaced(name, msg.sender, bid_amount);
+    }
+
+    fn settle_auction(name: string) {
+        let name_hash = keccak256(bytes(name));
+        let auction = domain_auctions[name_hash];
+        require(auction.domain_hash != bytes32(0), "Auction not found");
+        require(block.timestamp >= auction.end_time, "Auction not ended");
+        require(!auction.settled, "Already settled");
+
+        domain_auctions[name_hash].settled = true;
+
+        if auction.highest_bid >= auction.reserve_price {
+            // Transfer domain to winner
+            domains[name_hash].owner = auction.highest_bidder;
+
+            // Transfer proceeds to seller (minus platform fee)
+            let fee = auction.highest_bid * PLATFORM_FEE_BPS / 10000;
+            let proceeds = auction.highest_bid - fee;
+            transfer(auction.seller, proceeds);
+            transfer(owner, fee);
+            total_revenue = total_revenue + fee;
+
+            emit AuctionSettled(name, auction.highest_bidder, auction.highest_bid);
+        } else {
+            // Reserve not met - refund highest bidder
+            if auction.highest_bidder != address(0) {
+                transfer(auction.highest_bidder, auction.highest_bid);
+            }
+        }
+    }
+
+    // ===== RESOLVE DOMAIN =====
+
+    fn resolve_domain(name: string) -> string {
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        require(domain.active, "Domain not active");
+        require(block.timestamp < domain.expiration_time + GRACE_PERIOD, "Domain expired");
+
+        return domain.target_address;
+    }
+
+    fn set_resolution(name: string, target_address: string) {
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        require(domain.active, "Domain not active");
+        require(msg.sender == domain.owner, "Not domain owner");
+        require(block.timestamp < domain.expiration_time, "Domain expired");
+
+        domains[name_hash].target_address = target_address;
+        emit DomainResolved(name, target_address);
+    }
+
+    // ===== DOMAIN TRANSFER =====
+
+    fn transfer_domain(name: string, new_owner: address) {
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        require(domain.active, "Domain not active");
+        require(msg.sender == domain.owner, "Not domain owner");
+        require(new_owner != address(0), "Invalid owner");
+
+        domains[name_hash].owner = new_owner;
+        emit DomainTransferred(name, msg.sender, new_owner);
+    }
+
+    // ===== INTERNAL HELPERS =====
+
+    fn _calculate_registration_fee(name: string, years: u256) -> u256 {
+        let length = bytes(name).len();
+        let base_fee = REGISTRATION_FEE * years;
+
+        if length <= PREMIUM_THRESHOLD {
+            return base_fee * PREMIUM_MULTIPLIER;
+        }
+
+        // Longer domains get discount
+        if length <= 8 {
+            return base_fee;
+        } else if length <= 16 {
+            return base_fee * 80 / 100; // 20% discount
+        } else {
+            return base_fee * 50 / 100; // 50% discount
+        }
+    }
+
+    fn _is_valid_domain(name: string) -> bool {
+        let valid_chars = "abcdefghijklmnopqrstuvwxyz0123456789-";
+        for c in bytes(name) {
+            let found: bool = false;
+            for v in bytes(valid_chars) {
+                if c == v {
+                    found = true;
+                }
+            }
+            if !found {
+                return false;
+            }
+        }
+        // Cannot start or end with hyphen
+        let name_bytes = bytes(name);
+        if name_bytes[0] == '-' || name_bytes[name_bytes.len() - 1] == '-' {
+            return false;
+        }
+        return true;
+    }
+
+    // ===== ADMIN =====
+
+    fn reserve_name(name: string) {
+        require(msg.sender == owner, "Only owner");
+        reserved_names[name] = true;
+    }
+
+    fn unreserve_name(name: string) {
+        require(msg.sender == owner, "Only owner");
+        reserved_names[name] = false;
+    }
+
+    // ===== QUERY FUNCTIONS =====
+
+    fn get_domain(name: string) -> Domain {
+        let name_hash = keccak256(bytes(name));
+        return domains[name_hash];
+    }
+
+    fn get_auction(name: string) -> Auction {
+        let name_hash = keccak256(bytes(name));
+        return domain_auctions[name_hash];
+    }
+
+    fn get_user_domains(user: address) -> bytes32[] {
+        return user_domains[user];
+    }
+
+    fn get_total_domains() -> u256 {
+        return total_domains_registered;
+    }
+
+    fn get_total_revenue() -> u256 {
+        return total_revenue;
+    }
+
+    fn is_domain_available(name: string) -> bool {
+        let name_hash = keccak256(bytes(name));
+        let domain = domains[name_hash];
+        if reserved_names[name] {
+            return false;
+        }
+        if domain.name_hash == bytes32(0) {
+            return true;
+        }
+        if !domain.active {
+            return true;
+        }
+        if block.timestamp > domain.expiration_time + GRACE_PERIOD {
+            return true;
+        }
+        return false;
+    }
+}

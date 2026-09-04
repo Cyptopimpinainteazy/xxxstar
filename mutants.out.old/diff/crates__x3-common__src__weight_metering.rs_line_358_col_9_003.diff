@@ -1,0 +1,21 @@
+--- crates/x3-common/src/weight_metering.rs
++++ replace WeightMeter::consume_compute -> WeightResult<()> with WeightResult::from(())
+@@ -350,17 +350,17 @@
+             compute: ComputeMeter::new(config.max_compute_units),
+             gas: GasMeter::new(config.max_gas),
+             config,
+         }
+     }
+ 
+     /// Consume compute units
+     pub fn consume_compute(&mut self, units: u64) -> WeightResult<()> {
+-        self.compute.consume(units)
++        WeightResult::from(()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Consume gas
+     pub fn consume_gas(&mut self, gas: u64) -> WeightResult<()> {
+         self.gas.consume(gas)
+     }
+ 
+     /// Consume an operation with the given key type

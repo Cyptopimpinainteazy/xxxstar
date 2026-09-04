@@ -1,0 +1,63 @@
+# X3 RPC Gateway — Prometheus Configuration
+# Scrapes metrics from the x3-rpc-router and HAProxy.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  # ── X3 RPC Router metrics ─────────────────────────────────────────
+  - job_name: 'x3-rpc-router'
+    static_configs:
+      - targets:
+          - 'router1:18550'
+          - 'router2:18550'
+        labels:
+          service: 'x3-rpc-router'
+          env: 'mainnet'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'go_.*'
+        action: drop
+
+  # ── HAProxy metrics ───────────────────────────────────────────────
+  - job_name: 'haproxy'
+    static_configs:
+      - targets:
+          - 'haproxy:8404'
+        labels:
+          service: 'haproxy-edge'
+          env: 'mainnet'
+
+  # ── Blackbox exporter — external probes ────────────────────────────
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'https://rpc.x3-chain.io/health'
+          - 'https://rpc.x3-chain.io/'
+        labels:
+          service: 'rpc-gateway-external'
+          env: 'mainnet'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ── Node exporter ─────────────────────────────────────────────────
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'router1:9100'
+          - 'router2:9100'
+        labels:
+          service: 'host-metrics'
+
+rule_files:
+  - /etc/prometheus/alerts.yml

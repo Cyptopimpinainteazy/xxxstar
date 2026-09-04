@@ -1,0 +1,211 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x3-indexer
+  namespace: x3-chain
+  labels:
+    app: x3-indexer
+    component: indexer
+spec:
+  replicas: 2  # HA configuration
+  
+  selector:
+    matchLabels:
+      app: x3-indexer
+      component: indexer
+  
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  template:
+    metadata:
+      labels:
+        app: x3-indexer
+        component: indexer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+        prometheus.io/path: "/metrics"
+    
+    spec:
+      # ── Affinity ─────────────────────────────────────────────────────
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - x3-indexer
+                topologyKey: kubernetes.io/hostname
+      
+      # ── Containers ───────────────────────────────────────────────────
+      containers:
+        - name: indexer
+          image: docker.io/x3-chain/x3-indexer:latest
+          imagePullPolicy: IfNotPresent
+          
+          # ── Ports ────────────────────────────────────────────────────
+          ports:
+            - name: graphql
+              containerPort: 4000
+              protocol: TCP
+          
+          # ── Environment ──────────────────────────────────────────────
+          env:
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:4000"
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: x3-indexer-secrets
+                  key: LOG_LEVEL
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: x3-postgres-credentials
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: x3-postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: x3-postgres-credentials
+                  key: POSTGRES_DB
+            - name: RPC_ENDPOINT_0
+              value: "http://x3-validator-0.x3-validators.x3-chain:9933"
+            - name: RPC_ENDPOINT_1
+              value: "http://x3-validator-1.x3-validators.x3-chain:9933"
+            - name: RPC_ENDPOINT_2
+              value: "http://x3-validator-2.x3-validators.x3-chain:9933"
+          
+          # ── Command & Arguments ──────────────────────────────────────
+          command:
+            - /usr/local/bin/x3-indexer
+          args:
+            - --listen=$(LISTEN_ADDR)
+            - --rpc-urls
+            - $(RPC_ENDPOINT_0)
+            - $(RPC_ENDPOINT_1)
+            - $(RPC_ENDPOINT_2)
+            - --db-host=$(DB_HOST)
+            - --db-user=$(DB_USER)
+            - --db-password=$(DB_PASSWORD)
+            - --log-level=$(LOG_LEVEL)
+          
+          # ── Health Checks ────────────────────────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /graphql
+              port: graphql
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /graphql
+              port: graphql
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          
+          # ── Resources ────────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: 2
+              memory: 4Gi
+            limits:
+              cpu: 4
+              memory: 8Gi
+          
+          # ── Volume Mounts ───────────────────────────────────────────
+          volumeMounts:
+            - name: indexer-config
+              mountPath: /etc/x3-indexer
+              readOnly: true
+            - name: cache
+              mountPath: /home/indexer/cache
+          
+          # ── Security Context ────────────────────────────────────────
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+      
+      # ── Pod Security Context ─────────────────────────────────────────
+      securityContext:
+        fsGroup: 1000
+      
+      # ── Volumes ──────────────────────────────────────────────────────
+      volumes:
+        - name: indexer-config
+          configMap:
+            name: x3-indexer-config
+            defaultMode: 0444
+        - name: cache
+          persistentVolumeClaim:
+            claimName: x3-indexer-cache
+
+---
+# GraphQL Service (LoadBalancer for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: x3-indexer
+  namespace: x3-chain
+  labels:
+    app: x3-indexer
+    component: indexer
+spec:
+  type: LoadBalancer
+  selector:
+    app: x3-indexer
+    component: indexer
+  ports:
+    - name: graphql
+      port: 4000
+      targetPort: 4000
+      protocol: TCP
+
+---
+# GraphQL Service (ClusterIP for internal access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: x3-indexer-internal
+  namespace: x3-chain
+  labels:
+    app: x3-indexer
+    component: indexer-internal
+spec:
+  type: ClusterIP
+  selector:
+    app: x3-indexer
+    component: indexer
+  ports:
+    - name: graphql
+      port: 4000
+      targetPort: 4000
+      protocol: TCP

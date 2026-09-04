@@ -1,0 +1,163 @@
+# Flashloan Attack Scenarios
+# Security test scenarios for flashloan system
+
+scenarios:
+  - id: FLASH_001
+    name: "Flashloan Theft Attempt"
+    category: theft_prevention
+    severity: CATASTROPHIC
+    description: "Attacker borrows flashloan and attempts to keep funds without repaying"
+    
+    setup:
+      - flashloan_vault_funded_with_1000000_tokens
+      - attacker_contract_deployed
+      - attacker_has_no_collateral
+    
+    attack:
+      - attacker_calls_flashloan_borrow(100000_tokens)
+      - attacker_receives_tokens
+      - attacker_transfers_tokens_to_external_address
+      - attacker_does_not_call_repay
+      - transaction_ends
+    
+    expected_behavior:
+      - flashloan_system_checks_balance_at_end_of_transaction
+      - vault_balance_decreased_detected
+      - entire_transaction_reverted
+      - attacker_receives_nothing
+      - vault_balance_unchanged
+    
+    proof_requirements:
+      - unit_test: test_flashloan_unpaid_reverts
+      - integration_test: test_flashloan_theft_rejected
+      - fuzz_test: test_flashloan_repayment_variations
+    
+    related_claims:
+      - x3.flashloan.repay_or_revert
+      - x3.flashloan.vault_integrity
+  
+  - id: FLASH_002
+    name: "Cross-VM Flashloan Exploit"
+    category: cross_vm_security
+    severity: CATASTROPHIC
+    description: "Attacker uses cross-VM call to escape flashloan repayment"
+    
+    setup:
+      - flashloan_borrowed_in_evm_contract
+      - attacker_calls_svm_program_during_flashloan
+      - svm_program_transfers_tokens_away
+    
+    attack:
+      - attacker_borrows_flashloan_on_evm
+      - attacker_calls_cross_vm_router_to_svm
+      - svm_program_receives_tokens
+      - svm_program_transfers_to_attacker_external_account
+      - control_returns_to_evm
+      - evm_contract_attempts_repayment_with_empty_balance
+    
+    expected_behavior:
+      - cross_vm_atomic_execution_enabled
+      - svm_transfer_rolled_back_when_evm_repayment_fails
+      - entire_cross_vm_transaction_reverted
+      - no_tokens_leave_flashloan_vault
+    
+    proof_requirements:
+      - integration_test: test_cross_vm_flashloan_atomicity
+      - integration_test: test_cross_vm_rollback_on_flashloan_failure
+      - adversarial_test: test_cross_vm_escape_attempts
+    
+    related_claims:
+      - x3.flashloan.cross_vm_safety
+      - x3.atomic_execution.rollback_correctness
+  
+  - id: FLASH_003
+    name: "Flashloan Reentrancy Attack"
+    category: reentrancy
+    severity: CRITICAL
+    description: "Attacker attempts reentrancy during flashloan callback"
+    
+    setup:
+      - flashloan_vault_initialized
+      - attacker_contract_with_malicious_callback
+    
+    attack:
+      - attacker_calls_flashloan_borrow
+      - flashloan_vault_calls_attacker_callback
+      - attacker_callback_calls_flashloan_borrow_again
+      - nested_flashloan_attempts_to_drain_vault
+    
+    expected_behavior:
+      - reentrancy_guard_active_on_flashloan_vault
+      - second_borrow_call_rejected_with_error("ReentrancyDetected")
+      - first_flashloan_continues_normally
+      - vault_protected_from_reentrancy
+    
+    proof_requirements:
+      - unit_test: test_flashloan_reentrancy_guard
+      - integration_test: test_nested_flashloan_rejected
+      - fuzz_test: test_reentrancy_via_multiple_paths
+    
+    related_claims:
+      - x3.flashloan.reentrancy_protection
+      - x3.flashloan.vault_safety
+  
+  - id: FLASH_004
+    name: "Flashloan Fee Manipulation"
+    category: fee_manipulation
+    severity: HIGH
+    description: "Attacker manipulates flashloan fee calculation to reduce payment"
+    
+    setup:
+      - flashloan_fee_set_to_0.09_percent
+      - attacker_borrows_1000000_tokens
+      - expected_fee_is_900_tokens
+    
+    attack:
+      - attacker_manipulates_fee_calculation_input
+      - attacker_passes_fake_borrowed_amount
+      - attacker_repays_principal_plus_minimal_fee
+    
+    expected_behavior:
+      - flashloan_vault_tracks_borrowed_amount_internally
+      - fee_calculated_from_internal_tracking_not_user_input
+      - attacker_must_repay_full_fee_of_900_tokens
+      - transaction_reverts_if_fee_underpaid
+    
+    proof_requirements:
+      - unit_test: test_flashloan_fee_calculation_integrity
+      - integration_test: test_fee_manipulation_rejected
+      - fuzz_test: test_fee_calculation_robustness
+    
+    related_claims:
+      - x3.flashloan.fee_integrity
+      - x3.flashloan.vault_accounting
+  
+  - id: FLASH_005
+    name: "Flashloan Speedproof Violation"
+    category: performance
+    severity: MEDIUM
+    description: "Flashloan execution exceeds speed threshold"
+    
+    setup:
+      - flashloan_speedproof_threshold_set_to_100ms
+      - complex_arbitrage_operation_prepared
+    
+    attack:
+      - attacker_borrows_flashloan
+      - attacker_executes_computationally_expensive_operation
+      - operation_takes_500ms_to_complete
+      - attacker_repays_flashloan
+    
+    expected_behavior:
+      - flashloan_completes_successfully_if_repaid
+      - speedproof_violation_logged_as_warning
+      - future_optimizations_recommended
+      - no_transaction_revert_for_slow_execution
+    
+    proof_requirements:
+      - performance_test: test_flashloan_latency_measurement
+      - integration_test: test_flashloan_speedproof_monitoring
+    
+    related_claims:
+      - x3.flashloan.speedproof
+      - x3.flashloan.performance_monitoring

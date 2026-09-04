@@ -1,0 +1,21 @@
+--- crates/x3-fees/src/reputation.rs
++++ replace * with + in ReputationScore::compute
+@@ -35,17 +35,17 @@
+         } else {
+             0
+         };
+ 
+         let slash_penalty = 2u32.saturating_pow(rep.slashes.min(10) as u32);
+ 
+         // Composite: (success_rate × age_factor) / (100 × slash_penalty)
+         let raw =
+-            (success_rate_bps as u64 * age_factor as u64) / (100 * slash_penalty as u64).max(1);
++            (success_rate_bps as u64 * age_factor as u64) / (100 + /* ~ changed by cargo-mutants ~ */ slash_penalty as u64).max(1);
+ 
+         let composite_score = (raw as u32).min(10000);
+ 
+         ReputationScore {
+             success_rate_bps,
+             age_factor,
+             slash_penalty,
+             composite_score,

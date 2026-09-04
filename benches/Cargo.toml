@@ -1,0 +1,57 @@
+[workspace]
+# Standalone workspace — benchmarks do not participate in the
+# 200+ member main workspace to keep check/build/test times
+# manageable. Run with: cargo bench --manifest-path benches/Cargo.toml
+
+[package]
+name = "x3-benchmarks"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "X3 Chain microbenchmarks — Criterion.rs statistical benchmarks for hot-path Rust code"
+
+[[bench]]
+name = "atomic_swap_bench"
+harness = false
+path = "atomic_swap_bench.rs"
+
+[[bench]]
+name = "dex_route_bench"
+harness = false
+path = "dex_route_bench.rs"
+
+[[bench]]
+name = "bridge_proof_bench"
+harness = false
+path = "bridge_proof_bench.rs"
+
+[[bench]]
+name = "vm_dispatch_bench"
+harness = false
+path = "vm_dispatch_bench.rs"
+
+[[bench]]
+name = "rpc_encoding_bench"
+harness = false
+path = "rpc_encoding_bench.rs"
+
+[[bench]]
+name = "signature_verify_bench"
+harness = false
+path = "signature_verify_bench.rs"
+
+[dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+serde = { version = "1.0", features = ["derive"], default-features = false }
+serde_json = "1.0"
+hex = "0.4"
+sha2 = "0.10"
+sha3 = "0.10"
+rand = "0.8"
+blake2 = "0.10"
+
+[profile.bench]
+codegen-units = 1
+lto = true
+opt-level = 3

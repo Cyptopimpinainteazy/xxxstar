@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x3-validator-0-data
+  namespace: x3-chain
+  labels:
+    app: x3-chain
+    validator: validator-0
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+  # Optional: specify storageClassName if using custom storage class
+  # storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x3-validator-1-data
+  namespace: x3-chain
+  labels:
+    app: x3-chain
+    validator: validator-1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x3-validator-2-data
+  namespace: x3-chain
+  labels:
+    app: x3-chain
+    validator: validator-2
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x3-postgres-data
+  namespace: x3-chain
+  labels:
+    app: x3-indexer
+    component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x3-indexer-cache
+  namespace: x3-chain
+  labels:
+    app: x3-indexer
+    component: cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

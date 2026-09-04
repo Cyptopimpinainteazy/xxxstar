@@ -1,0 +1,27 @@
+--- crates/x3-common/src/signing.rs
++++ delete match arm PublicKey::Secp256k1(pk) in PublicKey::to_evm_address
+@@ -58,23 +58,17 @@
+             PublicKey::Secp256k1(pk) => pk.as_ref(),
+             PublicKey::Sr25519(pk) => pk.as_ref(),
+         }
+     }
+ 
+     /// Convert to EVM address (keccak256 hash of uncompressed pubkey)
+     pub fn to_evm_address(&self) -> [u8; 20] {
+         match self {
+-            PublicKey::Secp256k1(pk) => {
+-                // For secp256k1, use the last 20 bytes of keccak256(uncompressed_pubkey)
+-                let hash = keccak_256(pk);
+-                let mut addr = [0u8; 20];
+-                addr.copy_from_slice(&hash[12..]);
+-                addr
+-            }
++             /* ~ changed by cargo-mutants ~ */
+             _ => {
+                 // For other schemes, use blake2_256 and take last 20 bytes
+                 let hash = blake2_256(self.as_bytes());
+                 let mut addr = [0u8; 20];
+                 addr.copy_from_slice(&hash[12..]);
+                 addr
+             }
+         }

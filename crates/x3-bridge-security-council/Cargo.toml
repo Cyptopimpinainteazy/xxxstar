@@ -1,0 +1,13 @@
+[package]
+name = "x3-bridge-security-council"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "Security council policy primitives for X3 bridge operations"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"

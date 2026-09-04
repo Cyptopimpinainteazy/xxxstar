@@ -1,0 +1,21 @@
+--- crates/x3-common/src/lib.rs
++++ delete match arm "continue" in Keyword::parse
+@@ -86,17 +86,17 @@
+             "mut" => Some(Self::Mut),
+             "if" => Some(Self::If),
+             "else" => Some(Self::Else),
+             "while" => Some(Self::While),
+             "loop" => Some(Self::Loop),
+             "for" => Some(Self::For),
+             "return" => Some(Self::Return),
+             "break" => Some(Self::Break),
+-            "continue" => Some(Self::Continue),
++             /* ~ changed by cargo-mutants ~ */
+             "struct" => Some(Self::Struct),
+             "enum" => Some(Self::Enum),
+             "match" => Some(Self::Match),
+             "true" => Some(Self::True),
+             "false" => Some(Self::False),
+             "atomic" => Some(Self::Atomic),
+             "emit" => Some(Self::Emit),
+             "agent" => Some(Self::Agent),

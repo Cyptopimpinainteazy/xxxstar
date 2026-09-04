@@ -1,0 +1,21 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="warroomGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff1744;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d50000;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Panel layout -->
+  <rect x="20" y="28" width="32" height="40" fill="url(#warroomGrad)" opacity="0.8" rx="2"/>
+  <rect x="56" y="28" width="32" height="40" fill="url(#warroomGrad)" opacity="0.8" rx="2"/>
+  <rect x="92" y="28" width="16" height="40" fill="url(#warroomGrad)" opacity="0.6" rx="2"/>
+  <!-- Grid pattern -->
+  <circle cx="28" cy="36" r="3" fill="#ff1744" opacity="0.6"/>
+  <circle cx="28" cy="48" r="3" fill="#ff1744" opacity="0.6"/>
+  <circle cx="28" cy="60" r="3" fill="#ff1744" opacity="0.6"/>
+  <circle cx="64" cy="36" r="3" fill="#ff1744" opacity="0.6"/>
+  <circle cx="64" cy="48" r="3" fill="#ff1744" opacity="0.6"/>
+  <circle cx="64" cy="60" r="3" fill="#ff1744" opacity="0.6"/>
+  <!-- Alert indicator -->
+  <circle cx="100" cy="48" r="5" fill="#ff1744" opacity="0.8"/>
+</svg>

@@ -1,0 +1,20 @@
+{
+  "audit_type": "invariant_hunting",
+  "p0_invariants_to_find": [
+    "canonical_supply_conservation - total supply never changes",
+    "atomic_all_or_nothing - transaction executes atomically or rolls back completely",
+    "bridge_replay_impossible - no transaction can execute twice",
+    "finality_guarantee - settled transactions are irreversible",
+    "vault_solvency - reserves always cover liabilities",
+    "validator_equivocation_detection - double-signing is detected",
+    "nonce_monotonicity - account nonces only increase",
+    "settlement_settlement_guarantee - atomic swaps complete atomically",
+    "fresh_machine_bootstrap - node starts from zero state",
+    "multi_node_consensus - validators reach consensus"
+  ],
+  "test_coverage_matrix": {
+    "unit_tests": "55 files",
+    "integration_tests": "5 files",
+    "property_tests": "7 files"
+  }
+}

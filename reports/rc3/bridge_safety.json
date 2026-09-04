@@ -1,0 +1,44 @@
+{
+  "phase": "external_bridge_safety",
+  "timestamp": "2026-05-14T00:02:29.701035Z",
+  "external_bridges_enabled": false,
+  "external_roots_registered": 0,
+  "ethereum_route_active": false,
+  "solana_route_active": false,
+  "pending_supply_after_bridge_probes": 0,
+  "checks": [
+    {
+      "name": "enable bridge without audit gate",
+      "expected": "rejected",
+      "result": "PASS",
+      "bridges_enabled": false
+    },
+    {
+      "name": "register external root while disabled",
+      "expected": "rejected",
+      "result": "PASS",
+      "external_roots_registered": 0,
+      "note": "No external roots registered; registration blocked while disabled"
+    },
+    {
+      "name": "Ethereum route",
+      "expected": "rejected",
+      "result": "PASS",
+      "route_state": "inactive"
+    },
+    {
+      "name": "Solana route",
+      "expected": "rejected",
+      "result": "PASS",
+      "route_state": "inactive"
+    },
+    {
+      "name": "ledger unchanged",
+      "expected": "true",
+      "result": "PASS",
+      "pending_supply": 0,
+      "note": "No bridge operations reached the ledger"
+    }
+  ],
+  "verdict": "PASS"
+}

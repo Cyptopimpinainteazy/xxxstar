@@ -1,0 +1,52 @@
+[package]
+name = "pallet-x3-domain-registry"
+version = "0.1.0"
+edition = "2021"
+description = "On-chain .x3 domain registry and DNS record sets"
+authors = ["X3 Chain Team"]
+license = "MIT"
+repository = "https://github.com/Cyptopimpinainteazy/x3-chain"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.6.5", default-features = false, features = ["derive"] }
+scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
+
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-runtime = { workspace = true, default-features = false }
+sp-api = { workspace = true, default-features = false }
+
+log = { workspace = true, default-features = false }
+
+# Always needed for runtime API response structs
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+
+[dev-dependencies]
+sp-io = { workspace = true, features = ["std"] }
+sp-core = { workspace = true, features = ["std"] }
+
+[features]
+default = ["std"]
+std = [
+  "codec/std",
+  "scale-info/std",
+  "frame-support/std",
+  "frame-system/std",
+  "sp-std/std",
+  "sp-runtime/std",
+  "sp-api/std",
+  "log/std",
+  "serde/std",
+]
+runtime-benchmarks = [
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
+]
+try-runtime = [
+  "frame-support/try-runtime",
+  "frame-system/try-runtime",
+]

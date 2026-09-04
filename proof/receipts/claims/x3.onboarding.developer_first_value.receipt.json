@@ -1,0 +1,59 @@
+{
+  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "command_run": "x3-proof verify x3.onboarding.developer_first_value",
+  "artifact_hash": "4ef50ee4d21b43dcdf980e8693c72655dfcef08fabc3d5140e9f38d9d4b6e447",
+  "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
+  "relevant_files": [
+    "MAINNET_QUICK_START.md",
+    "OPTION_D_LAUNCH_GUIDE.md",
+    "docs/BLOCKCHAIN_STARTUP_GUIDE.md",
+    "README.md",
+    "Makefile",
+    "Cargo.toml",
+    "proof/onboarding/ttfv_benchmark.json"
+  ],
+  "timestamp": "2026-05-02T01:56:14.582201117Z",
+  "result": {
+    "claim_id": "x3.onboarding.developer_first_value",
+    "claim": "A fresh developer can deploy and test a first X3 app with measured time-to-first-value",
+    "status": "verified",
+    "proof_level": null,
+    "edge_case_level": null,
+    "hack_level": null,
+    "operator_level": null,
+    "degraded_level": null,
+    "files_inspected": [
+      "MAINNET_QUICK_START.md",
+      "OPTION_D_LAUNCH_GUIDE.md",
+      "docs/BLOCKCHAIN_STARTUP_GUIDE.md",
+      "README.md",
+      "Makefile",
+      "Cargo.toml",
+      "proof/onboarding/ttfv_benchmark.json"
+    ],
+    "commands_run": [],
+    "passed_checks": [
+      "Quickstart guide found: MAINNET_QUICK_START.md",
+      "Makefile present (dev entry point)",
+      "Node crate referenced in workspace Cargo.toml",
+      "All TTFV benchmark steps succeeded",
+      "TTFV 24.25s ≤ budget 600s",
+      "TTFV benchmark fresh (≤ 30 days, measured 2026-04-28T21:10:08Z)"
+    ],
+    "failed_checks": [],
+    "missing_proofs": [],
+    "blockers": [],
+    "score": 1.0,
+    "evidence": {
+      "ttfv_budget_seconds": "600",
+      "ttfv_measured_at": "2026-04-28T21:10:08Z",
+      "ttfv_total_seconds": "24.252",
+      "quickstart_doc": "MAINNET_QUICK_START.md",
+      "makefile": "present"
+    },
+    "timestamp": "2026-05-02T01:56:14.574489254Z",
+    "duration_ms": 0
+  },
+  "limitations": [],
+  "binding_hash": "a859c4c6419bfa265b8ec7e5d15b36a7087089db4d2fd371d33036303fa73187"
+}

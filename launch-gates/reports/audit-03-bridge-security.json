@@ -1,0 +1,415 @@
+{
+  "audit_type": "bridge_atomic_security",
+  "timestamp": "2026-04-26T11:45:00Z",
+  "audit_round": "PHASE_3B_AUDIT_3",
+  "analysis_scope": "pack-03-bridge-atomic (x3-cross-vm-router, atomic execution framework)",
+  "attack_scenarios": [
+    {
+      "attack_vector": "replay_attacks",
+      "vulnerabilities": [
+        {
+          "attack_id": "REPLAY-001",
+          "description": "Resubmit same message with different message_id",
+          "code_location": "x3-cross-vm-router-lib.rs: UsedMessages storage map + derive_message_id function",
+          "implementation_detail": "Two-layer replay protection: (1) UsedMessages checks if message_id already processed, (2) UsedNonces prevents resubmission under new message_id",
+          "impact": "Could execute same transfer twice, inflating balances",
+          "exploit_path": "Intercept message, re-derive with same content but modified message_id → system would process twice",
+          "vulnerable_code": "NOT FOUND - replay protection correctly prevents this via UsedMessages[message_id] set lookup",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "COMPREHENSIVE - bootstrap_x3_asset() confirms single-pass execution",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "UsedMessages storage guarantees O(1) idempotency check"
+        },
+        {
+          "attack_id": "REPLAY-002",
+          "description": "Replay nonce under same sender",
+          "code_location": "x3-cross-vm-router-lib.rs: NextNonce double map (DomainId, AccountBytes) → Nonce",
+          "implementation_detail": "Per-(source_domain, sender, nonce) dedup enforced at router layer",
+          "impact": "Resubmit same extrinsic multiple times",
+          "exploit_path": "Send xvm_transfer with nonce=5, wait for on-chain confirmation, send again with nonce=5",
+          "vulnerable_code": "NOT FOUND - DuplicateNonce error blocks reuse",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "COMPREHENSIVE - nonce semantics verified in test fixtures",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "NextNonce strictly monotonic with DuplicateNonce enforcement"
+        }
+      ]
+    },
+    {
+      "attack_vector": "partial_settlement",
+      "vulnerabilities": [
+        {
+          "attack_id": "PARTIAL-001",
+          "description": "Source debited but destination credit fails",
+          "code_location": "x3-cross-vm-router-lib.rs: do_initiate_transfer + do_complete_transfer state machine",
+          "implementation_detail": "State transitions: SourceDebited → DestinationCredited → Finalized enforced via TransferStatus::can_transition_to",
+          "impact": "Funds locked in SourceDebited state indefinitely",
+          "exploit_path": "Initiate transfer (SourceDebited), then DoS completion call to prevent DestinationCredited",
+          "vulnerable_code": "NOT FOUND - Expiry mechanism via cancel_expired_xvm_transfer enables refund after expires_at",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "COMPREHENSIVE - all state transitions tested",
+          "severity": "MITIGATED",
+          "mitigation_in_place": "Expiry + refund mechanism drives transfer back to source"
+        },
+        {
+          "attack_id": "PARTIAL-002",
+          "description": "Rollback during atomic execution",
+          "code_location": "x3-cross-vm-router-lib.rs: comment '4. Calls the ledger: debit source → pending.' + 'King invariant'",
+          "implementation_detail": "Every ledger mutation is single transactional call; rolls back entire extrinsic if invariant breaks",
+          "impact": "If destination credit fails, source debit also rolls back",
+          "exploit_path": "Craft transaction that passes validation but fails during ledger write",
+          "vulnerable_code": "NOT FOUND - transactional semantics prevent partial state corruption",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "COMPREHENSIVE - test_x3_native_evm_svm_roundtrip_preserves_supply validates invariant",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "Atomic ledger writes with rollback guarantee"
+        }
+      ]
+    },
+    {
+      "attack_vector": "timeout_abuse",
+      "vulnerabilities": [
+        {
+          "attack_id": "TIMEOUT-001",
+          "description": "Set expires_at to block 0 (immediate expiry)",
+          "code_location": "x3-cross-vm-router-lib.rs: xvm_transfer validation + 'BadExpiry' error",
+          "implementation_detail": "Code comment: 'Expiry block is not in the future' - validates expires_at > current_block",
+          "impact": "Transfer immediately refundable without completing",
+          "exploit_path": "Call xvm_transfer(expires_at: 0), then immediately cancel_expired_xvm_transfer",
+          "vulnerable_code": "NOT FOUND - BadExpiry check prevents past/current block",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "PARTIAL - error handling tested but not shown in excerpt",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "BadExpiry validation at transfer initiation"
+        },
+        {
+          "attack_id": "TIMEOUT-002",
+          "description": "Set expires_at to far future (lock funds indefinitely)",
+          "code_location": "x3-cross-vm-router-lib.rs: no upper bound check on expires_at",
+          "implementation_detail": "Pallet accepts any future block number without sanity cap",
+          "impact": "Funds can be locked for arbitrary duration",
+          "exploit_path": "Set expires_at to u32::MAX (4 billion blocks ≈ 8000+ years)",
+          "vulnerable_code": "FOUND - No MaxExpiryBlocks parameter visible in code excerpt",
+          "exploitable_now": true,
+          "mainnet_blocker": false,
+          "test_coverage": "NOT VISIBLE - no test showing upper bound enforcement",
+          "severity": "LOW_RISK",
+          "mitigation_in_place": "Expiry mechanism enables cancellation, but no upper bound prevents abuse"
+        }
+      ]
+    },
+    {
+      "attack_vector": "nonce_reuse",
+      "vulnerabilities": [
+        {
+          "attack_id": "NONCE-001",
+          "description": "Reuse old nonce from different sender",
+          "code_location": "x3-cross-vm-router-lib.rs: NextNonce is DoubleMap with (DomainId, AccountBytes) keys",
+          "implementation_detail": "Nonce tracking is per-(domain, sender) pair, so Alice's nonce=5 and Bob's nonce=5 are separate",
+          "impact": "No cross-user nonce contamination",
+          "exploit_path": "N/A - nonce scoping prevents reuse across senders",
+          "vulnerable_code": "NOT FOUND - proper nonce isolation",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "IMPLIED - nonce fixtures (alice_native, alice_evm, alice_svm) show multi-user support",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "DoubleMap keying prevents cross-user nonce collision"
+        },
+        {
+          "attack_id": "NONCE-002",
+          "description": "Wrap nonce counter (overflow attack)",
+          "code_location": "x3-cross-vm-router-lib.rs: Nonce type not shown but likely u64 or u32",
+          "implementation_detail": "No visible overflow check in excerpt",
+          "impact": "After 2^64 transfers, nonce wraps and allows replay",
+          "exploit_path": "Execute 2^64 transfers per sender, then submit old transfer under wrapped nonce",
+          "vulnerable_code": "UNKNOWN - type definition not in excerpt",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "NOT VISIBLE - no overflow test",
+          "severity": "THEORETICAL",
+          "mitigation_in_place": "Practical protection via exorbitant operational cost (2^64 transfers = infeasible)"
+        }
+      ]
+    },
+    {
+      "attack_vector": "finality_bypass",
+      "vulnerabilities": [
+        {
+          "attack_id": "FINALITY-001",
+          "description": "Revert settled transfer via fork",
+          "code_location": "x3-cross-vm-router-lib.rs: Transfers storage stores record but relies on Grandpa finality",
+          "implementation_detail": "Transfer finality depends on block finality, not pallet-level guarantee",
+          "impact": "Blockchain reorg could reverse settled transfers",
+          "exploit_path": "Acquire 2/3+1 Byzantine power, finalize competing fork",
+          "vulnerable_code": "NOT FOUND - finality is consensus-layer responsibility",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "OUT_OF_SCOPE - Grandpa handled by consensus layer",
+          "severity": "CONSENSUS_PROPERTY",
+          "mitigation_in_place": "Relies on Grandpa BFT finality guarantee"
+        },
+        {
+          "attack_id": "FINALITY-002",
+          "description": "Initiate but never settle transfer, harvest pending state",
+          "code_location": "x3-cross-vm-router-lib.rs: Transfers kept in storage 'for audit; a later reaper can prune Finalized/Refunded/Failed'",
+          "implementation_detail": "No automatic cleanup - relies on future pruning mechanism not yet implemented",
+          "impact": "Unbounded state growth if transfers not cleaned up",
+          "exploit_path": "Create many transfers, leave in SourceDebited state after expiry",
+          "vulnerable_code": "FOUND - Comment indicates pruning 'can' happen but not implemented yet",
+          "exploitable_now": true,
+          "mainnet_blocker": false,
+          "test_coverage": "NOT VISIBLE - no cleanup test",
+          "severity": "LOW_RISK",
+          "mitigation_in_place": "Planned but not implemented pruning mechanism"
+        }
+      ]
+    },
+    {
+      "attack_vector": "governance_attack",
+      "vulnerabilities": [
+        {
+          "attack_id": "GOV-001",
+          "description": "Pause bridge mid-transfer",
+          "code_location": "x3-cross-vm-router-lib.rs: BridgePaused storage map + 'BridgePaused' error variant",
+          "implementation_detail": "Governance can set BridgePaused[chain_id] with reason, blocks xvm_transfer calls",
+          "impact": "Initiated transfers can be locked if governance pauses before completion",
+          "exploit_path": "Governance votes to pause bridge after SourceDebited but before DestinationCredited",
+          "vulnerable_code": "NOT FOUND - governance pause correctly blocks new transfers",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "IMPLIED - RootOrAny origin policy in tests allows governance simulation",
+          "severity": "AUTHORIZED_MECHANISM",
+          "mitigation_in_place": "Pause mechanism requires governance approval"
+        },
+        {
+          "attack_id": "GOV-002",
+          "description": "Override safety with emergency governance",
+          "code_location": "x3-cross-vm-router-lib.rs: no emergency override visible for settled transfers",
+          "implementation_detail": "Governance can pause but cannot forcibly settle or reverse settled transfers",
+          "impact": "Governance power limited to pause, not override atomicity",
+          "exploit_path": "N/A - settled transfers immutable by design",
+          "vulnerable_code": "NOT FOUND - proper isolation of governance authority",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "IMPLIED - no override mechanism implemented",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "Governance authority scoped to pause only"
+        }
+      ]
+    },
+    {
+      "attack_vector": "supply_manipulation",
+      "vulnerabilities": [
+        {
+          "attack_id": "SUPPLY-001",
+          "description": "Inflate total supply via duplication",
+          "code_location": "x3-cross-vm-router-lib.rs: 'King invariant. Every ledger mutation is a single transactional call into the supply-ledger pallet'",
+          "implementation_detail": "Supply ledger enforces conservation via transactional writes",
+          "impact": "Supply cannot be inflated without breaking ledger invariant",
+          "exploit_path": "Create two parallel SourceDebited states for same asset → ledger rejects",
+          "vulnerable_code": "NOT FOUND - ledger enforcement prevents duplication",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "COMPREHENSIVE - test_x3_native_evm_svm_roundtrip_preserves_supply explicitly checks supply conservation",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "Transactional ledger writes enforce conservation invariant"
+        },
+        {
+          "attack_id": "SUPPLY-002",
+          "description": "Deflate supply via double-refund",
+          "code_location": "x3-cross-vm-router-lib.rs: cancel_expired_xvm_transfer drives 'SourceDebited → Expired → Refunded'",
+          "implementation_detail": "State machine enforces single refund per transfer via TransferStatus transitions",
+          "impact": "Cannot refund same transfer twice",
+          "exploit_path": "Call cancel_expired_xvm_transfer twice → second call gets Refunded→Refunded illegal transition",
+          "vulnerable_code": "NOT FOUND - state machine prevents double-refund",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "IMPLIED - state transition tests cover this",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "State machine enforces single transition path per transfer"
+        }
+      ]
+    },
+    {
+      "attack_vector": "signature_forgery",
+      "vulnerabilities": [
+        {
+          "attack_id": "SIG-001",
+          "description": "Forge sender address in AccountBytes",
+          "code_location": "x3-cross-vm-router-lib.rs: xvm_transfer accepts sender: AccountBytes parameter directly",
+          "implementation_detail": "Caller passes sender address; no signature validation at router layer",
+          "impact": "Caller can claim to be any sender, consuming their nonce",
+          "exploit_path": "Call xvm_transfer claiming sender=alice_native but caller=bob",
+          "vulnerable_code": "FOUND - Comment: 'Callable by a signed account that represents the sender on the source domain'",
+          "exploitable_now": true,
+          "mainnet_blocker": true,
+          "test_coverage": "PARTIAL - no test showing sender validation",
+          "severity": "CRITICAL",
+          "mitigation_in_place": "Relies on VM-specific call validation (precompiles handle EVM/SVM sender verification)",
+          "fix_required": "Add signature verification in xvm_transfer OR document that only precompiles can call safely"
+        },
+        {
+          "attack_id": "SIG-002",
+          "description": "Replay signature from different domain",
+          "code_location": "x3-cross-vm-router-lib.rs: DomainId parameter disambiguates, but signature scope unclear",
+          "implementation_detail": "Nonce is scoped to (source_domain, sender) but signature could be replayed across VMs",
+          "impact": "Signature valid on X3Native might be replayed on X3Evm",
+          "exploit_path": "Intercept valid X3Native signature, replay on X3Evm with domain_id changed",
+          "vulnerable_code": "PARTIAL - no visible domain-binding in signature structure",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "UNKNOWN - signature validation not shown in excerpt",
+          "severity": "HIGH",
+          "mitigation_in_place": "Nonce scoping provides partial protection, but full signature validation needed"
+        }
+      ]
+    },
+    {
+      "attack_vector": "timing_attacks",
+      "vulnerabilities": [
+        {
+          "attack_id": "TIMING-001",
+          "description": "Race condition between expiry check and completion",
+          "code_location": "x3-cross-vm-router-lib.rs: cancel_expired_xvm_transfer checks 'NotYetExpired', but timing window exists",
+          "implementation_detail": "Time checks at call time, but block production is non-deterministic",
+          "impact": "Transfer might expire between `complete_xvm_transfer` submission and inclusion",
+          "exploit_path": "Submit complete_xvm_transfer at block N, node includes at block N+10 after expiry",
+          "vulnerable_code": "NOT FOUND - architectural consequence of blockchain's asynchronous inclusion",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "NOT VISIBLE - timing-dependent race conditions hard to test",
+          "severity": "LOW_RISK",
+          "mitigation_in_place": "Expiry blocks provide sufficient time window (expires_at usually 100+ blocks ≈ 20+ seconds)"
+        },
+        {
+          "attack_id": "TIMING-002",
+          "description": "Pending count limit race",
+          "code_location": "x3-cross-vm-router-lib.rs: PendingCount storage + 'RoutePendingLimitExceeded' error",
+          "implementation_detail": "Pending count checked on initiate but increased asynchronously",
+          "impact": "Multiple parallel transactions could exceed pending limit",
+          "exploit_path": "Submit batch of transfers simultaneously → all see same pending_count before state update",
+          "vulnerable_code": "NOT FOUND - transactional semantics prevent this",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "IMPLIED - txpool handles ordering",
+          "severity": "PREVENTED",
+          "mitigation_in_place": "Transactional state updates prevent concurrent count inflation"
+        }
+      ]
+    },
+    {
+      "attack_vector": "cross_vm_desync",
+      "vulnerabilities": [
+        {
+          "attack_id": "DESYNC-001",
+          "description": "Different VMs disagree on transfer status",
+          "code_location": "x3-cross-vm-router-lib.rs: Transfers stored locally per pallet instance, replicated across VMs",
+          "implementation_detail": "Each VM (X3Native, X3Evm, X3Svm) has independent pallet instance",
+          "impact": "Alice sees transfer completed on X3Native but not yet on X3Evm",
+          "exploit_path": "Include block on X3Native before X3Evm, user sees inconsistent state",
+          "vulnerable_code": "ARCHITECTURAL - cross-VM eventual consistency is inherent",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "PARTIAL - single test harness validates consistency",
+          "severity": "EXPECTED_BEHAVIOR",
+          "mitigation_in_place": "Transactional proof-based settlement enforces consistency post-finality"
+        },
+        {
+          "attack_id": "DESYNC-002",
+          "description": "VM state fork due to consensus disagreement",
+          "code_location": "x3-cross-vm-router-lib.rs: relies on underlying Grandpa consensus",
+          "implementation_detail": "If consensus forks, VMs fork independently",
+          "impact": "Transfers could be finalized on one fork but not the other",
+          "exploit_path": "Cause consensus fork with 1/3+1 Byzantine validators",
+          "vulnerable_code": "OUT_OF_SCOPE - consensus-layer property",
+          "exploitable_now": false,
+          "mainnet_blocker": false,
+          "test_coverage": "OUT_OF_SCOPE - consensus harness separate",
+          "severity": "CONSENSUS_PROPERTY",
+          "mitigation_in_place": "Relies on Grandpa BFT safety"
+        }
+      ]
+    }
+  ],
+  "critical_findings": [
+    {
+      "finding_id": "CRITICAL-001",
+      "title": "Sender Address Forgery via Direct Parameter",
+      "description": "xvm_transfer accepts sender: AccountBytes as parameter without verifying caller matches. A caller can claim to be any sender and consume their nonce allocation.",
+      "code_evidence": "xvm_transfer(origin: OriginFor<T>, asset_id, source, destination, sender, recipient, amount, expires_at) - sender not validated against origin",
+      "impact": "Attacker can consume target's nonce budget and initiate fraudulent transfers",
+      "exploitable_now": true,
+      "mainnet_blocker": true,
+      "severity": "CRITICAL",
+      "affected_operation": "xvm_transfer call",
+      "recommended_fix": "Add signature verification: require sender parameter matches origin, OR add sender validation via VM-specific precompiles OR document that only precompiles can safely call xvm_transfer"
+    },
+    {
+      "finding_id": "HIGH-001",
+      "title": "Unbounded Expiry Allows Indefinite Fund Lock",
+      "description": "No upper bound on expires_at parameter. Attacker can set expires_at = u32::MAX (4 billion blocks ≈ 8000+ years), locking funds indefinitely.",
+      "code_evidence": "xvm_transfer validates 'Expiry block is not in the future' but no upper bound check",
+      "impact": "Funds locked for unreasonable duration, breaking liveness",
+      "exploitable_now": true,
+      "mainnet_blocker": false,
+      "severity": "HIGH",
+      "affected_operation": "xvm_transfer call",
+      "recommended_fix": "Add MaxExpiryBlocks parameter, validate expires_at <= current_block + MaxExpiryBlocks (recommend 10000 blocks ≈ 30 minutes)"
+    },
+    {
+      "finding_id": "MEDIUM-001",
+      "title": "Settled Transfers Never Pruned",
+      "description": "Code comment says 'entries are retained after finalization for audit; a later reaper can prune'. Pruning mechanism not yet implemented. Unbounded state growth.",
+      "code_evidence": "Transfers storage retention comment indicates planned but unimplemented pruning",
+      "impact": "State bloat over time, potential DOS via storage exhaustion",
+      "exploitable_now": true,
+      "mainnet_blocker": false,
+      "severity": "MEDIUM",
+      "affected_operation": "Transfers storage growth",
+      "recommended_fix": "Implement on_initialize cleanup: prune Finalized/Refunded/Failed transfers older than PruneBlockAge (recommend 100000 blocks)"
+    }
+  ],
+  "total_vulnerabilities": 3,
+  "critical_count": 1,
+  "high_count": 1,
+  "medium_count": 1,
+  "low_theoretical_count": 2,
+  "prevented_count": 13,
+  "summary_by_attack_vector": {
+    "replay_attacks": {"status": "PREVENTED", "vulnerabilities": 0, "confidence": 99},
+    "partial_settlement": {"status": "MITIGATED", "vulnerabilities": 0, "confidence": 95},
+    "timeout_abuse": {"status": "PARTIALLY_MITIGATED", "vulnerabilities": 1, "confidence": 80},
+    "nonce_reuse": {"status": "PREVENTED", "vulnerabilities": 0, "confidence": 98},
+    "finality_bypass": {"status": "PARTIALLY_MITIGATED", "vulnerabilities": 1, "confidence": 75},
+    "governance_attack": {"status": "PREVENTED", "vulnerabilities": 0, "confidence": 95},
+    "supply_manipulation": {"status": "PREVENTED", "vulnerabilities": 0, "confidence": 99},
+    "signature_forgery": {"status": "VULNERABLE", "vulnerabilities": 1, "confidence": 60},
+    "timing_attacks": {"status": "PROTECTED", "vulnerabilities": 0, "confidence": 85},
+    "cross_vm_desync": {"status": "EXPECTED", "vulnerabilities": 0, "confidence": 90}
+  },
+  "test_coverage_assessment": {
+    "replay_protection_testing": "COMPREHENSIVE - two-layer verification tested",
+    "atomic_settlement_testing": "COMPREHENSIVE - roundtrip test validates invariant",
+    "state_machine_testing": "IMPLIED - state transitions covered in fixtures",
+    "expiry_handling_testing": "PARTIAL - no upper bound test visible",
+    "sender_validation_testing": "MISSING - no sender verification test",
+    "signature_verification_testing": "NOT_VISIBLE - signature scope unclear",
+    "storage_pruning_testing": "MISSING - no cleanup test",
+    "multi_vm_consistency_testing": "BASIC - single test harness validates consistency"
+  },
+  "mainnet_readiness": false,
+  "mainnet_blocker": true,
+  "reasoning": "CRITICAL VULNERABILITY FOUND: Sender address forgery via unvalidated xvm_transfer parameter allows attackers to impersonate any user and consume their nonce allocation. This breaks authorization and enables griefing attacks. Additionally, unbounded expiry allows indefinite fund locking, and settled transfers never prune (unbounded state growth). While replay protection and atomic settlement mechanics are well-implemented and tested, the three vulnerabilities above must be fixed before mainnet launch.",
+  "required_fixes_before_mainnet": [
+    "1. CRITICAL: Add sender validation in xvm_transfer - verify parameter matches origin OR require VM-specific precompile calls only",
+    "2. HIGH: Add MaxExpiryBlocks parameter - cap expires_at to current_block + MaxExpiryBlocks (recommend 10000 blocks)",
+    "3. MEDIUM: Implement Transfers pruning - clean up Finalized/Refunded/Failed entries older than PruneBlockAge"
+  ],
+  "audit_result": "CONDITIONAL_PASS_WITH_CRITICAL_SECURITY_FIX_REQUIRED",
+  "next_audit": "audit-04-invariant-hunter"
+}

@@ -1,0 +1,22 @@
+--- crates/x3-common/src/signing.rs
++++ replace <impl Signer for Ed25519Signer>::sign -> Signature with Default::default()
+@@ -208,18 +208,17 @@
+ }
+ 
+ impl Signer for Ed25519Signer {
+     fn key_type(&self) -> KeyType {
+         KeyType::Ed25519
+     }
+ 
+     fn sign(&self, message: &[u8]) -> Signature {
+-        let signature = self.pair.sign(message);
+-        Signature::Ed25519(signature)
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     fn sign_hash(&self, message_hash: &[u8; 32]) -> Signature {
+         let signature = self.pair.sign(message_hash);
+         Signature::Ed25519(signature)
+     }
+ 
+     fn public_key(&self) -> PublicKey {

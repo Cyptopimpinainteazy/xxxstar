@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+make guard
+make test
+make audit
+make mainnet-check

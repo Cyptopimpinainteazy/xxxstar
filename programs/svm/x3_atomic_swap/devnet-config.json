@@ -1,0 +1,8 @@
+{
+  "cluster": "devnet",
+  "rpc_url": "https://api.devnet.solana.com",
+  "program_id": "<set-after-deployment>",
+  "htlc_timeout_slots": 400,
+  "slot_time_ms": 400,
+  "explorer_base_url": "https://explorer.solana.com/address/"
+}

@@ -1,0 +1,21 @@
+[package]
+name = "x3-svm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+parity-scale-codec = { workspace = true, features = ["derive"] }
+sp-std = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+    "parity-scale-codec/std",
+    "sp-std/std",
+]
+
+[lib]
+name = "x3_svm"
+path = "src/lib.rs"
