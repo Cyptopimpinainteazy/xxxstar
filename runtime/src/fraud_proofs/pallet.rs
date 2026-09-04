@@ -28,6 +28,11 @@
 
 pub use pallet::*;
 
+// Intentionally nested (file module `fraud_proofs::pallet` contains the FRAME
+// `pallet` module), matching crate references like
+// `crate::fraud_proofs::pallet::pallet::Config`. Large FraudProofV1 payloads
+// are kept inline in Call (boxing would change the extrinsic encoding).
+#[allow(clippy::module_inception, clippy::large_enum_variant)]
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::{
@@ -59,8 +64,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
         /// Currency used for reporter reward and proposer slashing.
         type Currency: ReservableCurrency<Self::AccountId>;
 
@@ -386,7 +389,6 @@ pub mod mock {
     }
 
     impl Config for Test {
-        type RuntimeEvent = RuntimeEvent;
         type Currency = Balances;
         type MaxTxCount = FraudProofMaxTxCount;
         type DisputeWindowBlocks = FraudProofDisputeWindowBlocks;

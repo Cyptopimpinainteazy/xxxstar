@@ -217,7 +217,7 @@ mod bridge_integration_tests {
     #[test]
     fn test_multiple_concurrent_proof_validations() {
         // Simulate concurrent proof validations
-        let proofs_to_validate = vec![
+        let proofs_to_validate = [
             (1u64, H256::from_low_u64_be(10)),
             (2u64, H256::from_low_u64_be(20)),
             (3u64, H256::from_low_u64_be(30)),

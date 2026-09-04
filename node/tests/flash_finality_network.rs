@@ -114,11 +114,9 @@ mod flash_finality_network_tests {
     /// Test sequential block finalization across network
     #[tokio::test]
     async fn test_sequential_finalization_across_network() {
-        let validators = vec![
-            MockValidator::new(1),
+        let validators = [MockValidator::new(1),
             MockValidator::new(2),
-            MockValidator::new(3),
-        ];
+            MockValidator::new(3)];
 
         // Finalize blocks 100-105 sequentially
         for block_num in 100..=105 {
@@ -207,11 +205,9 @@ mod flash_finality_network_tests {
     /// This is critical for Byzantine fault tolerance
     #[tokio::test]
     async fn test_equivocation_rejection() {
-        let validators = vec![
-            MockValidator::new(1),
+        let validators = [MockValidator::new(1),
             MockValidator::new(2),
-            MockValidator::new(3),
-        ];
+            MockValidator::new(3)];
 
         let block_100 = "0x64";
         let block_101 = "0x65";

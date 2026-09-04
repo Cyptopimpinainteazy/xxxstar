@@ -37,7 +37,7 @@ impl MockDexRpcClient {
 
     async fn estimate_swap(&self, request: serde_json::Value) -> Result<serde_json::Value, String> {
         // Simulate processing time: 5-15ms typical
-        let jitter = (self.request_count.load(Ordering::Relaxed) % 10) as u64;
+        let jitter = (self.request_count.load(Ordering::Relaxed) % 10);
         tokio::time::sleep(Duration::from_millis(self.latency_ms_base + jitter)).await;
 
         self.request_count.fetch_add(1, Ordering::Relaxed);
@@ -60,7 +60,7 @@ impl MockDexRpcClient {
 
     async fn execute_swap(&self, request: serde_json::Value) -> Result<serde_json::Value, String> {
         // Execute is slower: 20-50ms typical (includes settlement intent creation)
-        let jitter = (self.request_count.load(Ordering::Relaxed) % 30) as u64;
+        let jitter = (self.request_count.load(Ordering::Relaxed) % 30);
         tokio::time::sleep(Duration::from_millis(self.latency_ms_base * 2 + jitter)).await;
 
         self.request_count.fetch_add(1, Ordering::Relaxed);

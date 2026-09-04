@@ -145,8 +145,6 @@ pub mod pallet {
     pub trait Config:
         frame_system::Config + pallet_x3_kernel::Config + pallet_x3_atomic_kernel::Config
     {
-        /// The overarching event type.
-
         /// Weight information for extrinsics.
         type SettlementWeightInfo: crate::weights::WeightInfo;
 
@@ -780,15 +778,16 @@ pub mod pallet {
             // take() removes the index entry and returns the bounded vec: O(1) lookup.
             // Then we fetch only the specific locks registered for this block.
             let expiring_ids = AtomicLockExpiryIndex::<T>::take(current_block);
-            let expired_locks: Vec<(H256, atomic_lock::AtomicLock<BalanceOf<T>, AccountIdOf<T>>)> =
-                expiring_ids
-                    .iter()
-                    .filter_map(|id| AtomicLocks::<T>::get(id).map(|lock| (*id, lock)))
-                    // C-004: skip zero-amount locks; they were created before the fix and
-                    // would fire spurious AtomicLockTimeoutSlashed events/slash no funds.
-                    .filter(|(_, lock)| lock.amount > BalanceOf::<T>::default())
-                    .take(MAX_LOCKS_PER_BLOCK)
-                    .collect();
+            // Element type (H256, AtomicLock) is fixed by the storage reads; only the
+            // container needs a target, so avoid an unwieldy inline annotation.
+            let expired_locks: Vec<_> = expiring_ids
+                .iter()
+                .filter_map(|id| AtomicLocks::<T>::get(id).map(|lock| (*id, lock)))
+                // C-004: skip zero-amount locks; they were created before the fix and
+                // would fire spurious AtomicLockTimeoutSlashed events/slash no funds.
+                .filter(|(_, lock)| lock.amount > BalanceOf::<T>::default())
+                .take(MAX_LOCKS_PER_BLOCK)
+                .collect();
 
             // Process each expired lock
             for (intent_id, mut lock) in expired_locks {
@@ -1160,7 +1159,7 @@ pub mod pallet {
                 intent_id,
                 leg_index,
                 depositor: who.clone(),
-                chain: chain,
+                chain,
                 amount,
                 escrow_address: bounded_escrow_address,
                 state: EscrowLegState::Locked,
@@ -1313,7 +1312,7 @@ pub mod pallet {
             );
             Self::deposit_event(Event::SettlementProofVerified {
                 intent_id,
-                chain: chain,
+                chain,
                 block_or_slot,
                 proof_hash: H256::from(sp_io::hashing::sha2_256(&proof.encode())),
                 verified_at_block: current_block,
@@ -1530,6 +1529,7 @@ pub mod pallet {
         /// Submit BTC SPV proof for UTXO verification
         #[pallet::call_index(10)]
         #[pallet::weight(T::SettlementWeightInfo::verify_btc_proof())]
+        #[allow(clippy::too_many_arguments)]
         pub fn submit_btc_proof(
             origin: OriginFor<T>,
             intent_id: H256,

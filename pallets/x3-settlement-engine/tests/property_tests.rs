@@ -420,7 +420,7 @@ fn prop_zero_amount_settlement_valid() {
 
         // Should not panic or overflow
         prop_assert!(amount <= TOTAL_SUPPLY);
-        prop_assert!(legs_total <= MAX_SETTLEMENT_LEGS as u32);
+        prop_assert!(legs_total <= MAX_SETTLEMENT_LEGS);
     });
 }
 

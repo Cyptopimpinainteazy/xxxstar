@@ -5,8 +5,7 @@ use frame_support::{
     derive_impl, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64, EnsureOrigin},
 };
-use frame_system::EnsureRoot;
-use sp_core::{H160, H256};
+use sp_core::H160;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,

@@ -42,7 +42,16 @@ pub enum FreezeReason {
 
 /// The full freeze state stored in FRAME storage.
 #[derive(
-    Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct FreezeState {
@@ -54,17 +63,6 @@ pub struct FreezeState {
     pub reason: Option<FreezeReason>,
     /// Block number at which the freeze was applied (for auditing).
     pub frozen_at_block: Option<u32>,
-}
-
-impl Default for FreezeState {
-    fn default() -> Self {
-        Self {
-            ai_syscalls_frozen: false,
-            scheduler_frozen: false,
-            reason: None,
-            frozen_at_block: None,
-        }
-    }
 }
 
 impl FreezeState {

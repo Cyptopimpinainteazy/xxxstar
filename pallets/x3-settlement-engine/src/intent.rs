@@ -764,7 +764,7 @@ mod tests {
             from_crosschain_intent(&intent, 1u64, 2u64, 1_700_000_000).unwrap();
         let plan = IntentPlanner::plan_settlement(&rt.asset_a, &rt.asset_b, rt.timeout);
         // Both legs must reference chains the intent declared.
-        let chains: Vec<ExternalChainId> = plan.legs.iter().map(|l| l.chain.clone()).collect();
+        let chains: Vec<ExternalChainId> = plan.legs.iter().map(|l| l.chain).collect();
         assert!(chains.contains(&ExternalChainId::Ethereum));
         assert!(chains.contains(&ExternalChainId::X3Native));
         // The intent's timeout must be respected.

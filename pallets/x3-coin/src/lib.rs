@@ -158,6 +158,11 @@ pub struct CrossChainRuntimeEvent {
     pub data: Vec<u8>,
 }
 
+/// A snapshot of an account's team-vesting schedule.
+/// Factored out of a 5-tuple return type so the runtime API and its
+/// implementation stay readable (clippy::type_complexity).
+pub type TeamVestingView<Balance> = (Balance, Balance, u64, u64, u64);
+
 /// Proof types for cross-chain operations
 #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum X3Proof {
@@ -1521,9 +1526,7 @@ pub mod pallet {
             Self::bonus_pool_balance()
         }
 
-        pub fn get_team_vesting(
-            account: &T::AccountId,
-        ) -> Option<(T::Balance, T::Balance, u64, u64, u64)> {
+        pub fn get_team_vesting(account: &T::AccountId) -> Option<TeamVestingView<T::Balance>> {
             TeamVesting::<T>::get(account).map(|schedule| {
                 (
                     schedule.total_amount.saturated_into(),

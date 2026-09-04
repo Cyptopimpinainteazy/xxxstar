@@ -434,6 +434,7 @@ fn migration_runs_and_sets_storage_version() {
 }
 
 /// Mock implementation of DualVmDispatcher for testing
+#[allow(dead_code)]
 pub struct MockDispatcher;
 
 impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
@@ -518,9 +519,7 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
 
     /// Check authorization - in mock, always allow ALICE, deny others for non-empty ops
     fn auth_check(&self, caller: &Self::AccountId, operation: &[u8]) -> Result<(), DispatchError> {
-        if *caller == ALICE {
-            Ok(())
-        } else if operation.is_empty() {
+        if *caller == ALICE || operation.is_empty() {
             Ok(())
         } else {
             Err(DispatchError::BadOrigin)

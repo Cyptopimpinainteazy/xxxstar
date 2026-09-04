@@ -19,9 +19,8 @@
 // INVARIANT: STARTUP-GATE-002 — gate outputs are deterministic across all
 // compliant builds (same scheduler, same vectors).
 
-// Only meaningful in native / std context — no point running inside WASM.
-#![cfg(feature = "std")]
-
+// Only std-gated: the outer `#[cfg(feature = "std")] pub mod startup_gate;` in
+// mod.rs already restricts this module to native builds, so no inner cfg needed.
 use crate::fraud_proofs::scheduler_v1::scheduler_commitment_from_bytes;
 use sp_core::H256;
 
