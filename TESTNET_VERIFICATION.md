@@ -80,6 +80,18 @@ finalization.
   await-per-tx loader, NOT a chain ceiling (peak measured separately ~50+/s parallel).
 - Account funded: free=1000000000000000000 (1 unit); nonce advanced 0->120.
 
+### FAILURE-INJECTION / RESILIENCE — 2026-09-04 (OS-level single-node kill)
+Deterministic solo-join net (run-solo-join.py 7 40) converged 7/7 (identical head #283 and
+finalized head 0xf1a6f7fa…). Killed one leaf validator (sj3). Survivors continued authoring +
+finalizing (~#283 -> ~#0x1c6) but the majority net PARTITIONED into two finalized branches
+({sj1,sj2,sj4}=0xb3334567… vs {sj5,sj6,sj7}=0xf93d5110…); sj1 had 5 peers yet did not bridge.
+=> FINDING GAP-P2P-1: default local libp2p graph is sparse/star-ish and does not auto-heal into
+a full mesh on this host; single-node loss can fork a >2/3-majority network. Production/public
+resilience needs explicit reserved/full-mesh or public-addr+kademlia wiring.
+Also reproduced (and recorded in ledger): cold-start from empty genesis with all validators
+concurrent can race light forks; deterministic recipe = solo-lead node-1 then join (run-solo-join),
+which converges 7/7 cleanly.
+
 ### SUSTAINED FINALIZED TPS ON 7-VALIDATOR NET — PASS — 2026-09-04
 Parallel loader packages/ts-sdk/par-load.mjs (bounded in-flight, nonce-delta finalized count).
 Senders = separate fresh-key endowed accounts (validator-2/3 master seeds).
