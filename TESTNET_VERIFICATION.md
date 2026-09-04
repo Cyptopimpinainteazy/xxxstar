@@ -283,3 +283,36 @@ Command (x3-lang/): `cargo build --workspace` / `cargo clippy --workspace --all-
 Result: PASS (all EXIT 0)
 Evidence: build Finished 0.18s; clippy 0.23s no warnings; test: every `test result: ok`, 0 failed (incl USB b52_test/executor_tests/parser_coverage + LOCAL test_ir_verifier(8)/test_numeric_policy(5)/test_conformance(1)/test_diagnostics(3)).
 Root-integration: x3-lang is a self-contained separate workspace; no root-workspace crate path- or name-depends on any x3-lang-* crate (only x3-compiler/tests/schema_validator.rs reads x3-lang/schema.json as a data fixture). Reproduced 2026-09-04 by parent session; commits f55fa53a + f4c4ddc8 from reconcile subagent, tree clean.
+
+## X3-ATOMIC-SWAP-X3VM-RECONCILE 2026-09-04
+Reconcile of USB-finished `crates/x3-atomic-swap` + `crates/x3-vm/src/bridge.rs` vs local
+audited/testnet tree. Working tree was git-clean at 90d16bff. Source of record (READ-ONLY):
+`/media/lojak/USB-Drive/home/x3star/Desktop/xxxstar-main`.
+
+Commands (all from repo root):
+- `cargo clippy -p x3-atomic-swap -p x3-vm --all-targets --features x3-atomic-swap/std -- -D warnings` → EXIT 0
+- `cargo test -p x3-atomic-swap --features std` → 0 failed (lib 649, atlas_htlc 1, chaos 31, integration 44)
+- `cargo test -p x3-atomic-swap` (default) → 0 failed (lib 638, chaos 31, integration 44)
+- `cargo clippy -p x3-vm --all-targets -- -D warnings` → EXIT 0
+- `cargo test -p x3-vm` → 0 failed (lib 148 incl. new universal_escrow suite, gpu 8)
+- `cargo check --workspace` → EXIT 0 (no regression across all x3-vm / x3-atomic-swap reverse deps incl. node, x3-relayer, x3-bridge-adapters, pallets, chain-health-daemon)
+- `cargo test -p x3-chain-health-daemon` (only reverse dep of x3-atomic-swap) → EXIT 0 (4)
+
+Direction-facts verified per file: every one of the 18 differing *_htlc.rs/scoreboard files differed
+from local ONLY by the new `cross_adapter_atomicity_test` readiness field (+ matching readiness
+test assertions); adapter.rs & lib.rs differ structurally; x3-vm src/bridge.rs local was a pure subset
+of USB. Not re-derived by me (parent measured 2026-09-04); I confirmed each file diff directly.
+
+Adopted from USB (commit b1cb60ed): typed `VmFamily` engine + readiness incl.
+`cross_adapter_atomicity_test`, `VmType::WasmL1`, whole-file readiness propagations across all
+*_htlc adapters + scoreboard + chaos test, cross-adapter atomicity tests, scoreboard dynamic
+overall-% fix, clippy lint fixes (atlas test borrow; no behavior change).
+Adopted from USB (commit ac70bbb4): x3-vm bridge symmetric `unwind_*_lock` hooks + 0x32/0x33
+universal cross-VM hostcalls + the single required supporting module `universal_escrow.rs`.
+
+Kept local verbatim: `evm_live.rs`/`btc_live.rs` (+ their std-gated lib.rs mods) — USB lacked them.
+Not adopted (noted conflict): `tests/state_machine_proptest.rs` (USB-unvalidated: fails against the
+shared, out-of-scope `intent.rs` where `Expired` is terminal yet lists `Refundable/Failed` as valid
+transitions — adopting would force an out-of-scope intent.rs change) and `FoundryGovernance.sol`
+(USB rewrote its interface to VoteType/abstain/multisig but its governance test peer still uses the
+old interface — separate EVM-contracts reconcile; left local). Blockers below.
