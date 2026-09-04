@@ -29,10 +29,19 @@ function getEnvNumber(name: string, defaultValue: number): number {
   const parsed = parseInt(value, 10);
   return isNaN(parsed) ? defaultValue : parsed;
 }
-
 function getEnvBoolean(name: string, defaultValue: boolean): boolean {
   const value = getEnv(name, defaultValue.toString());
   return value.toLowerCase() === 'true' || value === '1';
+}
+
+// Read an optional env var: returns undefined when unset or empty, which is
+// appropriate for values typed as optional (e.g. an override endpoint).
+function getEnvOptional(name: string): string | undefined {
+  if (typeof process !== 'undefined' && process.env) {
+    const value = process.env[name];
+    return value === undefined || value === '' ? undefined : value;
+  }
+  return undefined;
 }
 
 // Network endpoints configuration
@@ -69,7 +78,7 @@ export function getSdkConfig(): X3SdkConfig {
 
   return {
     network,
-    endpoint: getEnv('X3_RPC_ENDPOINT', undefined),
+    endpoint: getEnvOptional('X3_RPC_ENDPOINT'),
     autoReconnect: getEnvBoolean('X3_AUTO_RECONNECT', true),
     reconnectMaxAttempts: getEnvNumber('X3_RECONNECT_MAX', 5),
     reconnectDelay: getEnvNumber('X3_RECONNECT_DELAY', 1000),
