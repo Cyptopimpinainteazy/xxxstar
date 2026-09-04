@@ -193,6 +193,8 @@ members = [
     "crates/x3-atomic-swap",
     # Bitcoin vault — threshold multisig vault with SPV proof accounting
     "crates/x3-bitcoin-vault",
+    # Chain health monitor daemon — merged from USB lineage 2026-09-04 (polls metrics, writes health proofs)
+    "crates/x3-chain-health-daemon",
 ]
 default-members = ["node"]
 resolver = "2"
