@@ -1,0 +1,6 @@
+# TESTNET Key material — NEVER commit. These are throwaway local-validator SURIs,
+# but the pattern must not leak secrets into the git history of this audit repo.
+deployment/chain-specs/fresh/validator-keys/
+*.suri
+*secret*key*
+deployment/chain-specs/fresh/.node-key-*
