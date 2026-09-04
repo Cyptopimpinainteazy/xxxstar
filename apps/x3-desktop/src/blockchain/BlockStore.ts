@@ -17,6 +17,9 @@ interface BlockStore {
   clearBlocks: () => void;
 }
 
+/** Maximum number of recent blocks retained by the store. */
+const MAX_RECENT_BLOCKS = 30;
+
 // Subscribe to real block:new events from the Tauri backend.
 // The Rust backend (main.rs start_telemetry_stream) polls chain_getBlock
 // on the node and emits 'block:new' events with { number, timestamp }.
@@ -40,7 +43,7 @@ function initBlockListener(): Promise<() => void> {
         },
       };
 
-      // Deduplicate: skip if this block number is already in the last 30
+      // Deduplicate: skip if this block number is already in recent history
       const alreadySeen = store.recentBlocks.some(
         (b) => b.height === block.height
       );
@@ -60,9 +63,17 @@ export const useBlockStore = create<BlockStore>((set) => ({
   recentBlocks: [],
 
   addBlock: (block) =>
-    set((state) => ({
-      recentBlocks: [...state.recentBlocks.slice(-30), block], // keep last 30
-    })),
+    set((state) => {
+      const next = [...state.recentBlocks, block];
+      return {
+        // Trim to the tail so we keep exactly MAX_RECENT_BLOCKS entries.
+        // Append-then-trim avoids the slice(-30) + append off-by-one of 31.
+        recentBlocks:
+          next.length > MAX_RECENT_BLOCKS
+            ? next.slice(next.length - MAX_RECENT_BLOCKS)
+            : next,
+      };
+    }),
 
   removeBlock: (id) =>
     set((state) => ({

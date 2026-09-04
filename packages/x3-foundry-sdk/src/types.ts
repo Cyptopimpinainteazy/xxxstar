@@ -10,6 +10,10 @@
 
 import type { BigNumberish } from 'ethers';
 
+// Re-exported so consumers of this module can import the shared ethers
+// scalar type from a single stable location (`. /types`).
+export type { BigNumberish };
+
 // =============================================================================
 // Enums
 // =============================================================================

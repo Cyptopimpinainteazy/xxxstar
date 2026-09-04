@@ -11,7 +11,6 @@ import type { ApiClient } from './client';
 import type {
   Template,
   TemplateRegistry,
-  DAppType,
   PaginationParams,
 } from './types';
 
