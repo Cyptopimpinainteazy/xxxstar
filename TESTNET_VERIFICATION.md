@@ -20,7 +20,7 @@ Evidence: <hash/output/link>
 
 ### Git/baseline snapshot
 - Repo had NO .git (unversioned snapshot). Created git repo, committed full tree as
-  `091dbe3 "Baseline snapshot ..."` on 2026-09-03. 21687 files staged. Working tree clean at baseline.
+  `091dbe3a "Baseline snapshot ..."` on 2026-09-03. 21687 files staged. Working tree clean at baseline.
 
 ### Canonical node dev-chain boot (LIVE baseline) — PASS
 - Command: `target/release/x3-chain-node --dev --alice --tmp` (prebuilt release binary)
@@ -191,7 +191,7 @@ needs real cross-host connectivity + stable on-disk node keys, but the P2P-struc
 Reconciled the `x3-lang/` compiler + x3-vm subsystem between the LOCAL tree
 and the USB lineage (`/media/lojak/USB-Drive/home/x3star/Desktop/xxxstar-main`).
 Both are listed Critical X3 Systems (`.x3` language compiler + x3-vm
-executor/verifier). Scope = `x3-lang/` only. Commits: `f55fa53a`.
+executor/verifier). Scope = `x3-lang/` only. Commits: `de8a9eff`.
 
 ## Direction facts (independent of this task, verified during work)
 - `x3-lang/` is its own Cargo **workspace** (members: x3-common, x3-lexer,
@@ -266,7 +266,7 @@ engine incl. mode/risk/invariant), `b52_test` 33, `executor_tests` 30,
 `test_e2e_examples` 10, and LOCAL-side `test_ir_verifier` 8, `test_numeric_policy`
 5, `test_conformance` 1, `test_diagnostics` 3.
 
-## Files changed (commit f55fa53a)
+## Files changed (commit de8a9eff)
 23 modified + 21 added inside `x3-lang/` (USB adoption + merged lib.rs +
 verify_ir exhaustiveness). No files changed outside `x3-lang/`.
 
@@ -282,11 +282,11 @@ verify_ir exhaustiveness). No files changed outside `x3-lang/`.
 Command (x3-lang/): `cargo build --workspace` / `cargo clippy --workspace --all-targets -- -D warnings` / `cargo test --workspace`
 Result: PASS (all EXIT 0)
 Evidence: build Finished 0.18s; clippy 0.23s no warnings; test: every `test result: ok`, 0 failed (incl USB b52_test/executor_tests/parser_coverage + LOCAL test_ir_verifier(8)/test_numeric_policy(5)/test_conformance(1)/test_diagnostics(3)).
-Root-integration: x3-lang is a self-contained separate workspace; no root-workspace crate path- or name-depends on any x3-lang-* crate (only x3-compiler/tests/schema_validator.rs reads x3-lang/schema.json as a data fixture). Reproduced 2026-09-04 by parent session; commits f55fa53a + f4c4ddc8 from reconcile subagent, tree clean.
+Root-integration: x3-lang is a self-contained separate workspace; no root-workspace crate path- or name-depends on any x3-lang-* crate (only x3-compiler/tests/schema_validator.rs reads x3-lang/schema.json as a data fixture). Reproduced 2026-09-04 by parent session; commits de8a9eff + ea186202 from reconcile subagent, tree clean.
 
 ## X3-ATOMIC-SWAP-X3VM-RECONCILE 2026-09-04
 Reconcile of USB-finished `crates/x3-atomic-swap` + `crates/x3-vm/src/bridge.rs` vs local
-audited/testnet tree. Working tree was git-clean at 90d16bff. Source of record (READ-ONLY):
+audited/testnet tree. Working tree was git-clean at 09dd0a0e. Source of record (READ-ONLY):
 `/media/lojak/USB-Drive/home/x3star/Desktop/xxxstar-main`.
 
 Commands (all from repo root):
@@ -303,11 +303,11 @@ from local ONLY by the new `cross_adapter_atomicity_test` readiness field (+ mat
 test assertions); adapter.rs & lib.rs differ structurally; x3-vm src/bridge.rs local was a pure subset
 of USB. Not re-derived by me (parent measured 2026-09-04); I confirmed each file diff directly.
 
-Adopted from USB (commit b1cb60ed): typed `VmFamily` engine + readiness incl.
+Adopted from USB (commit 139bf14f): typed `VmFamily` engine + readiness incl.
 `cross_adapter_atomicity_test`, `VmType::WasmL1`, whole-file readiness propagations across all
 *_htlc adapters + scoreboard + chaos test, cross-adapter atomicity tests, scoreboard dynamic
 overall-% fix, clippy lint fixes (atlas test borrow; no behavior change).
-Adopted from USB (commit ac70bbb4): x3-vm bridge symmetric `unwind_*_lock` hooks + 0x32/0x33
+Adopted from USB (commit ef8c9946): x3-vm bridge symmetric `unwind_*_lock` hooks + 0x32/0x33
 universal cross-VM hostcalls + the single required supporting module `universal_escrow.rs`.
 
 Kept local verbatim: `evm_live.rs`/`btc_live.rs` (+ their std-gated lib.rs mods) — USB lacked them.
@@ -321,10 +321,10 @@ old interface — separate EVM-contracts reconcile; left local). Blockers below.
 Command (root): `cargo clippy -p x3-atomic-swap -p x3-vm --all-targets --features x3-atomic-swap/std -- -D warnings` ; `cargo test -p x3-atomic-swap --features std` ; `cargo test -p x3-vm`
 Result: PASS (EXIT 0; all suites ok, 0 failed)
 Evidence (independently re-run by parent session): clippy EXIT 0 (36s, no warnings); atomic-swap std tests 0 failed (lib 649 + chaos 31 + integration 44 + atlas 1); x3-vm 0 failed. Tree clean. Fake-code scan clean on adapter.rs/wasm_l1_htlc.rs/universal_escrow.rs/bridge.rs.
-Reconcile commits b1cb60ed + ac70bbb4 + 0df9ab5d from subagent: USB typed-VmFamily/readiness engine + wasm_l1_htlc adapter + x3-vm symmetric unwind + 0x32/0x33 cross-VM escrow hostcalls; kept local evm_live/btc_live + universal_escrow. Excluded (genuine conflicts): state_machine_proptest.rs (needs out-of-scope intent.rs fix), FoundryGovernance.sol (USB internally inconsistent; separate EVM-contracts reconcile). Reproduced 2026-09-04.
+Reconcile commits 139bf14f + ef8c9946 + 0c1381a7 from subagent: USB typed-VmFamily/readiness engine + wasm_l1_htlc adapter + x3-vm symmetric unwind + 0x32/0x33 cross-VM escrow hostcalls; kept local evm_live/btc_live + universal_escrow. Excluded (genuine conflicts): state_machine_proptest.rs (needs out-of-scope intent.rs fix), FoundryGovernance.sol (USB internally inconsistent; separate EVM-contracts reconcile). Reproduced 2026-09-04.
 
 ## POST-USB-RECONCILE MESH RE-PROOF-2026-09-04 (fresh release binary from reconciled tree)
-Context: after merging USB-finished x3-atomic-swap (typed VmFamily adapter + wasm_l1_htlc + cross_adapter_atomicity_test ripple across 17 htlc files + scoreboard) and x3-vm (symmetric unwind + 0x32/0x33 universal escrow hostcalls) reconciles (commits b1cb60ed/ac70bbb4/0df9ab5d, verified 956f6465), re-ran reserved full-mesh proofs against a FRESH release build to confirm no bring-up/consensus regression. Node binary previously stale (2026-09-03) predating reconcile.
+Context: after merging USB-finished x3-atomic-swap (typed VmFamily adapter + wasm_l1_htlc + cross_adapter_atomicity_test ripple across 17 htlc files + scoreboard) and x3-vm (symmetric unwind + 0x32/0x33 universal escrow hostcalls) reconciles (commits 139bf14f/ef8c9946/0c1381a7, verified df4eac01), re-ran reserved full-mesh proofs against a FRESH release build to confirm no bring-up/consensus regression. Node binary previously stale (2026-09-03) predating reconcile.
 Command: `cargo build --release -p x3-chain-node` (EXIT 0, 5m13s, 2026-09-04 12:06) then `python3 scripts/testnet/run-mesh.py cycles --count 7 --cycles 8` and `... kills --count 7`.
 Result: PASS
 - Cold-start convergence (GAP-CONSENSUS-REPRO-1 bar): 8/8 cycles -> each cycle exactly ONE GRANDPA-finalized head across all 7 validators (18s converge; e.g. cycle8 mesh1..7 all final=0x16c424b36b83ef).
