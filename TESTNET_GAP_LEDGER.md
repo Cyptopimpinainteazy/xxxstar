@@ -62,4 +62,18 @@ history rewrite (filter-repo), deferred pending operator decision on audit-trail
 Lesson: audit .gitignore path bases (nested dirs resolve relative to the .gitignore location),
 and verify with `git check-ignore -v` + `git ls-files` not just gitignore presence.
 
+## SEC-v1 RESOLVED — full history purge — 2026-09-04 (completed, operator "do what's best")
+Committed the history rewrite with git filter-branch --index-filter removing
+validator-keys/suris.txt from all commits, then deleted refs/original/*, the refs/codex
+checkpoint that pinned the blob, orphaned stash ref, expired reflog, and gc --prune=now.
+VERIFIED triple-clean: (1) no suris.txt path reachable from any ref; (2) secret blob
+dab0e4e3... physically absent from object db (git cat-file -e fails); (3) deep scan of every
+remaining object found no seed hex (0xe8e93d...). History intact at 37 commits; all files
+present at HEAD; working tree clean. NOTE: cb1452e3/d594af8f hashes were REWRITTEN — use the
+new hashes (purge commit ≈207fffeb, ledger commit a063faeb), not the pre-rewrite ones.
+A pre-purge full-history bundle was written to /tmp/xxxstar-sec-histry-prebackup-*.bundle
+(CONTAINS THE OLD SECRET — delete it; do not ship/share). Lesson: after any rewrite the
+secret may survive in refs/* (refs/original, codex checkpoints) and reflog — must delete
+all pinning refs + expire reflog + gc --prune=now, then cat-file --batch-all-objects verify.
+
 Working notes: `.testnet-audit/`; evidence: `TESTNET_VERIFICATION.md`; mesh run logs /tmp/x3-mesh-*.
