@@ -31,9 +31,12 @@ use x3_common::{
 };
 use x3_cross_vm_bridge::CrossVmOperation;
 use x3_rpc::{
-    GasEstimationRPC, RPCTransaction, SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi,
-    WalletServiceRpc,
+    RPCTransaction, SwapRequest, WalletDexApi, WalletDexRpc, WalletServiceApi, WalletServiceRpc,
 };
+// Simulation-only gas estimator kept for off-chain developer tooling; canonical nodes
+// use the Frontier stub (see rpc_frontier).
+#[allow(deprecated)]
+use x3_rpc::GasEstimationRPC;
 
 use crate::rpc_middleware::RateLimiter;
 use crate::service::FullClient;
@@ -1326,9 +1329,10 @@ where
         )?;
     }
 
-    // ── Gas Estimation RPC ───────────────────────────────
+    // ── Gas Estimation RPC ──────────────────────────────
     // Simulation-only gas estimator for off-chain developer tooling.
     // Production nodes should use the Frontier stub in rpc_frontier.
+    #[allow(deprecated)] // see note above: intentional simulation-only estimator.
     let gas_estimator = std::sync::Arc::new(GasEstimationRPC::new());
     {
         let ge = gas_estimator.clone();

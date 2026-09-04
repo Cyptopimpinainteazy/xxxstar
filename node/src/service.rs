@@ -46,9 +46,9 @@ const AURA: KeyTypeId = KeyTypeId(*b"aura");
 /// Key type for GRANDPA finality
 const GRANDPA: KeyTypeId = KeyTypeId(*b"gran");
 
-/// Txpool sizing is determined dynamically by NetworkSpeed::detect().
-/// Design targets: 100k ready / 50k future, 256 MiB / 64 MiB, 60s ban.
-/// See NetworkSpeed enum and tuned_transaction_pool_options for runtime values.
+// Txpool sizing is determined dynamically by NetworkSpeed::detect().
+// Design targets: 100k ready / 50k future, 256 MiB / 64 MiB, 60s ban.
+// See NetworkSpeed enum and tuned_transaction_pool_options for runtime values.
 
 /// GPU Validator Sidecar health check interval (blocks).
 /// Health check runs every N blocks to detect sidecar crashes.
@@ -2052,8 +2052,10 @@ mod tests {
 
     #[test]
     fn grandpa_is_disabled_when_flash_finality_is_enabled() {
-        let mut feature_flags = NodeFeatureFlags::default();
-        feature_flags.enable_flash_finality = true;
+        let feature_flags = NodeFeatureFlags {
+            enable_flash_finality: true,
+            ..Default::default()
+        };
 
         assert!(!compute_enable_grandpa_from_flags(false, feature_flags));
     }
