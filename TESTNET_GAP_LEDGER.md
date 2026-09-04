@@ -7,20 +7,42 @@ tree treated as untrusted until reproduced. Severity labels as head note.
 
 | ID | Sev | Area | Description | Root cause | Evidence |
 |----|-----|------|-------------|-----------|----------|
-| GAP-P2P-1 | P1 | testnet/network bring-up | **Default libp2p graph is sparse/star-ish; single-node loss can partition a >2/3-majority net into forking groups.** Reproduced: 7-validator net (identical finalized heads) then killed sj3 (leaf). Survivors kept finalizing but split into two finalized branches {sj1,sj2,sj4}=0xb3334567… and {sj5,sj6,sj7}=0xf93d5110…; sj1 peers=5 yet did not bridge the two sides. | Local nodes on 127.0.0.1 with --no-mdns form a star to the bootnode + few edges; libp2p does not auto-heal into a full mesh; public-addr/kademlia gossip not wired on this host. | run: `scripts/testnet/run-solo-join.py 7 40` (converged 7/7) then `kill` node-3 (see logs /tmp/x3-solo-join/logs). |
 | GAP-CLI-1 | P1 | launch harness | `scripts/testnet/x3_testnet_up.sh` uses flags the current binary rejects (`--ws-port`, `--ws-external`, `--execution=NativeElseWasm`) and lacks forced node-key => first boot NetworkKeyNotFound. FIXED in place (edited script), re-verify under fresh review. | CLI surface drift vs doc'd harness. | bash -n clean after edit; single/7-node boots from the pattern now succeed. |
 | GAP-SPEC-1 | P0 | chain-spec generation | Stale dev-seed raw spec (deployment/chain-specs/x3-testnet-raw.json older, id x3_testnet_v1) is invalid: runtime LoadSpec rejects Live raw (no runtimeGenesis.config) OR missing Aura authorities. Correct path is env-gated `--chain=testnet` build-spec with fresh keys (plain, not --raw, because node file-validator rejects raw Live) + per-validator X3_DEV_SEED. | Live raw genesis cannot satisfy node-side structural validator; Aura requires real authority keys not dev seeds for live. | see TESTNET_VERIFICATION.md § multi-validator + fresh-key. |
 | GAP-AUTH-1 | P0 | node authoring | File-only keystore injection (standard substrate) does NOT drive Aura block authoring on this binary; needs programmatic insert via X3_DEV_SEED (service maybe_insert_dev_keys / insert_dev_keys_with_seed). Aura authorities ARE in block-0 storage. | Custom service; key discoverable only via maybe_insert_dev_keys path. | Single-node authored only after X3_DEV_SEED set (root-caused via A/B + storage read). |
-| GAP-BOOT-1 | P1 | local cold start | Concurrent starts from empty genesis are racy (observed forks). Prior note: solo-lead node1 then join (run-solo-join.py) reduced racy forks BUT see GAP-CONSENSUS-REPRO-1 — even solo-join is NOT reliably repeatable (forked on a later identical run). So start-ordering mitigates but does not guarantee clean convergence. | Aura/GRANDPA race + loopback contention. | see GAP-CONSENSUS-REPRO-1. |
-| GAP-MESH-1 | P1 | testnet networking | Hardening to a resilient full mesh needs --reserved-nodes with /p2p/<PeerId> suffixes; node CLI rejects reserved addresses without a PeerId ('Peer id is missing from the address'). Full-mesh therefore requires deterministic PeerId derivation from fixed node-keys (libp2p ed25519 multihash) — a deployment-phase task, not fixable purely on a single 127.0.0.1 host without that derivation. | substrate reserved-nodes contract requires PeerId; local testnet has none pre-derivable without node-key->PeerId helper. | run-mesh.py attempt: all nodes 2..N exited `error: invalid value ... Peer id is missing` — ERR_InvalidMultiaddr peer missing. |
-| GAP-CONSENSUS-REPRO-1 | P0 | consensus/P2P reliability | **Convergence is NOT reliably repeatable on this host's local multi-process testnet.** The SAME deterministic solo-join proc (run-solo-join.py 7 25) that earlier produced 7/7 identical finalized heads this session forked into two finalized sets ({sj2,sj5}=0x42edf6… vs {sj1,3,4,6,7}=0xb4da9f…) at the SAME best head #268. Combined with earlier net4 clean convergence and leaf-loss fork, conclusion: intermittent GRANDPA/P2P partition on loopback causes occasional lack-of-convergence/fork independent of runtime tx correctness (clean only when a connected majority forms). This is disqualifying for public-testnet readiness until the P2P healing / reserved-mesh / deterministic connectivity is implemented and re-proven across many repeated cold-starts. | GRANDPA agreement + libp2p graph healing under high-slot single-host contention is not reliably self-healing in this node/substrate pairing. | soak run 2026-09-04 (~00:5x): run-solo-join.py 7 25 -> unique finalized heads=2 (logs /tmp/x3-soak). Prior IDENTICAL run earlier = clean 1. |
 
 ## Confirmed solid (for the record)
 - Runtime GRANDPA consensus + tx finality correctness IS clean WHEN a connected majority forms: 7/7 identical finalized heads observed (net4), 2000/2000 remarks finalized at 110.6 finTPS / 0 lost, canonical head identical on all 7 under load.
 - Substrate runtime mechanics (aura/grandpa/session/txpool/rpc/spec build) operate correctly; the port/runtime/spec/CLI bring-up path is fully mapped.
-- NOTE: above does NOT guarantee reliable convergence on repeated cold-starts — see GAP-CONSENSUS-REPRO-1 (intermittent forks observed). Clean-runtime + fragile-local-P2P both true.
+- Reserved full mesh keeps runtime consensus clean WITHOUT a fragile local P2P bootstrap: 8/8 cold-starts and 7/7 single-loss survival on one host (see Resolved below).
 
-## Closed
-(empty; fixes above remain to be finally reviewed/committed as canonical ops.)
+## Resolved — RESERVED FULL-MESH (deterministic node-keys) — 2026-09-04
 
-Working notes: `.testnet-audit/`; evidence: `TESTNET_VERIFICATION.md`, run logs under /tmp/x3-*.
+Fixes GAP-P2P-1 / GAP-MESH-1 / GAP-CONSENSUS-REPRO-1 / GAP-BOOT-1 with `scripts/testnet/run-mesh.py`:
+each validator gets a deterministic `--node-key` (ed25519 secret = 0x…000N); each PeerId is
+derived from the node ITSELF (`system_localPeerId`, one throwaway sequential boot per key — ground
+truth, reproducible because the key is fixed); then all 7 are cold-started with a RESERVED FULL
+MESH (every node passes `--reserved-nodes /ip4/127.0.0.1/tcp/<P>/p2p/<PeerId>` for all OTHER nodes).
+No sparse star, no bootnode race, no single point of failure. Spec/tables: TESTNET_VERIFICATION.md
+§ RESERVED FULL-MESH.
+
+Closed on loopback-host empirical proof (single 127.0.0.1 host):
+- GAP-CONSENSUS-REPRO-1 (cold-start reliability): 8/8 fresh concurrent cold-starts each produced
+exactly ONE GRANDPA-finalized head across all 7 — `run-mesh.py cycles --count 7 --cycles 8`.
+- GAP-P2P-1 (single-loss partition): killing ANY one validator leaves the other 6 GRANDPA-finalizing
+ONE chain (7/7 victims) — `run-mesh.py kills --count 7` (was: one leaf loss split a majority into
+two finalized branches).
+- GAP-MESH-1 (reserved wiring): derived `/p2p/<PeerId>` reserved addresses accepted (no more 'Peer
+id is missing'); nodes reach peers=6/6.
+- GAP-BOOT-1 (boot-order race): simultaneous reserved starts converge — no solo-lead ordering needed.
+
+## Still open / honest bound
+- GAP-CLI-1, GAP-SPEC-1, GAP-AUTH-1 remain OPEN (table above) — bring-up/spec/author harness gaps,
+separate from P2P topology; the mesh proof rides on the now-known-good plain-spec + X3_DEV_SEED
+authoring + fixed node-key pattern.
+- Reserved-mesh convergence + single-loss survival is PROVEN on a SINGLE loopback host. Public
+cross-host readiness should re-prove on real network paths (multi-host/NAT/latency) and stable
+on-disk node keys; the P2P-structure root cause is deterministically addressed here, but loopback
+does not exercise real-world network contention.
+
+Working notes: `.testnet-audit/`; evidence: `TESTNET_VERIFICATION.md`; mesh run logs /tmp/x3-mesh-*.

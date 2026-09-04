@@ -1,0 +1,33 @@
+   derived node-1: 12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp
+   derived node-2: 12D3KooWHdiAxVd8uMQR1hGWXccidmfCwLqcMpGwR6QcTP6QRMuD
+   derived node-3: 12D3KooWSCufgHzV4fCwRijfH2k3abrpAJxTKxEvN1FDuRXA2U9x
+   derived node-4: 12D3KooWSsChzF81YDUKpe9Uk5AHV5oqAaXAcWNSPYgoLauUk4st
+   derived node-5: 12D3KooWSuTq6MG9gPt7qZqLFKkYrfxMewTZhj9nmRHJkPwzWDG2
+   derived node-6: 12D3KooWMz5U7fR8mF5DNhZSSyFN8c19kU63xYopzDSNCzoFigYk
+   derived node-7: 12D3KooWE3quQCP6Xu7eXpcmmpwVS1KofWnPCBWYNHCswgaqwCso
+[mesh] k-count=7; each victim taken from a fresh converged mesh
+[ok] victim=1: baseline converged in 18s; killing mesh1...
+[kill mesh1] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 0s -> SINGLE CHAIN
+    mesh1:DOWN | mesh2:final=0x8cfcfcbb1302c8,peers=5 | mesh3:final=0x8cfcfcbb1302c8,peers=5 | mesh4:final=0x8cfcfcbb1302c8,peers=5 | mesh5:final=0x8cfcfcbb1302c8,peers=5 | mesh6:final=0x8cfcfcbb1302c8,peers=5 | mesh7:final=0x8cfcfcbb1302c8,peers=5
+[ok] victim=2: baseline converged in 18s; killing mesh2...
+[kill mesh2] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 8s -> SINGLE CHAIN
+    mesh1:final=0x826e0db2cab669,peers=5 | mesh2:DOWN | mesh3:final=0x826e0db2cab669,peers=5 | mesh4:final=0x826e0db2cab669,peers=5 | mesh5:final=0x826e0db2cab669,peers=5 | mesh6:final=0x826e0db2cab669,peers=5 | mesh7:final=0x826e0db2cab669,peers=5
+[ok] victim=3: baseline converged in 14s; killing mesh3...
+[kill mesh3] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 0s -> SINGLE CHAIN
+    mesh1:final=0x113f56d2b8b121,peers=4 | mesh2:final=0x113f56d2b8b121,peers=4 | mesh3:DOWN | mesh4:final=0x113f56d2b8b121,peers=5 | mesh5:final=0x113f56d2b8b121,peers=4 | mesh6:final=0x113f56d2b8b121,peers=4 | mesh7:final=0x113f56d2b8b121,peers=1
+[ok] victim=4: baseline converged in 14s; killing mesh4...
+[kill mesh4] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 0s -> SINGLE CHAIN
+    mesh1:final=0xcfefdc35f428c3,peers=2 | mesh2:final=0xcfefdc35f428c3,peers=3 | mesh3:final=0xcfefdc35f428c3,peers=3 | mesh4:DOWN | mesh5:final=0xcfefdc35f428c3,peers=2 | mesh6:final=0xcfefdc35f428c3,peers=5 | mesh7:final=0xcfefdc35f428c3,peers=3
+[ok] victim=5: baseline converged in 14s; killing mesh5...
+[kill mesh5] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 0s -> SINGLE CHAIN
+    mesh1:final=0xd6d1ba606063d3,peers=2 | mesh2:final=0xd6d1ba606063d3,peers=1 | mesh3:final=0xd6d1ba606063d3,peers=1 | mesh4:final=0xd6d1ba606063d3,peers=3 | mesh5:DOWN | mesh6:final=0xd6d1ba606063d3,peers=1 | mesh7:final=0xd6d1ba606063d3,peers=2
+[ok] victim=6: baseline converged in 14s; killing mesh6...
+[kill mesh6] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 0s -> SINGLE CHAIN
+    mesh1:final=0xf92b65b65b0bb5,peers=3 | mesh2:final=0xf92b65b65b0bb5,peers=1 | mesh3:final=0xf92b65b65b0bb5,peers=2 | mesh4:final=0xf92b65b65b0bb5,peers=5 | mesh5:final=0xf92b65b65b0bb5,peers=4 | mesh6:DOWN | mesh7:final=0xf92b65b65b0bb5,peers=3
+[ok] victim=7: baseline converged in 18s; killing mesh7...
+[kill mesh7] 0 survivors lost RPC; 1 finalized head(s) among 6/6 in 0s -> SINGLE CHAIN
+    mesh1:final=0xdaaba1d50478f9,peers=5 | mesh2:final=0xdaaba1d50478f9,peers=5 | mesh3:final=0xdaaba1d50478f9,peers=5 | mesh4:final=0xdaaba1d50478f9,peers=5 | mesh5:final=0xdaaba1d50478f9,peers=5 | mesh6:final=0xdaaba1d50478f9,peers=5 | mesh7:DOWN
+
+[result] kill-survival (one loss at a time from full mesh): 7/7 victims -> survivors kept ONE chain
+
+[OK] RESERVED FULL MESH: loss of ANY single member left >=5 finalizing ONE chain.
