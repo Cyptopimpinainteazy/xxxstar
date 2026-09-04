@@ -122,12 +122,10 @@ mod cli_flags_tests {
     /// Test that feature flag names follow naming convention
     #[test]
     fn feature_flag_names_are_consistent() {
-        let flags = vec![
-            "enable_parallel_proposer",
+        let flags = ["enable_parallel_proposer",
             "enable_flash_finality",
             "enable_poh",
-            "gpu_required",
-        ];
+            "gpu_required"];
 
         // All enable_* flags should be toggles
         for flag in flags.iter().take(3) {
@@ -147,7 +145,7 @@ mod cli_flags_tests {
     /// Test that feature flags are boolean-valued
     #[test]
     fn feature_flags_are_boolean() {
-        let values = vec![true, false];
+        let values = [true, false];
         assert_eq!(
             values.len(),
             2,
@@ -183,7 +181,7 @@ mod config_separation_tests {
     /// Test that three configuration tiers are defined
     #[test]
     fn three_config_tiers_exist() {
-        let configs = vec!["development", "local", "staging"];
+        let configs = ["development", "local", "staging"];
         assert_eq!(configs.len(), 3, "Should have exactly 3 default configs");
     }
 
@@ -327,11 +325,9 @@ mod telemetry_tests {
 
         if flash_finality_enabled {
             // These metrics should be available
-            let metrics = vec![
-                "x3_flash_finality_rounds_completed",
+            let metrics = ["x3_flash_finality_rounds_completed",
                 "x3_flash_finality_shadow_agreements",
-                "x3_flash_finality_certificates_issued",
-            ];
+                "x3_flash_finality_certificates_issued"];
             assert_eq!(metrics.len(), 3, "Should have 3 Flash Finality metrics");
         }
     }
@@ -342,7 +338,7 @@ mod telemetry_tests {
         let poh_enabled = true;
 
         if poh_enabled {
-            let poh_metrics = vec!["x3_poh_tickets_verified", "x3_poh_digests_validated"];
+            let poh_metrics = ["x3_poh_tickets_verified", "x3_poh_digests_validated"];
             assert_eq!(poh_metrics.len(), 2, "Should have PoH metrics");
         }
     }
@@ -370,7 +366,7 @@ mod graceful_shutdown_tests {
     /// Test that SIGTERM is the primary shutdown signal
     #[test]
     fn sigterm_is_primary_signal() {
-        let shutdown_signals = vec!["SIGTERM", "SIGINT"];
+        let shutdown_signals = ["SIGTERM", "SIGINT"];
         assert!(
             shutdown_signals.contains(&"SIGTERM"),
             "SIGTERM should be supported"
@@ -409,12 +405,10 @@ mod graceful_shutdown_tests {
         // - Pending votes count
         // - Cleanup status
 
-        let logs_expected = vec![
-            "Shutdown initiated",
+        let logs_expected = ["Shutdown initiated",
             "Final block",
             "pending votes",
-            "database flush",
-        ];
+            "database flush"];
         assert_eq!(logs_expected.len(), 4);
     }
 

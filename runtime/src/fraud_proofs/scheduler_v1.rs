@@ -91,8 +91,8 @@ pub fn canonical_order(witness: &SchedulerWitnessV1) -> Result<Vec<u32>, Witness
     let n = witness.tx_ids.len();
 
     let mut in_degree = vec![0u32; n];
-    for i in 0..n {
-        for &j in &edges[i] {
+    for edge in edges.iter().take(n) {
+        for &j in edge {
             in_degree[j as usize] += 1;
         }
     }

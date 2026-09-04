@@ -554,7 +554,7 @@ mod tests {
     fn test_evm_receipt_rlp_validation_short_list() {
         // Test RLP validation for short list format
         // RLP for a simple list [1, 2, 3] = c3 01 02 03
-        let rlp = vec![0xc3, 0x01, 0x02, 0x03];
+        let rlp = [0xc3, 0x01, 0x02, 0x03];
 
         // Note: is_valid_receipt_rlp is private, so we test via the public function
         // For now, we just verify the logic conceptually
@@ -577,7 +577,7 @@ mod tests {
     fn test_evm_receipt_rlp_validation_non_list() {
         // RLP that's not a list should be invalid
         // Single byte encoding: 0x42 = the byte 0x42
-        let rlp = vec![0x42];
+        let rlp = [0x42];
 
         // This is not a list (which must start with 0xc0+)
         // Receipts are always lists
@@ -609,7 +609,7 @@ mod tests {
     fn test_solana_compact_u32_single_byte() {
         // Test decoding of single-byte compact u32 (0-127)
         // Values 0-127 encode as single byte
-        let data = vec![0x42]; // 66 in decimal
+        let data = [0x42]; // 66 in decimal
 
         // Verify basic structure
         assert_eq!(data[0], 0x42);
@@ -620,7 +620,7 @@ mod tests {
     fn test_solana_compact_u32_two_bytes() {
         // Test two-byte compact u32 encoding
         // Values 128-16383 encode as two bytes with top 2 bits as 0b10
-        let data = vec![0x80, 0x01]; // First byte: 10000000 (128-255), Second byte: 0xxxxxxx
+        let data = [0x80, 0x01]; // First byte: 10000000 (128-255), Second byte: 0xxxxxxx
 
         // First byte should have top 2 bits = 10
         assert_eq!(data[0] & 0xc0, 0x80);
@@ -668,7 +668,7 @@ mod tests {
     fn test_solana_transaction_structure_truncated() {
         // Truncated transaction is invalid
         // Only signature count byte, no signatures follow
-        let tx = vec![0x01]; // Says 1 signature, but none provided
+        let tx = [0x01]; // Says 1 signature, but none provided
         assert_eq!(tx.len(), 1);
         // Would need at least 1 + 64 bytes for valid transaction
         assert!(tx.len() < 65);

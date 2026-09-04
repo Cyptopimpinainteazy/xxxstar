@@ -12,9 +12,7 @@
 //! - clean_expired_proofs (expired cleanup)
 
 use crate::mock::*;
-use crate::types::{
-    ChallengeResolution, ProofConfig, ProofKind, ProofStatus,
-};
+use crate::types::{ChallengeResolution, ProofConfig, ProofKind, ProofStatus};
 use crate::{Error, Event};
 use frame_support::{assert_noop, assert_ok, traits::Currency};
 
@@ -229,7 +227,7 @@ fn test_submission_different_proof_kinds() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let kinds = vec![
+        let kinds = [
             ProofKind::ZkSnark,
             ProofKind::FormalVerification,
             ProofKind::ReplayProof,
@@ -541,7 +539,7 @@ fn test_resolve_challenge_upheld() {
         ));
 
         let _ = Balances::make_free_balance_be(&BOB, 1_000_000);
-        let bob_balance_before = Balances::free_balance(&BOB);
+        let bob_balance_before = Balances::free_balance(BOB);
 
         // Challenge
         assert_ok!(ProofCarryingAgent::challenge_proof(
@@ -566,8 +564,8 @@ fn test_resolve_challenge_upheld() {
         assert_eq!(challenge.resolution, Some(ChallengeResolution::Upheld));
 
         // BOB should get stake back (unreserved)
-        assert_eq!(Balances::reserved_balance(&BOB), 0);
-        assert_eq!(Balances::free_balance(&BOB), bob_balance_before);
+        assert_eq!(Balances::reserved_balance(BOB), 0);
+        assert_eq!(Balances::free_balance(BOB), bob_balance_before);
 
         // Event emitted
         System::assert_has_event(
@@ -619,7 +617,7 @@ fn test_resolve_challenge_dismissed() {
         assert_eq!(challenge.resolution, Some(ChallengeResolution::Dismissed));
 
         // BOB should lose stake (slashed)
-        assert_eq!(Balances::reserved_balance(&BOB), 0);
+        assert_eq!(Balances::reserved_balance(BOB), 0);
     });
 }
 
@@ -638,7 +636,7 @@ fn test_resolve_challenge_expired() {
         ));
 
         let _ = Balances::make_free_balance_be(&BOB, 1_000_000);
-        let bob_balance_before = Balances::free_balance(&BOB);
+        let bob_balance_before = Balances::free_balance(BOB);
 
         // Challenge
         assert_ok!(ProofCarryingAgent::challenge_proof(
@@ -659,8 +657,8 @@ fn test_resolve_challenge_expired() {
         assert_eq!(action.status, ProofStatus::Verified);
 
         // BOB should get stake back
-        assert_eq!(Balances::reserved_balance(&BOB), 0);
-        assert_eq!(Balances::free_balance(&BOB), bob_balance_before);
+        assert_eq!(Balances::reserved_balance(BOB), 0);
+        assert_eq!(Balances::free_balance(BOB), bob_balance_before);
     });
 }
 

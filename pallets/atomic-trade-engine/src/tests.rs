@@ -56,11 +56,6 @@ fn x3_leg(amount: u128, min_out: u128) -> TradeLegInput {
     create_test_leg(VmType::X3, AmmProtocol::ConstantProduct, amount, min_out)
 }
 
-/// Create a cross-VM trade leg
-fn cross_vm_leg(amount: u128, min_out: u128) -> TradeLegInput {
-    create_test_leg(VmType::CrossVm, AmmProtocol::AtlasAmm, amount, min_out)
-}
-
 // ============================================================================
 // Trade Batch Creation Tests
 // ============================================================================
@@ -84,7 +79,7 @@ fn create_trade_batch_works() {
         assert_eq!(AtomicTradeEngine::get_trade_nonce(&account), 1);
 
         // Verify pending batches
-        let pending = AtomicTradeEngine::pending_batches(&account);
+        let pending = AtomicTradeEngine::pending_batches(account);
         assert_eq!(pending.len(), 1);
     });
 }
@@ -237,7 +232,7 @@ fn execute_single_evm_leg_works() {
         ));
 
         // Get batch ID
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         // Execute batch
@@ -273,7 +268,7 @@ fn execute_single_svm_leg_works() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         assert_ok!(AtomicTradeEngine::execute_trade_batch(
@@ -303,7 +298,7 @@ fn execute_single_x3_leg_works() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         assert_ok!(AtomicTradeEngine::execute_trade_batch(
@@ -340,7 +335,7 @@ fn execute_triple_vm_batch_via_kernel_comit_v2_works() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&who);
+        let pending = AtomicTradeEngine::pending_batches(who);
         let batch_id = pending[0];
         let comit_id = H256::from_low_u64_be(5001);
 
@@ -382,7 +377,7 @@ fn kernel_comit_failure_is_rolled_back_but_batch_is_marked_failed() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&who);
+        let pending = AtomicTradeEngine::pending_batches(who);
         let batch_id = pending[0];
         let comit_id = H256::from_low_u64_be(5002);
 
@@ -424,7 +419,7 @@ fn execute_multi_leg_batch_works() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         assert_ok!(AtomicTradeEngine::execute_trade_batch(
@@ -461,7 +456,7 @@ fn execute_fails_with_slippage_exceeded() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         // Execute - returns Ok but batch status is Failed due to slippage
@@ -490,7 +485,7 @@ fn execute_fails_for_non_owner() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         // Different account tries to execute
@@ -533,7 +528,7 @@ fn cancel_pending_batch_works() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         assert_ok!(AtomicTradeEngine::cancel_trade_batch(
@@ -545,7 +540,7 @@ fn cancel_pending_batch_works() {
         assert!(AtomicTradeEngine::trade_batches(batch_id).is_none());
 
         // Should be removed from pending
-        let pending_after = AtomicTradeEngine::pending_batches(&account(1));
+        let pending_after = AtomicTradeEngine::pending_batches(account(1));
         assert!(pending_after.is_empty());
     });
 }
@@ -563,7 +558,7 @@ fn cancel_fails_for_non_owner() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         assert_noop!(
@@ -768,7 +763,7 @@ fn checkpoints_are_created_during_execution() {
             0,
         ));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         assert_ok!(AtomicTradeEngine::execute_trade_batch(
@@ -829,7 +824,7 @@ fn events_are_emitted_correctly() {
             RuntimeEvent::AtomicTradeEngine(Event::TradeBatchCreated { .. })
         )));
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         let batch_id = pending[0];
 
         System::reset_events();
@@ -914,7 +909,7 @@ fn concurrent_batches_per_account() {
             ));
         }
 
-        let pending = AtomicTradeEngine::pending_batches(&account(1));
+        let pending = AtomicTradeEngine::pending_batches(account(1));
         assert_eq!(pending.len(), 5);
     });
 }

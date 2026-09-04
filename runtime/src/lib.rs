@@ -121,6 +121,7 @@ use frame_support::dispatch::DispatchResult;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
+#[allow(deprecated)] // create_runtime_str! accepted: required by the runtime_version grammar.
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     traits::{
@@ -303,6 +304,10 @@ fn decode_evm_tx_hash(tx_hash: &[u8]) -> Option<H256> {
 }
 
 #[sp_version::runtime_version]
+// `create_runtime_str!` is required by the runtime_version proc-macro grammar;
+// the macro is deprecated upstream but there is no drop-in that keeps VERSION
+// parseable, so the deprecation is accepted here until sp_version relaxes it.
+#[allow(deprecated)]
 pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     spec_name: create_runtime_str!("x3-chain"),
     impl_name: create_runtime_str!("x3-chain"),
@@ -886,7 +891,7 @@ impl pallet_x3_oracle::Config for Runtime {
 parameter_types! {
     pub const MaxPendingRequests: u32 = 10;
     pub const BaseFee: Balance = 100 * DOLLARS;
-    pub const FeePerByte: Balance = 1 * DOLLARS / 1000;
+    pub const FeePerByte: Balance = DOLLARS / 1000;
     pub const MaxSeedLength: u32 = 100;
 }
 
@@ -1073,6 +1078,11 @@ impl pallet_balances::Config for Runtime {
 
 impl pallet_transaction_payment::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
+    // stable2512 still deprecates CurrencyAdapter in favour of FungibleAdapter;
+    // switching here would require re-typing the custom `DealWithFees` imbalance
+    // handler to the fungible imbalance type — a fee-behaviour migration tracked
+    // separately rather than bundled into a lint cleanup.
+    #[allow(deprecated)]
     type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees>;
     type OperationalFeeMultiplier = OperationalFeeMultiplier;
     type WeightToFee = IdentityFee<Balance>;
@@ -1139,7 +1149,6 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 
 // ── Fraud-proof inline pallet config ─────────────────────────────────────────
 impl crate::fraud_proofs::pallet::pallet::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type Currency = Balances;
     type MaxTxCount = FraudProofMaxTxCount;
     type DisputeWindowBlocks = FraudProofDisputeWindowBlocks;
@@ -3149,9 +3158,9 @@ impl GetSessionNumber for SessionHandler {
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benches {
+    use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
-    use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     use pallet_x3_slash::Pallet as X3Slash;
 
     frame_benchmarking::define_benchmarks!(
@@ -3255,6 +3264,7 @@ impl_runtime_apis! {
             pallet_x3_kernel::Authorities::<Runtime>::get().into_inner()
         }
 
+        #[allow(unused_variables)]
         fn map_evm_address(address: Vec<u8>) -> Option<AccountId> {
             #[cfg(feature = "frontier")]
             {
@@ -3280,6 +3290,7 @@ impl_runtime_apis! {
             { None }
         }
 
+        #[allow(unused_variables)]
         fn get_evm_balance(evm_address: Vec<u8>, asset_id: AssetId) -> Option<Balance> {
             #[cfg(feature = "frontier")]
             {
@@ -3301,6 +3312,7 @@ impl_runtime_apis! {
             { None }
         }
 
+        #[allow(unused_variables)]
         fn get_evm_code(evm_address: Vec<u8>) -> Vec<u8> {
             #[cfg(feature = "frontier")]
             {
@@ -3320,6 +3332,7 @@ impl_runtime_apis! {
             { Vec::new() }
         }
 
+        #[allow(unused_variables)]
         fn get_evm_storage(evm_address: Vec<u8>, storage_key: H256) -> Option<H256> {
             #[cfg(feature = "frontier")]
             {
@@ -3340,6 +3353,7 @@ impl_runtime_apis! {
             { None }
         }
 
+        #[allow(unused_variables)]
         fn get_evm_nonce(evm_address: Vec<u8>) -> u64 {
             #[cfg(feature = "frontier")]
             {
@@ -3392,6 +3406,7 @@ impl_runtime_apis! {
             balance > 0
         }
 
+        #[allow(unused_variables)]
         fn submit_evm_transaction(raw_tx: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
             #[cfg(feature = "frontier")]
             {
@@ -3635,6 +3650,7 @@ impl_runtime_apis! {
             }
         }
 
+        #[allow(unused_variables)]
         fn call_evm(caller: Option<Vec<u8>>, evm_address: Vec<u8>, input: Vec<u8>, gas_limit: u64) -> Result<Vec<u8>, Vec<u8>> {
             #[cfg(feature = "frontier")]
             {
@@ -3701,6 +3717,7 @@ impl_runtime_apis! {
             { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
         }
 
+        #[allow(unused_variables)]
         fn estimate_evm_gas(caller: Option<Vec<u8>>, evm_address: Vec<u8>, input: Vec<u8>, gas_limit: u64) -> Result<u64, Vec<u8>> {
             #[cfg(feature = "frontier")]
             {
@@ -3861,6 +3878,7 @@ impl_runtime_apis! {
             pallet_x3_kernel::SvmBlockhashSlots::<Runtime>::get(&blockhash)
         }
 
+        #[allow(unused_variables)]
         fn deploy_evm_contract(caller: Option<Vec<u8>>, bytecode: Vec<u8>, gas_limit: u64) -> Result<Vec<u8>, Vec<u8>> {
             #[cfg(feature = "frontier")]
             {
@@ -3928,6 +3946,7 @@ impl_runtime_apis! {
             { Err(b"EVM disabled in RC-1 (frontier feature off)".to_vec()) }
         }
 
+        #[allow(unused_variables)]
         fn get_evm_contract_receipt(contract_address: Vec<u8>) -> Option<Vec<u8>> {
             #[cfg(feature = "frontier")]
             {

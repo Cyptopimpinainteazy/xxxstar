@@ -85,10 +85,10 @@ proptest! {
         account in arb_account_id(),
         amount in arb_balance(1, 1_000_000)
     ) {
-        new_test_ext().execute_with(|| {
+        let _ = new_test_ext().execute_with(|| {
             // Initial state
-            let initial_free = mock::Balances::free_balance(&account);
-            let initial_reserved = mock::Balances::reserved_balance(&account);
+            let initial_free = mock::Balances::free_balance(account);
+            let initial_reserved = mock::Balances::reserved_balance(account);
             let initial_total = initial_free + initial_reserved;
 
             // Reserve some balance
@@ -96,8 +96,8 @@ proptest! {
                 let reserve_result = mock::Balances::reserve(&account, amount);
 
                 if reserve_result.is_ok() {
-                    let after_reserve_free = mock::Balances::free_balance(&account);
-                    let after_reserve_reserved = mock::Balances::reserved_balance(&account);
+                    let after_reserve_free = mock::Balances::free_balance(account);
+                    let after_reserve_reserved = mock::Balances::reserved_balance(account);
                     let after_reserve_total = after_reserve_free + after_reserve_reserved;
 
                     // Invariant 1: Total balance unchanged after reserve
@@ -117,8 +117,8 @@ proptest! {
                     // Unreserve the amount
                     let unreserved = mock::Balances::unreserve(&account, amount);
 
-                    let final_free = mock::Balances::free_balance(&account);
-                    let final_reserved = mock::Balances::reserved_balance(&account);
+                    let final_free = mock::Balances::free_balance(account);
+                    let final_reserved = mock::Balances::reserved_balance(account);
                     let final_total = final_free + final_reserved;
 
                     // Invariant 3: Full unreserve succeeds
@@ -170,9 +170,9 @@ proptest! {
         svm_payload in arb_payload(),
         x3_payload in arb_x3_payload(),
     ) {
-        new_test_ext().execute_with(|| {
+        let _ = new_test_ext().execute_with(|| {
             let account = ALICE;
-            let initial_balance = mock::Balances::free_balance(&account);
+            let initial_balance = mock::Balances::free_balance(account);
 
             // Skip if insufficient balance
             if initial_balance < max_fee {
@@ -200,7 +200,7 @@ proptest! {
                 prepare_root,
             );
 
-            let final_balance = mock::Balances::free_balance(&account);
+            let final_balance = mock::Balances::free_balance(account);
             let actual_fee_charged = initial_balance.saturating_sub(final_balance);
 
             if result.is_ok() {
@@ -246,7 +246,7 @@ proptest! {
         svm_payload in arb_payload(),
         x3_payload in arb_x3_payload(),
     ) {
-        new_test_ext().execute_with(|| {
+        let _ = new_test_ext().execute_with(|| {
             let account = ALICE;
             let mut sorted_nonces = nonce_sequence.clone();
             sorted_nonces.sort_unstable();
@@ -313,16 +313,16 @@ proptest! {
     fn prop_no_overflow(
         amounts in prop::collection::vec(arb_balance(1, 100_000), 1..=10),
     ) {
-        new_test_ext().execute_with(|| {
+        let _ = new_test_ext().execute_with(|| {
             let account = ALICE;
-            let initial_balance = mock::Balances::free_balance(&account);
+            let initial_balance = mock::Balances::free_balance(account);
 
             let mut cumulative_reserved: Balance = 0;
             let mut successful_reserves: Vec<Balance> = Vec::new();
 
             // Try to reserve multiple amounts
             for amount in &amounts {
-                let current_free = mock::Balances::free_balance(&account);
+                let current_free = mock::Balances::free_balance(account);
 
                 if current_free >= *amount {
                     let reserve_result = mock::Balances::reserve(&account, *amount);
@@ -331,7 +331,7 @@ proptest! {
                         cumulative_reserved = cumulative_reserved.saturating_add(*amount);
                         successful_reserves.push(*amount);
 
-                        let new_reserved = mock::Balances::reserved_balance(&account);
+                        let new_reserved = mock::Balances::reserved_balance(account);
 
                         // Invariant: Reserved balance accumulates correctly (no overflow)
                         prop_assert!(
@@ -354,8 +354,8 @@ proptest! {
                 );
             }
 
-            let final_free = mock::Balances::free_balance(&account);
-            let final_reserved = mock::Balances::reserved_balance(&account);
+            let final_free = mock::Balances::free_balance(account);
+            let final_reserved = mock::Balances::reserved_balance(account);
             let final_total = final_free + final_reserved;
             let initial_total = initial_balance;
 
@@ -383,9 +383,9 @@ proptest! {
         num_comits in 1u8..=5u8,
         max_fee_per_comit in arb_balance(100, 1000),
     ) {
-        new_test_ext().execute_with(|| {
+        let _ = new_test_ext().execute_with(|| {
             let account = ALICE;
-            let initial_balance = mock::Balances::free_balance(&account);
+            let initial_balance = mock::Balances::free_balance(account);
             let total_max_fees = max_fee_per_comit * num_comits as u128;
 
             // Skip if insufficient balance
@@ -402,7 +402,7 @@ proptest! {
                 let x3_payload = vec![0x58, 0x33, 0x00, 0x01, i];
                 let nonce = i as u64;
 
-                let balance_before = mock::Balances::free_balance(&account);
+                let balance_before = mock::Balances::free_balance(account);
 
                 let prepare_root = compute_property_prepare_root(
                     comit_id,
@@ -425,7 +425,7 @@ proptest! {
                 );
 
                 if result.is_ok() {
-                    let balance_after = mock::Balances::free_balance(&account);
+                    let balance_after = mock::Balances::free_balance(account);
                     let fee_charged = balance_before.saturating_sub(balance_after);
                     total_fees_charged = total_fees_charged.saturating_add(fee_charged);
 
@@ -437,7 +437,7 @@ proptest! {
                 }
             }
 
-            let final_balance = mock::Balances::free_balance(&account);
+            let final_balance = mock::Balances::free_balance(account);
             let actual_total = initial_balance.saturating_sub(final_balance);
 
             // Invariant 1: Accumulated fees match measured total
@@ -470,13 +470,13 @@ proptest! {
         max_fee in arb_fee(),
         nonce in arb_nonce(),
     ) {
-        new_test_ext().execute_with(|| {
+        let _ = new_test_ext().execute_with(|| {
             let account = ALICE;
 
             // Capture initial state
-            let initial_free = mock::Balances::free_balance(&account);
-            let initial_reserved = mock::Balances::reserved_balance(&account);
-            let initial_nonce = Nonces::<Test>::get(&account);
+            let initial_free = mock::Balances::free_balance(account);
+            let initial_reserved = mock::Balances::reserved_balance(account);
+            let initial_nonce = Nonces::<Test>::get(account);
 
             // Deliberately craft invalid payloads to trigger failures
             let comit_id = H256::random();
@@ -504,9 +504,9 @@ proptest! {
                 prepare_root,
             );
 
-            let final_free = mock::Balances::free_balance(&account);
-            let final_reserved = mock::Balances::reserved_balance(&account);
-            let final_nonce = Nonces::<Test>::get(&account);
+            let final_free = mock::Balances::free_balance(account);
+            let final_reserved = mock::Balances::reserved_balance(account);
+            let final_nonce = Nonces::<Test>::get(account);
 
             if result.is_err() {
                 // Invariant 1: Free balance unchanged on failure

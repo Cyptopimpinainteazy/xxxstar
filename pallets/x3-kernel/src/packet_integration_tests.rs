@@ -10,16 +10,12 @@
 mod integration_tests {
     use frame_support::assert_ok;
     use parity_scale_codec::Encode;
-    use x3_packet_schema::{
-        EvmCall, EvmPacket, Packet, SvmAccount, SvmPacket, X3VmPacket, U256,
-    };
+    use x3_packet_schema::{EvmCall, EvmPacket, Packet, SvmAccount, SvmPacket, X3VmPacket, U256};
 
     use crate::{
         mock::new_test_ext,
         packet_adapters::{deserialize_packet, route_packet, validate_packet, DomainRoute},
     };
-
-    type Test = crate::mock::Test;
 
     /// Test 1: Deserialize and route EVM Call packet
     #[test]
@@ -151,7 +147,6 @@ mod integration_tests {
                 args: vec![1, 2, 3],
                 value: U256::from(100u64),
             };
-            let evm_bytes = evm_packet_obj.encode();
 
             // Create an SVM packet and serialize it
             let svm_packet_obj = SvmPacket::Invoke {
@@ -159,7 +154,6 @@ mod integration_tests {
                 accounts: vec![],
                 data: vec![0xff, 0xee],
             };
-            let svm_bytes = svm_packet_obj.encode();
 
             // Create an X3VM AtomicCross packet with packet objects (Box-wrapped)
             let packet = Packet::X3Vm(X3VmPacket::AtomicCross {

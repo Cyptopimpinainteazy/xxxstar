@@ -109,7 +109,7 @@ fn genesis_config_works() {
         assert_eq!(X3Coin::bonus_pool_balance(), 200_000_000_000_000_000_000);
 
         // Check team vesting schedule
-        let team_schedule = X3Coin::team_vesting(&TEAM_MEMBER).unwrap();
+        let team_schedule = X3Coin::team_vesting(TEAM_MEMBER).unwrap();
         assert_eq!(team_schedule.total_amount, 300_000_000_000_000_000_000);
         assert_eq!(team_schedule.claimed, 0);
         assert_eq!(team_schedule.start_block, 0);
@@ -147,7 +147,7 @@ fn team_vesting_claim_works() {
         assert!(canonical_balance > 0);
 
         // Check vesting schedule was updated
-        let schedule = X3Coin::team_vesting(&TEAM_MEMBER).unwrap();
+        let schedule = X3Coin::team_vesting(TEAM_MEMBER).unwrap();
         assert_eq!(schedule.claimed, canonical_balance);
     });
 }
@@ -197,7 +197,7 @@ fn bonus_claim_works() {
         );
 
         // Check claim record was added
-        let claims = X3Coin::bonus_claims(&BONUS_CLAIMER);
+        let claims = X3Coin::bonus_claims(BONUS_CLAIMER);
         assert_eq!(claims.len(), 1);
         assert_eq!(claims[0].amount, bonus_amount);
     });
@@ -382,7 +382,7 @@ fn cross_chain_rejects_svm_invalid_signature_proof() {
         let proof = X3Proof::SvmProof {
             signature: vec![0u8; 32],
             block_number: 1000,
-            proof_data: svm_finality_proof_data(&vec![0u8; 32], 1000, 32),
+            proof_data: svm_finality_proof_data(&[0u8; 32], 1000, 32),
         };
 
         assert_noop!(
@@ -717,13 +717,9 @@ fn stress_test_multiple_operations() {
             let amount = 10_000_000_000_000_000; // 10 X3 each
 
             let proof = X3Proof::EvmProof {
-                tx_hash: H256::from_low_u64_be((i + 1) as u64),
-                block_number: 1000 + i as u64,
-                proof_data: evm_finality_proof_data(
-                    H256::from_low_u64_be((i + 1) as u64),
-                    1000 + i as u64,
-                    12,
-                ),
+                tx_hash: H256::from_low_u64_be(i + 1),
+                block_number: 1000 + i,
+                proof_data: evm_finality_proof_data(H256::from_low_u64_be(i + 1), 1000 + i, 12),
             };
 
             assert_ok!(X3Coin::mint(

@@ -306,8 +306,8 @@ fn kahn_topological_sort(
     // edges[i] already contains {j > i | conflict(i,j)}, so the DAG is edges itself.
 
     let mut in_degree: Vec<u32> = vec![0u32; tx_count];
-    for i in 0..tx_count {
-        for &j in &edges[i] {
+    for edge in edges.iter().take(tx_count) {
+        for &j in edge {
             in_degree[j as usize] += 1;
         }
     }

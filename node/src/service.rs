@@ -2330,9 +2330,9 @@ mod tests {
             &digest,
             tick_before,
             &{
-                let mut s2 = PoHState::default();
-                let h = s2.hash();
-                h
+                let s2 = PoHState::default();
+                
+                s2.hash()
             },
             &[],
         );

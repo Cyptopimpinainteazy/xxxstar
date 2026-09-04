@@ -225,7 +225,12 @@ impl InvariantEnforcer {
         InvariantCheckResult::Pass
     }
 
-    /// Run all invariant checks for a settlement
+    /// Run all invariant checks for a settlement.
+    ///
+    /// Facade that aggregates the focused per-aspect sub-checks; the parameter
+    /// count reflects the three disjoint check contracts and is intrinsic to
+    /// the API surface, not an opportunity for grouping.
+    #[allow(clippy::too_many_arguments)]
     pub fn check_all(
         &self,
         legs_total: u32,
