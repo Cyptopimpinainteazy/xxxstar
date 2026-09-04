@@ -1,10 +1,10 @@
-/// Integration tests for Flash-Finality voter in multi-validator network scenarios.
-///
-/// These tests simulate realistic consensus scenarios including:
-/// - Multiple validators reaching quorum
-/// - Network synchronization
-/// - Shadow mode vs live mode behavior
-/// - Failure and recovery scenarios
+//! Integration tests for Flash-Finality voter in multi-validator network scenarios.
+//!
+//! These tests simulate realistic consensus scenarios including:
+//! - Multiple validators reaching quorum
+//! - Network synchronization
+//! - Shadow mode vs live mode behavior
+//! - Failure and recovery scenarios
 
 #[cfg(test)]
 mod flash_finality_network_tests {
@@ -71,20 +71,19 @@ mod flash_finality_network_tests {
         }
 
         // Validators 1, 2, 3 reach quorum and create certificate
-        for i in 0..quorum_needed {
-            validators[i]
-                .apply_certificate(block_number, format!("0x{:x}", block_number))
+        for v in validators.iter().take(quorum_needed) {
+            v.apply_certificate(block_number, format!("0x{:x}", block_number))
                 .await;
         }
 
         // All 3 quorum validators have finalized the block
-        for i in 0..quorum_needed {
-            let head = validators[i].get_finalized_head().await;
+        for v in validators.iter().take(quorum_needed) {
+            let head = v.get_finalized_head().await;
             assert_eq!(
                 head,
                 Some(block_number),
                 "Validator {} should have finalized block {}",
-                validators[i].id,
+                v.id,
                 block_number
             );
         }
@@ -121,9 +120,8 @@ mod flash_finality_network_tests {
         // Finalize blocks 100-105 sequentially
         for block_num in 100..=105 {
             // Quorum (2 of 3) validators finalize
-            for i in 0..2 {
-                validators[i]
-                    .apply_certificate(block_num, format!("0x{:x}", block_num))
+            for v in validators.iter().take(2) {
+                v.apply_certificate(block_num, format!("0x{:x}", block_num))
                     .await;
             }
         }
@@ -250,7 +248,7 @@ mod flash_finality_network_tests {
     /// Test shadow mode: certificates logged but not applied to finality
     #[tokio::test]
     async fn test_shadow_mode_doesnt_finalize() {
-        let validators = vec![
+        let validators = [
             MockValidator::new(1), // shadow mode
             MockValidator::new(2), // shadow mode
             MockValidator::new(3),

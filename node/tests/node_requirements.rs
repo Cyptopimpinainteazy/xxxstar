@@ -1,13 +1,13 @@
 #![allow(unused_variables)]
 
-/// Comprehensive test suite for X3 Chain node production requirements
-///
-/// Tests verify:
-/// 1. Deterministic boot - genesis is reproducible across runs
-/// 2. CLI flags - all feature flags documented and functional
-/// 3. Config separation - dev/test/prod configs properly isolated
-/// 4. Telemetry hooks - metrics collection wired correctly
-/// 5. Graceful shutdown - clean termination on signals
+//! Comprehensive test suite for X3 Chain node production requirements
+//!
+//! Tests verify:
+//! 1. Deterministic boot - genesis is reproducible across runs
+//! 2. CLI flags - all feature flags documented and functional
+//! 3. Config separation - dev/test/prod configs properly isolated
+//! 4. Telemetry hooks - metrics collection wired correctly
+//! 5. Graceful shutdown - clean termination on signals
 
 #[cfg(test)]
 mod deterministic_boot_tests {
@@ -216,7 +216,7 @@ mod config_separation_tests {
     /// Test that chain type is correctly assigned
     #[test]
     fn chain_types_correctly_assigned() {
-        let chain_types = vec![
+        let chain_types = [
             ("dev", "development"), // Development = local node
             ("local", "local"),     // Local = testnet
             ("staging", "live"),    // Staging = live (production-like)
