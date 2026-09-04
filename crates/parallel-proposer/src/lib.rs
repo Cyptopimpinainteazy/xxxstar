@@ -837,7 +837,7 @@ impl DeterministicScheduler {
         }
     }
 
-    fn pick_or_create_shard(&self, shards: &mut Vec<Shard>) -> usize {
+    fn pick_or_create_shard(&self, shards: &mut [Shard]) -> usize {
         if shards.len() < self.max_parallelism {
             return shards.len();
         }
@@ -852,8 +852,10 @@ impl DeterministicScheduler {
     }
 
     fn build_contention_stats(&self, predictions: &[ContentionPrediction]) -> ContentionStats {
-        let mut stats = ContentionStats::default();
-        stats.total_predictions = predictions.len();
+        let mut stats = ContentionStats {
+            total_predictions: predictions.len(),
+            ..Default::default()
+        };
 
         for prediction in predictions {
             if prediction.contention_score >= 0.8 {

@@ -337,8 +337,8 @@ where
             }
         }
 
-        for idx in 0..pending.len() {
-            if !seen[idx] {
+        for (idx, is_seen) in seen.iter().enumerate() {
+            if !is_seen {
                 execution_order.push(idx);
             }
         }
