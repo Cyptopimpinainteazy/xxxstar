@@ -511,6 +511,7 @@ construct_runtime!(
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
+        X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         NorthernSwarm: pallet_northern_swarm,
     }
@@ -586,6 +587,7 @@ construct_runtime!(
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
+        X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         NorthernSwarm: pallet_northern_swarm,
         Evm: pallet_evm,
@@ -654,6 +656,7 @@ construct_runtime!(
         SvmRuntime: pallet_svm_runtime,
         X3JuryAnchor: pallet_x3_jury_anchor,
         X3LpLocker: pallet_x3_lp_locker,
+        X3Sentinel: pallet_x3_sentinel,
     }
 );
 
@@ -730,6 +733,7 @@ construct_runtime!(
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
+        X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
     }
 );
@@ -807,6 +811,7 @@ construct_runtime!(
         X3DappHub: pallet_x3_dapp_hub,
         X3ComputeMarket: pallet_x3_compute_market,
         X3LpLocker: pallet_x3_lp_locker,
+        X3Sentinel: pallet_x3_sentinel,
         X3FlashLoan: pallet_x3_flashloan,
         Evm: pallet_evm,
         Ethereum: pallet_ethereum,
@@ -2368,6 +2373,7 @@ impl pallet_x3_token_factory::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = X3SupplyLedger;
     type EconomicHalt = X3SupplyLedger;
+    type Sentinel = X3Sentinel;
 }
 
 impl pallet_x3_domain_registry::Config for Runtime {
@@ -2907,6 +2913,13 @@ impl pallet_x3_lp_locker::Config for Runtime {
     type MinLockDuration = ConstU32<1_500>;
     type MaxLockDuration = ConstU32<157_680_000>;
     type WeightInfo = ();
+}
+
+impl pallet_x3_sentinel::Config for Runtime {
+    // Freezing mint/freeze authority is a security power: Root only. Inherited
+    // council/governance must be delegated explicitly at runtime-author-time;
+    // this deliberately defaults to the strongest, easiest-to-audit origin.
+    type FreezeOrigin = frame_system::EnsureRoot<AccountId>;
 }
 
 // ===== X3 Launchpad Configuration =====

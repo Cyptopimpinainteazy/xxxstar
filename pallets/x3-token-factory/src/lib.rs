@@ -46,8 +46,8 @@ pub mod pallet {
     use sp_std::vec::Vec;
     use x3_asset_kernel_types::{
         traits::{
-            AssetRegistryInspect, AssetRegistryMutate, EconomicHaltInspect, SupplyLedgerGovern,
-            SupplyLedgerWrite,
+            AssetRegistryInspect, AssetRegistryMutate, EconomicHaltInspect, SentinelDenial,
+            SentinelGuard, SupplyLedgerGovern, SupplyLedgerWrite,
         },
         AssetId, Balance, DomainId, RouteConfig, RouteLimits, SupplyPolicy, TokenClass,
     };
@@ -142,6 +142,10 @@ pub mod pallet {
         type Ledger: SupplyLedgerGovern + SupplyLedgerWrite;
         /// Read-only economic halt gate.
         type EconomicHalt: EconomicHaltInspect;
+        /// Sentinel freeze/review guard consulted before every supply-changing
+        /// authority op. Wire to `pallet-x3-sentinel` for enforcement or to
+        /// `NoSentinelGuard` where no guard is configured.
+        type Sentinel: SentinelGuard<Self::AccountId>;
     }
 
     // ── Storage ────────────────────────────────────────────────────────────
@@ -234,6 +238,15 @@ pub mod pallet {
         NonceOverflow,
         /// New launch/mint operations halted by economic safety policy.
         EconomicHaltActive,
+        /// A supply-changing op was blocked by the Sentinel freeze/review guard
+        /// (whole-asset freeze).
+        AssetFrozenBySentinel,
+        /// A supply-changing op was blocked because the caller's authority is
+        /// frozen by the Sentinel.
+        AuthorityFrozenBySentinel,
+        /// A supply-changing op on an enrolled asset was blocked pending a
+        /// guardian approval from the Sentinel.
+        GuardianReviewRequired,
     }
 
     // ── Extrinsics ─────────────────────────────────────────────────────────
@@ -353,6 +366,8 @@ pub mod pallet {
                 !T::EconomicHalt::is_halted(),
                 Error::<T>::EconomicHaltActive
             );
+            // Fail-closed Sentinel guard before minting additional supply.
+            Self::check_sentinel(&asset_id, &who)?;
             let record = Tokens::<T>::get(asset_id).ok_or(Error::<T>::UnknownToken)?;
             ensure!(who == record.mint_authority, Error::<T>::NotMintAuthority);
             ensure!(
@@ -391,6 +406,8 @@ pub mod pallet {
             let record = Tokens::<T>::get(asset_id).ok_or(Error::<T>::UnknownToken)?;
             ensure!(who == record.mint_authority, Error::<T>::NotMintAuthority);
             ensure!(record.class.allows_burn(), Error::<T>::BurnNotAllowed);
+            // Fail-closed Sentinel guard before burning supply.
+            Self::check_sentinel(&asset_id, &who)?;
             T::Ledger::do_burn_canonical(&asset_id, domain, amount)?;
             Self::deposit_event(Event::TokenBurned {
                 asset_id,
@@ -412,6 +429,10 @@ pub mod pallet {
             Tokens::<T>::try_mutate(asset_id, |maybe| -> DispatchResult {
                 let record = maybe.as_mut().ok_or(Error::<T>::UnknownToken)?;
                 ensure!(who == record.mint_authority, Error::<T>::NotMintAuthority);
+                // Fail-closed Sentinel guard: the current authority must not be
+                // frozen and the asset must not require guardian review before
+                // the authority is handed to a new account.
+                Self::check_sentinel(&asset_id, &who)?;
                 let old_authority = record.mint_authority.clone();
                 record.mint_authority = new_authority.clone();
                 Self::deposit_event(Event::MintAuthorityChanged {
@@ -425,6 +446,28 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
+        /// Consult the configured Sentinel guard before a supply-changing
+        /// authority op. Maps the guard's denial to a pallet error so callers
+        /// get a precise, auditable reason. Uses fail-closed semantics through
+        /// the `SentinelGuard` trait.
+        fn check_sentinel(
+            asset_id: &AssetId,
+            who: &T::AccountId,
+        ) -> DispatchResult {
+            match T::Sentinel::can_authorize(asset_id, who) {
+                Ok(()) => Ok(()),
+                Err(SentinelDenial::AssetFrozen) => {
+                    Err(Error::<T>::AssetFrozenBySentinel.into())
+                }
+                Err(SentinelDenial::AuthorityFrozen) => {
+                    Err(Error::<T>::AuthorityFrozenBySentinel.into())
+                }
+                Err(SentinelDenial::ReviewRequired) => {
+                    Err(Error::<T>::GuardianReviewRequired.into())
+                }
+            }
+        }
+
         fn validate_enabled_domains(
             domains: &BoundedVec<DomainId, MaxEnabledDomains>,
         ) -> Result<(), Error<T>> {

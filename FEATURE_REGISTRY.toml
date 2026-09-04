@@ -383,3 +383,13 @@ dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
 # Remaining blockers are operational (multi-validator, BTC quorum, security
 # reviews), not code gaps. Core consensus features ready for guarded testnet
 # deployment with runtime EconomicHalt as the safety valve.
+
+# ── Addendum 2026-09-04: x3_sentinel now REAL (previously aspirational) ──
+# The `[x3_sentinel]` row here previously pointed at a `pallets/x3-sentinel`
+# that did not exist and CI test names that were unwritten — the "CI gate wired"
+# note above was aspirational. That fiction is now closed with real code:
+#   * pallets/x3-sentinel (workspace member) — real pallet + SentinelGuard impl
+#   * required_tests `sentinel_checks_mint_authority` + `sentinel_checks_freeze_authority` exist & pass (7 tests)
+#   * wired into all 5 construct_runtime! variants + Config (Root FreezeOrigin)
+#   * SentinelGuard trait + NoSentinelGuard added to x3-asset-kernel-types
+# Verified: cargo check default/dev/mainnet-rc1 runtime, cargo test -p pallet-x3-sentinel (green), clippy clean.

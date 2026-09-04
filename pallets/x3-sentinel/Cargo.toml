@@ -1,13 +1,17 @@
 [package]
-name = "pallet-x3-token-factory"
+name = "pallet-x3-sentinel"
 version = "0.1.0"
-authors = ["X3 Chain Core Team <core@x3-chain.io>"]
-description = "X3 OmniToken Factory — permissionless extrinsic to launch one canonical token native across X3Native, X3Evm, and X3Svm. Consumes x3-asset-registry and x3-supply-ledger via trait-typed config; never bypasses the Universal Asset Kernel invariant."
+description = "On-chain Sentinel guard — governance freeze/review gate over the Universal Asset Kernel token-factory mint authority"
+authors = ["X3 Chain Core Engineering <engineering@x3-chain.io>"]
 edition = "2021"
 license = "Apache-2.0"
 publish = false
 
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
 [lib]
+name = "pallet_x3_sentinel"
 crate-type = ["rlib"]
 
 [dependencies]
@@ -19,7 +23,6 @@ sp-core = { workspace = true, default-features = false }
 sp-io = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
-serde = { workspace = true, optional = true, features = ["derive"] }
 
 x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-features = false }
 
@@ -27,10 +30,6 @@ x3-asset-kernel-types = { path = "../../crates/x3-asset-kernel-types", default-f
 sp-core = { workspace = true, default-features = false, features = ["std"] }
 sp-io = { workspace = true, default-features = false, features = ["std"] }
 sp-runtime = { workspace = true, default-features = false, features = ["std"] }
-pallet-x3-asset-registry = { path = "../x3-asset-registry", default-features = false, features = ["std"] }
-pallet-x3-supply-ledger = { path = "../x3-supply-ledger", default-features = false, features = ["std"] }
-pallet-x3-cross-vm-router = { path = "../x3-cross-vm-router", default-features = false, features = ["std"] }
-pallet-x3-sentinel = { path = "../x3-sentinel", default-features = false, features = ["std"] }
 
 [features]
 default = ["std"]
@@ -43,8 +42,6 @@ std = [
     "sp-io/std",
     "sp-runtime/std",
     "sp-std/std",
-    "serde",
-    "serde/std",
     "x3-asset-kernel-types/std",
 ]
 try-runtime = [

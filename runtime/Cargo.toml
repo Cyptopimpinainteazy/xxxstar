@@ -99,6 +99,7 @@ x3-packet-standard = { path = "../crates/x3-packet-standard", default-features =
 quantum-crypto = { path = "../crates/quantum-crypto", optional = true }
 # staged-pallets (now wired)
 pallet-x3-lp-locker = { path = "../pallets/x3-lp-locker", default-features = false }
+pallet-x3-sentinel = { path = "../pallets/x3-sentinel", default-features = false }
 pallet-northern-swarm = { path = "../pallets/northern-swarm", default-features = false }
 pallet-x3-slash = { path = "../pallets/x3-slash", default-features = false }
 pallet-x3-agent-registry = { path = "../pallets/pallet-x3-agent-registry", default-features = false }
@@ -227,6 +228,7 @@ std = [
 	"pallet-meme-overlord/std",
 	"pallet-x3-consensus/std",
 	"pallet-x3-lp-locker/std",
+	"pallet-x3-sentinel/std",
 	"pallet-northern-swarm/std",
 	"pallet-x3-slash/std",
 	"pallet-x3-agent-registry/std",
