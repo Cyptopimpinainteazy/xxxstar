@@ -125,3 +125,7 @@ protoc_bin/
 
 # Repomix
 .repomix/
+# OpenClaw dreaming scratch (internal churn, not repo deliverables)
+DREAMS.md
+memory/dreaming/
+memory/.dreams/
