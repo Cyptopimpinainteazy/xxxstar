@@ -89,7 +89,7 @@
 **Build:**
 - `Cargo.toml` — workspace root; WARNING: 90+ phantom member crate entries
 - `rust-toolchain.toml` — `channel = "1.90.0"`, `targets = ["wasm32-unknown-unknown"]`
-- `MAINNET_RC1_SCOPE.md` — authoritative feature gate for RC-1
+- `LAUNCH_SCOPE.md` — authoritative RC-1/mainnet launch-scope gate (supersedes retired MAINNET_RC1_SCOPE.md)
 
 ## Platform Requirements
 

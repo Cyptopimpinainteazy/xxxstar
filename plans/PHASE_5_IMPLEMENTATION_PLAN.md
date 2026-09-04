@@ -368,7 +368,7 @@ sequenceDiagram
 ## Appendix B: References
 
 - [X3 Chain Architecture](docs/X3_ATOMIC_EXCHANGE_ARCHITECTURE.md)
-- [Mainnet RC-1 Scope](MAINNET_RC1_SCOPE.md)
+- [Mainnet RC-1 Scope](LAUNCH_SCOPE.md) — authoritative launch scope (retired MAINNET_RC1_SCOPE.md)
 - [Phase 5 Session Complete](archive/sessions/PHASE_5_SESSION_COMPLETE.md)
 - [Master Status](MASTER_STATUS.md)
 

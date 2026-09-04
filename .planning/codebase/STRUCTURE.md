@@ -147,7 +147,7 @@ X3_ATOMIC_STAR_corrupt_backup_20260518-225645/
 - `rust-toolchain.toml` — Rust 1.90.0 pin
 - `TESTNET_FEATURE_FLAGS.toml` — feature gate configuration
 - `FEATURE_REGISTRY.toml` — feature readiness registry
-- `MAINNET_RC1_SCOPE.md` — authoritative RC-1 scope definition
+- `LAUNCH_SCOPE.md` — authoritative launch scope (supersedes retired MAINNET_RC1_SCOPE.md)
 - `hardhat.config.ts` — Hardhat EVM deploy config (placeholder values only)
 
 **Core Logic:**

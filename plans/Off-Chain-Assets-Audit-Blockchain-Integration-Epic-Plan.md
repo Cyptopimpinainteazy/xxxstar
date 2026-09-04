@@ -399,7 +399,7 @@ This epic addresses the critical gaps in off-chain asset management and blockcha
 - [X3 Chain Architecture](docs/X3_ATOMIC_EXCHANGE_ARCHITECTURE.md)
 - [Cross-VM Bridge Specification](docs/COMIT_SPEC.md)
 - [Security Audit Report](docs/security-audit.md)
-- [Mainnet RC-1 Scope](MAINNET_RC1_SCOPE.md)
+- [Mainnet RC-1 Scope](LAUNCH_SCOPE.md) — authoritative launch scope (retired MAINNET_RC1_SCOPE.md)
 - [Gaps Report](GAPS_REPORT_2026_04_27.md)
 
 ---

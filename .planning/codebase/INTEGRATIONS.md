@@ -122,7 +122,7 @@
 
 - Crate: `crates/gpu-swarm.backup/` — GPU swarm acceleration backup
 - Python bridge: `swarm_infrastructure/gpu_bridge/`, `swarm_infrastructure/gpu_compute/`
-- Status: `gpu-acceleration` is gated out of RC-1 per `MAINNET_RC1_SCOPE.md`
+- Status: `gpu-acceleration` is gated out of RC-1 per `LAUNCH_SCOPE.md` (authority; retired MAINNET_RC1_SCOPE.md)
 - `cross-chain-gpu-validator` and `confidential-gpu` exist in `.rc4-worktrees/old/crates/`
 
 ## Webhooks & Callbacks

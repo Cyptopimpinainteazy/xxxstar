@@ -51,7 +51,13 @@
 
 ### P0-CRITICAL [Gap-4]: LP Locker Pallet Does Not Exist
 
-- **Issue:** `MAINNET_RC1_SCOPE.md` describes LiquidityCore LP lock as an RC-1 feature ("kernel invariants: LP locked after graduation"). No `pallets/x3-lp-locker/` directory exists anywhere. The anti_rug logic in `.rc4-worktrees/old/crates/x3-liquidity-core/src/anti_rug.rs` uses in-memory `BTreeMap`, not chain storage — cannot survive node restarts.
+> RESOLVED (verified 2026-09-04): `pallets/x3-lp-locker/` NOW EXISTS and is real code
+> (lib.rs 343 lines: `LpLocks` StorageDoubleMap, `lock_lp`/`unlock_lp`/`extend_lock`/`increase_lock`
+> extrinsics), wired into runtime (runtime/src/lib.rs :2906 Config, genesis :3001), no stub markers,
+> and `cargo test -p pallet-x3-lp-locker` -> 19/19 pass. LAUNCH_SCOPE.md:33 "LiquidityCore spot swap +
+> LP lock Active" is consistent with this. Original note below retained for audit history.
+
+- **Issue:** `LAUNCH_SCOPE.md` describes LiquidityCore LP lock as an RC-1 feature ("kernel invariants: LP locked after graduation"). No `pallets/x3-lp-locker/` directory exists anywhere. (Note: directory now exists — see RESOLVED above; the chain-enforced `x3-lp-locker` pallet is the RC-1 mechanism, distinct from the in-memory anti_rug helper.)
 - **Files:** No file — the pallet does not exist
 - **Impact:** LP token locks cannot be enforced on-chain. Anti-rug protection is non-functional for production.
 - **Fix:** Create `pallets/x3-lp-locker/` with:
@@ -274,7 +280,7 @@
 
 - **Issue:** `btc_mainnet_gateway = "DISABLED_BLOCKED"`. BTC bridge has no implementation visible at root (no `pallets/btc-*` directory). BTC fortress is SIM_TESTNET only.
 - **Files:** `TESTNET_FEATURE_FLAGS.toml`
-- **Impact:** No BTC bridge for RC-1 or near-term mainnet. This is by design per `MAINNET_RC1_SCOPE.md` but must be tracked.
+- **Impact:** No BTC bridge for RC-1 or near-term mainnet. This is by design per `LAUNCH_SCOPE.md` (authority; retired MAINNET_RC1_SCOPE.md) but must be tracked.
 - **Fix:** Defined as post-RC1 work. Track in backlog.
 
 ---
