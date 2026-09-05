@@ -4407,6 +4407,11 @@ sp_api::decl_runtime_apis! {
         /// Get the total issuance (total supply) of the native currency.
         fn get_total_issuance() -> Balance;
 
+        /// Native balance held by protocol-controlled accounts (treasury et al.)
+        /// that is not in free circulation. Protocol-locked supply; a caller may
+        /// derive circulating supply as `get_total_issuance() - native_locked_supply()`.
+        fn native_locked_supply() -> u128;
+
         /// Get the current peer count from the network.
         fn get_peer_count() -> u32;
     }
