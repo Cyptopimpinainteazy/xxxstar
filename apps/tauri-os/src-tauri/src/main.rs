@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tauri::{Emitter, Manager, State, generate_handler};
 use tokio::time::sleep;
-use sysinfo::System;
+use sysinfo::{Disks, System};
 
 /* ─── Shared state for OS-level monitoring ─────── */
 
@@ -16,13 +16,17 @@ struct OsState {
     swarm_tasks: Arc<RwLock<Vec<SwarmTask>>>,
     system_metrics: Arc<RwLock<SystemMetricsData>>,
     sys_handle: Arc<std::sync::Mutex<System>>,
+    // sysinfo 0.31 tracks disks as an independent value (not via System),
+    // so we keep a dedicated handle and refresh it each tick.
+    disks_handle: Arc<std::sync::Mutex<Disks>>,
 }
 
 impl OsState {
     fn new() -> Self {
         let mut sys = System::new_all();
         sys.refresh_all();
-        let initial_metrics = read_system_metrics(&sys);
+        let mut disks = Disks::new_with_refreshed_list();
+        let initial_metrics = read_system_metrics(&sys, &mut disks);
         Self {
             node_status: Arc::new(RwLock::new(NodeStatusData {
                 running: false,
@@ -34,6 +38,7 @@ impl OsState {
             swarm_tasks: Arc::new(RwLock::new(vec![])),
             system_metrics: Arc::new(RwLock::new(initial_metrics)),
             sys_handle: Arc::new(std::sync::Mutex::new(sys)),
+            disks_handle: Arc::new(std::sync::Mutex::new(disks)),
         }
     }
 }
@@ -288,17 +293,52 @@ async fn swarm_reject_task(task_id: String) -> Result<String, IpcError> {
 
 /* ─── System metrics helpers ──────────────────── */
 
-fn read_system_metrics(sys: &System) -> SystemMetricsData {
-    let cpu_info = sys.global_cpu_info();
-    let cpu_usage = cpu_info.cpu_usage();
+fn read_system_metrics(sys: &System, disks: &mut Disks) -> SystemMetricsData {
+    // sysinfo 0.31: global_cpu_usage() returns f32 directly; there is no
+    // global_cpu_info() wrapper anymore. Per-core usage/frequency come from
+    // the Cpu entries returned by System::cpus().
+    let cpu_usage = sys.global_cpu_usage();
     let total_memory = sys.total_memory();
     let used_memory = sys.used_memory();
+
+    let cores = sys.cpus().len() as u32;
+    let frequency = sys.cpus().first().map(|c| c.frequency()).unwrap_or(0);
+
+    // Real storage read (sysinfo 0.31 keeps disks as a Disks value). Each
+    // tick calls Disks::refresh() before this. Previously this fabricated the
+    // disk fields from RAM numbers, which reported memory as disk usage.
+    disks.refresh();
+    let mut disk_metrics: Vec<DiskMetrics> = Vec::new();
+    for disk in disks.list() {
+        let total = disk.total_space();
+        let used = disk.total_space().saturating_sub(disk.available_space());
+        let usage_percent = if total > 0 {
+            (used as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        disk_metrics.push(DiskMetrics {
+            name: disk.name().to_string_lossy().to_string(),
+            used,
+            total,
+            usage_percent: usage_percent as f32,
+        });
+    }
+    if disk_metrics.is_empty() {
+        // No physical disk reported (unusual container); keep the stream valid.
+        disk_metrics.push(DiskMetrics {
+            name: "System".into(),
+            used: 0,
+            total: 0,
+            usage_percent: 0.0,
+        });
+    }
 
     SystemMetricsData {
         cpu: CpuMetrics {
             usage_percent: cpu_usage,
-            cores: sys.cpus().len() as u32,
-            frequency: sys.cpus().first().map(|c| c.frequency()).unwrap_or(0),
+            cores,
+            frequency,
         },
         memory: MemoryMetrics {
             used: used_memory * 1024,
@@ -309,16 +349,7 @@ fn read_system_metrics(sys: &System) -> SystemMetricsData {
                 0.0
             },
         },
-        disk: vec![DiskMetrics {
-            name: "System".into(),
-            used: used_memory * 1024,
-            total: total_memory * 1024,
-            usage_percent: if total_memory > 0 {
-                (used_memory as f32 / total_memory as f32) * 100.0
-            } else {
-                0.0
-            },
-        }],
+        disk: disk_metrics,
         updated_at: chrono::Utc::now().to_rfc3339(),
     }
 }
@@ -333,10 +364,12 @@ fn start_os_monitor(app: tauri::AppHandle, state: OsState) {
             // Refresh system metrics.
             {
                 let mut sys = state.sys_handle.lock().expect("sys_handle lock");
-                sys.refresh_cpu();
+                sys.refresh_cpu_all();
                 sys.refresh_memory();
-                let metrics = read_system_metrics(&sys);
+                let mut disks = state.disks_handle.lock().expect("disks_handle lock");
+                let metrics = read_system_metrics(&sys, &mut disks);
                 drop(sys);
+                drop(disks);
                 *state.system_metrics.write().expect("system_metrics lock") = metrics;
             }
 

@@ -1,3 +1,10 @@
+[workspace]
+# Standalone workspace so `cargo build` in src-tauri does not walk up and
+# resolve against the monorepo root (which does not list this crate as a
+# member). Matches the layout shipped by the standard Tauri template and by
+# the sibling apps/x3-desktop/src-tauri app, which owns its own Cargo.lock.
+resolver = "2"
+
 [package]
 name = "tauri-os-backend"
 version = "0.1.0"
@@ -22,6 +29,9 @@ uuid = { version = "1", features = ["v4", "serde"] }
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
-[lib]
-name = "tauri_os_backend_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+[[bin]]
+# Desktop-only Tauri app: all logic lives in src/main.rs. A [lib] target is
+# intentionally not declared here (no src/lib.rs exists) so cargo can resolve
+# the single binary crate.
+name = "tauri-os-backend"
+path = "src/main.rs"
