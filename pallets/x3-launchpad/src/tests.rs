@@ -345,3 +345,78 @@ fn withdraw_raised_funds_by_creator() {
         assert_eq!(state.status, LaunchStatus::Completed);
     });
 }
+
+// ── graduate_launch ───────────────────────────────────────────────────────────
+//
+// Closes the gap identified in the deep-research assessment: the launchpad had a
+// full `fn graduate_launch` implementation but no unit test exercising it. The
+// flow runs three external trait calls (TokenFactory::create_token, Dex::create_pool,
+// LpLocker::lock_lp_for) — all stubbed in mock.rs.
+
+#[test]
+fn graduate_launch_happy_path() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        // Fund past soft cap to make it Successful after finalize.
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+
+        // Creator graduates the launch.
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
+
+        // Graduation recorded.
+        assert!(crate::GraduatedLaunches::<Test>::contains_key(id));
+        let _ = id;
+    });
+}
+
+#[test]
+fn graduate_launch_fails_for_non_creator() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+
+        // Non-creator (account 2) cannot graduate.
+        assert_noop!(
+            Launchpad::graduate_launch(RuntimeOrigin::signed(2), id),
+            Error::<Test>::NotCreator
+        );
+    });
+}
+
+#[test]
+fn graduate_launch_fails_before_finalize() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
+        // Do NOT finalize or withdraw — launch is still Active.
+        assert_noop!(
+            Launchpad::graduate_launch(RuntimeOrigin::signed(1), id),
+            Error::<Test>::LaunchNotSuccessful
+        );
+    });
+}
+
+#[test]
+fn graduate_launch_fails_when_already_graduated() {
+    new_test_ext().execute_with(|| {
+        let id = create_default_launch();
+        assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
+        jump_to(13);
+        assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+
+        // First graduation succeeds.
+        assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
+        // Second graduation must fail with AlreadyGraduated.
+        assert_noop!(
+            Launchpad::graduate_launch(RuntimeOrigin::signed(1), id),
+            Error::<Test>::AlreadyGraduated
+        );
+    });
+}
