@@ -4057,6 +4057,18 @@ impl_runtime_apis! {
             pallet_balances::TotalIssuance::<Runtime>::get()
         }
 
+        fn native_locked_supply() -> u128 {
+            // Native balance held by protocol-controlled accounts (treasury) that
+            // is not in free circulation among end users. Derived from real
+            // on-chain balances; returns 0 when the treasury is empty (fresh net).
+            // Currency::free_balance is in scope file-wide; reserved_balance
+            // resolves via pallet_balances::Pallet's ReservableCurrency impl.
+            let treasury = TreasuryAccountId::get();
+            let treasury_reserved = pallet_balances::Pallet::<Runtime>::reserved_balance(&treasury);
+            let treasury_free = pallet_balances::Pallet::<Runtime>::free_balance(&treasury);
+            treasury_free.saturating_add(treasury_reserved)
+        }
+
         fn get_peer_count() -> u32 {
             0
         }

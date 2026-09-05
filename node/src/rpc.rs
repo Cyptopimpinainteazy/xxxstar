@@ -1187,8 +1187,11 @@ where
                 .get_total_issuance(block_hash)
                 .unwrap_or_default();
 
-            // Read locked supply from treasury + staking pallets if available
-            let locked: u128 = 0u128; // placeholder — wire to treasury_reserved when pallet active
+            // Read locked (protocol-held, non-circulating) native supply from chain state.
+            let locked = supply_client
+                .runtime_api()
+                .native_locked_supply(block_hash)
+                .unwrap_or_default();
 
             let circulating = total_issuance.saturating_sub(locked);
 
