@@ -8,10 +8,70 @@ targets = [
 ]
 
 [advisories]
-# Fail CI on medium severity or higher (ignore low/informational)
-severity-threshold = "medium"
 yanked = "warn"
-# Audit config at .cargo/audit.toml handles ignore list
+# Audit config at .cargo/audit.toml handles ignore list for cargo-audit.
+# NOTE: severity-threshold was removed in cargo-deny 0.16+; use ignore list in
+# .cargo/audit.toml to manage per-advisory severity instead.
+#
+# cargo-deny uses its own [advisories] ignore list below (NOT read from
+# .cargo/audit.toml). Keep both lists in sync.
+ignore = [
+    # ===== wasmtime 8.0.1 + 35.0.0 cluster (polkadot-sdk stable2512) =====
+    # Pinned via sp-wasm-interface v20.0.0 and vendored sc-executor-wasmtime.
+    "RUSTSEC-2026-0006",
+    "RUSTSEC-2026-0085",
+    "RUSTSEC-2026-0086",
+    "RUSTSEC-2026-0087",
+    "RUSTSEC-2026-0088",
+    "RUSTSEC-2026-0089",
+    "RUSTSEC-2026-0091",
+    "RUSTSEC-2026-0092",
+    "RUSTSEC-2026-0093",
+    "RUSTSEC-2026-0094",
+    "RUSTSEC-2026-0095",
+    "RUSTSEC-2026-0096",
+    "RUSTSEC-2026-0114",
+    "RUSTSEC-2026-0222",
+    "RUSTSEC-2026-0269",
+
+    # ===== h2 0.3.27 + 0.4.15 (HTTP/2 server DoS, client-only in our usage) =====
+    "RUSTSEC-2026-0258",
+
+    # ===== rkyv 0.7.46 (workspace resolution ghost, not compiled) =====
+    "RUSTSEC-2026-0235",
+
+    # ===== Previously-known transitive pins =====
+    "RUSTSEC-2023-0091",
+    "RUSTSEC-2024-0438",
+    "RUSTSEC-2025-0118",
+    "RUSTSEC-2026-0020",
+    "RUSTSEC-2026-0021",
+    "RUSTSEC-2024-0344",
+    "RUSTSEC-2025-0009",
+    "RUSTSEC-2026-0118",
+    "RUSTSEC-2026-0119",
+    "RUSTSEC-2024-0421",
+    "RUSTSEC-2024-0437",
+    "RUSTSEC-2023-0071",
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+    "RUSTSEC-2026-0178",
+    "RUSTSEC-2025-0055",
+    "RUSTSEC-2022-0093",
+
+    # ===== Solana runtime transitive pins (solana-runtime v3.0.0) =====
+    # These unmaintained/unsound crates are pulled by solana-runtime,
+    # which is a dev-test-only dependency for x3-svm-integration tests.
+    # Not compiled into production runtime. The solana_rbpf unsound is
+    # in test-only EbpfVm::invoke_function (no production caller).
+    "RUSTSEC-2026-0173",   # proc-macro-error2 (solana-runtime -> aquamarine)
+    "RUSTSEC-2026-0251",   # sized-chunks (solana-runtime -> im)
+    "RUSTSEC-2026-0191",   # solana_rbpf EbpfVm::invoke_function unsound (test-only)
+    "RUSTSEC-2025-0134",   # rustls-pemfile (reqwest transitive; pem parsing only)
+    "RUSTSEC-2024-0320",   # yaml-rust (config crate -> analytics-service only)
+    "RUSTSEC-2024-0370",   # proc-macro-error 1.0.4 (frame-executive -> aquamarine -> proc-macro-error; pinned by polkadot-sdk stable2512)
+]
 
 [bans]
 multiple-versions = "warn"
@@ -30,7 +90,10 @@ allow = [
     "Zlib",
     "Unicode-3.0",
     "CC0-1.0",
-    "OpenSSL",
     "MPL-2.0",
-    "Unicode-DFS-2016",
+    # GPL-3.0-only: polkadot-sdk stable2512 xcm-procedural macro uses this;
+    # the produced code is consumed as a build-time codegen tool, not linked
+    # into our runtime binary. Acceptable for build-deps. (For runtime binary
+    # licensing we stay Apache-2.0 per workspace.package.license.)
+    "GPL-3.0-only",
 ]
