@@ -293,6 +293,49 @@ impl ChainHealthDaemon {
     }
 }
 
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+    log::info!("X3 Chain Health Daemon starting...");
+
+    // Default chains to monitor — configure via env vars or config file in production
+    let chains = vec![
+        ChainCheckConfig {
+            chain_id: 1,
+            rpc_urls: vec!["http://localhost:8545".into()],
+            max_block_delay_ms: 30_000,
+            max_finality_delay_ms: 120_000,
+            max_gas_price: 500_000_000_000,
+            rpc_quorum_required: 1,
+        },
+    ];
+
+    let mut daemon = ChainHealthDaemon::new(chains);
+
+    loop {
+        let results = daemon.tick().await;
+        for result in &results {
+            if !result.healthy {
+                log::warn!(
+                    "Chain {} unhealthy: halted={} degraded={} rpc_agree={} warnings={:?}",
+                    result.chain_id,
+                    result.halted,
+                    result.degraded,
+                    result.rpc_agreement,
+                    result.warnings
+                );
+            }
+        }
+
+        // Print health report periodically
+        if !results.is_empty() {
+            log::info!("{}", daemon.generate_report());
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,48 +385,5 @@ mod tests {
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("halted"));
         assert!(json.contains("Chain halted"));
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    env_logger::init();
-    log::info!("X3 Chain Health Daemon starting...");
-
-    // Default chains to monitor — configure via env vars or config file in production
-    let chains = vec![
-        ChainCheckConfig {
-            chain_id: 1,
-            rpc_urls: vec!["http://localhost:8545".into()],
-            max_block_delay_ms: 30_000,
-            max_finality_delay_ms: 120_000,
-            max_gas_price: 500_000_000_000,
-            rpc_quorum_required: 1,
-        },
-    ];
-
-    let mut daemon = ChainHealthDaemon::new(chains);
-
-    loop {
-        let results = daemon.tick().await;
-        for result in &results {
-            if !result.healthy {
-                log::warn!(
-                    "Chain {} unhealthy: halted={} degraded={} rpc_agree={} warnings={:?}",
-                    result.chain_id,
-                    result.halted,
-                    result.degraded,
-                    result.rpc_agreement,
-                    result.warnings
-                );
-            }
-        }
-
-        // Print health report periodically
-        if !results.is_empty() {
-            log::info!("{}", daemon.generate_report());
-        }
-
-        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
     }
 }
