@@ -4788,3 +4788,81 @@ mod cross_chain_proof_verifier_tests {
         });
     }
 }
+
+// NOTE: `native_locked_supply` and `get_total_issuance` are runtime-*API*
+// methods (impl_runtime_apis!) invocable only through a client-side runtime
+// API executor (node/src/rpc.rs `token_getSupply`). There is no lightweight
+// in-crate seam to call them without a full sp_api client harness, which this
+// repo does not vendor. What IS unit-testable here is the on-chain supply
+// contract the RPC math depends on: protocol/treasury-held native balance is
+// reported as isolated (non-circulating) via the exact accessors the runtime
+// API bodies read. The authoritative end-to-end assertion of the method
+// itself belongs to the node/integration suite (tests/e2e).
+#[cfg(all(test, feature = "std"))]
+mod native_supply_contract_tests {
+    use super::*;
+
+    #[test]
+    fn empty_treasury_reports_zero_protocol_locked() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            let t = TreasuryAccountId::get();
+            // Runtime API body reads free + reserved on the treasury account.
+            let locked = pallet_balances::Pallet::<Runtime>::free_balance(&t)
+                .saturating_add(pallet_balances::Pallet::<Runtime>::reserved_balance(&t));
+            assert_eq!(locked, 0, "fresh net must report no protocol-locked supply");
+        });
+    }
+
+    #[test]
+    fn treasury_deposit_is_protocol_locked_not_circulating() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            let t = TreasuryAccountId::get();
+            let seed: u128 = 1_000_000;
+            // Mint into the protocol treasury via the real balances Currency.
+            let _ = pallet_balances::Pallet::<Runtime>::deposit_creating(&t, seed);
+
+            let treasury_free = pallet_balances::Pallet::<Runtime>::free_balance(&t);
+            let treasury_reserved = pallet_balances::Pallet::<Runtime>::reserved_balance(&t);
+            let locked = treasury_free.saturating_add(treasury_reserved);
+
+            // Every unit minted to the treasury account is held by the protocol
+            // and therefore excluded from the circulating number derived by the
+            // RPC (circulating = total_issuance - native_locked_supply).
+            assert_eq!(
+                treasury_free, seed,
+                "free balance on treasury must match the minted seed"
+            );
+            assert_eq!(treasury_reserved, 0);
+            assert_eq!(locked, seed, "treasury-held seed is locked, not circulating");
+
+            // Sanity: minting 10x also lands entirely in the locked bucket.
+            let big: u128 = seed.saturating_mul(10);
+            let _ = pallet_balances::Pallet::<Runtime>::deposit_creating(&t, big);
+            let locked_after = pallet_balances::Pallet::<Runtime>::free_balance(&t)
+                .saturating_add(pallet_balances::Pallet::<Runtime>::reserved_balance(&t));
+            assert_eq!(locked_after, seed.saturating_add(big));
+        });
+    }
+
+    #[test]
+    fn user_balance_is_not_protocol_locked() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            // A normal (non-treasury) account funded by a user transfer is NOT
+            // protocol-held: free balance lives outside the treasury accessors
+            // the runtime API sums, so it must not be counted as locked.
+            let user = sp_runtime::AccountId32::new([0xabu8; 32]);
+            let t = TreasuryAccountId::get();
+            assert!(
+                user != t,
+                "test fixture must use a non-treasury account"
+            );
+            let user_seed: u128 = 5_000_000; // well above ExistentialDeposit (100 µATLAS)
+            let _ = pallet_balances::Pallet::<Runtime>::deposit_creating(&user, user_seed);
+
+            let treasury_locked = pallet_balances::Pallet::<Runtime>::free_balance(&t)
+                .saturating_add(pallet_balances::Pallet::<Runtime>::reserved_balance(&t));
+            assert_eq!(treasury_locked, 0, "user funds must not inflate locked supply");
+            assert_eq!(pallet_balances::Pallet::<Runtime>::free_balance(&user), user_seed);
+        });
+    }
+}
