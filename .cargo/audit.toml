@@ -89,4 +89,28 @@ ignore = [
     # two signatures with the same key under attacker-controlled
     # message conditions. Not practically exploitable in our usage.
     "RUSTSEC-2022-0093",
+
+    # ===== h2 0.3.27 + 0.4.15 (unbounded empty DATA frames, HTTP/2 DoS) =====
+    # Pulled by jsonrpsee-http-client v0.22.5 (via x3-cross-vm-bridge) and
+    # jsonrpsee-http-client v0.24.11 (via polkadot-sdk stable2512).
+    # Both are CLIENT-side only in our usage — we initiate HTTP/2 RPC
+    # connections to external nodes, we don't expose HTTP/2 servers to
+    # untrusted input. The DoS applies to HTTP/2 servers, not clients.
+    # Fix requires jsonrpsee/tonic upgrade — blocked by polkadot-sdk stable2512.
+    "RUSTSEC-2026-0258",
+
+    # ===== rkyv 0.7.46 (insufficient archive validation, OOB read) =====
+    # In Cargo.lock but not in cargo tree -i output — workspace resolution
+    # ghost: only referenced by vendored hashbrown-0.14.5 dev-deps and
+    # nalgebra optional features (not compiled into any binary we ship).
+    "RUSTSEC-2026-0235",
+
+    # ===== wasmtime 8.0.1 (newer advisories Aug-Sep 2026) =====
+    # Pinned by polkadot-sdk stable2512 via sp-wasm-interface v20.0.0.
+    # Upstream fix requires bumping the entire SDK, which is gated on
+    # our RC1 launch. Both issues are in Wasm execution sandbox —
+    # N/A for our runtime since untrusted code only runs via the
+    # FRAME Wasm executor (sandboxed, runtime-isolated).
+    "RUSTSEC-2026-0269",   # filesystem sandbox escape (trailing slash)
+    "RUSTSEC-2026-0222",   # Stores type indices between engines
 ]

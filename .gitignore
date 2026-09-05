@@ -142,3 +142,7 @@ X3-contracts/evm/cache/
 tests/security/lib/forge-std
 tests/security/out/
 tests/security/cache/
+
+# Tauri/desktop local build artifacts (regenerable; do not commit)
+apps/tauri-os/dist/
+apps/x3-desktop/dist/

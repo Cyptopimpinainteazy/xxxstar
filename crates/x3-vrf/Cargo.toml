@@ -1,8 +1,9 @@
 [package]
 name = "x3-vrf"
-version = "0.1.0"
-edition = "2021"
-authors = ["X3 Chain Team"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
 description = "Verifiable Random Function (VRF) implementation for X3 Chain"
 
 [dependencies]
