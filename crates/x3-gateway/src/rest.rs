@@ -2,10 +2,9 @@
 
 use crate::cache::RedisCache;
 use crate::db::{
-    ChainStats, Database, FundingSwarmGrant, FundingSwarmPublicationRecord,
-    FundingSwarmScoreboard, FundingSwarmTimelineItem, NewFundingSwarmGrant,
-    NewFundingSwarmPublication, NewApprovalCase, NewEvidenceBundle, NewOrchestraIntent,
-    NewVoteReceipt, NewVoteWindow, StoredBenchmarkReport,
+    ChainStats, Database, FundingSwarmGrant, FundingSwarmScoreboard, FundingSwarmTimelineItem,
+    NewFundingSwarmGrant, NewFundingSwarmPublication, NewApprovalCase, NewEvidenceBundle,
+    NewOrchestraIntent, NewVoteReceipt, NewVoteWindow, StoredBenchmarkReport,
 };
 use crate::error::GatewayError;
 use crate::graphql::AppSchema;
@@ -107,6 +106,7 @@ pub fn create_router(
         // Health and status
         .route("/health", get(health))
         .route("/status", get(status))
+        .route("/readyz", get(readiness))
         .route(
             "/api/public/funding-swarm/scoreboard",
             get(get_funding_swarm_scoreboard),
@@ -157,60 +157,60 @@ fn api_routes() -> Router<AppState> {
             get(admin_list_funding_swarm_grants).post(admin_create_funding_swarm_grant),
         )
         .route(
-            "/admin/funding-swarm/grants/:grant_id/research",
+            "/admin/funding-swarm/grants/{grant_id}/research",
             post(admin_research_funding_swarm_grant),
         )
         .route(
-            "/admin/funding-swarm/grants/:grant_id/draft",
+            "/admin/funding-swarm/grants/{grant_id}/draft",
             post(admin_draft_funding_swarm_grant),
         )
         .route(
-            "/admin/funding-swarm/grants/:grant_id/approve",
+            "/admin/funding-swarm/grants/{grant_id}/approve",
             post(admin_approve_funding_swarm_grant),
         )
         .route(
-            "/admin/funding-swarm/grants/:grant_id/submit-award-paid",
+            "/admin/funding-swarm/grants/{grant_id}/submit-award-paid",
             post(admin_submit_award_paid_funding_swarm_grant),
         )
         .route(
-            "/admin/funding-swarm/grants/:grant_id/publication",
+            "/admin/funding-swarm/grants/{grant_id}/publication",
             post(admin_create_funding_swarm_publication),
         )
         .route(
             "/benchmarks/reports",
             post(publish_benchmark_report).get(get_benchmark_reports),
         )
-        .route("/benchmarks/reports/:report_id", get(get_benchmark_report))
+        .route("/benchmarks/reports/{report_id}", get(get_benchmark_report))
         .route("/benchmarks/results", post(submit_benchmark_result))
         .route(
             "/orchestra/intents",
             post(create_orchestra_intent).get(list_orchestra_intents),
         )
-        .route("/orchestra/intents/:intent_id", get(get_orchestra_intent))
+        .route("/orchestra/intents/{intent_id}", get(get_orchestra_intent))
         .route(
-            "/orchestra/intents/:intent_id/dispatch",
+            "/orchestra/intents/{intent_id}/dispatch",
             post(dispatch_orchestra_intent),
         )
         .route(
             "/orchestra/approval-cases",
             post(create_approval_case).get(list_approval_cases),
         )
-        .route("/orchestra/approval-cases/:case_id", get(get_approval_case))
+        .route("/orchestra/approval-cases/{case_id}", get(get_approval_case))
         .route(
             "/orchestra/vote-windows",
             post(create_vote_window).get(list_vote_windows),
         )
-        .route("/orchestra/vote-windows/:window_id", get(get_vote_window))
+        .route("/orchestra/vote-windows/{window_id}", get(get_vote_window))
         .route(
-            "/orchestra/vote-windows/:window_id/receipts",
+            "/orchestra/vote-windows/{window_id}/receipts",
             post(create_vote_receipt),
         )
         .route(
-            "/orchestra/vote-windows/:window_id/close",
+            "/orchestra/vote-windows/{window_id}/close",
             post(close_vote_window),
         )
         .route(
-            "/orchestra/vote-windows/:window_id/imported-tally",
+            "/orchestra/vote-windows/{window_id}/imported-tally",
             post(import_vote_window_tally),
         )
         .route(
@@ -218,27 +218,27 @@ fn api_routes() -> Router<AppState> {
             post(create_evidence_bundle).get(list_evidence_bundles),
         )
         .route(
-            "/orchestra/evidence-bundles/:bundle_id",
+            "/orchestra/evidence-bundles/{bundle_id}",
             get(get_evidence_bundle),
         )
         // Blocks
         .route("/blocks", get(get_blocks))
         .route("/blocks/latest", get(get_latest_block))
-        .route("/blocks/:number", get(get_block))
-        .route("/blocks/:number/extrinsics", get(get_block_extrinsics))
-        .route("/blocks/:number/events", get(get_block_events))
+        .route("/blocks/{number}", get(get_block))
+        .route("/blocks/{number}/extrinsics", get(get_block_extrinsics))
+        .route("/blocks/{number}/events", get(get_block_events))
         // Extrinsics
         .route("/extrinsics", get(get_extrinsics))
-        .route("/extrinsics/:hash", get(get_extrinsic))
+        .route("/extrinsics/{hash}", get(get_extrinsic))
         // Events
         .route("/events", get(get_events))
         // Comits
         .route("/comits", get(get_comits))
-        .route("/comits/:hash", get(get_comit))
+        .route("/comits/{hash}", get(get_comit))
         // Accounts
-        .route("/accounts/:address", get(get_account))
-        .route("/accounts/:address/extrinsics", get(get_account_extrinsics))
-        .route("/accounts/:address/comits", get(get_account_comits))
+        .route("/accounts/{address}", get(get_account))
+        .route("/accounts/{address}/extrinsics", get(get_account_extrinsics))
+        .route("/accounts/{address}/comits", get(get_account_comits))
 }
 
 // ============================================================================
@@ -278,6 +278,40 @@ struct VoteWindowClosureResponse {
     evidence: crate::db::EvidenceBundle,
 }
 
+#[derive(Serialize)]
+struct ReadinessResponse {
+    status: String,
+    db: bool,
+    redis: bool,
+}
+
+/// Liveness is unconditional (`/health` always 200). Readiness is honest: the
+/// DB pool must be reachable and the optional Redis cache present before the
+/// gateway advertises itself ready for traffic that depends on those backends.
+/// In DB-free (degraded) mode this returns 503 with `db: false`, which is the
+/// accurate state rather than a fabricated readiness.
+async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
+    let db_ready = state.db.healthy().await;
+    // Redis is an optional accelerator; presence at startup is what we can
+    // report without adding operational complexity, and it never affects
+    // readiness beyond reflecting whether it is configured.
+    let redis_configured = state.redis_cache.is_some();
+    let ready = db_ready && redis_configured;
+    let status_code = if ready {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (
+        status_code,
+        Json(ReadinessResponse {
+            status: if ready { "ready".to_string() } else { "not_ready".to_string() },
+            db: db_ready,
+            redis: redis_configured,
+        }),
+    )
+}
+
 async fn status(State(state): State<AppState>) -> Result<Json<StatusResponse>, GatewayError> {
     let stats = load_chain_stats(&state).await?;
 
@@ -293,6 +327,36 @@ async fn status(State(state): State<AppState>) -> Result<Json<StatusResponse>, G
     }))
 }
 
+/// Wire representation of a relayer validator attestation. `ValidatorSignature`
+/// (from `x3-relayer`) deliberately does not implement serde `Deserialize`,
+/// so the HTTP boundary carries this serde-friendly mirror and the handler
+/// maps it into the real `ValidatorSignature` consumed by the proof type.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ValidatorAttestationWire {
+    pub validator_pubkey: [u8; 32],
+    pub signature: Vec<u8>,
+}
+
+fn into_validator_signatures(
+    wires: &[ValidatorAttestationWire],
+) -> Result<Vec<ValidatorSignature>, GatewayError> {
+    wires
+        .iter()
+        .map(|w| {
+            let signature: [u8; 64] = w.signature.as_slice().try_into().map_err(|_| {
+                GatewayError::BadRequest(format!(
+                    "validator signature must be exactly 64 bytes, got {}",
+                    w.signature.len()
+                ))
+            })?;
+            Ok(ValidatorSignature {
+                validator_pubkey: w.validator_pubkey,
+                signature,
+            })
+        })
+        .collect()
+}
+
 /// Request body for `/api/v1/relayer/proof-summary`. The client sends either
 /// an SVM proof (with validator attestations) or an EVM proof (with header
 /// data); the gateway validates the shape and returns aggregate metadata
@@ -305,7 +369,7 @@ pub enum RelayerProofRequest {
         source_domain: u32,
         slot: u64,
         blockhash: [u8; 32],
-        validator_signatures: Vec<ValidatorSignature>,
+        validator_signatures: Vec<ValidatorAttestationWire>,
         required_signatures: u32,
     },
     Evm {
@@ -337,13 +401,14 @@ async fn post_relayer_proof_summary(
 ) -> Result<Json<RelayerProofSummary>, GatewayError> {
     match req {
         RelayerProofRequest::Svm {
-            source_domain: _,
+            source_domain,
             slot,
             blockhash,
             validator_signatures,
             required_signatures,
         } => {
             let attestations = validator_signatures.len();
+            let validators = into_validator_signatures(&validator_signatures)?;
             let meets_quorum = (attestations as u32) >= required_signatures;
             // Shape-validate the relayer's submission against the same
             // type the on-chain pallet consumes; if anything is malformed
@@ -352,7 +417,7 @@ async fn post_relayer_proof_summary(
                 source_domain,
                 slot,
                 blockhash,
-                validator_signatures: validator_signatures.clone(),
+                validator_signatures: validators,
                 required_signatures,
             };
             Ok(Json(RelayerProofSummary {
@@ -387,6 +452,7 @@ async fn post_relayer_proof_summary(
                 chain_kind: "evm",
             }))
         }
+    }
 }
 
 /// Request body for `/api/v1/bridge/htlc/preimage-verify`. The client
@@ -477,8 +543,6 @@ async fn build_htlc_contract_shape(req: HtlcBuildRequest) -> HtlcBuildResponse {
         amount_x3: contract.amount_x3,
         hash_lock_hex: hex::encode(contract.hash_lock),
         time_lock: contract.time_lock,
-    }
-}
     }
 }
 
@@ -1527,7 +1591,7 @@ fn validate_signed_onboarding_artifact(
 }
 
 fn sort_benchmark_reports(
-    reports: &mut Vec<BenchmarkReport>,
+    reports: &mut [BenchmarkReport],
     sort_by: Option<&str>,
     sort_order: Option<&str>,
 ) {
@@ -1592,7 +1656,7 @@ mod tests {
     use crate::db::{NewEvidenceBundle, NewOrchestraIntent, NewVoteWindow};
     use crate::graphql::create_schema;
     use axum::{body::Body, http::Request, Router};
-    use hyper::body::to_bytes;
+    use axum::body::to_bytes;
     use serde_json::{json, Value};
     use std::sync::Arc;
     use tower::ServiceExt;
@@ -1915,10 +1979,97 @@ mod tests {
     }
 
     async fn read_json(response: axum::response::Response) -> Value {
-        let body = to_bytes(response.into_body())
+        let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("read response body");
         serde_json::from_slice(&body).expect("deserialize response body")
+    }
+
+    /// Boots the real [`crate::rest::create_router`] over an ephemeral TCP
+    /// port using a lazy (non-connecting) pool and proves the HTTP surface
+    /// actually serves: liveness, honest DB-free readiness, a DB-free REST
+    /// handler that computes real data, and the GraphQL endpoint. This is the
+    /// test that would have caught H11 ("gateway never starts its server")
+    /// without requiring an external Postgres.
+    #[tokio::test]
+    async fn router_serves_real_http_over_ephemeral_port_without_db() {
+        use crate::config::DatabaseConfig;
+        use std::time::Duration;
+
+        let db = Database::connect_lazy(&DatabaseConfig::new(
+            "postgres://u:p@127.0.0.1:1/x3_gateway_never".to_string(),
+        ))
+        .expect("lazy pool builds without connecting");
+        let schema = create_schema(db.clone(), None);
+        let app = create_router(db, schema, None, None);
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral listener");
+        let addr = listener.local_addr().expect("local addr");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve router");
+        });
+        let base = format!("http://{addr}");
+        let client = reqwest::Client::new();
+
+        // Poll until the server is accepting connections.
+        let mut got_health = None;
+        for _ in 0..100 {
+            if let Ok(r) = client.get(format!("{base}/health")).send().await {
+                if r.status().is_success() {
+                    got_health = Some(r.status().as_u16());
+                    break;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+        assert_eq!(got_health, Some(200), "server should answer /health");
+
+        // /readyz must honestly report the DB backend is down in degraded
+        // mode (503 + db:false) rather than fabricate readiness.
+        let readyz = client
+            .get(format!("{base}/readyz"))
+            .send()
+            .await
+            .expect("readyz request");
+        assert_eq!(readyz.status().as_u16(), 503);
+        let readyz_body: Value = readyz.json().await.expect("readyz json");
+        assert_eq!(readyz_body["db"], json!(false));
+
+        // A real DB-free REST handler computes real data (relayer proof
+        // summary for an EVM proof).
+        let evm_proof = json!({
+            "kind": "evm",
+            "source_domain": 1,
+            "block_hash": vec![1u8; 32],
+            "state_root": vec![0u8; 32],
+            "finalized_block": 42,
+            "proof_nonce": 0u32,
+        });
+        let proof_resp = client
+            .post(format!("{base}/api/v1/relayer/proof-summary"))
+            .json(&evm_proof)
+            .send()
+            .await
+            .expect("proof-summary request");
+        assert_eq!(proof_resp.status().as_u16(), 200);
+        let proof: Value = proof_resp.json().await.expect("proof-summary json");
+        assert_eq!(proof["kind"], json!("evm"));
+        assert_eq!(proof["meets_quorum"], json!(true));
+
+        // The GraphQL endpoint is served and answers a real query.
+        let gql = client
+            .post(format!("{base}/graphql"))
+            .json(&json!({ "query": "{ health }" }))
+            .send()
+            .await
+            .expect("graphql request");
+        assert_eq!(gql.status().as_u16(), 200);
+        let gql_body: Value = gql.json().await.expect("graphql json");
+        assert_eq!(gql_body["data"]["health"], json!("ok"));
+
+        server.abort();
     }
 
     fn integration_app(db: Database) -> Router {
@@ -2007,7 +2158,7 @@ mod tests {
                 }),
             )
             .route(
-                "/vote-windows/:window_id/votes",
+                "/vote-windows/{window_id}/votes",
                 post(|| async move {
                     Json(json!({
                         "receipt_id": "remote-receipt-1",
@@ -2020,7 +2171,7 @@ mod tests {
                 }),
             )
             .route(
-                "/intents/:intent_id/dispatch",
+                "/intents/{intent_id}/dispatch",
                 post(|| async move {
                     Json(json!({
                         "intent": {
@@ -2052,7 +2203,7 @@ mod tests {
                 }),
             )
             .route(
-                "/vote-windows/:window_id/close",
+                "/vote-windows/{window_id}/close",
                 post(|| async move {
                     Json(json!({
                         "vote_window": {
@@ -2095,7 +2246,7 @@ mod tests {
                 }),
             )
             .route(
-                "/vote-windows/:window_id/imported-tally",
+                "/vote-windows/{window_id}/imported-tally",
                 post(|| async move {
                     Json(json!({
                         "approvals": 1,
@@ -2105,7 +2256,7 @@ mod tests {
                 }),
             )
             .route(
-                "/evidence/:bundle_id",
+                "/evidence/{bundle_id}",
                 get(|| async move {
                     Json(json!({
                         "bundle_id": "remote-fetched-evidence-1",
@@ -2129,13 +2280,8 @@ mod tests {
         let addr = listener
             .local_addr()
             .expect("mock control-plane local addr");
-        let std_listener = listener
-            .into_std()
-            .expect("convert mock control-plane listener");
         let handle = tokio::spawn(async move {
-            axum::Server::from_tcp(std_listener)
-                .expect("serve mock control-plane from tcp")
-                .serve(app.into_make_service())
+            axum::serve(listener, app.into_make_service())
                 .await
                 .expect("run mock control-plane server");
         });
