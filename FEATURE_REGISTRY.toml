@@ -2,21 +2,24 @@
 mode = "LIVE_TESTNET"
 crate_or_service = "pallets/x3-atomic-kernel"
 tauri_app = "AtomicLock"
-required_tests = [
-  "canonical_supply_invariant_holds",
-  "represented_total_equals_canonical_supply",
-  "pending_supply_returns_to_zero",
-  "invariant_break_triggers_economic_halt",
-  "halt_blocks_new_mint",
-  "halt_blocks_new_transfer",
-  "halt_blocks_new_swap",
-  "halt_allows_refund",
-  "halt_allows_recovery"
-]
+# CRITICAL-TOK-1 (2026-09-06 independent audit,
+# audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/): all 9 names
+# previously listed here (canonical_supply_invariant_holds,
+# represented_total_equals_canonical_supply, pending_supply_returns_to_zero,
+# invariant_break_triggers_economic_halt, halt_blocks_new_mint,
+# halt_blocks_new_transfer, halt_blocks_new_swap, halt_allows_refund,
+# halt_allows_recovery) did not exist anywhere in this pallet, or under any
+# name, in the repository. The pallet's real EconomicHalt guard
+# (pallets/x3-atomic-kernel/src/lib.rs, `ensure!(!T::EconomicHalt::is_halted(), ...)`
+# inside `submit_atomic_bundle`) is real code but has zero dedicated test
+# coverage today. scripts/check-readiness-consistency.sh now verifies every
+# required_tests entry against real `fn` names so this cannot recur silently.
+required_tests = []
 health_endpoint = "/health/atomic-kernel"
 proof_report = "reports/six_route_invariants.md"
-readiness_score = 85
+readiness_score = 40
 blockers = [
+  "required_tests for the EconomicHalt invariant (mint/transfer/swap-blocking, refund/recovery-allowing) are not yet written — see CRITICAL-TOK-1; write real tests in pallets/x3-atomic-kernel/src/tests.rs before restoring a higher score",
   "Economic halt path is tested but has never been triggered in a multi-validator network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
@@ -73,16 +76,14 @@ dangerous_paths = ["external bridges", "gateway enablement", "audit gate"]
 mode = "SIM_TESTNET"
 crate_or_service = "crates/x3-gateway"
 tauri_app = "BTCGateway"
-required_tests = [
-  "btc_regtest_deposit_detected",
-  "btc_requires_confirmations",
-  "btc_xbtc_mint_updates_kernel_accounting",
-  "btc_mainnet_disabled_by_feature_flag"
-]
+# CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names
+# previously listed here existed as real tests anywhere under crates/x3-gateway.
+required_tests = []
 health_endpoint = "/health/btc-gateway"
 proof_report = "reports/btc_gateway_report.md"
 readiness_score = 25
 blockers = [
+  "required_tests (btc_regtest_deposit_detected, btc_requires_confirmations, btc_xbtc_mint_updates_kernel_accounting, btc_mainnet_disabled_by_feature_flag) were fictional — see CRITICAL-TOK-1; write real tests before re-adding them",
   "SIM_TESTNET only — regtest Bitcoin, not mainnet",
   "BTC mainnet disabled by feature flag; no real BTC signer quorum"
 ]
@@ -191,13 +192,11 @@ tauri_app = "SwarmCommand"
 health_endpoint = "/health/x3-swarm-core"
 proof_report = "reports/swarm_health_report.md"
 readiness_score = 25
-required_tests = [
-  "swarm_agent_can_receive_task",
-  "swarm_agent_cannot_touch_forbidden_files",
-  "swarm_memory_records_lesson",
-  "swarm_kill_switch_stops_agents"
-]
+# CRITICAL-TOK-1 (2026-09-06 independent audit): none of the 4 names
+# previously listed here existed as real tests anywhere under crates/x3-swarm-core.
+required_tests = []
 blockers = [
+  "required_tests (swarm_agent_can_receive_task, swarm_agent_cannot_touch_forbidden_files, swarm_memory_records_lesson, swarm_kill_switch_stops_agents) were fictional — see CRITICAL-TOK-1; write real tests before re-adding them",
   "Experimental — not in CI critical path",
   "No multi-agent race-condition or partition-tolerance testing"
 ]
