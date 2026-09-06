@@ -403,10 +403,12 @@ fn test_c01_rejects_oversized_proof_payload() {
     new_test_ext().execute_with(|| {
         enroll(1);
         // 10 KiB cap = 10240 bytes. Push past it with nonzero leaves.
-        let big: Vec<u8> = (0..(10240u32 / 32 + 2)).flat_map(|i| {
-            let b = ((i % 250) as u8).wrapping_add(1);
-            std::iter::repeat(b).take(32)
-        }).collect();
+        let big: Vec<u8> = (0..(10240u32 / 32 + 2))
+            .flat_map(|i| {
+                let b = ((i % 250) as u8).wrapping_add(1);
+                std::iter::repeat_n(b, 32)
+            })
+            .collect();
         let ok = crate::Pallet::<MockRuntime>::validate_evm_header(
             RuntimeOrigin::signed(1),
             100,

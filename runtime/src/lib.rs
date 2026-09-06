@@ -5,6 +5,12 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::single_component_path_imports)]
 
+// The in-tree `quantum-crypto` crate is a research implementation. It must
+// never be enabled in a runtime artifact until it is replaced by an audited,
+// interoperable PQC implementation with published test vectors.
+#[cfg(feature = "pq")]
+compile_error!("The pq runtime feature is disabled for production: replace the research quantum-crypto implementation with an audited PQC backend before enabling it.");
+
 #[cfg(feature = "runtime-benchmarks")]
 use frame_benchmarking;
 
@@ -3235,9 +3241,6 @@ impl_runtime_apis! {
                         "testnet" => {
                             Some(include_bytes!("../genesis-presets/testnet.json").to_vec())
                         }
-                        "production" => {
-                            Some(include_bytes!("../genesis-presets/production.json").to_vec())
-                        }
                         _ => None,
                     }
                 },
@@ -3248,7 +3251,6 @@ impl_runtime_apis! {
             vec![
                 "dev".into(),
                 "testnet".into(),
-                "production".into(),
             ]
         }
     }
@@ -4841,7 +4843,10 @@ mod native_supply_contract_tests {
                 "free balance on treasury must match the minted seed"
             );
             assert_eq!(treasury_reserved, 0);
-            assert_eq!(locked, seed, "treasury-held seed is locked, not circulating");
+            assert_eq!(
+                locked, seed,
+                "treasury-held seed is locked, not circulating"
+            );
 
             // Sanity: minting 10x also lands entirely in the locked bucket.
             let big: u128 = seed.saturating_mul(10);
@@ -4860,17 +4865,20 @@ mod native_supply_contract_tests {
             // the runtime API sums, so it must not be counted as locked.
             let user = sp_runtime::AccountId32::new([0xabu8; 32]);
             let t = TreasuryAccountId::get();
-            assert!(
-                user != t,
-                "test fixture must use a non-treasury account"
-            );
+            assert!(user != t, "test fixture must use a non-treasury account");
             let user_seed: u128 = 5_000_000; // well above ExistentialDeposit (100 µATLAS)
             let _ = pallet_balances::Pallet::<Runtime>::deposit_creating(&user, user_seed);
 
             let treasury_locked = pallet_balances::Pallet::<Runtime>::free_balance(&t)
                 .saturating_add(pallet_balances::Pallet::<Runtime>::reserved_balance(&t));
-            assert_eq!(treasury_locked, 0, "user funds must not inflate locked supply");
-            assert_eq!(pallet_balances::Pallet::<Runtime>::free_balance(&user), user_seed);
+            assert_eq!(
+                treasury_locked, 0,
+                "user funds must not inflate locked supply"
+            );
+            assert_eq!(
+                pallet_balances::Pallet::<Runtime>::free_balance(&user),
+                user_seed
+            );
         });
     }
 }

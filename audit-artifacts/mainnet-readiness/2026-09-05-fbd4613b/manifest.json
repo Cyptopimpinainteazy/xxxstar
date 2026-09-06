@@ -1,0 +1,166 @@
+{
+  "audited_repository": "X3 Atomic Star (xxxstar-main)",
+  "audited_commit": "fbd4613bd8769ac7422278fae441af1b302a1c88",
+  "audited_branch": "master",
+  "audit_date": "2026-09-05",
+  "generated_at": "2026-09-06T14:26:23.419104+00:00",
+  "generator": "Claude (Anthropic), AI-assisted audit + Typst 0.12.0 booklet generation",
+  "files": [
+    {
+      "path": "README.md",
+      "purpose": "Explains this directory's contents and exact PDF regeneration steps.",
+      "size_bytes": 6809,
+      "sha256": "5541dc42922d73cc81980efe34875be9eec1eb88923c0c141a9870821f79fcf3"
+    },
+    {
+      "path": "booklet.pdf",
+      "purpose": "Full rendered audit booklet (61 pages) \u2014 the primary deliverable.",
+      "size_bytes": 492322,
+      "sha256": "685da18c666486ec43a35f64e733203ad577dee6f2b7c4a2891a4f577b0977e5"
+    },
+    {
+      "path": "executive-summary.md",
+      "purpose": "Standalone executive summary for grant/sponsor/partner review.",
+      "size_bytes": 4661,
+      "sha256": "a353432950f65f8fd8092bca010dccc263042aeb97c4cb754b64ce3a374e219e"
+    },
+    {
+      "path": "feature-matrix.csv",
+      "purpose": "Canonical machine-readable capability-completeness register (67 rows).",
+      "size_bytes": 27836,
+      "sha256": "9c03aa3b66abcfe1a369d09742beb31ddab3558929c718189d64e224bcc5e5e1"
+    },
+    {
+      "path": "findings.json",
+      "purpose": "Canonical machine-readable defect register (33 findings).",
+      "size_bytes": 47893,
+      "sha256": "342c9d81ec53ab026b3443b9a336a66b949120189f8664db5215a4c3fa66ba29"
+    },
+    {
+      "path": "source/booklet.typ",
+      "purpose": "Typst entry point: imports style/components/data/charts, includes all 16 chapter files in order.",
+      "size_bytes": 888,
+      "sha256": "b69252fef56f862c833cddbf829a3007852f84879f639f02e644526b45bbe3dc"
+    },
+    {
+      "path": "source/chapters/00-frontmatter.typ",
+      "purpose": "Front matter: title page, scope, safety disclaimer, how-to-read legend, TOC.",
+      "size_bytes": 8422,
+      "sha256": "bd5722400551057471a6f852522b4a8a9edfc9d58c1198e70f27601e2b9bc743"
+    },
+    {
+      "path": "source/chapters/01-executive-verdict.typ",
+      "purpose": "Executive verdict: overall score, GO/NO-GO, top strengths/weaknesses, 7/30/60/90-day plan.",
+      "size_bytes": 10599,
+      "sha256": "8c5e728e3cdccec5138e241aa258c6e482b44c8d3c38b64ae0e673770bcca7c6"
+    },
+    {
+      "path": "source/chapters/02-scoring-methodology.typ",
+      "purpose": "Scoring methodology: weighted formula, per-category weights/scores/evidence.",
+      "size_bytes": 6150,
+      "sha256": "e4a5e4a9128c1d0b1c3aaf4117b86bf03c53e2c47d0aae160030818c026d8808"
+    },
+    {
+      "path": "source/chapters/03-architecture-overview.typ",
+      "purpose": "Architecture overview: node/runtime topology, consensus flow, cross-chain trust boundary diagrams.",
+      "size_bytes": 7360,
+      "sha256": "56f23675aee116e880f24b4fcd23708ff5e72a0b09c5cc9c0fea0d966365a9b4"
+    },
+    {
+      "path": "source/chapters/04-feature-completeness.typ",
+      "purpose": "Feature completeness scorecard: status distribution chart and by-subsystem breakdown.",
+      "size_bytes": 4268,
+      "sha256": "75059529459532a187f8d2210d9396e21bf79b64d60257da4e16041b2012eb1c"
+    },
+    {
+      "path": "source/chapters/05-findings-critical-high.typ",
+      "purpose": "Findings: Critical and High severity, full finding cards.",
+      "size_bytes": 1089,
+      "sha256": "fe836ba101fbcc01f74e93422d56e81ba0c5587e6ecc545d8468dca8282765e7"
+    },
+    {
+      "path": "source/chapters/06-findings-medium-low-info.typ",
+      "purpose": "Findings: Medium, Low, and Informational severity.",
+      "size_bytes": 1290,
+      "sha256": "720de7de2a5063555d38e92f9531ba7c0aa73bfa2461c3536120f9b7542a86d5"
+    },
+    {
+      "path": "source/chapters/07-fake-completeness-report.typ",
+      "purpose": "Fake-completeness report: confirmed doc-vs-code mismatches.",
+      "size_bytes": 4182,
+      "sha256": "3c578a293c1587de45aff348a44a966d4ed94929ec2a0c96744277b804b26aa3"
+    },
+    {
+      "path": "source/chapters/08-security-threat-model.typ",
+      "purpose": "Security threat model: protected assets, privileged roles, risk matrix.",
+      "size_bytes": 6335,
+      "sha256": "a725f47556e70546dc7d5e42ccfc8ab2207e18222a19efa96a534e13c35a6a62"
+    },
+    {
+      "path": "source/chapters/09-tokenomics-dex-spotlight.typ",
+      "purpose": "Tokenomics & DEX spotlight: deep dive on the float-arithmetic finding.",
+      "size_bytes": 4627,
+      "sha256": "45d2b40a8d24cccb46baa88127285fd22cb4812985e52567ecc746c7c534b01c"
+    },
+    {
+      "path": "source/chapters/10-consensus-tx-state-integrity.typ",
+      "purpose": "Consensus, transactions & state integrity: end-to-end transaction trace.",
+      "size_bytes": 4621,
+      "sha256": "e1337c41c77581e22b76d84028feb4b85240798408ab71cdbff6b07b9a26c55e"
+    },
+    {
+      "path": "source/chapters/11-ops-deployment-proofgates.typ",
+      "purpose": "Operations, deployment & proof-gate enforcement analysis.",
+      "size_bytes": 5662,
+      "sha256": "0ce6bb6b6efeef98674ae164e5f06f7c781a90a4635e4fa80af1a9ea88de1e1f"
+    },
+    {
+      "path": "source/chapters/12-performance-evidence.typ",
+      "purpose": "Performance evidence: measured vs. not-measured gap table.",
+      "size_bytes": 4131,
+      "sha256": "064fb61493b5c9612abae7d8d3fb6d61248203f4a4c2b67827b83ffcba77cf0d"
+    },
+    {
+      "path": "source/chapters/13-recovery-plan.typ",
+      "purpose": "Prioritized recovery plan: P0-P3 task tables with files and verification.",
+      "size_bytes": 7477,
+      "sha256": "4eaed411ed4e0451a7eff8a46b102a8043922093eac5561ad4f2153244b5b3fe"
+    },
+    {
+      "path": "source/chapters/14-launch-gates.typ",
+      "purpose": "Final launch gates: devnet through mainnet, waivable vs. non-waivable.",
+      "size_bytes": 4814,
+      "sha256": "c13d4c29e0da720cbe4fd82c993020cf0140b2560a9cf99a9bf60980696e9075"
+    },
+    {
+      "path": "source/chapters/15-appendices.typ",
+      "purpose": "Appendices: findings register, evidence ledger, glossary, assumptions.",
+      "size_bytes": 6882,
+      "sha256": "0b62cfb10dc0a26f90750a64cc78289a9c0b047ef7d05c7ceb3ecac8d345557e"
+    },
+    {
+      "path": "source/charts.typ",
+      "purpose": "Hand-rolled cetz bar-chart functions (severity, subsystem score, feature status).",
+      "size_bytes": 3302,
+      "sha256": "5f900b6db2e83e2f2315bd4be14066732b13fead15a9f66eaa51d488df06fb57"
+    },
+    {
+      "path": "source/components.typ",
+      "purpose": "Reusable Typst components: badges, finding cards, callouts, pull quotes.",
+      "size_bytes": 5514,
+      "sha256": "4fb1af1771f101ee3a3e9c53ed7b56d367291357769d88f590bef2b1a4fb2758"
+    },
+    {
+      "path": "source/data.typ",
+      "purpose": "Single source of truth: reads findings.json/feature-matrix.csv, defines the 16-category scoring model.",
+      "size_bytes": 3084,
+      "sha256": "66e9bc89375eb0aadf9b17bd452b9575ce74f65d2f11715feeb363d9aca49c6e"
+    },
+    {
+      "path": "source/style.typ",
+      "purpose": "Page setup, typography, and color palette.",
+      "size_bytes": 3533,
+      "sha256": "f9e004bc19bcc4b02a227e76e190d857059d9e11f0e1dbe34a78f2b0a621e318"
+    }
+  ]
+}

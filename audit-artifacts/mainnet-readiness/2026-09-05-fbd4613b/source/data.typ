@@ -42,7 +42,7 @@
   (name: "Consensus safety", weight: 13, score: 55),
   (name: "Cryptography & key management", weight: 10, score: 38),
   (name: "Test quality", weight: 8, score: 58),
-  (name: "Transaction correctness", weight: 8, score: 70),
+  (name: "Transaction correctness", weight: 8, score: 42),
   (name: "Tokenomics & economic safety", weight: 7, score: 50),
   (name: "State integrity", weight: 6, score: 60),
   (name: "Smart-contract / VM safety", weight: 6, score: 62),
