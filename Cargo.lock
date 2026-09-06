@@ -1437,6 +1437,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-swap-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures 0.3.32",
+ "hex",
+ "libc",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core 39.0.0",
+ "sp-runtime 45.0.0",
+ "thiserror 1.0.69",
+ "tokio",
+ "x3-vm",
+]
+
+[[package]]
 name = "atomic-take"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

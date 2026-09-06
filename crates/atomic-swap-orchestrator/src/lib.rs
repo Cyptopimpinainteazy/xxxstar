@@ -5,8 +5,9 @@
 //! verification and commitment phases.
 
 use anyhow::{anyhow, Result};
+use parity_scale_codec::Encode;
 use serde::{Deserialize, Serialize};
-use sp_core::{hashing::sha2_256, H256};
+use sp_core::{hashing::{blake2_256, sha2_256}, H256};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use x3_vm::{
@@ -96,6 +97,43 @@ pub struct FinalizationRequest {
     pub finality_cert: H256,
     /// GPU commit timestamp in nanoseconds (for auditing; not stored on-chain).
     pub committed_at_ns: u64,
+}
+
+/// Structured pre-image that `pallet-x3-atomic-kernel` commits to when it
+/// validates a PoAE receipt root. Field order is consensus protocol and must
+/// match `pallet_x3_atomic_kernel::ReceiptRootData`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KernelReceiptRootData {
+    /// The bundle being finalized.
+    pub bundle_id: H256,
+    /// Hash of the ordered leg list committed at submission time.
+    pub legs_hash: H256,
+    /// Number of legs in the bundle.
+    pub leg_count: u32,
+    /// `blake2_256(executor_account_id.encode())`, or `H256::zero()` if no
+    /// executor has been assigned yet.
+    pub executor_hash: H256,
+    /// Block number at which the bundle is being finalized.
+    pub finalized_block: u64,
+    /// Flash Finality / GRANDPA certificate hash (never `H256::zero()`).
+    pub finality_cert: H256,
+}
+
+impl Encode for KernelReceiptRootData {
+    fn encode_to<W: parity_scale_codec::Output + ?Sized>(&self, dest: &mut W) {
+        self.bundle_id.encode_to(dest);
+        self.legs_hash.encode_to(dest);
+        self.leg_count.encode_to(dest);
+        self.executor_hash.encode_to(dest);
+        self.finalized_block.encode_to(dest);
+        self.finality_cert.encode_to(dest);
+    }
+}
+
+/// Compute the receipt root that the atomic-kernel pallet will accept on
+/// mainnet: `blake2_256(SCALE_encode(KernelReceiptRootData))`.
+pub fn kernel_compatible_receipt_root(data: &KernelReceiptRootData) -> H256 {
+    H256(blake2_256(&data.encode()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -469,6 +507,25 @@ impl AtomicSwapOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kernel_receipt_root_matches_onchain_commitment_vector() {
+        let data = KernelReceiptRootData {
+            bundle_id: H256([1u8; 32]),
+            legs_hash: H256([2u8; 32]),
+            leg_count: 2,
+            executor_hash: H256([3u8; 32]),
+            finalized_block: 7,
+            finality_cert: H256([4u8; 32]),
+        };
+
+        let root = kernel_compatible_receipt_root(&data);
+        let expected = H256::from_slice(
+            &hex::decode("92167022b179ca59a63262fa9547834ae63325bac145b793931835fbc47fc200")
+                .expect("hex vector"),
+        );
+        assert_eq!(root, expected, "receipt-root encoding must match pallet commitment");
+    }
 
     // ── AtomicPair helpers ────────────────────────────────────────────────────
 

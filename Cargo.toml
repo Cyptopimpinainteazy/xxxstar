@@ -184,6 +184,7 @@ members = [
     "crates/x3-agent",
     "crates/x3-intent",
     # CI canonical crate paths: required workspace members
+    "crates/atomic-swap-orchestrator",
     "crates/x3-relayer",
     "crates/x3-bridge-security-council",
     "crates/x3-genesis-builder",
