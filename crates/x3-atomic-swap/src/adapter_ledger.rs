@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn test_new_creates_empty_bridge() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         assert_eq!(bridge.ledger().records.len(), 0);
@@ -467,7 +467,7 @@ mod tests {
         let mut existing_ledger = ProofLedger::new();
         existing_ledger.create_record(1, "test-relayer".into(), 100);
 
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let bridge = AdapterLedgerBridge::new_with_ledger(Box::new(adapter), existing_ledger);
 
         assert_eq!(bridge.ledger().records.len(), 1);
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_adapter_accessor() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         assert_eq!(bridge.adapter().adapter_name(), "x3-adapter-x3vm");
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_ledger_mut_accessor() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         bridge.ledger_mut().create_record(42, "test".into(), 200);
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn test_lock_and_record_writes_to_ledger() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"test_lock_record");
@@ -519,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_lock_and_record_proof_details() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"test_lock_details");
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn test_claim_and_record_writes_to_ledger() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let preimage: [u8; 32] = *b"test_claim_preimage_ledger_exact"; // 32 bytes
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_claim_and_record_preserves_preimage() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let preimage: [u8; 32] = *b"specific_preimage_value_12345678"; // 32 bytes
@@ -579,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_refund_and_record_writes_to_ledger() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let intent_id = 300;
@@ -599,7 +599,7 @@ mod tests {
 
     #[test]
     fn test_refund_and_record_proof_details() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let intent_id = 301;
@@ -615,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_full_lifecycle_lock_claim() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"lifecycle_test_lock_claim");
@@ -651,7 +651,7 @@ mod tests {
 
     #[test]
     fn test_full_lifecycle_lock_refund() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"lifecycle_lock_refund");
@@ -686,7 +686,7 @@ mod tests {
 
     #[test]
     fn test_full_lifecycle_with_three_proofs() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"three_proof_lifecycle");
@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_verify_and_record_source_lock() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let proof_data = b"valid_lock_proof_data".to_vec();
@@ -787,7 +787,7 @@ mod tests {
 
     #[test]
     fn test_verify_and_record_claim() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let proof_data = b"claim_proof_data".to_vec();
@@ -807,7 +807,7 @@ mod tests {
 
     #[test]
     fn test_verify_and_record_refund() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let proof_data = b"refund_proof_data".to_vec();
@@ -820,7 +820,7 @@ mod tests {
 
     #[test]
     fn test_verify_empty_data_fails() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let result = bridge.verify_and_record(ProofKind::SourceLock, Vec::new());
@@ -834,7 +834,7 @@ mod tests {
 
     #[test]
     fn test_missing_proofs_returns_all_for_empty_ledger() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let missing = bridge.missing_proofs(999);
@@ -846,7 +846,7 @@ mod tests {
 
     #[test]
     fn test_missing_proofs_after_lock() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"missing_proofs_lock");
@@ -873,7 +873,7 @@ mod tests {
 
     #[test]
     fn test_missing_proofs_after_lock_and_claim() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"missing_lock_claim");
@@ -895,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_multiple_intents_tracked_independently() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         // Intent A: lock only
@@ -943,7 +943,7 @@ mod tests {
 
     #[test]
     fn test_works_with_x3vm_adapter() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"x3vm_adapter_test");
@@ -1004,7 +1004,7 @@ mod tests {
     fn test_lock_proof_to_entry_creates_valid_entry() {
         let hashlock = make_hashlock(b"conversion_test");
         let intent = make_test_intent(900, hashlock);
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let proof = adapter.lock(&intent).expect("lock");
 
         let entry = lock_proof_to_entry(&proof, 900, ChainKind::X3);
@@ -1017,7 +1017,7 @@ mod tests {
 
     #[test]
     fn test_claim_proof_to_entry_creates_valid_entry() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let preimage: [u8; 32] = *b"claim_conv_test_preimage_1234567";
         let proof = adapter.claim(901, preimage).expect("claim");
 
@@ -1031,7 +1031,7 @@ mod tests {
 
     #[test]
     fn test_refund_proof_to_entry_creates_valid_entry() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let proof = adapter.refund(902).expect("refund");
 
         let entry = refund_proof_to_entry(&proof, 902, ChainKind::X3);
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn test_into_parts_recovers_adapter_and_ledger() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let mut bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         let hashlock = make_hashlock(b"into_parts_test");
@@ -1059,7 +1059,7 @@ mod tests {
 
     #[test]
     fn test_ledger_empty_after_new() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let bridge = AdapterLedgerBridge::new(Box::new(adapter));
 
         assert_eq!(bridge.ledger().records.len(), 0);
