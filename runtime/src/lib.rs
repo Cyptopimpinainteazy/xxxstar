@@ -1121,19 +1121,29 @@ ord_parameter_types! {
     ///
     /// Cross-VM feature extrinsics are intentionally wired to this account so
     /// users must enter through x3-lang tooling/runtime instead of calling the
-    /// low-level router and atomic-kernel pallets directly.
-    pub const X3LangGatewayAccount: AccountId =
-        <PalletId as AccountIdConversion<AccountId>>::into_account_truncating(&PalletId(*b"x3langgw"));
+    /// low-level router and atomic-kernel pallets directly. The account is an
+    /// sr25519 public key whose seed is held by the node's atomic gateway
+    /// service (`//x3-atomic-gateway` by default, overridable via CLI/env).
+    pub const X3LangGatewayAccount: AccountId = AccountId::new([
+        0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2,
+        0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52, 0x32, 0x87,
+        0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e,
+        0x4f, 0xb8, 0xd8, 0x23, 0xdd, 0xe6, 0x29, 0x35,
+    ]);
 }
 
 pub type EnsureX3LangGateway = frame_system::EnsureSignedBy<X3LangGatewayAccount, AccountId>;
 
 ord_parameter_types! {
-    /// Dedicated runtime account for the settlement engine.
-    /// Separate from x3langgw so that `finalize_with_settlement` cannot be
-    /// called by the gateway and the gateway cannot call settlement-only paths.
-    pub const SettlementGatewayAccount: AccountId =
-        <PalletId as AccountIdConversion<AccountId>>::into_account_truncating(&PalletId(*b"x3settle"));
+    /// Dedicated runtime account for the settlement engine. Separate from the
+    /// X3-lang gateway so that `finalize_with_settlement` cannot be called by
+    /// the gateway. Seed: `//x3-settlement-gateway`.
+    pub const SettlementGatewayAccount: AccountId = AccountId::new([
+        0x46, 0xec, 0x0b, 0x4a, 0x2c, 0x8f, 0x07, 0xe9,
+        0x5b, 0x63, 0x71, 0x59, 0x8e, 0x7b, 0x3b, 0x88,
+        0xdc, 0x58, 0xc4, 0x58, 0xe1, 0xa5, 0x12, 0x6e,
+        0x2a, 0x6d, 0x4c, 0xf4, 0xdd, 0xd2, 0x27, 0x7f,
+    ]);
 }
 
 /// Origin guard for `finalize_with_settlement`: only the settlement pallet's
