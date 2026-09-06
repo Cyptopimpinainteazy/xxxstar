@@ -45,6 +45,7 @@ use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::traits::ConstU32;
+use sp_std::vec;
 use sp_std::vec::Vec;
 
 /// Maximum encoded VM state diff bytes kept per executed leg.
