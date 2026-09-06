@@ -24121,6 +24121,7 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "log",
+ "pallet-x3-atomic-kernel",
  "pallet-x3-kernel",
  "parity-scale-codec",
  "reqwest 0.12.28",
