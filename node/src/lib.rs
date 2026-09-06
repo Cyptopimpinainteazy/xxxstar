@@ -56,6 +56,9 @@ pub mod metrics;
 /// network configurations.
 pub mod chain_spec;
 
+/// Atomic gateway key handling and signed atomic-kernel extrinsic builders.
+pub mod atomic_gateway;
+
 /// Flash Finality network bridge and gossip message handling.
 pub mod flash_finality;
 /// Service factory implementations, including node initialization, consensus
