@@ -2315,6 +2315,14 @@ impl pallet_x3_verifier::Config for Runtime {
 
 impl pallet_cross_chain_validator::Config for Runtime {
     type WeightInfo = pallet_cross_chain_validator::weights::SubstrateWeight<Runtime>;
+    /// Header-submitter membership is managed through the same governance path used
+    /// by the other chain-critical administrative pallets (Root or the technical
+    /// committee); arbitrary signed accounts cannot self-administer.
+    type AdminOrigin = EnsureRootOrHalfCouncil;
+    /// Only accept external headers whose height is within 10M local blocks of the
+    /// chain tip, so an attacker cannot poison the high-water mark with a far-future
+    /// height and block later legitimate headers.
+    type MaxHeaderLookahead = ConstU64<10_000_000>;
 }
 
 // ===== X3 Domain Registry Pallet Configuration =====
