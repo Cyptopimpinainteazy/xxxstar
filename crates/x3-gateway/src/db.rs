@@ -519,6 +519,36 @@ impl Database {
         &self.pool
     }
 
+    /// Build a lazy (deferred-connect) pool handle without running migrations
+    /// or contacting the server. Used to start the API in degraded mode when no
+    /// database is configured: DB-backed endpoints fail per-request, while
+    /// liveness and DB-free endpoints keep serving, and `healthy()` reports the
+    /// real backend state. Prefer [`Database::connect`] for production, which
+    /// connects and applies migrations before the server begins serving.
+    pub fn connect_lazy(config: &DatabaseConfig) -> Result<Self> {
+        let pool = PgPoolOptions::new()
+            .max_connections(config.max_connections)
+            .min_connections(config.min_connections)
+            .acquire_timeout(Duration::from_secs(30))
+            .connect_lazy(&config.url)?;
+        Ok(Self { pool })
+    }
+
+    /// Report whether the Postgres backend is reachable right now. A lazy or
+    /// dead pool returns `false`; this powers `/readyz` and the GraphQL
+    /// `dbReachable` field without faking readiness.
+    pub async fn healthy(&self) -> bool {
+        match self.pool.acquire().await {
+            Ok(mut conn) => {
+                // Best-effort round trip so we know a query would actually
+                // succeed, not merely that a socket opened.
+                let ok = sqlx::query("SELECT 1").execute(&mut *conn).await.is_ok();
+                ok
+            }
+            Err(_) => false,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) async fn connect_isolated_for_test(database_url: &str) -> Result<(Self, String)> {
         use std::sync::Arc;
@@ -1586,7 +1616,7 @@ impl Database {
 
         Ok(ChainStats {
             total_blocks: total_blocks.0,
-            latest_block: latest.and_then(|l| Some(l.0)),
+            latest_block: latest.map(|l| l.0),
             total_extrinsics: total_extrinsics.0,
             total_events: total_events.0,
             total_comits: total_comits.0,
@@ -1756,6 +1786,7 @@ impl SwarmJobStage {
 
     /// Parse from the `stage` string stored in the DB.  Returns `None` for
     /// unknown values (forward-compatible with future stages).
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "discovery"             => Some(Self::Discovery),
