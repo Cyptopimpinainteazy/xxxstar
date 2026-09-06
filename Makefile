@@ -1,13 +1,13 @@
-.PHONY: guard test audit mainnet-check fresh-machine-check\
- test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
+.PHONY: guard test audit mainnet-check fresh-machine-check check-make-gates\
+ test-node-build test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
  test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
  test-runtime-upgrade test-all-pallets fmt lint\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
 guard:
-	@python scripts/agent_guard.py
-	@python scripts/no_stub_guard.py
-	@python scripts/test_cheat_guard.py
+	@python3 scripts/agent_guard.py
+	@python3 scripts/no_stub_guard.py
+	@python3 scripts/test_cheat_guard.py
 
 test:
 	@pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py
@@ -15,28 +15,40 @@ test:
 	@cargo test --manifest-path x3-lang/Cargo.toml --tests
 
 # ── Pallet test suites (wired to CI — removes "No CI gate" blockers) ──
+#
+# Swallow-fix (H13): never pipe a cargo test straight into `tail` (e.g.
+# `cargo test ... | tail -5`) — make would see only tail's exit code (always 0)
+# and report a *green* recipe even when the test fails. Every recipe below
+# therefore captures the real logs to a temp file, prints a bounded tail, and
+# then `exit`s with cargo's own status so a failing test fails the make target.
+# This works under both bash and dash (/bin/sh on CI runners) with no `pipefail`
+# dependency.
 test-atomic-kernel:
-	@cargo test -p pallet-x3-atomic-kernel -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p pallet-x3-atomic-kernel -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-atomic-router:
-	@cargo test -p pallet-x3-cross-vm-router -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p pallet-x3-cross-vm-router -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-axe:
-	@cargo test -p pallet-x3-dex --features std -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p pallet-x3-dex --features std -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-x3-forge:
-	@cargo test -p pallet-x3-token-factory --features std -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p pallet-x3-token-factory --features std -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-x3-sentinel:
-	@cargo test -p pallet-x3-sentinel --features std -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p pallet-x3-sentinel --features std -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-x3-wallet:
-	@cargo test -p pallet-x3-wallet-pallet --features std -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p pallet-x3-wallet --features std -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-atomic-gateway:
-	@cargo test -p x3-gateway -- --nocapture 2>&1 | tail -5
+	@log=$$(mktemp); cargo test -p x3-gateway -- --nocapture > "$$log" 2>&1; rc=$$?; tail -n 5 "$$log"; rm -f "$$log"; exit $$rc
 test-x3-readiness:
 	@cargo test -p x3-readiness --tests
 test-x3-lang-vm:
 	@cargo test --manifest-path x3-lang/Cargo.toml --tests
 test-runtime-upgrade:
 	@echo "=== Runtime upgrade rehearsal ==="
-	@cargo build -p node --features mainnet-rc1 --release
+	@cargo build -p x3-chain-node --features mainnet-rc1 --release
 	@echo "=== Runtime built, try-runtime requires live chain ==="
+
+test-node-build:
+	@cargo check -p x3-chain-node --features mainnet-rc1
+	@echo "=== x3-chain-node (mainnet-rc1) check passes ==="
 test-all-pallets:
 	@$(MAKE) test-atomic-kernel
 	@$(MAKE) test-atomic-router
@@ -50,16 +62,21 @@ test-all-pallets:
 	@echo "=== All pallet tests passed ==="
 
 audit:
-	@python scripts/invariant_guard.py
-	@python scripts/mainnet_release_gate.py
+	@python3 scripts/invariant_guard.py
+	@python3 scripts/mainnet_release_gate.py
 	@bash scripts/check-readiness-consistency.sh
 
 mainnet-check:
-	@python scripts/mainnet_release_gate.py
+	@python3 scripts/mainnet_release_gate.py
 	@bash scripts/check-readiness-consistency.sh
 
+# Regression gate for audit finding H13: prove test recipes propagate real
+# exit codes (a failing test must fail the make target, never be swallowed).
+check-make-gates:
+	@bash scripts/verify_make_swallow_fix.sh
+
 fresh-machine-check:
-	@cargo build -p node --features mainnet-rc1 --release
+	@cargo build -p x3-chain-node --features mainnet-rc1 --release
 	@$(MAKE) test-all-pallets
 	@echo "=== Fresh machine check passed ==="
 
