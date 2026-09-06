@@ -5,7 +5,10 @@
 //! and the Frontier-compatible ETH/SVM RPC provided by `rpc_frontier`.
 
 use codec::{Decode, Encode};
+use crate::atomic_service::AtomicGatewayCommand;
 use flash_finality::FlashFinalityGadget;
+use frame_support::traits::ConstU32;
+use frame_support::BoundedVec;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::{BlockBackend, StorageProvider};
@@ -14,13 +17,15 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_core::storage::StorageKey;
-use sp_core::Pair;
+use sp_core::{Pair, H256};
 use sp_runtime::generic::Era;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_runtime::transaction_validity::TransactionSource;
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
+use pallet_x3_atomic_kernel::proof::{BundleLeg, DeclaredAccess, VmType};
 use x3_chain_runtime::{
     opaque::Block, AccountId, Address, AssetId, Balance, Runtime, RuntimeCall, Signature,
     SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
@@ -298,6 +303,93 @@ fn decode_agent_law_check() -> Result<pallet_x3_agent_law::AgentLawCheck<Runtime
         .map_err(|e| custom_error(format!("decode agent law extension failed: {e}")))
 }
 
+fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<BundleLeg>, JsonRpseeError> {
+    let legs = value
+        .get("legs")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| custom_error("Missing legs array"))?;
+    legs.iter()
+        .map(|leg| {
+            let vm_type = match leg
+                .get("vm_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+            {
+                "evm" => VmType::Evm,
+                "svm" => VmType::Svm,
+                "x3" => VmType::X3,
+                "cross" => VmType::Cross,
+                other => {
+                    return Err(custom_error(format!("Invalid vm_type: {other}")));
+                }
+            };
+            let token_in = decode_hex_32(
+                leg.get("token_in")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing token_in"))?,
+                "token_in",
+            )?;
+            let token_out = decode_hex_32(
+                leg.get("token_out")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing token_out"))?,
+                "token_out",
+            )?;
+            let amount_in = parse_u128_value(leg.get("amount_in"), "amount_in")?;
+            let min_amount_out =
+                parse_u128_value(leg.get("min_amount_out"), "min_amount_out")?;
+            let deadline = parse_u128_value(leg.get("deadline"), "deadline")? as u64;
+            let reads = leg
+                .get("access")
+                .and_then(|a| a.get("reads"))
+                .and_then(|r| r.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|h| {
+                            let s = h
+                                .as_str()
+                                .ok_or_else(|| custom_error("access read must be a string"))?;
+                            decode_hex_32(s, "access read").map(H256)
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            let writes = leg
+                .get("access")
+                .and_then(|a| a.get("writes"))
+                .and_then(|r| r.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|h| {
+                            let s = h
+                                .as_str()
+                                .ok_or_else(|| custom_error("access write must be a string"))?;
+                            decode_hex_32(s, "access write").map(H256)
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            let access = DeclaredAccess {
+                reads: BoundedVec::<H256, ConstU32<64>>::try_from(reads)
+                    .map_err(|_| custom_error("access reads exceed 64"))?,
+                writes: BoundedVec::<H256, ConstU32<64>>::try_from(writes)
+                    .map_err(|_| custom_error("access writes exceed 64"))?,
+            };
+            Ok(BundleLeg {
+                vm_type,
+                token_in: H256(token_in),
+                token_out: H256(token_out),
+                amount_in,
+                min_amount_out,
+                deadline,
+                access,
+            })
+        })
+        .collect()
+}
+
 /// Full RPC extension creation.
 ///
 /// Called by the service to build the RPC module for each connection.
@@ -308,6 +400,7 @@ pub fn create_full<P>(
     limiter: Arc<RateLimiter>,
     _subscription_executor: sc_rpc::SubscriptionTaskExecutor,
     enable_demo_wallet_rpc: bool,
+    atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>>,
 ) -> Result<RpcModule<()>, RpcError>
 where
     P: TransactionPool<Block = Block> + Sync + Send + 'static,
@@ -326,6 +419,37 @@ where
         pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
 {
     let mut module = RpcModule::new(());
+
+    if let Some(atomic_gateway_tx) = atomic_gateway_tx {
+        module.register_method(
+            "atomic_submitAtomicBundle",
+            move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse()?;
+            let legs = parse_overlay_legs(&req)?;
+            let deadline_blocks = req
+                .get("deadline_blocks")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing deadline_blocks"))? as u32;
+            let chain_id = req
+                .get("chain_id")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing chain_id"))? as u32;
+            let nonce = req
+                .get("nonce")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing nonce"))?;
+            atomic_gateway_tx
+                .try_send(AtomicGatewayCommand::SubmitBundle {
+                    legs,
+                    deadline_blocks,
+                    chain_id,
+                    nonce,
+                })
+                .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
+            Ok(serde_json::json!({ "status": "accepted" }))
+            },
+        )?;
+    }
 
     let tx_pool = pool.clone();
     let system_rpc = substrate_frame_rpc_system::System::new(client.clone(), pool);

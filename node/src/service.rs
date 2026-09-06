@@ -1,4 +1,5 @@
 use crate::flash_finality::FlashFinalityBridge;
+use crate::atomic_service::{AtomicGatewayCommand, AtomicGatewayService};
 use crate::metrics::X3PrometheusMetrics;
 use crate::rpc_middleware::{RateLimitConfig, RateLimiter};
 use contention_predictor::{ContentionPredictor, PredictorConfig};
@@ -25,7 +26,7 @@ use sp_runtime::{
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 use x3_bridge_adapters::{
     OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
@@ -774,12 +775,23 @@ impl CrossVmBridgeSafetyGate {
     }
 }
 
-/// Start a new X3 Chain full node with complete consensus and networking
+/// Start a new X3 Chain full node with complete consensus and networking.
 pub fn new_full<
+    N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+>(
+    config: Configuration,
+    feature_flags: NodeFeatureFlags,
+) -> Result<TaskManager, ServiceError> {
+    new_full_with_atomic_gateway::<N>(config, feature_flags, None)
+}
+
+/// Start a full node with an optional atomic gateway service.
+pub fn new_full_with_atomic_gateway<
     N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
 >(
     mut config: Configuration,
     feature_flags: NodeFeatureFlags,
+    atomic_gateway_uri: Option<String>,
 ) -> Result<TaskManager, ServiceError> {
     enforce_startup_gate_if_authority(config.role.is_authority())?;
 
@@ -814,10 +826,49 @@ pub fn new_full<
         log::info!(
             "🧩 Atomic kernel feature gate enabled; sequencer and settlement pipelines are active"
         );
-        // Additional atomic kernel activation hooks can be added here.
     } else {
         log::info!("🧩 Atomic kernel feature gate is disabled (default)");
     }
+
+    // Optional node-side atomic gateway service: signs and submits
+    // atomic-kernel extrinsics through this node's transaction pool.
+    let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags.enable_atomic_kernel {
+        match atomic_gateway_uri {
+            Some(uri) => match AtomicGatewayService::new(
+                &uri,
+                client.clone(),
+                transaction_pool.clone(),
+            ) {
+                Ok(service) => {
+                    let uri_for_log = uri.clone();
+                    let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
+                    task_manager.spawn_handle().spawn(
+                        "atomic-gateway-service",
+                        Some("x3"),
+                        async move {
+                            service.run(rx).await;
+                        },
+                    );
+                    log::info!(
+                        "🧩 Atomic gateway service spawned (uri: {uri_for_log})"
+                    );
+                    Some(tx)
+                }
+                Err(e) => {
+                    log::error!("🧩 Atomic gateway service failed to start: {e}");
+                    None
+                }
+            },
+            None => {
+                log::warn!(
+                    "🧩 enable-atomic-kernel requires --atomic-gateway-uri or X3_ATOMIC_GATEWAY_URI; service not spawned"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     let genesis_hash = client
         .block_hash(0)?
@@ -1008,6 +1059,7 @@ pub fn new_full<
         let transaction_pool = transaction_pool.clone();
         let gadget = flash_finality_gadget.clone();
         let limiter = rate_limiter.clone();
+        let atomic_gateway_tx = atomic_gateway_tx.clone();
         Box::new(
             move |subscription_executor: sc_rpc::SubscriptionTaskExecutor| {
                 crate::rpc::create_full(
@@ -1017,6 +1069,7 @@ pub fn new_full<
                     limiter.clone(),
                     subscription_executor,
                     enable_demo_wallet_rpc,
+                    atomic_gateway_tx.clone(),
                 )
                 .map_err(Into::into)
             },
