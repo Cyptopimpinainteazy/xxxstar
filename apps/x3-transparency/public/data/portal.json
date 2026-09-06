@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-06T01:10:44.192Z",
+  "source": {
+    "snapshotPath": "snapshots/20260906T011036-dfbd8e73",
+    "sourceFingerprint": "0d3862f931de1bc431c294b80aa457abc55f68ad1d68457e22e46318b9c0de93",
+    "sourceCommit": "16337b54c66c3975149240159701f181b7054d1e",
+    "readinessGeneratedAt": "2026-09-06T01:10:36.569058+00:00",
+    "evidenceAssets": [
+      "data/evidence-assets/readiness.svg",
+      "data/evidence-assets/subsystems.svg",
+      "data/evidence-assets/findings.svg",
+      "data/evidence-assets/tasks.svg",
+      "data/evidence-assets/checks.svg"
+    ]
+  },
+  "funding": {
+    "currency": "USD",
+    "asOf": "2026-09-06",
+    "requested": 0,
+    "pledged": 0,
+    "received": 0,
+    "allocated": 0,
+    "spent": 0
+  },
+  "workPackages": [
+    {
+      "id": "proof-boundary-remediation",
+      "title": "Proof-boundary remediation",
+      "description": "Close unauthenticated external header, finality-anchor, and rollback-state defects before public testnet consideration.",
+      "linkedFindings": [
+        "C01",
+        "C02",
+        "C03",
+        "H01",
+        "H02",
+        "H03"
+      ],
+      "requested": 0,
+      "pledged": 0,
+      "received": 0,
+      "allocated": 0,
+      "spent": 0,
+      "status": "scope_pending",
+      "evidenceStatus": "unverified",
+      "proofIds": []
+    },
+    {
+      "id": "reproducible-release",
+      "title": "Reproducible release and honest gates",
+      "description": "Restore the workspace build and enforce release evidence that cannot mask failed checks or stale artifacts.",
+      "linkedFindings": [
+        "H13",
+        "H14",
+        "H15",
+        "H18"
+      ],
+      "requested": 0,
+      "pledged": 0,
+      "received": 0,
+      "allocated": 0,
+      "spent": 0,
+      "status": "scope_pending",
+      "evidenceStatus": "unverified",
+      "proofIds": []
+    },
+    {
+      "id": "network-evidence",
+      "title": "Multi-node and recovery evidence",
+      "description": "Demonstrate finalized multi-node operation, recovery, fault handling, and operator-grade launch gates.",
+      "linkedFindings": [
+        "M02",
+        "M03",
+        "M04",
+        "L01"
+      ],
+      "requested": 0,
+      "pledged": 0,
+      "received": 0,
+      "allocated": 0,
+      "spent": 0,
+      "status": "scope_pending",
+      "evidenceStatus": "unverified",
+      "proofIds": []
+    }
+  ],
+  "proofLedger": [],
+  "completion": {
+    "readinessScore": 0,
+    "uncappedScore": 0,
+    "taskCount": 29,
+    "completedTasks": 0,
+    "taskProgressPercent": 0,
+    "openFindings": {
+      "Critical": 3,
+      "High": 18,
+      "Medium": 7,
+      "Low": 1
+    },
+    "releaseDecision": "NO-GO",
+    "checks": [
+      {
+        "id": "rpc-unit",
+        "status": "stale",
+        "reason": "Source or check definition changed",
+        "exitCode": 0,
+        "evidenceId": "7795cf968e0d4a129367ac81f926c246",
+        "log": "evidence/7795cf968e0d4a129367ac81f926c246.log"
+      },
+      {
+        "id": "dsl-tests",
+        "status": "stale",
+        "reason": "Source or check definition changed",
+        "exitCode": 1,
+        "evidenceId": "0b9afede8a2c4248b45280c62dc0cb42",
+        "log": "evidence/0b9afede8a2c4248b45280c62dc0cb42.log"
+      }
+    ],
+    "baselineEligible": false
+  }
+}
