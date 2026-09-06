@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-06T01:10:44.192Z",
+  "generatedAt": "2026-09-06T02:46:35.782Z",
   "source": {
-    "snapshotPath": "snapshots/20260906T011036-dfbd8e73",
-    "sourceFingerprint": "0d3862f931de1bc431c294b80aa457abc55f68ad1d68457e22e46318b9c0de93",
-    "sourceCommit": "16337b54c66c3975149240159701f181b7054d1e",
-    "readinessGeneratedAt": "2026-09-06T01:10:36.569058+00:00",
+    "snapshotPath": "snapshots/20260906T024632-400c14a0",
+    "sourceFingerprint": "be5a9e6a7daaf654a2c5d234ee08c8e729e9e1570b59064d10c02558d565a7c7",
+    "sourceCommit": "fbd4613bd8769ac7422278fae441af1b302a1c88",
+    "readinessGeneratedAt": "2026-09-06T02:46:32.502118+00:00",
     "evidenceAssets": [
       "data/evidence-assets/readiness.svg",
       "data/evidence-assets/subsystems.svg",

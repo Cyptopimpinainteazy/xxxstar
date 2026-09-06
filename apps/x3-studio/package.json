@@ -6,10 +6,10 @@
   "scripts": {
     "dev:renderer": "vite",
     "dev:electron": "sleep 3 && NODE_ENV=development electron . --dev",
-    "dev": "concurrently -k \"pnpm dev:renderer\" \"pnpm dev:electron\"",
+    "dev": "concurrently -k \"corepack pnpm dev:renderer\" \"corepack pnpm dev:electron\"",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build": "pnpm build:electron && pnpm build:renderer",
+    "build": "corepack pnpm build:electron && corepack pnpm build:renderer",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit -p tsconfig.json"

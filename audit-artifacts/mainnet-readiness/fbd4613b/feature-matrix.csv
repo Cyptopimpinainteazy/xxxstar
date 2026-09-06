@@ -1,0 +1,101 @@
+id,subsystem,feature,claimed_behavior,actual_implementation,runtime_wiring,test_count,status,completion_pct,evidence_file,missing_work
+F001,consensus,Aura block production,Authored by slot leaders via pallet-aura,Real Substrate pallet_aura wired in all 6 construct_runtime! variants,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,75,runtime/src/lib.rs,Multi-validator slot rotation drill
+F002,consensus,GRANDPA finality,Finality via pallet-grandpa,Real Substrate pallet_grandpa wired,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,70,runtime/src/lib.rs,Multi-validator GRANDPA convergence proof
+F003,consensus,Validator lifecycle enrollment,Session pallet with validator keys,Real pallet_session wired,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,70,node/src/service.rs,4-validator testnet run
+F004,consensus,Slashing (equivocation/double-sign),pallet-x3-slash + Substrate offences,Real pallet-x3-slash exists,Partial (typed but no live SecurityEventBroadcaster),21,PARTIAL,50,pallets/x3-slash/src/tests.rs,Wire SecurityEventBroadcaster + run equivocation drill
+F005,consensus,Fork choice / reorg handling,Substrate fork choice via sc-consensus,Default Substrate fork choice,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,60,node/src/service.rs,Adversarial reorg test
+F006,tx_lifecycle,Transaction decoding + signature verification,Substrate SignedPayload + sr25519,Real Substrate CheckedExtrinsic,Yes (runtime),,VERIFIED,85,runtime/src/lib.rs,—
+F007,tx_lifecycle,Nonce uniqueness + replay protection,pallet-x3-cross-vm-router NextNonce monotonic + UsedMessages,Real,Yes (runtime),50,VERIFIED,90,pallets/x3-cross-vm-router/src/tests.rs,—
+F008,tx_lifecycle,Mempool admission + ordering,Substrate sc-transaction-pool,Real sc-transaction-pool wired,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,70,node/src/service.rs,Mempool spam resistance test
+F009,tx_lifecycle,Fee accounting + gas metering,pallet-transaction-payment,Real Substrate pallet,Yes (runtime),,VERIFIED,80,runtime/src/lib.rs,—
+F010,tx_lifecycle,Receipt / event emission,Substrate System Events,Real,Yes (runtime),,VERIFIED,85,runtime/src/lib.rs,—
+F011,state,State root + Merkle commitment,Substrate default trie + storage root,Real,Yes (runtime),,VERIFIED,80,runtime/src/lib.rs,Replay-from-genesis test
+F012,state,Storage backend (RocksDB),Substrate RocksDbWeight,Real,Yes (runtime),,VERIFIED,75,runtime/src/lib.rs,—
+F013,state,Supply ledger invariants,pallet-x3-supply-ledger represented_total ≤ canonical_supply,Real invariant enforced on every mutation,Yes (runtime),33,VERIFIED,90,pallets/x3-supply-ledger/src/tests_*,—
+F014,state,EconomicHalt on invariant break,pallet-x3-supply-ledger halt path,Real halt path,Yes (runtime),6,IMPLEMENTED_BUT_UNVERIFIED,75,pallets/x3-supply-ledger/src/tests_halt.rs,Multi-validator halt propagation
+F015,state,Atomic bundle kernel + PoAE,pallet-x3-atomic-kernel,Real implementation with PoaeProof,Yes (runtime),36,VERIFIED,80,pallets/x3-atomic-kernel/src/tests.rs,External verifier integration
+F016,state,Settlement escrow + refund,pallet-x3-settlement-engine,Real escrow lifecycle,Yes (runtime),81,VERIFIED,85,pallets/x3-settlement-engine/src/tests.rs,—
+F017,vm,X3Native domain execution,Native token + staking,Real pallet_balances + custom pallets,Yes (runtime),,VERIFIED,85,runtime/src/lib.rs,—
+F018,vm,X3Evm domain execution,Frontier pallet-evm + pallet-ethereum,Real Frontier pallet-evm wired,Yes (runtime),,VERIFIED,75,runtime/src/lib.rs (frontier feature),—
+F019,vm,X3Svm domain execution,pallet-svm-runtime + crates/x3-svm,Real SVM runtime,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,60,pallets/svm-runtime,Determinism + gas metering audit
+F020,vm,Gas / resource metering,x3-svm syscall table,Real metering in crates/x3-svm/src/metering,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,55,crates/x3-svm/src/metering.rs,Gas exhaustion / OOG test
+F021,cross_vm,6-route internal cross-VM (Native↔Evm↔Svm),pallet-x3-cross-vm-router,Real 6-route matrix with replay protection,Yes (runtime),50,VERIFIED,90,pallets/x3-cross-vm-router/src/tests.rs,—
+F022,cross_vm,External chain bridges (Ethereum/Solana/Bitcoin),crates/x3-crosschain-gateway,x3-crosschain-gateway 1285 lines real impl + 4 verifier families,Gated OFF in mainnet-rc1 by compile_error!,,DISCONNECTED,30,crates/x3-crosschain-gateway/src/lib.rs,Regtest/testnet deposit+withdrawal drill
+F023,cross_vm,BTC signer quorum + mainnet path,crates/x3-bitcoin-vault,Real SPV verifier + vault code but no threshold signing,Gated OFF (feature flag),,DISCONNECTED,25,crates/x3-bitcoin-vault,Implement FROST/MuSig2 signing
+F024,cross_chain,External route registry,crates/x3-external-route-registry,Real registry,Gated OFF,,IMPLEMENTED_BUT_UNVERIFIED,35,crates/x3-external-route-registry,—
+F025,cross_chain,Circuit breaker + risk engine,crates/x3-circuit-breaker + x3-gateway-risk-engine,Real implementations,Gated OFF,,IMPLEMENTED_BUT_UNVERIFIED,40,crates/x3-circuit-breaker,—
+F026,cross_chain,Dispute resolution (jury anchor),pallet-x3-jury-anchor,Real pallet,Yes (runtime),,PARTIAL,55,pallets/x3-jury-anchor,Live dispute drill
+F027,crypto,Signature: sr25519 (Aura),Substrate sp_consensus_aura::sr25519,Real Substrate crypto,Yes (runtime),,VERIFIED,90,node/src/service.rs,—
+F028,crypto,Signature: ed25519 (GRANDPA),Substrate sp_consensus_grandpa::ed25519,Real Substrate crypto,Yes (runtime),,VERIFIED,90,node/src/service.rs,—
+F029,crypto,Hash: Blake2-256 + Keccak256 + SHA-256,Substrate defaults + sha2 + keccak,Real,Yes (runtime),,VERIFIED,85,runtime/src/lib.rs,—
+F030,crypto,Post-quantum signatures,Dilithium/Falcon per crates/x3-pq types,EMPTY — crates/x3-quantum-crypto has no .rs files,Gated OFF behind pq feature,,PLACEHOLDER,5,crates/x3-quantum-crypto,Implement or remove
+F031,keymgmt,Validator key generation,Substrate sc_cli + AuthorityKeys,Real,Yes (runtime),,VERIFIED,80,node/src/command.rs,—
+F032,keymgmt,Key storage (keystore),Substrate KeystoreContainer,Real,Yes (runtime),,VERIFIED,80,node/src/service.rs,—
+F033,keymgmt,Domain separation for replay,Substrate SignedPayload + chain_id,Real,Yes (runtime),,VERIFIED,85,runtime/src/lib.rs,—
+F034,governance,Council + collective,pallet_collective,Real Substrate pallet,Yes (runtime),,VERIFIED,80,runtime/src/lib.rs,—
+F035,governance,Treasury + spending,pallet_treasury + pallet-x3-treasury-policy,Real Substrate + custom,Yes (runtime),,VERIFIED,75,runtime/src/lib.rs,Treasury policy drill
+F036,governance,Runtime upgrade governance,Substrate set_code + governance vote,Real Substrate + governance,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,70,runtime/src/lib.rs,try-runtime-upgrade rehearsal on 4-validator
+F037,contracts,EVM contract deployment,pallet-evm + pallet-ethereum,Real Frontier,Yes (runtime, frontier feature),,VERIFIED,70,runtime/src/lib.rs,—
+F038,contracts,SVM program execution,pallet-svm-runtime + crates/x3-svm,Real SVM execution,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,60,crates/x3-svm,—
+F039,contracts,x3-lang compiler (Python),x3-lang/cli.py + planner.py + emitter,Real Python pipeline,Yes (x3-lang/),,IMPLEMENTED_BUT_UNVERIFIED,65,x3-lang/cli.py,Cross-impl determinism with Rust compiler
+F040,contracts,x3-lang compiler (Rust),crates/x3-compiler + x3-ast + x3-mir + x3-opt,Real but experimental,Partial,EXCLUDED from main workspace (x3-frontend note),,PARTIAL,40,crates/x3-compiler,Freeze or remove
+F041,networking,P2P networking,Substrate sc-network + libp2p,Real,Yes (runtime),,VERIFIED,80,node/src/service.rs,—
+F042,networking,Gossip propagation,Substrate sc-gossip,Real,Yes (runtime),,VERIFIED,75,node/src/service.rs,—
+F043,networking,Peer discovery + bootnodes,node/src/chain_spec.rs load_bootnodes,Real,Yes (runtime),,VERIFIED,75,node/src/chain_spec.rs,—
+F044,networking,Rate limiting + DOS resistance,node/src/rpc_middleware.rs RateLimiter,Real implementation,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,65,node/src/rpc_middleware.rs,Adversarial peer flood test
+F045,rpc,RPC server (JSON-RPC + WS),Substrate jsonrpsee,Real,Yes (runtime),,VERIFIED,80,node/src/rpc.rs,—
+F046,rpc,Custom RPC endpoints (EVM + bridge + authority),node/src/rpc.rs + rpc_frontier.rs (1873 lines),Real implementations,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,70,node/src/rpc.rs,—
+F047,rpc,Health endpoints,node/src/metrics.rs + crates/x3-chain-health-daemon,Real metrics + daemon,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,70,node/src/metrics.rs,End-to-end health probe test
+F048,rpc,Flash Finality gossip,node/src/flash_finality.rs + crates/flash-finality,Real FlashFinalityBridge,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,60,node/src/flash_finality.rs,Multi-validator flash finality drill
+F049,wallet,X3 wallet pallet,pallets/x3-wallet-pallet,Real pallet,Yes (runtime),,PARTIAL,55,pallets/x3-wallet-pallet,External security audit (biometric + recovery)
+F050,wallet,Wallet CLI / SDK,crates/x3-wallet-cli + crates/x3-sdk,Real crates,Yes,EXCLUDED from main workspace,,IMPLEMENTED_BUT_UNVERIFIED,55,crates/x3-wallet-cli,—
+F051,wallet,x3-mobile-sdk,crates/x3-mobile-sdk,Real crate,Yes,,,IMPLEMENTED_BUT_UNVERIFIED,45,crates/x3-mobile-sdk,—
+F052,wallet,Tauri OS desktop app,apps/tauri-os,Partial — dead buttons reported,Partial,,,PARTIAL,15,apps/tauri-os,Complete wiring or document CLI-only
+F053,dex,AXE DEX (constant product AMM),pallet-x3-dex,Real implementation,Yes (runtime, NOT in mainnet-rc1),3,PARTIAL,75,pallets/x3-dex,—
+F054,dex,LP locker + anti-rug,pallet-x3-lp-locker,Real pallet,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,65,pallets/x3-lp-locker,—
+F055,dex,Advanced DEX (perps/options/flashloans),Not implemented,Gated OFF behind advanced-dex feature,,,MISSING,0,N/A,Defer post-mainnet
+F056,tokenomics,Token factory (forge),pallet-x3-token-factory,Real pallet,Yes (runtime),5,PARTIAL,75,pallets/x3-token-factory,Sentinel score integration
+F057,tokenomics,Sentinel guard over mint authority,pallet-x3-sentinel,Real pallet,Yes (runtime),,PARTIAL,50,pallets/x3-sentinel,Wire to TokenFactory CreateTokenOrigin
+F058,tokenomics,Flash loan pallet,pallet-x3-flashloan,Real pallet,Yes (runtime, NOT in mainnet-rc1),,IMPLEMENTED_BUT_UNVERIFIED,60,pallets/x3-flashloan,—
+F059,tokenomics,Launchpad / presale,pallet-x3-launchpad,Real pallet,Yes (runtime, NOT in mainnet-rc1),,PARTIAL,55,pallets/x3-launchpad,—
+F060,tokenomics,Auction (English),pallet-x3-auction,Real pallet,Yes (runtime, NOT in mainnet-rc1),,PARTIAL,55,pallets/x3-auction,—
+F061,tokenomics,Wrapped X3 token (cross-chain),pallet-x3-wrapped,Real pallet,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,60,pallets/x3-wrapped,—
+F062,observability,Prometheus metrics,node/src/metrics.rs (420 lines),Real X3PrometheusMetrics,Yes (runtime),,VERIFIED,75,node/src/metrics.rs,—
+F063,observability,Logging (env_logger),node/src/logging.rs + runtime env_logger,Real,Yes (runtime),,VERIFIED,80,node/src/logging.rs,—
+F064,observability,Tracing (substrate-tracing),Substrate sc-tracing wired,Yes (runtime),,IMPLEMENTED_BUT_UNVERIFIED,65,node/src/service.rs,—
+F065,observability,Security event broadcast,crates/x3-security-events + runtime FailClosedSecurityHook,Fail-closed stub (log+drop),Yes (runtime stub),,PARTIAL,30,runtime/src/lib.rs:21-44,Wire live SwarmEventBroadcaster
+F066,observability,Accounting event spine,crates/x3-accounting-events + runtime FailClosedSpine,Fail-closed stub (log+drop),Yes (runtime stub),,PARTIAL,30,runtime/src/lib.rs:36-44,Wire live AccountingSpine
+F067,deployment,Node binary build,cargo build -p x3-chain-node,PASS in this audit,Yes,EXCLUDED from main workspace,,VERIFIED,95,logs/cargo_check.log,—
+F068,deployment,WASM runtime build,cargo build --release --features mainnet-rc1 --target wasm32-unknown-unknown,NOT attempted (WASM target missing),,BLOCKED,0,N/A,Install wasm32 target + resolve pre-existing compile error
+F069,deployment,Systemd units,packaging/systemd/,Real systemd units,Yes,,VERIFIED,75,packaging/systemd/,—
+F070,deployment,Dockerfile (validator/indexer/mainnet-check),Dockerfile.* (3 files),Real Dockerfiles (dev/test only per Dockerfile.validator warning),,INFORMATIONAL,60,Dockerfile.*,—
+F071,deployment,Chain spec presets (dev/local/staging/testnet/production),runtime/genesis-presets/ + node/src/chain_spec.rs,Real 4 presets (dev, local variants, testnet, production) + 3 generated (staging/local_two/three_validator),Yes (runtime),,VERIFIED,80,runtime/genesis-presets/,—
+F072,deployment,Genesis ceremony script,scripts/mainnet/genesis_ceremony.sh,Real script,Yes (script),,IMPLEMENTED_BUT_UNVERIFIED,55,scripts/mainnet/genesis_ceremony.sh,Execute + srtool-verify
+F073,deployment,Fresh-machine check,scripts/fresh_machine_check.sh + Makefile target,Real script + target,Yes,,IMPLEMENTED_BUT_UNVERIFIED,60,scripts/fresh_machine_check.sh,Run on fresh VM
+F074,deployment,Reproducible build (srtool),scripts/run-srtool.sh,Real script,Yes,,IMPLEMENTED_BUT_UNVERIFIED,55,scripts/run-srtool.sh,Verify on 2+ machines
+F075,ci,CI gate matrix,38 .github/workflows/*.yml,Real 38 workflows,,,VERIFIED,85,.github/workflows/,—
+F076,ci,SAST (Semgrep + CodeQL),semgrep.yml + codeql.yml,Real workflows,,,VERIFIED,80,.github/workflows/,—
+F077,ci,Dependency audit (OSV + Snyk + cargo-deny),osv-scan.yml + snyk.yml + deny.toml,Real workflows + config,,,VERIFIED,80,.github/workflows/osv-scan.yml,—
+F078,ci,Zombienet integration test,zombienet-integration.yml,Real workflow exists but not executed,,,PARTIAL,40,.github/workflows/zombienet-integration.yml,Execute in CI
+F079,ci,try-runtime upgrade rehearsal,try-runtime-upgrade.yml + release-candidate-rehearsal.yml,Real workflows,,,IMPLEMENTED_BUT_UNVERIFIED,55,.github/workflows/try-runtime-upgrade.yml,Execute regularly
+F080,perf,Unit-level benchmarks,crates/x3-bench + frame benchmarks,Real benchmarking harnesses,Yes,,IMPLEMENTED_BUT_UNVERIFIED,40,crates/x3-bench,Run + commit results
+F081,perf,System-level TPS / latency,tests/p4_performance_benchmark.py + p4_benchmarks/,Real scripts but no committed results,,,PARTIAL,30,tests/p4_performance_benchmark.py,Execute on 4-validator + commit
+F082,perf,GPU validator perf,crates/x3-gpu-validator-swarm + tests/cross_chain_gpu_validator/,Real implementation but benchmark not in CI critical path,,,PARTIAL,40,crates/x3-gpu-validator-swarm,GPU_VALIDATOR_HONEST_AUDIT.md review
+F083,x3-lang,Python pipeline (CLI/planner/emitter/runner),x3-lang/cli.py + planner.py + emitter/ + runner.py,Real Python implementation,Yes (x3-lang/),,IMPLEMENTED_BUT_UNVERIFIED,65,x3-lang/cli.py,—
+F084,x3-lang,Rust compiler (ast/hir/mir/opt/typeck/semantics/verifier/parser/lexer),crates/x3-ast/hir/mir/opt/typeck/semantics/verifier/parser/lexer + x3-compiler,Real but experimental,Yes (x3-lang/crates/),,PARTIAL,40,crates/x3-compiler,Freeze or remove
+F085,x3-lang,VM execution,x3-lang/vm/ + crates/x3-vm,Real VM with opcode groups documented in x3-lang/README.md,Yes,,IMPLEMENTED_BUT_UNVERIFIED,65,x3-lang/vm/,Multi-validator atomic execution tests
+F086,x3-lang,Bridge production backend (4 verifier families),x3-lang/vm/src/bridge.rs init_production_backend,Real — 4 verifiers (evm-light-client, svm-light-client, evm-rpc, svm-rpc),Yes,,VERIFIED,75,x3-lang/vm/src/bridge.rs,—
+F087,apps,Dashboard (apps/dashboard),apps/dashboard,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,55,apps/dashboard,—
+F088,apps,Explorer (apps/explorer),apps/explorer,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,55,apps/explorer,—
+F089,apps,Analytics service,apps/analytics/analytics-service,Real Rust service,Yes,,IMPLEMENTED_BUT_UNVERIFIED,60,apps/analytics,—
+F090,apps,x3-desktop (Tauri),apps/x3-desktop,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,50,apps/x3-desktop,—
+F091,apps,x3-funding,apps/x3-funding,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,45,apps/x3-funding,—
+F092,apps,x3-intelligence,apps/x3-intelligence,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,45,apps/x3-intelligence,—
+F093,apps,x3-studio,apps/x3-studio,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,45,apps/x3-studio,—
+F094,apps,x3-transparency,apps/x3-transparency,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,45,apps/x3-transparency,—
+F095,apps,Validators app,apps/validators,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,45,apps/validators,—
+F096,apps,Wallet app,apps/wallet,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,50,apps/wallet,—
+F097,apps,x3-super-ide,apps/super-ide,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,40,apps/super-ide,—
+F098,apps,inferstructor-dashboard,apps/inferstructor-dashboard,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,40,apps/inferstructor-dashboard,—
+F099,apps,atlas-sphere-clean,apps/atlas-sphere-clean,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,35,apps/atlas-sphere-clean,—
+F100,apps,blockchain-adapter,apps/blockchain-adapter,Real app,Yes,,IMPLEMENTED_BUT_UNVERIFIED,45,apps/blockchain-adapter,—

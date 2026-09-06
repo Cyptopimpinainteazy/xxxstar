@@ -1,0 +1,73 @@
+{
+  "audit": {
+    "repo": "/home/lojak/Desktop/xxxstar-main",
+    "commit": "fbd4613bd8769ac7422278fae441af1b302a1c88",
+    "short_sha": "fbd4613b",
+    "branch": "master",
+    "audit_date_utc": "2026-09-06",
+    "auditor": "Codex AI-assisted (read-only)",
+    "overall_readiness_score": 54,
+    "public_testnet_go_nogo": "NO-GO",
+    "mainnet_go_nogo": "NO-GO",
+    "build_verification": "PASS"
+  },
+  "toolchain": {
+    "rustc": "1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "1.90.0 (840b83a10 2025-07-30)",
+    "typst": "0.12.0 (737895d7)"
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "size_bytes": 7522,
+      "sha256": "c3a7b4166f114ebe412bcfe97176a89fb215aa81426f443348136a8d49cafc29",
+      "sha256_short": "c3a7b4166f114ebe"
+    },
+    {
+      "path": "booklet.pdf",
+      "size_bytes": 267271,
+      "sha256": "4ceda75c53153918aeb5a4c8729be9554a0989a0df04e23f6c42b07ce59960c4",
+      "sha256_short": "4ceda75c53153918"
+    },
+    {
+      "path": "booklet.typ",
+      "size_bytes": 120822,
+      "sha256": "a9f19dd2bc7372f627618df3538765d9ca1a08b38f08d348b252ccf4dc16f76d",
+      "sha256_short": "a9f19dd2bc7372f6"
+    },
+    {
+      "path": "executive-summary.md",
+      "size_bytes": 12816,
+      "sha256": "fc0d718aeee899ae817c52b7381c19db66cbc2f1a8800dc13f2ae7c245b6daea",
+      "sha256_short": "fc0d718aeee899ae"
+    },
+    {
+      "path": "feature-matrix.csv",
+      "size_bytes": 16707,
+      "sha256": "5c538e5cfc9ae3143f2c8c126fd5f92c49e9d1dfddd0c83cbfb8212ece1a9a35",
+      "sha256_short": "5c538e5cfc9ae314"
+    },
+    {
+      "path": "findings/findings.json",
+      "size_bytes": 38878,
+      "sha256": "e634daa74a19ca173a61357b82b678bab6bf208721f5606470e0aba999da194f",
+      "sha256_short": "e634daa74a19ca17"
+    },
+    {
+      "path": "logs/core_pallet_tests.log",
+      "size_bytes": 6147,
+      "sha256": "e34d238d7e2723e06ae677ff7c27f48661a6aedf1ad916252d310d19602014c6",
+      "sha256_short": "e34d238d7e2723e0"
+    },
+    {
+      "path": "manifest.json",
+      "size_bytes": 2224,
+      "sha256": "2669e1cae03e3a0dd89169e24b55b1c6ab9f9fd1de22b618e86514f2a726aadf",
+      "sha256_short": "2669e1cae03e3a0d"
+    }
+  ],
+  "totals": {
+    "files": 8,
+    "total_bytes": 472387
+  }
+}

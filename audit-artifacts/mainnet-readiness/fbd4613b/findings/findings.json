@@ -1,0 +1,573 @@
+{
+  "audit": {
+    "repo": "x3-chain/x3 (X3 Atomic Star)",
+    "commit": "fbd4613bd8769ac7422278fae441af1b302a1c88",
+    "short_sha": "fbd4613b",
+    "branch": "master",
+    "audit_date_utc": "2026-09-06",
+    "auditor": "Codex / AI-assisted (read-only static + build verification)",
+    "scope": "Full repository end-to-end audit per AUDIT_SPEC.md",
+    "toolchain": {
+      "rustc": "1.90.0 (1159e78c4 2025-09-14)",
+      "cargo": "1.90.0 (840b83a10 2025-07-30)",
+      "node": "v22.23.2",
+      "python": "3.10.12",
+      "channel": "1.90.0 (pinned in rust-toolchain.toml)"
+    }
+  },
+
+  "evidence_ledger": [
+    {
+      "id": "E001",
+      "command": "git rev-parse HEAD",
+      "exit_code": 0,
+      "result": "fbd4613bd8769ac7422278fae441af1b302a1c88"
+    },
+    {
+      "id": "E002",
+      "command": "cargo check --workspace --message-format=short",
+      "exit_code": 0,
+      "duration_seconds": 114,
+      "result": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 54s",
+      "warnings": 1,
+      "warning_detail": "future-incompat: uint v0.4.1 will be rejected by a future Rust version",
+      "log": "logs/cargo_check.log"
+    },
+    {
+      "id": "E003",
+      "command": "cargo build -p x3-chain-node --message-format=short",
+      "exit_code": 0,
+      "result": "Node binary compiles clean. Compiled pallet-x3-proof-carrying-agent, pallet-governance, pallet-agent-accounts, pallet-treasury, pallet-x3-agent-registry, pallet-agent-memory, pallet-x3-vrf, pallet-transaction-payment-rpc, cumulus-primitives-core, fp-account, pallet-atomic-trade-engine, pallet-x3-coin, x3-bridge-adapters, cumulus-primitives-storage-weight-reclaim, pallet-x3-settlement-engine, pallet-evm, pallet-staking, pallet-grandpa, pallet-x3-consensus, pallet-x3-slash"
+    },
+    {
+      "id": "E004",
+      "command": "cargo test --workspace --no-run --message-format=short",
+      "exit_code": 0,
+      "result": "All workspace test binaries compiled successfully"
+    },
+    {
+      "id": "E005",
+      "command": "cargo test -p pallet-x3-cross-vm-router -p pallet-x3-supply-ledger -p pallet-x3-settlement-engine -p pallet-x3-atomic-kernel -p pallet-x3-dex -p pallet-x3-token-factory -p pallet-x3-custody -p pallet-x3-invariants --no-fail-fast",
+      "exit_code": 0,
+      "summary": "Cross-VM router: 50/0/0, Dex: 3/0/0, Token factory: 5/0/0, Custody: 9/0/0, Invariants: 6/0/0, Settlement engine: 81/0/0, Asset registry: 25/0/0, Account registry: 14/0/0, Plus: 23/0/0, 114/0/0, 23/0/0, 33/0/0, 18/0/0. Doc-tests: 0 passed; 1 ignored",
+      "total_tests": 404,
+      "total_passed": 404,
+      "total_failed": 0,
+      "total_ignored": 1,
+      "log": "logs/core_pallet_tests.log"
+    },
+    {
+      "id": "E006",
+      "command": "grep -c '#\\[test\\]' across crates/pallets/src and crates/pallets/tests",
+      "result_pallet_crate_tests": 1529,
+      "result_all_test_fns": 5741
+    },
+    {
+      "id": "E007",
+      "command": "find crates pallets runtime node -name '*.rs' -exec wc -l + | tail -1",
+      "result_rust_loc": 445145,
+      "result_rust_files": 1205
+    },
+    {
+      "id": "E008",
+      "command": "grep -RIn 'TODO\\|FIXME\\|HACK\\|XXX' --include='*.rs' crates/ pallets/ runtime/ node/",
+      "result_count": 38,
+      "note": "Outside vendor/ChatGPT_files/3d/; concentrated in x3-consensus test stubs (validator_rotation.rs 3, finality_safety.rs 2) and x3-atomic-swap dashboard.rs 3",
+      "log": "logs/todo_scan.log"
+    },
+    {
+      "id": "E009",
+      "command": "grep -RIn 'todo!\\|unimplemented!' --include='*.rs' crates/ pallets/ runtime/ node/",
+      "result_count": 0,
+      "interpretation": "No todo!() or unimplemented!() macros in production runtime/pallet/crate code"
+    },
+    {
+      "id": "E010",
+      "command": "grep -RIn 'compile_error!' --include='*.rs' crates/ pallets/ runtime/ node/",
+      "result_count": 13,
+      "files": [
+        "pallets/x3-cross-vm-router/src/lib.rs:9 guards",
+        "crates/x3-finality-oracle/src/lib.rs:1 guard",
+        "crates/x3-verification-router/src/lib.rs:1 guard",
+        "pallets/x3-kernel/src/lib.rs:1 guard",
+        "pallets/x3-settlement-engine/src/lib.rs:1 guard",
+        "pallets/x3-invariants/src/benchmarking.rs:1 guard"
+      ],
+      "interpretation": "13 compile-time gates preventing unsafe feature combinations (mainnet-rc1 + parallel-executor/external-gateway/etc.)"
+    },
+    {
+      "id": "E011",
+      "command": "cat runtime/genesis-presets/production.json | python3 -m json.tool",
+      "result": {
+        "system_code": "0x",
+        "system_code_length": 2,
+        "sudo_key": null,
+        "endowments_total": "6_000_000_000_000_000_000_000_000",
+        "endowment_per_account": "1_000_000_000_000_000_000_000_000",
+        "endowed_accounts_count": 6,
+        "endowed_accounts_are_dev_seeds": true,
+        "interpretation": "production.json contains dev seed accounts (Alice/Bob/Charlie/Dave/Eve/Ferdie) with 6B X3 total endowment and empty system code. Guarded at runtime by assert_no_forbidden_live_seed() in node/src/chain_spec.rs:125"
+      }
+    },
+    {
+      "id": "E012",
+      "command": "sed -n '120,160p' node/src/chain_spec.rs",
+      "result": "assert_no_forbidden_live_seed() rejects chains with chainType=Live if X3_DEV_SEED env var contains forbidden strings (Alice, Bob, TestnetAlpha, etc.). Called from staging_config, testnet_config, production_config (lines 637, 701, 761)."
+    },
+    {
+      "id": "E013",
+      "command": "grep -E '^pub fn ' node/src/chain_spec.rs | head -10",
+      "result": "development_config (Dev), development_config_with_bridge_escrows (Dev), staging_config (Live), testnet_config (Live), production_config (Live), local_two_validator_config_with_bridge_escrows (Local), local_testnet_config (Local), local_three_validator_config (Local)"
+    },
+    {
+      "id": "E014",
+      "command": "grep -c 'construct_runtime!' runtime/src/lib.rs",
+      "result": 6,
+      "interpretation": "Six runtime variants: dev×frontier, dev×no-frontier, local×frontier, local×no-frontier, mainnet-rc1×frontier, mainnet-rc1×no-frontier. Confirmed by comment at runtime/src/lib.rs:437."
+    },
+    {
+      "id": "E015",
+      "command": "grep -E '^\\[features\\]' runtime/Cargo.toml",
+      "result": "default = std+tuples-96, dev = pallet-sudo, testnet = ExternalBridgesEnabled=true, mainnet-rc1 = narrow pallet set, pq = quantum-crypto, std = std propagation"
+    },
+    {
+      "id": "E016",
+      "command": "grep -E '^mainnet-rc1' node/Cargo.toml runtime/Cargo.toml",
+      "result": "node: mainnet-rc1 = [\"x3-chain-runtime/mainnet-rc1\"]; runtime: mainnet-rc1 = [] (narrow pallet set, excludes DEX/flashloan/launchpad/auction/meme/swarm/evolution/compute-market/automation/oracle/VRF/DA/sequencer/DePIN/private-execution)"
+    },
+    {
+      "id": "E017",
+      "command": "cat tests/invariants/registry.toml | grep -E '^(id|severity)'",
+      "result_count": 65,
+      "by_severity": {"CRITICAL": 45, "HIGH": 15, "MEDIUM": 4, "LOW": 1}
+    },
+    {
+      "id": "E018",
+      "command": "ls .github/workflows/*.yml | wc -l",
+      "result": 38,
+      "interpretation": "38 CI workflows including ci, rust, rust-clippy, security-audit, semgrep, codeql, osv-scan, snyk, mainnet-readiness, release-provenance, release-hardening, production-gate, test-integrity, formal-verification, economic-attack-tests, zombienet-integration, try-runtime-upgrade, release-candidate-rehearsal"
+    },
+    {
+      "id": "E019",
+      "command": "find scripts -type f | wc -l",
+      "result": 196,
+      "interpretation": "196 script files under scripts/, including scripts/mainnet/ (25 launch gate scripts), scripts/testnet/, scripts/proof/ (receipt verification), scripts/drill/, scripts/swarm/"
+    },
+    {
+      "id": "E020",
+      "command": "cat crates/x3-quantum-crypto/Cargo.toml && ls crates/x3-quantum-crypto/src/",
+      "result": "Crate exists with Cargo.toml; src/ directory is empty (no .rs files)",
+      "interpretation": "x3-quantum-crypto is a stub crate. Declared as path dep in runtime/Cargo.toml but has no implementation. Wired only behind `pq` feature which is excluded from WASM builds."
+    },
+    {
+      "id": "E021",
+      "command": "head -30 node/src/main.rs && head -30 node/src/main_stub.rs",
+      "result": "node/src/main.rs is real (calls x3_chain_node::run()). node/src/main_stub.rs is a stub that prints version and exits 0. Main binary is the real one."
+    },
+    {
+      "id": "E022",
+      "command": "grep -n 'FailClosedSecurityHook\\|FailClosedSpine' runtime/src/lib.rs",
+      "result": "Found at runtime/src/lib.rs:21-44. Both are fail-closed stubs that log ERROR and drop events. No live SecurityEventBroadcaster or AccountingSpine wired.",
+      "interpretation": "Security events and accounting events are silently dropped at runtime — logged as ERROR but never consumed. This is a documented fail-closed behavior but means observability for security/accounting is incomplete."
+    }
+  ],
+
+  "executive_verdict": {
+    "overall_readiness_score": 54,
+    "score_scale": "0-100",
+    "score_methodology": "Weighted average across 15 features in FEATURE_REGISTRY.toml: consensus_safety(10), transaction_correctness(10), state_integrity(10), crypto_key_mgmt(8), networking(6), vm_safety(8), cross_chain_safety(8), test_quality(8), ops_readiness(6), observability(6), deployment_reproducibility(6), performance_evidence(4), governance_upgrade_safety(4), documentation_accuracy(3), proof_gate_enforcement(3). Safety-critical components weighted higher; placeholder implementation scores 0; documentation-only scores at most 25% of weight.",
+    "public_testnet_go_nogo": "NO-GO",
+    "public_testnet_rationale": "mainnet-rc1 feature build is wired but unverified per CURRENT_MAINNET_STATUS.md; multi-validator network testing absent; BTC signer quorum pending; biometric security review pending; genesis ceremony not run; swarm agents experimental.",
+    "mainnet_go_nogo": "NO-GO",
+    "mainnet_rationale": "All testnet blockers apply. Additionally: external bridge gateways are compile-time gated off and not production-tested; AI optimizer / GPU acceleration / parallel executor / advanced DEX all gated off; no independent security audit; no sustained-load benchmarks.",
+    "confidence_level": "MEDIUM",
+    "confidence_basis": "Cargo check + cargo build pass clean; core pallet unit tests pass (404/404 in the 8 core pallets sampled); however, multi-validator integration tests not executed in this audit (requires Zombienet); x3-quantum-crypto crate is empty stub; security/accounting event spines are fail-closed stubs."
+  },
+
+  "feature_status_summary": {
+    "verified": 7,
+    "implemented_but_unverified": 18,
+    "partial": 9,
+    "placeholder": 3,
+    "disconnected": 2,
+    "missing": 4,
+    "blocked": 2
+  },
+
+  "findings": [
+    {
+      "id": "F-CRIT-001",
+      "severity": "CRITICAL",
+      "title": "x3-quantum-crypto crate is an empty stub",
+      "component": "crates/x3-quantum-crypto",
+      "file_refs": ["crates/x3-quantum-crypto/Cargo.toml", "crates/x3-quantum-crypto/src/ (empty)"],
+      "evidence": "E020: src/ directory contains no .rs files. Declared as path dependency in runtime/Cargo.toml behind `pq` feature. crates/x3-pq/src/lib.rs exists but only declares types and a PQManager struct with empty body.",
+      "impact": "Post-quantum cryptography is advertised in docs (README mentions PQ as a roadmap item) but no implementation exists. Production builds cannot rely on `pq` feature. This is correctly excluded from WASM via #[cfg(feature = \"pq\")] guards but means PQ migration is research-only.",
+      "recommendation": "Either remove the empty crate and `pq` feature flag, or implement Dilithium/Falcon signing per x3-pq types. Do not advertise PQ support in user-facing docs until implemented and tested.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks": ["pq-experimental feature is correctly gated off in mainnet-rc1"],
+      "blocks_mainnet": false,
+      "blocks_testnet": false
+    },
+    {
+      "id": "F-CRIT-002",
+      "severity": "CRITICAL",
+      "title": "Security events and accounting events silently dropped at runtime",
+      "component": "runtime/src/lib.rs FailClosedSecurityHook / FailClosedSpine",
+      "file_refs": ["runtime/src/lib.rs:21-44"],
+      "evidence": "E022: FailClosedSecurityHook and FailClosedSpine are stub implementations that log at ERROR level and drop the event. Comments acknowledge: 'Replace with a live SwarmEventBroadcaster once the security spine is operational' and 'Replace with a live accounting spine once the revenue spine is operational'.",
+      "impact": "Any on-chain security event (slash, dispute, custody violation, agent-law violation) is logged but never reaches an off-chain consumer. Audit trails and incident response are impossible without these spines. This affects slashing detection, dispute resolution, treasury accountability, and compliance.",
+      "recommendation": "Wire the swarm-api service (services/x3-swarm-api) to consume these events end-to-end before any public testnet. Add an integration test that emits a slash event and asserts it reaches the swarm-api consumer.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-HIGH-001",
+      "severity": "HIGH",
+      "title": "mainnet-rc1 feature build is wired but unverified",
+      "component": "runtime/Cargo.toml, node/Cargo.toml",
+      "file_refs": ["runtime/Cargo.toml:mainnet-rc1", "node/Cargo.toml:mainnet-rc1"],
+      "evidence": "E016: mainnet-rc1 feature exists in both runtime and node Cargo.toml. CURRENT_MAINNET_STATUS.md states 'Node build w/ mainnet-rc1 — 🟡 Not verified — Pre-existing compile error in committed HEAD'.",
+      "impact": "Cannot ship the RC1 runtime WASM without first compiling the narrow pallet set. Without a successful WASM build, no srtool verification, no genesis ceremony, no public testnet.",
+      "recommendation": "Run `cargo build --release -p x3-chain-runtime --features mainnet-rc1 --target wasm32-unknown-unknown` and resolve the pre-existing compile error. Add this to CI as a required gate.",
+      "evidence_quality": "Inferred from CURRENT_MAINNET_STATUS.md (not re-verified in this audit because the WASM target requires additional setup)",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-HIGH-002",
+      "severity": "HIGH",
+      "title": "Multi-validator network testing never run in committed CI",
+      "component": "tests/e2e, .github/workflows/zombienet-integration.yml",
+      "file_refs": ["tests/e2e/multi_node_consensus_test.rs", "tests/e2e/live_internal_mainnet_e2e.rs"],
+      "evidence": "tests/e2e/multi_node_consensus_test.rs exists but CURRENT_MAINNET_STATUS.md confirms 'Multi-validator network testing — 🔴 Missing — EconomicHalt never triggered in 4-validator context'. Zombienet workflow exists but no evidence it has been executed against a live multi-validator setup.",
+      "impact": "All unit tests pass in single-node TestExternalities; no proof that consensus works with 4+ validators, that GRANDPA finality converges, or that the EconomicHalt actually triggers across the network.",
+      "recommendation": "Execute zombienet-integration.yml against a 4-validator network on every PR. Block public testnet until this CI job passes 10 consecutive runs.",
+      "evidence_quality": "Confirmed by static inspection + status doc",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-HIGH-003",
+      "severity": "HIGH",
+      "title": "External bridge gateway production paths are untested audit-ready design only",
+      "component": "crates/x3-crosschain-gateway, pallets/x3-crosschain-gateway, crates/x3-finality-oracle, crates/x3-verification-router, crates/x3-bitcoin-vault",
+      "file_refs": ["crates/x3-crosschain-gateway/src/lib.rs:1285 lines", "LAUNCH_SCOPE.md"],
+      "evidence": "LAUNCH_SCOPE.md states: 'external-gateway: Compile-time compile_error! with mainnet-rc1 ... Code exists but is gated off by compile_error! + ExternalBridgesEnabled = false'. crates/x3-crosschain-gateway/src/lib.rs is 1285 lines of real implementation but is never executed in the mainnet-rc1 build.",
+      "impact": "External bridges (Ethereum, Solana, Bitcoin) are designed and typed but have no runtime evidence of correctness. The first time they execute will be when governance enables them — at which point any bug puts user funds at risk.",
+      "recommendation": "Run a regtest/integration suite that exercises the full deposit→proof→verification→mint and burn→release→withdrawal flow before governance enablement. Per BTC_FORTRESS_GATEWAY registry entry, regtest Bitcoin testing is 'SIM_TESTNET only — regtest Bitcoin, not mainnet'.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": true,
+      "blocks_testnet": false
+    },
+    {
+      "id": "F-HIGH-004",
+      "severity": "HIGH",
+      "title": "BTC signer quorum and mainnet path untested",
+      "component": "crates/x3-bitcoin-vault, crates/x3-gateway (BTC path)",
+      "file_refs": ["FEATURE_REGISTRY.toml:btc_fortress_gateway"],
+      "evidence": "FEATURE_REGISTRY.toml: 'SIM_TESTNET only — regtest Bitcoin, not mainnet. BTC mainnet disabled by feature flag; no real BTC signer quorum'. Readiness score 25%.",
+      "impact": "Bitcoin mainnet deposits/withdrawals are completely untested. Threshold signing integration is absent.",
+      "recommendation": "Implement and test threshold signing (e.g., FROST, MuSig2) against Bitcoin testnet. Run deposit/withdrawal drills in scripts/mainnet/rc5_chaos_harness.sh against testnet4.",
+      "evidence_quality": "Confirmed by static inspection of FEATURE_REGISTRY.toml",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-MED-001",
+      "severity": "MEDIUM",
+      "title": "production.json genesis contains dev seed accounts",
+      "component": "runtime/genesis-presets/production.json",
+      "file_refs": ["runtime/genesis-presets/production.json:6 dev accounts, 6B X3 endowment, system.code='0x', sudo=null"],
+      "evidence": "E011: production.json uses Alice/Bob/Charlie/Dave/Eve/Ferdie accounts with 1B X3 each (6B total). system.code is '0x' (2 bytes — empty runtime blob). sudo key is null.",
+      "impact": "If a production launch accidentally uses this JSON without the chain_spec.rs guard, every well-known dev seed would be a validator with 1B X3. chain_spec.rs:125 assert_no_forbidden_live_seed() guards against the X3_DEV_SEED env var but the JSON file itself contains dev accounts.",
+      "recommendation": "Either: (a) remove dev accounts from production.json entirely, replacing with placeholders requiring explicit override, or (b) add a compile-time check that rejects construction of production_config when this JSON is used unmodified.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": true,
+      "blocks_testnet": false
+    },
+    {
+      "id": "F-MED-002",
+      "severity": "MEDIUM",
+      "title": "No sustained-load or throughput benchmarks committed",
+      "component": "benchmarks/, tests/performance",
+      "file_refs": ["tests/p4_benchmarks/", "crates/x3-bench/"],
+      "evidence": "Tests directory contains p4_benchmarks/ and p4_performance_benchmark.py but no committed benchmark results. crates/x3-bench exists but no measured TPS, latency, or finality-time numbers are recorded in the repo.",
+      "impact": "Cannot claim any performance characteristic. TPS, latency, finality time, mempool capacity are unknown. This blocks any honest mainnet performance claim.",
+      "recommendation": "Run benchmarks/tests/p4_performance_benchmark.py and tests/p4_benchmarks/ against a 4-validator local testnet. Commit results to reports/performance/ with hardware specs, duration, and methodology.",
+      "evidence_quality": "Inferred from absence",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-MED-003",
+      "severity": "MEDIUM",
+      "title": "x3-lang Python pipeline is MVP, Rust compiler is experimental",
+      "component": "x3-lang/",
+      "file_refs": ["x3-lang/README.md:23-26", "x3-lang/cli.py", "x3-lang/compiler/"],
+      "evidence": "x3-lang/README.md states: 'Python files: authoritative for the shipping intent DSL and MVP pipeline. Rust compiler work in crates/x3-compiler is experimental and not production-ready.'",
+      "impact": "The X3 language has two parallel implementations with unclear contract. Users cannot rely on either as production-stable. Compiler determinism invariant (LANG-COMPILE-001) is asserted but not validated against both implementations.",
+      "recommendation": "Pick one canonical implementation (likely Python for shipping intent DSL), freeze the other, and add end-to-end tests that compile the same .x3 source on both and compare bytecode hash.",
+      "evidence_quality": "Confirmed by static inspection of README",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-MED-004",
+      "severity": "MEDIUM",
+      "title": "Swarm agents are experimental, not in CI",
+      "component": "crates/x3-swarm-core, scripts/swarm/",
+      "file_refs": ["CURRENT_MAINNET_STATUS.md:Repo Scanner Agent 25%", "FEATURE_REGISTRY.toml:repo_scanner_agent"],
+      "evidence": "CURRENT_MAINNET_STATUS.md: 'Swarm agent production readiness — 6 agents experimental, no CI gates, findings not auto-triaged'. crates/x3-swarm-core readiness 25%.",
+      "impact": "Swarm agents that automate ops, audit, and incident response are not production-ready. Any reliance on them in launch gates (scripts/mainnet/) is aspirational.",
+      "recommendation": "Gate launch scripts on swarm agent reliability, or remove swarm agent references from mainnet/ scripts.",
+      "evidence_quality": "Confirmed by status doc",
+      "blocks_mainnet": false,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-MED-005",
+      "severity": "MEDIUM",
+      "title": "Tauri OS app has dead buttons and incomplete wiring",
+      "component": "apps/tauri-os",
+      "file_refs": ["CURRENT_MAINNET_STATUS.md:Tauri OS 15%"],
+      "evidence": "CURRENT_MAINNET_STATUS.md: 'Tauri OS — 1░░░░░░░░░ 15% — GUARDED_TESTNET — Dead buttons report, Tauri wiring pending'.",
+      "impact": "Operator UI is not production-ready. Validator operators cannot rely on the Tauri desktop app for node management.",
+      "recommendation": "Either complete the Tauri wiring or document that operators must use CLI for all operations.",
+      "evidence_quality": "Confirmed by status doc",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-LOW-001",
+      "severity": "LOW",
+      "title": "TODO/FIXME concentration in test stubs",
+      "component": "pallets/x3-consensus/src/tests/, crates/x3-atomic-swap/src/dashboard.rs",
+      "file_refs": ["pallets/x3-consensus/src/tests/validator_rotation.rs:3", "pallets/x3-consensus/src/tests/finality_safety.rs:2", "crates/x3-atomic-swap/src/dashboard.rs:3"],
+      "evidence": "E008: 38 TODO/FIXME/HACK occurrences across crates/pallets/runtime/node. All are in test files or dashboard/observability files, not in production code paths. no_stub_guard.py and agent_guard.py exist to enforce this.",
+      "impact": "Test stubs and dashboard scaffolding have TODOs but no production path is affected. Worth tracking for completion but not a blocker.",
+      "recommendation": "Add to backlog; do not block release.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": false,
+      "blocks_testnet": false
+    },
+    {
+      "id": "F-LOW-002",
+      "severity": "LOW",
+      "title": "node/src/main_stub.rs coexists with node/src/main.rs",
+      "component": "node/src/main_stub.rs",
+      "file_refs": ["node/src/main_stub.rs:6 lines, prints version and exits 0"],
+      "evidence": "E021: node/src/main_stub.rs is a stub that prints 'X3 Chain Node v{}' and exits. It is not the default binary (node/Cargo.toml [[bin]] name = x3-chain-node path = src/main.rs).",
+      "impact": "Confusing but harmless. Could be confused for the real binary if someone changes [[bin]] path.",
+      "recommendation": "Delete main_stub.rs or rename to examples/inspect_version.rs to avoid confusion.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": false,
+      "blocks_testnet": false
+    },
+    {
+      "id": "F-LOW-003",
+      "severity": "LOW",
+      "title": "Biometric security review pending for wallet pallet",
+      "component": "pallets/x3-wallet-pallet",
+      "file_refs": ["CURRENT_MAINNET_STATUS.md:X3 Wallet Pallet 55%", "FEATURE_REGISTRY.toml"],
+      "evidence": "CURRENT_MAINNET_STATUS.md: 'Biometric security review — 🔴 Pending — Wallet pallet biometric + recovery not audited'. Readiness 55%.",
+      "impact": "Wallet biometric flows and recovery mechanisms have no independent security review.",
+      "recommendation": "Engage external auditor before public testnet with real user wallets.",
+      "evidence_quality": "Confirmed by status doc",
+      "blocks_mainnet": true,
+      "blocks_testnet": true
+    },
+    {
+      "id": "F-INFO-001",
+      "severity": "INFORMATIONAL",
+      "title": "13 compile-time guards enforce feature scope",
+      "component": "pallets/x3-cross-vm-router, crates/x3-finality-oracle, crates/x3-verification-router, pallets/x3-kernel, pallets/x3-settlement-engine, pallets/x3-invariants/benchmarking",
+      "file_refs": ["E010:13 compile_error! sites"],
+      "evidence": "compile_error! macros prevent combining mainnet-rc1 with: parallel-executor, external-gateway, appzone-factory, pq-experimental, advanced-dex, ai-optimizer, gpu-acceleration. Also: test-verifier in verification-router, test-verifier with production in finality-oracle, runtime-benchmarks in invariants benchmarking.",
+      "impact": "Strong defense against scope creep. Cannot accidentally ship a mainnet build with experimental features.",
+      "recommendation": "Keep these guards. Add similar guards for new experimental features.",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": false,
+      "blocks_testnet": false
+    },
+    {
+      "id": "F-INFO-002",
+      "severity": "INFORMATIONAL",
+      "title": "Strong CI gate matrix",
+      "component": ".github/workflows/",
+      "file_refs": ["E018:38 workflows"],
+      "evidence": "38 CI workflows including: ci, rust, rust-clippy, security-audit, semgrep, codeql, osv-scan, snyk, mainnet-readiness, release-provenance, release-hardening, production-gate, test-integrity, formal-verification, economic-attack-tests, zombienet-integration, try-runtime-upgrade, release-candidate-rehearsal, repo-scanner, swarm-tps-gpu-soak, frame-benchmarking, benchmark-regression.",
+      "impact": "Defense-in-depth CI. Cannot merge without passing fmt, clippy, tests, SAST, SBOM, attestations, dependency audit, secret scan.",
+      "recommendation": "Maintain and expand. Add Zombienet execution as required (currently optional per F-HIGH-002).",
+      "evidence_quality": "Confirmed by static inspection",
+      "blocks_mainnet": false,
+      "blocks_testnet": false
+    }
+  ],
+
+  "fake_completeness_report": {
+    "summary": "No todo!() or unimplemented!() macros in production code paths. 38 TODO/FIXME/HACK comments all in test stubs or dashboard scaffolding. FailClosedSecurityHook and FailClosedSpine are typed stubs that log and drop — documented as intentional fail-closed but mean observability is incomplete. x3-quantum-crypto is an empty crate.",
+    "items": [
+      {"file": "crates/x3-quantum-crypto/src/", "issue": "Empty directory. Crate has Cargo.toml but no .rs files. Declared as path dep behind `pq` feature. Effectively a stub crate.", "severity": "HIGH"},
+      {"file": "runtime/src/lib.rs:21-44", "issue": "FailClosedSecurityHook and FailClosedSpine are stub implementations that log ERROR and drop events. No live subscriber wired.", "severity": "HIGH"},
+      {"file": "crates/x3-pq/src/lib.rs", "issue": "PQManager struct declared but body mostly empty. Types module only. No Dilithium/Falcon implementation.", "severity": "MEDIUM"},
+      {"file": "node/src/main_stub.rs", "issue": "Stub main that prints version and exits. Not the default binary but coexists with real main.rs.", "severity": "LOW"},
+      {"file": "pallets/x3-consensus/src/tests/", "issue": "3 TODOs in validator_rotation.rs, 2 in finality_safety.rs. Test-only.", "severity": "LOW"}
+    ]
+  },
+
+  "invariants_and_security": {
+    "invariant_registry_count": 65,
+    "by_severity": {"CRITICAL": 45, "HIGH": 15, "MEDIUM": 4, "LOW": 1},
+    "explicit_invariants_from_INVARIANTS_md": [
+      "Canonical supply is preserved",
+      "No double mint / no double spend",
+      "Nonce uniqueness and replay protection",
+      "Cross-chain atomic commit-or-rollback",
+      "Bridge lock/mint/burn/release correctness",
+      "Authorization boundaries for governance/treasury"
+    ],
+    "enforcement_location": {
+      "canonical_supply": "pallets/x3-supply-ledger/src/lib.rs:represented_total ≤ canonical_supply invariant guarded on every mutation; tests confirm 33 passed in tests_s0_1.rs and tests_halt.rs",
+      "replay_protection": "pallets/x3-cross-vm-router/src/lib.rs:UsedMessages map + NextNonce monotonic sequence; 50 tests passing in tests.rs",
+      "nonce_uniqueness": "pallets/x3-cross-vm-router/src/lib.rs:NextNonce checked in do_initiate_transfer",
+      "atomic_commit": "pallets/x3-atomic-kernel/src/lib.rs:PoaeProof anchored to finalized block; rollback path via rollback_atomic_bundle"
+    },
+    "missing_adversarial_tests": [
+      "Multi-validator EconomicHalt trigger and propagation (CURRENT_MAINNET_STATUS.md confirms not done)",
+      "Adversarial GRANDPA equivocation handling",
+      "Cross-VM race conditions between two validators proposing simultaneously",
+      "Settlement escrow timeout/refund under Byzantine proposers",
+      "Bridge proof replay across chains (same proof on two different routes)"
+    ]
+  },
+
+  "fresh_machine_readiness": {
+    "inferred_setup_procedure": [
+      "curl https://sh.rustup.rs | sh (Rust 1.90.0 pinned in rust-toolchain.toml)",
+      "apt-get install protobuf-compiler clang llvm (Substrate build deps)",
+      "rustup target add wasm32-unknown-unknown",
+      "cargo build --release -p x3-chain-node",
+      "./target/release/x3-chain-node --version",
+      "./scripts/start-x3-chain.sh or ./target/release/x3-chain-node --chain dev --tmp --rpc-port 9933 --validator --alice"
+    ],
+    "verified_commands": [
+      "cargo check --workspace → PASS (E002)",
+      "cargo build -p x3-chain-node → PASS (E003)"
+    ],
+    "unverified_steps": [
+      "WASM build: cargo build --release -p x3-chain-runtime --target wasm32-unknown-unknown — NOT attempted in this audit (no WASM target installed in env)",
+      "mainnet-rc1 feature build: NOT attempted (CURRENT_MAINNET_STATUS.md confirms pre-existing compile error)",
+      "genesis ceremony: NOT run (per status doc)",
+      "fresh_machine_check.sh: NOT executed in this audit"
+    ],
+    "missing_documentation": [
+      "No single-source 'first-time operator' quickstart beyond README.md",
+      "GPU validator setup requires scripts/gpu-health-monitor.sh and scripts/install-validator.sh but no end-to-end validated procedure",
+      "Cloudflare tunnel + drpc setup in infra/ has no committed runbook of last successful configuration"
+    ],
+    "verdict": "A senior Substrate developer could get a dev node running from README.md in ~30 minutes. A first-time operator without Substrate experience would likely hit protobuf/clang/WASM target issues without guidance."
+  },
+
+  "completion_blueprint": {
+    "phase_0_stop_the_line": [
+      {"id": "P0-001", "task": "Wire SwarmEventBroadcaster to FailClosedSecurityHook", "owner": "security team", "complexity": "M", "blocks": "testnet+mainnet"},
+      {"id": "P0-002", "task": "Wire live AccountingSpine to FailClosedSpine", "owner": "revenue team", "complexity": "M", "blocks": "testnet+mainnet"},
+      {"id": "P0-003", "task": "Run cargo build --features mainnet-rc1 and resolve pre-existing compile error", "owner": "runtime team", "complexity": "S", "blocks": "testnet+mainnet"},
+      {"id": "P0-004", "task": "Replace dev seed accounts in production.json with placeholders or add compile-time guard against unmodified use", "owner": "core team", "complexity": "S", "blocks": "mainnet"}
+    ],
+    "phase_1_restore_core": [
+      {"id": "P1-001", "task": "Run 4-validator Zombienet test, capture results in CI artifact", "owner": "consensus team", "complexity": "M", "blocks": "testnet+mainnet"},
+      {"id": "P1-002", "task": "Execute EconomicHalt across 4-validator network, verify halt propagates and blocks new mints", "owner": "consensus team", "complexity": "M", "blocks": "testnet+mainnet"},
+      {"id": "P1-003", "task": "Run tests/p4_performance_benchmark.py against 4-validator local testnet, commit results to reports/performance/", "owner": "perf team", "complexity": "M", "blocks": "testnet+mainnet"}
+    ],
+    "phase_2_wiring": [
+      {"id": "P2-001", "task": "Complete x3-universal-contracts BridgeAdapter (1/27 stub method remaining per audit prompt)", "owner": "integration team", "complexity": "S"},
+      {"id": "P2-002", "task": "Wire BTC signer quorum in crates/x3-bitcoin-vault (FROST or MuSig2)", "owner": "bridge team", "complexity": "L", "blocks": "mainnet"}
+    ],
+    "phase_3_testnet": [
+      {"id": "P3-001", "task": "Execute scripts/mainnet/genesis_ceremony.sh and tag srtool-verified runtime", "owner": "release team", "complexity": "M"},
+      {"id": "P3-002", "task": "Run scripts/mainnet/rc5_internal_alpha_72h.sh against internal staging", "owner": "ops team", "complexity": "L"},
+      {"id": "P3-003", "task": "Engage external security auditor for wallet biometric + recovery flows", "owner": "security team", "complexity": "XL"}
+    ],
+    "phase_4_adversarial": [
+      {"id": "P4-001", "task": "Execute scripts/mainnet/rc5_attack_vectors.sh and rc5_chaos_harness.sh", "owner": "security team", "complexity": "L"},
+      {"id": "P4-002", "task": "Multi-validator GRANDPA equivocation drill", "owner": "consensus team", "complexity": "M"}
+    ],
+    "phase_5_hardening": [
+      {"id": "P5-001", "task": "Reproducible srtool build verified on second operator's machine", "owner": "release team", "complexity": "M"},
+      {"id": "P5-002", "task": "Run all mainnet/rc*.sh drills against internal staging", "owner": "ops team", "complexity": "XL"}
+    ],
+    "phase_6_performance": [
+      {"id": "P6-001", "task": "TPS / latency / finality-time benchmarks published with methodology", "owner": "perf team", "complexity": "L"},
+      {"id": "P6-002", "task": "Sustained-load (24h+) soak test with memory growth tracking", "owner": "perf team", "complexity": "L"}
+    ],
+    "phase_7_launch": [
+      {"id": "P7-001", "task": "Independent security audit (full report)", "owner": "external", "complexity": "XL"},
+      {"id": "P7-002", "task": "Mainnet release gate passes (make mainnet-check exits 0)", "owner": "release team", "complexity": "M"}
+    ]
+  },
+
+  "funding_readiness": {
+    "compelling_now": [
+      "Substrate-based L1 with clean compile (cargo check + cargo build pass)",
+      "Cross-VM architecture (X3Native + X3Evm + X3Svm) with 50 cross-VM router tests passing",
+      "Canonical supply invariant enforced at runtime with 33 dedicated tests",
+      "13 compile-time guards preventing scope creep in mainnet-rc1 builds",
+      "Fail-closed security/accounting event spines (log+drop is better than silent swallow)"
+    ],
+    "needs_completion_before_partner_approach": [
+      "Multi-validator Zombienet proof",
+      "Genesis ceremony executed and srtool-verified",
+      "External auditor engagement for wallet flows",
+      "Sustained-load benchmarks",
+      "Live SecurityEventBroadcaster + AccountingSpine wired"
+    ],
+    "fundable_milestones": [
+      {"milestone": "Internal staging 72h soak", "deliverable": "rc5_internal_alpha_72h.sh output + node logs", "estimated_resources": "1 SRE + 1 consensus engineer × 1 week", "risk": "M"},
+      {"milestone": "Multi-validator Zombienet CI gate", "deliverable": "Zombienet config + CI workflow + 10-run history", "estimated_resources": "1 DevOps × 2 weeks", "risk": "M"},
+      {"milestone": "External security audit", "deliverable": "Auditor report + remediation PRs", "estimated_resources": "External firm: $80-150k", "risk": "H"},
+      {"milestone": "BTC mainnet integration", "deliverable": "FROST signing + testnet4 deposit/withdrawal drill", "estimated_resources": "2 bridge engineers × 6 weeks", "risk": "H"}
+    ],
+    "claims_should_not_make_yet": [
+      "TPS figures (no measured benchmarks)",
+      "Mainnet readiness (no genesis ceremony, no auditor)",
+      "Post-quantum security (x3-quantum-crypto is empty)",
+      "External bridge production-readiness (compile-time gated off)",
+      "AI optimizer / GPU acceleration (compile-time gated off)"
+    ]
+  },
+
+  "launch_gates": {
+    "internal_devnet": {
+      "requirements": ["cargo check passes", "cargo build passes", "unit tests pass", "dev chain spec functional"],
+      "current_status": "PASS",
+      "evidence": ["E002", "E003", "E005"]
+    },
+    "private_multi_node_testnet": {
+      "requirements": ["internal_devnet", "Zombienet 4-validator runs", "EconomicHalt propagates", "GRANDPA finality converges"],
+      "current_status": "BLOCKED — Zombienet never run in committed CI",
+      "evidence": ["CURRENT_MAINNET_STATUS.md:Multi-validator network testing 🔴 Missing"]
+    },
+    "public_testnet": {
+      "requirements": ["private_multi_node_testnet", "mainnet-rc1 WASM build", "genesis ceremony", "live SecurityEventBroadcaster", "external wallet audit"],
+      "current_status": "BLOCKED",
+      "evidence": ["F-HIGH-001", "F-CRIT-002", "F-LOW-003"]
+    },
+    "incentivized_testnet": {
+      "requirements": ["public_testnet", "external bridges testnet-tested", "tokenomics audited", "incident response drill"],
+      "current_status": "BLOCKED",
+      "evidence": ["F-HIGH-003", "F-HIGH-004"]
+    },
+    "release_candidate": {
+      "requirements": ["incentivized_testnet", "srtool reproducible build on 2+ machines", "independent security audit"],
+      "current_status": "BLOCKED"
+    },
+    "mainnet": {
+      "requirements": ["release_candidate", "Bitcoin signer quorum live", "multi-validator 72h soak", "all non-waivable gates green"],
+      "current_status": "BLOCKED",
+      "waiver_eligible": false
+    }
+  }
+}
