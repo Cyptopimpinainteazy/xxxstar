@@ -1328,7 +1328,7 @@ fn validate_signed_onboarding_artifact(
 }
 
 fn sort_benchmark_reports(
-    reports: &mut Vec<BenchmarkReport>,
+    reports: &mut [BenchmarkReport],
     sort_by: Option<&str>,
     sort_order: Option<&str>,
 ) {
@@ -1392,8 +1392,7 @@ mod tests {
     use super::*;
     use crate::db::{NewEvidenceBundle, NewOrchestraIntent, NewVoteWindow};
     use crate::graphql::create_schema;
-    use axum::{body::Body, http::Request, Router};
-    use hyper::body::to_bytes;
+    use axum::{body::{to_bytes, Body}, http::Request, Router};
     use serde_json::{json, Value};
     use std::sync::Arc;
     use tower::ServiceExt;
@@ -1716,7 +1715,7 @@ mod tests {
     }
 
     async fn read_json(response: axum::response::Response) -> Value {
-        let body = to_bytes(response.into_body())
+        let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("read response body");
         serde_json::from_slice(&body).expect("deserialize response body")
@@ -1930,13 +1929,8 @@ mod tests {
         let addr = listener
             .local_addr()
             .expect("mock control-plane local addr");
-        let std_listener = listener
-            .into_std()
-            .expect("convert mock control-plane listener");
         let handle = tokio::spawn(async move {
-            axum::Server::from_tcp(std_listener)
-                .expect("serve mock control-plane from tcp")
-                .serve(app.into_make_service())
+            axum::serve(listener, app)
                 .await
                 .expect("run mock control-plane server");
         });
