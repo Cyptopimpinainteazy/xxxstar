@@ -90,6 +90,59 @@ if [[ "$PATH_MISSING" -gt 0 ]]; then
 fi
 echo ""
 
+# --- required_tests existence check ---
+# CRITICAL-TOK-1 (2026-09-06 independent audit): FEATURE_REGISTRY.toml's
+# `required_tests` arrays are the evidentiary basis for each feature's
+# readiness_score, but nothing previously verified that a cited test name
+# corresponds to a real `#[test] fn` anywhere in the feature's own
+# crate_or_service path. That let [atomic_kernel] (score 85, the highest
+# in the registry) cite five test names — halt_blocks_new_mint,
+# halt_blocks_new_transfer, halt_blocks_new_swap, halt_allows_refund,
+# halt_allows_recovery — that did not exist anywhere in the repository
+# under any name. This section closes that gap for every registry entry,
+# not just that one.
+echo "--- Checking required_tests exist as real test functions ---"
+TESTS_MISSING=0
+current_key=""
+current_path=""
+in_tests_array=0
+while IFS= read -r line; do
+  if [[ "$line" =~ ^\[([a-z0-9_]+)\]$ ]]; then
+    current_key="${BASH_REMATCH[1]}"
+    current_path=""
+    in_tests_array=0
+  elif [[ "$line" =~ ^crate_or_service[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]] && [[ -n "$current_key" ]]; then
+    current_path="${BASH_REMATCH[1]}"
+  elif [[ "$line" =~ ^required_tests[[:space:]]*=[[:space:]]*\[ ]]; then
+    in_tests_array=1
+    if [[ "$line" =~ \][[:space:]]*$ ]]; then
+      in_tests_array=0
+    fi
+  elif [[ "$in_tests_array" -eq 1 ]]; then
+    if [[ "$line" =~ \"([a-zA-Z0-9_]+)\" ]]; then
+      test_name="${BASH_REMATCH[1]}"
+      abs_path="$REPO_ROOT/$current_path"
+      if [[ -n "$current_path" ]] && [[ -d "$abs_path" ]]; then
+        rs_file_count=$(find "$abs_path" -name "*.rs" 2>/dev/null | wc -l)
+        if [[ "$rs_file_count" -gt 0 ]]; then
+          if ! grep -rqE "fn[[:space:]]+${test_name}[[:space:]]*\(" "$abs_path" --include="*.rs" 2>/dev/null; then
+            echo "  VIOLATION: feature '$current_key' required_tests cites '$test_name' but no 'fn $test_name' exists under $current_path"
+            TESTS_MISSING=$((TESTS_MISSING + 1))
+          fi
+        fi
+      fi
+    fi
+    if [[ "$line" =~ \][[:space:]]*$ ]]; then
+      in_tests_array=0
+    fi
+  fi
+done < "$REGISTRY"
+VIOLATIONS=$((VIOLATIONS + TESTS_MISSING))
+if [[ "$TESTS_MISSING" -gt 0 ]]; then
+  echo "  → $TESTS_MISSING fictional required_tests citation(s). Write the missing test(s) or correct the citation."
+fi
+echo ""
+
 # --- Cross-check TESTNET_FEATURE_FLAGS.toml against registry modes ---
 if [[ -f "$FLAGS" ]]; then
   echo "--- Checking TESTNET_FEATURE_FLAGS.toml vs registry modes ---"

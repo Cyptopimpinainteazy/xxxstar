@@ -9,7 +9,7 @@
 
 ```
 Atomic Router (pallets/x3-cross-vm-router)        ████████░░  88%  LIVE_TESTNET — All 8 invariants passing, CI gate wired
-Atomic Kernel (pallets/x3-atomic-kernel)           ████████░░  85%  LIVE_TESTNET — 9 invariants passing, EconomicHalt wired
+Atomic Kernel (pallets/x3-atomic-kernel)           ████░░░░░░  40%  LIVE_TESTNET — EconomicHalt guard is real code, but its 9 previously-claimed invariant tests were fictional (CRITICAL-TOK-1, 2026-09-06 audit); real tests not yet written
 AXE DEX (pallets/x3-dex)                           ███████░░░  75%  GUARDED_TESTNET — EconomicHalt runtime gate, CI wired
 X3 Forge (pallets/x3-token-factory)                ███████░░░  75%  GUARDED_TESTNET — EconomicHalt runtime gate, CI wired
 Atomic Lock (pallets/x3-atomic-kernel)             ██████░░░░  68%  LIVE_TESTNET — CI gate wired via atomic_kernel
@@ -25,7 +25,7 @@ Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░�
 Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
 ```
 
-**Average readiness: ~54%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05), core consensus features ready for guarded testnet deployment.
+**Average readiness: ~51%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05; atomic_kernel corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 — its required_tests were fictional), core consensus features ready for guarded testnet deployment.
 
 ## What's Actually Working
 
