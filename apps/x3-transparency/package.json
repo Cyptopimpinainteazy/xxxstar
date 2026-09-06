@@ -9,7 +9,8 @@
     "watch:data": "node scripts/watch-data.mjs",
     "test": "node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "build": "npm run generate:data && tsc --noEmit && vite build"
+    "build": "npm run generate:data && tsc --noEmit && vite build",
+    "build:static": "tsc --noEmit && vite build"
   },
   "dependencies": {
     "react": "^18.2.0",

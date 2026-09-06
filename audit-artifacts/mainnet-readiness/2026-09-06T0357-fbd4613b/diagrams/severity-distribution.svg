@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" font-family="Helvetica,Arial,sans-serif">
+  <style>
+    .lbl { font-size: 13px; fill: #1a1a2e; }
+    .val { font-size: 13px; fill: #1a1a2e; font-weight: 700; }
+    .title { font-size: 16px; font-weight: 700; fill: #1a1a2e; }
+    .sub { font-size: 11px; fill: #555; }
+  </style>
+  <rect width="640" height="300" fill="#ffffff"/>
+  <text x="20" y="26" class="title">Findings by Severity (this audit)</text>
+  <text x="20" y="44" class="sub">19 total findings register entries (findings.json). Bar length = count, scaled 40px/finding.</text>
+
+  <text x="140" y="80" class="lbl" text-anchor="end">Critical</text>
+  <rect x="150" y="66" width="160" height="24" fill="#8f2d2d"/>
+  <text x="318" y="83" class="val">4</text>
+
+  <text x="140" y="116" class="lbl" text-anchor="end">High</text>
+  <rect x="150" y="102" width="200" height="24" fill="#c9982a"/>
+  <text x="358" y="119" class="val">5</text>
+
+  <text x="140" y="152" class="lbl" text-anchor="end">Medium</text>
+  <rect x="150" y="138" width="240" height="24" fill="#4a6fa5"/>
+  <text x="398" y="155" class="val">6</text>
+
+  <text x="140" y="188" class="lbl" text-anchor="end">Low</text>
+  <rect x="150" y="174" width="120" height="24" fill="#7a8a99"/>
+  <text x="278" y="191" class="val">3</text>
+
+  <text x="140" y="224" class="lbl" text-anchor="end">Informational</text>
+  <rect x="150" y="210" width="40" height="24" fill="#b7c0c8"/>
+  <text x="198" y="227" class="val">1</text>
+
+  <text x="20" y="264" class="sub">4 findings are hard blockers for both public testnet and mainnet (CRITICAL-TX-1, CRITICAL-TOK-1, CRITICAL-CN-1, CRITICAL-CK-1).</text>
+</svg>

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="Helvetica,Arial,sans-serif">
+  <style>
+    .lbl { font-size: 13px; fill: #1a1a2e; }
+    .val { font-size: 12px; fill: #1a1a2e; font-weight: 600; }
+    .axis { stroke: #999; stroke-width: 1; }
+    .grid { stroke: #e0e0e0; stroke-width: 1; }
+    .title { font-size: 16px; font-weight: 700; fill: #1a1a2e; }
+    .sub { font-size: 11px; fill: #555; }
+  </style>
+  <rect width="760" height="420" fill="#ffffff"/>
+  <text x="20" y="26" class="title">Subsystem Readiness — Unweighted Mean of Audited Feature Completion %</text>
+  <text x="20" y="44" class="sub">Source: feature-matrix.csv (this audit). Each bar = mean(completion_pct) across features this audit graded in that subsystem. Not a repo self-reported score.</text>
+
+  <!-- gridlines at 0/25/50/75/100 -->
+  <g class="grid">
+    <line x1="220" y1="70"  x2="220" y2="390"/>
+    <line x1="335" y1="70"  x2="335" y2="390"/>
+    <line x1="450" y1="70"  x2="450" y2="390"/>
+    <line x1="565" y1="70"  x2="565" y2="390"/>
+    <line x1="680" y1="70"  x2="680" y2="390"/>
+  </g>
+  <g class="axis">
+    <line x1="220" y1="70" x2="220" y2="390"/>
+  </g>
+  <text x="220" y="405" class="sub" text-anchor="middle">0</text>
+  <text x="335" y="405" class="sub" text-anchor="middle">25</text>
+  <text x="450" y="405" class="sub" text-anchor="middle">50</text>
+  <text x="565" y="405" class="sub" text-anchor="middle">75</text>
+  <text x="680" y="405" class="sub" text-anchor="middle">100</text>
+
+  <!-- bars: x=220 baseline, 4.6px per pct -->
+  <!-- Consensus 76 -->
+  <text x="210" y="90" class="lbl" text-anchor="end">Consensus</text>
+  <rect x="220" y="78" width="349.6" height="20" fill="#2f6f4f"/>
+  <text x="575" y="93" class="val">76</text>
+
+  <!-- Transaction lifecycle 64 -->
+  <text x="210" y="123" class="lbl" text-anchor="end">Transaction Lifecycle</text>
+  <rect x="220" y="111" width="294.4" height="20" fill="#c9982a"/>
+  <text x="520" y="126" class="val">64</text>
+
+  <!-- State/Storage 65 -->
+  <text x="210" y="156" class="lbl" text-anchor="end">State &amp; Storage</text>
+  <rect x="220" y="144" width="299" height="20" fill="#c9982a"/>
+  <text x="524" y="159" class="val">65</text>
+
+  <!-- Cryptography 63 -->
+  <text x="210" y="189" class="lbl" text-anchor="end">Cryptography &amp; Keys</text>
+  <rect x="220" y="177" width="289.8" height="20" fill="#c9982a"/>
+  <text x="515" y="192" class="val">63</text>
+
+  <!-- Smart contracts/cross-chain 66 -->
+  <text x="210" y="222" class="lbl" text-anchor="end">Contracts / VM / Cross-Chain</text>
+  <rect x="220" y="210" width="303.6" height="20" fill="#c9982a"/>
+  <text x="528" y="225" class="val">66</text>
+
+  <!-- Tokenomics 55 -->
+  <text x="210" y="255" class="lbl" text-anchor="end">Token Economics</text>
+  <rect x="220" y="243" width="253" height="20" fill="#b5502e"/>
+  <text x="478" y="258" class="val">55</text>
+
+  <!-- APIs/Frontends 25 -->
+  <text x="210" y="288" class="lbl" text-anchor="end">APIs / Frontends</text>
+  <rect x="220" y="276" width="115" height="20" fill="#8f2d2d"/>
+  <text x="340" y="291" class="val">25</text>
+
+  <!-- Ops/Proof gates 71 -->
+  <text x="210" y="321" class="lbl" text-anchor="end">Ops / Proof Gates</text>
+  <rect x="220" y="309" width="326.6" height="20" fill="#2f6f4f"/>
+  <text x="551" y="324" class="val">71</text>
+
+  <!-- Overall -->
+  <line x1="220" y1="345" x2="700" y2="345" stroke="#999" stroke-dasharray="3,3"/>
+  <text x="210" y="368" class="lbl" text-anchor="end" font-weight="700">Overall (mean of means)</text>
+  <rect x="220" y="356" width="291" height="22" fill="#1a1a2e"/>
+  <text x="516" y="372" class="val" fill="#fff">63</text>
+
+  <g transform="translate(220,392)">
+    <rect x="0" y="4" width="12" height="12" fill="#8f2d2d"/><text x="16" y="14" class="sub">&lt;40 Not testnet-ready</text>
+    <rect x="200" y="4" width="12" height="12" fill="#c9982a"/><text x="216" y="14" class="sub">40-69 Guarded testnet</text>
+    <rect x="420" y="4" width="12" height="12" fill="#2f6f4f"/><text x="436" y="14" class="sub">70+ Stronger footing</text>
+  </g>
+</svg>

@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/transparency/',
+  base: process.env.VITE_BASE_PATH ?? '/transparency/',
   server: { port: 1450, strictPort: true },
 })

@@ -1,0 +1,50 @@
+name: Deploy Transparency Portal
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - apps/x3-transparency/**
+      - scripts/transparency/**
+      - audit-artifacts/mainnet-readiness/live/**
+      - .github/workflows/deploy-transparency.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: transparency-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}/transparency/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install portal dependencies
+        working-directory: apps/x3-transparency
+        run: npm install --ignore-scripts
+      - name: Build committed portal evidence
+        working-directory: apps/x3-transparency
+        env:
+          VITE_BASE_PATH: /xxxstar/transparency/
+        run: npm run build:static
+      - name: Package GitHub Pages site
+        run: |
+          mkdir -p _site/transparency
+          cp -R apps/x3-transparency/dist/. _site/transparency/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
