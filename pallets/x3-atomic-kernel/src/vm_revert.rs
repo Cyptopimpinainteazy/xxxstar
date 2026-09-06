@@ -43,6 +43,7 @@ use crate::proof::VmType;
 use frame_support::{traits::Get, BoundedVec};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
+use sp_core::H256;
 use sp_runtime::traits::ConstU32;
 use sp_std::vec::Vec;
 
@@ -662,6 +663,233 @@ fn x3vm_storage_slot_key(key: &[u8; 32]) -> Vec<u8> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// Overlay Ledger Reverter
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Canonical, runtime-dispatcher overlay receipts:
+//
+//   [magic: 8 bytes "x3ovldf\x00"]
+//   [entry_count: u32 LE]
+//   for each entry:
+//     [domain: u8 (0=EVM,1=SVM,2=X3)]
+//     [address_len: u32 LE] [address: address_len bytes]
+//     [key: 32 bytes]
+//     [old_value: SCALE Option<[u8;32]>]
+//     [new_value: SCALE Option<[u8;32]>]
+//
+// The node service commits these changes into the pallet-owned overlay ledger
+// before bundle finalization; this reverter applies the inverse from that same
+// ledger when a bundle is rolled back.
+
+/// Magic header used to distinguish overlay diffs from EVM/SVM/X3VM formats.
+pub const OVERLAY_DIFF_MAGIC: [u8; 8] = *b"x3ovldf\0";
+
+/// Maximum entries in a single overlay state diff.
+pub const MAX_OVERLAY_DIFF_ENTRIES: u32 = 4096;
+
+/// Execution domain for an overlay ledger change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
+pub enum OverlayDomain {
+    Evm = 0,
+    Svm = 1,
+    X3 = 2,
+}
+
+/// A single address/key balance-or-state overlay change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OverlayLegChange {
+    /// Domain whose overlay ledger is being reverted.
+    pub domain: OverlayDomain,
+    /// Raw address (20-byte EVM, 32-byte SVM/X3).
+    pub address: Vec<u8>,
+    /// Storage/balance key inside the domain.
+    pub key: H256,
+    /// Value before execution (`None` = absent).
+    pub old_value: Option<H256>,
+    /// Value after execution (`None` = deleted).
+    pub new_value: Option<H256>,
+}
+
+/// Decode a pallet `StateDiff` into overlay ledger changes.
+pub fn decode_overlay_state_diff(diff: &StateDiff) -> Result<Vec<OverlayLegChange>, RevertError> {
+    let bytes = diff.as_bytes();
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
+    if bytes.len() < 8 || bytes[..8] != OVERLAY_DIFF_MAGIC {
+        return Err(RevertError::InvalidStateDiff);
+    }
+    if bytes.len() < 12 {
+        return Err(RevertError::InvalidStateDiff);
+    }
+    let entry_count = u32::from_le_bytes(
+        bytes[8..12]
+            .try_into()
+            .map_err(|_| RevertError::InvalidStateDiff)?,
+    );
+    if entry_count > MAX_OVERLAY_DIFF_ENTRIES {
+        return Err(RevertError::InvalidStateDiff);
+    }
+
+    let mut offset = 12usize;
+    let mut changes = Vec::with_capacity(entry_count as usize);
+    for _ in 0..entry_count {
+        if offset + 1 > bytes.len() {
+            return Err(RevertError::InvalidStateDiff);
+        }
+        let domain = match bytes[offset] {
+            0 => OverlayDomain::Evm,
+            1 => OverlayDomain::Svm,
+            2 => OverlayDomain::X3,
+            _ => return Err(RevertError::InvalidStateDiff),
+        };
+        offset += 1;
+
+        if offset + 4 > bytes.len() {
+            return Err(RevertError::InvalidStateDiff);
+        }
+        let addr_len =
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap_or_default()) as usize;
+        offset += 4;
+        if offset + addr_len > bytes.len() {
+            return Err(RevertError::InvalidStateDiff);
+        }
+        let address = bytes[offset..offset + addr_len].to_vec();
+        offset += addr_len;
+
+        if offset + 32 > bytes.len() {
+            return Err(RevertError::InvalidStateDiff);
+        }
+        let mut key_bytes = [0u8; 32];
+        key_bytes.copy_from_slice(&bytes[offset..offset + 32]);
+        offset += 32;
+
+        let old_value = decode_optional_h256(&bytes, &mut offset)?;
+        let new_value = decode_optional_h256(&bytes, &mut offset)?;
+
+        changes.push(OverlayLegChange {
+            domain,
+            address,
+            key: H256(key_bytes),
+            old_value,
+            new_value,
+        });
+    }
+    Ok(changes)
+}
+
+fn decode_optional_h256(
+    bytes: &[u8],
+    offset: &mut usize,
+) -> Result<Option<H256>, RevertError> {
+    if *offset >= bytes.len() {
+        return Err(RevertError::InvalidStateDiff);
+    }
+    match bytes[*offset] {
+        0 => {
+            *offset += 1;
+            Ok(None)
+        }
+        1 => {
+            *offset += 1;
+            if *offset + 32 > bytes.len() {
+                return Err(RevertError::InvalidStateDiff);
+            }
+            let mut val = [0u8; 32];
+            val.copy_from_slice(&bytes[*offset..*offset + 32]);
+            *offset += 32;
+            Ok(Some(H256(val)))
+        }
+        _ => Err(RevertError::InvalidStateDiff),
+    }
+}
+
+/// Encode overlay ledger changes into a pallet `StateDiff`.
+pub fn encode_overlay_state_diff(changes: &[OverlayLegChange]) -> StateDiff {
+    let mut bytes = OVERLAY_DIFF_MAGIC.to_vec();
+    bytes.extend_from_slice(&(changes.len() as u32).to_le_bytes());
+    for change in changes {
+        let domain = match change.domain {
+            OverlayDomain::Evm => 0u8,
+            OverlayDomain::Svm => 1u8,
+            OverlayDomain::X3 => 2u8,
+        };
+        bytes.push(domain);
+        bytes.extend_from_slice(&(change.address.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&change.address);
+        bytes.extend_from_slice(change.key.as_bytes());
+        encode_optional_h256(&mut bytes, change.old_value);
+        encode_optional_h256(&mut bytes, change.new_value);
+    }
+    StateDiff::from(bytes)
+}
+
+fn encode_optional_h256(out: &mut Vec<u8>, value: Option<H256>) {
+    match value {
+        Some(v) => {
+            out.push(1);
+            out.extend_from_slice(v.as_bytes());
+        }
+        None => out.push(0),
+    }
+}
+
+/// Storage key for the atomic-kernel overlay ledger map.
+///
+/// Mirrors FRAME's `StorageMap<_, Blake2_128Concat, RawOverlayKey, H256>`:
+/// `twox_128(pallet) ++ twox_128(item) ++ blake2_128(map_key) ++ map_key`.
+fn overlay_ledger_storage_key(change: &OverlayLegChange) -> Vec<u8> {
+    let mut map_key = vec![match change.domain {
+        OverlayDomain::Evm => 0u8,
+        OverlayDomain::Svm => 1u8,
+        OverlayDomain::X3 => 2u8,
+    }];
+    map_key.extend_from_slice(&change.address);
+    map_key.extend_from_slice(change.key.as_bytes());
+
+    let mut storage_key = Vec::new();
+    storage_key.extend_from_slice(&sp_io::hashing::twox_128(b"x3-atomic-kernel"));
+    storage_key.extend_from_slice(&sp_io::hashing::twox_128(b"OverlayLedger"));
+    storage_key.extend_from_slice(&sp_io::hashing::blake2_128(&map_key));
+    storage_key.extend_from_slice(&map_key);
+    storage_key
+}
+
+/// Reverter for runtime-dispatcher overlay ledger diffs.
+pub struct OverlayReverter;
+
+impl OverlayReverter {
+    /// Restore the pre-execution value for every overlay ledger change.
+    pub fn revert(diff: &StateDiff) -> Result<RevertOutcome, RevertError> {
+        let changes = decode_overlay_state_diff(diff)?;
+        if changes.is_empty() {
+            return Ok(RevertOutcome::NoSideEffects);
+        }
+
+        let mut reverted: u32 = 0;
+        for change in &changes {
+            let storage_key = overlay_ledger_storage_key(change);
+            match change.old_value {
+                Some(value) => {
+                    sp_io::storage::set(&storage_key, value.as_bytes());
+                    reverted += 1;
+                }
+                None => {
+                    sp_io::storage::clear(&storage_key);
+                }
+            }
+        }
+
+        log::info!(
+            target: "x3-atomic-kernel",
+            "OverlayReverter: reverted {} overlay ledger entry(s)",
+            reverted
+        );
+        Ok(RevertOutcome::Reverted)
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // Composite Reverter — dispatches to per-VM implementations
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -689,6 +917,11 @@ impl VmReverter for CompositeReverter {
     fn revert_leg(vm_type: VmType, state_diff: &StateDiff) -> Result<RevertOutcome, RevertError> {
         if state_diff.is_empty() {
             return Ok(RevertOutcome::NoSideEffects);
+        }
+        if state_diff.as_bytes().len() >= 8
+            && state_diff.as_bytes()[..8] == OVERLAY_DIFF_MAGIC
+        {
+            return OverlayReverter::revert(state_diff);
         }
         match vm_type {
             VmType::Evm => EvmReverter::revert(state_diff),
@@ -978,5 +1211,87 @@ mod tests {
         let diff = StateDiff::from(vec![0xFF; 3]);
         let result = CompositeReverter::revert_leg(VmType::Svm, &diff);
         assert_eq!(result.unwrap_err(), RevertError::InvalidStateDiff);
+    }
+
+    // ── Overlay Ledger Reverter ───────────────────────────────────────────
+
+    #[test]
+    fn overlay_diff_encode_decode_roundtrip() {
+        let changes = vec![
+            OverlayLegChange {
+                domain: OverlayDomain::Evm,
+                address: vec![0x42; 20],
+                key: H256([0x11; 32]),
+                old_value: Some(H256([0xAA; 32])),
+                new_value: Some(H256([0xBB; 32])),
+            },
+            OverlayLegChange {
+                domain: OverlayDomain::Svm,
+                address: vec![0x58; 32],
+                key: H256([0x22; 32]),
+                old_value: None,
+                new_value: Some(H256([0xCC; 32])),
+            },
+        ];
+        let diff = encode_overlay_state_diff(&changes);
+        assert!(!diff.is_empty());
+
+        let decoded = decode_overlay_state_diff(&diff).expect("overlay diff decodes");
+        assert_eq!(decoded, changes);
+    }
+
+    #[test]
+    fn overlay_reverter_restores_pre_execution_value() {
+        run(|| {
+            let change = OverlayLegChange {
+                domain: OverlayDomain::X3,
+                address: vec![0x09; 32],
+                key: H256([0x33; 32]),
+                old_value: Some(H256([0x99; 32])),
+                new_value: Some(H256([0x00; 32])),
+            };
+            let diff = encode_overlay_state_diff(&[change.clone()]);
+            let result = OverlayReverter::revert(&diff);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+
+            let key = overlay_ledger_storage_key(&change);
+            let stored = sp_io::storage::get(&key).expect("old value restored");
+            assert_eq!(stored, H256([0x99; 32]).as_bytes());
+        });
+    }
+
+    #[test]
+    fn overlay_reverter_deletes_key_that_did_not_exist_before() {
+        run(|| {
+            let change = OverlayLegChange {
+                domain: OverlayDomain::Svm,
+                address: vec![0x58; 32],
+                key: H256([0x44; 32]),
+                old_value: None,
+                new_value: Some(H256([0xDD; 32])),
+            };
+            let diff = encode_overlay_state_diff(&[change.clone()]);
+            OverlayReverter::revert(&diff).expect("revert succeeds");
+
+            let key = overlay_ledger_storage_key(&change);
+            assert!(sp_io::storage::get(&key).is_none(), "deleted key stays deleted");
+        });
+    }
+
+    #[test]
+    fn composite_reverter_dispatches_overlay_diff_before_vm_decoder() {
+        run(|| {
+            let change = OverlayLegChange {
+                domain: OverlayDomain::Evm,
+                address: vec![0x42; 20],
+                key: H256([0x55; 32]),
+                old_value: Some(H256([0xEE; 32])),
+                new_value: Some(H256([0xFF; 32])),
+            };
+            let diff = encode_overlay_state_diff(&[change]);
+            let result = CompositeReverter::revert_leg(VmType::Evm, &diff);
+            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+        });
     }
 }
