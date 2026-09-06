@@ -2,6 +2,12 @@
 //!
 //! Revenue calculation and distribution for the X3 Foundry ecosystem.
 //! All fee calculations use basis points (bps) where 10000 bps = 100%.
+//!
+//! Canonical default split:
+//! - 2% platform
+//! - 97% creator
+//! - 0.5% referral
+//! - 0.5% treasury
 
 use chrono::{DateTime, Utc};
 use rust_decimal::prelude::*;
@@ -11,22 +17,25 @@ use std::collections::HashMap;
 /// Maximum basis points (100%).
 pub const MAX_BASIS_POINTS: u64 = 10_000;
 
-/// Default platform fee in basis points (5%).
-pub const DEFAULT_PLATFORM_FEE_BPS: u64 = 500;
+/// Default platform fee in basis points (2%).
+pub const DEFAULT_PLATFORM_FEE_BPS: u64 = 200;
 
-/// Default creator fee in basis points (85%).
-pub const DEFAULT_CREATOR_FEE_BPS: u64 = 8_500;
+/// Default creator fee in basis points (97%).
+pub const DEFAULT_CREATOR_FEE_BPS: u64 = 9_700;
 
-/// Default referral fee in basis points (5%).
-pub const DEFAULT_REFERRAL_FEE_BPS: u64 = 500;
+/// Default referral fee in basis points (0.5%).
+pub const DEFAULT_REFERRAL_FEE_BPS: u64 = 50;
 
-/// Default treasury fee in basis points (5%).
-pub const DEFAULT_TREASURY_FEE_BPS: u64 = 500;
+/// Default treasury fee in basis points (0.5%).
+pub const DEFAULT_TREASURY_FEE_BPS: u64 = 50;
 
-/// Minimum fee in basis points (0.1%).
+/// Minimum non-zero fee in basis points (0.1%).
 pub const MIN_FEE_BPS: u64 = 10;
 
-/// Maximum fee in basis points (50%).
+/// Maximum non-creator fee in basis points (50%).
+///
+/// Creator share is intentionally excluded from this cap: the canonical
+/// Foundry model expects creators to receive the majority of earned revenue.
 pub const MAX_FEE_BPS: u64 = 5_000;
 
 /// Errors that can occur during revenue operations.
@@ -351,7 +360,7 @@ impl FeeValidator {
         if let Err(e) = Self::validate_basis_points(config.platform_fee_bps) {
             errors.push(e);
         }
-        if let Err(e) = Self::validate_basis_points(config.creator_fee_bps) {
+        if let Err(e) = Self::validate_percentage_bps(config.creator_fee_bps) {
             errors.push(e);
         }
         if let Err(e) = Self::validate_basis_points(config.referral_fee_bps) {
@@ -372,13 +381,19 @@ impl FeeValidator {
         }
     }
 
-    /// Validate a single basis points value.
+    /// Validate a non-creator fee basis-points value.
     pub fn validate_basis_points(bps: u64) -> Result<(), RevenueError> {
-        if bps > MAX_BASIS_POINTS {
-            return Err(RevenueError::InvalidBasisPoints(bps));
-        }
+        Self::validate_percentage_bps(bps)?;
         if bps > MAX_FEE_BPS {
             return Err(RevenueError::FeeExceedsMax(bps, MAX_FEE_BPS));
+        }
+        Ok(())
+    }
+
+    /// Validate a general revenue-share basis-points value.
+    pub fn validate_percentage_bps(bps: u64) -> Result<(), RevenueError> {
+        if bps > MAX_BASIS_POINTS {
+            return Err(RevenueError::InvalidBasisPoints(bps));
         }
         if bps > 0 && bps < MIN_FEE_BPS {
             return Err(RevenueError::FeeBelowMin(bps, MIN_FEE_BPS));
@@ -390,19 +405,19 @@ impl FeeValidator {
     pub fn validate_treasury_split(config: &TreasurySplitConfig) -> Result<(), Vec<RevenueError>> {
         let mut errors = Vec::new();
 
-        if let Err(e) = Self::validate_basis_points(config.operations_bps) {
+        if let Err(e) = Self::validate_percentage_bps(config.operations_bps) {
             errors.push(e);
         }
-        if let Err(e) = Self::validate_basis_points(config.development_bps) {
+        if let Err(e) = Self::validate_percentage_bps(config.development_bps) {
             errors.push(e);
         }
-        if let Err(e) = Self::validate_basis_points(config.marketing_bps) {
+        if let Err(e) = Self::validate_percentage_bps(config.marketing_bps) {
             errors.push(e);
         }
-        if let Err(e) = Self::validate_basis_points(config.reserves_bps) {
+        if let Err(e) = Self::validate_percentage_bps(config.reserves_bps) {
             errors.push(e);
         }
-        if let Err(e) = Self::validate_basis_points(config.community_bps) {
+        if let Err(e) = Self::validate_percentage_bps(config.community_bps) {
             errors.push(e);
         }
 
@@ -435,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_invalid_fee_config() {
-        let config = FeeConfig::new(5000, 5000, 0, 0);
+        let config = FeeConfig::new(5000, 4000, 0, 0);
         assert!(config.is_err());
     }
 
@@ -450,7 +465,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_platform_share(&amount).unwrap();
-        assert_eq!(share, dec!(50)); // 5% of 1000
+        assert_eq!(share, dec!(20)); // 2% of 1000
     }
 
     #[test]
@@ -458,7 +473,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_creator_share(&amount).unwrap();
-        assert_eq!(share, dec!(850)); // 85% of 1000
+        assert_eq!(share, dec!(970)); // 97% of 1000
     }
 
     #[test]
@@ -466,7 +481,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_referral_share(&amount).unwrap();
-        assert_eq!(share, dec!(50)); // 5% of 1000
+        assert_eq!(share, dec!(5)); // 0.5% of 1000
     }
 
     #[test]
@@ -474,7 +489,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_treasury_share(&amount).unwrap();
-        assert_eq!(share, dec!(50)); // 5% of 1000
+        assert_eq!(share, dec!(5)); // 0.5% of 1000
     }
 
     #[test]
@@ -482,10 +497,10 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(10000);
         let shares = calc.calculate_all_shares(&amount).unwrap();
-        assert_eq!(shares.platform, dec!(500));
-        assert_eq!(shares.creator, dec!(8500));
-        assert_eq!(shares.referral, dec!(500));
-        assert_eq!(shares.treasury, dec!(500));
+        assert_eq!(shares.platform, dec!(200));
+        assert_eq!(shares.creator, dec!(9700));
+        assert_eq!(shares.referral, dec!(50));
+        assert_eq!(shares.treasury, dec!(50));
     }
 
     #[test]
@@ -512,8 +527,8 @@ mod tests {
         assert_eq!(report.dapp_id, "dapp-1");
         assert_eq!(report.total_revenue, dec!(5000));
         assert_eq!(report.transaction_count, 10);
-        assert_eq!(report.platform_share, dec!(250));
-        assert_eq!(report.creator_share, dec!(4250));
+        assert_eq!(report.platform_share, dec!(100));
+        assert_eq!(report.creator_share, dec!(4850));
     }
 
     #[test]
@@ -524,7 +539,7 @@ mod tests {
 
     #[test]
     fn test_fee_validator_invalid_bps() {
-        assert!(FeeValidator::validate_basis_points(MAX_BASIS_POINTS + 1).is_err());
+        assert!(FeeValidator::validate_percentage_bps(MAX_BASIS_POINTS + 1).is_err());
         assert!(FeeValidator::validate_basis_points(MAX_FEE_BPS + 1000).is_err());
     }
 
@@ -540,7 +555,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000000000000);
         let share = calc.calculate_platform_share(&amount).unwrap();
-        assert_eq!(share, dec!(50000000000));
+        assert_eq!(share, dec!(20000000000));
     }
 
     #[test]

@@ -4,6 +4,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::env;
 use tracing::info;
 
 /// Deployment manifest containing all deployment metadata.
@@ -50,12 +51,20 @@ impl Deployer {
     }
 
     /// Deploys all smart contracts for the dApp.
+    ///
+    /// Current transport is deterministic/local deployment emulation. That is
+    /// acceptable for local, dev, anvil, and testnet profiles. Production-like
+    /// chains must opt in explicitly with `X3_FOUNDRY_ALLOW_SIMULATED_DEPLOY=1`
+    /// until the real signed transaction transport lands. This prevents a
+    /// mainnet path from returning fake addresses and calling that success.
     pub fn deploy_contracts(
         &self,
         contracts: &HashMap<String, String>,
         deployment_order: &[String],
         chain: &str,
     ) -> Result<Vec<DeployedContractInfo>, FoundryError> {
+        self.ensure_simulated_deployment_allowed(chain)?;
+
         info!(
             "Deployer: deploying {} contracts to {}",
             contracts.len(),
@@ -71,8 +80,7 @@ impl Deployer {
                 ))
             })?;
 
-            // Simulate deployment
-            let address = self.simulate_deploy(contract_name, source, chain);
+            let address = self.derive_local_contract_address(contract_name, source, chain);
             let tx_hash = self.compute_tx_hash(contract_name, chain);
             let block_number = self.simulate_block_number();
             let gas_used = self.estimate_gas(source);
@@ -151,18 +159,17 @@ impl Deployer {
         platform_fee_bps: u16,
         chain: &str,
     ) -> Result<Vec<String>, FoundryError> {
+        self.ensure_simulated_deployment_allowed(chain)?;
+
         info!("Deployer: deploying treasury hooks for {}", treasury_wallet);
+        let key_preview = preview_key(&self.deployer_key);
         let hooks = vec![
             format!(
                 "FeeCollector: {} bps -> {}",
                 platform_fee_bps, treasury_wallet
             ),
             format!("RevenueDistributor: deployed on {}", chain),
-            format!(
-                "TreasuryHook: 0x{}...{}",
-                &self.deployer_key[..8],
-                &self.deployer_key[self.deployer_key.len().saturating_sub(8)..]
-            ),
+            format!("TreasuryHook: {}", key_preview),
         ];
         Ok(hooks)
     }
@@ -175,6 +182,8 @@ impl Deployer {
         _tags: &[String],
         chain: &str,
     ) -> Result<String, FoundryError> {
+        self.ensure_simulated_deployment_allowed(chain)?;
+
         info!("Deployer: creating marketplace listing for {}", title);
         let listing_id = format!("listing-{}", &uuid::Uuid::new_v4().to_string()[..8]);
         info!("Marketplace listing created: {} on {}", listing_id, chain);
@@ -225,7 +234,6 @@ impl Deployer {
             manifest_hash: String::new(), // Will be computed
         };
 
-        // Compute manifest hash
         let manifest_json = serde_json::to_string(&manifest).unwrap_or_default();
         let mut hasher = Sha256::new();
         hasher.update(manifest_json.as_bytes());
@@ -250,8 +258,19 @@ impl Deployer {
         info!("Receipt signed: {}", receipt.signature);
     }
 
-    /// Simulates contract deployment (generates a deterministic address).
-    fn simulate_deploy(&self, contract_name: &str, source: &str, chain: &str) -> String {
+    fn ensure_simulated_deployment_allowed(&self, chain: &str) -> Result<(), FoundryError> {
+        if is_local_or_test_chain(chain) || allow_simulated_deploys() {
+            return Ok(());
+        }
+
+        Err(FoundryError::DeploymentFailed(format!(
+            "Refusing simulated Foundry deployment on production-like chain '{}'. Wire real signed transaction deployment or set X3_FOUNDRY_ALLOW_SIMULATED_DEPLOY=1 only for controlled drills.",
+            chain
+        )))
+    }
+
+    /// Derives a deterministic local/test address for non-production drills.
+    fn derive_local_contract_address(&self, contract_name: &str, source: &str, chain: &str) -> String {
         let input = format!(
             "{}{}{}{}",
             contract_name,
@@ -265,7 +284,7 @@ impl Deployer {
         format!("0x{}", &hash[..40])
     }
 
-    /// Computes a deterministic transaction hash.
+    /// Computes a deterministic transaction hash for local/test deployment drills.
     fn compute_tx_hash(&self, contract_name: &str, chain: &str) -> String {
         let input = format!(
             "deploy-{}-{}-{}",
@@ -278,7 +297,7 @@ impl Deployer {
         hex::encode(hasher.finalize())
     }
 
-    /// Simulates block number.
+    /// Simulates block number for local/test deployment drills.
     fn simulate_block_number(&self) -> u64 {
         (Utc::now().timestamp() as u64) % 100_000_000 + 10_000_000
     }
@@ -287,6 +306,40 @@ impl Deployer {
     fn estimate_gas(&self, source: &str) -> u64 {
         let lines = source.lines().count() as u64;
         500_000 + lines * 10_000
+    }
+}
+
+fn is_local_or_test_chain(chain: &str) -> bool {
+    let chain = chain.to_ascii_lowercase();
+    chain.contains("testnet")
+        || chain.contains("local")
+        || chain.contains("anvil")
+        || chain.contains("dev")
+        || chain == "31337"
+        || chain == "1337"
+}
+
+fn allow_simulated_deploys() -> bool {
+    env::var("X3_FOUNDRY_ALLOW_SIMULATED_DEPLOY")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
+fn preview_key(key: &str) -> String {
+    let prefix: String = key.chars().take(8).collect();
+    let suffix: String = key
+        .chars()
+        .rev()
+        .take(8)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+
+    if key.chars().count() <= 16 {
+        format!("{}...", prefix)
+    } else {
+        format!("{}...{}", prefix, suffix)
     }
 }
 
@@ -368,20 +421,34 @@ impl Default for CrossChainDeployer {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_deploy_contracts() {
-        let deployer = Deployer::new("test-key".into(), "x3-testnet".into());
+    fn sample_contracts() -> (HashMap<String, String>, Vec<String>) {
         let mut contracts = HashMap::new();
         contracts.insert(
             "TestToken".into(),
             "pragma solidity ^0.8.20;\ncontract TestToken {}".into(),
         );
         let order = vec!["TestToken".into()];
+        (contracts, order)
+    }
+
+    #[test]
+    fn test_deploy_contracts() {
+        let deployer = Deployer::new("test-key".into(), "x3-testnet".into());
+        let (contracts, order) = sample_contracts();
         let result = deployer.deploy_contracts(&contracts, &order, "x3-testnet");
         assert!(result.is_ok());
         let deployed = result.unwrap();
         assert_eq!(deployed.len(), 1);
         assert!(deployed[0].address.starts_with("0x"));
+    }
+
+    #[test]
+    fn test_mainnet_rejects_simulated_deploy_without_escape_hatch() {
+        env::remove_var("X3_FOUNDRY_ALLOW_SIMULATED_DEPLOY");
+        let deployer = Deployer::new("test-key".into(), "x3-mainnet".into());
+        let (contracts, order) = sample_contracts();
+        let result = deployer.deploy_contracts(&contracts, &order, "x3-mainnet");
+        assert!(matches!(result, Err(FoundryError::DeploymentFailed(_))));
     }
 
     #[test]
@@ -396,19 +463,18 @@ mod tests {
     fn test_cross_chain() {
         let mut cc = CrossChainDeployer::new();
         cc.add_chain(
-            "x3-mainnet".into(),
-            Deployer::new("key1".into(), "x3-mainnet".into()),
+            "x3-testnet".into(),
+            Deployer::new("key1".into(), "x3-testnet".into()),
         );
         cc.add_chain(
-            "ethereum".into(),
-            Deployer::new("key2".into(), "ethereum".into()),
+            "ethereum-anvil".into(),
+            Deployer::new("key2".into(), "ethereum-anvil".into()),
         );
-        let mut contracts = HashMap::new();
-        contracts.insert("Token".into(), "contract Token {}".into());
+        let (contracts, order) = sample_contracts();
         let result = cc.deploy_to_chains(
             &contracts,
-            &["Token".into()],
-            &["x3-mainnet".into(), "ethereum".into()],
+            &order,
+            &["x3-testnet".into(), "ethereum-anvil".into()],
         );
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 2);

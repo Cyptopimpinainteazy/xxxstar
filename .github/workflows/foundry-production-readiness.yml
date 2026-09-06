@@ -1,0 +1,38 @@
+name: Foundry Production Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'X3-contracts/evm/contracts/foundry/**'
+      - 'crates/x3-foundry-*/**'
+      - 'packages/x3-foundry-sdk/**'
+      - 'apps/x3-desktop/src-tauri/src/foundry.rs'
+      - 'apps/x3-desktop/src/ui/FoundryPanel.tsx'
+      - 'docs/X3_FOUNDRY_*.md'
+      - 'docs/current/FAILURES_AND_TODOS.md'
+      - 'scripts/foundry-production-check.sh'
+      - '.github/workflows/foundry-production-readiness.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'X3-contracts/evm/contracts/foundry/**'
+      - 'crates/x3-foundry-*/**'
+      - 'packages/x3-foundry-sdk/**'
+      - 'apps/x3-desktop/src-tauri/src/foundry.rs'
+      - 'apps/x3-desktop/src/ui/FoundryPanel.tsx'
+      - 'docs/X3_FOUNDRY_*.md'
+      - 'docs/current/FAILURES_AND_TODOS.md'
+      - 'scripts/foundry-production-check.sh'
+      - '.github/workflows/foundry-production-readiness.yml'
+
+jobs:
+  static-foundry-guards:
+    name: Static Foundry production guards
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Foundry production guardrails
+        run: bash scripts/foundry-production-check.sh
