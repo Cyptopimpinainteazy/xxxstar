@@ -252,11 +252,21 @@ pub mod pallet {
 
         /// Report validator misbehavior and apply a proportional stake slash.
         ///
-        /// The caller must be a signed account. The slash amount is computed as
-        /// `SlashFraction` basis points of the validator's current stake, with
-        /// the result floored at `MinStakeAfterSlash` to prevent a complete
-        /// zeroing in a single report. When the remaining stake reaches that
-        /// floor the validator is also marked inactive.
+        /// Root/governance-only (see CRITICAL-CN-1 in
+        /// `audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/`):
+        /// this call previously accepted `ensure_signed` from any account with
+        /// no evidence requirement, letting any signed account costlessly
+        /// slash any validator. Restricting the origin to root closes that
+        /// exploit; a full on-chain evidence/proof requirement per
+        /// `SlashReason` (mirroring the GRANDPA equivocation-proof path in
+        /// `runtime/src/lib.rs`) is tracked as separate follow-up work rather
+        /// than attempted here.
+        ///
+        /// The slash amount is computed as `SlashFraction` basis points of the
+        /// validator's current stake, with the result floored at
+        /// `MinStakeAfterSlash` to prevent a complete zeroing in a single
+        /// report. When the remaining stake reaches that floor the validator
+        /// is also marked inactive.
         #[pallet::call_index(1)]
         #[pallet::weight(<T as Config>::WeightInfo::report_misbehavior())]
         pub fn report_misbehavior(
@@ -264,7 +274,7 @@ pub mod pallet {
             validator: T::AccountId,
             reason: SlashReason,
         ) -> DispatchResult {
-            let _reporter = ensure_signed(origin)?;
+            ensure_root(origin)?;
             ensure!(
                 ValidatorStake::<T>::contains_key(&validator),
                 Error::<T>::ValidatorNotFound

@@ -999,6 +999,10 @@ pub fn new_full<
             });
     }
 
+    // The demo wallet_* RPC surface (crates/x3-rpc/src/wallet_service_rpc.rs) is a
+    // fabricated, non-cryptographic placeholder (see CRITICAL-TX-1). It must never
+    // be reachable outside a `--dev`-type chain spec.
+    let enable_demo_wallet_rpc = config.chain_spec.chain_type() == ChainType::Development;
     let rpc_builder = {
         let client = client.clone();
         let transaction_pool = transaction_pool.clone();
@@ -1012,6 +1016,7 @@ pub fn new_full<
                     gadget.clone(),
                     limiter.clone(),
                     subscription_executor,
+                    enable_demo_wallet_rpc,
                 )
                 .map_err(Into::into)
             },
