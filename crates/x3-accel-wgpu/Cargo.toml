@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [dependencies]
 bytemuck = "1.18"
-pollster = "0.3"
+pollster = "0.4"
 thiserror = "1.0"
 wgpu = "0.20"
 
