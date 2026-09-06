@@ -1,0 +1,184 @@
+[
+  {
+    "number": 1,
+    "id": "subsystems",
+    "caption": "Subsystem evidence score",
+    "svg": "assets/subsystems.svg",
+    "pdf": "assets/subsystems.pdf"
+  },
+  {
+    "number": 2,
+    "id": "status",
+    "caption": "Feature-status distribution",
+    "svg": "assets/status.svg",
+    "pdf": "assets/status.pdf"
+  },
+  {
+    "number": 3,
+    "id": "severity",
+    "caption": "Finding severity distribution",
+    "svg": "assets/severity.svg",
+    "pdf": "assets/severity.pdf"
+  },
+  {
+    "number": 4,
+    "id": "implementation",
+    "caption": "Implementation versus verification",
+    "svg": "assets/implementation.svg",
+    "pdf": "assets/implementation.pdf"
+  },
+  {
+    "number": 5,
+    "id": "radar",
+    "caption": "Readiness radar: equal axes, evidence-derived raw scores",
+    "svg": "assets/radar.svg",
+    "pdf": "assets/radar.pdf"
+  },
+  {
+    "number": 6,
+    "id": "risk",
+    "caption": "Risk heatmap: finding counts by inferred likelihood and impact, not probabilities",
+    "svg": "assets/risk.svg",
+    "pdf": "assets/risk.pdf"
+  },
+  {
+    "number": 7,
+    "id": "architecture",
+    "caption": "System architecture",
+    "svg": "assets/architecture.svg",
+    "pdf": "assets/architecture.pdf"
+  },
+  {
+    "number": 8,
+    "id": "transaction",
+    "caption": "Transaction lifecycle",
+    "svg": "assets/transaction.svg",
+    "pdf": "assets/transaction.pdf"
+  },
+  {
+    "number": 9,
+    "id": "consensus",
+    "caption": "Consensus and finality",
+    "svg": "assets/consensus.svg",
+    "pdf": "assets/consensus.pdf"
+  },
+  {
+    "number": 10,
+    "id": "trust",
+    "caption": "Trust boundaries",
+    "svg": "assets/trust.svg",
+    "pdf": "assets/trust.pdf"
+  },
+  {
+    "number": 11,
+    "id": "dependencies",
+    "caption": "Component dependencies",
+    "svg": "assets/dependencies.svg",
+    "pdf": "assets/dependencies.pdf"
+  },
+  {
+    "number": 12,
+    "id": "critical-path",
+    "caption": "Critical-path completion roadmap",
+    "svg": "assets/critical-path.svg",
+    "pdf": "assets/critical-path.pdf"
+  },
+  {
+    "number": 13,
+    "id": "timeline",
+    "caption": "7 / 30 / 60 / 90-day planning horizons",
+    "svg": "assets/timeline.svg",
+    "pdf": "assets/timeline.pdf"
+  },
+  {
+    "number": 14,
+    "id": "startup",
+    "caption": "Node startup path",
+    "svg": "assets/startup.svg",
+    "pdf": "assets/startup.pdf"
+  },
+  {
+    "number": 15,
+    "id": "state",
+    "caption": "State transition and persistence",
+    "svg": "assets/state.svg",
+    "pdf": "assets/state.pdf"
+  },
+  {
+    "number": 16,
+    "id": "deployment",
+    "caption": "Proposed isolated testnet topology",
+    "svg": "assets/deployment.svg",
+    "pdf": "assets/deployment.pdf"
+  },
+  {
+    "number": 17,
+    "id": "external",
+    "caption": "External dependency map",
+    "svg": "assets/external.svg",
+    "pdf": "assets/external.pdf"
+  },
+  {
+    "number": 18,
+    "id": "attack",
+    "caption": "Attack tree: false settlement",
+    "svg": "assets/attack.svg",
+    "pdf": "assets/attack.pdf"
+  },
+  {
+    "number": 19,
+    "id": "privilege",
+    "caption": "Privilege map",
+    "svg": "assets/privilege.svg",
+    "pdf": "assets/privilege.pdf"
+  },
+  {
+    "number": 20,
+    "id": "keys",
+    "caption": "Key lifecycle acceptance plan",
+    "svg": "assets/keys.svg",
+    "pdf": "assets/keys.pdf"
+  },
+  {
+    "number": 21,
+    "id": "test-matrix",
+    "caption": "Test evidence matrix: observed execution status, not coverage percentage",
+    "svg": "assets/test-matrix.svg",
+    "pdf": "assets/test-matrix.pdf"
+  },
+  {
+    "number": 22,
+    "id": "gates",
+    "caption": "Launch gate dashboard",
+    "svg": "assets/gates.svg",
+    "pdf": "assets/gates.pdf"
+  },
+  {
+    "number": 23,
+    "id": "effort",
+    "caption": "Effort-versus-impact prioritization: ordinal estimates and grouped finding counts",
+    "svg": "assets/effort.svg",
+    "pdf": "assets/effort.pdf"
+  },
+  {
+    "number": 24,
+    "id": "readiness",
+    "caption": "Overall readiness evidence",
+    "svg": "assets/readiness.svg",
+    "pdf": "assets/readiness.pdf"
+  },
+  {
+    "number": 25,
+    "id": "docs",
+    "caption": "Documentation versus executable evidence",
+    "svg": "assets/docs.svg",
+    "pdf": "assets/docs.pdf"
+  },
+  {
+    "number": 26,
+    "id": "dependency-heatmap",
+    "caption": "Critical dependency coverage",
+    "svg": "assets/dependency-heatmap.svg",
+    "pdf": "assets/dependency-heatmap.pdf"
+  }
+]

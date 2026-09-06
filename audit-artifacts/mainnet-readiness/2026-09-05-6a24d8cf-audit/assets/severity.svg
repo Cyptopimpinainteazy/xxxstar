@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="189" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 189" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="189"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-189)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="18" y="164" style="font-family: Helvetica; font-size: 14px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,328) scale(1,-1)">Finding severity distribution</text>
+			<text x="12" y="131" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,262) scale(1,-1)">Critical</text>
+			<rect x="220" y="128" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="128" width="37.5" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(69%,18%,23%); fill-rule: evenodd;"/>
+			<text x="450" y="131" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,262) scale(1,-1)">3</text>
+			<text x="12" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,210) scale(1,-1)">High</text>
+			<rect x="220" y="102" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="102" width="225.0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,36%,0%); fill-rule: evenodd;"/>
+			<text x="450" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,210) scale(1,-1)">18</text>
+			<text x="12" y="79" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,158) scale(1,-1)">Medium</text>
+			<rect x="220" y="76" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="76" width="87.5" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="450" y="79" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,158) scale(1,-1)">7</text>
+			<text x="12" y="53" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,106) scale(1,-1)">Low</text>
+			<rect x="220" y="50" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="50" width="12.5" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<text x="450" y="53" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,106) scale(1,-1)">1</text>
+			<text x="12" y="14" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,28) scale(1,-1)">Review findings, not a count of independent exploits.</text>
+		</g>
+	</g>
+</svg>

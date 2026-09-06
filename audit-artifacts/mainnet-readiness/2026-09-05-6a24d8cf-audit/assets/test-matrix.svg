@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="300" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="300"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-300)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="18" y="275" style="font-family: Helvetica; font-size: 14px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,550) scale(1,-1)">Test evidence matrix</text>
+			<text x="235" y="250" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,500) scale(1,-1)">Present</text>
+			<text x="317" y="250" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,500) scale(1,-1)">Ran</text>
+			<text x="399" y="250" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,500) scale(1,-1)">Passed</text>
+			<text x="18" y="222" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,444) scale(1,-1)">RPC algorithm</text>
+			<rect x="228" y="217" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="222" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,444) scale(1,-1)">YES</text>
+			<rect x="310" y="217" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="333.996" y="222" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,444) scale(1,-1)">YES</text>
+			<rect x="392" y="217" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="415.996" y="222" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,444) scale(1,-1)">YES</text>
+			<text x="18" y="196" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,392) scale(1,-1)">Python parsing / types</text>
+			<rect x="228" y="191" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="196" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,392) scale(1,-1)">YES</text>
+			<rect x="310" y="191" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="333.996" y="196" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,392) scale(1,-1)">YES</text>
+			<rect x="392" y="191" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="415.996" y="196" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,392) scale(1,-1)">YES</text>
+			<text x="18" y="170" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,340) scale(1,-1)">Python emitters</text>
+			<rect x="228" y="165" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="170" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,340) scale(1,-1)">YES</text>
+			<rect x="310" y="165" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="333.996" y="170" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,340) scale(1,-1)">YES</text>
+			<rect x="392" y="165" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="418.0" y="170" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,340) scale(1,-1)">NO</text>
+			<text x="18" y="144" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,288) scale(1,-1)">Proof-router rejection</text>
+			<rect x="228" y="139" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="144" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,288) scale(1,-1)">YES</text>
+			<rect x="310" y="139" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="333.996" y="144" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,288) scale(1,-1)">YES</text>
+			<rect x="392" y="139" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="418.0" y="144" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,288) scale(1,-1)">NO</text>
+			<text x="18" y="118" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,236) scale(1,-1)">Full workspace</text>
+			<rect x="228" y="113" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="118" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,236) scale(1,-1)">YES</text>
+			<rect x="310" y="113" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="336.0" y="118" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,236) scale(1,-1)">NO</text>
+			<rect x="392" y="113" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="418.0" y="118" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,236) scale(1,-1)">NO</text>
+			<text x="18" y="92" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,184) scale(1,-1)">Two-node finality</text>
+			<rect x="228" y="87" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="92" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,184) scale(1,-1)">YES</text>
+			<rect x="310" y="87" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="336.0" y="92" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,184) scale(1,-1)">NO</text>
+			<rect x="392" y="87" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="418.0" y="92" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,184) scale(1,-1)">NO</text>
+			<text x="18" y="66" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,132) scale(1,-1)">Contracts / migrations</text>
+			<rect x="228" y="61" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="251.996" y="66" style="font-family: Helvetica; font-size: 8px;fill: rgb(100%,100%,100%); stroke:none;" transform="translate(0,132) scale(1,-1)">YES</text>
+			<rect x="310" y="61" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="336.0" y="66" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,132) scale(1,-1)">NO</text>
+			<rect x="392" y="61" width="64" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<text x="418.0" y="66" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,132) scale(1,-1)">NO</text>
+			<text x="18" y="15" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,30) scale(1,-1)">Build attempts ran; full workspace tests did not execute. This is not line coverage.</text>
+		</g>
+	</g>
+</svg>

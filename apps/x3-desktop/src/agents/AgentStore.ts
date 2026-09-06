@@ -136,7 +136,7 @@ if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
   initFromSwarmHealth();
 }
 
-export const useAgentStore = create<AgentStore>()((set, get) => ({
+export const useAgentStore = create<AgentStore>()((set, _get) => ({
   agents: DEFAULT_AGENTS,
   getInitialState: () => ({ agents: DEFAULT_AGENTS }),
 

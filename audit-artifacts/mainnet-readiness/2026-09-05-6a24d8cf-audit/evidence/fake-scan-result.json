@@ -1,0 +1,15 @@
+{
+  "command": [
+    "grep",
+    "-RIn",
+    "TODO\\|FIXME\\|stub\\|mock\\|fake\\|placeholder\\|dummy\\|unimplemented!\\|todo!\\|panic!(\"not implemented",
+    ".",
+    "--exclude-dir=.git",
+    "--exclude-dir=target",
+    "--exclude-dir=node_modules"
+  ],
+  "exit_code": 2,
+  "matches": 54017,
+  "seconds": 39.98326778411865,
+  "scope": "Isolated copy; credentials, .git, build outputs and tauri vendor excluded during copy. Text content redacted; locations retained."
+}

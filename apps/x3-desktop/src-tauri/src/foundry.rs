@@ -354,10 +354,11 @@ pub async fn foundry_deploy(
     state: State<'_, FoundryState>,
     request: DeployRequest,
 ) -> Result<DeployResult, String> {
-    let project = {
-        let mut projects = state.projects.write().map_err(|e| e.to_string())?;
-        projects.get_mut(&request.project_id)
+    let mut project = {
+        let projects = state.projects.read().map_err(|e| e.to_string())?;
+        projects.get(&request.project_id)
             .ok_or_else(|| format!("Project not found: {}", request.project_id))?
+            .clone()
     };
 
     let chain = request.chain.unwrap_or_else(|| project.chain.clone());
@@ -398,7 +399,7 @@ pub async fn foundry_deploy(
             "params": [format!("0x{}", hex::encode(contract.as_bytes()))]
         });
 
-        match rpc_client.post(&rpc_url)
+        match rpc_client.post(rpc_url)
             .json(&deploy_body)
             .send()
             .await
@@ -437,7 +438,7 @@ pub async fn foundry_deploy(
         "method": "eth_blockNumber",
         "params": []
     });
-    if let Ok(resp) = rpc_client.post(&rpc_url).json(&block_body).send().await {
+    if let Ok(resp) = rpc_client.post(rpc_url).json(&block_body).send().await {
         if let Ok(json) = resp.json::<serde_json::Value>().await {
             if let Some(hex_block) = json.get("result").and_then(|r| r.as_str()) {
                 block_number = u64::from_str_radix(hex_block.trim_start_matches("0x"), 16).unwrap_or(0);
@@ -463,6 +464,14 @@ pub async fn foundry_deploy(
     project.frontend_url = frontend_url.clone();
     project.chain = chain.clone();
     project.updated_at = Utc::now().to_rfc3339();
+
+    // Persist the updated project back into state.
+    {
+        let mut projects = state.projects.write().map_err(|e| e.to_string())?;
+        if let Some(p) = projects.get_mut(&request.project_id) {
+            *p = project;
+        }
+    }
 
     Ok(DeployResult {
         success: true,

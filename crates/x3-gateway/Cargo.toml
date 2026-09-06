@@ -53,6 +53,17 @@ config = "0.14"
 dotenvy = "0.15"
 x3-rpc = { path = "../x3-rpc" }
 x3-orchestra-control-plane = { path = "../x3-orchestra-control-plane" }
+# Off-chain relayer: source of cross-chain proof submissions. The gateway
+# consumes the relayer's `ValidatorSignature` / `SvmProof` / `EvmProof`
+# types to forward into the on-chain pallet, completing the loop that
+# used to leave `x3-relayer` as a workspace island. Without this dep the
+# relayer's proof types never reach the gateway's REST handlers.
+x3-relayer = { path = "../x3-relayer" }
+# Cross-chain bridge types (HTLC, EVM bridge, SVM bridge). Promotes
+# `x3-bridge` from a workspace island (no declared consumer in any
+# workspace member) to a real compiled consumer of the gateway service.
+# Used by the HTLC construction endpoint and the BTC bridge helpers.
+x3-bridge = { path = "../x3-bridge" }
 
 # Utilities
 uuid = { version = "1.7", features = ["serde", "v4"] }

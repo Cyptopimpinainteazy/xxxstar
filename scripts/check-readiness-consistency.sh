@@ -57,6 +57,39 @@ echo "========================================"
 echo "Canonical source: FEATURE_REGISTRY.toml"
 echo ""
 
+# --- Path-exists sanity: every registry entry must point at real code ---
+# Catches the "FICTIONAL registry row" failure mode (registry claims a crate
+# that does not exist on disk). Checks crate_or_service against the repo root
+# and tolerates either a directory, a Cargo.toml, or a shell script.
+echo "--- Checking crate_or_service paths exist on disk ---"
+PATH_MISSING=0
+current_key=""
+while IFS= read -r line; do
+  if [[ "$line" =~ ^\[([a-z0-9_]+)\]$ ]]; then
+    current_key="${BASH_REMATCH[1]}"
+  elif [[ "$line" =~ ^crate_or_service[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]] && [[ -n "$current_key" ]]; then
+    p="${BASH_REMATCH[1]}"
+    # Resolve relative to repo root
+    abs_path="$REPO_ROOT/$p"
+    found=0
+    for cand in "$abs_path" "$abs_path/Cargo.toml" "$abs_path/src/lib.rs"; do
+      if [[ -e "$cand" ]]; then
+        found=1
+        break
+      fi
+    done
+    if [[ "$found" -eq 0 ]]; then
+      echo "  VIOLATION: feature '$current_key' points at '$p' which does not exist on disk"
+      PATH_MISSING=$((PATH_MISSING + 1))
+    fi
+  fi
+done < "$REGISTRY"
+VIOLATIONS=$((VIOLATIONS + PATH_MISSING))
+if [[ "$PATH_MISSING" -gt 0 ]]; then
+  echo "  → $PATH_MISSING fictional registry path(s). Delete or rewrite the affected entries."
+fi
+echo ""
+
 # --- Cross-check TESTNET_FEATURE_FLAGS.toml against registry modes ---
 if [[ -f "$FLAGS" ]]; then
   echo "--- Checking TESTNET_FEATURE_FLAGS.toml vs registry modes ---"

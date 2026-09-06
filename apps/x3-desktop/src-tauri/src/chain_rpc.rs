@@ -45,7 +45,7 @@ pub async fn raw_rpc_call(url: &str, method: &str, params: Value) -> Option<Valu
 }
 
 /// Resolve the RPC URL for a given chain name.
-pub fn rpc_url_for_chain(config: &ChainRpcConfig, chain: &str) -> &str {
+pub fn rpc_url_for_chain<'a>(config: &'a ChainRpcConfig, chain: &str) -> &'a str {
     match chain {
         "ethereum" => &config.ethereum_rpc,
         "x3" | "x3-chain" => &config.x3_rpc,

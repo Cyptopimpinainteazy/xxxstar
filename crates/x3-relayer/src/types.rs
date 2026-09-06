@@ -1,4 +1,13 @@
 /// Relayer configuration structures and types
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
+#[cfg(feature = "std")]
+use std::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 /// Main relayer configuration

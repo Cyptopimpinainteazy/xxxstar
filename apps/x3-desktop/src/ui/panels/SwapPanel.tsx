@@ -134,7 +134,7 @@ function SwapPanel() {
       )}
 
       <div className="mt-3 text-xs text-gray-600">
-        Query: invoke('submit_cross_swap', { fromChain, toChain, amount }) → intent + tx hash
+        {`Query: invoke('submit_cross_swap', { fromChain, toChain, amount }) → intent + tx hash`}
       </div>
     </div>
   );

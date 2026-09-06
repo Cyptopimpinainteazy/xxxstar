@@ -1,0 +1,40 @@
+{
+  "project": "X3 Atomic Star",
+  "date": "2026-09-05",
+  "created_at": "2026-09-05T18:49:13.696047+00:00",
+  "commit": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+  "branch": "master",
+  "repository_url": "",
+  "dirty": true,
+  "audited_scope": "Current filesystem including existing tracked edits and untracked first-party source; commit alone is insufficient to reproduce. No source changes made by audit.",
+  "copy_exclusions": [
+    ".git",
+    "target",
+    "node_modules",
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "keystore",
+    "screenshots",
+    "tauri-vendor",
+    "tauri-vendov",
+    "audit-artifacts"
+  ],
+  "firstparty_inventory_exclusions": [
+    "vendor",
+    "forge-std",
+    "lib",
+    ".pre-edit-snapshot",
+    ".rc4-runtime-upgrade-work",
+    ".venv",
+    "node_modules",
+    "target"
+  ],
+  "source_hash_manifest": "evidence/source-hashes.json",
+  "lockfile_hashes": {
+    "Cargo.lock": "0b2de09a5f2d7876e5a59a47a9f0a0a31db46e3456d195848ef63b21d1b419ca",
+    "rust-toolchain.toml": "95ee8f25747fefbcf37146d7d0c5bf1d7ece3374aeeeac8203d5954ac81a75af",
+    "package.json": "f1aa314e5f5507dfd24e762fefec72ea70064d8bc1ea4b2228d3cde7bffbc321"
+  }
+}

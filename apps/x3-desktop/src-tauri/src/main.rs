@@ -1487,7 +1487,6 @@ fn main() {
       wallet::generate_universal_wallet,
       wallet::import_universal_wallet,
       wallet::get_evm_chain_count,
-      wallet::store_wallet_secure,
       wallet::get_wallet_balance,
       wallet::submit_cross_swap,
       wallet::execute_x3_script,

@@ -14,22 +14,27 @@ export type PanelTab =
   | 'intelligence'
   | 'explorer';
 
+// Real brand icon assets shipped with the repo under public/assets/icons.
+// Each value is the SVG basename (no extension) resolved at render time to
+// /assets/icons/<name>.svg — the actual desktop/app artifacts for the X3 apps.
 const DESKTOP_ICONS: { name: string; label: string; tab?: PanelTab; url?: string; icon: string }[] = [
-  { name: 'wallet', label: 'Wallet', tab: 'wallet', icon: '💼' },
-  { name: 'swap', label: 'Swap', tab: 'swap', icon: '🔄' },
-  { name: 'bridge', label: 'Bridge', tab: 'crossvm', icon: '🌉' },
-  { name: 'validators', label: 'Validators', tab: 'validators', icon: '🌐' },
-  { name: 'governance', label: 'Governance', tab: 'phase5', icon: '🏛️' },
-  { name: 'network', label: 'Network', tab: 'network', icon: '🔗' },
-  { name: 'supply', label: 'Supply', tab: 'supply', icon: '💰' },
-  { name: 'swarm', label: 'AI Swarm', tab: 'swarm', icon: '🐝' },
-  { name: 'foundry', label: 'Foundry', tab: 'foundry', icon: '⚒️' },
-  { name: 'arena', label: 'Arena', tab: 'arena', icon: '🎮' },
-  { name: 'intelligence', label: 'Intelligence', tab: 'intelligence', icon: '🧠' },
-  { name: 'infra', label: 'Infra', tab: 'foundry', icon: '🔧' },
-  { name: 'explorer', label: 'Explorer', tab: 'explorer', icon: '🔍' },
-  { name: 'metrics', label: 'Metrics', tab: 'network', icon: '📊' },
+  { name: 'wallet', label: 'Wallet', tab: 'wallet', icon: 'wallet' },
+  { name: 'swap', label: 'Swap', tab: 'swap', icon: 'swap' },
+  { name: 'bridge', label: 'Bridge', tab: 'crossvm', icon: 'bridge' },
+  { name: 'validators', label: 'Validators', tab: 'validators', icon: 'operator' },
+  { name: 'governance', label: 'Governance', tab: 'phase5', icon: 'governance' },
+  { name: 'network', label: 'Network', tab: 'network', icon: 'network' },
+  { name: 'supply', label: 'Supply', tab: 'supply', icon: 'treasury' },
+  { name: 'swarm', label: 'AI Swarm', tab: 'swarm', icon: 'ai-swarm' },
+  { name: 'foundry', label: 'Foundry', tab: 'foundry', icon: 'devtools' },
+  { name: 'arena', label: 'Arena', tab: 'arena', icon: 'x3os' },
+  { name: 'intelligence', label: 'Intelligence', tab: 'intelligence', icon: 'quantum' },
+  { name: 'infra', label: 'Infra', tab: 'foundry', icon: 'telemetry' },
+  { name: 'explorer', label: 'Explorer', tab: 'explorer', icon: 'ecosystem' },
+  { name: 'metrics', label: 'Metrics', tab: 'network', icon: 'metrics' },
 ];
+
+const iconPath = (ic: string) => `/assets/icons/${ic}.svg`;
 
 interface DesktopIconsProps {
   onNavigate?: (tab: PanelTab) => void;
@@ -76,16 +81,18 @@ export default function DesktopIcons({ onNavigate }: DesktopIconsProps) {
             onClick={() => handleClick(ic)}
             title={ic.label}
           >
-            <span className="w-8 h-8 flex items-center justify-center text-xl drop-shadow-lg"
+            <img
+              src={iconPath(ic.icon)}
+              alt={ic.label}
+              draggable={false}
+              className="w-9 h-9 object-contain drop-shadow-lg"
               style={{
                 filter:
                   hovered === ic.name
-                    ? 'brightness(1.3) drop-shadow(0 0 6px rgba(0,200,255,0.5))'
-                    : 'brightness(0.9)',
+                    ? 'brightness(1.15) drop-shadow(0 0 6px rgba(0,200,255,0.6))'
+                    : 'brightness(1)',
               }}
-            >
-              {ic.icon}
-            </span>
+            />
             <span className="text-[10px] text-white/80 font-medium leading-tight text-center drop-shadow-lg">
               {ic.label}
             </span>

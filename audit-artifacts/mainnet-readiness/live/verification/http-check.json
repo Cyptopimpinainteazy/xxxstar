@@ -1,0 +1,22 @@
+{
+  "index.html": {
+    "status": 200,
+    "bytes": 27801
+  },
+  "current.json": {
+    "status": 200,
+    "bytes": 196
+  },
+  "summary.json": {
+    "status": 200,
+    "bytes": 1742441
+  },
+  "X3-LIVE-READINESS.pdf": {
+    "status": 200,
+    "bytes": 64765
+  },
+  "assets/readiness.svg": {
+    "status": 200,
+    "bytes": 877
+  }
+}

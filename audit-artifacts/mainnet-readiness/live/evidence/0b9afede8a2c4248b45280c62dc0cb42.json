@@ -1,0 +1,28 @@
+{
+  "id": "0b9afede8a2c4248b45280c62dc0cb42",
+  "check_id": "dsl-tests",
+  "check_hash": "de343c26443f86fefd4be08bac9186badd67feb29cb4e6a284f3678bf3dcb2ea",
+  "argv": [
+    "/usr/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "x3-lang/tests/test_parser.py",
+    "x3-lang/tests/test_typechecker.py",
+    "x3-lang/tests/test_emitter.py",
+    "x3-lang/tests/test_simulator.py"
+  ],
+  "cwd": "/home/lojak/Desktop/xxxstar-main",
+  "started_at": "2026-09-05T19:53:56.963740+00:00",
+  "finished_at": "2026-09-05T19:54:01.649750+00:00",
+  "seconds": 4.686,
+  "exit_code": 1,
+  "timed_out": false,
+  "log": "evidence/0b9afede8a2c4248b45280c62dc0cb42.log",
+  "log_sha256": "b5090d0795427b34d3ffc04ae7fa5ca5ccd4c989009cefaef1aeb9d690b58167",
+  "truncated": false,
+  "source_fingerprint": "475338a94dcc01f7ad3a3617ccb78fef42d8f85d78aca18a0ae21333d759151e",
+  "source_changed": false,
+  "commit": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+  "environment_policy": "Minimal inherited environment; offline Cargo; local disposable target directory"
+}

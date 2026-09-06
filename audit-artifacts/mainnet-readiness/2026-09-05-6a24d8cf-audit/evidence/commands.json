@@ -1,0 +1,102 @@
+[
+  {
+    "id": "tools",
+    "command": "rustc --version; cargo --version; node --version; npm --version; pnpm --version; python --version; python3 --version; /usr/bin/python3 --version; cargo audit --version; forge --version; anchor --version; protoc --version; clang --version",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 2.79,
+    "time": "2026-09-05T18:28:14.843362+00:00",
+    "log": "evidence/tools.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "metadata",
+    "command": "cargo metadata --offline --locked --no-deps --format-version 1",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 0.16,
+    "time": "2026-09-05T18:28:17.635406+00:00",
+    "log": "evidence/metadata.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "check",
+    "command": "cargo check --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 124,
+    "seconds": 180.13,
+    "time": "2026-09-05T18:28:17.799366+00:00",
+    "log": "evidence/check.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "test",
+    "command": "cargo test --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 124,
+    "seconds": 180.2,
+    "time": "2026-09-05T18:31:17.931913+00:00",
+    "log": "evidence/test.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "clippy",
+    "command": "cargo clippy --workspace --all-targets -- -D warnings",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 124,
+    "seconds": 180.01,
+    "time": "2026-09-05T18:34:18.134623+00:00",
+    "log": "evidence/clippy.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "pnpm-test",
+    "command": "pnpm test",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.01,
+    "time": "2026-09-05T18:37:18.152509+00:00",
+    "log": "evidence/pnpm-test.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "pnpm-build",
+    "command": "pnpm build",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.01,
+    "time": "2026-09-05T18:37:18.159324+00:00",
+    "log": "evidence/pnpm-build.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "npm-test",
+    "command": "npm test",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.89,
+    "time": "2026-09-05T18:37:18.170522+00:00",
+    "log": "evidence/npm-test.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "pytest",
+    "command": "python -m pytest",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.0,
+    "time": "2026-09-05T18:37:19.058254+00:00",
+    "log": "evidence/pytest.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "fmt",
+    "command": "cargo fmt --all -- --check",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 10.35,
+    "time": "2026-09-05T18:37:19.064902+00:00",
+    "log": "evidence/fmt.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  }
+]

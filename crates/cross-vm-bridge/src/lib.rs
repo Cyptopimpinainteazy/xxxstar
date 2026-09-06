@@ -299,9 +299,10 @@ pub trait CrossVmDispatcher {
 ///
 /// Produces deterministic, structurally valid results for unit and
 /// integration tests. It is **not** available in production builds
-/// (`#[cfg(test)]`) so a misconfigured runtime cannot accidentally route
-/// real cross-VM traffic through a fake-success adapter.
-#[cfg(test)]
+/// (`#[cfg(any(test, feature = "test-utils"))]`) so a misconfigured runtime
+/// cannot accidentally route real cross-VM traffic through a fake-success
+/// adapter. The `test-utils` Cargo feature is opt-in for integration tests.
+#[cfg(any(test, feature = "test-utils"))]
 pub struct NoOpDispatcher {
     evm_escrow: [u8; 20],
     svm_escrow: [u8; 32],
@@ -313,7 +314,7 @@ pub struct NoOpDispatcher {
     svm_balance: u64,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 impl NoOpDispatcher {
     /// Create a new NoOpDispatcher with configurable escrow addresses and a
     /// zero balance (i.e. an underfunded account unless later funded).
@@ -358,7 +359,7 @@ impl NoOpDispatcher {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 impl CrossVmDispatcher for NoOpDispatcher {
     fn execute_evm_tx(
         &self,

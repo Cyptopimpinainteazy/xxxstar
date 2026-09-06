@@ -31,6 +31,17 @@ name = "live_internal_mainnet_e2e"
 path = "live_internal_mainnet_e2e.rs"
 required-features = []
 
+[[test]]
+name = "internal_mainnet_happy_path"
+path = "src/internal_mainnet_happy_path.rs"
+required-features = []
+# Exercises the unit-style happy path: lock/mint, swap (incl. fee accounting),
+# atomic rollback, invariant violation prevention, emergency halt/restart,
+# cross-VM settlement, and replay protection. Wired as a proper integration
+# test target so `cargo test -p e2e_tests --test internal_mainnet_happy_path`
+# resolves in CI. Without this entry, the CI step silently errors with
+# "no test target named ...".
+
 [features]
 default = []
 full_e2e = []

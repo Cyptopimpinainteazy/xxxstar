@@ -1,0 +1,193 @@
+{
+  "page_count": 127,
+  "chapter_pages": [
+    {
+      "title": "Scope, provenance and how to read",
+      "page": 2,
+      "key": "sec-Scope--provenance-and-how-to-read"
+    },
+    {
+      "title": "Contents",
+      "page": 3,
+      "key": "sec-Contents"
+    },
+    {
+      "title": "Figures and tables",
+      "page": 4,
+      "key": "sec-Figures-and-tables"
+    },
+    {
+      "title": "1 Executive Command Brief",
+      "page": 6,
+      "key": "sec-1-Executive-Command-Brief"
+    },
+    {
+      "title": "2 System Architecture",
+      "page": 10,
+      "key": "sec-2-System-Architecture"
+    },
+    {
+      "title": "3 Repository Anatomy",
+      "page": 16,
+      "key": "sec-3-Repository-Anatomy"
+    },
+    {
+      "title": "4 Feature Completion Scorecard",
+      "page": 19,
+      "key": "sec-4-Feature-Completion-Scorecard"
+    },
+    {
+      "title": "5 Mainnet Blockers",
+      "page": 29,
+      "key": "sec-5-Mainnet-Blockers"
+    },
+    {
+      "title": "6 Security Threat Model",
+      "page": 59,
+      "key": "sec-6-Security-Threat-Model"
+    },
+    {
+      "title": "7 Consensus, Transactions and State Integrity",
+      "page": 63,
+      "key": "sec-7-Consensus--Transactions-and-State-Integrity"
+    },
+    {
+      "title": "8 Smart Contracts, VM and Cross-Chain Systems",
+      "page": 65,
+      "key": "sec-8-Smart-Contracts--VM-and-Cross-Chain-Systems"
+    },
+    {
+      "title": "9 Performance and Scaling",
+      "page": 67,
+      "key": "sec-9-Performance-and-Scaling"
+    },
+    {
+      "title": "10 Test and Verification Strategy",
+      "page": 69,
+      "key": "sec-10-Test-and-Verification-Strategy"
+    },
+    {
+      "title": "11 Operations and Deployment",
+      "page": 75,
+      "key": "sec-11-Operations-and-Deployment"
+    },
+    {
+      "title": "12 The Completion Blueprint",
+      "page": 78,
+      "key": "sec-12-The-Completion-Blueprint"
+    },
+    {
+      "title": "13 Funding and Partnership Readiness",
+      "page": 93,
+      "key": "sec-13-Funding-and-Partnership-Readiness"
+    },
+    {
+      "title": "14 Final Launch Gates",
+      "page": 95,
+      "key": "sec-14-Final-Launch-Gates"
+    },
+    {
+      "title": "Appendix A Detailed Feature Acceptance Cards",
+      "page": 99,
+      "key": "sec-Appendix-A-Detailed-Feature-Acceptance-Cards"
+    },
+    {
+      "title": "Appendix B Evidence Ledger and Repository Inventories",
+      "page": 115,
+      "key": "sec-Appendix-B-Evidence-Ledger-and-Repository-Inventories"
+    },
+    {
+      "title": "Appendix C Fake-Completeness and Unknowns",
+      "page": 125,
+      "key": "sec-Appendix-C-Fake-Completeness-and-Unknowns"
+    },
+    {
+      "title": "Appendix D Glossary and Reading Guide",
+      "page": 126,
+      "key": "sec-Appendix-D-Glossary-and-Reading-Guide"
+    },
+    {
+      "title": "Appendix E References, Regeneration and Integrity",
+      "page": 127,
+      "key": "sec-Appendix-E-References--Regeneration-and-Integrity"
+    }
+  ],
+  "tables": [
+    {
+      "number": 1,
+      "caption": "Five strongest foundations"
+    },
+    {
+      "number": 2,
+      "caption": "Five most dangerous weaknesses"
+    },
+    {
+      "number": 3,
+      "caption": "Repository groups and responsibilities"
+    },
+    {
+      "number": 4,
+      "caption": "Code exists versus code runs"
+    },
+    {
+      "number": 5,
+      "caption": "Migration and configuration inventory"
+    },
+    {
+      "number": 6,
+      "caption": "Subsystem scoring weights and raw evidence"
+    },
+    {
+      "number": 7,
+      "caption": "Feature matrix overview"
+    },
+    {
+      "number": 8,
+      "caption": "Security controls and remaining exposure"
+    },
+    {
+      "number": 9,
+      "caption": "Protocol invariant register"
+    },
+    {
+      "number": 10,
+      "caption": "Trustless, trusted or unsupported claim?"
+    },
+    {
+      "number": 11,
+      "caption": "Benchmark measurements to produce"
+    },
+    {
+      "number": 12,
+      "caption": "Executed test and build outcomes"
+    },
+    {
+      "number": 13,
+      "caption": "Engineering phases"
+    },
+    {
+      "number": 14,
+      "caption": "Milestone-based funding packages"
+    },
+    {
+      "number": 15,
+      "caption": "Verification command ledger"
+    },
+    {
+      "number": 16,
+      "caption": "Durable inventory map"
+    },
+    {
+      "number": 17,
+      "caption": "Workspace package targets"
+    },
+    {
+      "number": 18,
+      "caption": "Confirmed misleading or nonfunctional behavior"
+    },
+    {
+      "number": 19,
+      "caption": "Glossary"
+    }
+  ]
+}

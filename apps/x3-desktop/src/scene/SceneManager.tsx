@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree, ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { OrbitControls, Text, Line, Html } from '@react-three/drei';
-import { CameraController } from './CameraController';
+import { OrbitControls, Text, Html } from '@react-three/drei';
+import {
+  CameraController,
+} from './CameraController';
 import { EntityFactory } from './EntityFactory';
 import { ParticleFlows } from './ParticleFlows';
+import { CenterEye } from './CenterEye';
 import { useAgentStore, AgentState } from '../agents/AgentStore';
 import { useBlockStore, BlockEntry } from '../blockchain/BlockStore';
 
@@ -189,25 +192,6 @@ function BlockMesh({ block, onAnimateComplete }: { block: BlockEntry; onAnimateC
   );
 }
 
-/* ─── Transaction Beam ─────────────────────────── */
-function TxBeam({ from, to, onComplete }: { from: THREE.Vector3; to: THREE.Vector3; onComplete: () => void }) {
-  const points = React.useMemo(() => {
-    const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
-    mid.y += 3;
-    return new THREE.CatmullRomCurve3([from, mid, to]).getPoints(20);
-  }, [from, to]);
-
-  return (
-    <Line
-      points={points}
-      color="#00ddff"
-      lineWidth={1}
-      transparent
-      opacity={0.6}
-    />
-  );
-}
-
 /* ─── Main Scene ───────────────────────────────── */
 function ArenaScene({ selectedAgentId, onAgentSelect }: {
   selectedAgentId: string | null;
@@ -216,7 +200,7 @@ function ArenaScene({ selectedAgentId, onAgentSelect }: {
   const agents = useAgentStore((s) => s.agents);
   const blocks = useBlockStore((s) => s.recentBlocks);
   const removeBlock = useBlockStore((s) => s.removeBlock);
-  const { camera, gl } = useThree();
+  const { camera } = useThree();
 
   // Camera controls
   useEffect(() => {
@@ -227,11 +211,6 @@ function ArenaScene({ selectedAgentId, onAgentSelect }: {
   const handleBlockComplete = useCallback((id: string) => {
     removeBlock(id);
   }, [removeBlock]);
-
-  const handleClickEmpty = useCallback(() => {
-    // Deselect on background click
-    onAgentSelect('');
-  }, [onAgentSelect]);
 
   return (
     <>
@@ -254,6 +233,9 @@ function ArenaScene({ selectedAgentId, onAgentSelect }: {
           onClick={onAgentSelect}
         />
       ))}
+
+      {/* Overseer eyeball — central sculpture that tracks the mouse pointer */}
+      <CenterEye />
 
       {/* Blocks falling */}
       {blocks.map((block) => (

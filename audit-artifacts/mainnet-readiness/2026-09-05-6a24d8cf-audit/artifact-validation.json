@@ -1,0 +1,137 @@
+{
+  "checked_at": "2026-09-05T19:12:59.356556+00:00",
+  "command": "/usr/bin/python3 validate_package.py",
+  "exit_code": 0,
+  "pdf_pages": 127,
+  "internal_pdf_destinations_resolved": 66,
+  "source_files_checked": 6909,
+  "source_hash_mismatches": [],
+  "lockfile_hash_mismatches": [],
+  "working_tree_status_equal_excluding_audit_artifacts": true,
+  "score_formula_and_counts_consistent": true,
+  "figure_assets_and_references_checked": 26,
+  "words_outside_page": [],
+  "replacement_glyphs": [],
+  "pages_with_fewer_than_20_words": [],
+  "navigation_checks": [
+    {
+      "title": "Scope, provenance and how to read",
+      "page": 2,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Contents",
+      "page": 3,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Figures and tables",
+      "page": 4,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "1 Executive Command Brief",
+      "page": 6,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "2 System Architecture",
+      "page": 10,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "3 Repository Anatomy",
+      "page": 16,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "4 Feature Completion Scorecard",
+      "page": 19,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "5 Mainnet Blockers",
+      "page": 29,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "6 Security Threat Model",
+      "page": 59,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "7 Consensus, Transactions and State Integrity",
+      "page": 63,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "8 Smart Contracts, VM and Cross-Chain Systems",
+      "page": 65,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "9 Performance and Scaling",
+      "page": 67,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "10 Test and Verification Strategy",
+      "page": 69,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "11 Operations and Deployment",
+      "page": 75,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "12 The Completion Blueprint",
+      "page": 78,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "13 Funding and Partnership Readiness",
+      "page": 93,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "14 Final Launch Gates",
+      "page": 95,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Appendix A Detailed Feature Acceptance Cards",
+      "page": 99,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Appendix B Evidence Ledger and Repository Inventories",
+      "page": 115,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Appendix C Fake-Completeness and Unknowns",
+      "page": 125,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Appendix D Glossary and Reading Guide",
+      "page": 126,
+      "heading_and_toc_text_present": true
+    },
+    {
+      "title": "Appendix E References, Regeneration and Integrity",
+      "page": 127,
+      "heading_and_toc_text_present": true
+    }
+  ],
+  "credential_pattern_scanned_files": 101,
+  "credential_pattern_match_paths": [],
+  "credential_scan_limit": "Heuristic pattern scan plus review of generated report/log content. Not a guarantee against every secret format; sensitive input files were excluded.",
+  "visual_inspection": "All final pages rendered to PNG; contact sheets and selected full-size pages reviewed. Vector figures; no observed clipping or overlaps.",
+  "render_repairs": [
+    "Grouped closing statement and compacted final explanatory notes to remove isolated overflow lines.",
+    "Replaced unavailable Drawing.scaled with copied/scaled vector drawing.",
+    "Compressed TOC spacing to avoid one-entry overflow; separate table list page; reduced body/table spacing to improve pagination."
+  ]
+}

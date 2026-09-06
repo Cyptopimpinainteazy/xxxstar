@@ -1,0 +1,8 @@
+[package]
+name = "x3-audit-proof-harness"
+version = "0.1.0"
+edition = "2021"
+[workspace]
+[dependencies]
+x3-verification-router = { path = "../../../../../crates/x3-verification-router", features = ["production"] }
+x3-bitcoin-vault = { path = "../../../../../crates/x3-bitcoin-vault" }

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="281" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 281" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="281"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-281)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="18" y="256" style="font-family: Helvetica; font-size: 14px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,512) scale(1,-1)">Node startup path</text>
+			<path d="M 162,192.5 L 178,192.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="178 192.5, 172 189.5, 172 195.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 322,192.5 L 338,192.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="338 192.5, 332 189.5, 332 195.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 410,162 L 90,125 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="90 125, 95.61571 128.6693, 96.30487 122.709" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 162,94.5 L 178,94.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="178 94.5, 172 91.5, 172 97.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 322,94.5 L 338,94.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="338 94.5, 332 91.5, 332 97.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<rect x="18.0" y="162" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="18.0" y="218" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="26.0" y="203" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,406) scale(1,-1)">main / run</text>
+			<text x="26.0" y="191" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,382) scale(1,-1)">CLI parse + chain spec</text>
+			<rect x="178.0" y="162" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="178.0" y="218" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="186.0" y="203" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,406) scale(1,-1)">new_partial</text>
+			<text x="186.0" y="191" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,382) scale(1,-1)">WASM / DB / keystore</text>
+			<rect x="338.0" y="162" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="338.0" y="218" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="346.0" y="203" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,406) scale(1,-1)">Pool + import queue</text>
+			<text x="346.0" y="191" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,382) scale(1,-1)">Aura + GRANDPA import</text>
+			<rect x="18.0" y="64" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="18.0" y="120" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="26.0" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,210) scale(1,-1)">new_full</text>
+			<text x="26.0" y="93" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,186) scale(1,-1)">Network + RPC tasks</text>
+			<rect x="178.0" y="64" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="178.0" y="120" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="186.0" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,210) scale(1,-1)">Authority role</text>
+			<text x="186.0" y="93" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,186) scale(1,-1)">Aura proposer</text>
+			<rect x="338.0" y="64" width="144.0" height="61" style="stroke: rgb(60%,36%,0%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="338.0" y="120" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,36%,0%); fill-rule: evenodd;"/>
+			<text x="346.0" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(60%,36%,0%); stroke:none;" transform="translate(0,210) scale(1,-1)">Consensus selection</text>
+			<text x="346.0" y="93" style="font-family: Helvetica; font-size: 9px;fill: rgb(60%,36%,0%); stroke:none;" transform="translate(0,186) scale(1,-1)">GRANDPA or flash flag</text>
+			<text x="18" y="24" style="font-family: Helvetica; font-size: 7.5px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,48) scale(1,-1)">I implemented/unverified  P partial  D disconnected  X unsafe  V verified  N proposed</text>
+			<text x="18" y="10" style="font-family: Helvetica; font-size: 7.5px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,20) scale(1,-1)">Static wiring; no live deployment is asserted.</text>
+		</g>
+	</g>
+</svg>

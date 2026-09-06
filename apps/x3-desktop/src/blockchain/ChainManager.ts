@@ -5,7 +5,7 @@
  * Routes to appropriate adapters based on chain configuration.
  */
 
-import { ChainAdapter, ChainStatus, Block, Tx, SignedTx, TxHash } from './ChainAdapter';
+import { ChainAdapter, ChainStatus } from './ChainAdapter';
 import { LocalAdapter } from './LocalAdapter';
 import { EthereumAdapter } from './EthereumAdapter';
 

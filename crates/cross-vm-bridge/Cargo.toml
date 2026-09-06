@@ -49,6 +49,15 @@ std = [
     "dep:serde_json",
     "serde_json?/std",
 ]
+# Test-only synthetic dispatcher (NoOpDispatcher). Wired into `#[cfg(any(test, feature = "test-utils"))]`
+# so integration tests in `tests/integration.rs` can opt-in via the feature while production
+# binaries remain unable to route real traffic through a fake-success adapter.
+test-utils = []
 
 [lib]
 crate-type = ["rlib"]
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+required-features = ["test-utils"]
