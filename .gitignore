@@ -88,10 +88,22 @@ apps/explorer/.next/
 # Deployment key templates (FILL_IN placeholders only; real keys injected at deploy)
 deployment/keys/*.json
 deployment/keys/*-key
+deployment/keys/*summary*.txt
+deployment/keys/validator-*.txt
 deployment/keys/README.md
 !deployment/keys/README.md
 !deployment/keys/key-rotation-template.json
 !deployment/keys/key-rotation-template.key
+
+# --- CREDENTIAL/SECRET FILES (TREASURY_POLICY.md §3) ---
+# Confirmed key material must NEVER enter the repo. TRACKED in old history;
+# untracked here so the next git tag excludes them. See deployment/keys/README.md
+# and TREASURY_POLICY.md §3 for the offline rotation procedure.
+sepolia-deployer-wallet.txt
+sepolia-deployer-wallet.txt.*
+deployment/keys/validator-*.txt
+*.suri
+deployment/chain-specs/fresh/validator-keys/
 
 # Systemd packaging (compiled .service files, not templates)
 packaging/*.service
