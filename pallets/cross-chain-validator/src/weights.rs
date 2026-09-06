@@ -14,6 +14,7 @@ use core::marker::PhantomData;
 pub trait WeightInfo {
     fn validate_evm_header() -> Weight;
     fn validate_svm_header() -> Weight;
+    fn set_authorized_submitters() -> Weight;
 }
 
 pub struct SubstrateWeight<T>(PhantomData<T>);
@@ -37,6 +38,14 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().reads(1u64))
             .saturating_add(T::DbWeight::get().writes(1u64))
     }
+
+    /// Storage: CrossChainValidator AuthorizedSubmitters (r:1 w:64 max)
+    /// Writes the governed authorized-submitter set.
+    fn set_authorized_submitters() -> Weight {
+        Weight::from_parts(20_000_000u64, 512u64)
+            .saturating_add(T::DbWeight::get().reads(1u64))
+            .saturating_add(T::DbWeight::get().writes(65u64))
+    }
 }
 
 impl WeightInfo for () {
@@ -48,5 +57,10 @@ impl WeightInfo for () {
     fn validate_svm_header() -> Weight {
         Weight::from_parts(52_000_000u64, 512u64)
             .saturating_add(RocksDbWeight::get().reads_writes(1, 1))
+    }
+
+    fn set_authorized_submitters() -> Weight {
+        Weight::from_parts(20_000_000u64, 512u64)
+            .saturating_add(RocksDbWeight::get().reads_writes(1, 65))
     }
 }
