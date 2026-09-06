@@ -17,6 +17,7 @@ repomix-output.md
 # Node
 node_modules/
 *.log
+tests/wallet-integration/coverage/
 
 # Misc
 .DS_Store
