@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" font-family="Helvetica,Arial,sans-serif">
+  <style>
+    .title { font-size: 16px; font-weight: 700; fill: #1a1a2e; }
+    .sub { font-size: 11px; fill: #555; }
+    .box { stroke-width: 1.6; }
+    .lbl { font-size: 12.5px; fill: #1a1a2e; }
+    .tag { font-size: 10.5px; fill: #fff; font-weight: 700; }
+    .arrow { stroke: #444; stroke-width: 1.6; marker-end: url(#arr); fill:none; }
+  </style>
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#444"/></marker>
+  </defs>
+  <rect width="800" height="560" fill="#ffffff"/>
+  <text x="20" y="26" class="title">Trust Boundary Map — X3 Atomic Star (evidence-based, commit fbd4613b)</text>
+  <text x="20" y="44" class="sub">Green = real cryptographic/consensus enforcement verified this audit. Amber = real but centralized/single-key trust. Red = fabricated or fails closed with no real implementation.</text>
+
+  <!-- External client -->
+  <rect x="30" y="70" width="150" height="50" rx="6" fill="#eef1f5" stroke="#888" class="box"/>
+  <text x="105" y="99" class="lbl" text-anchor="middle">External Client</text>
+
+  <!-- Node RPC surface -->
+  <rect x="260" y="60" width="290" height="150" rx="6" fill="#fff" stroke="#333" class="box"/>
+  <text x="405" y="78" class="lbl" text-anchor="middle" font-weight="700">Node RPC surface</text>
+
+  <rect x="275" y="88" width="255" height="30" rx="4" fill="#8f2d2d"/>
+  <text x="402" y="108" class="tag" text-anchor="middle">wallet_* (fabricated — CRITICAL-TX-1)</text>
+
+  <rect x="275" y="124" width="255" height="30" rx="4" fill="#c9982a"/>
+  <text x="402" y="144" class="tag" text-anchor="middle">x3_submitCrossVmTransaction (single-key signer)</text>
+
+  <rect x="275" y="160" width="255" height="30" rx="4" fill="#2f6f4f"/>
+  <text x="402" y="180" class="tag" text-anchor="middle">standard extrinsic submission (real)</text>
+
+  <!-- Runtime / consensus -->
+  <rect x="620" y="60" width="150" height="150" rx="6" fill="#fff" stroke="#333" class="box"/>
+  <text x="695" y="78" class="lbl" text-anchor="middle" font-weight="700">Runtime</text>
+  <rect x="632" y="88" width="126" height="26" rx="4" fill="#2f6f4f"/>
+  <text x="695" y="106" class="tag" text-anchor="middle">Aura + GRANDPA</text>
+  <rect x="632" y="120" width="126" height="26" rx="4" fill="#2f6f4f"/>
+  <text x="695" y="138" class="tag" text-anchor="middle">Supply ledger</text>
+  <rect x="632" y="152" width="126" height="26" rx="4" fill="#8f2d2d"/>
+  <text x="695" y="170" class="tag" text-anchor="middle">report_misbehavior</text>
+
+  <!-- Consensus / validators row -->
+  <rect x="260" y="250" width="290" height="80" rx="6" fill="#fff" stroke="#333" class="box"/>
+  <text x="405" y="268" class="lbl" text-anchor="middle" font-weight="700">Validator set</text>
+  <rect x="275" y="278" width="255" height="26" rx="4" fill="#c9982a"/>
+  <text x="402" y="296" class="tag" text-anchor="middle">Root-controlled (no staking) — HIGH-CN-2</text>
+
+  <!-- Bridge layer -->
+  <rect x="260" y="360" width="510" height="150" rx="6" fill="#fff" stroke="#333" class="box"/>
+  <text x="515" y="378" class="lbl" text-anchor="middle" font-weight="700">External bridge surface (EVM / SVM / BTC)</text>
+  <rect x="275" y="388" width="480" height="26" rx="4" fill="#2f6f4f"/>
+  <text x="515" y="406" class="tag" text-anchor="middle">ExternalBridgesEnabled = false at genesis — verified enforced kill switch</text>
+  <rect x="275" y="420" width="230" height="30" rx="4" fill="#2f6f4f"/>
+  <text x="390" y="440" class="tag" text-anchor="middle">EVM receipt Merkle proof (real)</text>
+  <rect x="515" y="420" width="240" height="30" rx="4" fill="#c9982a"/>
+  <text x="635" y="440" class="tag" text-anchor="middle">Root registration: privileged, weak proof check</text>
+  <rect x="275" y="456" width="480" height="26" rx="4" fill="#c9982a"/>
+  <text x="515" y="474" class="tag" text-anchor="middle">Wrapped-asset mint: single-key council threshold=1 — HIGH-TX-2</text>
+
+  <!-- Secrets -->
+  <rect x="30" y="360" width="200" height="90" rx="6" fill="#fff" stroke="#8f2d2d" stroke-width="2"/>
+  <text x="130" y="380" class="lbl" text-anchor="middle" font-weight="700">Git history</text>
+  <text x="130" y="404" class="sub" text-anchor="middle">Validator seeds +</text>
+  <text x="130" y="418" class="sub" text-anchor="middle">Sepolia key still</text>
+  <text x="130" y="432" class="sub" text-anchor="middle">recoverable</text>
+  <rect x="45" y="440" width="170" height="18" fill="#8f2d2d"/>
+  <text x="130" y="453" class="tag" text-anchor="middle" font-size="9.5">CRITICAL-CK-1</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M180,95 L260,95"/>
+  <path class="arrow" d="M550,110 L620,110"/>
+  <path class="arrow" d="M405,210 L405,250"/>
+  <path class="arrow" d="M515,330 L515,360"/>
+  <path class="arrow" d="M230,410 L260,410" stroke-dasharray="4,3"/>
+
+  <text x="20" y="540" class="sub">Legend: solid arrow = normal call path. Dashed = adjacent risk relationship (secret history feeds validator identity), not a runtime call.</text>
+</svg>

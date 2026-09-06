@@ -25,6 +25,8 @@ npm run dev
 
 The development server uses port `1450`. The Vite base path is `/transparency/`.
 
+The GitHub Pages workflow sets `VITE_BASE_PATH=/xxxstar/transparency/` and publishes the site at `/xxxstar/transparency/`.
+
 To regenerate evidence when the readiness pointer or funding ledger changes, run this beside the site server or as a deployment worker:
 
 ```bash
