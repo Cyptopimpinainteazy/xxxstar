@@ -48,7 +48,7 @@ fn slash_reduces_stake_by_fraction() {
         register(validator, initial_stake);
 
         assert_ok!(Consensus::report_misbehavior(
-            RuntimeOrigin::signed(42),
+            RuntimeOrigin::root(),
             validator,
             SlashReason::DoubleSign,
         ));
@@ -90,7 +90,7 @@ fn slash_floors_at_min_stake() {
         register(validator, 1_050_000);
 
         assert_ok!(Consensus::report_misbehavior(
-            RuntimeOrigin::signed(99),
+            RuntimeOrigin::root(),
             validator,
             SlashReason::MissingBlocks,
         ));
@@ -134,7 +134,7 @@ fn slash_marks_validator_inactive_at_min_stake() {
         register(validator, 1_100_000);
 
         assert_ok!(Consensus::report_misbehavior(
-            RuntimeOrigin::signed(7),
+            RuntimeOrigin::root(),
             validator,
             SlashReason::Equivocation,
         ));
@@ -160,7 +160,7 @@ fn slash_on_nonexistent_validator_returns_error() {
 
         assert_noop!(
             Consensus::report_misbehavior(
-                RuntimeOrigin::signed(1),
+                RuntimeOrigin::root(),
                 ghost,
                 SlashReason::InvalidFinality,
             ),
@@ -169,6 +169,36 @@ fn slash_on_nonexistent_validator_returns_error() {
 
         // Nothing should have been written.
         assert!(ValidatorStake::<Test>::get(ghost).is_none());
+    });
+}
+
+/// CRITICAL-CN-1 regression test: `report_misbehavior` must reject any
+/// non-root signed origin with `BadOrigin`, and must not mutate stake.
+/// Previously this call accepted `ensure_signed` from any account with no
+/// evidence requirement, letting any signed account costlessly slash any
+/// validator.
+#[test]
+fn report_misbehavior_rejects_non_root_origin() {
+    new_test_ext().execute_with(|| {
+        let validator: u64 = 5;
+        let initial_stake: u128 = 10_000_000;
+        register(validator, initial_stake);
+
+        assert_noop!(
+            Consensus::report_misbehavior(
+                RuntimeOrigin::signed(999),
+                validator,
+                SlashReason::DoubleSign,
+            ),
+            sp_runtime::DispatchError::BadOrigin,
+        );
+
+        // Confirm the bare, unauthenticated call did not touch stake.
+        let info = ValidatorStake::<Test>::get(validator).expect("validator must still exist");
+        assert_eq!(
+            info.stake, initial_stake,
+            "an unauthenticated report must not slash the validator"
+        );
     });
 }
 

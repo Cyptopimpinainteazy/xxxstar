@@ -307,6 +307,7 @@ pub fn create_full<P>(
     gadget: Option<Arc<FlashFinalityGadget>>,
     limiter: Arc<RateLimiter>,
     _subscription_executor: sc_rpc::SubscriptionTaskExecutor,
+    enable_demo_wallet_rpc: bool,
 ) -> Result<RpcModule<()>, RpcError>
 where
     P: TransactionPool<Block = Block> + Sync + Send + 'static,
@@ -458,6 +459,15 @@ where
         },
     )?;
 
+    // Demo wallet RPC (wallet_*): every method in this service is a fabricated,
+    // non-cryptographic placeholder (fake balances, a substring "signature",
+    // a hardcoded default mnemonic when none is supplied — see CRITICAL-TX-1
+    // in audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/).
+    // It is retained only as a disabled-by-default demo surface for local UI
+    // development against `--dev`/explicitly-opted-in chains, per this repo's
+    // AGENTS.md rule against reachable fake stubs in production paths. It MUST
+    // NOT be reachable on any non-dev chain spec.
+    if enable_demo_wallet_rpc {
     // Initialize Wallet Service RPC
     let wallet_service = Arc::new(WalletServiceRpc::<Block, FullClient>::new(client.clone()));
 
@@ -651,6 +661,7 @@ where
                 .map_err(|e| custom_error(format!("wallet_getNetworks failed: {e}")))
         }
     })?;
+    } // enable_demo_wallet_rpc
 
     // Register signing RPC methods
     module.register_method(
