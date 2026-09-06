@@ -175,8 +175,8 @@ testnet = []
 # DePIN marketplace, private execution).
 # Use `--features mainnet-rc1` to build the RC1 runtime WASM.
 mainnet-rc1 = []
-# Enable post-quantum crypto primitives on native (non-WASM) builds.
-# quantum-crypto depends on thiserror/anyhow/rand which require std; never enable in WASM.
+# Reserved for an audited PQC backend. The runtime fails closed while the
+# in-tree research implementation remains in use.
 pq = ["quantum-crypto"]
 std = [
 	"codec/std",

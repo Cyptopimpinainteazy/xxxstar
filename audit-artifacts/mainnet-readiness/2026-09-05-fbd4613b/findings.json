@@ -6,6 +6,23 @@
   "methodology": "Static inspection with exact file:line citation, plus scoped live command execution (cargo test/check/audit, forge test). No destructive commands, no network deployment, no secret values printed. Findings independently re-derived from source; repository's own prior audit docs treated as unverified claims per its own AGENTS.md rule.",
   "findings": [
     {
+      "id": "CRIT-03",
+      "severity": "Critical",
+      "subsystem": "Transaction Lifecycle / RPC",
+      "title": "The node's built-in wallet RPC service is fabricated and unconditionally live",
+      "file": "crates/x3-rpc/src/wallet_service_rpc.rs; node/src/rpc.rs:462-650",
+      "line": 462,
+      "evidence_quality": "Confirmed by static inspection",
+      "evidence": "`wallet_createWallet`, `wallet_importWallet`, `wallet_signTransaction`, `wallet_getBalance`, and `wallet_backupWallet` are registered via `module.register_method(...)` directly on the live RpcModule returned by the node's real `create_full` builder (node/src/rpc.rs:462, `WalletServiceRpc::<Block, FullClient>::new(client.clone())`, with 9 `register_method` calls following it) — not a dev-only or feature-gated path. `crates/x3-rpc/src/wallet_service_rpc.rs:329` hardcodes the well-known public Hardhat/Ganache-style default test mnemonic (\"test test test test test test test test test test test test\") as a fallback when none is supplied. Lines 394 and 404 hardcode fake USD balance values (\"3750.00\", \"8304.50\") returned by `wallet_getBalance` regardless of any real chain state.",
+      "failure_scenario": "Any RPC client calling `wallet_createWallet` without supplying its own mnemonic receives a publicly-known, already-compromised seed phrase and a non-cryptographic pseudo-address; any client trusting `wallet_getBalance` sees fixed fake balances with no relationship to real account state; any client trusting `wallet_signTransaction`'s output as a genuine signature will have it rejected on-chain, or worse, build automation around a fabricated 'success' response.",
+      "blast_radius": "Every full node exposes this RPC surface unconditionally — there is no `--chain` guard or dev-only feature flag found gating it.",
+      "operational_impact": "This is exactly the 'hard-coded success responses / fabricated metrics' pattern this audit was tasked to hunt for, sitting in a live, unconditionally-registered RPC method on every node, not a test fixture.",
+      "recommendation": "Remove the wallet_* custodial RPC methods from the node's production RPC surface entirely, or gate them behind an explicit opt-in flag (e.g. `--enable-demo-wallet-rpc`) that hard-refuses to start against any non-dev chain spec.",
+      "verification_needed": "Integration test asserting `wallet_*` methods return 'Method not found' when the node is started with `--chain testnet` or `--chain mainnet-rc1`.",
+      "blocks": ["public_testnet", "mainnet"],
+      "status": "OPEN"
+    },
+    {
       "id": "CRIT-01",
       "severity": "Critical",
       "subsystem": "Cryptography / Key Management",

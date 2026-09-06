@@ -1,0 +1,69 @@
+{
+  "manifest_version": 1,
+  "repository": "X3 Atomic Star (xxxstar-main)",
+  "audited_commit": "fbd4613bd8769ac7422278fae441af1b302a1c88",
+  "audited_branch": "master",
+  "audit_date": "2026-09-06",
+  "generated_by": "Claude (Anthropic), AI-assisted independent read-only audit",
+  "note": "This directory is an independent, from-scratch audit produced in this session. It does not overwrite or depend on the other audit directories already present under audit-artifacts/mainnet-readiness/ (e.g. 2026-09-05-6a24d8cf-audit, 2026-09-05-fbd4613b, fbd4613b, live), which are separate prior artifacts.",
+  "files": [
+    {
+      "path": "X3-ROAD-TO-MAINNET.pdf",
+      "purpose": "Fully rendered final deliverable PDF (the booklet)",
+      "sha256": "6074dcfd167a01d675e77c479ad3a154db6148df9c6effc0bf8f797b7571a5c1"
+    },
+    {
+      "path": "source/report.typ",
+      "purpose": "Maintainable Typst source for the PDF; regenerate with `typst compile --root . source/report.typ X3-ROAD-TO-MAINNET.pdf`",
+      "sha256": "b431070a8ff3059464798f2f4d25700a69b840ba3ae59826758411e9023fbc51"
+    },
+    {
+      "path": "findings.json",
+      "purpose": "Machine-readable findings register: 19 findings with severity, file:line evidence, failure scenarios, fixes, and verification-commands-run log",
+      "sha256": "70edcb718b9c377a75fa8d8237f69bfa31b777fea25e2427d16a19f553f3f03e"
+    },
+    {
+      "path": "feature-matrix.csv",
+      "purpose": "Feature-completeness matrix, 48 rows, one per audited feature, with status/completion%/evidence/missing-work columns",
+      "sha256": "c44c24a940342b89bb0d1f282241b5ce474642f8d2cca269cd93b51ecc210e13"
+    },
+    {
+      "path": "EXECUTIVE_SUMMARY.md",
+      "purpose": "Standalone one-page-equivalent executive summary suitable for grant/sponsor applications",
+      "sha256": "5c4b8cb619d66ee512a8620cdb4e1ef9ddf2c424b47f0b05b21c6e5f52a2aeb2"
+    },
+    {
+      "path": "diagrams/trust-boundary.svg",
+      "purpose": "Trust-boundary diagram referenced as Figure 1 in the PDF",
+      "sha256": "8130d2ac0473ef22ff67821d90310ca197399bb38b89ad9b300bf5a755094e9b"
+    },
+    {
+      "path": "diagrams/subsystem-readiness.svg",
+      "purpose": "Subsystem readiness bar chart referenced as Figure 2 in the PDF",
+      "sha256": "878baf78fbf7b4c5dbc04d00fc7a9cb7ade095e642b35e9a948d12447f117c8d"
+    },
+    {
+      "path": "diagrams/severity-distribution.svg",
+      "purpose": "Findings-by-severity bar chart referenced as Figure 3 in the PDF",
+      "sha256": "6c17ada6cdd651a294ce72f2926ea110d4bedbe61838ba86a4f9a8c9cbfe71fb"
+    },
+    {
+      "path": "README.md",
+      "purpose": "Regeneration instructions and directory guide",
+      "sha256": "3c2c301e55b262128960353c306b1847a87c60a5f9bd0f80b38b30b74f943212"
+    }
+  ],
+  "verification_note": "Run `sha256sum -c checksums.txt` in this directory to verify all files against the checksums recorded at generation time.",
+  "pdf_page_count": 18,
+  "findings_summary": {
+    "critical": 4,
+    "high": 5,
+    "medium": 6,
+    "low": 3,
+    "informational": 1,
+    "total": 19
+  },
+  "overall_readiness_score": 63,
+  "public_testnet_verdict": "CONDITIONAL NO-GO",
+  "mainnet_verdict": "NO-GO"
+}

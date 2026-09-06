@@ -118,17 +118,19 @@
     above: 0.8em,
     below: 0.8em,
   )[
-    #grid(columns: (auto, auto, 1fr), gutter: 6pt, align: horizon)[
-      #severity-badge(f.severity)
-    ][
-      #text(font: mono-font, size: 8.4pt, fill: c-muted)[#f.id]
-    ][
-      #align(right)[#status-badge(f.status)]
+    #block(breakable: false)[
+      #grid(columns: (auto, auto, 1fr), gutter: 6pt, align: horizon)[
+        #severity-badge(f.severity)
+      ][
+        #text(font: mono-font, size: 8.4pt, fill: c-muted)[#f.id]
+      ][
+        #align(right)[#status-badge(f.status)]
+      ]
+      #v(0.35em)
+      #text(font: title-font, size: 11.5pt, weight: "bold")[#f.title]
+      #v(0.15em)
+      #text(font: title-font, size: 8pt, fill: c-brand, tracking: 0.03em)[#upper(f.subsystem)]
     ]
-    #v(0.35em)
-    #text(font: title-font, size: 11.5pt, weight: "bold")[#f.title]
-    #v(0.15em)
-    #text(font: title-font, size: 8pt, fill: c-brand, tracking: 0.03em)[#upper(f.subsystem)]
     #v(0.4em)
     #if "file" in f and f.file != none [
       #text(font: mono-font, size: 8.6pt, fill: c-muted)[

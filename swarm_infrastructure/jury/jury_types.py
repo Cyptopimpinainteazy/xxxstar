@@ -261,9 +261,9 @@ class JurySizer:
         """
         # Check size constraints
         if len(members) < sizing.min_size:
-            return False, f"Jury too small: {len(members)} < {sizing.min_size}}"
+            return False, f"Jury too small: {len(members)} < {sizing.min_size}"
         if len(members) > sizing.max_size:
-            return False, f"Jury too large: {len(members)} > {sizing.max_size}}"
+            return False, f"Jury too large: {len(members)} > {sizing.max_size}"
         
         # Check required sections present
         member_sections = {m.section for m in members}

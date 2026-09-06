@@ -65,6 +65,16 @@ impl SolverModel {
         ((self.success_count * 100) / total) as u32
     }
 
+    /// Compute failure rate as failure / (success + failure).
+    /// Returns `None` for a solver with no recorded activity.
+    pub fn failure_rate_pct(&self) -> Option<f64> {
+        let total = self.success_count + self.failure_count;
+        if total == 0 {
+            return None;
+        }
+        Some((self.failure_count as f64) * 100.0 / (total as f64))
+    }
+
     /// Record a successful fill.
     pub fn record_success(&mut self) {
         self.success_count += 1;
@@ -126,6 +136,16 @@ impl RelayerModel {
     /// Record a slash event.
     pub fn record_slash(&mut self) {
         self.slash_count += 1;
+    }
+
+    /// Compute uptime as success_rate = success / (success + failure).
+    /// Returns `None` for a relayer with no recorded activity.
+    pub fn uptime_pct(&self) -> Option<f64> {
+        let total = self.success_count + self.failure_count;
+        if total == 0 {
+            return None;
+        }
+        Some((self.success_count as f64) * 100.0 / (total as f64))
     }
 }
 

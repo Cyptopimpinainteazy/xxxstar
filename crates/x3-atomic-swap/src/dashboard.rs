@@ -281,10 +281,16 @@ impl AtomicCommandCenter {
     /// # Parameters
     /// - `intents` - all tracked atomic swap intents
     /// - `ledger` - the proof ledger (shared across all intents)
+    /// - `solver_registry` - the solver registry (for failure-rate aggregation)
+    /// - `relayer_registry` - the relayer registry (for uptime aggregation)
+    /// - `insurance_fund_usd` - current on-chain insurance pool balance, if available
     /// - `now` - current unix timestamp
     pub fn build(
         intents: &[AtomicIntent],
         ledger: &ProofLedger,
+        solver_registry: &SolverRegistry,
+        relayer_registry: &RelayerRegistry,
+        insurance_fund_usd: Option<u128>,
         now: u64,
     ) -> SwapDashboardSnapshot {
         let mut active_swaps: u64 = 0;
@@ -445,10 +451,35 @@ impl AtomicCommandCenter {
             failed_swaps,
             average_fill_time_secs: ledger.compute_average_fill_time_secs(),
             total_volume_notional: total_volume,
-            // Derive relayer uptime from the registry (or leave unavailable).
-            relayer_uptime_pct: None, // TODO: populate from relayer-registry heartbeat data
-            solver_failure_rate_pct: None, // TODO: aggregate from solver-registry history
-            insurance_fund_usd: None, // TODO: wire to on-chain insurance pool balance
+            // Aggregate relayer uptime: average of uptime_pct() over active relayers.
+            relayer_uptime_pct: {
+                let uptimes: Vec<f64> = relayer_registry
+                    .get_active()
+                    .iter()
+                    .filter_map(|r| r.uptime_pct())
+                    .collect();
+                if uptimes.is_empty() {
+                    None
+                } else {
+                    let sum: f64 = uptimes.iter().sum();
+                    Some(sum / (uptimes.len() as f64))
+                }
+            },
+            // Aggregate solver failure rate: average of failure_rate_pct() over active solvers.
+            solver_failure_rate_pct: {
+                let rates: Vec<f64> = solver_registry
+                    .get_active()
+                    .iter()
+                    .filter_map(|s| s.failure_rate_pct())
+                    .collect();
+                if rates.is_empty() {
+                    None
+                } else {
+                    let sum: f64 = rates.iter().sum();
+                    Some(sum / (rates.len() as f64))
+                }
+            },
+            insurance_fund_usd,
             alerts,
             details,
         }
@@ -678,7 +709,16 @@ mod tests {
         let ledger = ProofLedger::new();
         let now = 1000;
 
-        let snapshot = AtomicCommandCenter::build(&intents, &ledger, now);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            now,
+        );
         assert_eq!(snapshot.active_swaps, 2);
         assert_eq!(snapshot.completed_swaps, 0);
         assert_eq!(snapshot.details.len(), 2);
@@ -696,7 +736,16 @@ mod tests {
         intents[2].status = AtomicSwapStatus::Failed;
 
         let ledger = ProofLedger::new();
-        let snapshot = AtomicCommandCenter::build(&intents, &ledger, 1000);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            1000,
+        );
 
         assert_eq!(snapshot.active_swaps, 1);
         assert_eq!(snapshot.completed_swaps, 1);
@@ -843,12 +892,30 @@ mod tests {
         let now = 5000u64;
         let intents = vec![make_intent(1)]; // source_timeout = 6000
         let ledger = ProofLedger::new();
-        let snapshot = AtomicCommandCenter::build(&intents, &ledger, now);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            now,
+        );
         assert_eq!(snapshot.details[0].timeout_countdown_secs, 1000); // 6000 - 5000
 
         // After timeout
         let later = 7000u64;
-        let snapshot2 = AtomicCommandCenter::build(&intents, &ledger, later);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot2 = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            later,
+        );
         assert_eq!(snapshot2.details[0].timeout_countdown_secs, -1000); // 6000 - 7000 = -1000
     }
 
@@ -856,7 +923,16 @@ mod tests {
     fn test_dashboard_summary_formatting() {
         let intents = vec![make_intent(1)];
         let ledger = ProofLedger::new();
-        let snapshot = AtomicCommandCenter::build(&intents, &ledger, 1000);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            1000,
+        );
         let summary = snapshot.dashboard_summary();
         assert!(summary.contains("X3 Atomic Command Center"));
         assert!(summary.contains("Active swaps: 1"));
@@ -913,7 +989,16 @@ mod tests {
         }
 
         let intents = vec![intent1, intent2];
-        let snapshot = AtomicCommandCenter::build(&intents, &ledger, 1000);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            1000,
+        );
 
         assert_eq!(snapshot.details.len(), 2);
 
@@ -958,7 +1043,16 @@ mod tests {
         // claim the number is in USD when pricing isn't injected.
         let intents = vec![make_intent(1), make_intent(2)]; // 1000 each
         let ledger = ProofLedger::new();
-        let snapshot = AtomicCommandCenter::build(&intents, &ledger, 1000);
+        let solver_registry = SolverRegistry::new();
+        let relayer_registry = RelayerRegistry::new();
+        let snapshot = AtomicCommandCenter::build(
+            &intents,
+            &ledger,
+            &solver_registry,
+            &relayer_registry,
+            None,
+            1000,
+        );
         // Two intents, 1000 each → 2000 notional
         assert_eq!(snapshot.total_volume_notional, 2000);
         let summary = snapshot.dashboard_summary();
