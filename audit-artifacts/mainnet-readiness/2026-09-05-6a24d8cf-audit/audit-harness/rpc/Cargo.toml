@@ -1,0 +1,7 @@
+[package]
+name = "x3-audit-rpc-harness"
+version = "0.1.0"
+edition = "2021"
+[workspace]
+[dependencies]
+serde = { version = "1", features = ["derive"] }

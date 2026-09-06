@@ -1,0 +1,738 @@
+{
+  "planning_assumptions": "No team size or time budget supplied. Complexity is ordinal. Review horizons are not promises.",
+  "phases": [
+    [
+      "0",
+      "Stop-the-line security and integrity",
+      "C01,C02,C03,H01,H03,H04,H06",
+      "Contain unsigned/structural trust paths and validate their replacements."
+    ],
+    [
+      "1",
+      "Restore core build and proof controls",
+      "H18,H13,H14,H15",
+      "Produce a clean build and gates that cannot hide failed evidence."
+    ],
+    [
+      "2",
+      "Complete runtime integration",
+      "H02,H05,H07,H08,H09,H10,H11,H12,H17,M05",
+      "Wire persistent execution and authenticated submission; no path-existence credit."
+    ],
+    [
+      "3",
+      "Public testnet prerequisites",
+      "M02,L01",
+      "Require isolated multi-node finality/recovery and reproducible operator setup."
+    ],
+    [
+      "4",
+      "Adversarial stabilization",
+      "All safety finding retests",
+      "Run partitions, malformed proofs, replay, rollback and unauthorized-origin tests."
+    ],
+    [
+      "5",
+      "Mainnet hardening",
+      "H16,M03,M04,M06",
+      "Bound resources; prove event delivery, key lifecycle and restore/upgrade."
+    ],
+    [
+      "6",
+      "Performance optimization",
+      "M07",
+      "Measure genuine finalized workloads before optimization."
+    ],
+    [
+      "7",
+      "Independent review and approval",
+      "M01 + complete gate register",
+      "Retest closure independently and approve exact release/spec hashes."
+    ]
+  ],
+  "items": [
+    {
+      "id": "FIX-C01",
+      "priority": "P0",
+      "description": "External header validation accepts unproved claims",
+      "reason": "A signed user can poison LastEvmHeader/LastSvmHeader, including with a far-future height, defeating the authenticity assumption and blocking later legitimate headers. Fund-release exploitation also depends on settlement-state and secret/leg checks; no live theft was attempted.",
+      "files": [
+        "pallets/cross-chain-validator/src/lib.rs:181",
+        "pallets/cross-chain-validator/src/lib.rs:332",
+        "pallets/cross-chain-validator/src/lib.rs:279",
+        "runtime/src/lib.rs:2412",
+        "runtime/src/lib.rs:980"
+      ],
+      "dependencies": [],
+      "approach": "Use authenticated chain-specific finalized-header clients with trusted validator/checkpoint transitions, verified signatures, bounded proofs, and authenticated parent links. Reject unsupported chains.",
+      "required_tests": "Arbitrary hashes, duplicate signers, self-selected validator sets, future heights and invalid membership proofs are rejected without writes; canonical external fixtures pass.",
+      "acceptance": "Arbitrary hashes, duplicate signers, self-selected validator sets, future heights and invalid membership proofs are rejected without writes; canonical external fixtures pass.",
+      "verification_command": "cargo test -p pallet-cross-chain-validator --features std",
+      "evidence_artifact": "closure/C01/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Critical",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-C02",
+      "priority": "P0",
+      "description": "Unsigned finality anchors make certificate checks circular",
+      "reason": "An untrusted transaction can front-run the genuine anchor and permanently poison a block reference. Matching a caller-created anchor cannot prove consensus finality.",
+      "files": [
+        "pallets/x3-atomic-kernel/src/lib.rs:884",
+        "pallets/x3-atomic-kernel/src/lib.rs:1118",
+        "pallets/x3-atomic-kernel/src/lib.rs:1416"
+      ],
+      "dependencies": [],
+      "approach": "Validate an actual GRANDPA justification or authenticated authority certificate bound to block hash, number, set ID and chain ID; remove arbitrary unsigned anchor admission.",
+      "required_tests": "Forged and conflicting anchors cannot enter pool or dispatch; independently verified justification anchors the exact finalized block; late legitimate anchors remain recoverable.",
+      "acceptance": "Forged and conflicting anchors cannot enter pool or dispatch; independently verified justification anchors the exact finalized block; late legitimate anchors remain recoverable.",
+      "verification_command": "cargo test -p pallet-x3-atomic-kernel --features std",
+      "evidence_artifact": "closure/C02/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Critical",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-C03",
+      "priority": "P0",
+      "description": "Unsigned rollback receipts trust attacker-selected prior state",
+      "reason": "An attacker can race an executing bundle to install a rollback diff; a later authorized rollback applies attacker-selected VM state. Actual contract impact depends on storage namespace correctness; state provenance is absent even where namespaces are wrong.",
+      "files": [
+        "pallets/x3-atomic-kernel/src/lib.rs:1030",
+        "pallets/x3-atomic-kernel/src/lib.rs:1150",
+        "pallets/x3-atomic-kernel/src/lib.rs:1289",
+        "pallets/x3-atomic-kernel/src/vm_revert.rs:342",
+        "runtime/src/lib.rs:2675"
+      ],
+      "dependencies": [
+        "FIX-C02"
+      ],
+      "approach": "Generate diffs inside transactional execution, bind them to executor/leg/pre-state/access set, and validate both old and current values. Roll back in reverse dependency order with complete failure propagation.",
+      "required_tests": "Unrelated caller/diff and stale pre-state are rejected; injected rollback failure leaves no partial state; reverse-order replay restores exact pre-root.",
+      "acceptance": "Unrelated caller/diff and stale pre-state are rejected; injected rollback failure leaves no partial state; reverse-order replay restores exact pre-root.",
+      "verification_command": "cargo test -p pallet-x3-atomic-kernel --features std",
+      "evidence_artifact": "closure/C03/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Critical",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H01",
+      "priority": "P0",
+      "description": "Production proof-router alternatives accept arbitrary bytes",
+      "reason": "Configured routes rely on privileged submitter honesty rather than independently verified deposits. Enabling permissionless relayers before replacement would expose the acceptance flaw directly.",
+      "files": [
+        "crates/x3-verification-router/src/lib.rs:323",
+        "crates/x3-verification-router/src/lib.rs:355",
+        "crates/x3-verification-router/src/lib.rs:276",
+        "pallets/x3-crosschain-gateway/src/lib.rs:1162",
+        "runtime/src/lib.rs:2479"
+      ],
+      "dependencies": [
+        "FIX-C01"
+      ],
+      "approach": "Remove structural verifiers from production and implement signature membership, unique quorum, chain binding and event inclusion; retain governance admission only as defense in depth.",
+      "required_tests": "All three isolated rejection tests pass; actual signed finalized fixtures pass through the runtime gateway, not only the helper.",
+      "acceptance": "All three isolated rejection tests pass; actual signed finalized fixtures pass through the runtime gateway, not only the helper.",
+      "verification_command": "cargo test --manifest-path audit-harness/proof/Cargo.toml",
+      "evidence_artifact": "closure/H01/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H02",
+      "priority": "P0",
+      "description": "EVM receipt verifier lacks trusted roots and misbinds inclusion",
+      "reason": "Real Ethereum proofs can be rejected, and asserted roots/heights cannot establish canonical settlement even if trie parsing succeeds. This is not a working Ethereum light client.",
+      "files": [
+        "crates/x3-verification-router/src/evm_receipt.rs:737",
+        "crates/x3-verification-router/src/evm_receipt.rs:593",
+        "crates/x3-verification-router/src/evm_receipt.rs:335"
+      ],
+      "dependencies": [
+        "FIX-C01"
+      ],
+      "approach": "Use canonical typed receipts and RLP(index), verify the exact receipt value under an authenticated receiptsRoot, bind gateway/event/amount/sender/recipient/chain, and verify finality separately.",
+      "required_tests": "Cross-check independent execution-client proof vectors, tampered receipt values and false heads; require both authentic root and exact inclusion.",
+      "acceptance": "Cross-check independent execution-client proof vectors, tampered receipt values and false heads; require both authentic root and exact inclusion.",
+      "verification_command": "cargo test -p x3-verification-router --features production",
+      "evidence_artifact": "closure/H02/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H03",
+      "priority": "P0",
+      "description": "Bitcoin verification uses asserted confirmations and incomplete vault approval",
+      "reason": "The route lacks authentic Bitcoin chain depth and output/amount/recipient binding. Repeated vault method calls can progress approval without threshold signatures if that library path is used. Direct on-chain reachability of the vault state machine was not established.",
+      "files": [
+        "crates/x3-verification-router/src/lib.rs:557",
+        "crates/x3-verification-router/src/lib.rs:617",
+        "crates/x3-bitcoin-vault/src/lib.rs:324",
+        "crates/x3-bitcoin-vault/src/lib.rs:450"
+      ],
+      "dependencies": [
+        "FIX-H01"
+      ],
+      "approach": "Implement persistent best-work header validation with checkpoints/difficulty rules and transaction output proofs; verify distinct authorized signatures over exact deposit/withdrawal payloads.",
+      "required_tests": "Reject invented tips, wrong outputs, wrong recipient/value, repeated approvals and forged signatures; restart and reorg tests preserve accounting.",
+      "acceptance": "Reject invented tips, wrong outputs, wrong recipient/value, repeated approvals and forged signatures; restart and reorg tests preserve accounting.",
+      "verification_command": "cargo test -p x3-bitcoin-vault && cargo test -p x3-verification-router --features production",
+      "evidence_artifact": "closure/H03/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H04",
+      "priority": "P0",
+      "description": "Public misbehavior report has no evidence and does not slash currency",
+      "reason": "A signed caller can repeatedly reduce validator metadata; operators can mistake metadata changes for bonded-asset penalties and removal. This is not proof of theft from Balances.",
+      "files": [
+        "pallets/x3-consensus/src/lib.rs:263",
+        "pallets/x3-consensus/src/lib.rs:381",
+        "pallets/x3-consensus/src/tests/slashing.rs:31",
+        "runtime/src/lib.rs:1063"
+      ],
+      "dependencies": [],
+      "approach": "Route offenses through validated equivocation/unavailability evidence with unique offence IDs; reserve real stake, slash it atomically and coordinate session removal.",
+      "required_tests": "Invalid/replayed evidence cannot slash; total reserved balances and treasury/burn conservation reconcile after each valid offence; removed keys cannot author/vote.",
+      "acceptance": "Invalid/replayed evidence cannot slash; total reserved balances and treasury/burn conservation reconcile after each valid offence; removed keys cannot author/vote.",
+      "verification_command": "cargo test -p pallet-x3-consensus --features std",
+      "evidence_artifact": "closure/H04/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H05",
+      "priority": "P0",
+      "description": "Validator rotation ignores requested activation delay at session boundary",
+      "reason": "A governance change scheduled beyond the next session can enter the session pipeline prematurely, and local validator metadata can diverge from session authorities.",
+      "files": [
+        "pallets/x3-consensus/src/lib.rs:229",
+        "pallets/x3-consensus/src/lib.rs:412",
+        "runtime/src/lib.rs:1042"
+      ],
+      "dependencies": [
+        "FIX-H04"
+      ],
+      "approach": "Use one activation state machine for queued keys, session selection and metadata. Reject empty/duplicate/unkeyed sets and enforce the same scheduled boundary.",
+      "required_tests": "A change delayed over several sessions is not activated early; restart and session transition preserve identical authority sets on all nodes.",
+      "acceptance": "A change delayed over several sessions is not activated early; restart and session transition preserve identical authority sets on all nodes.",
+      "verification_command": "cargo test -p pallet-x3-consensus --features std",
+      "evidence_artifact": "closure/H05/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H06",
+      "priority": "P0",
+      "description": "Flash-finality opt-in disables GRANDPA without a proven replacement",
+      "reason": "Opt-in can stall finality; self-created keys can contribute votes in the gadget. Default GRANDPA path is separate and is not alleged broken by this finding.",
+      "files": [
+        "node/src/service.rs:656",
+        "node/src/service.rs:962",
+        "node/src/service.rs:1937",
+        "crates/flash-finality/src/lib.rs:389"
+      ],
+      "dependencies": [],
+      "approach": "Keep GRANDPA mandatory until a separately audited finality engine proves authority membership, safety and liveness; reject incompatible flags or missing keys at startup.",
+      "required_tests": "Wrong keys/sets cannot form certificates; missing keys fail startup; partition, equivocation and recovery tests establish one finalized history.",
+      "acceptance": "Wrong keys/sets cannot form certificates; missing keys fail startup; partition, equivocation and recovery tests establish one finalized history.",
+      "verification_command": "cargo test -p x3-chain-node --lib",
+      "evidence_artifact": "closure/H06/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H07",
+      "priority": "P0",
+      "description": "Default mini-EVM executes against disposable synthetic state",
+      "reason": "Successful opcode execution does not demonstrate persistent EVM contracts, authenticated caller semantics or real gas payment. Internal representation transfers must not be marketed as full EVM interoperability.",
+      "files": [
+        "crates/evm-integration/src/mini_evm.rs:102",
+        "crates/evm-integration/src/mini_evm.rs:148",
+        "pallets/x3-kernel/src/wasm_adapters.rs:34",
+        "runtime/src/lib.rs:1564"
+      ],
+      "dependencies": [
+        "FIX-C03"
+      ],
+      "approach": "Connect actual runtime state, caller/value, logs, state commitment and gas charging through a transactional interpreter; run canonical EVM conformance tests.",
+      "required_tests": "A contract SSTORE persists across blocks/restart, a second user cannot impersonate the first, out-of-gas fully reverts and fees reconcile.",
+      "acceptance": "A contract SSTORE persists across blocks/restart, a second user cannot impersonate the first, out-of-gas fully reverts and fees reconcile.",
+      "verification_command": "cargo test -p x3-chain-runtime --features frontier",
+      "evidence_artifact": "closure/H07/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H08",
+      "priority": "P0",
+      "description": "Ethereum submission RPC bypasses the transaction-pool lifecycle",
+      "reason": "When frontier is enabled, the method cannot establish signed admission, durable inclusion or finality by returning a hash from a runtime query. The API cannot be treated as Ethereum-compatible submission.",
+      "files": [
+        "node/src/rpc_frontier.rs:457",
+        "runtime/src/lib.rs:3425",
+        "node/src/rpc.rs:341"
+      ],
+      "dependencies": [
+        "FIX-H07"
+      ],
+      "approach": "Decode and verify canonical signed transactions and submit an appropriate runtime extrinsic through the pool; report receipts only after inclusion and finality.",
+      "required_tests": "Submit a signed transfer over RPC, observe pool admission, block inclusion, finality and persisted balance change on another node; reject replay/wrong chain ID.",
+      "acceptance": "Submit a signed transfer over RPC, observe pool admission, block inclusion, finality and persisted balance change on another node; reject replay/wrong chain ID.",
+      "verification_command": "cargo test -p x3-chain-node --features frontier --lib",
+      "evidence_artifact": "closure/H08/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H09",
+      "priority": "P0",
+      "description": "Relayer manual extrinsic encoding and signing do not match runtime",
+      "reason": "Proof helpers can produce bytes that cannot be admitted as valid runtime transactions; dependency wiring alone does not make the relayer operational.",
+      "files": [
+        "crates/x3-relayer/src/submitter.rs:437",
+        "crates/x3-relayer/src/submitter.rs:568",
+        "runtime/src/lib.rs:850"
+      ],
+      "dependencies": [
+        "FIX-H01",
+        "FIX-H08"
+      ],
+      "approach": "Use metadata-derived typed calls and the exact signed extensions, chain/genesis versions and custody signer; introduce an explicit governed relayer authorization model.",
+      "required_tests": "Exact production runtime decodes, authenticates, includes and finalizes generated deposit/release transactions; no fallback signer or zero-chain context.",
+      "acceptance": "Exact production runtime decodes, authenticates, includes and finalizes generated deposit/release transactions; no fallback signer or zero-chain context.",
+      "verification_command": "cargo test -p x3-relayer",
+      "evidence_artifact": "closure/H09/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H10",
+      "priority": "P0",
+      "description": "Relayer checkpoints can skip failed events and are not durable",
+      "reason": "A failed earlier event can fall behind a later cursor; restart loses deduplication and causes unbounded rescans. Event observation is not finalized delivery.",
+      "files": [
+        "crates/x3-relayer/src/main.rs:535",
+        "crates/x3-relayer/src/main.rs:795",
+        "crates/x3-relayer/src/main.rs:827"
+      ],
+      "dependencies": [
+        "FIX-H09"
+      ],
+      "approach": "Persist transactional inbox/outbox and per-event delivery state; checkpoint only a contiguous completed finalized range with reorg rollback and idempotent retries.",
+      "required_tests": "Fail submission for an early event, process later events, restart and recover the failed event exactly once; bound RPC scans and memory.",
+      "acceptance": "Fail submission for an early event, process later events, restart and recover the failed event exactly once; bound RPC scans and memory.",
+      "verification_command": "cargo test -p x3-relayer",
+      "evidence_artifact": "closure/H10/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Protocol security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H11",
+      "priority": "P1",
+      "description": "Gateway binary never starts its REST/GraphQL implementation",
+      "reason": "A successfully built gateway can exit without serving any route. Claimed bridge and database integration through gateway dependencies is disconnected.",
+      "files": [
+        "crates/x3-gateway/src/main.rs:1",
+        "crates/x3-gateway/Cargo.toml:12",
+        "crates/x3-gateway/src/rest.rs:85"
+      ],
+      "dependencies": [],
+      "approach": "Implement validated configuration loading, database migrations, cache setup, router binding and graceful shutdown; expose dependency readiness separately from liveness.",
+      "required_tests": "Start the built binary against disposable services, serve actual API/GraphQL data, fail readiness when DB is down, and recover after restart.",
+      "acceptance": "Start the built binary against disposable services, serve actual API/GraphQL data, fail readiness when DB is down, and recover after restart.",
+      "verification_command": "cargo test -p x3-gateway && cargo run -p x3-gateway",
+      "evidence_artifact": "closure/H11/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Backend / SRE",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H12",
+      "priority": "P1",
+      "description": "SDK EVM and SVM encoding contains production placeholders",
+      "reason": "Users can derive the wrong address or send wrong function/account encodings. A working transport does not make this SDK protocol compatible.",
+      "files": [
+        "packages/ts-sdk/src/evm.ts:140",
+        "packages/ts-sdk/src/evm.ts:154",
+        "packages/ts-sdk/src/evm.ts:440",
+        "packages/ts-sdk/src/svm.ts:230"
+      ],
+      "dependencies": [],
+      "approach": "Use canonical Keccak address/selector derivation and canonical Solana message compilation with real account metas and program indices.",
+      "required_tests": "Match independent reference vectors for EVM selectors/addresses and multi-account SVM messages, then finalize one transaction per advertised protocol.",
+      "acceptance": "Match independent reference vectors for EVM selectors/addresses and multi-account SVM messages, then finalize one transaction per advertised protocol.",
+      "verification_command": "npm --prefix packages/ts-sdk test -- --runInBand",
+      "evidence_artifact": "closure/H12/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "SDK engineer",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H13",
+      "priority": "P0",
+      "description": "CI make recipes swallow failures and reference missing targets",
+      "reason": "Required checks can claim success without testing the intended pallet; another gate fails before assessing the node.",
+      "files": [
+        "Makefile:19",
+        "Makefile:29",
+        "Makefile:38",
+        ".github/workflows/production-gate.yml:25"
+      ],
+      "dependencies": [],
+      "approach": "Preserve exit codes, use exact package names and define/reconcile workflow targets; test gates against a deliberately failing test in disposable fixtures.",
+      "required_tests": "Cargo failure produces nonzero make/CI exit; every workflow command resolves; mainnet-required aggregate cannot pass with skipped/missing jobs.",
+      "acceptance": "Cargo failure produces nonzero make/CI exit; every workflow command resolves; mainnet-required aggregate cannot pass with skipped/missing jobs.",
+      "verification_command": "make test-x3-wallet; make -n test-node-build",
+      "evidence_artifact": "closure/H13/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "S",
+      "risk": "High",
+      "owner": "Release engineering",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H14",
+      "priority": "P0",
+      "description": "Release gate accepts stale build artifacts without source binding",
+      "reason": "An old binary or a parseable but wrong genesis can satisfy these subchecks for new source.",
+      "files": [
+        "scripts/mainnet_release_gate.py:84",
+        "scripts/mainnet_release_gate.py:118"
+      ],
+      "dependencies": [
+        "FIX-H13"
+      ],
+      "approach": "Build from a clean locked commit, verify compiler/runtime/features, regenerate genesis, sign a source-bound manifest and reject dirty or stale evidence.",
+      "required_tests": "Mutating source or substituting a binary/spec invalidates evidence and blocks release; two builders reproduce the same WASM.",
+      "acceptance": "Mutating source or substituting a binary/spec invalidates evidence and blocks release; two builders reproduce the same WASM.",
+      "verification_command": "python3 scripts/mainnet_release_gate.py",
+      "evidence_artifact": "closure/H14/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "M",
+      "risk": "High",
+      "owner": "Release engineering",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H15",
+      "priority": "P0",
+      "description": "Dependency audit pass masks unresolved advisory matches",
+      "reason": "A green configured audit is not proof that dependencies are unaffected. Reachability and platform-specific exploitability require per-binary analysis; 53 matches are not 53 confirmed exploitable node vulnerabilities.",
+      "files": [
+        ".cargo/audit.toml:1",
+        "Cargo.lock:1",
+        "evidence/advisories-unfiltered.json"
+      ],
+      "dependencies": [
+        "FIX-H13"
+      ],
+      "approach": "Triage each advisory against shipped binaries/features; upgrade affected paths and narrowly justify time-limited exceptions with technical evidence. Verify fresh official advisory data before release.",
+      "required_tests": "No reachable unmitigated critical/high advisories; exceptions have owners, expiry, exact dependency paths and regression evidence.",
+      "acceptance": "No reachable unmitigated critical/high advisories; exceptions have owners, expiry, exact dependency paths and regression evidence.",
+      "verification_command": "cargo audit --no-fetch --stale --no-yanked --file Cargo.lock --json",
+      "evidence_artifact": "closure/H15/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Security / dependency engineering",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H16",
+      "priority": "P0",
+      "description": "Supply invariant finalization work is unbounded by asset count",
+      "reason": "As asset count grows, mandatory work can exceed block resources and undermine liveness independently of transaction admission limits.",
+      "files": [
+        "pallets/x3-supply-ledger/src/lib.rs:158",
+        "pallets/x3-supply-ledger/src/lib.rs:166"
+      ],
+      "dependencies": [
+        "FIX-C01"
+      ],
+      "approach": "Bound asset cardinality/work or use an incremental authenticated aggregate; benchmark and reserve hook weight with proof size accounting.",
+      "required_tests": "Worst-case asset count fits declared block budget; adversarial asset creation cannot make next-block mandatory work unbounded.",
+      "acceptance": "Worst-case asset count fits declared block budget; adversarial asset creation cannot make next-block mandatory work unbounded.",
+      "verification_command": "cargo test -p pallet-x3-supply-ledger --features std",
+      "evidence_artifact": "closure/H16/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Runtime performance",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H17",
+      "priority": "P0",
+      "description": "EVM external verifier is blocked in production and bypassable by mode",
+      "reason": "Bridge either cannot verify withdrawals or relies on unverified signature slots if the owner enables test mode. Deployment and owner state were not queried.",
+      "files": [
+        "X3-contracts/evm/contracts/EvmReceiptVerifier.sol:205",
+        "X3-contracts/evm/contracts/EvmReceiptVerifier.sol:183",
+        "X3-contracts/evm/contracts/EvmReceiptVerifier.sol:73"
+      ],
+      "dependencies": [
+        "FIX-H01"
+      ],
+      "approach": "Deploy a real supported verifier with domain/set binding and unique quorum; remove bypass from funded deployments and govern rotations with delays.",
+      "required_tests": "Real proof accepted, zero/duplicate/forged signatures rejected; funded deployment cannot enable structural bypass; owner rotation preserves trust policy.",
+      "acceptance": "Real proof accepted, zero/duplicate/forged signatures rejected; funded deployment cannot enable structural bypass; owner rotation preserves trust policy.",
+      "verification_command": "forge test --root X3-contracts/evm",
+      "evidence_artifact": "closure/H17/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "High",
+      "owner": "Smart-contract security",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M01",
+      "priority": "P2",
+      "description": "Readiness documentation contradicts executable evidence",
+      "reason": "Sponsors/operators can infer maturity from scores that do not verify the promised behavior.",
+      "files": [
+        "CURRENT_MAINNET_STATUS.md:3",
+        "CURRENT_MAINNET_STATUS.md:63",
+        "FEATURE_REGISTRY.toml:18",
+        "evidence/consistency.log"
+      ],
+      "dependencies": [],
+      "approach": "Generate status from commit-bound feature proof criteria and preserve blocked/failed results. Remove operational claims that only have path-existence evidence.",
+      "required_tests": "Any failed core proof lowers its status; stale commit evidence is rejected; readiness prose and matrix derive from the same data.",
+      "acceptance": "Any failed core proof lowers its status; stale commit evidence is rejected; readiness prose and matrix derive from the same data.",
+      "verification_command": "bash scripts/check-readiness-consistency.sh",
+      "evidence_artifact": "closure/M01/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "S",
+      "risk": "Medium",
+      "owner": "Release / technical writing",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M02",
+      "priority": "P1",
+      "description": "Finality and multi-node proof tests are ignored",
+      "reason": "Ordinary workspace green results can exclude the tests that establish cross-node finalized state.",
+      "files": [
+        "node/src/service.rs:2429",
+        "node/src/service.rs:2580",
+        "node/src/service.rs:2664"
+      ],
+      "dependencies": [
+        "FIX-H13"
+      ],
+      "approach": "Run each node in a separate process with isolated logger/ports/data; hard-gate finalized transaction and reconnect recovery tests.",
+      "required_tests": "At least four validators agree on finalized hash/root through restart and one-node failure; ignored critical tests count as release failure.",
+      "acceptance": "At least four validators agree on finalized hash/root through restart and one-node failure; ignored critical tests count as release failure.",
+      "verification_command": "cargo test -p x3-chain-node two_validator_nodes_submit_on_first_observe_finalized_bridge_state_on_second -- --ignored --nocapture",
+      "evidence_artifact": "closure/M02/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Medium",
+      "owner": "Distributed-systems QA",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M03",
+      "priority": "P2",
+      "description": "Gateway health and event spines do not prove dependencies",
+      "reason": "Operators can observe liveness while indexing/accounting subscribers are absent; incident evidence may be lost.",
+      "files": [
+        "crates/x3-gateway/src/rest.rs:248",
+        "runtime/src/lib.rs:11",
+        "runtime/src/lib.rs:24"
+      ],
+      "dependencies": [
+        "FIX-H11"
+      ],
+      "approach": "Separate liveness/readiness, probe DB/indexer lag and durable event delivery, and make missing required consumers explicit startup/readiness failures.",
+      "required_tests": "Stop database/event sink and see readiness fail; replay missed events exactly once after recovery.",
+      "acceptance": "Stop database/event sink and see readiness fail; replay missed events exactly once after recovery.",
+      "verification_command": "cargo test -p x3-gateway",
+      "evidence_artifact": "closure/M03/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Medium",
+      "owner": "Observability / SRE",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M04",
+      "priority": "P2",
+      "description": "Restore validates archive shape, not trusted checksum or chain state",
+      "reason": "A corrupted or substituted readable archive can be accepted; successful extraction is not successful chain recovery.",
+      "files": [
+        "scripts/snapshot-restore.sh:130",
+        "scripts/snapshot-restore.sh:141"
+      ],
+      "dependencies": [
+        "FIX-H14"
+      ],
+      "approach": "Verify authenticated manifest, confined archive paths, chain/genesis/schema identity and finalized state before activation.",
+      "required_tests": "Tampered archive fails before extraction; restored node catches up and matches independently recorded finalized state.",
+      "acceptance": "Tampered archive fails before extraction; restored node catches up and matches independently recorded finalized state.",
+      "verification_command": "bash -n scripts/snapshot-restore.sh",
+      "evidence_artifact": "closure/M04/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Medium",
+      "owner": "SRE / storage",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M05",
+      "priority": "P1",
+      "description": "Python DSL emitter tests fail under the current proof contract",
+      "reason": "The published happy path and fixtures are not integrated with the enforced proof requirement; simulated planning is not execution.",
+      "files": [
+        "x3-lang/emitter/x3.py:60",
+        "x3-lang/tests/test_emitter.py:1",
+        "evidence/dsl-tests.log"
+      ],
+      "dependencies": [
+        "FIX-H01"
+      ],
+      "approach": "Supply real verification fixtures and reconcile emitters, runner and CLI contracts without weakening fail-closed proof checks.",
+      "required_tests": "All emitter tests pass with independently validated proof fixtures and reject empty/tampered bundles; one local end-to-end emission is consumed by the real runtime.",
+      "acceptance": "All emitter tests pass with independently validated proof fixtures and reject empty/tampered bundles; one local end-to-end emission is consumed by the real runtime.",
+      "verification_command": "/usr/bin/python3 -m pytest -q x3-lang/tests/test_emitter.py",
+      "evidence_artifact": "closure/M05/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "L",
+      "risk": "Medium",
+      "owner": "Language / SDK",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M06",
+      "priority": "P2",
+      "description": "Desktop defaults select an unregistered chain",
+      "reason": "Default adapter lookup can fail after initialization; network identity presented to users is ambiguous.",
+      "files": [
+        "apps/x3-desktop/src/blockchain/ChainManager.ts:59",
+        "apps/x3-desktop/src/blockchain/ChainManager.ts:117"
+      ],
+      "dependencies": [],
+      "approach": "Register configured enabled adapters and select an initialized network by verified chain/genesis identity; use secure transport for public endpoints.",
+      "required_tests": "Default startup obtains the intended adapter, missing network fails clearly, and wrong genesis cannot be signed against.",
+      "acceptance": "Default startup obtains the intended adapter, missing network fails clearly, and wrong genesis cannot be signed against.",
+      "verification_command": "npm --prefix apps/x3-desktop test",
+      "evidence_artifact": "closure/M06/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "S",
+      "risk": "Medium",
+      "owner": "Desktop / wallet",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-M07",
+      "priority": "P3",
+      "description": "Optimizer throughput is not network TPS evidence",
+      "reason": "Reusing these numbers as blockchain TPS would mislead capacity planning and sponsor claims.",
+      "files": [
+        "crates/x3-bench/src/main.rs:3",
+        "crates/x3-bench/src/runner.rs:251"
+      ],
+      "dependencies": [],
+      "approach": "Keep compiler metrics labeled; add finalized unique transaction load tests with latency histograms and resource/recovery evidence.",
+      "required_tests": "Publish reproducible sustained finalized TPS, rejection rate, p50/p95/p99 finality latency and hardware/profile/commit details; no synthetic metric substitution.",
+      "acceptance": "Publish reproducible sustained finalized TPS, rejection rate, p50/p95/p99 finality latency and hardware/profile/commit details; no synthetic metric substitution.",
+      "verification_command": "cargo run -p x3-bench -- --baseline",
+      "evidence_artifact": "closure/M07/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "M",
+      "risk": "Medium",
+      "owner": "Performance engineering",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-L01",
+      "priority": "P2",
+      "description": "Fresh-machine helper does not verify the required environment",
+      "reason": "Fresh-machine success/failure is not a reliable installation assessment; commands need one pinned, reproducible setup contract.",
+      "files": [
+        "scripts/fresh_machine_check.sh:5",
+        "Makefile:61",
+        "rust-toolchain.toml:3"
+      ],
+      "dependencies": [],
+      "approach": "Validate exact tools/versions, native libraries and lockfile installs; distinguish unavailable tool from failed project test.",
+      "required_tests": "Clean image builds all intended targets and runs real smoke tests with explicit offline/cache prerequisites.",
+      "acceptance": "Clean image builds all intended targets and runs real smoke tests with explicit offline/cache prerequisites.",
+      "verification_command": "bash scripts/fresh_machine_check.sh",
+      "evidence_artifact": "closure/L01/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "S",
+      "risk": "Low",
+      "owner": "Developer experience",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    },
+    {
+      "id": "FIX-H18",
+      "priority": "P1",
+      "description": "Workspace verification fails in WASM runtime build",
+      "reason": "No complete node/runtime build or workspace test pass was demonstrated for this source state in the audit environment. Existing binaries and historic reports cannot supply that proof.",
+      "files": [
+        "runtime/build.rs:1",
+        "rust-toolchain.toml:3",
+        "evidence/check-complete.log",
+        "evidence/test-complete.log",
+        "evidence/clippy-complete.log"
+      ],
+      "dependencies": [],
+      "approach": "Reconcile pinned rust-src/target/build-std configuration and dependency build graph in a fresh build directory; preserve both native and WASM validation without skip-WASM workarounds.",
+      "required_tests": "From the frozen source state, all required workspace checks and release/testnet feature builds exit zero and produce source-bound artifacts.",
+      "acceptance": "From the frozen source state, all required workspace checks and release/testnet feature builds exit zero and produce source-bound artifacts.",
+      "verification_command": "cargo check --workspace && cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings",
+      "evidence_artifact": "closure/H18/manifest.json",
+      "rollback": "Retain the previous signed binary and state snapshot; never downgrade across changed storage without a tested reverse migration. Keep affected entrypoints disabled if rollback cannot preserve state.",
+      "complexity": "M",
+      "risk": "High",
+      "owner": "Rust build / release engineering",
+      "parallelization": "Independent component work until runtime interface integration; honor listed dependencies."
+    }
+  ]
+}

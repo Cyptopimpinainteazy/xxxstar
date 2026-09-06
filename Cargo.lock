@@ -24231,7 +24231,10 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "parity-scale-codec",
+ "scale-info",
  "serde",
+ "sha2 0.10.9",
+ "sp-api",
  "sp-core 39.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=stable2512)",
  "sp-io 44.0.0",
  "sp-std 14.0.0",
@@ -24778,7 +24781,9 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.23",
  "uuid",
+ "x3-bridge",
  "x3-orchestra-control-plane",
+ "x3-relayer",
  "x3-rpc",
 ]
 
@@ -25282,6 +25287,7 @@ dependencies = [
  "serde",
  "sha2 0.10.9",
  "tiny-keccak 2.0.2",
+ "x3-bitcoin-vault",
 ]
 
 [[package]]

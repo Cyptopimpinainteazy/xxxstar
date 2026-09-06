@@ -18,6 +18,11 @@ use crate::wallet_core::signers::btc::BtcSigner;
 use crate::wallet_core::signers::evm::EvmSigner;
 use crate::wallet_core::signers::svm::SvmSigner;
 
+/// Approximate count of EVM-compatible chains reachable by a single EVM address.
+/// Used only for the wallet's informational "60k+ chains" claim. Not security-critical.
+/// Source-of-truth for both `UniversalWallet::evm_chain_count` and the `get_evm_chain_count` IPC command.
+pub const EVM_CHAIN_COUNT: usize = 60_000;
+
 #[derive(Debug, thiserror::Error, serde::Serialize)]
 pub enum WalletError {
     #[error("Crypto error: {0}")]
@@ -758,8 +763,8 @@ pub fn generate_universal_wallet() -> Result<UniversalWallet, WalletError> {
     let pair = sr25519::Pair::from_seed(&seed_array);
     let substrate_address = pair.public().to_ss58check();
 
-    // Chain count - placeholder
-    let evm_chain_count = 60000;
+    // Chain count from shared constant (informational, not security-critical)
+    let evm_chain_count = EVM_CHAIN_COUNT;
 
     Ok(UniversalWallet {
         mnemonic: mnemonic_str,
@@ -800,7 +805,8 @@ pub fn import_universal_wallet(mnemonic: String) -> Result<UniversalWallet, Wall
     let pair = sr25519::Pair::from_seed(&seed_array);
     let substrate_address = pair.public().to_ss58check();
 
-    let evm_chain_count = 60000;
+    // Chain count from shared constant (informational, not security-critical)
+    let evm_chain_count = EVM_CHAIN_COUNT;
 
     Ok(UniversalWallet {
         mnemonic: mnemonic_str,
@@ -817,14 +823,7 @@ pub fn import_universal_wallet(mnemonic: String) -> Result<UniversalWallet, Wall
 
 #[command]
 pub fn get_evm_chain_count() -> usize {
-    59263
-}
-
-#[command]
-pub async fn store_wallet_secure(_wallet: UniversalWallet) -> Result<(), WalletError> {
-    // Use Tauri's store plugin for secure storage
-    // For now, placeholder - in production would encrypt and store
-    Ok(())
+    EVM_CHAIN_COUNT
 }
 
 #[command]

@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>X3 live readiness</title>
+<style>body{margin:0;font:15px system-ui;background:#eef3f6;color:#142b40}header{padding:12px 20px;border-bottom:1px solid #bbcbd5}iframe{width:100%;height:calc(100vh - 68px);border:0}#status{font-weight:600}</style>
+<header><strong>X3 / LIVE READINESS</strong> · <span id="status" role="status">Loading latest snapshot…</span></header><iframe id="report" title="Current X3 readiness report"></iframe>
+<script>
+let last='';async function update(){try{const r=await fetch('current.json',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const p=await r.json();if(!/^snapshots\/[A-Za-z0-9-]+$/.test(p.snapshot))throw Error('Invalid snapshot path');if(last!==p.snapshot){document.getElementById('report').src=p.snapshot+'/index.html';last=p.snapshot;}document.getElementById('status').textContent='Snapshot '+p.updated_at+' · checks run only on request';}catch(e){document.getElementById('status').textContent='Refresh unavailable: '+e.message+'. Serve this directory over localhost HTTP; an already displayed snapshot may be stale.';}}update();setInterval(update,10000);
+</script></html>

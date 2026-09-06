@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="137" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 137" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="137"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-137)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="18" y="112" style="font-family: Helvetica; font-size: 14px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,224) scale(1,-1)">Overall readiness evidence</text>
+			<text x="12" y="79" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,158) scale(1,-1)">Uncapped weighted score</text>
+			<rect x="220" y="76" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="76" width="54.65250000000003" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="450" y="79" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,158) scale(1,-1)">24.29/100</text>
+			<text x="12" y="53" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,106) scale(1,-1)">Safety-capped score</text>
+			<rect x="220" y="50" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="50" width="45.0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(69%,18%,23%); fill-rule: evenodd;"/>
+			<text x="450" y="53" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,106) scale(1,-1)">20/100</text>
+			<text x="12" y="14" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,28) scale(1,-1)">Any unresolved Critical finding caps readiness at 20; this is not a probability of safety.</text>
+		</g>
+	</g>
+</svg>

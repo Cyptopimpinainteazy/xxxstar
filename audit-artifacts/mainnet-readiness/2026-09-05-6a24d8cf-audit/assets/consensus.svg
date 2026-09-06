@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="281" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 281" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="281"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-281)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="18" y="256" style="font-family: Helvetica; font-size: 14px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,512) scale(1,-1)">Consensus and finality</text>
+			<path d="M 162,192.5 L 178,192.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="178 192.5, 172 189.5, 172 195.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 322,192.5 L 338,192.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="338 192.5, 332 189.5, 332 195.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 410,162 L 90,125 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="90 125, 95.61571 128.6693, 96.30487 122.709" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 90,162 L 250,125 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="250 125, 243.4784 123.429, 244.8302 129.2747" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 162,94.5 L 338,94.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="338 94.5, 332 91.5, 332 97.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<path d="M 322,94.5 L 338,94.5 Z" style="stroke: rgb(37%,43%,47%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="338 94.5, 332 91.5, 332 97.5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(37%,43%,47%); fill-rule: evenodd;"/>
+			<rect x="18.0" y="162" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="18.0" y="218" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="26.0" y="203" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,406) scale(1,-1)">Genesis session keys</text>
+			<text x="26.0" y="191" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,382) scale(1,-1)">I: Aura / GRANDPA</text>
+			<rect x="178.0" y="162" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="178.0" y="218" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="186.0" y="203" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,406) scale(1,-1)">Aura import queue</text>
+			<text x="186.0" y="191" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,382) scale(1,-1)">I: slot validation</text>
+			<rect x="338.0" y="162" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="338.0" y="218" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="346.0" y="203" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,406) scale(1,-1)">Block authoring</text>
+			<text x="346.0" y="191" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,382) scale(1,-1)">I: proposer</text>
+			<rect x="18.0" y="64" width="144.0" height="61" style="stroke: rgb(13%,39%,65%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="18.0" y="120" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(13%,39%,65%); fill-rule: evenodd;"/>
+			<text x="26.0" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,210) scale(1,-1)">GRANDPA voter</text>
+			<text x="26.0" y="93" style="font-family: Helvetica; font-size: 9px;fill: rgb(13%,39%,65%); stroke:none;" transform="translate(0,186) scale(1,-1)">I: default finality</text>
+			<rect x="178.0" y="64" width="144.0" height="61" style="stroke: rgb(69%,18%,23%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="178.0" y="120" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(69%,18%,23%); fill-rule: evenodd;"/>
+			<text x="186.0" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(69%,18%,23%); stroke:none;" transform="translate(0,210) scale(1,-1)">Flash opt-in</text>
+			<text x="186.0" y="93" style="font-family: Helvetica; font-size: 9px;fill: rgb(69%,18%,23%); stroke:none;" transform="translate(0,186) scale(1,-1)">X: missing membership</text>
+			<rect x="338.0" y="64" width="144.0" height="61" style="stroke: rgb(69%,18%,23%); stroke-linecap: butt; stroke-width: 1.5; fill: rgb(100%,100%,100%); fill-rule: evenodd;"/>
+			<rect x="338.0" y="120" width="144.0" height="5" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(69%,18%,23%); fill-rule: evenodd;"/>
+			<text x="346.0" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(69%,18%,23%); stroke:none;" transform="translate(0,210) scale(1,-1)">Finality anchors</text>
+			<text x="346.0" y="93" style="font-family: Helvetica; font-size: 9px;fill: rgb(69%,18%,23%); stroke:none;" transform="translate(0,186) scale(1,-1)">X: unsigned hash</text>
+			<text x="18" y="24" style="font-family: Helvetica; font-size: 7.5px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,48) scale(1,-1)">I implemented/unverified  P partial  D disconnected  X unsafe  V verified  N proposed</text>
+			<text x="18" y="10" style="font-family: Helvetica; font-size: 7.5px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,20) scale(1,-1)">Static wiring; no live deployment is asserted.</text>
+		</g>
+	</g>
+</svg>

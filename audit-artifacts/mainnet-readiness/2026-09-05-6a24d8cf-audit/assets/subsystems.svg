@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="500" height="475" preserveAspectRatio="xMinYMin meet" viewBox="0 0 500 475" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="500" height="475"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-475)" style="clip-path: url(#clip)">
+		<g transform="">
+			<text x="18" y="450" style="font-family: Helvetica; font-size: 14px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,900) scale(1,-1)">Subsystem evidence score</text>
+			<text x="12" y="417" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,834) scale(1,-1)">Consensus</text>
+			<rect x="220" y="414" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="414" width="60.00749999999999" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="417" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,834) scale(1,-1)">26.67%</text>
+			<text x="12" y="391" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,782) scale(1,-1)">Transactions</text>
+			<rect x="220" y="388" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="388" width="67.5" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="391" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,782) scale(1,-1)">30%</text>
+			<text x="12" y="365" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,730) scale(1,-1)">State</text>
+			<rect x="220" y="362" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="362" width="63.0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="365" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,730) scale(1,-1)">28%</text>
+			<text x="12" y="339" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,678) scale(1,-1)">Crypto</text>
+			<rect x="220" y="336" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="336" width="60.00749999999999" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="339" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,678) scale(1,-1)">26.67%</text>
+			<text x="12" y="313" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,626) scale(1,-1)">Networking</text>
+			<rect x="220" y="310" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="310" width="90.0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="313" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,626) scale(1,-1)">40%</text>
+			<text x="12" y="287" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,574) scale(1,-1)">VM</text>
+			<rect x="220" y="284" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="284" width="82.5075" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="287" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,574) scale(1,-1)">36.67%</text>
+			<text x="12" y="261" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,522) scale(1,-1)">Cross-chain</text>
+			<rect x="220" y="258" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="258" width="42.1875" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="261" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,522) scale(1,-1)">18.75%</text>
+			<text x="12" y="235" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,470) scale(1,-1)">Tests</text>
+			<rect x="220" y="232" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="232" width="45.0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="235" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,470) scale(1,-1)">20%</text>
+			<text x="12" y="209" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,418) scale(1,-1)">Operations</text>
+			<rect x="220" y="206" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="206" width="29.992500000000007" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="209" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,418) scale(1,-1)">13.33%</text>
+			<text x="12" y="183" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,366) scale(1,-1)">Observability</text>
+			<rect x="220" y="180" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="180" width="22.5" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="183" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,366) scale(1,-1)">10%</text>
+			<text x="12" y="157" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,314) scale(1,-1)">Deployment</text>
+			<rect x="220" y="154" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="154" width="0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="157" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,314) scale(1,-1)">0%</text>
+			<text x="12" y="131" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,262) scale(1,-1)">Performance</text>
+			<rect x="220" y="128" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="128" width="0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="131" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,262) scale(1,-1)">0%</text>
+			<text x="12" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,210) scale(1,-1)">Governance</text>
+			<rect x="220" y="102" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="102" width="74.9925" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="105" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,210) scale(1,-1)">33.33%</text>
+			<text x="12" y="79" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,158) scale(1,-1)">Documentation</text>
+			<rect x="220" y="76" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="76" width="0" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="79" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,158) scale(1,-1)">0%</text>
+			<text x="12" y="53" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,106) scale(1,-1)">Proof gates</text>
+			<rect x="220" y="50" width="225" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,95%,96%); fill-rule: evenodd;"/>
+			<rect x="220" y="50" width="22.5" height="14" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(0%,48%,51%); fill-rule: evenodd;"/>
+			<text x="450" y="53" style="font-family: Helvetica; font-size: 9px;fill: rgb(7%,16%,25%); stroke:none;" transform="translate(0,106) scale(1,-1)">10%</text>
+			<text x="12" y="14" style="font-family: Helvetica; font-size: 8px;fill: rgb(37%,43%,47%); stroke:none;" transform="translate(0,28) scale(1,-1)">Raw subsystem evidence scores; overall safety cap = 20/100.</text>
+		</g>
+	</g>
+</svg>

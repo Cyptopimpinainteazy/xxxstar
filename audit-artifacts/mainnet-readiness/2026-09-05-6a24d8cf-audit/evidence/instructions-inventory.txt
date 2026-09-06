@@ -1,0 +1,8 @@
+AGENTS.md
+SECURITY.md
+.ai/AGENTS.md
+.swarm/prompts/SECURITY.md
+docs/openspec/AGENTS.md
+docs/security/SECURITY.md
+patches/rustix/CONTRIBUTING.md
+patches/rustix/SECURITY.md

@@ -1,0 +1,65 @@
+id,feature,subsystem,status,completion_percent,implemented,wired,tested,executed,reproducible
+FT01,Aura block production,Consensus,PARTIAL,40,1,1,0,0,0
+FT02,GRANDPA finality and fork choice,Consensus,PARTIAL,40,1,1,0,0,0
+FT03,Validator rotation,Consensus,PARTIAL,20,0,1,0,0,0
+FT04,Validator bonded stake and slashing,Consensus,PARTIAL,20,0,1,0,0,0
+FT05,Flash finality,Consensus,UNVERIFIED,0,0,0,0,0,0
+FT06,Genesis construction and live-seed validation,Consensus,PARTIAL,40,1,1,0,0,0
+FT07,Signed native transaction path,Transactions,PARTIAL,40,1,1,0,0,0
+FT08,"Nonce, genesis, era replay checks",Transactions,PARTIAL,40,1,1,0,0,0
+FT09,Transaction pool limits and ordering,Transactions,PARTIAL,20,0,1,0,0,0
+FT10,Fee charging and refunds,Transactions,PARTIAL,40,1,1,0,0,0
+FT11,Ethereum raw transaction RPC,Transactions,PARTIAL,20,0,1,0,0,0
+FT12,Canonical FRAME storage,State,PARTIAL,40,1,1,0,0,0
+FT13,Storage upgrade migrations,State,PARTIAL,40,1,1,0,0,0
+FT14,Supply conservation ledger,State,PARTIAL,20,0,1,0,0,0
+FT15,Snapshot backup and restoration,State,PARTIAL,20,0,1,0,0,0
+FT16,Atomic rollback state provenance,State,PARTIAL,20,0,1,0,0,0
+FT17,Signature primitives and key custody,Crypto,PARTIAL,40,1,1,0,0,0
+FT18,Dependency advisory handling,Crypto,PARTIAL,20,0,1,0,0,0
+FT19,P2P networking and sync,Networking,PARTIAL,40,1,1,0,0,0
+FT20,Bootstrap helper configuration,Networking,PARTIAL,20,1,0,0,0,0
+FT21,PoH import verification,Networking,UNVERIFIED,0,0,0,0,0,0
+FT22,RPC limiter algorithm (narrow scope),Networking,VERIFIED,100,1,1,1,1,1
+FT23,WASM mini-EVM persistent execution,VM,PARTIAL,20,0,1,0,0,0
+FT24,SVM execution and account context,VM,PARTIAL,20,0,1,0,0,0
+FT25,X3 VM runtime,VM,PARTIAL,40,1,1,0,0,0
+FT26,X3 Python parser and typechecker,VM,VERIFIED,100,1,1,1,1,1
+FT27,X3 emitter and execution pipeline,VM,PARTIAL,20,0,1,0,0,0
+FT28,Rust compiler tracks,VM,PARTIAL,20,1,0,0,0,0
+FT29,Internal cross-VM representation router,Cross-chain,PARTIAL,40,1,1,0,0,0
+FT30,Atomic bundle orchestration / Atomic Lock,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT31,Settlement timeout and refund engine,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT32,External header finality oracle,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT33,Production EVM receipt proof route,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT34,Solana finalized proof route,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT35,Validator quorum proof route,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT36,Bitcoin SPV route,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT37,Bitcoin vault approvals,Cross-chain,UNVERIFIED,0,0,0,0,0,0
+FT38,Relayer binary delivery,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT39,Relayer typed submission library,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT40,EVM HTLC contract,Cross-chain,PARTIAL,20,1,0,0,0,0
+FT41,SVM HTLC contract,Cross-chain,PARTIAL,20,1,0,0,0,0
+FT42,External EVM proof verifier contract,Cross-chain,UNVERIFIED,0,0,0,0,0,0
+FT43,Solver marketplace and intent routing,Cross-chain,PARTIAL,20,1,0,0,0,0
+FT44,Validator attestation / proof ledger,Cross-chain,PARTIAL,20,0,1,0,0,0
+FT45,REST/GraphQL gateway,Operations,UNVERIFIED,0,0,0,0,0,0
+FT46,SQL indexer and migrations,Operations,PARTIAL,20,1,0,0,0,0
+FT47,Metrics / chain health monitoring,Observability,PARTIAL,20,0,1,0,0,0
+FT48,Security and accounting event consumers,Observability,UNVERIFIED,0,0,0,0,0,0
+FT49,"DEX, Forge and LP locker",Governance,PARTIAL,40,1,1,0,0,0
+FT50,Sentinel and economic halt,Governance,PARTIAL,20,0,1,0,0,0
+FT51,Council / treasury / upgrades,Governance,PARTIAL,40,1,1,0,0,0
+FT52,Wallet / biometric / recovery pallet,Crypto,PARTIAL,20,0,1,0,0,0
+FT53,TypeScript SDK encoding,Transactions,PARTIAL,20,0,1,0,0,0
+FT54,Desktop / Tauri OS network integration,Operations,PARTIAL,20,0,1,0,0,0
+FT55,GPU / swarm orchestration,Operations,UNVERIFIED,0,0,0,0,0,0
+FT56,CI test quality and coverage,Tests,PARTIAL,20,0,1,0,0,0
+FT57,Workspace build / release reproducibility,Deployment,UNVERIFIED,0,0,0,0,0,0
+FT58,Fresh-machine bootstrap,Deployment,UNVERIFIED,0,0,0,0,0,0
+FT59,Deployment isolation and validator services,Operations,PARTIAL,40,1,1,0,0,0
+FT60,Sustained finalized TPS evidence,Performance,UNVERIFIED,0,0,0,0,0,0
+FT61,Mainnet / ProofGate enforcement,Proof gates,PARTIAL,20,0,1,0,0,0
+FT62,Documentation accuracy / scoreboard,Documentation,UNVERIFIED,0,0,0,0,0,0
+FT63,Public testnet recovery drill evidence,Operations,UNVERIFIED,0,0,0,0,0,0
+FT64,Independent launch approval evidence,Proof gates,UNVERIFIED,0,0,0,0,0,0

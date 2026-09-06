@@ -492,14 +492,53 @@ fn verify_btc_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]
 }
 
 // ── Bitcoin SPV Verifier ────────────────────────────────────────────────────
+//
+// Integrates with `x3-bitcoin-vault` so confirmation thresholds and the
+// signer-threshold configuration come from a single canonical source rather
+// than being hard-coded in the verifier. This promotes the previously-orphan
+// `x3-bitcoin-vault` crate to a real compiled consumer of the production
+// Bitcoin SPV path used by `pallet_x3_crosschain_gateway`.
 
 pub struct BitcoinSpvVerifier {
     pub min_confirmations: u64,
+    /// Signer threshold required for vault withdrawals. SPV-verified deposits
+    /// must be backed by at least this many vault signers (enforced via
+    /// `BtcVaultConfig::signers`). `0` disables the check (e.g. SPV-only
+    /// flows that don't go through the vault).
+    pub vault_threshold: u32,
+    /// Total signers authorized on the vault. Used together with
+    /// `vault_threshold` to derive the minimum signer-acknowledgement
+    /// count a SPV-verified deposit must carry.
+    pub vault_total_signers: u32,
 }
 
 impl BitcoinSpvVerifier {
+    /// Default constructor: uses `x3-bitcoin-vault` constants for confirmations
+    /// and the default (threshold, total) signer set. Prefer this over
+    /// `BitcoinSpvVerifier::new(6)` so confirmation policy stays centralized.
+    pub fn from_vault_defaults() -> Self {
+        Self {
+            min_confirmations: x3_bitcoin_vault::MIN_BITCOIN_CONFIRMATIONS,
+            vault_threshold: x3_bitcoin_vault::DEFAULT_THRESHOLD,
+            vault_total_signers: x3_bitcoin_vault::DEFAULT_TOTAL_SIGNERS,
+        }
+    }
+
     pub fn new(min_confirmations: u64) -> Self {
-        Self { min_confirmations }
+        Self {
+            min_confirmations,
+            vault_threshold: 0,
+            vault_total_signers: 0,
+        }
+    }
+
+    /// Configure from an explicit vault config (recommended for production
+    /// gateways — keeps the verifier in lock-step with the vault signer set).
+    pub fn with_vault_config(mut self, config: &x3_bitcoin_vault::BtcVaultConfig) -> Self {
+        self.min_confirmations = config.min_confirmations;
+        self.vault_threshold = config.threshold;
+        self.vault_total_signers = config.signers.len() as u32;
+        self
     }
 }
 

@@ -12,7 +12,7 @@
 //! Detailed status and limitations: `docs/testing/internal-mainnet-happy-path-e2e.md`.
 
 #[cfg(test)]
-use crate::TestResult;
+use e2e_tests::TestResult;
 #[cfg(test)]
 use std::collections::{HashMap, HashSet};
 #[cfg(test)]
@@ -472,6 +472,10 @@ pub struct TestEnvironment {
 #[cfg(test)]
 struct MockState {
     supply_by_asset: HashMap<String, u128>,
+    /// Cumulative external deposits per asset. Used by supply-conservation
+    /// invariants: total tracked representations (locked + bridge-minted)
+    /// must never exceed what was ever funded.
+    total_funded_by_asset: HashMap<String, u128>,
     balances: HashMap<([u8; 32], String), u128>,
     halted: bool,
     max_supply_by_asset: HashMap<String, u128>,
@@ -484,10 +488,12 @@ struct MockState {
 }
 
 #[cfg(test)]
+#[allow(clippy::derivable_impls)]
 impl Default for MockState {
     fn default() -> Self {
         Self {
             supply_by_asset: HashMap::new(),
+            total_funded_by_asset: HashMap::new(),
             balances: HashMap::new(),
             halted: false,
             max_supply_by_asset: HashMap::new(),
@@ -555,6 +561,7 @@ impl TestEnvironment {
             .max_supply_by_asset
             .get("NATIVE")
             .unwrap_or(&u128::MAX);
+        let native_funded = *state.total_funded_by_asset.get("NATIVE").unwrap_or(&0);
 
         let bridge_minted_total: u128 = state
             .balances
@@ -562,10 +569,15 @@ impl TestEnvironment {
             .filter(|((_, asset), _)| asset == "EVM")
             .map(|(_, value)| *value)
             .sum();
+        // No-inflation invariant: every bridged/wrapped representation
+        // (EVM balances) must be backed by something — either NATIVE that's
+        // been locked into supply, or NATIVE that's been funded externally.
+        // This catches swaps/bridges that mint EVM out of thin air.
+        let backing = native_supply.saturating_add(native_funded);
         Ok(InvariantState {
             max_supply_respected: native_supply <= native_max,
             double_mint_prevented: true,
-            total_supply_conserved: native_supply >= bridge_minted_total,
+            total_supply_conserved: backing >= bridge_minted_total,
         })
     }
 
@@ -628,12 +640,26 @@ impl TestEnvironment {
         _min_out: u128,
     ) -> TestResult<SwapResult> {
         let mut state = self.state.lock().expect("mock state lock poisoned");
+        let native_key = (_addr, "NATIVE".to_string());
         let evm_key = (_addr, "EVM".to_string());
-        let current = *state.balances.get(&evm_key).unwrap_or(&0);
+
+        // Swap must MOVE value NATIVE -> EVM, not mint EVM out of thin air.
+        let native_bal = *state.balances.get(&native_key).unwrap_or(&0);
+        if native_bal < _amount_in {
+            return Ok(SwapResult {
+                success: false,
+                amount_out: 0,
+            });
+        }
+
         let amount_out = 900u128.max(_min_out);
         state
             .balances
-            .insert(evm_key, current.saturating_add(amount_out));
+            .insert(native_key, native_bal - _amount_in);
+        let evm_bal = *state.balances.get(&evm_key).unwrap_or(&0);
+        state
+            .balances
+            .insert(evm_key, evm_bal.saturating_add(amount_out));
         Ok(SwapResult {
             success: true,
             amount_out,
@@ -653,6 +679,18 @@ impl TestEnvironment {
         let key = (_addr, _asset.to_string());
         let current = *state.balances.get(&key).unwrap_or(&0);
         state.balances.insert(key, current.saturating_add(_amount));
+        // Funding is an external deposit; it credits balance but does NOT
+        // mutate supply_by_asset (supply tracks what's been locked/minted
+        // via execute_lock). The total-funded figure is tracked separately
+        // so swap/bridge invariants can compare against it.
+        let prev_funded = state
+            .total_funded_by_asset
+            .get(_asset)
+            .copied()
+            .unwrap_or(0);
+        state
+            .total_funded_by_asset
+            .insert(_asset.to_string(), prev_funded.saturating_add(_amount));
         Ok(())
     }
 

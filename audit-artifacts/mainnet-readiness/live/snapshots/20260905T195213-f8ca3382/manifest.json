@@ -1,0 +1,17 @@
+{
+  "created_at": "2026-09-05T19:52:14.203652+00:00",
+  "source_fingerprint": "475338a94dcc01f7ad3a3617ccb78fef42d8f85d78aca18a0ae21333d759151e",
+  "files": {
+    "index.html": "413fbc9f9035ce3327c8f596d02a31d1262fc43cebde9391a2155cdcd2d59a6e",
+    "features.csv": "2eb4f06a0f4935d2eb5fa1828928a61d55febc6a29dea7a59e43e009588d26af",
+    "source.md": "6fd717e1491c321833cee1cd7e58291d97aef5331998417f22d40cdfa9f4b03e",
+    "summary.json": "25573e61092e4c509ea39320816f5096f1df54a150e9798829076bbfe15e1a7e",
+    "state.json": "77493da51ee81b7c50383eccce0f0372da255171cfbac71cc0d98f28606aa93a",
+    "X3-LIVE-READINESS.pdf": "6761585adedfb8bd749efb7e805b1bd7a1fd9230258557bac3b55ddd534ea417",
+    "assets/subsystems.svg": "0313d82d958287cbdbb0cf14310ca4df905b1d9fe829a02476907aad7cd1f36d",
+    "assets/tasks.svg": "4191b4cfd513b6591ee24598913ccf0ee8f649468051ec8e8db8bd9624c41f28",
+    "assets/findings.svg": "344c39b2e7902b16c12bb45eb495d9ea3db0b2402e084e6fb8e212ccb77a112d",
+    "assets/readiness.svg": "36240674fc87e19076c7bea6868d6fb03ec51400c53d22a8ef8b7d710ab0aa6a",
+    "assets/checks.svg": "946405c0f25e1806af57f66120a50ab051964889334d410c2b38ce28bbc56b53"
+  }
+}

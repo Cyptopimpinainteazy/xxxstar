@@ -156,34 +156,6 @@ blockers = [
 ]
 dangerous_paths = ["gpu benchmark", "concurrency"]
 
-[x3_broadcast]
-mode = "LIVE_TESTNET"
-crate_or_service = "crates/x3-broadcast"
-tauri_app = "Broadcast"
-required_tests = ["marketing_claims_audit"]
-health_endpoint = "/health/x3-broadcast"
-proof_report = "reports/marketing_claims_audit.md"
-readiness_score = 30
-blockers = [
-  "Non-consensus tooling — not part of blockchain runtime",
-  "Marketing claims audit is documentation check only"
-]
-dangerous_paths = ["unsupported marketing claims"]
-
-[x3_grantsmith]
-mode = "LIVE_TESTNET"
-crate_or_service = "crates/x3-grantsmith"
-tauri_app = "Grantsmith"
-required_tests = ["grant_pipeline_report"]
-health_endpoint = "/health/x3-grantsmith"
-proof_report = "reports/grant_pipeline_report.md"
-readiness_score = 20
-blockers = [
-  "Non-consensus tooling — grant pipeline is off-chain documentation",
-  "No CI integration"
-]
-dangerous_paths = ["grant funding", "proposal drafting"]
-
 [tauri_os]
 mode = "GUARDED_TESTNET"
 crate_or_service = "apps/tauri-os"
@@ -244,102 +216,6 @@ blockers = [
   "Single test; no CI gate"
 ]
 dangerous_paths = ["keys", "secrets", "mainnet"]
-
-[testbuilder_agent]
-mode = "GUARDED_TESTNET"
-crate_or_service = "x3-swarm-core"
-tauri_app = "SwarmCommand"
-health_endpoint = "/health/testbuilder-agent"
-proof_report = "reports/swarm_task_queue.md"
-readiness_score = 20
-required_tests = [
-  "testbuilder_generates_test_task",
-  "testbuilder_cannot_edit_forbidden_paths"
-]
-blockers = [
-  "Experimental — guarded, not in CI",
-  "Generated test tasks not validated against project test suite"
-]
-dangerous_paths = ["keys", "validator_keys", "mainnet"]
-
-[auditor_agent]
-mode = "LIVE_TESTNET"
-crate_or_service = "x3-swarm-core"
-tauri_app = "SwarmCommand"
-health_endpoint = "/health/auditor-agent"
-proof_report = "reports/swarm_audit_report.md"
-readiness_score = 25
-required_tests = [
-  "auditor_generates_findings",
-  "auditor_does_not_modify_files"
-]
-blockers = [
-  "Experimental — not in CI",
-  "Audit findings not automatically triaged or gated"
-]
-dangerous_paths = ["keys", "secrets", "mainnet"]
-
-[breaker_agent]
-mode = "LIVE_TESTNET"
-crate_or_service = "x3-swarm-core"
-tauri_app = "SwarmCommand"
-health_endpoint = "/health/breaker-agent"
-proof_report = "reports/swarm_breaker_report.md"
-readiness_score = 20
-required_tests = [
-  "breaker_generates_attack_tests",
-  "breaker_cannot_touch_mainnet"
-]
-blockers = [
-  "Experimental — not in CI",
-  "Generated attack tests may not accurately model real threats"
-]
-dangerous_paths = ["keys", "secrets", "mainnet"]
-
-[fixer_agent]
-mode = "GUARDED_TESTNET"
-crate_or_service = "x3-swarm-core"
-tauri_app = "SwarmCommand"
-health_endpoint = "/health/fixer-agent"
-proof_report = "reports/swarm_fixer_report.md"
-readiness_score = 15
-required_tests = [
-  "fixer_requires_approval_for_runtime",
-  "fixer_adds_regression_test"
-]
-blockers = [
-  "Experimental — guarded, not in CI",
-  "Runtime-modifying agent requires human approval, not tested under load"
-]
-dangerous_paths = ["runtime", "pallets", "mainnet"]
-
-[marketing_agent]
-mode = "LIVE_TESTNET"
-crate_or_service = "x3-readiness"
-tauri_app = "SwarmCommand"
-health_endpoint = "/health/marketing-agent"
-proof_report = "reports/marketing_claims_audit.md"
-readiness_score = 15
-required_tests = ["marketing_rejects_unverified_claim"]
-blockers = [
-  "Non-consensus tooling — marketing claims validation",
-  "Single test; no CI gate"
-]
-dangerous_paths = ["unsupported-claims", "mainnet"]
-
-[grant_agent]
-mode = "LIVE_TESTNET"
-crate_or_service = "x3-grantsmith"
-tauri_app = "SwarmCommand"
-health_endpoint = "/health/grant-agent"
-proof_report = "reports/grant_pipeline_report.md"
-readiness_score = 15
-required_tests = ["grant_agent_generates_draft"]
-blockers = [
-  "Non-consensus tooling — grant draft generation",
-  "Single test; no CI gate"
-]
-dangerous_paths = ["grant-funding", "mainnet"]
 
 [x3_wallet_pallet]
 mode = "LIVE_TESTNET"

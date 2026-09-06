@@ -1,0 +1,25 @@
+{
+  "id": "7795cf968e0d4a129367ac81f926c246",
+  "check_id": "rpc-unit",
+  "check_hash": "4018e4850153b98e7af8f895699d4c09b2a9fde3ee855d31b739b5f1e0c2af2b",
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/audit-harness/rpc/Cargo.toml"
+  ],
+  "cwd": "/home/lojak/Desktop/xxxstar-main",
+  "started_at": "2026-09-05T19:53:40.655592+00:00",
+  "finished_at": "2026-09-05T19:53:50.351569+00:00",
+  "seconds": 9.696,
+  "exit_code": 0,
+  "timed_out": false,
+  "log": "evidence/7795cf968e0d4a129367ac81f926c246.log",
+  "log_sha256": "6fd0a321662af8aa5ca5b58a1d5079f3ddb9c569bad36cf9d5ffc0a03e11665f",
+  "truncated": false,
+  "source_fingerprint": "475338a94dcc01f7ad3a3617ccb78fef42d8f85d78aca18a0ae21333d759151e",
+  "source_changed": false,
+  "commit": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+  "environment_policy": "Minimal inherited environment; offline Cargo; local disposable target directory"
+}

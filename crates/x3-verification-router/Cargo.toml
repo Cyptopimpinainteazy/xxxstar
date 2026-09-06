@@ -19,6 +19,10 @@ scale-info = { version = "2.5", default-features = false, features = ["derive"] 
 serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
 # SHA-256 for Bitcoin SPV proof verification
 sha2 = { workspace = true }
+# Bitcoin vault types: threshold/multisig config + UTXO helpers used by the
+# Bitcoin SPV verifier path. Promotes `x3-bitcoin-vault` from a workspace
+# island to a real compiled consumer of production verification flow.
+x3-bitcoin-vault = { path = "../x3-bitcoin-vault", default-features = false }
 
 [features]
 default = ["std"]

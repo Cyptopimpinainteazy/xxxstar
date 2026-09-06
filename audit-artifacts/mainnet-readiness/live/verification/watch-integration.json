@@ -1,0 +1,8 @@
+{
+  "scenario": "Real temporary Git source, subprocess evidence, operator review, then source mutation while watch runs; test fixture only, no X3 tasks changed",
+  "watch_exit_code": 0,
+  "before_completed_tasks": 1,
+  "after_completed_tasks": 0,
+  "after_check_status": "stale",
+  "new_snapshot_published": true
+}

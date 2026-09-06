@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
 tokio-util = "0.7"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
 anyhow = "1.0"
@@ -22,9 +22,9 @@ rand = "0.8"
 sha2 = "0.10"
 env_logger = "0.11"
 reqwest = { version = "0.11", features = ["json", "blocking"] }
-hex = "0.4"
+hex = { version = "0.4", default-features = false }
 sha3 = "0.10"
-codec = { workspace = true }
+codec = { workspace = true, default-features = false }
 sp-core = { workspace = true }
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 x3-finality-oracle = { path = "../x3-finality-oracle" }
@@ -32,6 +32,14 @@ x3-verification-router = { path = "../x3-verification-router" }
 x3-validator-attestation = { path = "../x3-validator-attestation" }
 x3-proof-dispute = { path = "../x3-proof-dispute" }
 x3-gateway-risk-engine = { path = "../x3-gateway-risk-engine" }
+
+[features]
+# `std` enables the off-chain service (tokio-based relayer runtime).
+# The `types` module is always available in no_std so the runtime
+# gateway pallet can consume `ValidatorSignature` / `SvmProof` /
+# `EvmProof` without pulling in tokio.
+default = ["std"]
+std = []
 
 [dev-dependencies]
 tokio-test = "0.4"

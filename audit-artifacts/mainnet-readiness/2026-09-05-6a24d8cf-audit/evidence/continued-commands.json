@@ -1,0 +1,72 @@
+[
+  {
+    "id": "check-complete",
+    "command": "cargo check --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 20.75,
+    "time": "2026-09-05T18:38:35.952291+00:00",
+    "log": "evidence/check-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "test-complete",
+    "command": "cargo test --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 42.86,
+    "time": "2026-09-05T18:38:56.704087+00:00",
+    "log": "evidence/test-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "clippy-complete",
+    "command": "cargo clippy --workspace --all-targets -- -D warnings",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 14.74,
+    "time": "2026-09-05T18:39:39.561908+00:00",
+    "log": "evidence/clippy-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "release-complete",
+    "command": "cargo build --locked --release -p x3-chain-node --features mainnet-rc1",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 278.48,
+    "time": "2026-09-05T18:39:54.301539+00:00",
+    "log": "evidence/release-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "testnet-complete",
+    "command": "cargo check --locked -p x3-chain-node --features testnet",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 117.16,
+    "time": "2026-09-05T18:44:32.780134+00:00",
+    "log": "evidence/testnet-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "contracts",
+    "command": "forge test --root X3-contracts/evm --offline",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.0,
+    "time": "2026-09-05T18:46:29.938098+00:00",
+    "log": "evidence/contracts.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "anchor",
+    "command": "anchor test --skip-deploy --skip-local-validator",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.0,
+    "time": "2026-09-05T18:46:29.942966+00:00",
+    "log": "evidence/anchor.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  }
+]

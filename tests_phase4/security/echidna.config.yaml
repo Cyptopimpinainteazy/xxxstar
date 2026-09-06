@@ -1,0 +1,43 @@
+# Echidna property-based fuzzer configuration for X3 cross-VM contracts
+# Run: echidna tests/solidity_contracts/ --config tests/security/echidna.config.yaml
+
+testMode: "property"
+testLimit: 500000
+seqLen: 100
+shrinkLimit: 5000
+
+# Corpus & coverage
+corpusDir: "tests/security/echidna-corpus"
+coverageFormats: ["text", "lcov"]
+codeSize: "0x1000000"
+
+# Parallel workers
+workers: 8
+
+# Timeout per campaign (seconds)
+timeout: 7200
+
+# Dictionaries for interesting values
+allContracts: false
+
+# Balances for fuzz accounts
+balanceAddr: "0x10000000000000000000"
+balanceContract: "0x10000000000000000000"
+
+# Key properties to verify (mapped to InvariantProperties.sol)
+# - echidna_total_supply_conserved
+# - echidna_atomic_commit_or_revert
+# - echidna_no_partial_cross_vm_state
+# - echidna_gas_accounting_bounded
+# - echidna_no_reentrancy_across_vms
+
+# Sanity check: fail immediately if any invariant starts false
+initialize: null
+
+# Output verbosity
+quiet: false
+format: "text"
+
+# Filter to security-critical contracts
+filterBlacklist: false
+filterFunctions: []

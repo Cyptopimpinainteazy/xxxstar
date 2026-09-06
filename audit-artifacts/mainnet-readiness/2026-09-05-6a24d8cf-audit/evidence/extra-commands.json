@@ -1,0 +1,66 @@
+[
+  {
+    "id": "rpc-unit",
+    "command": "rustc --edition=2021 --test node/src/rpc_middleware.rs -o /tmp/x3-audit-20260905/rpc-tests && /tmp/x3-audit-20260905/rpc-tests --test-threads=1",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 0.31,
+    "log": "evidence/rpc-unit.log"
+  },
+  {
+    "id": "dsl-tests",
+    "command": "/usr/bin/python3 -m pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_emitter.py x3-lang/tests/test_simulator.py",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 4.32,
+    "log": "evidence/dsl-tests.log"
+  },
+  {
+    "id": "dsl-cli",
+    "command": "/usr/bin/python3 x3-lang/cli.py x3-lang/examples/arb_solana_eth.x3",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 0.11,
+    "log": "evidence/dsl-cli.log"
+  },
+  {
+    "id": "fresh",
+    "command": "bash scripts/fresh_machine_check.sh",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 0.01,
+    "log": "evidence/fresh.log"
+  },
+  {
+    "id": "consistency",
+    "command": "bash scripts/check-readiness-consistency.sh",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 6.03,
+    "log": "evidence/consistency.log"
+  },
+  {
+    "id": "npm-build",
+    "command": "npm run build",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.95,
+    "log": "evidence/npm-build.log"
+  },
+  {
+    "id": "audit-help",
+    "command": "cargo audit --help",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 0.13,
+    "log": "evidence/audit-help.log"
+  },
+  {
+    "id": "python-collection",
+    "command": "/usr/bin/python3 -m pytest --collect-only -q tests/test_migrations.py",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 2,
+    "seconds": 0.92,
+    "log": "evidence/python-collection.log"
+  }
+]

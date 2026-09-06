@@ -1,4 +1,4 @@
-import { useAgentStore, AgentState } from './AgentStore';
+import { useAgentStore } from './AgentStore';
 import { strategyCore } from './StrategyCore';
 import { useBlockStore } from '../blockchain/BlockStore';
 

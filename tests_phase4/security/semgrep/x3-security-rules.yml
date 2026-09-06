@@ -1,0 +1,170 @@
+rules:
+  # ────────────────────────────────────────────────────────────────
+  # X3 Custom Semgrep Security Rules
+  # Run: semgrep --config tests/security/semgrep/ --error
+  # ────────────────────────────────────────────────────────────────
+
+  # ── Frontend integrity ──────────────────────────────────────────
+
+  - id: x3-silent-demo-fallback
+    message: |
+      Silent fallback to demo/mock data detected without calling `dataIntegrity.reportDemoFallback()`.
+      In production this is a data integrity breach. Always call reportDemoFallback(pageName, reason)
+      in the catch block so the DemoDataBanner alerts the user.
+      Ref: FRONTEND-TELEMETRY-001
+    languages: [typescript, tsx]
+    severity: ERROR
+    patterns:
+      - pattern: |
+          .catch(() => {
+            ...
+          })
+      - pattern-not: |
+          .catch((...) => {
+            ...
+            dataIntegrity.reportDemoFallback(...)
+            ...
+          })
+      - pattern-not: |
+          .catch((...) => {
+            ...
+            reportDemoFallback(...)
+            ...
+          })
+    paths:
+      include:
+        - "apps/*/src/pages/*.tsx"
+        - "apps/*/src/pages/*.ts"
+
+  - id: x3-demo-fallback-needs-report
+    message: |
+      catch block comment says "demo data" / "fallback" but does not call
+      `dataIntegrity.reportDemoFallback()`. This violates the data integrity enforcement rule.
+      Ref: FRONTEND-TELEMETRY-001
+    languages: [typescript, tsx]
+    severity: ERROR
+    pattern-regex: "catch.*\\{[^}]*(?:demo data|fallback|mock data)[^}]*\\}"
+    paths:
+      include:
+        - "apps/*/src/**/*.tsx"
+        - "apps/*/src/**/*.ts"
+
+  # ── Solidity / EVM surface ──────────────────────────────────────
+
+  - id: x3-no-tx-origin-auth
+    message: |
+      Using tx.origin for authorization is insecure (phishing via proxy contracts).
+      Replace with msg.sender checks or explicit role validation.
+      Ref: SWC-115
+    languages: [solidity]
+    severity: ERROR
+    pattern: "require(tx.origin == ...)"
+    paths:
+      include:
+        - "contracts/**/*.sol"
+        - "tests/solidity_contracts/**/*.sol"
+        - "tests/security/contracts/**/*.sol"
+
+  - id: x3-no-low-level-call-unchecked
+    message: |
+      Low-level call() return value not checked. This silently swallows failures.
+      Always check (bool success, ) = addr.call{...}(...); require(success, "call failed");
+      Ref: SWC-104
+    languages: [solidity]
+    severity: ERROR
+    pattern: |
+      $ADDR.call{...}(...)
+    pattern-not: |
+      (bool $_, ...) = $ADDR.call{...}(...)
+    paths:
+      include:
+        - "contracts/**/*.sol"
+
+  - id: x3-no-delegatecall-to-variable
+    message: |
+      Calling delegatecall on a user-controlled address allows arbitrary code
+      execution in the context of this contract. Only delegatecall to known,
+      audited, immutable addresses.
+    languages: [solidity]
+    severity: ERROR
+    pattern: "$ADDR.delegatecall(...)"
+    pattern-not: "IMPLEMENTATION.delegatecall(...)"
+    paths:
+      include:
+        - "contracts/**/*.sol"
+
+  # ── Rust consensus path ─────────────────────────────────────────
+
+  - id: x3-no-float-in-consensus
+    message: |
+      Floating point arithmetic (f32/f64) detected in a consensus-critical module.
+      Floats produce non-deterministic results across hardware and compiler versions,
+      causing state root divergence and chain splits.
+      Use fixed-point integers (u128 with a known scale factor) instead.
+      Ref: VM-EXEC-001, INFRA-CCGV-001
+    languages: [rust]
+    severity: ERROR
+    pattern-either:
+      - pattern: "let $X: f32 = $Y"
+      - pattern: "let $X: f64 = $Y"
+      - pattern: "$X as f32"
+      - pattern: "$X as f64"
+    paths:
+      include:
+        - "pallets/**/*.rs"
+        - "x3-lang/**/*.rs"
+        - "crates/**/*.rs"
+        - "runtime/**/*.rs"
+      exclude:
+        - "**/tests/**"
+        - "**/*_test.rs"
+        - "**/*_bench.rs"
+        - "**/benches/**"
+
+  - id: x3-no-unwrap-in-consensus
+    message: |
+      `.unwrap()` in consensus-critical code will panic the validator on unexpected
+      input, enabling a liveness-denial attack. Use proper error propagation with `?`,
+      or explicit match/if-let with a safe fallback.
+    languages: [rust]
+    severity: WARNING
+    pattern: "$X.unwrap()"
+    paths:
+      include:
+        - "pallets/**/*.rs"
+        - "x3-lang/vm/**/*.rs"
+        - "crates/x3-atomic-kernel/**/*.rs"
+      exclude:
+        - "**/tests/**"
+        - "**/*_test.rs"
+
+  - id: x3-no-unsafe-in-state-transition
+    message: |
+      `unsafe` block found in a state-transition module. Any memory unsafety here
+      can corrupt consensus state or enable exploits. Justify with a safety comment
+      or move to an audited GPU kernel helper crate.
+    languages: [rust]
+    severity: WARNING
+    pattern: "unsafe { ... }"
+    paths:
+      include:
+        - "pallets/**/*.rs"
+        - "runtime/**/*.rs"
+      exclude:
+        - "**/tests/**"
+
+  # ── Hardcoded secrets ───────────────────────────────────────────
+
+  - id: x3-no-hardcoded-private-key
+    message: |
+      Hardcoded private key or mnemonic detected. Remove it immediately.
+      Use environment variables or a secrets manager.
+    languages: [typescript, javascript, rust, python]
+    severity: ERROR
+    pattern-regex: '(?i)(private[_\s]?key|mnemonic|seed[_\s]?phrase)\s*[=:]\s*["'']0x[0-9a-fA-F]{64}["'']'
+    paths:
+      include:
+        - "apps/**"
+        - "packages/**"
+        - "swarm/**"
+        - "scripts/**"

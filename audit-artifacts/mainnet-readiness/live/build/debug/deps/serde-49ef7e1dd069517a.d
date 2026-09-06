@@ -1,0 +1,14 @@
+/home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/deps/serde-49ef7e1dd069517a.d: /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/build/serde-ae12508abf13d3de/out/private.rs
+
+/home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/deps/libserde-49ef7e1dd069517a.rlib: /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/build/serde-ae12508abf13d3de/out/private.rs
+
+/home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/deps/libserde-49ef7e1dd069517a.rmeta: /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/build/serde-ae12508abf13d3de/out/private.rs
+
+/home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/home/lojak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/build/serde-ae12508abf13d3de/out/private.rs:
+
+# env-dep:OUT_DIR=/home/lojak/Desktop/xxxstar-main/audit-artifacts/mainnet-readiness/live/build/debug/build/serde-ae12508abf13d3de/out

@@ -1,0 +1,56 @@
+[
+  {
+    "stage": "Internal devnet",
+    "requirement": "Current locked node/runtime build, correct local genesis and basic signed transfer",
+    "threshold": "All required local build/format checks pass; one transfer included and persisted after restart",
+    "owner": "Build/release engineer",
+    "evidence": "build logs, binary/WASM hashes, genesis hash, receipt and restart state",
+    "status": "NOT ESTABLISHED",
+    "waiver": "Safety gates nonwaivable"
+  },
+  {
+    "stage": "Private multi-node testnet",
+    "requirement": "Four distinct validators; replay, partition and crash tests",
+    "threshold": "One finalized hash/root across honest nodes; no double debit; recovery succeeds; no ignored critical test",
+    "owner": "Consensus lead",
+    "evidence": "topology/config hashes, per-node logs, finalized roots, fault timeline",
+    "status": "NOT ESTABLISHED",
+    "waiver": "Safety gates nonwaivable"
+  },
+  {
+    "stage": "Public testnet",
+    "requirement": "All applicable Critical/High closure plus operational readiness",
+    "threshold": "Zero open Critical/High in enabled paths; audited scope/keys; resource limits; restore and incident drills pass",
+    "owner": "Security lead + operator lead",
+    "evidence": "closure manifests, load/fault tests, alerts, backup recovery proof",
+    "status": "NOT ESTABLISHED",
+    "waiver": "Safety gates nonwaivable"
+  },
+  {
+    "stage": "Incentivized testnet",
+    "requirement": "Public-testnet gates plus abuse-resistant reward accounting",
+    "threshold": "Every reward/slash reconciles; replay/Sybil abuse limits proven; no unresolved economic safety defect",
+    "owner": "Economic/security lead",
+    "evidence": "ledger reconciliation, abuse test corpus and published reward policy",
+    "status": "NOT ESTABLISHED",
+    "waiver": "Safety gates nonwaivable"
+  },
+  {
+    "stage": "Release candidate",
+    "requirement": "Exact artifact reproducibility and independent review",
+    "threshold": "Two independent builders reproduce runtime WASM; clean source; all tests/gates pass; no stale evidence",
+    "owner": "Release manager + independent reviewer",
+    "evidence": "signed source/build/feature/spec manifest and reviewer retest",
+    "status": "NOT ESTABLISHED",
+    "waiver": "Safety gates nonwaivable"
+  },
+  {
+    "stage": "Mainnet",
+    "requirement": "All previous gates, funded-route proof, custody and governance readiness",
+    "threshold": "Zero unresolved nonwaivable findings; genesis/keys/upgrade/restore approved; capacity SLO proven on final release",
+    "owner": "Accountable protocol/security/operator signers",
+    "evidence": "signed launch decision covering exact binary/WASM/genesis hashes",
+    "status": "NOT ESTABLISHED",
+    "waiver": "Safety gates nonwaivable"
+  }
+]

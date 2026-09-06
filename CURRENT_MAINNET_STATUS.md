@@ -1,9 +1,9 @@
 # X3 Atomic Star — Mainnet Status
 
-**Updated: 2026-06-18 — Honest ~60% average readiness (up from ~54%). Build compiles clean. Phase 3 integration pre-wired.**
+**Updated: 2026-09-05 — Honest ~54% average readiness (15/15 registry entries point at real code). Build compiles clean. Fictional registry rows purged.**
 
 > `FEATURE_REGISTRY.toml` is the single canonical source. All percentages derive from it.
-> Run `scripts/check-readiness-consistency.sh` to validate.
+> Run `scripts/check-readiness-consistency.sh` to validate (now also fails on fictional registry paths).
 
 ## System Completion Scoreboard
 
@@ -19,21 +19,13 @@ X3 Wallet Pallet (pallets/x3-wallet-pallet)        █████░░░░�
 Launch Gate (scripts/mainnet)                      █████░░░░░  55%  LIVE_TESTNET — Readiness consistency + mainnet-rc1 wired
 X3 Sentinel (pallets/x3-sentinel)                  █████░░░░░  50%  GUARDED_TESTNET — CI gate wired
 X3 Reactor (crates/x3-bench)                       ████░░░░░░  40%  LIVE_TESTNET — Benchmark not in CI critical path
-X3 Broadcast (crates/x3-broadcast)                 ███░░░░░░░  30%  LIVE_TESTNET — Marketing claims audit gated in CI
 X3 Swarm Core (crates/x3-swarm-core)               ██░░░░░░░░  25%  GUARDED_TESTNET — Experimental, not in CI
 BTC Fortress Gateway (crates/x3-gateway)           ██░░░░░░░░  25%  SIM_TESTNET — BTC signer quorum pending
 Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░░  25%  LIVE_TESTNET — Dev-ops tooling, experimental
-Auditor Agent (x3-swarm-core)                      ██░░░░░░░░  25%  LIVE_TESTNET — Not in CI, findings not auto-triaged
-X3 Grantsmith (crates/x3-grantsmith)               ██░░░░░░░░  20%  LIVE_TESTNET — Single test, no CI gate
-Breaker Agent (x3-swarm-core)                      ██░░░░░░░░  20%  LIVE_TESTNET — Not in CI, attack models unvalidated
-TestBuilder Agent (x3-swarm-core)                  ██░░░░░░░░  20%  GUARDED_TESTNET — Experimental, not in CI
 Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
-Fixer Agent (x3-swarm-core)                        █░░░░░░░░░  15%  GUARDED_TESTNET — Runtime-modifying agent requires human approval
-Marketing Agent (x3-readiness)                     █░░░░░░░░░  15%  LIVE_TESTNET — Non-consensus tooling, single test
-Grant Agent (x3-grantsmith)                        █░░░░░░░░░  15%  LIVE_TESTNET — Non-consensus tooling, single test
 ```
 
-**Average readiness: ~54%** — 23 features tracked, core consensus features ready for guarded testnet deployment.
+**Average readiness: ~54%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05), core consensus features ready for guarded testnet deployment.
 
 ## What's Actually Working
 

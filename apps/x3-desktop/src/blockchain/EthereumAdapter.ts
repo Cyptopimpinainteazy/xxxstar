@@ -9,16 +9,13 @@ import { invoke } from '../ipc/tauri';
 export class EthereumAdapter implements ChainAdapter {
   readonly name = 'Ethereum';
   readonly chainId = 1;
-  private connected = false;
 
   async connect(): Promise<void> {
-    const result = await invoke<string>('connect_chain', { chain: 'ethereum' });
-    this.connected = result === 'ok';
+    await invoke<string>('connect_chain', { chain: 'ethereum' });
   }
 
   async disconnect(): Promise<void> {
     await invoke<string>('disconnect_chain', { chain: 'ethereum' });
-    this.connected = false;
   }
 
   async getStatus(): Promise<ChainStatus> {

@@ -1,0 +1,1238 @@
+{
+  "generated_at_utc": "2026-09-05T19:13:20.234474+00:00",
+  "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+  "audited_tree": "Base commit plus pre-existing working-tree changes; see provenance.json",
+  "hash_algorithm": "SHA-256",
+  "pdf_pages": 127,
+  "excluded": [
+    "manifest.json (detached checksum in manifest.sha256)",
+    "manifest.sha256",
+    "__pycache__/"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "purpose": "Artifact index and reproduction instructions",
+      "created_at_utc": "2026-09-05T19:12:57.252074+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 9900,
+      "sha256": "2c9c3ce45f275a3d3d7f74841427521061cdd07b3cb8baee30679f52755106de"
+    },
+    {
+      "path": "X3-ROAD-TO-MAINNET.pdf",
+      "purpose": "Final illustrated field manual",
+      "created_at_utc": "2026-09-05T19:11:37.517757+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 355184,
+      "sha256": "62ca447d5e36aadd9e8333116795f065873a42b6aff4d11d02ef3d98a5728380"
+    },
+    {
+      "path": "artifact-validation.json",
+      "purpose": "Final document, data and source-preservation validation",
+      "created_at_utc": "2026-09-05T19:12:59.356082+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 4066,
+      "sha256": "99419c1330488551ec2493b0675da659726a05da2476e8b10f24057818ed7562"
+    },
+    {
+      "path": "assets/architecture.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.768219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2443,
+      "sha256": "764bb9f18a954137f22bfac07fd88ef9a08a301ad4251f682fadf7311938111c"
+    },
+    {
+      "path": "assets/architecture.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.764219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6961,
+      "sha256": "ca00e6c6fcf7d3d7f0916c84c5445bef791ecbc523bc6321a623eb7d0f0b7a82"
+    },
+    {
+      "path": "assets/attack.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.871219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2424,
+      "sha256": "489014f8d65ea6d71fd4a886517c3139e5a3b73fd5cf4d7540507694dc6ded79"
+    },
+    {
+      "path": "assets/attack.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.867219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6781,
+      "sha256": "bce2f4050f3feaef0d784460e36481c36d38ef37eadccec615dc21272606d652"
+    },
+    {
+      "path": "assets/consensus.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.787219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2450,
+      "sha256": "d1332cdf2aac9ce1296701a33371a12b95820f1e57b91f28766e4e1999f65445"
+    },
+    {
+      "path": "assets/consensus.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.782219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6988,
+      "sha256": "cec894f36f557b40ff79cb1f530b0660ef2288dafb8fd045cd1339b962474c16"
+    },
+    {
+      "path": "assets/critical-path.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.817219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2601,
+      "sha256": "7f958ea46bdf07f8551bcfc31469c7a902922371bb1340c850fa12ebce6767fb"
+    },
+    {
+      "path": "assets/critical-path.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.812219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 8901,
+      "sha256": "95e32c82feca0fa8d4f32756c312294f453afe3742a4ad5060a8ca5e548ab3d1"
+    },
+    {
+      "path": "assets/dependencies.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.805219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2470,
+      "sha256": "d4d804ac5bf38455301298d47cc9de8b134a7259ab53b160794e13a635f45764"
+    },
+    {
+      "path": "assets/dependencies.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.801219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6720,
+      "sha256": "e46307af8666fc0c77d7557dae4a3d55be77ecf056c4b25e8810f342ced466c0"
+    },
+    {
+      "path": "assets/dependency-heatmap.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.936219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2488,
+      "sha256": "a431a437012e012622053342b9ba20cd1c2d9e6644e451c8cabfce39f5d6a792"
+    },
+    {
+      "path": "assets/dependency-heatmap.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.932219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6818,
+      "sha256": "4b5330997a65ac4b51ad60f8233b1857e035425ee6d8af3d17676cf9ffb20cae"
+    },
+    {
+      "path": "assets/deployment.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.851219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2440,
+      "sha256": "36a15e5ccec2f258a8dc0ecfd2ba7659844335a81afe3aa93b3207810f731659"
+    },
+    {
+      "path": "assets/deployment.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.847219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6927,
+      "sha256": "52252a4c9b7a7c189bab952802a66d9e9ba313a7946c22437df1197c726c0d00"
+    },
+    {
+      "path": "assets/docs.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.927219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2065,
+      "sha256": "2dcb4cc2bbcddd73794f001475442d38ae08fab6eaf211a04a2fe95a4ffb6608"
+    },
+    {
+      "path": "assets/docs.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.924219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3650,
+      "sha256": "7417d1c48b91efb5ef87352a4658a98dfbac14f60d56d119bc3e7a93be6778ae"
+    },
+    {
+      "path": "assets/effort.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.917219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2545,
+      "sha256": "79ff25a8e670eb609c09745df0777db6aea8118aef1eccb7e5b72a77ed086df8"
+    },
+    {
+      "path": "assets/effort.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.913219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 5629,
+      "sha256": "68d6dbec9e436f17d957e4fbc3360bd45975fc72661f09b15bce07f37bf71cc9"
+    },
+    {
+      "path": "assets/external.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.862219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2456,
+      "sha256": "c99c10ee35d2a9b5c2b9a80470a35ff301237b6041b039053f4452b8076dd317"
+    },
+    {
+      "path": "assets/external.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.858219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6708,
+      "sha256": "4bea21c6af0b51bfc6363edfd58168e14c7f5184db94878d7786ef4dee5ad292"
+    },
+    {
+      "path": "assets/gates.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.909219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2054,
+      "sha256": "f852dec08992f3bcdec7fe06d332c1eef38e707552d39e455f082274402f8376"
+    },
+    {
+      "path": "assets/gates.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.905219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 4842,
+      "sha256": "d403b08e667a7422c9cc728517c30d41e797ec30ceab5d09dd37878da2048e74"
+    },
+    {
+      "path": "assets/implementation.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.732219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2018,
+      "sha256": "1902d328299e86105350f4492f33f57221d45f538bf76f42068b14b1742e57ba"
+    },
+    {
+      "path": "assets/implementation.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.729218+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 4287,
+      "sha256": "5336451f82901104f52b8028c840e9aabba8db1615b208fc1e1eca82edd0941a"
+    },
+    {
+      "path": "assets/keys.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.889219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2449,
+      "sha256": "89c57f267f37755a4dc509ad9302cd0bb720b67734c60681596315e61acaa513"
+    },
+    {
+      "path": "assets/keys.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.885219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6943,
+      "sha256": "c664df03c4db0b8a5e4530b277ae12b6c4d30f4485a6f2275c1d4cdae478c112"
+    },
+    {
+      "path": "assets/privilege.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.880219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2471,
+      "sha256": "ac7411420cf216f7d4acc007e1b73b4790197e113d9dd8dc8065eb6fa172e591"
+    },
+    {
+      "path": "assets/privilege.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.876219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6709,
+      "sha256": "b290a887c1557eb8c676c2e4678451b943554b26caf144e23a428dacccc307cd"
+    },
+    {
+      "path": "assets/radar.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.742218+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3302,
+      "sha256": "634abdb45280c593df835b4244d5ec89c17c9971e526dd162e7b4a904a790fc9"
+    },
+    {
+      "path": "assets/radar.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.737219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 8146,
+      "sha256": "d30a12135866864192a984323e5c7d94446b8463b13ea4e67a5a26374770f0d3"
+    },
+    {
+      "path": "assets/readiness.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.921219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1955,
+      "sha256": "94663cac91732cf5dd3e483a16d0166f19e7b5052dd9f56bc4f12cb2801d80cf"
+    },
+    {
+      "path": "assets/readiness.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.919219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2340,
+      "sha256": "ef968616a83cf48963364e895f816a67b5d5b8c9cb8e4532d8a1c8753adeb1a5"
+    },
+    {
+      "path": "assets/risk.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.759219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2312,
+      "sha256": "2b93a4b87dd4c64cfcbc026fc2816725e96f809941f7ddec6c16284aa2a43d59"
+    },
+    {
+      "path": "assets/risk.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.753219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 11358,
+      "sha256": "7101a155a4cbcecee7be0d2f5a6344a602bc4d8e8cb61d2ed218bc819df75035"
+    },
+    {
+      "path": "assets/severity.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.725219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1967,
+      "sha256": "ee01477c4938d21046629431abd513efd22c02f56da51d71dbccfda3f560dd8d"
+    },
+    {
+      "path": "assets/severity.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.723218+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3514,
+      "sha256": "2238360c8048ec019cfa3bfd3bf8d9d66b7447336b5fa486f7b5e30767daf207"
+    },
+    {
+      "path": "assets/startup.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.833219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2420,
+      "sha256": "b66e183cec7d2fbd6101a20e21d3052a5a8438756a6a3c3bac09b461b1197238"
+    },
+    {
+      "path": "assets/startup.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.829219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6699,
+      "sha256": "315a02233aa19aee31edf3d6b2db759d05fc0f2c830dc5eb0812c961b9ce3158"
+    },
+    {
+      "path": "assets/state.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.842219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2463,
+      "sha256": "fe9fcf3a70f0d5fe8d2739ab44e9258b313d62369a2049d5da269891ebab4cbd"
+    },
+    {
+      "path": "assets/state.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.838219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6745,
+      "sha256": "12523e630fa11141a1ecb3df4900742a6860e53ab71ad1d18a9fb6a1a4b1d4da"
+    },
+    {
+      "path": "assets/status.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.719218+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2162,
+      "sha256": "eb7db07f662f69012c6cc58afa72cf7f996c9f855060f5e8d3bc9ac015e77919"
+    },
+    {
+      "path": "assets/status.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.716218+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 5551,
+      "sha256": "2468fe3b0f5461d5ce90f503306da0b3b83549a8bfd888f030dc96fd1347ac91"
+    },
+    {
+      "path": "assets/subsystems.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.711219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2330,
+      "sha256": "e13d7a9976ba4bd5c83f7f48a1332e379a2d05afb42bea3ef555a5a9f56f3cb6"
+    },
+    {
+      "path": "assets/subsystems.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.704219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 10598,
+      "sha256": "ce3a17d9e02555aa67e5833c67c18141306cd805f599faeee5da6a3e9bda4a7c"
+    },
+    {
+      "path": "assets/test-matrix.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.901219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2300,
+      "sha256": "88ba07a53edbfcf4de6db7aa1ab6b28efcd9082ef8031cd1162e924cb2e2a7b7"
+    },
+    {
+      "path": "assets/test-matrix.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.896219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 9426,
+      "sha256": "4408328e4d3e32a9d0f0045985879c51635758333a1b6cc59479fb5f148c54b3"
+    },
+    {
+      "path": "assets/timeline.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.824219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2250,
+      "sha256": "b062754155b3d2f4b83cd846666091c33a84b0e5d77a89f0154d43c51c8069bb"
+    },
+    {
+      "path": "assets/timeline.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.820219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 4948,
+      "sha256": "f3c877872f8b8e9026d4cc0c4509eb478dbbbc141a67da777943e6b4011e62d1"
+    },
+    {
+      "path": "assets/transaction.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.777219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2429,
+      "sha256": "303e89ac7988a061a17590c628109ab1a9edfd720adf196f114fa3fb454611c9"
+    },
+    {
+      "path": "assets/transaction.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.773219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6677,
+      "sha256": "3e0987608d771699313e27309606c24c551a3af944ab3dc55d3b9e4433978830"
+    },
+    {
+      "path": "assets/trust.pdf",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.796219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2488,
+      "sha256": "32aff06747d56ba4ef324f8189f7e3473769ce1c198f9cd30abfa4fadc4660b6"
+    },
+    {
+      "path": "assets/trust.svg",
+      "purpose": "Reusable vector audit figure",
+      "created_at_utc": "2026-09-05T18:51:53.792219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 6761,
+      "sha256": "69ecc9e6efab8e5593a7550ef0af5ddc78794d357abef1eed45b6710ac61fc63"
+    },
+    {
+      "path": "audit-harness/proof/Cargo.lock",
+      "purpose": "Reproducible bounded audit test harness or locked dependencies",
+      "created_at_utc": "2026-09-05T18:49:13.691154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 11813,
+      "sha256": "ea13c3f45ff60b56d2c46db43194d1e4e2bfc26a23c3ed3cb61fb60f94daff5a"
+    },
+    {
+      "path": "audit-harness/proof/Cargo.toml",
+      "purpose": "Reproducible bounded audit test harness or locked dependencies",
+      "created_at_utc": "2026-09-05T18:49:13.691154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 285,
+      "sha256": "9fbd243a9b6fa303461389a56adda90d498f5f267c1bdbc888d5e794bd50854a"
+    },
+    {
+      "path": "audit-harness/proof/src/lib.rs",
+      "purpose": "Reproducible bounded audit test harness or locked dependencies",
+      "created_at_utc": "2026-09-05T18:49:13.691154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1298,
+      "sha256": "81d9d024aa645eee53ba31d30572543b02bb1b31253e6220043b6260b5d111bf"
+    },
+    {
+      "path": "audit-harness/rpc/Cargo.lock",
+      "purpose": "Reproducible bounded audit test harness or locked dependencies",
+      "created_at_utc": "2026-09-05T18:49:13.690154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1825,
+      "sha256": "dcab76cf2f2112f354b8aef6b755a2caec3015cb8af37965a614d27b1b7ce266"
+    },
+    {
+      "path": "audit-harness/rpc/Cargo.toml",
+      "purpose": "Reproducible bounded audit test harness or locked dependencies",
+      "created_at_utc": "2026-09-05T18:49:13.690154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 151,
+      "sha256": "0219523a1ec4e0abae74cb33dde9bad66986dc5cf2631830e5d2422aeeaf4560"
+    },
+    {
+      "path": "audit-harness/rpc/src/lib.rs",
+      "purpose": "Reproducible bounded audit test harness or locked dependencies",
+      "created_at_utc": "2026-09-05T18:49:13.691154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 81,
+      "sha256": "85529b5cb110f88d6c6af9ce91c5fb0f55b0f18b8fdd9c5d331aab94adefba47"
+    },
+    {
+      "path": "author_report.py",
+      "purpose": "Maintainable audit package generation or validation source",
+      "created_at_utc": "2026-09-05T19:00:03.660273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 63721,
+      "sha256": "0f5d8d311439b8a1b4d5e7694ecbc91c55bc2d37c3ea64eb435af6b1b64d4e39"
+    },
+    {
+      "path": "benchmark-results.csv",
+      "purpose": "Blank unmeasured performance template",
+      "created_at_utc": "2026-09-05T19:00:03.726273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 282,
+      "sha256": "78cfc0af0216d31c979bd304a664d89d04d295fcd85ef643341e6820cea17585"
+    },
+    {
+      "path": "evidence/advisories-unfiltered.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.686154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 249297,
+      "sha256": "ad0ada0625b63357688da30dc5b9f47c80b19c659042a582f24ae24526c1c70f"
+    },
+    {
+      "path": "evidence/advisories.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.685154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 54634,
+      "sha256": "c510bf997238b418690f79ca385c4ca8dedd847806f937b11d909d521ef39f5e"
+    },
+    {
+      "path": "evidence/anchor.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:46:29.945324+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 40,
+      "sha256": "39f5e4e46edd08115bcf94cb7f3f731d85507ca36fc00781b68b64665aeaf4d6"
+    },
+    {
+      "path": "evidence/api-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2841,
+      "sha256": "691a5e1e9684c5c23524fb83b40c2cb53f458e96adca82e27bef2bda29a70faf"
+    },
+    {
+      "path": "evidence/audit-help.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:33:06.525105+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1718,
+      "sha256": "6dad1dc32bf1a72f26dc8cfe3dad280d55934f77db9d08f3ff554a112581bee9"
+    },
+    {
+      "path": "evidence/check-complete.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:38:56.702312+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 22100,
+      "sha256": "be55f8ba1a18d89986cee15fbddbd2ccb7f2fed713cc52e7d2e48a8fe094cc75"
+    },
+    {
+      "path": "evidence/check.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:31:17.926399+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 68169,
+      "sha256": "3cf832ffc4fdfe9a4cc0a684a6af07532308318f01a6cf6efcec6a04bb1da110"
+    },
+    {
+      "path": "evidence/clippy-complete.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:39:54.299669+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 22640,
+      "sha256": "571741be5a989ffebbfd5ce9e7613d44705ad8dd1e26e748ed0f3c6f0d9617b8"
+    },
+    {
+      "path": "evidence/clippy.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:18.146699+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 55590,
+      "sha256": "ac6e35198e47db5c5134ac2573d2876d311398364cd273ff8550407d9d080d84"
+    },
+    {
+      "path": "evidence/commands.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:29.415770+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3665,
+      "sha256": "b588e773635954e8abc98668d56d55850c79475067bc2ed0388f8d382e0d9457"
+    },
+    {
+      "path": "evidence/component-map.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:34:51.582776+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 366469,
+      "sha256": "0ebf41d5ef3fa21c2be06ad5db02760efc88644c5909772d7ffcc99c4bb58572"
+    },
+    {
+      "path": "evidence/configuration-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 22990,
+      "sha256": "b103676a6b5a7cd799167fa0039a87b54543090a364318ec38a4a7f4e9b4f734"
+    },
+    {
+      "path": "evidence/consistency.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:33:05.445098+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 569,
+      "sha256": "68fb1d6886967870d300a2611bb103c57d1dddd1dd3d42eaf31447039ba2f98d"
+    },
+    {
+      "path": "evidence/continued-commands.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:46:29.946324+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2650,
+      "sha256": "d0816b58d1c7eb5e47e8e88235c024ea2e60884e94858e6d36445b2c5b39ad1b"
+    },
+    {
+      "path": "evidence/contracts-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3536,
+      "sha256": "254bfbabf8d7b671b5d0533956ed9c43cabefe7753e0d7e35ddb3e669caba0b2"
+    },
+    {
+      "path": "evidence/contracts.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:46:29.941324+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 39,
+      "sha256": "121d0a0d6de57fb2194eb92f892c3d02fd667335f1261063147ad5004b1bc6fa"
+    },
+    {
+      "path": "evidence/dependency-inventory.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.833154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 708876,
+      "sha256": "0e9777b15fa6ec0e77ecc1ad53cec6ca7bc847ed013a452877ea797c34f14b77"
+    },
+    {
+      "path": "evidence/deployment-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.846154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 12335,
+      "sha256": "fc2b4c2d6692a05d68b6457546b890d52c9c3fa48684800d1bcab815f918712b"
+    },
+    {
+      "path": "evidence/dsl-cli.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:32:59.410059+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3054,
+      "sha256": "2938faea1f1a67a57e7c764a7cd2a8b87ab88d402ace316507e1147ff03de7ba"
+    },
+    {
+      "path": "evidence/dsl-tests.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:32:59.298058+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 13606,
+      "sha256": "7607dc2d2eb3d0523d92c266071492779c705c7573ee66e8ba38a577537d71c4"
+    },
+    {
+      "path": "evidence/extra-commands.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:33:07.452111+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1913,
+      "sha256": "436bb0eef49de270218bd7df2fba14cf8d031d2a2a4251a7e01b95ea8c3f11a6"
+    },
+    {
+      "path": "evidence/fake-scan-locations.jsonl",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:35:59.991209+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 5204662,
+      "sha256": "30c75bde51950391d6c6051e7b8a7416e2d3b2518b0d9a421fb1a3a6f5ca9f14"
+    },
+    {
+      "path": "evidence/fake-scan-result.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:35:59.994209+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 471,
+      "sha256": "97fa18a7e6b76ed2534243f37a1407b3c6ca191b488ef453c73308f44a5f0d23"
+    },
+    {
+      "path": "evidence/fmt.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:29.415770+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 90713,
+      "sha256": "c735554719182eb7a872f3e64a9063c28cd2631ebedd0529695ad40a7db52e36"
+    },
+    {
+      "path": "evidence/fresh.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:32:59.419059+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 50,
+      "sha256": "568babb31c66255ea7081a07d61d291c5a14beca130707ef631deed8911344a2"
+    },
+    {
+      "path": "evidence/gate-wallet.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.686154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 65,
+      "sha256": "e8ba25ea0890bf6630709e9f811ccb71944e489015181c521f81c609f9040c2a"
+    },
+    {
+      "path": "evidence/incompleteness-candidates.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:34:51.535776+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2522157,
+      "sha256": "e73e0f1e61c81d802af532dcc906252b3fa473b5b225c3a41ac6a6719939c6c6"
+    },
+    {
+      "path": "evidence/instructions-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 171,
+      "sha256": "d986733e7771218564c507c510a1832372f8715234ed84cba7dbc37337c2ed89"
+    },
+    {
+      "path": "evidence/inventory.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:34:51.448775+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1320116,
+      "sha256": "238c8c9151ff0e87d3e750502b95eec215f73bcb1ae51995144dcb610f15b379"
+    },
+    {
+      "path": "evidence/lockfiles-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1213,
+      "sha256": "d6fd70d2cfdfde2a7e90ab50c7b3fb2565cc666f4eaaf4a94235e62edee8cf05"
+    },
+    {
+      "path": "evidence/metadata.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:28:17.797198+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 571626,
+      "sha256": "c7f694acaaf6da2e6dc84f34148cd44361da5a9843eb5132cfad774af49570b3"
+    },
+    {
+      "path": "evidence/migrations-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.846154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1251,
+      "sha256": "9a5bd8cbee588ff3443e47a4264a98fbfd65003ad6c38d53446401b0d4b6b2f4"
+    },
+    {
+      "path": "evidence/npm-build.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:33:06.396104+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 957,
+      "sha256": "d744c2765a86e5fbf5e8b2cb381e76708b9aff49b23f7e0e462ca0ef85b44373"
+    },
+    {
+      "path": "evidence/npm-test.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:19.056705+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 719,
+      "sha256": "5d04b034822edb5b3064f5d332f035351e92ee0e659959f5ebd234ad018e5aad"
+    },
+    {
+      "path": "evidence/pnpm-build.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:18.168699+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 38,
+      "sha256": "8ea8852ca7b9ecd2ce751cf547b78d017506426b7ca75e885defbc47dddddb3c"
+    },
+    {
+      "path": "evidence/pnpm-test.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:18.157699+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 38,
+      "sha256": "8ea8852ca7b9ecd2ce751cf547b78d017506426b7ca75e885defbc47dddddb3c"
+    },
+    {
+      "path": "evidence/proof-harness.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:38:16.436063+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3584,
+      "sha256": "8e682a0881f44f58128aa84971f83f2b25043035ee7b3dbbadbe22ce0889dd8c"
+    },
+    {
+      "path": "evidence/pytest.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:37:19.062705+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 40,
+      "sha256": "9a09aa2b820a5dea9b1eb80a0982abaa348b527946d0fb6ea98c9bc9c8ec61b2"
+    },
+    {
+      "path": "evidence/python-collection.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:33:07.452111+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 819,
+      "sha256": "b886587db17a3b58fad39d532890c50fa8766b4313da190021147b8426e5aea1"
+    },
+    {
+      "path": "evidence/release-complete.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:44:32.778641+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 62904,
+      "sha256": "498924818057207a993625d5ec87d391295a770f8b0f9dc052ecfc0750f215b3"
+    },
+    {
+      "path": "evidence/rpc-harness.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:33:27.959243+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1048,
+      "sha256": "fc41aab132a8552fc64f7a2362aaba76652112b5d5da90416f2dd037341b1132"
+    },
+    {
+      "path": "evidence/rpc-unit.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:32:54.976030+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 700,
+      "sha256": "6e33ffc5ef7fbc053c615e19174c4b7cf175f11a3c43f8b14937ff5587db42e2"
+    },
+    {
+      "path": "evidence/source-hashes.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:34:51.469775+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1035657,
+      "sha256": "d39bfcf2b1d2f1af10ad9e294591cdeb81c814f262504534927836c809b53456"
+    },
+    {
+      "path": "evidence/test-complete.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:39:39.560578+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 21318,
+      "sha256": "b510a50ca854a4b245c762c23c636a0267b9fed6fe80d2863f9f28edc55f232c"
+    },
+    {
+      "path": "evidence/test.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:34:18.133564+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 65350,
+      "sha256": "a4accfb5d9de9e4a91de886a596952461da7ab9e21f8b45075f5bcdfbbc6462c"
+    },
+    {
+      "path": "evidence/testnet-complete.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:46:29.936324+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 46214,
+      "sha256": "4434f335dd225101466b3b974377fa588e1d7c55cfa2fcdd512183d6d9b6bba2"
+    },
+    {
+      "path": "evidence/tests-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 23140,
+      "sha256": "b2105c459906317d5b0e828c93f28f338fa17efb5be4f49002cfb23b89734a9b"
+    },
+    {
+      "path": "evidence/tools.log",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:28:17.633197+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 424,
+      "sha256": "033f0cfe5189a41353cda98971408b055e75fb6e4d25519a967b4c0bc404053a"
+    },
+    {
+      "path": "evidence/verification-ledger.json",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.835154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 10406,
+      "sha256": "9561507280744ab5bf931ba1ea83271054cf472d56cfde4d91f3b552cd8f1354"
+    },
+    {
+      "path": "evidence/workflows-inventory.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.845154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1443,
+      "sha256": "cfa83eb4709e2fca790535521d9374663af2ced4da72f4371c4daea3a4688db6"
+    },
+    {
+      "path": "evidence/working-tree-after.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T19:12:58.611079+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2468,
+      "sha256": "10e6844186d5b54c96e6564514dc1a17ea51cdff678571ab76011aaaeb0ef32a"
+    },
+    {
+      "path": "evidence/working-tree-before.txt",
+      "purpose": "Retained audit evidence, command log or repository inventory",
+      "created_at_utc": "2026-09-05T18:49:13.690154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2448,
+      "sha256": "6dd6d2b32fc072ffc7b91fd69e4e7660be040cd4b49808e44d5699379977b273"
+    },
+    {
+      "path": "executive-summary.md",
+      "purpose": "Standalone executive summary",
+      "created_at_utc": "2026-09-05T19:00:03.726273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2294,
+      "sha256": "fceda370f8f86cc8e03fd7b5287268c9e639744aa2fea3dce5ee987cc8103817"
+    },
+    {
+      "path": "feature-completeness.csv",
+      "purpose": "Capability acceptance matrix",
+      "created_at_utc": "2026-09-05T18:45:19.748491+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 45839,
+      "sha256": "8d56fe74245a5af29450152bb7c995a48dfae5c0d36c32079ef7468cbffd71ff"
+    },
+    {
+      "path": "figure-register.json",
+      "purpose": "Figure numbering and captions",
+      "created_at_utc": "2026-09-05T18:51:53.937219+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 4402,
+      "sha256": "5aedcfc8fb0bab8c67fce3da5708788cf2daa25ec7d146eabd6bb34f5d415c7d"
+    },
+    {
+      "path": "findings.json",
+      "purpose": "Detailed findings register",
+      "created_at_utc": "2026-09-05T18:45:19.015493+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 64393,
+      "sha256": "15085d3d67819c9c1bad25a51716ba264802345656d54d8f0fe2bd1b410f8d88"
+    },
+    {
+      "path": "launch-gates.json",
+      "purpose": "Proposed objective launch gates",
+      "created_at_utc": "2026-09-05T19:00:03.716273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 2772,
+      "sha256": "39d4807059be32c55173e69f853c07aa9926663c013ccee17b55264ba80515b8"
+    },
+    {
+      "path": "make_manifest.py",
+      "purpose": "Maintainable audit package generation or validation source",
+      "created_at_utc": "2026-09-05T19:12:57.252074+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 3424,
+      "sha256": "6c23cfedda6d3eef1f2baf19c9631777ce854d6dd921a204faa00b575f22670b"
+    },
+    {
+      "path": "pdf-navigation.json",
+      "purpose": "Rendered chapter page and table register",
+      "created_at_utc": "2026-09-05T19:11:37.518757+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 4537,
+      "sha256": "3dbf9dc7b1f93f31a36afe6178c62269becb008500e85be3d5560149762c13d7"
+    },
+    {
+      "path": "provenance.json",
+      "purpose": "Audited source provenance and exclusions",
+      "created_at_utc": "2026-09-05T18:49:13.704154+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 1179,
+      "sha256": "88fc315942a0f2bbf8e2644d8cb2e6bf4d1863bee76a3c14486dc848e0f2b4c3"
+    },
+    {
+      "path": "recovery-plan.json",
+      "purpose": "Phased remediation backlog",
+      "created_at_utc": "2026-09-05T19:00:03.716273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 48570,
+      "sha256": "1e6868b699524b417227e154ef10665fbbecb55de2c5858a56aa53718d24bb34"
+    },
+    {
+      "path": "render_report.py",
+      "purpose": "Maintainable audit package generation or validation source",
+      "created_at_utc": "2026-09-05T19:11:35.628750+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 11041,
+      "sha256": "bd31c9fd85d668b2405dcbe8312b842ee32db7b86b2de55e3af7de15bfb6a3b1"
+    },
+    {
+      "path": "report-source.json",
+      "purpose": "Structured report rendering source",
+      "created_at_utc": "2026-09-05T19:00:03.724273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 309224,
+      "sha256": "eaed1ad2b6b043ebd71f02b8a322b5ca3e9195593aa69d440bfa40e5918d931b"
+    },
+    {
+      "path": "scorecard.json",
+      "purpose": "Evidence criteria, weighting and score calculation",
+      "created_at_utc": "2026-09-05T18:45:19.744491+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 84701,
+      "sha256": "d5976e8d380d5c7d385a0508fd5b4812691e464ab5daf26dc23820043164af77"
+    },
+    {
+      "path": "source.md",
+      "purpose": "Full Markdown manuscript",
+      "created_at_utc": "2026-09-05T19:00:03.726273+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 208042,
+      "sha256": "52555b2134fd63b5ef116f6dee01dfc1464825e6fee32d723122a0c761e04872"
+    },
+    {
+      "path": "validate_package.py",
+      "purpose": "Maintainable audit package generation or validation source",
+      "created_at_utc": "2026-09-05T19:12:57.251074+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 5737,
+      "sha256": "b561322caba16d6674ead753e7e3c83d2b65a79009b53ba11fb28050b1db2ea3"
+    },
+    {
+      "path": "visual-review/pages-001-024.jpg",
+      "purpose": "Contact-sheet evidence from all-page raster layout review",
+      "created_at_utc": "2026-09-05T19:12:25.586947+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 402146,
+      "sha256": "bae8f6cf06949fc449c02c96a40ca0e0e8bb3ea75464a1f16a669c9085068b06"
+    },
+    {
+      "path": "visual-review/pages-025-048.jpg",
+      "purpose": "Contact-sheet evidence from all-page raster layout review",
+      "created_at_utc": "2026-09-05T19:12:25.731948+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 514028,
+      "sha256": "308f80f3a012a8115c79dcab224efe72195a33059c749071fa0f847a4911939a"
+    },
+    {
+      "path": "visual-review/pages-049-072.jpg",
+      "purpose": "Contact-sheet evidence from all-page raster layout review",
+      "created_at_utc": "2026-09-05T19:12:25.866949+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 479443,
+      "sha256": "63c2eff4153dd3ccf12d74a19d50e16b0052a808467da78e501c160ba294dfff"
+    },
+    {
+      "path": "visual-review/pages-073-096.jpg",
+      "purpose": "Contact-sheet evidence from all-page raster layout review",
+      "created_at_utc": "2026-09-05T19:12:26.006949+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 540607,
+      "sha256": "317b93680a22c689f4d19c35e431ad92b8d779f7cf2b2bb8592c51fbc714558f"
+    },
+    {
+      "path": "visual-review/pages-097-120.jpg",
+      "purpose": "Contact-sheet evidence from all-page raster layout review",
+      "created_at_utc": "2026-09-05T19:12:26.140950+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 579074,
+      "sha256": "f8c3a93e372a3c1bf5dda11f5d6831a3081d5d696a4f7d385a0c789cc313e3e2"
+    },
+    {
+      "path": "visual-review/pages-121-127.jpg",
+      "purpose": "Contact-sheet evidence from all-page raster layout review",
+      "created_at_utc": "2026-09-05T19:12:26.188950+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 204082,
+      "sha256": "a08a1158f5392dad231d0ef093d48ee7e37d5104668ef1714f6ee4e783ba390e"
+    },
+    {
+      "path": "visuals.py",
+      "purpose": "Maintainable audit package generation or validation source",
+      "created_at_utc": "2026-09-05T18:51:53.090218+00:00",
+      "creation_time_basis": "filesystem birth time when available; otherwise last modification time",
+      "repository_commit_sha": "6a24d8cf38f2522ddf9ae0b47011fd59a9984208",
+      "bytes": 14456,
+      "sha256": "6428a4d3fc5335ff504ecbad173ab64685cd352a34fca87a5b6ec1fdbae75bde"
+    }
+  ]
+}

@@ -21,6 +21,9 @@ Use one directive per entry:
 
 - Prefer ...
 
+<!-- observed: 2026-09-04 | status: active -->
+- When asked to compare an external repo against this workspace, evaluate strictly by whether it adds real, non-deprecated code we lack; do not import scaffolding, deprecated crates, or redundant alternate implementations of features we already own in another layer. <!-- project: path:/home/lojak/Desktop/xxxstar-main -->
+
 ## Related
 
 - [Agent workspace](/concepts/agent-workspace)

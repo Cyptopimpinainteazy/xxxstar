@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 /**
  * Factory for creating agent geometries as React Three Fiber components.
  */

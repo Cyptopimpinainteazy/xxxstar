@@ -1,0 +1,299 @@
+[
+  {
+    "id": "tools",
+    "command": "rustc --version; cargo --version; node --version; npm --version; pnpm --version; python --version; python3 --version; /usr/bin/python3 --version; cargo audit --version; forge --version; anchor --version; protoc --version; clang --version",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 2.79,
+    "time": "2026-09-05T18:28:14.843362+00:00",
+    "log": "evidence/tools.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "metadata",
+    "command": "cargo metadata --offline --locked --no-deps --format-version 1",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 0.16,
+    "time": "2026-09-05T18:28:17.635406+00:00",
+    "log": "evidence/metadata.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "check",
+    "command": "cargo check --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 124,
+    "seconds": 180.13,
+    "time": "2026-09-05T18:28:17.799366+00:00",
+    "log": "evidence/check.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "test",
+    "command": "cargo test --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 124,
+    "seconds": 180.2,
+    "time": "2026-09-05T18:31:17.931913+00:00",
+    "log": "evidence/test.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "clippy",
+    "command": "cargo clippy --workspace --all-targets -- -D warnings",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 124,
+    "seconds": 180.01,
+    "time": "2026-09-05T18:34:18.134623+00:00",
+    "log": "evidence/clippy.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "pnpm-test",
+    "command": "pnpm test",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.01,
+    "time": "2026-09-05T18:37:18.152509+00:00",
+    "log": "evidence/pnpm-test.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "pnpm-build",
+    "command": "pnpm build",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.01,
+    "time": "2026-09-05T18:37:18.159324+00:00",
+    "log": "evidence/pnpm-build.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "npm-test",
+    "command": "npm test",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.89,
+    "time": "2026-09-05T18:37:18.170522+00:00",
+    "log": "evidence/npm-test.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "pytest",
+    "command": "python -m pytest",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.0,
+    "time": "2026-09-05T18:37:19.058254+00:00",
+    "log": "evidence/pytest.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "fmt",
+    "command": "cargo fmt --all -- --check",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 10.35,
+    "time": "2026-09-05T18:37:19.064902+00:00",
+    "log": "evidence/fmt.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "rpc-unit",
+    "command": "rustc --edition=2021 --test node/src/rpc_middleware.rs -o /tmp/x3-audit-20260905/rpc-tests && /tmp/x3-audit-20260905/rpc-tests --test-threads=1",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 0.31,
+    "log": "evidence/rpc-unit.log"
+  },
+  {
+    "id": "dsl-tests",
+    "command": "/usr/bin/python3 -m pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_emitter.py x3-lang/tests/test_simulator.py",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 4.32,
+    "log": "evidence/dsl-tests.log"
+  },
+  {
+    "id": "dsl-cli",
+    "command": "/usr/bin/python3 x3-lang/cli.py x3-lang/examples/arb_solana_eth.x3",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 0.11,
+    "log": "evidence/dsl-cli.log"
+  },
+  {
+    "id": "fresh",
+    "command": "bash scripts/fresh_machine_check.sh",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 1,
+    "seconds": 0.01,
+    "log": "evidence/fresh.log"
+  },
+  {
+    "id": "consistency",
+    "command": "bash scripts/check-readiness-consistency.sh",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 6.03,
+    "log": "evidence/consistency.log"
+  },
+  {
+    "id": "npm-build",
+    "command": "npm run build",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.95,
+    "log": "evidence/npm-build.log"
+  },
+  {
+    "id": "audit-help",
+    "command": "cargo audit --help",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 0,
+    "seconds": 0.13,
+    "log": "evidence/audit-help.log"
+  },
+  {
+    "id": "python-collection",
+    "command": "/usr/bin/python3 -m pytest --collect-only -q tests/test_migrations.py",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 2,
+    "seconds": 0.92,
+    "log": "evidence/python-collection.log"
+  },
+  {
+    "id": "check-complete",
+    "command": "cargo check --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 20.75,
+    "time": "2026-09-05T18:38:35.952291+00:00",
+    "log": "evidence/check-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "test-complete",
+    "command": "cargo test --workspace",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 42.86,
+    "time": "2026-09-05T18:38:56.704087+00:00",
+    "log": "evidence/test-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "clippy-complete",
+    "command": "cargo clippy --workspace --all-targets -- -D warnings",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 14.74,
+    "time": "2026-09-05T18:39:39.561908+00:00",
+    "log": "evidence/clippy-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "release-complete",
+    "command": "cargo build --locked --release -p x3-chain-node --features mainnet-rc1",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 278.48,
+    "time": "2026-09-05T18:39:54.301539+00:00",
+    "log": "evidence/release-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "testnet-complete",
+    "command": "cargo check --locked -p x3-chain-node --features testnet",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 101,
+    "seconds": 117.16,
+    "time": "2026-09-05T18:44:32.780134+00:00",
+    "log": "evidence/testnet-complete.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "contracts",
+    "command": "forge test --root X3-contracts/evm --offline",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.0,
+    "time": "2026-09-05T18:46:29.938098+00:00",
+    "log": "evidence/contracts.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "anchor",
+    "command": "anchor test --skip-deploy --skip-local-validator",
+    "cwd": "/tmp/x3-audit-20260905/repo",
+    "exit_code": 127,
+    "seconds": 0.0,
+    "time": "2026-09-05T18:46:29.942966+00:00",
+    "log": "evidence/anchor.log",
+    "effects": "Isolated source copy; offline Cargo; temporary build outputs; no credentials inherited"
+  },
+  {
+    "id": "rpc-harness",
+    "command": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/x3-audit-20260905/rpc-target cargo test --manifest-path /tmp/x3-audit-20260905/rpc-harness/Cargo.toml",
+    "exit_code": 0,
+    "log": "evidence/rpc-harness.log"
+  },
+  {
+    "id": "proof-harness",
+    "command": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/x3-audit-20260905/proof-target cargo test --manifest-path /tmp/x3-audit-20260905/proof-harness/Cargo.toml",
+    "exit_code": 101,
+    "log": "evidence/proof-harness.log"
+  },
+  {
+    "id": "gate-wallet",
+    "command": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/x3-audit-20260905/gate-target make test-x3-wallet",
+    "exit_code": 0,
+    "log": "evidence/gate-wallet.log"
+  },
+  {
+    "id": "missing-target",
+    "command": "make -n test-node-build",
+    "exit_code": 2,
+    "log": null
+  },
+  {
+    "id": "advisories-configured",
+    "command": "cargo audit --no-fetch --stale --no-yanked --json",
+    "exit_code": 0,
+    "log": "evidence/advisories.json"
+  },
+  {
+    "id": "advisories-unsuppressed",
+    "command": "cargo audit --no-fetch --stale --no-yanked --file /tmp/x3-audit-20260905/advisory-unfiltered/Cargo.lock --json (cwd /tmp)",
+    "exit_code": 1,
+    "log": "evidence/advisories-unfiltered.json"
+  },
+  {
+    "id": "advisories-copy-error",
+    "command": "cp Cargo.lock /tmp/x3-audit-20260905/advisory-unfiltered/Cargo.lock (cwd /tmp)",
+    "exit_code": 1,
+    "log": null
+  },
+  {
+    "id": "initial-release-interrupted",
+    "command": "cargo build --locked --release -p x3-chain-node --features mainnet-rc1",
+    "exit_code": 130,
+    "log": null
+  },
+  {
+    "id": "fake-scan",
+    "command": [
+      "grep",
+      "-RIn",
+      "TODO\\|FIXME\\|stub\\|mock\\|fake\\|placeholder\\|dummy\\|unimplemented!\\|todo!\\|panic!(\"not implemented",
+      ".",
+      "--exclude-dir=.git",
+      "--exclude-dir=target",
+      "--exclude-dir=node_modules"
+    ],
+    "exit_code": 2,
+    "log": "evidence/fake-scan-locations.jsonl",
+    "note": "Grep reported read/traversal errors (exit 2); 54017 matches retained as locations, not all findings. stderr was not retained. Separate first-party context scan completed."
+  }
+]

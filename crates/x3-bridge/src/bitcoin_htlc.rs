@@ -1,9 +1,10 @@
 /// Bitcoin HTLC Bridge — Hash Time-Locked Contract atomic swaps enabling BTC ↔ X3 trustless trading
 /// Implements HTLC construction, preimage validation, and timeout refunds
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct HTLCContract {
     pub contract_id: [u8; 32],
     pub initiator: Vec<u8>,     // Bitcoin address
@@ -16,7 +17,7 @@ pub struct HTLCContract {
     pub created_block: u64,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub enum HTLCState {
     Open,
     Redeemed,
@@ -24,19 +25,34 @@ pub enum HTLCState {
     Expired,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct Preimage {
     pub value: Vec<u8>,
     pub length: u32,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+impl Preimage {
+    /// Returns true iff `SHA256(self.value) == hash_lock`. Used by the
+    /// runtime API to verify an off-chain preimage against an on-chain
+    /// commitment before the redeem extrinsic is submitted.
+    pub fn matches_hash(&self, hash_lock: [u8; 32]) -> bool {
+        let mut hasher = sha2::Sha256::new();
+        use sha2::Digest;
+        hasher.update(&self.value);
+        let computed = hasher.finalize();
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&computed);
+        out == hash_lock
+    }
+}
+
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct BitcoinAddress {
     pub address_type: AddressType,
     pub bytes: Vec<u8>,
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub enum AddressType {
     P2PKH,  // Pay to Public Key Hash
     P2SH,   // Pay to Script Hash
@@ -44,7 +60,7 @@ pub enum AddressType {
     P2TR,   // Pay to Taproot (SegWit v1)
 }
 
-#[derive(Clone, Encode, Decode, DecodeWithMemTracking, Debug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, PartialEq, Eq)]
 pub struct BitcoinTxProof {
     pub tx_hash: [u8; 32],
     pub merkle_proof: Vec<[u8; 32]>,
@@ -531,5 +547,36 @@ mod tests {
         let id1 = BitcoinHTLC::generate_contract_id(b"1A1z7agoat", &[1; 32], 1000000);
         let id2 = BitcoinHTLC::generate_contract_id(b"1A1z7agoat", &[1; 32], 1000000);
         assert_eq!(id1, id2);
+    }
+}
+
+// ── Runtime API ─────────────────────────────────────────────────────────────
+
+sp_api::decl_runtime_apis! {
+    /// Cross-chain bridge runtime API — exposes Bitcoin HTLC state to
+    /// off-chain clients (relayer, gateway REST service) without requiring
+    /// a direct Bitcoin peer. Constructing a contract here does NOT
+    /// mutate chain state; on-chain submission still goes through the
+    /// gateway pallet extrinsic.
+    #[allow(clippy::too_many_arguments)]
+    pub trait BridgeHtlcRuntimeApi {
+        /// Build a shape-valid `HTLCContract` from caller-supplied
+        /// parameters. The returned contract uses `HTLCState::Open` and
+        /// has the canonical encoding the on-chain pallet expects.
+        fn build_htlc_contract(
+            contract_id: [u8; 32],
+            initiator_btc_address: Vec<u8>,
+            counterparty_x3: [u8; 32],
+            amount_satoshis: u64,
+            amount_x3: u128,
+            hash_lock: [u8; 32],
+            time_lock: u64,
+            created_block: u64,
+        ) -> HTLCContract;
+
+        /// Verify a SHA256 preimage against a stored hash lock. Off-chain
+        /// callers use this to validate a preimage before submitting the
+        /// redeem extrinsic.
+        fn verify_htlc_preimage(preimage: Vec<u8>, hash_lock: [u8; 32]) -> bool;
     }
 }

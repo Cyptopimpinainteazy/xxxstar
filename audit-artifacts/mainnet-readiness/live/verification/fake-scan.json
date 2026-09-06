@@ -1,0 +1,20 @@
+{
+  "command": "Required recursive grep scan; source contents omitted from retained output",
+  "exit_code": 2,
+  "matches": 114378,
+  "files": 12215,
+  "token_categories": {
+    "fake": 5041,
+    "mock": 39300,
+    "stub": 16220,
+    "placeholder": 6443,
+    "FIXME": 4491,
+    "TODO": 29147,
+    "dummy": 10021,
+    "todo!": 1678,
+    "unimplemented!": 3856,
+    "panic!(\"not implemented": 7
+  },
+  "seconds": 64.91,
+  "meaning": "Candidate matches, not confirmed defects. Read errors mean traversal is incomplete."
+}

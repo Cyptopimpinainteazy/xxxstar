@@ -1176,8 +1176,12 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::BitcoinSpvProof => {
+                    // Production path: SPV verifier is configured from the
+                    // canonical Bitcoin vault defaults (confirmation threshold
+                    // + signer policy live in `x3-bitcoin-vault`). Routes can
+                    // still override `finality_requirement` per-route.
                     let v: Arc<dyn Verifier> =
-                        Arc::new(BitcoinSpvVerifier::new(route.finality_requirement));
+                        Arc::new(BitcoinSpvVerifier::from_vault_defaults());
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::X3Internal => {

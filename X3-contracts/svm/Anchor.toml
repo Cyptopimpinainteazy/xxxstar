@@ -12,6 +12,7 @@ x3_vm_erc20 = "X3VmERC201111111111111111111111111111111112"
 x3_external_gateway = "X3ExtGate1111111111111111111111111111111113"
 x3_kernel_bridge = "X3KernBri1111111111111111111111111111111114"
 x3_receipt_verifier = "X3RecptVr1111111111111111111111111111111115"
+x3_htlc = "X3HtLc111111111111111111111111111111111111111"
 
 [registry]
 url = "https://api.apr.dev"
@@ -30,4 +31,5 @@ members = [
     "programs/x3_external_gateway",
     "programs/x3_kernel_bridge",
     "programs/x3_receipt_verifier",
+    "programs/x3_htlc",
 ]
