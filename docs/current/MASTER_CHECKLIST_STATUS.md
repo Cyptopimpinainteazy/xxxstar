@@ -171,6 +171,7 @@
 - ✅ **Cargo audit clean** (0 vulns, 33 documented unmaintained/yanked warnings per `.cargo/audit.toml`)
 - ✅ **`deny.toml` fixed** (deprecated `severity-threshold` removed, GPL-3.0-only allowed for xcm-procedural, x3-vrf license now uses workspace)
 - ⚠️ **`unsafe_code` audit needed** (some `unsafe` use in substrate/polkadot-sdk internals — not actionable)
+- ❌ **EVM Treasury single-owner → Safe gate (BLOCKER for any EVM mainnet money)** — `X3-contracts/evm/contracts/treasury/Treasury.sol` uses OpenZeppelin `Ownable` (single owner can change splits + `routeFee` destinations) and `routeFee` is callable by anyone. Before any real value hits that contract: deploy behind a **Safe multisig owner**, **or** replace with a Safe-mirror (no value storage), **or** restrict `routeFee` to a permissioned router. Full policy: `TREASURY_POLICY.md` §1 (Security gap) + §2. If the EVM treasury contract is never funded/used, this is not a go-blocker — but it MUST be resolved before the first funded ETH/USDC route. This is the EVM-safe fix tracked from the treasury audit session.
 
 ---
 
@@ -203,6 +204,8 @@
 | **M1 (Internal Testnet)** | FRAME benchmarks for 17 more pallets, signed release, property tests, multi-host mesh proof, graceful-shutdown verification, ABI verifier check, 5 daemon checks | **W1–W3** |
 | **M2 (Bridge Testnet)** | External audit engagement + remediation, chain-specific finality proofs (ETH+SOL), bridge adapter production deployment, bug bounty activation, public RPC separation | **W4–W22** |
 | **M3 (Public Mainnet)** | Permissionless staking, multisig validator admission, signed genesis ceremony, legal package, public soak | **W23–W32** |
+| **Pre-tag security (any next git tag)** | Rotate the 3 credential classes from `TREASURY_POLICY.md` §3 (validator summaries, sepolia deployer wallet, validator suris) BEFORE tagging | **Earliest** |
+| **EVM treasury** | Resolve `Treasury.sol` single-owner `/` open-`routeFee` via Safe owner / Safe-mirror / permissioned router BEFORE any funded EVM route; not a blocker if EVM treasury stays unfunded | **Before first EVM $** |
 
 **Honest read:** the repo is **~85–90% complete for M1 (Internal Staged Testnet)**, which is the actual target per `LAUNCH_SCOPE.md` v1.1. For M3 (public mainnet) it's ~35–40%, with the main blockers being external audit (not code), genesis ceremony coordination (multi-party), and public soak (time-bound, not code).
 
@@ -232,6 +235,8 @@ See `docs/current/READINESS_GRAPH.md` for the milestone progress graph.
 | Bug bounty budget | ❌ | $50k–$150k decision pending |
 | Legal counsel engagement | ❌ | $10k–$30k decision pending |
 | API key rotation (security debt) | ⚠️ | DeepSeek sk-... + GitHub PAT surfaced in earlier transcript — must rotate |
+| **EVM treasury Safe gate** | ❌ | `Treasury.sol` single owner + open `routeFee`. Resolve (Safe owner / Safe-mirror / permissioned router) before first funded EVM route. See `TREASURY_POLICY.md` §1 + §2. Blocking ONLY if EVM treasury used |
+| **3 repo key rotations (before next git tag)** | ❌ | 1) `deployment/keys/validator-0{1,2,3}-summary.txt` (AURA+GRANDPA seeds + 12-word mnemonics — TRACKED in git history, so rotate AND purge history via `git filter-branch`/BFG before any public tag). 2) `sepolia-deployer-wallet.txt` (plaintext Sepolia key, repo root — TRACKED, rotate address + purge history). 3) `deployment/chain-specs/fresh/validator-keys/validator-{1..7}.suri` (7 raw seeds, TESTNET-ONLY, **gitignored/untracked** — rotate local files + move out of repo; NO history purge needed). Rotate offline with `subkey`, move to secret manager, regen chain-spec if used. See `TREASURY_POLICY.md` §3 |
 
 ---
 
