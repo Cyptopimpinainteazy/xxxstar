@@ -57,4 +57,6 @@ impl system::Config for MockRuntime {
 
 impl crate::Config for MockRuntime {
     type WeightInfo = crate::weights::SubstrateWeight<MockRuntime>;
+    type AdminOrigin = frame_system::EnsureRoot<u64>;
+    type MaxHeaderLookahead = frame_support::traits::ConstU64<10_000_000>;
 }
