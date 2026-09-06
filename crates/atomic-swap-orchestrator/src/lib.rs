@@ -62,6 +62,77 @@ pub struct AtomicPair {
     pub pallet_bundle_id: Option<H256>,
 }
 
+/// VM target for a kernel bundle leg. Variant order and SCALE encoding MUST
+/// stay identical to `pallet_x3_atomic_kernel::proof::VmType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Encode)]
+pub enum KernelVmType {
+    Evm,
+    Svm,
+    X3,
+    Cross,
+}
+
+/// Declared read/write accounts for a kernel leg. Encoding matches
+/// `pallet_x3_atomic_kernel::proof::DeclaredAccess` (bounded vectors encode
+/// identically to ordinary vectors under SCALE).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode)]
+pub struct KernelDeclaredAccess {
+    pub reads: Vec<H256>,
+    pub writes: Vec<H256>,
+}
+
+impl Default for KernelDeclaredAccess {
+    fn default() -> Self {
+        Self {
+            reads: Vec::new(),
+            writes: Vec::new(),
+        }
+    }
+}
+
+/// A single atomic-trade leg as recorded by `pallet-x3-atomic-kernel`.
+/// Encoding MUST match `pallet_x3_atomic_kernel::proof::BundleLeg`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode)]
+pub struct KernelBundleLeg {
+    pub vm_type: KernelVmType,
+    pub token_in: H256,
+    pub token_out: H256,
+    pub amount_in: u128,
+    pub min_amount_out: u128,
+    pub deadline: u64,
+    pub access: KernelDeclaredAccess,
+}
+
+/// Canonical node-side request: the on-chain kernel accounting legs AND the
+/// raw executable payloads they describe. This is the single intake type the
+/// node atomic-swap service consumes before submitting to the runtime and
+/// executing the legs through the runtime-backed dispatcher.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AtomicExecutionRequest {
+    /// The executable pair (SVM + EVM raw payloads) and off-chain correlation id.
+    pub pair: AtomicPair,
+    /// Kernel accounting legs that will be recorded on-chain.
+    pub legs: Vec<KernelBundleLeg>,
+    /// Submission deadline in X3 blocks (capped by the pallet).
+    pub deadline_blocks: u32,
+    /// Chain id used by the pallet's nonce registry.
+    pub chain_id: u32,
+    /// Strictly-increasing per (chain_id, submitter) nonce.
+    pub nonce: u64,
+}
+
+impl AtomicExecutionRequest {
+    /// Hash that `submit_atomic_bundle` records as `legs_hash`.
+    ///
+    /// The pallet hashes the SCALE encoding of its bounded leg vector with
+    /// `sha2_256`. Because `KernelBundleLeg` is field-for-field and enum-order
+    /// identical to the pallet type, encoding the canonical request's legs
+    /// here yields the same hash.
+    pub fn legs_hash(&self) -> H256 {
+        H256(sha2_256(&self.legs.encode()))
+    }
+}
+
 /// Outcome returned by `process_swap()`.  Contains both the local `AtomicStatus`
 /// and all data needed for on-chain finalization via `finalize_atomic_bundle`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -525,6 +596,34 @@ mod tests {
                 .expect("hex vector"),
         );
         assert_eq!(root, expected, "receipt-root encoding must match pallet commitment");
+    }
+
+    #[test]
+    fn execution_request_legs_hash_is_deterministic_and_content_bound() {
+        let leg = |amount: u128| KernelBundleLeg {
+            vm_type: KernelVmType::Svm,
+            token_in: H256([1u8; 32]),
+            token_out: H256([2u8; 32]),
+            amount_in: amount,
+            min_amount_out: amount.saturating_sub(1),
+            deadline: 1_800,
+            access: KernelDeclaredAccess::default(),
+        };
+        let req = |amount: u128| AtomicExecutionRequest {
+            pair: make_pair(1, b"svm_payload", b"evm_payload", 0),
+            legs: vec![leg(amount)],
+            deadline_blocks: 100,
+            chain_id: 1,
+            nonce: 1,
+        };
+
+        let a = req(1_000);
+        let b = req(1_000);
+        let c = req(2_000);
+
+        assert_eq!(a.legs_hash(), b.legs_hash());
+        assert_ne!(a.legs_hash(), H256::zero());
+        assert_ne!(a.legs_hash(), c.legs_hash(), "amount must change legs hash");
     }
 
     // ── AtomicPair helpers ────────────────────────────────────────────────────
