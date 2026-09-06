@@ -1,0 +1,49 @@
+{
+  "currency": "USD",
+  "asOf": "2026-09-06",
+  "workPackages": [
+    {
+      "id": "proof-boundary-remediation",
+      "title": "Proof-boundary remediation",
+      "description": "Close unauthenticated external header, finality-anchor, and rollback-state defects before public testnet consideration.",
+      "linkedFindings": ["C01", "C02", "C03", "H01", "H02", "H03"],
+      "requested": 0,
+      "pledged": 0,
+      "received": 0,
+      "allocated": 0,
+      "spent": 0,
+      "status": "scope_pending",
+      "evidenceStatus": "unverified",
+      "proofIds": []
+    },
+    {
+      "id": "reproducible-release",
+      "title": "Reproducible release and honest gates",
+      "description": "Restore the workspace build and enforce release evidence that cannot mask failed checks or stale artifacts.",
+      "linkedFindings": ["H13", "H14", "H15", "H18"],
+      "requested": 0,
+      "pledged": 0,
+      "received": 0,
+      "allocated": 0,
+      "spent": 0,
+      "status": "scope_pending",
+      "evidenceStatus": "unverified",
+      "proofIds": []
+    },
+    {
+      "id": "network-evidence",
+      "title": "Multi-node and recovery evidence",
+      "description": "Demonstrate finalized multi-node operation, recovery, fault handling, and operator-grade launch gates.",
+      "linkedFindings": ["M02", "M03", "M04", "L01"],
+      "requested": 0,
+      "pledged": 0,
+      "received": 0,
+      "allocated": 0,
+      "spent": 0,
+      "status": "scope_pending",
+      "evidenceStatus": "unverified",
+      "proofIds": []
+    }
+  ],
+  "proofs": []
+}
