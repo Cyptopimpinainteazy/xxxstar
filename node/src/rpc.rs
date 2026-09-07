@@ -28,6 +28,7 @@ use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
+use pallet_x3_atomic_kernel::BundleRollbackReason;
 use x3_chain_runtime::{
     opaque::Block, AccountId, Address, AssetId, Balance, Runtime, RuntimeCall, Signature,
     SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
@@ -536,6 +537,7 @@ where
     let mut module = RpcModule::new(());
 
     if let Some(atomic_gateway_tx) = atomic_gateway_tx {
+        let rollback_tx = atomic_gateway_tx.clone();
         module.register_method(
             "atomic_submitAtomicBundle",
             move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
@@ -587,6 +589,32 @@ where
                 .try_send(AtomicGatewayCommand::SubmitBundle(request))
                 .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
             Ok(serde_json::json!({ "status": "accepted" }))
+            },
+        )?;
+        module.register_method(
+            "atomic_rollbackBundle",
+            move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+                let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+                let bundle_id = H256(decode_hex_32(
+                    req.get("bundle_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing bundle_id"))?,
+                    "bundle_id",
+                )?);
+                let reason = match req
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("submitter_cancelled")
+                {
+                    "execution_failed" => BundleRollbackReason::ExecutionFailed,
+                    "access_set_violation" => BundleRollbackReason::AccessSetViolation,
+                    "deadline_exceeded" => BundleRollbackReason::DeadlineExceeded,
+                    _ => BundleRollbackReason::SubmitterCancelled,
+                };
+                rollback_tx
+                    .try_send(AtomicGatewayCommand::Rollback { bundle_id, reason })
+                    .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
+                Ok(serde_json::json!({ "status": "accepted" }))
             },
         )?;
     }
