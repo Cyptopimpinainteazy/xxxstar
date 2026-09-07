@@ -93,6 +93,23 @@ impl AtomicGatewayKey {
         self.signed_extrinsic(call, genesis_hash, tx_nonce)
     }
 
+    /// Build a signed `rollback_atomic_bundle` extrinsic.
+    pub fn rollback_atomic_bundle(
+        &self,
+        bundle_id: H256,
+        reason: pallet_x3_atomic_kernel::BundleRollbackReason,
+        genesis_hash: H256,
+        tx_nonce: u32,
+    ) -> Result<UncheckedExtrinsic, String> {
+        let call = RuntimeCall::X3AtomicKernel(
+            pallet_x3_atomic_kernel::Call::<Runtime>::rollback_atomic_bundle {
+                bundle_id,
+                reason,
+            },
+        );
+        self.signed_extrinsic(call, genesis_hash, tx_nonce)
+    }
+
     fn signed_extrinsic(
         &self,
         call: RuntimeCall,

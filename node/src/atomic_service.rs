@@ -44,6 +44,13 @@ pub enum AtomicGatewayCommand {
         /// On-chain bundle identifier.
         bundle_id: H256,
     },
+    /// Roll back a submitted bundle.
+    Rollback {
+        /// On-chain bundle identifier.
+        bundle_id: H256,
+        /// Reason recorded on-chain.
+        reason: pallet_x3_atomic_kernel::BundleRollbackReason,
+    },
 }
 
 /// Service that signs and submits atomic-kernel calls.
@@ -128,6 +135,13 @@ impl AtomicGatewayService {
             AtomicGatewayCommand::AssignExecutor { bundle_id } => (
                 self.key
                     .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+                None,
+                None,
+                None,
+            ),
+            AtomicGatewayCommand::Rollback { bundle_id, reason } => (
+                self.key
+                    .rollback_atomic_bundle(bundle_id, reason, self.genesis_hash, tx_nonce)?,
                 None,
                 None,
                 None,
