@@ -14,10 +14,21 @@ class TestJurySelector:
     def agent_pool(self):
         """Create a diverse pool of test agents."""
         pool = {}
-        sections = ["governance", "economic", "security", "technical", "general"]
+        sections = [
+            "governance",
+            "economic",
+            "security",
+            "technical",
+            "general",
+            "forensic",
+            "auditor",
+            "market-analyst",
+            "research",
+        ]
 
-        # Create 20 agents, 4 per section
-        for i in range(20):
+        # Create enough agents to satisfy the largest jury while representing
+        # every specialty required by the sizing matrix.
+        for i in range(45):
             section_idx = i % len(sections)
             agent_id = f"agent_{i:02d}"
             pool[agent_id] = JuryMember(
@@ -214,8 +225,8 @@ class TestIntegration:
         pool = JuryPool()
 
         # Build large pool
-        sections = ["governance", "economic", "security", "technical"]
-        for i in range(32):
+        sections = ["governance", "economic", "security", "technical", "research"]
+        for i in range(40):
             pool.add_agent(f"agent_{i:02d}", sections[i % len(sections)])
 
         # Select jury
@@ -230,7 +241,7 @@ class TestIntegration:
 
         # Verify they're unavailable
         available = pool.get_available()
-        assert len(available) == 32 - len(jury)
+        assert len(available) == 40 - len(jury)
         for agent_id in jury_ids:
             assert agent_id not in available
 

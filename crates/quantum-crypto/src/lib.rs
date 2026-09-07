@@ -67,6 +67,25 @@ pub enum SecurityLevel {
     Level5,
 }
 
+impl SecurityLevel {
+    /// Convert to numeric level (1, 3, or 5)
+    pub fn to_u8(self) -> u8 {
+        match self {
+            SecurityLevel::Level1 => 1,
+            SecurityLevel::Level3 => 3,
+            SecurityLevel::Level5 => 5,
+        }
+    }
+    /// Convert from numeric level (1, 3, or 5)
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            1 => SecurityLevel::Level1,
+            5 => SecurityLevel::Level5,
+            _ => SecurityLevel::Level3,
+        }
+    }
+}
+
 /// Combined quantum-resistant keypair
 pub struct QuantumKeypair {
     /// SPHINCS+ keypair for signatures
@@ -143,5 +162,15 @@ mod tests {
         let hash1 = quantum_hash(data);
         let hash2 = quantum_hash(data);
         assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_security_level_conversion() {
+        assert_eq!(SecurityLevel::from_u8(1), SecurityLevel::Level1);
+        assert_eq!(SecurityLevel::from_u8(3), SecurityLevel::Level3);
+        assert_eq!(SecurityLevel::from_u8(5), SecurityLevel::Level5);
+        assert_eq!(SecurityLevel::Level1.to_u8(), 1);
+        assert_eq!(SecurityLevel::Level3.to_u8(), 3);
+        assert_eq!(SecurityLevel::Level5.to_u8(), 5);
     }
 }

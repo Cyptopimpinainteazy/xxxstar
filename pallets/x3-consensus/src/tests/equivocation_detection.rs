@@ -57,7 +57,7 @@ fn test_double_sign_detection_is_modeled_by_slash_call() {
         System::set_block_number(1);
 
         assert_ok!(Consensus::report_misbehavior(
-            RuntimeOrigin::signed(2),
+            RuntimeOrigin::root(),
             offender,
             SlashReason::DoubleSign,
         ));
@@ -89,7 +89,7 @@ fn test_equivocation_slashing_disables_at_floor() {
         );
 
         assert_ok!(Consensus::report_misbehavior(
-            RuntimeOrigin::signed(4),
+            RuntimeOrigin::root(),
             offender,
             SlashReason::Equivocation,
         ));
@@ -116,7 +116,7 @@ fn test_offence_reporting_extrinsic_accepts_known_validator() {
         );
 
         assert_ok!(Consensus::report_misbehavior(
-            RuntimeOrigin::signed(6),
+            RuntimeOrigin::root(),
             offender,
             SlashReason::InvalidFinality,
         ));

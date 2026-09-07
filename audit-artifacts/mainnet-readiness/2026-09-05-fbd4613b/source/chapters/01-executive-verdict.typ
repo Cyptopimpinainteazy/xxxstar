@@ -15,7 +15,7 @@
 
 #v(0.6em)
 
-The repository's own `LAUNCH_SCOPE.md` self-labels the project as a **"v0.4 Internal Testnet Candidate"** — it does not claim public testnet readiness, and this audit agrees with that self-assessment. The findings below explain what stands between the current state and each subsequent gate.
+The repository's own `LAUNCH_SCOPE.md` self-labels the project as a *"v0.4 Internal Testnet Candidate"* — it does not claim public testnet readiness, and this audit agrees with that self-assessment. The findings below explain what stands between the current state and each subsequent gate.
 
 #pull-quote(
   [X3 Atomic Star is in v0.4 Internal Testnet Candidate phase. This is an internal-only, closed-operator staged testnet. It is NOT a public testnet, NOT a mainnet candidate, and NOT production-ready for external bridging or public-value settlement.],
@@ -30,7 +30,7 @@ X3 Atomic Star is a Substrate-based Layer-1 blockchain with native cross-VM atom
 
 #figure(
   severity-bar-chart(sev-counts),
-  caption: [Findings by severity across all seven audited domains (32 total). Full register in `findings.json` and Appendix A.]
+  caption: [Findings by severity across all seven audited domains (33 total). Full register in `findings.json` and Appendix A.]
 ) <fig-severity>
 
 The codebase compiles clean (`cargo check --workspace`, default features, exit 0, 1m52s), `cargo audit` reports zero blocking vulnerabilities, and the Foundry EVM contract suite passes 169/169 tests across 12 suites. Several pallet-level test suites were executed live in this audit and passed: the cross-VM router (81 tests), the settlement engine (23 property-based tests), the supply ledger (33 tests including a fuzz test), the DEX pallet (14 tests), and the LP locker (19 tests). This is real, substantive, working code — not a shell.
@@ -47,19 +47,19 @@ At the same time, this audit surfaced #by-severity("Critical").len() Critical an
 
 == Top Five Most Dangerous Weaknesses
 
++ *A live, unconditional RPC surface fabricates wallet data on every node* (CRIT-03, `crates/x3-rpc/src/wallet_service_rpc.rs`) — `wallet_createWallet` falls back to the publicly-known default test mnemonic, and `wallet_getBalance` returns hardcoded fake USD balances, with no real cryptography or chain-state lookup behind either.
 + *An unauthenticated public call can slash any validator with zero evidence* (CRIT-02, `pallets/x3-consensus/src/lib.rs:262`) — a live griefing/DoS vector against validator liveness, reachable in every runtime variant.
 + *Validator authoring seeds and a plaintext EVM private key remain reachable in git history* (CRIT-01) — the remediation commit made today only untracked the files; the secrets themselves are still fetchable from any prior clone.
 + *The DEX's entire pricing engine uses floating-point arithmetic* (HIGH-02, `crates/x3-dex/src/amm_pools.rs`) — a determinism and precision hazard in validator-executed financial state-transition code, masked by tests that only check the float implementation against itself.
 + *A bridge RPC path presents a single-key mint as a "council" vote* (HIGH-01, `node/src/rpc.rs:1058-1093`) — `pallet_collective::propose{threshold: 1}` executes immediately with no real multi-party vote; currently inert only because bridges are disabled by default.
-+ *Cited "reproducible build" evidence proves nothing* (HIGH-05) — the srtool checksums the repository's own status doc points to are checksums of log files that do not exist, from a different machine, four months stale.
 
 == Most Serious Security or Integrity Concern
 
-The unauthenticated `report_misbehavior` call (CRIT-02) is the single most serious finding in this audit. It sits directly beside a *correctly engineered* equivocation-slashing path that requires a real cryptographic proof — meaning the codebase clearly knows the right pattern, but a second, parallel entrypoint to the same dangerous operation (slashing a validator's stake) was left without that protection. This is exactly the kind of defect that a broad, mechanical stub-scanner (grepping for `todo!()`, `unimplemented!()`, `mock`) would never catch, because the code is fully implemented, compiles, and has no obvious placeholder marker — it simply lacks an authorization check appropriate to its power. It should be fixed before any network carrying real stake is exposed to a wider set of accounts than a small trusted internal group.
+Two findings are tied for most serious, for different reasons. CRIT-03's fabricated wallet RPC is the most concretely "fake" thing this audit found anywhere in the codebase — a live, unconditionally-registered production endpoint that hands any caller a publicly-known compromised seed phrase and invented dollar balances, exactly the pattern this audit was tasked to hunt for. CRIT-02's unauthenticated `report_misbehavior` call is the more structurally revealing finding: it sits directly beside a *correctly engineered* equivocation-slashing path that requires a real cryptographic proof, meaning the codebase clearly knows the right pattern but left a second, parallel entrypoint to the same dangerous operation unprotected. Neither would be caught by a broad, mechanical stub-scanner (grepping for `todo!()`, `unimplemented!()`, `mock`) — both are fully implemented, compile cleanly, and have no obvious placeholder marker. Both should be fixed before this network is exposed to any account outside a small trusted group.
 
 == Fastest Credible Path Forward
 
-The two Critical findings (CRIT-01, CRIT-02) are both narrow, well-understood fixes — a history rewrite plus key rotation, and an authorization check mirroring a pattern the codebase already implements correctly elsewhere — and neither requires new architecture. Fixing both, plus the top three High findings that block any bridge-enabled or DEX-carrying deployment (HIGH-01, HIGH-02, HIGH-04), would move this repository from "internal testnet candidate with live security defects" to "internal testnet candidate with only the already-disclosed, already-gated limitations remaining" within a small, well-scoped engineering effort. See Chapter 13 for the full prioritized recovery plan.
+All three Critical findings (CRIT-01, CRIT-02, CRIT-03) are narrow, well-understood fixes — a history rewrite plus key rotation, an authorization check mirroring a pattern the codebase already implements correctly elsewhere, and deleting or gating a wallet RPC service — and none requires new architecture. Fixing all three, plus the top three High findings that block any bridge-enabled or DEX-carrying deployment (HIGH-01, HIGH-02, HIGH-04), would move this repository from "internal testnet candidate with live security defects" to "internal testnet candidate with only the already-disclosed, already-gated limitations remaining" within a small, well-scoped engineering effort. See Chapter 13 for the full prioritized recovery plan.
 
 == Next 7 / 30 / 60 / 90 Days
 
@@ -67,7 +67,7 @@ The two Critical findings (CRIT-01, CRIT-02) are both narrow, well-understood fi
   columns: (auto, 1fr),
   fill: (x, y) => if y == 0 { c-brand } else if calc.even(y) { c-bg-panel } else { white },
   [*Window*], [*What should happen*],
-  [Next 7 days], [Fix CRIT-02 (require real evidence for `report_misbehavior`); begin the git-history rewrite for CRIT-01 and rotate every affected key offline via `subkey`; correct the two disproven documentation claims (TREASURY_POLICY.md, FEATURE_REGISTRY.toml health endpoints) so the audit trail stops citing false evidence.],
+  [Next 7 days], [Fix CRIT-02 (require real evidence for `report_misbehavior`); remove or gate the fabricated wallet RPC service (CRIT-03); begin the git-history rewrite for CRIT-01 and rotate every affected key offline via `subkey`; correct the two disproven documentation claims (TREASURY_POLICY.md, FEATURE_REGISTRY.toml health endpoints) so the audit trail stops citing false evidence.],
   [Next 30 days], [Replace DEX pricing math with integer/fixed-point arithmetic (HIGH-02); decouple VRF's `dev` feature from `std` (HIGH-03); re-run `scripts/run-srtool.sh` on a machine with Docker and commit real evidence (HIGH-05); re-verify the 8/8 mesh-resilience result across 3+ physically separate hosts, not loopback.],
   [Next 60 days], [Wire the multisig propose/sign/execute engine into real dispatchable calls (MED-03); build a real Anchor test suite for the 6 untested SVM programs (MED-08); add dependency-checked `/ready` endpoints to every service currently reporting liveness-only "health" (MED-09/MED-10); broaden the secret-scan CI gate to cover history, not just the working tree (MED-11).],
   [Next 90 days], [Engage an external, licensed security audit firm for the runtime pallets, EVM contracts, and SVM/Anchor programs — the repository's own `LAUNCH_SCOPE.md` correctly identifies this as not yet done and as the primary blocker to any public-beta claim; run a real, honestly-labeled multi-host performance benchmark to replace the loopback-only 110.6 finTPS figure.],
@@ -79,6 +79,6 @@ The two Critical findings (CRIT-01, CRIT-02) are both narrow, well-understood fi
     #text(font: title-font, size: 13pt, weight: "bold", fill: c-brand)[If You Read Nothing Else]
     #v(0.5em)
     #set text(size: 10.5pt)
-    X3 Atomic Star's core cross-VM atomicity claim is real, tested, and well-engineered — the settlement engine, supply ledger, and internal router are the strongest parts of this codebase. Everything that crosses a real external chain boundary (EVM/SVM/Bitcoin bridges) is correctly disabled by default and honestly documented as audit-ready-only, not active. Two Critical defects — an unauthenticated validator-slashing call and unremediated leaked git-history secrets — must be fixed before this network is exposed to any account outside a small trusted group. The DEX's floating-point pricing engine must be replaced before it ever carries real value. None of this requires new architecture; all of it is well-scoped, understood work. An external, licensed security audit — not yet engaged — remains the primary gate before any public-facing claim.
+    X3 Atomic Star's core cross-VM atomicity claim is real, tested, and well-engineered — the settlement engine, supply ledger, and internal router are the strongest parts of this codebase. Everything that crosses a real external chain boundary (EVM/SVM/Bitcoin bridges) is correctly disabled by default and honestly documented as audit-ready-only, not active. Three Critical defects — a fabricated wallet RPC live on every node, an unauthenticated validator-slashing call, and unremediated leaked git-history secrets — must be fixed before this network is exposed to any account outside a small trusted group. The DEX's floating-point pricing engine must be replaced before it ever carries real value. None of this requires new architecture; all of it is well-scoped, understood work. An external, licensed security audit — not yet engaged — remains the primary gate before any public-facing claim.
   ]
 ]

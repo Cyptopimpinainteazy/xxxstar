@@ -1802,16 +1802,15 @@ fn test_scoreboard_edge_cases() {
 }
 
 // ===========================================================================
-// Test 22: Live adapter scoreboard - AtomicCommandCenter with real adapters
+// Test 22: Adapter scoreboard - AtomicCommandCenter with offline adapters
 // ===========================================================================
 #[test]
-fn test_live_adapter_scoreboard() {
-    // Create live adapters
-    let evm = Box::new(X3VmAdapterImpl::new("eth".into())) as Box<dyn X3VmAdapter>;
-    let x3vm = Box::new(X3VmAdapterImpl::new("x3-mainnet".into())) as Box<dyn X3VmAdapter>;
+fn test_adapter_scoreboard_marks_simulation_x3vm_unready() {
+    // These are offline adapters; X3VM has no live transport yet.
+    let evm = Box::new(X3VmAdapterImpl::simulation("eth".into())) as Box<dyn X3VmAdapter>;
+    let x3vm = Box::new(X3VmAdapterImpl::simulation("x3-mainnet".into())) as Box<dyn X3VmAdapter>;
     let substrate = Box::new(SubstrateHtlcAdapter::new("polkadot".into())) as Box<dyn X3VmAdapter>;
 
-    // Create command center with live adapters
     let center = AtomicCommandCenter::with_adapters(vec![evm, x3vm, substrate]);
 
     // Get scoreboard
@@ -1827,22 +1826,20 @@ fn test_live_adapter_scoreboard() {
         output
     );
 
-    // X3VmAdapterImpl has all capabilities → score 100
-    assert!(
-        output.contains("100"),
-        "output must contain score 100, got:\n{}",
-        output
-    );
-
     // Verify format_adapter_scoreboard also works
     let formatted = center.format_adapter_scoreboard();
     assert!(
         formatted.contains("LIVE adapter scores"),
-        "must show live scores"
+        "must show adapter scores"
     );
     assert!(
         formatted.contains("x3-adapter-x3vm"),
         "must contain x3-adapter-x3vm"
+    );
+    assert!(
+        !formatted.contains("✓ x3-adapter-x3vm"),
+        "offline X3VM adapter must not be marked production-ready:\n{}",
+        formatted
     );
 
     // Empty adapters should fall back to default scores
@@ -1865,7 +1862,7 @@ fn test_concurrent_multi_vm_swaps() {
     let hashlocks: Vec<[u8; 32]> = preimages.iter().map(|p| make_hashlock(p)).collect();
 
     // Create 5 different VM adapter types
-    let _evm = Box::new(X3VmAdapterImpl::new("eth".into())) as Box<dyn X3VmAdapter>;
+    let _evm = Box::new(X3VmAdapterImpl::simulation("eth".into())) as Box<dyn X3VmAdapter>;
     let _svm = Box::new(SubstrateHtlcAdapter::new("solana".into())) as Box<dyn X3VmAdapter>;
     let _sub = Box::new(SubstrateHtlcAdapter::new("polkadot".into())) as Box<dyn X3VmAdapter>;
     let _move_vm = Box::new(MoveVmAdapter::new("sui-mainnet".into())) as Box<dyn X3VmAdapter>;
@@ -2113,11 +2110,11 @@ fn test_high_volume_intent_throughput() {
 #[test]
 fn test_multi_vm_adapter_rotation() {
     // Create 8 adapters
-    let evm = Box::new(X3VmAdapterImpl::new("eth".into())) as Box<dyn X3VmAdapter>;
+    let evm = Box::new(X3VmAdapterImpl::simulation("eth".into())) as Box<dyn X3VmAdapter>;
     let svm = Box::new(SubstrateHtlcAdapter::new("solana".into())) as Box<dyn X3VmAdapter>;
     let sub = Box::new(SubstrateHtlcAdapter::new("polkadot".into())) as Box<dyn X3VmAdapter>;
     let btc = Box::new(BtcHtlcAdapter::new(BitcoinNetwork::Mainnet)) as Box<dyn X3VmAdapter>;
-    let x3vm = Box::new(X3VmAdapterImpl::new("x3-mainnet".into())) as Box<dyn X3VmAdapter>;
+    let x3vm = Box::new(X3VmAdapterImpl::simulation("x3-mainnet".into())) as Box<dyn X3VmAdapter>;
     let move_vm = Box::new(MoveVmAdapter::new("sui-mainnet".into())) as Box<dyn X3VmAdapter>;
     let cw = Box::new(CosmWasmAdapter::new("cosmwasm-mainnet".into())) as Box<dyn X3VmAdapter>;
     let cairo = Box::new(CairoVmAdapter::new("starknet-mainnet".into())) as Box<dyn X3VmAdapter>;
@@ -2492,7 +2489,7 @@ fn test_multi_vm_timeout_stress() {
 #[test]
 fn test_concurrent_lock_claim_stress() {
     // Use X3VM adapter (native, 100% readiness)
-    let x3vm = X3VmAdapterImpl::new("x3-mainnet".into());
+    let x3vm = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
     // Create 5 intents
     let mut relayer = Relayer::new("instant-relayer".into(), 12);
@@ -2600,11 +2597,11 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
     // ===== SETUP PHASE =====
 
     // 1. Create instances of all 15 adapters
-    let _evm_adapter = X3VmAdapterImpl::new("eth".into());
+    let _evm_adapter = X3VmAdapterImpl::simulation("eth".into());
     let _svm_adapter = SubstrateHtlcAdapter::new("solana".into());
     let _substrate = SubstrateHtlcAdapter::new("polkadot".into());
     let _btc_adapter = BtcHtlcAdapter::new(BitcoinNetwork::Mainnet);
-    let _x3vm_adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+    let _x3vm_adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
     let _move_vm_adapter = MoveVmAdapter::new("sui-mainnet".into());
     let _cw_adapter = CosmWasmAdapter::new("cosmwasm-mainnet".into());
     let _cairo_adapter = CairoVmAdapter::new("starknet-mainnet".into());
@@ -2666,21 +2663,21 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
     let _timeout_engine = TimeoutEngine::new(100);
 
     // 7. Create AdapterLedgerBridge for each adapter
-    let _evm_bridge = AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::new("eth".into())));
+    let _evm_bridge = AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::simulation("eth".into())));
     let _svm_bridge =
         AdapterLedgerBridge::new(Box::new(SubstrateHtlcAdapter::new("solana".into())));
-    let _x3_bridge = AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::new("x3-mainnet".into())));
+    let _x3_bridge = AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::simulation("x3-mainnet".into())));
     let _move_bridge = AdapterLedgerBridge::new(Box::new(MoveVmAdapter::new("sui-mainnet".into())));
     let _cw_bridge =
         AdapterLedgerBridge::new(Box::new(CosmWasmAdapter::new("cosmwasm-mainnet".into())));
 
     // 8. Create AtomicCommandCenter with all adapters
     let all_adapters: Vec<Box<dyn X3VmAdapter>> = vec![
-        Box::new(X3VmAdapterImpl::new("eth".into())),
+        Box::new(X3VmAdapterImpl::simulation("eth".into())),
         Box::new(SubstrateHtlcAdapter::new("solana".into())),
         Box::new(SubstrateHtlcAdapter::new("polkadot".into())),
         Box::new(BtcHtlcAdapter::new(BitcoinNetwork::Mainnet)),
-        Box::new(X3VmAdapterImpl::new("x3-mainnet".into())),
+        Box::new(X3VmAdapterImpl::simulation("x3-mainnet".into())),
         Box::new(MoveVmAdapter::new("sui-mainnet".into())),
         Box::new(CosmWasmAdapter::new("cosmwasm-mainnet".into())),
         Box::new(CairoVmAdapter::new("starknet-mainnet".into())),
@@ -2814,7 +2811,7 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
     let mut relayer = Relayer::new("e2e-relayer".into(), 12);
 
     // 11. Lock Intent A via X3VM adapter
-    let x3vm_impl = X3VmAdapterImpl::new("x3-mainnet".into());
+    let x3vm_impl = X3VmAdapterImpl::simulation("x3-mainnet".into());
     let lock_a = x3vm_impl
         .lock(&intent_a)
         .expect("Intent A lock must succeed");
@@ -2827,7 +2824,7 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
     relayer.record_finality_verified(rec_a, true, 1500).unwrap();
 
     // 12. Lock Intent B via EVM adapter
-    let evm_impl = X3VmAdapterImpl::new("eth".into());
+    let evm_impl = X3VmAdapterImpl::simulation("eth".into());
     let lock_b = evm_impl
         .lock(&intent_b)
         .expect("Intent B lock must succeed");
@@ -2989,15 +2986,15 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
         );
     }
 
-    // 24. Verify adapter scoreboard shows correct scores for all 15 adapters
+    // 24. Verify adapter scoreboard shows correct scores for all adapters
     let adapter_output = center.adapter_scoreboard();
     assert!(
         adapter_output.contains("x3-adapter-x3vm"),
         "must contain x3vm"
     );
-    assert!(adapter_output.contains("100"), "must contain score 100");
 
-    // 25. Verify overall score > 70
+    // 25. Verify overall score is at least 70. X3VM is offline simulation
+    // only, so it must not be marked as a fully production-ready adapter.
     let scoreboard = AdapterScoreboard::from_adapters(
         &center
             .adapters
@@ -3007,9 +3004,19 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
         0,
     );
     assert!(
-        scoreboard.overall_score > 70,
-        "overall score must be > 70, got {}",
+        scoreboard.overall_score >= 70,
+        "overall score must be at least 70, got {}",
         scoreboard.overall_score
+    );
+    let x3vm_entry = scoreboard
+        .entries
+        .iter()
+        .find(|e| e.adapter_name == "x3-adapter-x3vm")
+        .expect("x3vm entry present");
+    assert!(
+        x3vm_entry.score < 80,
+        "offline X3VM adapter must not be production-ready, got {}",
+        x3vm_entry.score
     );
 
     // ===== FAILURE RECOVERY PHASE =====
@@ -3047,7 +3054,7 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
 
     // 28. Create Intent E for unsupported VM
     // (Using a VM adapter that doesn't support the chain)
-    let unsupported_vm = X3VmAdapterImpl::new("unsupported".into());
+    let unsupported_vm = X3VmAdapterImpl::simulation("unsupported".into());
     let unsupported_intent = AtomicIntentBuilder::new()
         .source_chain(ChainKind::Ethereum)
         .destination_chain(ChainKind::Solana)
@@ -3128,7 +3135,7 @@ fn test_e2e_chaos_recovery() {
         .build(900)
         .expect("recovery intent should build");
 
-    let x3vm = X3VmAdapterImpl::new("x3-mainnet".into());
+    let x3vm = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
     // 2. Lock it via X3VM adapter
     let lock = x3vm.lock(&intent).expect("lock must succeed");

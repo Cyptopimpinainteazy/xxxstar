@@ -102,6 +102,14 @@ pub struct NodeFeatureFlags {
     #[arg(long, default_value_t = false)]
     pub enable_atomic_kernel: bool,
 
+    /// Sr25519 secret URI for the X3-lang atomic gateway account.
+    ///
+    /// Required when `--enable-atomic-kernel` is set. Defaults to
+    /// `//x3-atomic-gateway` for dev chains; also honored from the
+    /// `X3_ATOMIC_GATEWAY_URI` environment variable.
+    #[arg(long, value_name = "SURI")]
+    pub atomic_gateway_uri: Option<String>,
+
     /// Require GPU path for validation critical flows.
     ///
     /// When set to true, the node will enforce GPU execution for performance-critical

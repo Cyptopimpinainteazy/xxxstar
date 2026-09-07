@@ -110,6 +110,9 @@ pub fn make_json_rpc_call(
 
 use codec::{Decode, Encode};
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
+use pallet_x3_atomic_kernel::vm_revert::{
+    encode_overlay_state_diff, OverlayDomain, OverlayLegChange, StateDiff,
+};
 use sha2::{Digest, Sha256};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
@@ -174,6 +177,42 @@ fn balance_slot_key(address: &[u8]) -> H256 {
     ctx.update(address);
     let d = ctx.finalize();
     H256::from_slice(&d)
+}
+
+fn h256_from_u128(value: u128) -> H256 {
+    let mut value_bytes = [0u8; 32];
+    value_bytes[..16].copy_from_slice(&value.to_le_bytes());
+    H256::from(value_bytes)
+}
+
+/// A pre/post balance-slot overlay transition captured by the runtime-backed
+/// balance adapter. `old_value` is the balance as of the last chain read;
+/// `new_value` is the balance after the dispatcher executed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OverlayTransition {
+    pub address: Vec<u8>,
+    pub key: H256,
+    pub old_value: H256,
+    pub new_value: H256,
+}
+
+/// Encode dispatcher overlay transitions into an atomic-kernel `StateDiff`
+/// for the given execution domain.
+pub fn overlay_state_diff_for_domain(
+    transitions: &[OverlayTransition],
+    domain: OverlayDomain,
+) -> StateDiff {
+    let changes: Vec<OverlayLegChange> = transitions
+        .iter()
+        .map(|t| OverlayLegChange {
+            domain,
+            address: t.address.clone(),
+            key: t.key,
+            old_value: Some(t.old_value),
+            new_value: Some(t.new_value),
+        })
+        .collect();
+    encode_overlay_state_diff(&changes)
 }
 
 pub struct SubstrateClientBalanceAdapter<C, Block> {
@@ -257,8 +296,6 @@ where
             .iter()
             .filter(|(_, entry)| entry.current != entry.chain_snapshot)
             .map(|(addr, entry)| {
-                let mut value_bytes = [0u8; 32];
-                value_bytes[..16].copy_from_slice(&entry.current.to_le_bytes());
                 StateChange {
                     address: addr.clone(),
                     // Deterministic, domain-separated balance-slot key derived
@@ -266,10 +303,47 @@ where
                     // only, with one balance per address). Replaces the previous
                     // H256::zero() placeholder, which was not a reproducible key.
                     key: balance_slot_key(addr),
-                    value: H256::from(value_bytes),
+                    value: h256_from_u128(entry.current),
                 }
             })
             .collect()
+    }
+
+    /// Read the dispatcher overlay as pre/post balance transitions without
+    /// consuming them. The node service passes these to
+    /// `overlay_state_diff_for_domain` when recording a leg receipt.
+    pub fn overlay_transitions(&self) -> Vec<OverlayTransition> {
+        let guard = self.overlay.read().expect("overlay read");
+        guard
+            .iter()
+            .filter(|(_, entry)| entry.current != entry.chain_snapshot)
+            .map(|(addr, entry)| OverlayTransition {
+                address: addr.clone(),
+                key: balance_slot_key(addr),
+                old_value: h256_from_u128(entry.chain_snapshot),
+                new_value: h256_from_u128(entry.current),
+            })
+            .collect()
+    }
+
+    /// Capture changed overlay transitions and advance each entry's snapshot
+    /// to its current value, so a subsequent leg only reports its own delta.
+    pub fn take_overlay_transitions(&self) -> Vec<OverlayTransition> {
+        let mut guard = self.overlay.write().expect("overlay write");
+        let mut transitions = Vec::new();
+        for (addr, entry) in guard.iter_mut() {
+            if entry.current == entry.chain_snapshot {
+                continue;
+            }
+            transitions.push(OverlayTransition {
+                address: addr.clone(),
+                key: balance_slot_key(addr),
+                old_value: h256_from_u128(entry.chain_snapshot),
+                new_value: h256_from_u128(entry.current),
+            });
+            entry.chain_snapshot = entry.current;
+        }
+        transitions
     }
 }
 
@@ -1185,5 +1259,38 @@ mod tests {
         assert_eq!(receipt.call_hash, call.call_hash(&expected_root));
         assert_eq!(dispatcher.get_evm_bridge_escrow(), evm_escrow);
         assert_eq!(dispatcher.get_svm_bridge_escrow(), svm_escrow);
+    }
+
+    #[test]
+    fn overlay_diff_roundtrips_with_atomic_kernel_format() {
+        let transitions = vec![
+            OverlayTransition {
+                address: vec![0x42; 20],
+                key: balance_slot_key(&[0x42; 20]),
+                old_value: H256([0xAA; 32]),
+                new_value: H256([0xBB; 32]),
+            },
+            OverlayTransition {
+                address: vec![0x51; 32],
+                key: balance_slot_key(&[0x51; 32]),
+                old_value: H256([0x01; 32]),
+                new_value: H256([0x02; 32]),
+            },
+        ];
+
+        let evm_diff = overlay_state_diff_for_domain(&transitions[..1], OverlayDomain::Evm);
+        let svm_diff = overlay_state_diff_for_domain(&transitions[1..], OverlayDomain::Svm);
+
+        let decoded_evm = pallet_x3_atomic_kernel::vm_revert::decode_overlay_state_diff(&evm_diff)
+            .expect("evm overlay diff decodes");
+        let decoded_svm = pallet_x3_atomic_kernel::vm_revert::decode_overlay_state_diff(&svm_diff)
+            .expect("svm overlay diff decodes");
+
+        assert_eq!(decoded_evm.len(), 1);
+        assert_eq!(decoded_evm[0].domain, OverlayDomain::Evm);
+        assert_eq!(decoded_evm[0].address, transitions[0].address);
+        assert_eq!(decoded_svm.len(), 1);
+        assert_eq!(decoded_svm[0].domain, OverlayDomain::Svm);
+        assert_eq!(decoded_svm[0].address, transitions[1].address);
     }
 }
