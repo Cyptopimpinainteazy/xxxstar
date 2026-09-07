@@ -6,13 +6,18 @@
 
 use crate::atomic_gateway::AtomicGatewayKey;
 use crate::service::FullClient;
+use codec::Encode;
+use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use sc_client_api::{BlockBackend, HeaderBackend};
+use sp_api::ProvideRuntimeApi;
+use sp_core::hashing::sha2_256;
 use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sp_core::H256;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use x3_chain_runtime::opaque::Block;
+use pallet_x3_atomic_kernel::BundleStatus;
 
 /// Transaction pool type used by the node atomic gateway service.
 pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClient>;
@@ -83,31 +88,78 @@ impl AtomicGatewayService {
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
         let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
-        let extrinsic = match command {
+        let (extrinsic, legs_hash) = match command {
             AtomicGatewayCommand::SubmitBundle {
                 legs,
                 deadline_blocks,
                 chain_id,
                 nonce,
-            } => self.key.submit_atomic_bundle(
-                legs,
-                deadline_blocks,
-                chain_id,
-                nonce,
-                self.genesis_hash,
-                tx_nonce,
-            )?,
-            AtomicGatewayCommand::AssignExecutor { bundle_id } => self
-                .key
-                .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+            } => {
+                let legs_hash = H256(sha2_256(&legs.encode()));
+                let extrinsic = self.key.submit_atomic_bundle(
+                    legs,
+                    deadline_blocks,
+                    chain_id,
+                    nonce,
+                    self.genesis_hash,
+                    tx_nonce,
+                )?;
+                (extrinsic, Some(legs_hash))
+            }
+            AtomicGatewayCommand::AssignExecutor { bundle_id } => (
+                self.key
+                    .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+                None,
+            ),
         };
         let best_hash = self.client.info().best_hash;
         let at = best_hash;
         self.pool
             .submit_one(at, TransactionSource::External, extrinsic.into())
             .await
-            .map(|_| ())
             .map_err(|e| format!("transaction pool rejected atomic extrinsic: {e}"))
+            .map(|_| ())?;
+
+        if let Some(legs_hash) = legs_hash {
+            self.wait_for_submission_and_assign(legs_hash).await?;
+        }
+        Ok(())
+    }
+
+    async fn wait_for_submission_and_assign(
+        &self,
+        legs_hash: H256,
+    ) -> Result<(), String> {
+        for _ in 0..50 {
+            let at = self.client.info().best_hash;
+            let submitter: sp_core::crypto::AccountId32 = self.key.account().into();
+            let found = self
+                .client
+                .runtime_api()
+                .find_bundle(at, submitter, legs_hash)
+                .map_err(|e| format!("find_bundle runtime call failed: {e}"))?;
+
+            if let Some((bundle_id, BundleStatus::Pending)) = found {
+                let assign_nonce =
+                    self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+                let extrinsic = self.key.assign_bundle_executor(
+                    bundle_id,
+                    self.genesis_hash,
+                    assign_nonce,
+                )?;
+                self.pool
+                    .submit_one(
+                        self.client.info().best_hash,
+                        TransactionSource::External,
+                        extrinsic.into(),
+                    )
+                    .await
+                    .map_err(|e| format!("assign_bundle_executor rejected: {e}"))?;
+                return Ok(());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        Err("bundle submission was not found on-chain within timeout".to_string())
     }
 }
 

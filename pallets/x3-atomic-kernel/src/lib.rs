@@ -1520,6 +1520,22 @@ pub mod pallet {
         pub fn bundle_status(bundle_id: H256) -> Option<BundleStatus> {
             Bundles::<T>::get(bundle_id).map(|r| r.status)
         }
+
+        /// Find a submitted bundle by gateway submitter and legs hash.
+        ///
+        /// Used by the node service to discover the on-chain bundle id after
+        /// `submit_atomic_bundle` is included, without scanning block events.
+        pub fn find_bundle(
+            submitter: &T::AccountId,
+            legs_hash: H256,
+        ) -> Option<(H256, BundleStatus)> {
+            Bundles::<T>::iter()
+                .find(|(_, record)| {
+                    &record.submitter == submitter && record.legs_hash == legs_hash
+                })
+                .map(|(bundle_id, record)| (bundle_id, record.status))
+        }
+
         /// Derive the pallet-level treasury account that receives slashed bond funds.
         fn treasury_account() -> T::AccountId {
             PALLET_ID.into_account_truncating()
@@ -1544,6 +1560,12 @@ sp_api::decl_runtime_apis! {
 
         /// Return the current status of a bundle.
         fn get_bundle_status(bundle_id: sp_core::H256) -> Option<crate::BundleStatus>;
+
+        /// Find a submitted bundle by gateway submitter and legs hash.
+        fn find_bundle(
+            submitter: sp_core::crypto::AccountId32,
+            legs_hash: sp_core::H256,
+        ) -> Option<(sp_core::H256, crate::BundleStatus)>;
 
         /// Return the Flash Finality certificate anchor stored for the given block number.
         fn get_finality_cert_anchor(block_num: u64) -> Option<sp_core::H256>;

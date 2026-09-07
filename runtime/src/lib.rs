@@ -4319,6 +4319,34 @@ impl_runtime_apis! {
         }
     }
 
+    impl pallet_x3_atomic_kernel::X3AtomicKernelApi<Block> for Runtime {
+        fn get_poae_proof(
+            bundle_id: sp_core::H256,
+        ) -> Option<pallet_x3_atomic_kernel::proof::PoaeProof> {
+            pallet_x3_atomic_kernel::Pallet::<Runtime>::get_poae_proof(bundle_id)
+        }
+
+        fn get_bundle_status(
+            bundle_id: sp_core::H256,
+        ) -> Option<pallet_x3_atomic_kernel::BundleStatus> {
+            pallet_x3_atomic_kernel::Pallet::<Runtime>::bundle_status(bundle_id)
+        }
+
+        fn find_bundle(
+            submitter: sp_core::crypto::AccountId32,
+            legs_hash: sp_core::H256,
+        ) -> Option<(sp_core::H256, pallet_x3_atomic_kernel::BundleStatus)> {
+            pallet_x3_atomic_kernel::Pallet::<Runtime>::find_bundle(
+                &AccountId::from(submitter),
+                legs_hash,
+            )
+        }
+
+        fn get_finality_cert_anchor(block_num: u64) -> Option<sp_core::H256> {
+            pallet_x3_atomic_kernel::FinalityCertAnchors::<Runtime>::get(block_num)
+        }
+    }
+
     impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime {
         fn query_info(
             uxt: <Block as BlockT>::Extrinsic,
