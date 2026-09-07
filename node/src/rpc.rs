@@ -595,7 +595,7 @@ where
     module.register_method(
         "atomic_findBundle",
         move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
-            let req: serde_json::Value = params.parse()?;
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
             let submitter_hex = req
                 .get("submitter")
                 .and_then(|v| v.as_str())

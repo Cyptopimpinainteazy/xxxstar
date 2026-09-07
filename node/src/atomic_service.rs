@@ -288,12 +288,16 @@ impl AtomicGatewayService {
     ) -> Result<(), String> {
         for _ in 0..100 {
             let info = self.client.info();
-            let block_num: u64 = info.best_number.saturated_into();
-            let best_hash = info.best_hash;
+            let block_num: u64 = info.finalized_number.saturated_into();
+            if block_num == 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                continue;
+            }
+            let finalized_hash = info.best_hash;
             let finality_cert = match self
                 .client
                 .runtime_api()
-                .get_finality_cert_anchor(best_hash, block_num)
+                .get_finality_cert_anchor(finalized_hash, block_num)
             {
                 Ok(Some(cert)) => cert,
                 Ok(None) => {
@@ -317,19 +321,20 @@ impl AtomicGatewayService {
                 finalized_block: block_num,
                 finality_cert,
             });
-            let call = RuntimeCall::X3AtomicKernel(
-                pallet_x3_atomic_kernel::Call::<Runtime>::submit_finalization_result {
-                    bundle_id,
-                    receipt_root,
-                    finality_cert,
-                    committed_at_ns: 0,
-                },
-            );
-            let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+            let finalize_nonce =
+                self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+            let extrinsic = self.key.finalize_atomic_bundle(
+                bundle_id,
+                receipt_root,
+                finality_cert,
+                block_num as u32,
+                self.genesis_hash,
+                finalize_nonce,
+            )?;
             return self
                 .pool
                 .submit_one(
-                    best_hash,
+                    finalized_hash,
                     TransactionSource::External,
                     extrinsic.into(),
                 )

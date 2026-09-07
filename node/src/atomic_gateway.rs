@@ -71,6 +71,28 @@ impl AtomicGatewayKey {
         self.signed_extrinsic(call, genesis_hash, tx_nonce)
     }
 
+    /// Build a signed `finalize_atomic_bundle` extrinsic for the finalized
+    /// block that owns the bundle.
+    pub fn finalize_atomic_bundle(
+        &self,
+        bundle_id: H256,
+        receipt_root: H256,
+        finality_cert: H256,
+        finalized_block: u32,
+        genesis_hash: H256,
+        tx_nonce: u32,
+    ) -> Result<UncheckedExtrinsic, String> {
+        let call = RuntimeCall::X3AtomicKernel(
+            pallet_x3_atomic_kernel::Call::<Runtime>::finalize_atomic_bundle {
+                bundle_id,
+                receipt_root,
+                finality_cert,
+                finalized_block,
+            },
+        );
+        self.signed_extrinsic(call, genesis_hash, tx_nonce)
+    }
+
     fn signed_extrinsic(
         &self,
         call: RuntimeCall,
