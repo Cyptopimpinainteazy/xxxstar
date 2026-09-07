@@ -15,6 +15,15 @@ GitHub reports the following vulnerabilities on the default branch:
 - Blocking mainnet merge: no, because these are dependency advisories rather than
   atomic-swap proof-path correctness issues.
 
+## Rust Advisory Evidence
+
+- `cargo audit` exit code: 0
+- Blocking vulnerabilities: 0
+- Allowed warnings: 33
+
+The 591 GitHub Dependabot findings are therefore predominantly JS/Python
+ecosystem advisories and/or GitHub severity policy, not Rust security failures.
+
 ## Remediation plan
 
 1. Generate the complete advisory list from GitHub Security > Dependabot.
