@@ -40,7 +40,7 @@ python -m pytest
 Run fake-code scan:
 
 ```bash
-grep -RIn "TODO\|FIXME\|stub\|mock\|fake\|placeholder\|dummy\|unimplemented!\|todo!\|panic!(\"not implemented" . --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules
+grep -rIn "TODO\|FIXME\|stub\|mock\|fake\|placeholder\|dummy\|unimplemented!\|todo!\|panic!(\"not implemented" . --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir='.wt-*'
 ```
 
 ## Completion Report Required

@@ -1,13 +1,10 @@
-//! # X3VM HTLC Adapter (Native)
+//! # X3VM HTLC adapter
 //!
-//! The **native** adapter for X3VM chains (x3-mainnet, x3-testnet,
-//! x3-local). Since X3 runs natively on X3VM, this adapter is the most
-//! complete: it has instant finality (1 block), full replay protection via
-//! nonces, and stateful double-claim / double-refund enforcement.
-//!
-//! In production, [`lock`] would interact with the X3 runtime's atomic-swap
-//! runtime, [`claim`] would submit a claim with the preimage, and [`refund`]
-//! would trigger the refund path after timeout.
+//! There is **no live X3VM HTLC transport implemented yet**. The default
+//! adapter refuses to fabricate transaction ids, block hashes, or proofs.
+//! An explicit [`X3VmAdapterImpl::simulation`] constructor is provided only
+//! for offline dry-runs and tests; it must never be used as a production
+//! proof source.
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,
@@ -44,6 +41,9 @@ pub struct X3VmAdapterImpl {
     pub claimed_intents: Vec<u64>,
     /// Tracked refunded intent IDs.
     pub refunded_intents: Vec<u64>,
+    /// When false, lifecycle operations fail closed instead of fabricating
+    /// proofs, because no live X3VM transport is configured.
+    simulation: bool,
 }
 
 /// Internal lock state tracked by the stateful adapter.
@@ -74,10 +74,21 @@ impl X3VmAdapterImpl {
             used_nonces: Vec::new(),
             claimed_intents: Vec::new(),
             refunded_intents: Vec::new(),
+            simulation: false,
         }
     }
 
-    /// Create a new X3VM adapter with a specific escrow address.
+    /// Create an offline simulation adapter. Proofs returned by this adapter
+    /// are deterministic local artifacts, not on-chain transactions, and must
+    /// not be written to a production proof ledger.
+    pub fn simulation(chain_id: ChainId) -> Self {
+        Self {
+            simulation: true,
+            ..Self::new(chain_id)
+        }
+    }
+
+    /// Create a production adapter with a specific escrow address.
     pub fn with_escrow(chain_id: ChainId, escrow: Vec<u8>) -> Self {
         Self {
             chain_id,
@@ -86,6 +97,15 @@ impl X3VmAdapterImpl {
             used_nonces: Vec::new(),
             claimed_intents: Vec::new(),
             refunded_intents: Vec::new(),
+            simulation: false,
+        }
+    }
+
+    /// Create an offline simulation adapter with a specific escrow address.
+    pub fn simulation_with_escrow(chain_id: ChainId, escrow: Vec<u8>) -> Self {
+        Self {
+            simulation: true,
+            ..Self::with_escrow(chain_id, escrow)
         }
     }
 
@@ -94,8 +114,8 @@ impl X3VmAdapterImpl {
         self.escrow_address = escrow;
     }
 
-    /// Generate a deterministic mock tx_id from intent_id and a label byte.
-    fn mock_tx_id(intent_id: IntentId, label: u8) -> TxId {
+    /// Generate a deterministic simulation tx_id from intent_id and a label byte.
+    fn simulated_tx_id(intent_id: IntentId, label: u8) -> TxId {
         let mut hasher = Sha256::new();
         hasher.update(intent_id.to_le_bytes());
         hasher.update([label]);
@@ -128,6 +148,13 @@ impl X3VmAdapter for X3VmAdapterImpl {
     // ── Lifecycle operations ──────────────────────────────────────────────
 
     fn lock(&self, intent: &AtomicIntent) -> Result<LockProof, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM live transport is not implemented; refusing to fabricate a lock proof"
+                    .into(),
+            ));
+        }
+
         // Use intent_id as nonce for replay protection
         let nonce = intent.intent_id;
 
@@ -139,7 +166,7 @@ impl X3VmAdapter for X3VmAdapterImpl {
         }
 
         let chain_id = self.chain_id.clone();
-        let tx_id = Self::mock_tx_id(intent.intent_id, 0x01);
+        let tx_id = Self::simulated_tx_id(intent.intent_id, 0x01);
         let lock_address = if self.escrow_address.is_empty() {
             // Derive a mock escrow address from chain_id
             let mut hasher = Sha256::new();
@@ -171,11 +198,18 @@ impl X3VmAdapter for X3VmAdapterImpl {
             receiver,
             refund_address,
             timeout: intent.source_timeout,
-            raw_proof: vec![0x78, 0x33, 0x76, 0x6d, 0x01], // "x3vm\x01" - mock proof
+            raw_proof: vec![0x78, 0x33, 0x76, 0x6d, 0x01], // "x3vm\x01" - simulation proof
         })
     }
 
     fn claim(&self, intent_id: IntentId, preimage: [u8; 32]) -> Result<ClaimProof, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM live transport is not implemented; refusing to fabricate a claim proof"
+                    .into(),
+            ));
+        }
+
         // Check if already claimed
         if self.claimed_intents.contains(&intent_id) {
             return Err(SwapError::ClaimFailed {
@@ -193,7 +227,7 @@ impl X3VmAdapter for X3VmAdapterImpl {
         }
 
         let chain_id = self.chain_id.clone();
-        let tx_id = Self::mock_tx_id(intent_id, 0x02);
+        let tx_id = Self::simulated_tx_id(intent_id, 0x02);
         let block_number = self.finalized_block + 2;
 
         Ok(ClaimProof {
@@ -204,11 +238,18 @@ impl X3VmAdapter for X3VmAdapterImpl {
             preimage,
             block_number,
             block_hash: hex::encode(Sha256::digest(block_number.to_le_bytes())),
-            raw_proof: vec![0x78, 0x33, 0x76, 0x6d, 0x02], // "x3vm\x02" - mock proof
+            raw_proof: vec![0x78, 0x33, 0x76, 0x6d, 0x02], // "x3vm\x02" - simulation proof
         })
     }
 
     fn refund(&self, intent_id: IntentId) -> Result<RefundProof, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM live transport is not implemented; refusing to fabricate a refund proof"
+                    .into(),
+            ));
+        }
+
         // Check if already claimed
         if self.claimed_intents.contains(&intent_id) {
             return Err(SwapError::RefundFailed {
@@ -226,7 +267,7 @@ impl X3VmAdapter for X3VmAdapterImpl {
         }
 
         let chain_id = self.chain_id.clone();
-        let tx_id = Self::mock_tx_id(intent_id, 0x03);
+        let tx_id = Self::simulated_tx_id(intent_id, 0x03);
         let block_number = self.finalized_block + 3;
 
         Ok(RefundProof {
@@ -236,13 +277,19 @@ impl X3VmAdapter for X3VmAdapterImpl {
             vm_type: VmType::X3Vm,
             block_number,
             block_hash: hex::encode(Sha256::digest(block_number.to_le_bytes())),
-            raw_proof: vec![0x78, 0x33, 0x76, 0x6d, 0x03], // "x3vm\x03" - mock proof
+            raw_proof: vec![0x78, 0x33, 0x76, 0x6d, 0x03], // "x3vm\x03" - simulation proof
         })
     }
 
     // ── Verification ──────────────────────────────────────────────────────
 
     fn verify_lock(&self, proof: &LockProof) -> Result<bool, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM proof verification requires a live chain proof source; not implemented"
+                    .into(),
+            ));
+        }
         if proof.vm_type != VmType::X3Vm {
             return Ok(false);
         }
@@ -266,6 +313,12 @@ impl X3VmAdapter for X3VmAdapterImpl {
     }
 
     fn verify_claim(&self, proof: &ClaimProof) -> Result<bool, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM proof verification requires a live chain proof source; not implemented"
+                    .into(),
+            ));
+        }
         if proof.vm_type != VmType::X3Vm {
             return Ok(false);
         }
@@ -279,6 +332,12 @@ impl X3VmAdapter for X3VmAdapterImpl {
     }
 
     fn verify_refund(&self, proof: &RefundProof) -> Result<bool, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM proof verification requires a live chain proof source; not implemented"
+                    .into(),
+            ));
+        }
         if proof.vm_type != VmType::X3Vm {
             return Ok(false);
         }
@@ -291,6 +350,11 @@ impl X3VmAdapter for X3VmAdapterImpl {
     // ── Estimation & Health ───────────────────────────────────────────────
 
     fn estimate_fee(&self, _intent: &AtomicIntent) -> Result<FeeEstimate, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM fee estimation requires a live gas source; not implemented".into(),
+            ));
+        }
         // Native X3 fee: 0.001 X3 = 1_000_000_000_000_000 wei equivalent
         Ok(FeeEstimate {
             chain_id: self.chain_id.clone(),
@@ -303,6 +367,11 @@ impl X3VmAdapter for X3VmAdapterImpl {
     }
 
     fn finality_status(&self, tx_id: &TxId) -> Result<FinalityProof, SwapError> {
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM finality requires a live chain proof source; not implemented".into(),
+            ));
+        }
         // X3VM has instant finality (1 block)
         let confirmations = 1u64;
         let finalized = true;
@@ -322,7 +391,12 @@ impl X3VmAdapter for X3VmAdapterImpl {
     }
 
     fn chain_health(&self) -> Result<ChainHealth, SwapError> {
-        // X3VM is always healthy, not halted, safe for new intents
+        if !self.simulation {
+            return Err(SwapError::Internal(
+                "X3VM health checks require a live RPC endpoint; not implemented".into(),
+            ));
+        }
+        // Simulation health is always healthy because no real network is queried.
         Ok(ChainHealth {
             chain_id: self.chain_id.clone(),
             vm_type: VmType::X3Vm,
@@ -341,20 +415,41 @@ impl X3VmAdapter for X3VmAdapterImpl {
     // ── Readiness ─────────────────────────────────────────────────────────
 
     fn readiness_score(&self) -> AdapterReadinessScore {
-        // X3VM is fully implemented - all capabilities are present
+        if !self.simulation {
+            return AdapterReadinessScore {
+                adapter_name: "x3-adapter-x3vm",
+                vm_type: VmType::X3Vm,
+                interface_implemented: false,
+                lock_path: false,
+                claim_path: false,
+                refund_path: false,
+                event_proof_extraction: false,
+                finality_proof: false,
+                rpc_indexer_support: false,
+                timeout_safety: false,
+                tests_implemented: true,
+                proof_ledger_integration: false,
+                ibc_support: false,
+                cross_adapter_atomicity_test: false,
+            };
+        }
+
+        // Simulation capabilities only: the offline adapter can exercise lock,
+        // claim, refund, and timeout logic, but it cannot produce on-chain
+        // proofs or extract real events.
         AdapterReadinessScore {
             adapter_name: "x3-adapter-x3vm",
             vm_type: VmType::X3Vm,
-            interface_implemented: true,
+            interface_implemented: false,
             lock_path: true,
             claim_path: true,
             refund_path: true,
-            event_proof_extraction: true, // X3VM natively supports event proofs
-            finality_proof: true,
-            rpc_indexer_support: true, // X3VM has full RPC/indexer support
+            event_proof_extraction: false,
+            finality_proof: false,
+            rpc_indexer_support: false,
             timeout_safety: true,
             tests_implemented: true,
-            proof_ledger_integration: true,
+            proof_ledger_integration: false,
             ibc_support: false,
             cross_adapter_atomicity_test: false,
         }
@@ -382,9 +477,25 @@ impl StatefulX3VmAdapter {
         }
     }
 
+    /// Stateful offline simulation adapter (see [`X3VmAdapterImpl::simulation`]).
+    pub fn simulation(chain_id: ChainId) -> Self {
+        Self {
+            inner: X3VmAdapterImpl::simulation(chain_id),
+            locks: Vec::new(),
+        }
+    }
+
     pub fn with_escrow(chain_id: ChainId, escrow: Vec<u8>) -> Self {
         Self {
             inner: X3VmAdapterImpl::with_escrow(chain_id, escrow),
+            locks: Vec::new(),
+        }
+    }
+
+    /// Stateful offline simulation adapter with a specific escrow address.
+    pub fn simulation_with_escrow(chain_id: ChainId, escrow: Vec<u8>) -> Self {
+        Self {
+            inner: X3VmAdapterImpl::simulation_with_escrow(chain_id, escrow),
             locks: Vec::new(),
         }
     }
@@ -593,11 +704,36 @@ mod tests {
         hash
     }
 
+    #[test]
+    fn test_production_constructor_fails_closed_without_live_transport() {
+        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let intent = make_test_intent(1, make_hashlock(b"preimage"));
+
+        assert!(
+            adapter.lock(&intent).is_err(),
+            "production adapter must not fabricate a lock proof"
+        );
+        assert!(
+            adapter.claim(1, [7u8; 32]).is_err(),
+            "production adapter must not fabricate a claim proof"
+        );
+        assert!(
+            adapter.refund(1).is_err(),
+            "production adapter must not fabricate a refund proof"
+        );
+
+        let readiness = adapter.readiness_score();
+        assert!(!readiness.lock_path);
+        assert!(!readiness.claim_path);
+        assert!(!readiness.refund_path);
+        assert!(!readiness.finality_proof);
+    }
+
     // ── Adapter Identity Tests ────────────────────────────────────────────
 
     #[test]
     fn test_adapter_identity() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         assert_eq!(adapter.vm_type(), VmType::X3Vm);
         assert_eq!(adapter.adapter_name(), "x3-adapter-x3vm");
@@ -614,7 +750,7 @@ mod tests {
 
     #[test]
     fn test_adapter_name_const() {
-        let adapter = X3VmAdapterImpl::new("x3-testnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-testnet".into());
         let name: &'static str = adapter.adapter_name();
         assert_eq!(name, "x3-adapter-x3vm");
     }
@@ -623,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_new_constructor() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         assert_eq!(adapter.chain_id, "x3-mainnet");
         assert!(adapter.escrow_address.is_empty());
         assert!(adapter.used_nonces.is_empty());
@@ -634,7 +770,7 @@ mod tests {
     #[test]
     fn test_with_escrow_constructor() {
         let escrow = vec![0xABu8; 32];
-        let adapter = X3VmAdapterImpl::with_escrow("x3-mainnet".into(), escrow.clone());
+        let adapter = X3VmAdapterImpl::simulation_with_escrow("x3-mainnet".into(), escrow.clone());
         assert_eq!(adapter.chain_id, "x3-mainnet");
         assert_eq!(adapter.escrow_address, escrow);
     }
@@ -643,7 +779,7 @@ mod tests {
 
     #[test]
     fn test_lock_creates_proof() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"test_x3_lock");
         let intent = make_test_intent(42, hashlock);
 
@@ -668,7 +804,7 @@ mod tests {
             0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
             0x88, 0x99,
         ];
-        let adapter = X3VmAdapterImpl::with_escrow("x3-mainnet".into(), escrow);
+        let adapter = X3VmAdapterImpl::simulation_with_escrow("x3-mainnet".into(), escrow);
         let hashlock = make_hashlock(b"escrow_test");
         let intent = make_test_intent(43, hashlock);
 
@@ -680,7 +816,7 @@ mod tests {
 
     #[test]
     fn test_lock_differs_per_intent() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let h1 = make_hashlock(b"secret_x3_1");
         let h2 = make_hashlock(b"secret_x3_2");
 
@@ -694,7 +830,7 @@ mod tests {
 
     #[test]
     fn test_claim_with_preimage() {
-        let adapter = X3VmAdapterImpl::new("x3-testnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-testnet".into());
         let preimage: [u8; 32] = {
             let mut p = [0u8; 32];
             p[..5].copy_from_slice(b"x3_cl");
@@ -713,7 +849,7 @@ mod tests {
 
     #[test]
     fn test_refund_after_timeout() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let proof = adapter.refund(200).expect("refund should succeed");
 
@@ -727,7 +863,7 @@ mod tests {
 
     #[test]
     fn test_verify_valid_lock() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"valid_x3_lock");
         let intent = make_test_intent(10, hashlock);
 
@@ -739,7 +875,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_lock_wrong_vm() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let bad_proof = LockProof {
             tx_id: "some_tx".into(),
@@ -763,7 +899,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_lock_empty_tx() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let bad_proof = LockProof {
             tx_id: String::new(),
@@ -787,7 +923,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_lock_zero_amount() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let bad_proof = LockProof {
             tx_id: "tx_123".into(),
@@ -811,7 +947,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_lock_bad_address() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let bad_proof = LockProof {
             tx_id: "tx_123".into(),
@@ -835,7 +971,7 @@ mod tests {
 
     #[test]
     fn test_verify_valid_claim() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let preimage: [u8; 32] = {
             let mut p = [0u8; 32];
             p[..5].copy_from_slice(b"claim");
@@ -849,7 +985,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_claim_zero_preimage() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let bad_proof = ClaimProof {
             tx_id: "tx_claim".into(),
@@ -868,7 +1004,7 @@ mod tests {
 
     #[test]
     fn test_verify_valid_refund() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let proof = adapter.refund(42).expect("refund");
         let valid = adapter.verify_refund(&proof).expect("verify");
         assert!(valid, "well-formed refund proof should verify");
@@ -876,7 +1012,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_refund_empty_tx() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let bad_proof = RefundProof {
             tx_id: String::new(),
@@ -896,7 +1032,7 @@ mod tests {
 
     #[test]
     fn test_instant_finality() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let proof = adapter
             .finality_status(&"some_tx".into())
@@ -911,7 +1047,7 @@ mod tests {
 
     #[test]
     fn test_chain_health_always_healthy() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
 
         let health = adapter.chain_health().expect("health");
         assert!(health.rpc_quorum_healthy);
@@ -925,7 +1061,7 @@ mod tests {
 
     #[test]
     fn test_estimate_fee() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"fee_test_x3");
         let intent = make_test_intent(1, hashlock);
 
@@ -940,30 +1076,30 @@ mod tests {
     // ── Readiness Score Tests ─────────────────────────────────────────────
 
     #[test]
-    fn test_readiness_score_100() {
-        let adapter = X3VmAdapterImpl::new("x3-mainnet".into());
+    fn test_simulation_readiness_reflects_missing_live_capabilities() {
+        let adapter = X3VmAdapterImpl::simulation("x3-mainnet".into());
         let score = adapter.readiness_score();
 
         assert_eq!(score.adapter_name, "x3-adapter-x3vm");
         assert_eq!(score.vm_type, VmType::X3Vm);
-        assert!(score.interface_implemented);
+        assert!(!score.interface_implemented);
         assert!(score.lock_path);
         assert!(score.claim_path);
         assert!(score.refund_path);
-        assert!(score.event_proof_extraction);
-        assert!(score.finality_proof);
-        assert!(score.rpc_indexer_support);
+        assert!(!score.event_proof_extraction);
+        assert!(!score.finality_proof);
+        assert!(!score.rpc_indexer_support);
         assert!(score.timeout_safety);
         assert!(score.tests_implemented);
-        assert!(score.proof_ledger_integration);
-        assert_eq!(score.score(), 100);
+        assert!(!score.proof_ledger_integration);
+        assert_eq!(score.score(), 50);
     }
 
     // ── Stateful Adapter Tests ────────────────────────────────────────────
 
     #[test]
     fn test_stateful_double_claim_rejected() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let preimage = make_hashlock(b"real_preimage_x3");
         let hashlock = make_hashlock(&preimage);
         let intent = make_test_intent(50, hashlock);
@@ -985,7 +1121,7 @@ mod tests {
 
     #[test]
     fn test_stateful_double_refund_rejected() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"refund_test_x3");
         let intent = make_test_intent(60, hashlock);
 
@@ -1007,7 +1143,7 @@ mod tests {
 
     #[test]
     fn test_stateful_claim_then_refund_rejected() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let preimage = make_hashlock(b"claim_first_x3");
         let hashlock = make_hashlock(&preimage);
         let intent = make_test_intent(70, hashlock);
@@ -1028,7 +1164,7 @@ mod tests {
 
     #[test]
     fn test_stateful_is_claimed() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let preimage = make_hashlock(b"check_claimed_x3");
         let hashlock = make_hashlock(&preimage);
         let intent = make_test_intent(80, hashlock);
@@ -1042,7 +1178,7 @@ mod tests {
 
     #[test]
     fn test_stateful_is_refunded() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"check_refunded_x3");
         let intent = make_test_intent(90, hashlock);
 
@@ -1056,7 +1192,7 @@ mod tests {
 
     #[test]
     fn test_stateful_refund_before_timeout_rejected() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"early_refund_x3");
         let intent = make_test_intent(100, hashlock);
 
@@ -1075,7 +1211,7 @@ mod tests {
 
     #[test]
     fn test_stateful_lock_tracks_state() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"track_state");
         let intent = make_test_intent(110, hashlock);
 
@@ -1088,7 +1224,7 @@ mod tests {
 
     #[test]
     fn test_stateful_lock_prevents_duplicate() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"dup_lock");
         let intent = make_test_intent(120, hashlock);
 
@@ -1104,7 +1240,7 @@ mod tests {
 
     #[test]
     fn test_lock_nonce_tracking() {
-        let mut adapter = StatefulX3VmAdapter::new("x3-mainnet".into());
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let hashlock = make_hashlock(b"nonce_test");
         let intent = make_test_intent(130, hashlock);
 

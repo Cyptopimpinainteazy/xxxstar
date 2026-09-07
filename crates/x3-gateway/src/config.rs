@@ -102,12 +102,14 @@ pub fn from_env() -> Result<Config> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn defaults_to_loopback() {
-        // Remove ambient env so the test is deterministic.
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::remove_var(ENV_LISTEN);
-        std::env::set_var(ENV_LISTEN, "");
         assert_eq!(
             from_env().expect("default config").listen,
             "127.0.0.1:8080".parse::<SocketAddr>().unwrap()
@@ -116,8 +118,9 @@ mod tests {
 
     #[test]
     fn rejects_malformed_listen_addr() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var(ENV_LISTEN, "not-an-addr");
         assert!(from_env().is_err());
-        std::env::set_var(ENV_LISTEN, "");
+        std::env::remove_var(ENV_LISTEN);
     }
 }

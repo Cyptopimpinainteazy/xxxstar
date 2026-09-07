@@ -17,6 +17,7 @@ bitcoin-adapter = []
 x3-vm = { path = "../x3-vm" }
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 pallet-x3-kernel = { path = "../../pallets/x3-kernel" }
+pallet-x3-atomic-kernel = { path = "../../pallets/x3-atomic-kernel" }
 
 # Substrate node-side
 sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }

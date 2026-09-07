@@ -25,6 +25,7 @@ poh-generator = { package = "x3-poh-generator", path = "../crates/poh-generator"
 x3-bridge-adapters = { path = "../crates/x3-bridge-adapters" }
 x3-rpc = { path = "../crates/x3-rpc" }
 x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
+atomic-swap-orchestrator = { path = "../crates/atomic-swap-orchestrator" }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge" }
 pallet-x3-settlement-engine = { path = "../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
 pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false, features = ["std"] }
@@ -60,6 +61,8 @@ pallet-collective = { workspace = true, default-features = false, features = ["s
 pallet-transaction-payment = { workspace = true, default-features = false, features = ["std"] }
 pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = false, features = ["std"] }
 pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false, features = ["std"] }
+pallet-x3-atomic-kernel = { path = "../pallets/x3-atomic-kernel", default-features = false, features = ["std"] }
+frame-support = { workspace = true, default-features = false, features = ["std"] }
 
 
 sc-basic-authorship = { workspace = true }

@@ -5,8 +5,9 @@
 //! verification and commitment phases.
 
 use anyhow::{anyhow, Result};
+use parity_scale_codec::Encode;
 use serde::{Deserialize, Serialize};
-use sp_core::{hashing::sha2_256, H256};
+use sp_core::{hashing::{blake2_256, sha2_256}, H256};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use x3_vm::{
@@ -61,6 +62,96 @@ pub struct AtomicPair {
     pub pallet_bundle_id: Option<H256>,
 }
 
+/// VM target for a kernel bundle leg. Variant order and SCALE encoding MUST
+/// stay identical to `pallet_x3_atomic_kernel::proof::VmType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Encode)]
+pub enum KernelVmType {
+    Evm,
+    Svm,
+    X3,
+    Cross,
+}
+
+/// Declared read/write accounts for a kernel leg. Encoding matches
+/// `pallet_x3_atomic_kernel::proof::DeclaredAccess` (bounded vectors encode
+/// identically to ordinary vectors under SCALE).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Encode)]
+pub struct KernelDeclaredAccess {
+    pub reads: Vec<H256>,
+    pub writes: Vec<H256>,
+}
+
+/// A single atomic-trade leg as recorded by `pallet-x3-atomic-kernel`.
+/// Encoding MUST match `pallet_x3_atomic_kernel::proof::BundleLeg`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode)]
+pub struct KernelBundleLeg {
+    pub vm_type: KernelVmType,
+    pub token_in: H256,
+    pub token_out: H256,
+    pub amount_in: u128,
+    pub min_amount_out: u128,
+    pub deadline: u64,
+    pub access: KernelDeclaredAccess,
+}
+
+/// Structured arguments for executing one leg through the runtime cross-VM
+/// dispatcher. This replaces opaque raw transaction blobs so the node service
+/// can execute legs without guessing at chain semantics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AtomicLegExecution {
+    /// Execute an EVM call against the runtime's pallet-evm runner.
+    Evm {
+        caller: [u8; 20],
+        target: [u8; 20],
+        value: u128,
+        input: Vec<u8>,
+    },
+    /// Execute an SVM instruction against the runtime's rBPF adapter.
+    Svm {
+        caller: [u8; 32],
+        program_id: [u8; 32],
+        instruction: Vec<u8>,
+    },
+    /// Execute an X3 module call through the runtime's X3 executor.
+    X3 {
+        caller: [u8; 32],
+        selector: [u8; 4],
+        payload: Vec<u8>,
+    },
+}
+
+/// Canonical node-side request: the on-chain kernel accounting legs AND the
+/// raw executable payloads they describe. This is the single intake type the
+/// node atomic-swap service consumes before submitting to the runtime and
+/// executing the legs through the runtime-backed dispatcher.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AtomicExecutionRequest {
+    /// The executable pair (SVM + EVM raw payloads) and off-chain correlation id.
+    pub pair: AtomicPair,
+    /// Kernel accounting legs that will be recorded on-chain.
+    pub legs: Vec<KernelBundleLeg>,
+    /// Submission deadline in X3 blocks (capped by the pallet).
+    pub deadline_blocks: u32,
+    /// Chain id used by the pallet's nonce registry.
+    pub chain_id: u32,
+    /// Strictly-increasing per (chain_id, submitter) nonce.
+    pub nonce: u64,
+    /// Structured dispatcher arguments aligned by index with `legs`.
+    pub executions: Vec<AtomicLegExecution>,
+}
+
+impl AtomicExecutionRequest {
+    /// Hash that `submit_atomic_bundle` records as `legs_hash`.
+    ///
+    /// The pallet hashes the SCALE encoding of its bounded leg vector with
+    /// `sha2_256`. Because `KernelBundleLeg` is field-for-field and enum-order
+    /// identical to the pallet type, encoding the canonical request's legs
+    /// here yields the same hash.
+    pub fn legs_hash(&self) -> H256 {
+        H256(sha2_256(&self.legs.encode()))
+    }
+}
+
 /// Outcome returned by `process_swap()`.  Contains both the local `AtomicStatus`
 /// and all data needed for on-chain finalization via `finalize_atomic_bundle`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +187,43 @@ pub struct FinalizationRequest {
     pub finality_cert: H256,
     /// GPU commit timestamp in nanoseconds (for auditing; not stored on-chain).
     pub committed_at_ns: u64,
+}
+
+/// Structured pre-image that `pallet-x3-atomic-kernel` commits to when it
+/// validates a PoAE receipt root. Field order is consensus protocol and must
+/// match `pallet_x3_atomic_kernel::ReceiptRootData`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KernelReceiptRootData {
+    /// The bundle being finalized.
+    pub bundle_id: H256,
+    /// Hash of the ordered leg list committed at submission time.
+    pub legs_hash: H256,
+    /// Number of legs in the bundle.
+    pub leg_count: u32,
+    /// `blake2_256(executor_account_id.encode())`, or `H256::zero()` if no
+    /// executor has been assigned yet.
+    pub executor_hash: H256,
+    /// Block number at which the bundle is being finalized.
+    pub finalized_block: u64,
+    /// Flash Finality / GRANDPA certificate hash (never `H256::zero()`).
+    pub finality_cert: H256,
+}
+
+impl Encode for KernelReceiptRootData {
+    fn encode_to<W: parity_scale_codec::Output + ?Sized>(&self, dest: &mut W) {
+        self.bundle_id.encode_to(dest);
+        self.legs_hash.encode_to(dest);
+        self.leg_count.encode_to(dest);
+        self.executor_hash.encode_to(dest);
+        self.finalized_block.encode_to(dest);
+        self.finality_cert.encode_to(dest);
+    }
+}
+
+/// Compute the receipt root that the atomic-kernel pallet will accept on
+/// mainnet: `blake2_256(SCALE_encode(KernelReceiptRootData))`.
+pub fn kernel_compatible_receipt_root(data: &KernelReceiptRootData) -> H256 {
+    H256(blake2_256(&data.encode()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -155,8 +283,8 @@ impl AtomicSwapOrchestrator {
     /// Implements the 3-Phase Atomic Commit (3PAC) protocol:
     ///  1. **Verify** — GPU batch-verifies Ed25519 (SVM) + secp256k1 (EVM) sigs.
     ///  2. **Commit** — GPU writes the pair to the shm ring buffer.
-    ///  3. **Drain**  — Reads the ring buffer for this pair's committed entry,
-    ///                  builds the receipt_root, and returns finalization data.
+    ///  3. **Drain** — Reads the ring buffer for this pair's committed entry,
+    ///     builds the receipt_root, and returns finalization data.
     ///
     /// The returned `ProcessResult` contains everything needed to call
     /// `finalize_atomic_bundle` on the x3-atomic-kernel pallet.
@@ -235,7 +363,7 @@ impl AtomicSwapOrchestrator {
                     .rposition(|&b| b != 0)
                     .map(|i| i + 1)
                     .unwrap_or(32);
-                &svm[..prefix_len] == &our_svm_prefix[..prefix_len]
+                svm[..prefix_len] == our_svm_prefix[..prefix_len]
             }) {
                 found_entry = Some(entry);
                 break;
@@ -469,6 +597,58 @@ impl AtomicSwapOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kernel_receipt_root_matches_onchain_commitment_vector() {
+        let data = KernelReceiptRootData {
+            bundle_id: H256([1u8; 32]),
+            legs_hash: H256([2u8; 32]),
+            leg_count: 2,
+            executor_hash: H256([3u8; 32]),
+            finalized_block: 7,
+            finality_cert: H256([4u8; 32]),
+        };
+
+        let root = kernel_compatible_receipt_root(&data);
+        let expected = H256::from_slice(
+            &hex::decode("92167022b179ca59a63262fa9547834ae63325bac145b793931835fbc47fc200")
+                .expect("hex vector"),
+        );
+        assert_eq!(root, expected, "receipt-root encoding must match pallet commitment");
+    }
+
+    #[test]
+    fn execution_request_legs_hash_is_deterministic_and_content_bound() {
+        let leg = |amount: u128| KernelBundleLeg {
+            vm_type: KernelVmType::Svm,
+            token_in: H256([1u8; 32]),
+            token_out: H256([2u8; 32]),
+            amount_in: amount,
+            min_amount_out: amount.saturating_sub(1),
+            deadline: 1_800,
+            access: KernelDeclaredAccess::default(),
+        };
+        let req = |amount: u128| AtomicExecutionRequest {
+            pair: make_pair(1, b"svm_payload", b"evm_payload", 0),
+            legs: vec![leg(amount)],
+            deadline_blocks: 100,
+            chain_id: 1,
+            nonce: 1,
+            executions: vec![AtomicLegExecution::Svm {
+                caller: [0u8; 32],
+                program_id: [2u8; 32],
+                instruction: vec![1, 2, 3],
+            }],
+        };
+
+        let a = req(1_000);
+        let b = req(1_000);
+        let c = req(2_000);
+
+        assert_eq!(a.legs_hash(), b.legs_hash());
+        assert_ne!(a.legs_hash(), H256::zero());
+        assert_ne!(a.legs_hash(), c.legs_hash(), "amount must change legs hash");
+    }
 
     // ── AtomicPair helpers ────────────────────────────────────────────────────
 

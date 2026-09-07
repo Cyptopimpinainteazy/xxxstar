@@ -5,6 +5,12 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::single_component_path_imports)]
 
+// The in-tree `quantum-crypto` crate is a research implementation. It must
+// never be enabled in a runtime artifact until it is replaced by an audited,
+// interoperable PQC implementation with published test vectors.
+#[cfg(feature = "pq")]
+compile_error!("The pq runtime feature is disabled for production: replace the research quantum-crypto implementation with an audited PQC backend before enabling it.");
+
 #[cfg(feature = "runtime-benchmarks")]
 use frame_benchmarking;
 
@@ -1115,19 +1121,29 @@ ord_parameter_types! {
     ///
     /// Cross-VM feature extrinsics are intentionally wired to this account so
     /// users must enter through x3-lang tooling/runtime instead of calling the
-    /// low-level router and atomic-kernel pallets directly.
-    pub const X3LangGatewayAccount: AccountId =
-        <PalletId as AccountIdConversion<AccountId>>::into_account_truncating(&PalletId(*b"x3langgw"));
+    /// low-level router and atomic-kernel pallets directly. The account is an
+    /// sr25519 public key whose seed is held by the node's atomic gateway
+    /// service (`//x3-atomic-gateway` by default, overridable via CLI/env).
+    pub const X3LangGatewayAccount: AccountId = AccountId::new([
+        0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2,
+        0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52, 0x32, 0x87,
+        0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e,
+        0x4f, 0xb8, 0xd8, 0x23, 0xdd, 0xe6, 0x29, 0x35,
+    ]);
 }
 
 pub type EnsureX3LangGateway = frame_system::EnsureSignedBy<X3LangGatewayAccount, AccountId>;
 
 ord_parameter_types! {
-    /// Dedicated runtime account for the settlement engine.
-    /// Separate from x3langgw so that `finalize_with_settlement` cannot be
-    /// called by the gateway and the gateway cannot call settlement-only paths.
-    pub const SettlementGatewayAccount: AccountId =
-        <PalletId as AccountIdConversion<AccountId>>::into_account_truncating(&PalletId(*b"x3settle"));
+    /// Dedicated runtime account for the settlement engine. Separate from the
+    /// X3-lang gateway so that `finalize_with_settlement` cannot be called by
+    /// the gateway. Seed: `//x3-settlement-gateway`.
+    pub const SettlementGatewayAccount: AccountId = AccountId::new([
+        0x46, 0xec, 0x0b, 0x4a, 0x2c, 0x8f, 0x07, 0xe9,
+        0x5b, 0x63, 0x71, 0x59, 0x8e, 0x7b, 0x3b, 0x88,
+        0xdc, 0x58, 0xc4, 0x58, 0xe1, 0xa5, 0x12, 0x6e,
+        0x2a, 0x6d, 0x4c, 0xf4, 0xdd, 0xd2, 0x27, 0x7f,
+    ]);
 }
 
 /// Origin guard for `finalize_with_settlement`: only the settlement pallet's
@@ -3235,9 +3251,6 @@ impl_runtime_apis! {
                         "testnet" => {
                             Some(include_bytes!("../genesis-presets/testnet.json").to_vec())
                         }
-                        "production" => {
-                            Some(include_bytes!("../genesis-presets/production.json").to_vec())
-                        }
                         _ => None,
                     }
                 },
@@ -3248,7 +3261,6 @@ impl_runtime_apis! {
             vec![
                 "dev".into(),
                 "testnet".into(),
-                "production".into(),
             ]
         }
     }
@@ -4307,6 +4319,34 @@ impl_runtime_apis! {
         }
     }
 
+    impl pallet_x3_atomic_kernel::X3AtomicKernelApi<Block> for Runtime {
+        fn get_poae_proof(
+            bundle_id: sp_core::H256,
+        ) -> Option<pallet_x3_atomic_kernel::proof::PoaeProof> {
+            pallet_x3_atomic_kernel::Pallet::<Runtime>::get_poae_proof(bundle_id)
+        }
+
+        fn get_bundle_status(
+            bundle_id: sp_core::H256,
+        ) -> Option<pallet_x3_atomic_kernel::BundleStatus> {
+            pallet_x3_atomic_kernel::Pallet::<Runtime>::bundle_status(bundle_id)
+        }
+
+        fn find_bundle(
+            submitter: sp_core::crypto::AccountId32,
+            legs_hash: sp_core::H256,
+        ) -> Option<(sp_core::H256, pallet_x3_atomic_kernel::BundleStatus)> {
+            pallet_x3_atomic_kernel::Pallet::<Runtime>::find_bundle(
+                &AccountId::from(submitter),
+                legs_hash,
+            )
+        }
+
+        fn get_finality_cert_anchor(block_num: u64) -> Option<sp_core::H256> {
+            pallet_x3_atomic_kernel::FinalityCertAnchors::<Runtime>::get(block_num)
+        }
+    }
+
     impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime {
         fn query_info(
             uxt: <Block as BlockT>::Extrinsic,
@@ -4841,7 +4881,10 @@ mod native_supply_contract_tests {
                 "free balance on treasury must match the minted seed"
             );
             assert_eq!(treasury_reserved, 0);
-            assert_eq!(locked, seed, "treasury-held seed is locked, not circulating");
+            assert_eq!(
+                locked, seed,
+                "treasury-held seed is locked, not circulating"
+            );
 
             // Sanity: minting 10x also lands entirely in the locked bucket.
             let big: u128 = seed.saturating_mul(10);
@@ -4860,17 +4903,20 @@ mod native_supply_contract_tests {
             // the runtime API sums, so it must not be counted as locked.
             let user = sp_runtime::AccountId32::new([0xabu8; 32]);
             let t = TreasuryAccountId::get();
-            assert!(
-                user != t,
-                "test fixture must use a non-treasury account"
-            );
+            assert!(user != t, "test fixture must use a non-treasury account");
             let user_seed: u128 = 5_000_000; // well above ExistentialDeposit (100 µATLAS)
             let _ = pallet_balances::Pallet::<Runtime>::deposit_creating(&user, user_seed);
 
             let treasury_locked = pallet_balances::Pallet::<Runtime>::free_balance(&t)
                 .saturating_add(pallet_balances::Pallet::<Runtime>::reserved_balance(&t));
-            assert_eq!(treasury_locked, 0, "user funds must not inflate locked supply");
-            assert_eq!(pallet_balances::Pallet::<Runtime>::free_balance(&user), user_seed);
+            assert_eq!(
+                treasury_locked, 0,
+                "user funds must not inflate locked supply"
+            );
+            assert_eq!(
+                pallet_balances::Pallet::<Runtime>::free_balance(&user),
+                user_seed
+            );
         });
     }
 }

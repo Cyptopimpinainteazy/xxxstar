@@ -48,6 +48,24 @@ fn dev_evm_endowed_accounts() -> Vec<AccountId> {
         .collect()
 }
 
+fn atomic_gateway_endowed_accounts() -> Vec<AccountId> {
+    // Public keys for `//x3-atomic-gateway` and `//x3-settlement-gateway`.
+    vec![
+        AccountId::new([
+            0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2,
+            0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52, 0x32, 0x87,
+            0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e,
+            0x4f, 0xb8, 0xd8, 0x23, 0xdd, 0xe6, 0x29, 0x35,
+        ]),
+        AccountId::new([
+            0x46, 0xec, 0x0b, 0x4a, 0x2c, 0x8f, 0x07, 0xe9,
+            0x5b, 0x63, 0x71, 0x59, 0x8e, 0x7b, 0x3b, 0x88,
+            0xdc, 0x58, 0xc4, 0x58, 0xe1, 0xa5, 0x12, 0x6e,
+            0x2a, 0x6d, 0x4c, 0xf4, 0xdd, 0xd2, 0x27, 0x7f,
+        ]),
+    ]
+}
+
 #[derive(Debug, Deserialize)]
 struct ExternalAuthority {
     aura: String,
@@ -430,6 +448,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         get_account_id_from_seed::<sr25519::Public>("Ferdie")?,
     ];
     endowed_accounts.extend(dev_evm_endowed_accounts());
+    endowed_accounts.extend(atomic_gateway_endowed_accounts());
 
     // Single-member dev council so EnsureRootOrHalfCouncil-gated calls can be
     // executed via Council::propose(threshold=1, ...) without a Sudo pallet.
@@ -473,6 +492,7 @@ pub fn development_config_with_bridge_escrows(
         get_account_id_from_seed::<sr25519::Public>("Ferdie")?,
     ];
     endowed_accounts.extend(dev_evm_endowed_accounts());
+    endowed_accounts.extend(atomic_gateway_endowed_accounts());
 
     let council_members = vec![get_account_id_from_seed::<sr25519::Public>("Alice")?];
     let genesis_config = x3_chain_genesis(
@@ -517,6 +537,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
         get_account_id_from_seed::<sr25519::Public>("Ferdie")?,
     ];
     endowed_accounts.extend(dev_evm_endowed_accounts());
+    endowed_accounts.extend(atomic_gateway_endowed_accounts());
 
     let council_members = vec![
         get_account_id_from_seed::<sr25519::Public>("Alice")?,

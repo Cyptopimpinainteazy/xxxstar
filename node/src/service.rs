@@ -1,4 +1,5 @@
 use crate::flash_finality::FlashFinalityBridge;
+use crate::atomic_service::{AtomicGatewayCommand, AtomicGatewayService};
 use crate::metrics::X3PrometheusMetrics;
 use crate::rpc_middleware::{RateLimitConfig, RateLimiter};
 use contention_predictor::{ContentionPredictor, PredictorConfig};
@@ -8,6 +9,7 @@ use parallel_proposer::{extract_tx_metadata, ParallelProposerFactory};
 use poh_generator::PoHState;
 use poh_generator::{PoHDigest, PoHVerifier, POH_ENGINE_ID};
 use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
+use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResult};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
@@ -17,7 +19,7 @@ use sc_service::{
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
-use sp_core::{crypto::KeyTypeId, Pair};
+use sp_core::{crypto::KeyTypeId, H256, Pair};
 use sp_runtime::traits::Header as HeaderT;
 use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
@@ -25,11 +27,11 @@ use sp_runtime::{
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 use x3_bridge_adapters::{
     OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
-use x3_chain_runtime::{opaque::Block, RuntimeApi};
+use x3_chain_runtime::{opaque::Block, Runtime, RuntimeApi, RuntimeCall, UncheckedExtrinsic};
 use x3_cross_vm_bridge::{CrossVmBridge, CrossVmResult};
 use x3_finality_oracle::{
     Chain as FinalityChain, FinalityOracle, FinalityRule, FinalityStatus, InMemoryFinalityOracle,
@@ -774,12 +776,23 @@ impl CrossVmBridgeSafetyGate {
     }
 }
 
-/// Start a new X3 Chain full node with complete consensus and networking
+/// Start a new X3 Chain full node with complete consensus and networking.
 pub fn new_full<
+    N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
+>(
+    config: Configuration,
+    feature_flags: NodeFeatureFlags,
+) -> Result<TaskManager, ServiceError> {
+    new_full_with_atomic_gateway::<N>(config, feature_flags, None)
+}
+
+/// Start a full node with an optional atomic gateway service.
+pub fn new_full_with_atomic_gateway<
     N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
 >(
     mut config: Configuration,
     feature_flags: NodeFeatureFlags,
+    atomic_gateway_uri: Option<String>,
 ) -> Result<TaskManager, ServiceError> {
     enforce_startup_gate_if_authority(config.role.is_authority())?;
 
@@ -814,10 +827,49 @@ pub fn new_full<
         log::info!(
             "🧩 Atomic kernel feature gate enabled; sequencer and settlement pipelines are active"
         );
-        // Additional atomic kernel activation hooks can be added here.
     } else {
         log::info!("🧩 Atomic kernel feature gate is disabled (default)");
     }
+
+    // Optional node-side atomic gateway service: signs and submits
+    // atomic-kernel extrinsics through this node's transaction pool.
+    let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags.enable_atomic_kernel {
+        match atomic_gateway_uri {
+            Some(uri) => match AtomicGatewayService::new(
+                &uri,
+                client.clone(),
+                transaction_pool.clone(),
+            ) {
+                Ok(service) => {
+                    let uri_for_log = uri.clone();
+                    let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
+                    task_manager.spawn_handle().spawn(
+                        "atomic-gateway-service",
+                        Some("x3"),
+                        async move {
+                            service.run(rx).await;
+                        },
+                    );
+                    log::info!(
+                        "🧩 Atomic gateway service spawned (uri: {uri_for_log})"
+                    );
+                    Some(tx)
+                }
+                Err(e) => {
+                    log::error!("🧩 Atomic gateway service failed to start: {e}");
+                    None
+                }
+            },
+            None => {
+                log::warn!(
+                    "🧩 enable-atomic-kernel requires --atomic-gateway-uri or X3_ATOMIC_GATEWAY_URI; service not spawned"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     let genesis_hash = client
         .block_hash(0)?
@@ -999,11 +1051,16 @@ pub fn new_full<
             });
     }
 
+    // The demo wallet_* RPC surface (crates/x3-rpc/src/wallet_service_rpc.rs) is a
+    // fabricated, non-cryptographic placeholder (see CRITICAL-TX-1). It must never
+    // be reachable outside a `--dev`-type chain spec.
+    let enable_demo_wallet_rpc = config.chain_spec.chain_type() == ChainType::Development;
     let rpc_builder = {
         let client = client.clone();
         let transaction_pool = transaction_pool.clone();
         let gadget = flash_finality_gadget.clone();
         let limiter = rate_limiter.clone();
+        let atomic_gateway_tx = atomic_gateway_tx.clone();
         Box::new(
             move |subscription_executor: sc_rpc::SubscriptionTaskExecutor| {
                 crate::rpc::create_full(
@@ -1012,6 +1069,8 @@ pub fn new_full<
                     gadget.clone(),
                     limiter.clone(),
                     subscription_executor,
+                    enable_demo_wallet_rpc,
+                    atomic_gateway_tx.clone(),
                 )
                 .map_err(Into::into)
             },
@@ -1233,6 +1292,14 @@ pub fn new_full<
         );
 
         log::info!("⚡ Flash Finality gadget, network bridge, and voter started");
+    } else {
+        let client_for_anchor = client.clone();
+        let pool_for_anchor = transaction_pool.clone();
+        task_manager.spawn_essential_handle().spawn(
+            "grandpa-finality-anchor",
+            Some("x3"),
+            run_grandpa_finality_anchor(client_for_anchor, pool_for_anchor),
+        );
     }
 
     // Spawn GPU Validator Orchestrator if enabled (feature-gated)
@@ -1922,6 +1989,50 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 ///
 /// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
 /// Value:      `cert_hash (32 bytes)`
+async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::atomic_service::AtomicPool>) {
+    log::info!("⚡ GRANDPA finality anchor task started");
+    let mut last_finalized_hash = sp_core::H256::zero();
+    loop {
+        let info = client.info();
+        log::debug!(
+            "⚡ GRANDPA anchor poll: number={} finalized={}",
+            info.best_number,
+            info.finalized_number
+        );
+        if info.finalized_number > 0 && info.finalized_hash != last_finalized_hash {
+            let number: u64 = info.finalized_number.saturated_into();
+            let hash: [u8; 32] = info.finalized_hash.as_ref().try_into().unwrap_or([0u8; 32]);
+            last_finalized_hash = info.finalized_hash;
+            let cert_hash = sp_core::blake2_256(&hash);
+            log::info!(
+                "⚡ [GRANDPA] finality head reached block {number}"
+            );
+        let call = RuntimeCall::X3AtomicKernel(
+            pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
+                block_num: number,
+                cert: H256(cert_hash),
+            },
+        );
+        let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+        if let Err(e) = pool
+            .submit_one(
+                client.info().best_hash,
+                TransactionSource::Local,
+                extrinsic.into(),
+            )
+            .await
+        {
+            log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
+        }
+        log::info!(
+            "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
+            hex::encode(&cert_hash[..8])
+        );
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+}
+
 async fn run_flash_finality_voter<Client, Block>(
     gadget: Arc<FlashFinalityGadget>,
     client: Arc<Client>,
@@ -2405,7 +2516,6 @@ mod runtime_bridge_client_tests {
     use clap::Parser;
     use codec::{Decode, Encode};
     use sc_cli::SubstrateCli;
-    use sc_transaction_pool_api::TransactionPool;
     use sp_core::{H160, H256};
     use sp_inherents::InherentDataProvider;
     use sp_runtime::{

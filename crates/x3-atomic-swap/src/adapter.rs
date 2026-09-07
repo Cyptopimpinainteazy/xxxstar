@@ -638,7 +638,7 @@ mod cross_adapter_tests {
 
     #[test]
     fn test_cross_adapter_x3vm_to_evm() {
-        let x3 = crate::x3vm_htlc::X3VmAdapterImpl::new("x3-mainnet".into());
+        let x3 = crate::x3vm_htlc::X3VmAdapterImpl::simulation("x3-mainnet".into());
         let evm = crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20]);
         let intent = sample_intent(11, "x3", "eth");
         let (lock, claim) = lock_and_claim(&x3, &evm, &intent).unwrap();
@@ -692,7 +692,7 @@ mod cross_adapter_tests {
             Box::new(crate::svm_htlc::SvmAdapter::at_program_id([0x02u8; 32])),
             Box::new(crate::substrate_htlc::SubstrateHtlcAdapter::new("sub".into())),
             Box::new(crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet)),
-            Box::new(crate::x3vm_htlc::X3VmAdapterImpl::new("x3".into())),
+            Box::new(crate::x3vm_htlc::X3VmAdapterImpl::simulation("x3".into())),
             Box::new(crate::move_vm_htlc::MoveVmAdapter::new("sui".into())),
             Box::new(crate::cosmwasm_htlc::CosmWasmAdapter::new("osmo".into())),
             Box::new(crate::cairo_vm_htlc::CairoVmAdapter::new("stark".into())),

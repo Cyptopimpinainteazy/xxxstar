@@ -22,9 +22,9 @@
       #grid(columns: (auto, 1fr), row-gutter: 8pt, column-gutter: 12pt)[
         *Repository*][X3 Atomic Star (`xxxstar-main`)
       ][
-        *Branch*][`#audit-branch`
+        *Branch*][#raw(audit-branch)
       ][
-        *Audited commit*][`#audit-commit`
+        *Audited commit*][#raw(audit-commit)
       ][
         *Audit date*][#audit-date
       ][
@@ -48,15 +48,19 @@
 
 == Scope & Limitations
 
-This audit is **read-only**: no files in the audited repository were modified, no contracts were deployed, no transactions were broadcast, and no keys were generated or rotated. Every command executed is listed in Appendix B (Evidence Ledger) with its exit code.
+This audit is *read-only*: no files in the audited repository were modified, no contracts were deployed, no transactions were broadcast, and no keys were generated or rotated. Every command executed is listed in Appendix B (Evidence Ledger) with its exit code.
 
 The investigation combined:
 - Full-text reading of the repository's own governance/scope documents (`AGENTS.md`, `CLAUDE.md`, `LAUNCH_SCOPE.md`, `RELEASE_GATES.md`, `FEATURE_REGISTRY.toml`, `docs/current/*`), treated as *unverified claims* per this repository's own stated rule that stale markdown must not be trusted over code.
 - Seven independent, parallel domain investigations (consensus/networking, transaction lifecycle, state/storage, cryptography/keys, contracts/VM/cross-chain, tokenomics, and APIs/ops/proof-gates/performance), each citing exact `file:line` evidence.
 - Live, scoped command execution: `cargo check --workspace`, `cargo audit`, `forge test` (169 EVM tests), and targeted `cargo test -p <pallet>` runs for the highest-value pallets (cross-vm-router, settlement-engine, supply-ledger, dex, lp-locker).
-- Independent re-verification of a sample of the repository's own prior audit claims — several were confirmed, and several were found to be **factually wrong or unsupported by evidence** (see Chapter 7, Fake-Completeness Report).
+- Independent re-verification of a sample of the repository's own prior audit claims — several were confirmed, and several were found to be *factually wrong or unsupported by evidence* (see Chapter 7, Fake-Completeness Report).
 
 *What this audit did not do*, and why: it did not boot a live multi-node network (loopback evidence exists in the repository and is cited as such, but was not re-executed this session); it did not run the full `cargo test --workspace` suite (individual high-value package tests were run instead, in the interest of time); it did not run `scripts/run-srtool.sh` (Docker is unavailable in this environment — this absence is itself a finding, see HIGH-05); it did not engage an external, licensed security firm — no AI-assisted review, however thorough, substitutes for one before mainnet.
+
+#callout(kind: "warning", title: "A Note on Environment Stability During This Audit")[
+  This repository is under continuous, autonomous modification by a separate, independently-operating agent system on the host machine (observed committing as `openclaw-agent`) that was making live changes to runtime and consensus source files *during* this audit. All findings below cite the exact commit `fbd4613bd8769ac7422278fae441af1b302a1c88`; any change landed after that commit is out of scope for this document by definition, but a reader should confirm the cited file:line references still match `HEAD` before acting on them, since this codebase is evidently changing quickly.
+]
 
 == Safety Disclaimer
 

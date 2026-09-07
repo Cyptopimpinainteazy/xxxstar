@@ -5,6 +5,11 @@
 //! and the Frontier-compatible ETH/SVM RPC provided by `rpc_frontier`.
 
 use codec::{Decode, Encode};
+use crate::atomic_service::AtomicGatewayCommand;
+use atomic_swap_orchestrator::{
+    AtomicExecutionRequest, AtomicLegExecution, AtomicPair, KernelBundleLeg,
+    KernelDeclaredAccess, KernelVmType,
+};
 use flash_finality::FlashFinalityGadget;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
@@ -14,13 +19,16 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_core::storage::StorageKey;
-use sp_core::Pair;
+use sp_core::{crypto::AccountId32, Pair, H256};
 use sp_runtime::generic::Era;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_runtime::transaction_validity::TransactionSource;
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
+use pallet_x3_atomic_kernel::X3AtomicKernelApi;
+use pallet_x3_atomic_kernel::BundleRollbackReason;
 use x3_chain_runtime::{
     opaque::Block, AccountId, Address, AssetId, Balance, Runtime, RuntimeCall, Signature,
     SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
@@ -74,6 +82,12 @@ fn decode_hex_32(value: &str, label: &str) -> Result<[u8; 32], JsonRpseeError> {
     let mut array = [0u8; 32];
     array.copy_from_slice(&bytes);
     Ok(array)
+}
+
+/// Decode hex string with "0x" prefix into raw bytes.
+fn decode_hex_bytes(value: &str, label: &str) -> Result<Vec<u8>, JsonRpseeError> {
+    let stripped = value.strip_prefix("0x").unwrap_or(value);
+    hex::decode(stripped).map_err(|e| custom_error(format!("{label} decode failed: {e}")))
 }
 
 /// Decode hex string with "0x" prefix to 20-byte array.
@@ -298,6 +312,198 @@ fn decode_agent_law_check() -> Result<pallet_x3_agent_law::AgentLawCheck<Runtime
         .map_err(|e| custom_error(format!("decode agent law extension failed: {e}")))
 }
 
+fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<KernelBundleLeg>, JsonRpseeError> {
+    let legs = value
+        .get("legs")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| custom_error("Missing legs array"))?;
+    legs.iter()
+        .map(|leg| {
+            let vm_type = match leg
+                .get("vm_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+            {
+                "evm" => KernelVmType::Evm,
+                "svm" => KernelVmType::Svm,
+                "x3" => KernelVmType::X3,
+                "cross" => KernelVmType::Cross,
+                other => {
+                    return Err(custom_error(format!("Invalid vm_type: {other}")));
+                }
+            };
+            let token_in = decode_hex_32(
+                leg.get("token_in")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing token_in"))?,
+                "token_in",
+            )?;
+            let token_out = decode_hex_32(
+                leg.get("token_out")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing token_out"))?,
+                "token_out",
+            )?;
+            let amount_in = parse_u128_value(leg.get("amount_in"), "amount_in")?;
+            let min_amount_out =
+                parse_u128_value(leg.get("min_amount_out"), "min_amount_out")?;
+            let deadline = parse_u128_value(leg.get("deadline"), "deadline")? as u64;
+            let reads = leg
+                .get("access")
+                .and_then(|a| a.get("reads"))
+                .and_then(|r| r.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|h| {
+                            let s = h
+                                .as_str()
+                                .ok_or_else(|| custom_error("access read must be a string"))?;
+                            decode_hex_32(s, "access read").map(H256)
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            let writes = leg
+                .get("access")
+                .and_then(|a| a.get("writes"))
+                .and_then(|r| r.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|h| {
+                            let s = h
+                                .as_str()
+                                .ok_or_else(|| custom_error("access write must be a string"))?;
+                            decode_hex_32(s, "access write").map(H256)
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            let access = KernelDeclaredAccess {
+                reads,
+                writes,
+            };
+            Ok(KernelBundleLeg {
+                vm_type,
+                token_in: H256(token_in),
+                token_out: H256(token_out),
+                amount_in,
+                min_amount_out,
+                deadline,
+                access,
+            })
+        })
+        .collect()
+}
+
+fn parse_executions(value: &serde_json::Value) -> Result<Vec<AtomicLegExecution>, JsonRpseeError> {
+    let Some(executions) = value.get("executions").and_then(|v| v.as_array()) else {
+        return Ok(Vec::new());
+    };
+    executions
+        .iter()
+        .map(|execution| {
+            let vm = execution
+                .get("vm")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            match vm {
+                "evm" => {
+                    let caller = decode_hex_20(
+                        execution
+                            .get("caller")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing evm caller"))?,
+                        "caller",
+                    )?;
+                    let target = decode_hex_20(
+                        execution
+                            .get("target")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing evm target"))?,
+                        "target",
+                    )?;
+                    let value = parse_u128_value(execution.get("value"), "value")?;
+                    let input = decode_hex_bytes(
+                        execution
+                            .get("input")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                        "input",
+                    )?;
+                    Ok(AtomicLegExecution::Evm {
+                        caller,
+                        target,
+                        value,
+                        input,
+                    })
+                }
+                "svm" => {
+                    let caller = decode_hex_32(
+                        execution
+                            .get("caller")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing svm caller"))?,
+                        "caller",
+                    )?;
+                    let program_id = decode_hex_32(
+                        execution
+                            .get("program_id")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing svm program_id"))?,
+                        "program_id",
+                    )?;
+                    let instruction = decode_hex_bytes(
+                        execution
+                            .get("instruction")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                        "instruction",
+                    )?;
+                    Ok(AtomicLegExecution::Svm {
+                        caller,
+                        program_id,
+                        instruction,
+                    })
+                }
+                "x3" => {
+                    let caller = decode_hex_32(
+                        execution
+                            .get("caller")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing x3 caller"))?,
+                        "caller",
+                    )?;
+                    let selector_raw = decode_hex_bytes(
+                        execution
+                            .get("selector")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing x3 selector"))?,
+                        "selector",
+                    )?;
+                    let selector: [u8; 4] = selector_raw
+                        .try_into()
+                        .map_err(|_| custom_error("X3 selector must be 4 bytes"))?;
+                    let payload = decode_hex_bytes(
+                        execution
+                            .get("payload")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                        "payload",
+                    )?;
+                    Ok(AtomicLegExecution::X3 {
+                        caller,
+                        selector,
+                        payload,
+                    })
+                }
+                other => Err(custom_error(format!("Invalid execution vm: {other}"))),
+            }
+        })
+        .collect()
+}
+
 /// Full RPC extension creation.
 ///
 /// Called by the service to build the RPC module for each connection.
@@ -307,6 +513,8 @@ pub fn create_full<P>(
     gadget: Option<Arc<FlashFinalityGadget>>,
     limiter: Arc<RateLimiter>,
     _subscription_executor: sc_rpc::SubscriptionTaskExecutor,
+    enable_demo_wallet_rpc: bool,
+    atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>>,
 ) -> Result<RpcModule<()>, RpcError>
 where
     P: TransactionPool<Block = Block> + Sync + Send + 'static,
@@ -323,8 +531,133 @@ where
         >,
     <FullClient as ProvideRuntimeApi<Block>>::Api:
         pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
+    <FullClient as ProvideRuntimeApi<Block>>::Api:
+        pallet_x3_atomic_kernel::X3AtomicKernelApi<Block>,
 {
     let mut module = RpcModule::new(());
+
+    if let Some(atomic_gateway_tx) = atomic_gateway_tx {
+        let rollback_tx = atomic_gateway_tx.clone();
+        module.register_method(
+            "atomic_submitAtomicBundle",
+            move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            let legs = parse_overlay_legs(&req)?;
+            let deadline_blocks = req
+                .get("deadline_blocks")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing deadline_blocks"))? as u32;
+            let chain_id = req
+                .get("chain_id")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing chain_id"))? as u32;
+            let nonce = req
+                .get("nonce")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing nonce"))?;
+            let svm_tx = decode_hex_bytes(
+                req.get("svm_tx")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing svm_tx"))?,
+                "svm_tx",
+            )?;
+            let evm_tx = decode_hex_bytes(
+                req.get("evm_tx")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing evm_tx"))?,
+                "evm_tx",
+            )?;
+            let sequence_nonce = req
+                .get("sequence_nonce")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let request = AtomicExecutionRequest {
+                pair: AtomicPair {
+                    swap_id: Vec::new(),
+                    svm_tx,
+                    evm_tx,
+                    sequence_nonce,
+                    pallet_bundle_id: None,
+                },
+                legs,
+                deadline_blocks,
+                chain_id,
+                nonce,
+                executions: parse_executions(&req)?,
+            };
+            let hold_for_rollback = req
+                .get("hold_for_rollback")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let command = if hold_for_rollback {
+                AtomicGatewayCommand::SubmitBundleHoldForRollback(request)
+            } else {
+                AtomicGatewayCommand::SubmitBundle(request)
+            };
+            atomic_gateway_tx
+                .try_send(command)
+                .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
+            Ok(serde_json::json!({ "status": "accepted" }))
+            },
+        )?;
+        module.register_method(
+            "atomic_rollbackBundle",
+            move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+                let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+                let bundle_id = H256(decode_hex_32(
+                    req.get("bundle_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing bundle_id"))?,
+                    "bundle_id",
+                )?);
+                let reason = match req
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("submitter_cancelled")
+                {
+                    "execution_failed" => BundleRollbackReason::ExecutionFailed,
+                    "access_set_violation" => BundleRollbackReason::AccessSetViolation,
+                    "deadline_exceeded" => BundleRollbackReason::DeadlineExceeded,
+                    _ => BundleRollbackReason::SubmitterCancelled,
+                };
+                rollback_tx
+                    .try_send(AtomicGatewayCommand::Rollback { bundle_id, reason })
+                    .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
+                Ok(serde_json::json!({ "status": "accepted" }))
+            },
+        )?;
+    }
+
+    let client_for_find = client.clone();
+    module.register_method(
+        "atomic_findBundle",
+        move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            let submitter_hex = req
+                .get("submitter")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| custom_error("Missing submitter"))?;
+            let submitter = AccountId32::new(decode_hex_32(submitter_hex, "submitter")?);
+            let legs_hash = H256(decode_hex_32(
+                req.get("legs_hash")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing legs_hash"))?,
+                "legs_hash",
+            )?);
+            let at = client_for_find.info().best_hash;
+            match client_for_find.runtime_api().find_bundle(at, submitter, legs_hash) {
+                Ok(Some((bundle_id, status))) => Ok(serde_json::json!({
+                    "bundle_id": format!("0x{}", hex::encode(bundle_id)),
+                    "status": format!("{status:?}"),
+                })),
+                Ok(None) => Ok(serde_json::json!({
+                    "bundle_id": null,
+                    "status": null,
+                })),
+                Err(e) => Err(custom_error(format!("runtime find_bundle failed: {e}"))),
+            }
+        },
+    )?;
 
     let tx_pool = pool.clone();
     let system_rpc = substrate_frame_rpc_system::System::new(client.clone(), pool);
@@ -458,6 +791,15 @@ where
         },
     )?;
 
+    // Demo wallet RPC (wallet_*): every method in this service is a fabricated,
+    // non-cryptographic placeholder (fake balances, a substring "signature",
+    // a hardcoded default mnemonic when none is supplied — see CRITICAL-TX-1
+    // in audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/).
+    // It is retained only as a disabled-by-default demo surface for local UI
+    // development against `--dev`/explicitly-opted-in chains, per this repo's
+    // AGENTS.md rule against reachable fake stubs in production paths. It MUST
+    // NOT be reachable on any non-dev chain spec.
+    if enable_demo_wallet_rpc {
     // Initialize Wallet Service RPC
     let wallet_service = Arc::new(WalletServiceRpc::<Block, FullClient>::new(client.clone()));
 
@@ -651,6 +993,7 @@ where
                 .map_err(|e| custom_error(format!("wallet_getNetworks failed: {e}")))
         }
     })?;
+    } // enable_demo_wallet_rpc
 
     // Register signing RPC methods
     module.register_method(

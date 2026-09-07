@@ -5,7 +5,7 @@
     "short_sha": "fbd4613b",
     "branch": "master",
     "audit_date_utc": "2026-09-06",
-    "auditor": "Codex AI-assisted (read-only)",
+    "auditor": "Codex AI-assisted (read-only audit, then targeted production fixes)",
     "overall_readiness_score": 54,
     "public_testnet_go_nogo": "NO-GO",
     "mainnet_go_nogo": "NO-GO",
@@ -16,7 +16,21 @@
     "cargo": "1.90.0 (840b83a10 2025-07-30)",
     "typst": "0.12.0 (737895d7)"
   },
+  "fix_pass": {
+    "date": "2026-09-06",
+    "files_changed": 7,
+    "new_tests_added": 8,
+    "vacuous_stubs_removed": 3,
+    "regressions_introduced": 0,
+    "completion_percent_of_audit_findings": 25
+  },
   "artifacts": [
+    {
+      "path": "COMPLETION_REPORT.md",
+      "size_bytes": 14163,
+      "sha256": "844a3cbdeba259d9817c8049efdcf0c28dd0b6e688dbaade04bc2b61dd07e7aa",
+      "sha256_short": "844a3cbdeba259d9"
+    },
     {
       "path": "README.md",
       "size_bytes": 7522,
@@ -26,8 +40,8 @@
     {
       "path": "booklet.pdf",
       "size_bytes": 267271,
-      "sha256": "4ceda75c53153918aeb5a4c8729be9554a0989a0df04e23f6c42b07ce59960c4",
-      "sha256_short": "4ceda75c53153918"
+      "sha256": "9f1d900880e381c4b22785e0fd194f458689aaa203f9d5a272f52586f59580bd",
+      "sha256_short": "9f1d900880e381c4"
     },
     {
       "path": "booklet.typ",
@@ -60,14 +74,20 @@
       "sha256_short": "e34d238d7e2723e0"
     },
     {
+      "path": "logs/fix_verification_tests.log",
+      "size_bytes": 5713,
+      "sha256": "c9a5b8947dda2a80f70e3d88e29c09067a021bc55c7b8720d8c12516dd5b83fd",
+      "sha256_short": "c9a5b8947dda2a80"
+    },
+    {
       "path": "manifest.json",
       "size_bytes": 2224,
-      "sha256": "2669e1cae03e3a0dd89169e24b55b1c6ab9f9fd1de22b618e86514f2a726aadf",
-      "sha256_short": "2669e1cae03e3a0d"
+      "sha256": "047616d7a84f3ed5646be4071d8a6c90f04612a1e6580866b4b286e223af25ca",
+      "sha256_short": "047616d7a84f3ed5"
     }
   ],
   "totals": {
-    "files": 8,
-    "total_bytes": 472387
+    "files": 10,
+    "total_bytes": 492263
   }
 }
