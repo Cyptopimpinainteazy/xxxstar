@@ -75,19 +75,10 @@ pub enum KernelVmType {
 /// Declared read/write accounts for a kernel leg. Encoding matches
 /// `pallet_x3_atomic_kernel::proof::DeclaredAccess` (bounded vectors encode
 /// identically to ordinary vectors under SCALE).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Encode)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Encode)]
 pub struct KernelDeclaredAccess {
     pub reads: Vec<H256>,
     pub writes: Vec<H256>,
-}
-
-impl Default for KernelDeclaredAccess {
-    fn default() -> Self {
-        Self {
-            reads: Vec::new(),
-            writes: Vec::new(),
-        }
-    }
 }
 
 /// A single atomic-trade leg as recorded by `pallet-x3-atomic-kernel`.
@@ -292,8 +283,8 @@ impl AtomicSwapOrchestrator {
     /// Implements the 3-Phase Atomic Commit (3PAC) protocol:
     ///  1. **Verify** — GPU batch-verifies Ed25519 (SVM) + secp256k1 (EVM) sigs.
     ///  2. **Commit** — GPU writes the pair to the shm ring buffer.
-    ///  3. **Drain**  — Reads the ring buffer for this pair's committed entry,
-    ///                  builds the receipt_root, and returns finalization data.
+    ///  3. **Drain** — Reads the ring buffer for this pair's committed entry,
+    ///     builds the receipt_root, and returns finalization data.
     ///
     /// The returned `ProcessResult` contains everything needed to call
     /// `finalize_atomic_bundle` on the x3-atomic-kernel pallet.
@@ -372,7 +363,7 @@ impl AtomicSwapOrchestrator {
                     .rposition(|&b| b != 0)
                     .map(|i| i + 1)
                     .unwrap_or(32);
-                &svm[..prefix_len] == &our_svm_prefix[..prefix_len]
+                svm[..prefix_len] == our_svm_prefix[..prefix_len]
             }) {
                 found_entry = Some(entry);
                 break;

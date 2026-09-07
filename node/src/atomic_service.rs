@@ -159,7 +159,7 @@ impl AtomicGatewayService {
     ) -> Result<H256, String> {
         for _ in 0..50 {
             let at = self.client.info().best_hash;
-            let submitter: sp_core::crypto::AccountId32 = self.key.account().into();
+            let submitter = self.key.account();
             let found = self
                 .client
                 .runtime_api()
@@ -290,14 +290,22 @@ impl AtomicGatewayService {
             let info = self.client.info();
             let block_num: u64 = info.best_number.saturated_into();
             let best_hash = info.best_hash;
-            let finality_cert = self
+            let finality_cert = match self
                 .client
                 .runtime_api()
                 .get_finality_cert_anchor(best_hash, block_num)
-                .map_err(|e| format!("finality cert anchor runtime call failed: {e}"))?
-                .ok_or_else(|| {
-                    format!("no finality cert anchored yet at block {block_num}")
-                })?;
+            {
+                Ok(Some(cert)) => cert,
+                Ok(None) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    continue;
+                }
+                Err(e) => {
+                    return Err(format!(
+                        "finality cert anchor runtime call failed: {e}"
+                    ));
+                }
+            };
 
             let submitter = self.key.account();
             let executor_hash = H256(sp_core::hashing::blake2_256(&submitter.encode()));
