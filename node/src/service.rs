@@ -1990,13 +1990,23 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 /// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
 /// Value:      `cert_hash (32 bytes)`
 async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::atomic_service::AtomicPool>) {
-    use futures_util::StreamExt;
-
-    let mut finality_notifications = client.finality_notification_stream();
-    while let Some(notification) = finality_notifications.next().await {
-        let number: u64 = (*notification.header.number()).saturated_into();
-        let hash: [u8; 32] = notification.hash.as_ref().try_into().unwrap_or([0u8; 32]);
-        let cert_hash = sp_core::blake2_256(&hash);
+    log::info!("⚡ GRANDPA finality anchor task started");
+    let mut last_finalized_hash = sp_core::H256::zero();
+    loop {
+        let info = client.info();
+        log::debug!(
+            "⚡ GRANDPA anchor poll: number={} finalized={}",
+            info.best_number,
+            info.finalized_number
+        );
+        if info.finalized_number > 0 && info.finalized_hash != last_finalized_hash {
+            let number: u64 = info.finalized_number.saturated_into();
+            let hash: [u8; 32] = info.finalized_hash.as_ref().try_into().unwrap_or([0u8; 32]);
+            last_finalized_hash = info.finalized_hash;
+            let cert_hash = sp_core::blake2_256(&hash);
+            log::info!(
+                "⚡ [GRANDPA] finality head reached block {number}"
+            );
         let call = RuntimeCall::X3AtomicKernel(
             pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
                 block_num: number,
@@ -2012,12 +2022,14 @@ async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::a
             )
             .await
         {
-            log::debug!("failed to anchor GRANDPA cert for block {number}: {e}");
+            log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
         }
-        log::debug!(
+        log::info!(
             "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
             hex::encode(&cert_hash[..8])
         );
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
 }
 
