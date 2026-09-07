@@ -765,8 +765,8 @@ pub fn decode_overlay_state_diff(diff: &StateDiff) -> Result<Vec<OverlayLegChang
         key_bytes.copy_from_slice(&bytes[offset..offset + 32]);
         offset += 32;
 
-        let old_value = decode_optional_h256(&bytes, &mut offset)?;
-        let new_value = decode_optional_h256(&bytes, &mut offset)?;
+        let old_value = decode_optional_h256(bytes, &mut offset)?;
+        let new_value = decode_optional_h256(bytes, &mut offset)?;
 
         changes.push(OverlayLegChange {
             domain,
@@ -1251,7 +1251,7 @@ mod tests {
                 old_value: Some(H256([0x99; 32])),
                 new_value: Some(H256([0x00; 32])),
             };
-            let diff = encode_overlay_state_diff(&[change.clone()]);
+            let diff = encode_overlay_state_diff(core::slice::from_ref(&change));
             let result = OverlayReverter::revert(&diff);
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), RevertOutcome::Reverted);
@@ -1272,7 +1272,7 @@ mod tests {
                 old_value: None,
                 new_value: Some(H256([0xDD; 32])),
             };
-            let diff = encode_overlay_state_diff(&[change.clone()]);
+            let diff = encode_overlay_state_diff(core::slice::from_ref(&change));
             OverlayReverter::revert(&diff).expect("revert succeeds");
 
             let key = overlay_ledger_storage_key(&change);
@@ -1307,7 +1307,8 @@ mod tests {
                 new_value: Some(H256([0xAA; 32])),
             };
             let mut receipt = LegReceipt::new(0, VmType::X3);
-            receipt.mark_executed(encode_overlay_state_diff(&[change.clone()]));
+            receipt
+                .mark_executed(encode_overlay_state_diff(core::slice::from_ref(&change)));
 
             // Simulate the execution write and then roll it back through the
             // same CompositeReverter the kernel uses for bundle rollback.
