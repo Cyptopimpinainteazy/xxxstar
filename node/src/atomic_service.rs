@@ -7,8 +7,10 @@
 use crate::atomic_gateway::AtomicGatewayKey;
 use crate::service::FullClient;
 use atomic_swap_orchestrator::{
-    AtomicExecutionRequest, AtomicLegExecution, KernelBundleLeg, KernelVmType,
+    kernel_compatible_receipt_root, AtomicExecutionRequest, AtomicLegExecution,
+    KernelBundleLeg, KernelReceiptRootData, KernelVmType,
 };
+use codec::Encode;
 use pallet_x3_atomic_kernel::vm_revert::StateDiff;
 use pallet_x3_atomic_kernel::vm_revert::OverlayDomain;
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
@@ -16,6 +18,7 @@ use sc_client_api::{BlockBackend, HeaderBackend};
 use sp_api::ProvideRuntimeApi;
 use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sp_core::H256;
+use sp_runtime::traits::SaturatedConversion;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -97,9 +100,10 @@ impl AtomicGatewayService {
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
         let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
-        let (extrinsic, legs_hash, executions) = match command {
+        let (extrinsic, legs_hash, executions, request_clone) = match command {
             AtomicGatewayCommand::SubmitBundle(request) => {
                 let legs_hash = request.legs_hash();
+                let request_clone = request.clone();
                 let executions = request.executions.clone();
                 let legs = request
                     .legs
@@ -114,11 +118,17 @@ impl AtomicGatewayService {
                     self.genesis_hash,
                     tx_nonce,
                 )?;
-                (extrinsic, Some(legs_hash), Some(executions))
+                (
+                    extrinsic,
+                    Some(legs_hash),
+                    Some(executions),
+                    Some(request_clone),
+                )
             }
             AtomicGatewayCommand::AssignExecutor { bundle_id } => (
                 self.key
                     .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+                None,
                 None,
                 None,
             ),
@@ -135,6 +145,9 @@ impl AtomicGatewayService {
             let bundle_id = self.wait_for_submission_and_assign(legs_hash).await?;
             if let Some(executions) = executions {
                 self.execute_legs(&executions, bundle_id).await?;
+                if let Some(request) = request_clone {
+                    self.finalize_bundle(&request, bundle_id).await?;
+                }
             }
         }
         Ok(())
@@ -266,6 +279,57 @@ impl AtomicGatewayService {
             .await
             .map(|_| ())
             .map_err(|e| format!("record_leg_execution_receipt rejected: {e}"))
+    }
+
+    async fn finalize_bundle(
+        &self,
+        request: &AtomicExecutionRequest,
+        bundle_id: H256,
+    ) -> Result<(), String> {
+        for _ in 0..100 {
+            let info = self.client.info();
+            let block_num: u64 = info.best_number.saturated_into();
+            let best_hash = info.best_hash;
+            let finality_cert = self
+                .client
+                .runtime_api()
+                .get_finality_cert_anchor(best_hash, block_num)
+                .map_err(|e| format!("finality cert anchor runtime call failed: {e}"))?
+                .ok_or_else(|| {
+                    format!("no finality cert anchored yet at block {block_num}")
+                })?;
+
+            let submitter = self.key.account();
+            let executor_hash = H256(sp_core::hashing::blake2_256(&submitter.encode()));
+            let receipt_root = kernel_compatible_receipt_root(&KernelReceiptRootData {
+                bundle_id,
+                legs_hash: request.legs_hash(),
+                leg_count: request.legs.len() as u32,
+                executor_hash,
+                finalized_block: block_num,
+                finality_cert,
+            });
+            let call = RuntimeCall::X3AtomicKernel(
+                pallet_x3_atomic_kernel::Call::<Runtime>::submit_finalization_result {
+                    bundle_id,
+                    receipt_root,
+                    finality_cert,
+                    committed_at_ns: 0,
+                },
+            );
+            let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+            return self
+                .pool
+                .submit_one(
+                    best_hash,
+                    TransactionSource::External,
+                    extrinsic.into(),
+                )
+                .await
+                .map(|_| ())
+                .map_err(|e| format!("submit_finalization_result rejected: {e}"));
+        }
+        Err("no anchored finality certificate within timeout".to_string())
     }
 }
 
