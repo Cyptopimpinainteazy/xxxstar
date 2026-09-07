@@ -1291,6 +1291,13 @@ pub fn new_full_with_atomic_gateway<
         );
 
         log::info!("⚡ Flash Finality gadget, network bridge, and voter started");
+    } else {
+        let client_for_anchor = client.clone();
+        task_manager.spawn_essential_handle().spawn(
+            "grandpa-finality-anchor",
+            Some("x3"),
+            run_grandpa_finality_anchor(client_for_anchor),
+        );
     }
 
     // Spawn GPU Validator Orchestrator if enabled (feature-gated)
@@ -1980,6 +1987,33 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 ///
 /// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
 /// Value:      `cert_hash (32 bytes)`
+async fn run_grandpa_finality_anchor<Client, Block>(client: Arc<Client>)
+where
+    Client: BlockchainEvents<Block> + BlockBackend<Block> + Send + Sync + 'static,
+    Block: sp_runtime::traits::Block + 'static,
+    Block::Header: HeaderT,
+{
+    use futures_util::StreamExt;
+
+    let mut finality_notifications = client.finality_notification_stream();
+    while let Some(notification) = finality_notifications.next().await {
+        let number: u64 = (*notification.header.number()).saturated_into();
+        let hash: [u8; 32] = notification.hash.as_ref().try_into().unwrap_or([0u8; 32]);
+        let cert_hash = sp_core::blake2_256(&hash);
+        let mut key = b"x3ff:".to_vec();
+        key.extend_from_slice(&number.to_le_bytes());
+        sp_io::offchain::local_storage_set(
+            sp_runtime::offchain::StorageKind::PERSISTENT,
+            &key,
+            &cert_hash,
+        );
+        log::debug!(
+            "⚡ [GRANDPA] cert stored at key x3ff:{number} → cert_hash=0x{}",
+            hex::encode(&cert_hash[..8])
+        );
+    }
+}
+
 async fn run_flash_finality_voter<Client, Block>(
     gadget: Arc<FlashFinalityGadget>,
     client: Arc<Client>,
