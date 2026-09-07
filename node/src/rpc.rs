@@ -7,7 +7,8 @@
 use codec::{Decode, Encode};
 use crate::atomic_service::AtomicGatewayCommand;
 use atomic_swap_orchestrator::{
-    AtomicExecutionRequest, AtomicPair, KernelBundleLeg, KernelDeclaredAccess, KernelVmType,
+    AtomicExecutionRequest, AtomicLegExecution, AtomicPair, KernelBundleLeg,
+    KernelDeclaredAccess, KernelVmType,
 };
 use flash_finality::FlashFinalityGadget;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
@@ -395,6 +396,113 @@ fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<KernelBundleLeg>,
         .collect()
 }
 
+fn parse_executions(value: &serde_json::Value) -> Result<Vec<AtomicLegExecution>, JsonRpseeError> {
+    let Some(executions) = value.get("executions").and_then(|v| v.as_array()) else {
+        return Ok(Vec::new());
+    };
+    executions
+        .iter()
+        .map(|execution| {
+            let vm = execution
+                .get("vm")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            match vm {
+                "evm" => {
+                    let caller = decode_hex_20(
+                        execution
+                            .get("caller")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing evm caller"))?,
+                        "caller",
+                    )?;
+                    let target = decode_hex_20(
+                        execution
+                            .get("target")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing evm target"))?,
+                        "target",
+                    )?;
+                    let value = parse_u128_value(execution.get("value"), "value")?;
+                    let input = decode_hex_bytes(
+                        execution
+                            .get("input")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                        "input",
+                    )?;
+                    Ok(AtomicLegExecution::Evm {
+                        caller,
+                        target,
+                        value,
+                        input,
+                    })
+                }
+                "svm" => {
+                    let caller = decode_hex_32(
+                        execution
+                            .get("caller")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing svm caller"))?,
+                        "caller",
+                    )?;
+                    let program_id = decode_hex_32(
+                        execution
+                            .get("program_id")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing svm program_id"))?,
+                        "program_id",
+                    )?;
+                    let instruction = decode_hex_bytes(
+                        execution
+                            .get("instruction")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                        "instruction",
+                    )?;
+                    Ok(AtomicLegExecution::Svm {
+                        caller,
+                        program_id,
+                        instruction,
+                    })
+                }
+                "x3" => {
+                    let caller = decode_hex_32(
+                        execution
+                            .get("caller")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing x3 caller"))?,
+                        "caller",
+                    )?;
+                    let selector_raw = decode_hex_bytes(
+                        execution
+                            .get("selector")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing x3 selector"))?,
+                        "selector",
+                    )?;
+                    let selector: [u8; 4] = selector_raw
+                        .try_into()
+                        .map_err(|_| custom_error("X3 selector must be 4 bytes"))?;
+                    let payload = decode_hex_bytes(
+                        execution
+                            .get("payload")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                        "payload",
+                    )?;
+                    Ok(AtomicLegExecution::X3 {
+                        caller,
+                        selector,
+                        payload,
+                    })
+                }
+                other => Err(custom_error(format!("Invalid execution vm: {other}"))),
+            }
+        })
+        .collect()
+}
+
 /// Full RPC extension creation.
 ///
 /// Called by the service to build the RPC module for each connection.
@@ -473,6 +581,7 @@ where
                 deadline_blocks,
                 chain_id,
                 nonce,
+                executions: parse_executions(&req)?,
             };
             atomic_gateway_tx
                 .try_send(AtomicGatewayCommand::SubmitBundle(request))

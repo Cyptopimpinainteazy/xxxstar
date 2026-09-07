@@ -103,6 +103,32 @@ pub struct KernelBundleLeg {
     pub access: KernelDeclaredAccess,
 }
 
+/// Structured arguments for executing one leg through the runtime cross-VM
+/// dispatcher. This replaces opaque raw transaction blobs so the node service
+/// can execute legs without guessing at chain semantics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AtomicLegExecution {
+    /// Execute an EVM call against the runtime's pallet-evm runner.
+    Evm {
+        caller: [u8; 20],
+        target: [u8; 20],
+        value: u128,
+        input: Vec<u8>,
+    },
+    /// Execute an SVM instruction against the runtime's rBPF adapter.
+    Svm {
+        caller: [u8; 32],
+        program_id: [u8; 32],
+        instruction: Vec<u8>,
+    },
+    /// Execute an X3 module call through the runtime's X3 executor.
+    X3 {
+        caller: [u8; 32],
+        selector: [u8; 4],
+        payload: Vec<u8>,
+    },
+}
+
 /// Canonical node-side request: the on-chain kernel accounting legs AND the
 /// raw executable payloads they describe. This is the single intake type the
 /// node atomic-swap service consumes before submitting to the runtime and
@@ -119,6 +145,8 @@ pub struct AtomicExecutionRequest {
     pub chain_id: u32,
     /// Strictly-increasing per (chain_id, submitter) nonce.
     pub nonce: u64,
+    /// Structured dispatcher arguments aligned by index with `legs`.
+    pub executions: Vec<AtomicLegExecution>,
 }
 
 impl AtomicExecutionRequest {
@@ -615,6 +643,11 @@ mod tests {
             deadline_blocks: 100,
             chain_id: 1,
             nonce: 1,
+            executions: vec![AtomicLegExecution::Svm {
+                caller: [0u8; 32],
+                program_id: [2u8; 32],
+                instruction: vec![1, 2, 3],
+            }],
         };
 
         let a = req(1_000);
