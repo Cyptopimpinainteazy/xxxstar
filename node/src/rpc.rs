@@ -17,7 +17,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_core::storage::StorageKey;
-use sp_core::{Pair, H256};
+use sp_core::{crypto::AccountId32, Pair, H256};
 use sp_runtime::generic::Era;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_runtime::transaction_validity::TransactionSource;
@@ -26,6 +26,7 @@ use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
 use pallet_x3_atomic_kernel::proof::{BundleLeg, DeclaredAccess, VmType};
+use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use x3_chain_runtime::{
     opaque::Block, AccountId, Address, AssetId, Balance, Runtime, RuntimeCall, Signature,
     SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
@@ -417,6 +418,8 @@ where
         >,
     <FullClient as ProvideRuntimeApi<Block>>::Api:
         pallet_x3_kernel::AtlasKernelRuntimeApi<Block, AccountId, Balance, AssetId>,
+    <FullClient as ProvideRuntimeApi<Block>>::Api:
+        pallet_x3_atomic_kernel::X3AtomicKernelApi<Block>,
 {
     let mut module = RpcModule::new(());
 
@@ -450,6 +453,37 @@ where
             },
         )?;
     }
+
+    let client_for_find = client.clone();
+    module.register_method(
+        "atomic_findBundle",
+        move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse()?;
+            let submitter_hex = req
+                .get("submitter")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| custom_error("Missing submitter"))?;
+            let submitter = AccountId32::new(decode_hex_32(submitter_hex, "submitter")?);
+            let legs_hash = H256(decode_hex_32(
+                req.get("legs_hash")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing legs_hash"))?,
+                "legs_hash",
+            )?);
+            let at = client_for_find.info().best_hash;
+            match client_for_find.runtime_api().find_bundle(at, submitter, legs_hash) {
+                Ok(Some((bundle_id, status))) => Ok(serde_json::json!({
+                    "bundle_id": format!("0x{}", hex::encode(bundle_id)),
+                    "status": format!("{status:?}"),
+                })),
+                Ok(None) => Ok(serde_json::json!({
+                    "bundle_id": null,
+                    "status": null,
+                })),
+                Err(e) => Err(custom_error(format!("runtime find_bundle failed: {e}"))),
+            }
+        },
+    )?;
 
     let tx_pool = pool.clone();
     let system_rpc = substrate_frame_rpc_system::System::new(client.clone(), pool);
