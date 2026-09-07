@@ -659,6 +659,59 @@ where
         },
     )?;
 
+    let client_for_status = client.clone();
+    module.register_method(
+        "atomic_getBundleStatus",
+        move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            let bundle_id = H256(decode_hex_32(
+                req.get("bundle_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing bundle_id"))?,
+                "bundle_id",
+            )?);
+            let at = client_for_status.info().best_hash;
+            let status = client_for_status
+                .runtime_api()
+                .get_bundle_status(at, bundle_id)
+                .map_err(|e| custom_error(format!("get_bundle_status failed: {e}")))?;
+            Ok(serde_json::json!({
+                "bundle_id": format!("0x{}", hex::encode(bundle_id)),
+                "status": status.map(|s| format!("{s:?}")),
+            }))
+        },
+    )?;
+
+    let client_for_proof = client.clone();
+    module.register_method(
+        "atomic_getPoAEProof",
+        move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+            let bundle_id = H256(decode_hex_32(
+                req.get("bundle_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing bundle_id"))?,
+                "bundle_id",
+            )?);
+            let at = client_for_proof.info().best_hash;
+            let proof = client_for_proof
+                .runtime_api()
+                .get_poae_proof(at, bundle_id)
+                .map_err(|e| custom_error(format!("get_poae_proof failed: {e}")))?;
+            Ok(match proof {
+                Some(proof) => serde_json::json!({
+                    "bundle_id": format!("0x{}", hex::encode(proof.bundle_id)),
+                    "receipt_root": format!("0x{}", hex::encode(proof.receipt_root)),
+                    "finalized_block": proof.finalized_block,
+                    "finality_cert": format!("0x{}", hex::encode(proof.finality_cert)),
+                    "legs_hash": format!("0x{}", hex::encode(proof.legs_hash)),
+                    "leg_count": proof.leg_count,
+                }),
+                None => serde_json::json!(null),
+            })
+        },
+    )?;
+
     let tx_pool = pool.clone();
     let system_rpc = substrate_frame_rpc_system::System::new(client.clone(), pool);
     module.merge(substrate_frame_rpc_system::SystemApiServer::into_rpc(
