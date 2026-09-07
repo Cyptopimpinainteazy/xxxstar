@@ -27,6 +27,13 @@ Tauri OS (apps/tauri-os)                           █░░░░░░░░�
 
 **Average readiness: ~51%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05; atomic_kernel corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 — its required_tests were fictional), core consensus features ready for guarded testnet deployment.
 
+### 2026-09-07 Atomic lifecycle live evidence
+
+- Dev-chain submission reached `Finalized`.
+- A held submission reached `Executing`, then forced rollback reached `RolledBack`.
+- `cargo audit`: 0 blocking Rust vulnerabilities, 33 allowed warnings.
+- Root `pytest tests`: 181 passed.
+
 ## What's Actually Working
 
 | Capability | Status | Detail |
