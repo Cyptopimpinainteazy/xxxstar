@@ -585,8 +585,17 @@ where
                 nonce,
                 executions: parse_executions(&req)?,
             };
+            let hold_for_rollback = req
+                .get("hold_for_rollback")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let command = if hold_for_rollback {
+                AtomicGatewayCommand::SubmitBundleHoldForRollback(request)
+            } else {
+                AtomicGatewayCommand::SubmitBundle(request)
+            };
             atomic_gateway_tx
-                .try_send(AtomicGatewayCommand::SubmitBundle(request))
+                .try_send(command)
                 .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
             Ok(serde_json::json!({ "status": "accepted" }))
             },
