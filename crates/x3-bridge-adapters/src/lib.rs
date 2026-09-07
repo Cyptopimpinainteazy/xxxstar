@@ -1293,4 +1293,27 @@ mod tests {
         assert_eq!(decoded_svm[0].domain, OverlayDomain::Svm);
         assert_eq!(decoded_svm[0].address, transitions[1].address);
     }
+
+    #[test]
+    fn overlay_diff_encoding_benchmark_smoke() {
+        let transitions: Vec<_> = (0..10_000)
+            .map(|i| OverlayTransition {
+                address: vec![i as u8; 32],
+                key: balance_slot_key(&[i as u8; 32]),
+                old_value: H256([1u8; 32]),
+                new_value: H256([2u8; 32]),
+            })
+            .collect();
+
+        let start = std::time::Instant::now();
+        for _ in 0..100 {
+            let diff = overlay_state_diff_for_domain(&transitions, OverlayDomain::X3);
+            assert!(!diff.is_empty());
+        }
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed.as_secs_f64() < 5.0,
+            "overlay diff encoding took too long: {elapsed:?}"
+        );
+    }
 }
