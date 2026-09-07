@@ -9,6 +9,7 @@ use parallel_proposer::{extract_tx_metadata, ParallelProposerFactory};
 use poh_generator::PoHState;
 use poh_generator::{PoHDigest, PoHVerifier, POH_ENGINE_ID};
 use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
+use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResult};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
@@ -18,7 +19,7 @@ use sc_service::{
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
-use sp_core::{crypto::KeyTypeId, Pair};
+use sp_core::{crypto::KeyTypeId, H256, Pair};
 use sp_runtime::traits::Header as HeaderT;
 use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
@@ -30,7 +31,7 @@ use tokio::sync::{mpsc, Mutex};
 use x3_bridge_adapters::{
     OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
-use x3_chain_runtime::{opaque::Block, RuntimeApi};
+use x3_chain_runtime::{opaque::Block, Runtime, RuntimeApi, RuntimeCall, UncheckedExtrinsic};
 use x3_cross_vm_bridge::{CrossVmBridge, CrossVmResult};
 use x3_finality_oracle::{
     Chain as FinalityChain, FinalityOracle, FinalityRule, FinalityStatus, InMemoryFinalityOracle,
@@ -1293,10 +1294,11 @@ pub fn new_full_with_atomic_gateway<
         log::info!("⚡ Flash Finality gadget, network bridge, and voter started");
     } else {
         let client_for_anchor = client.clone();
+        let pool_for_anchor = transaction_pool.clone();
         task_manager.spawn_essential_handle().spawn(
             "grandpa-finality-anchor",
             Some("x3"),
-            run_grandpa_finality_anchor(client_for_anchor),
+            run_grandpa_finality_anchor(client_for_anchor, pool_for_anchor),
         );
     }
 
@@ -1987,12 +1989,7 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 ///
 /// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
 /// Value:      `cert_hash (32 bytes)`
-async fn run_grandpa_finality_anchor<Client, Block>(client: Arc<Client>)
-where
-    Client: BlockchainEvents<Block> + BlockBackend<Block> + Send + Sync + 'static,
-    Block: sp_runtime::traits::Block + 'static,
-    Block::Header: HeaderT,
-{
+async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::atomic_service::AtomicPool>) {
     use futures_util::StreamExt;
 
     let mut finality_notifications = client.finality_notification_stream();
@@ -2000,15 +1997,25 @@ where
         let number: u64 = (*notification.header.number()).saturated_into();
         let hash: [u8; 32] = notification.hash.as_ref().try_into().unwrap_or([0u8; 32]);
         let cert_hash = sp_core::blake2_256(&hash);
-        let mut key = b"x3ff:".to_vec();
-        key.extend_from_slice(&number.to_le_bytes());
-        sp_io::offchain::local_storage_set(
-            sp_runtime::offchain::StorageKind::PERSISTENT,
-            &key,
-            &cert_hash,
+        let call = RuntimeCall::X3AtomicKernel(
+            pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
+                block_num: number,
+                cert: H256(cert_hash),
+            },
         );
+        let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+        if let Err(e) = pool
+            .submit_one(
+                client.info().best_hash,
+                TransactionSource::Local,
+                extrinsic.into(),
+            )
+            .await
+        {
+            log::debug!("failed to anchor GRANDPA cert for block {number}: {e}");
+        }
         log::debug!(
-            "⚡ [GRANDPA] cert stored at key x3ff:{number} → cert_hash=0x{}",
+            "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
             hex::encode(&cert_hash[..8])
         );
     }
@@ -2497,7 +2504,6 @@ mod runtime_bridge_client_tests {
     use clap::Parser;
     use codec::{Decode, Encode};
     use sc_cli::SubstrateCli;
-    use sc_transaction_pool_api::TransactionPool;
     use sp_core::{H160, H256};
     use sp_inherents::InherentDataProvider;
     use sp_runtime::{
