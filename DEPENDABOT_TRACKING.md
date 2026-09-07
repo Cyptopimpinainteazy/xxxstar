@@ -3,10 +3,10 @@
 GitHub reports the following vulnerabilities on the default branch:
 
 - Critical: 5
-- High: 263
-- Moderate: 296
-- Low: 77
-- Total: 641
+- High: 243
+- Moderate: 278
+- Low: 65
+- Total: 591
 
 ## Status
 
