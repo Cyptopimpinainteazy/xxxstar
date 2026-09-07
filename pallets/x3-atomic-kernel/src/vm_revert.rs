@@ -1295,4 +1295,40 @@ mod tests {
             assert_eq!(result.unwrap(), RevertOutcome::Reverted);
         });
     }
+
+    #[test]
+    fn rollback_restores_overlay_ledger_from_stored_leg_receipt() {
+        run(|| {
+            let change = OverlayLegChange {
+                domain: OverlayDomain::X3,
+                address: vec![0x71; 32],
+                key: H256([0x77; 32]),
+                old_value: Some(H256([0x99; 32])),
+                new_value: Some(H256([0xAA; 32])),
+            };
+            let mut receipt = LegReceipt::new(0, VmType::X3);
+            receipt.mark_executed(encode_overlay_state_diff(&[change.clone()]));
+
+            // Simulate the execution write and then roll it back through the
+            // same CompositeReverter the kernel uses for bundle rollback.
+            let key = overlay_ledger_storage_key(&change);
+            sp_io::storage::set(
+                &key,
+                change
+                    .new_value
+                    .expect("new value present")
+                    .as_bytes(),
+            );
+
+            let outcome =
+                CompositeReverter::revert_leg(VmType::X3, &receipt.state_diff);
+            assert_eq!(outcome.unwrap(), RevertOutcome::Reverted);
+
+            let restored = sp_io::storage::get(&key).expect("overlay ledger value restored");
+            assert_eq!(
+                restored,
+                change.old_value.expect("old value present").as_bytes()
+            );
+        });
+    }
 }
