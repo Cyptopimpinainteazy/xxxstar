@@ -6,11 +6,12 @@
 
 use crate::atomic_gateway::AtomicGatewayKey;
 use crate::service::FullClient;
-use codec::Encode;
+use atomic_swap_orchestrator::{
+    AtomicExecutionRequest, KernelBundleLeg, KernelVmType,
+};
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use sc_client_api::{BlockBackend, HeaderBackend};
 use sp_api::ProvideRuntimeApi;
-use sp_core::hashing::sha2_256;
 use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sp_core::H256;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -25,17 +26,8 @@ pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClie
 /// A request accepted by the atomic gateway service.
 #[derive(Debug, Clone)]
 pub enum AtomicGatewayCommand {
-    /// Submit a new bundle on-chain.
-    SubmitBundle {
-        /// Kernel accounting legs to record on-chain.
-        legs: Vec<pallet_x3_atomic_kernel::proof::BundleLeg>,
-        /// Submission deadline in X3 blocks.
-        deadline_blocks: u32,
-        /// Chain id for the pallet nonce registry.
-        chain_id: u32,
-        /// Strictly-increasing per chain/account nonce.
-        nonce: u64,
-    },
+    /// Submit a canonical execution request on-chain.
+    SubmitBundle(AtomicExecutionRequest),
     /// Assign the gateway account as executor of a pending bundle.
     AssignExecutor {
         /// On-chain bundle identifier.
@@ -89,18 +81,18 @@ impl AtomicGatewayService {
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
         let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
         let (extrinsic, legs_hash) = match command {
-            AtomicGatewayCommand::SubmitBundle {
-                legs,
-                deadline_blocks,
-                chain_id,
-                nonce,
-            } => {
-                let legs_hash = H256(sha2_256(&legs.encode()));
+            AtomicGatewayCommand::SubmitBundle(request) => {
+                let legs_hash = request.legs_hash();
+                let legs = request
+                    .legs
+                    .iter()
+                    .map(to_pallet_leg)
+                    .collect::<Result<Vec<_>, _>>()?;
                 let extrinsic = self.key.submit_atomic_bundle(
                     legs,
-                    deadline_blocks,
-                    chain_id,
-                    nonce,
+                    request.deadline_blocks,
+                    request.chain_id,
+                    request.nonce,
                     self.genesis_hash,
                     tx_nonce,
                 )?;
@@ -161,6 +153,41 @@ impl AtomicGatewayService {
         }
         Err("bundle submission was not found on-chain within timeout".to_string())
     }
+}
+
+fn to_pallet_leg(
+    leg: &KernelBundleLeg,
+) -> Result<pallet_x3_atomic_kernel::proof::BundleLeg, String> {
+    use pallet_x3_atomic_kernel::proof::{BundleLeg, DeclaredAccess, VmType};
+    let vm_type = match leg.vm_type {
+        KernelVmType::Evm => VmType::Evm,
+        KernelVmType::Svm => VmType::Svm,
+        KernelVmType::X3 => VmType::X3,
+        KernelVmType::Cross => VmType::Cross,
+    };
+    let access = DeclaredAccess {
+        reads: leg
+            .access
+            .reads
+            .clone()
+            .try_into()
+            .map_err(|_| "access reads exceed 64 entries".to_string())?,
+        writes: leg
+            .access
+            .writes
+            .clone()
+            .try_into()
+            .map_err(|_| "access writes exceed 64 entries".to_string())?,
+    };
+    Ok(BundleLeg {
+        vm_type,
+        token_in: leg.token_in,
+        token_out: leg.token_out,
+        amount_in: leg.amount_in,
+        min_amount_out: leg.min_amount_out,
+        deadline: leg.deadline,
+        access,
+    })
 }
 
 #[cfg(test)]

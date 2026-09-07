@@ -6,9 +6,10 @@
 
 use codec::{Decode, Encode};
 use crate::atomic_service::AtomicGatewayCommand;
+use atomic_swap_orchestrator::{
+    AtomicExecutionRequest, AtomicPair, KernelBundleLeg, KernelDeclaredAccess, KernelVmType,
+};
 use flash_finality::FlashFinalityGadget;
-use frame_support::traits::ConstU32;
-use frame_support::BoundedVec;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::{BlockBackend, StorageProvider};
@@ -25,7 +26,6 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
-use pallet_x3_atomic_kernel::proof::{BundleLeg, DeclaredAccess, VmType};
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use x3_chain_runtime::{
     opaque::Block, AccountId, Address, AssetId, Balance, Runtime, RuntimeCall, Signature,
@@ -80,6 +80,12 @@ fn decode_hex_32(value: &str, label: &str) -> Result<[u8; 32], JsonRpseeError> {
     let mut array = [0u8; 32];
     array.copy_from_slice(&bytes);
     Ok(array)
+}
+
+/// Decode hex string with "0x" prefix into raw bytes.
+fn decode_hex_bytes(value: &str, label: &str) -> Result<Vec<u8>, JsonRpseeError> {
+    let stripped = value.strip_prefix("0x").unwrap_or(value);
+    hex::decode(stripped).map_err(|e| custom_error(format!("{label} decode failed: {e}")))
 }
 
 /// Decode hex string with "0x" prefix to 20-byte array.
@@ -304,7 +310,7 @@ fn decode_agent_law_check() -> Result<pallet_x3_agent_law::AgentLawCheck<Runtime
         .map_err(|e| custom_error(format!("decode agent law extension failed: {e}")))
 }
 
-fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<BundleLeg>, JsonRpseeError> {
+fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<KernelBundleLeg>, JsonRpseeError> {
     let legs = value
         .get("legs")
         .and_then(|v| v.as_array())
@@ -316,10 +322,10 @@ fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<BundleLeg>, JsonR
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
             {
-                "evm" => VmType::Evm,
-                "svm" => VmType::Svm,
-                "x3" => VmType::X3,
-                "cross" => VmType::Cross,
+                "evm" => KernelVmType::Evm,
+                "svm" => KernelVmType::Svm,
+                "x3" => KernelVmType::X3,
+                "cross" => KernelVmType::Cross,
                 other => {
                     return Err(custom_error(format!("Invalid vm_type: {other}")));
                 }
@@ -372,13 +378,11 @@ fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<BundleLeg>, JsonR
                 })
                 .transpose()?
                 .unwrap_or_default();
-            let access = DeclaredAccess {
-                reads: BoundedVec::<H256, ConstU32<64>>::try_from(reads)
-                    .map_err(|_| custom_error("access reads exceed 64"))?,
-                writes: BoundedVec::<H256, ConstU32<64>>::try_from(writes)
-                    .map_err(|_| custom_error("access writes exceed 64"))?,
+            let access = KernelDeclaredAccess {
+                reads,
+                writes,
             };
-            Ok(BundleLeg {
+            Ok(KernelBundleLeg {
                 vm_type,
                 token_in: H256(token_in),
                 token_out: H256(token_out),
@@ -441,13 +445,37 @@ where
                 .get("nonce")
                 .and_then(|v| v.as_u64())
                 .ok_or_else(|| custom_error("Missing nonce"))?;
+            let svm_tx = decode_hex_bytes(
+                req.get("svm_tx")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing svm_tx"))?,
+                "svm_tx",
+            )?;
+            let evm_tx = decode_hex_bytes(
+                req.get("evm_tx")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| custom_error("Missing evm_tx"))?,
+                "evm_tx",
+            )?;
+            let sequence_nonce = req
+                .get("sequence_nonce")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let request = AtomicExecutionRequest {
+                pair: AtomicPair {
+                    swap_id: Vec::new(),
+                    svm_tx,
+                    evm_tx,
+                    sequence_nonce,
+                    pallet_bundle_id: None,
+                },
+                legs,
+                deadline_blocks,
+                chain_id,
+                nonce,
+            };
             atomic_gateway_tx
-                .try_send(AtomicGatewayCommand::SubmitBundle {
-                    legs,
-                    deadline_blocks,
-                    chain_id,
-                    nonce,
-                })
+                .try_send(AtomicGatewayCommand::SubmitBundle(request))
                 .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
             Ok(serde_json::json!({ "status": "accepted" }))
             },
