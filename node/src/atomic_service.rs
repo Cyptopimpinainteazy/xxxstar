@@ -184,10 +184,12 @@ impl AtomicGatewayService {
             .await
             .map_err(|e| format!("transaction pool rejected atomic extrinsic: {e}"))
             .map(|_| ())?;
+        log::info!(target: "x3-atomic-gateway", "atomic extrinsic submitted");
 
         if let Some(legs_hash) = legs_hash {
             let bundle_id = self.wait_for_submission_and_assign(legs_hash).await?;
             if let Some(executions) = executions {
+                log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} executing {}/{} legs", executions.len(), executions.len());
                 self.execute_legs(&executions, bundle_id).await?;
                 if should_finalize {
                     if let Some(request) = request_clone {
@@ -255,6 +257,7 @@ impl AtomicGatewayService {
             let state_diff = self.execute_x3_leg(execution, index as u64).await?;
             self.record_leg_receipt(bundle_id, index as u32, state_diff)
                 .await?;
+            log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} leg {index} recorded");
         }
         Ok(())
     }
@@ -323,7 +326,7 @@ impl AtomicGatewayService {
                 extrinsic.into(),
             )
             .await
-            .map(|_| ())
+            .map(|_| log::debug!(target: "x3-atomic-gateway", "leg {leg_index} receipt submitted"))
             .map_err(|e| format!("record_leg_execution_receipt rejected: {e}"))
     }
 
@@ -385,8 +388,8 @@ impl AtomicGatewayService {
                     extrinsic.into(),
                 )
                 .await
-                .map(|_| ())
-                .map_err(|e| format!("submit_finalization_result rejected: {e}"));
+                .map(|_| log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} finalized"))
+                .map_err(|e| format!("finalize_atomic_bundle rejected: {e}"));
         }
         Err("no anchored finality certificate within timeout".to_string())
     }
