@@ -299,14 +299,14 @@ class JuryTokenManager:
         agents_alive = sum(1 for ledger in self.agent_ledgers.values() if ledger.civic_status == "active")
         agents_terminated = total_agents - agents_alive
         total_tokens_minted = total_agents * self.TOKENS_PER_AGENT
-        total_tokens_burned = sum(r.agent_id for r in self.burn_records)
+        total_tokens_burned = len(self.burn_records)
         
         return {
             "total_agents": total_agents,
             "agents_civically_alive": agents_alive,
             "agents_terminated": agents_terminated,
             "total_tokens_minted": total_tokens_minted,
-            "total_tokens_burned": len(self.burn_records),
-            "avg_tokens_per_agent": (self.TOKENS_PER_AGENT * total_agents - len(self.burn_records)) / max(total_agents, 1),
+            "total_tokens_burned": total_tokens_burned,
+            "avg_tokens_per_agent": (total_tokens_minted - total_tokens_burned) / max(agents_alive, 1),
             "termination_rate": agents_terminated / max(total_agents, 1),
         }
