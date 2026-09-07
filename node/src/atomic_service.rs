@@ -39,6 +39,8 @@ pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClie
 pub enum AtomicGatewayCommand {
     /// Submit a canonical execution request on-chain.
     SubmitBundle(AtomicExecutionRequest),
+    /// Submit, assign, and execute, but wait for an explicit rollback/finalize.
+    SubmitBundleHoldForRollback(AtomicExecutionRequest),
     /// Assign the gateway account as executor of a pending bundle.
     AssignExecutor {
         /// On-chain bundle identifier.
@@ -107,7 +109,7 @@ impl AtomicGatewayService {
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
         let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
-        let (extrinsic, legs_hash, executions, request_clone) = match command {
+        let (extrinsic, legs_hash, executions, request_clone, should_finalize) = match command {
             AtomicGatewayCommand::SubmitBundle(request) => {
                 let legs_hash = request.legs_hash();
                 let request_clone = request.clone();
@@ -130,6 +132,32 @@ impl AtomicGatewayService {
                     Some(legs_hash),
                     Some(executions),
                     Some(request_clone),
+                    true,
+                )
+            }
+            AtomicGatewayCommand::SubmitBundleHoldForRollback(request) => {
+                let legs_hash = request.legs_hash();
+                let request_clone = request.clone();
+                let executions = request.executions.clone();
+                let legs = request
+                    .legs
+                    .iter()
+                    .map(to_pallet_leg)
+                    .collect::<Result<Vec<_>, _>>()?;
+                let extrinsic = self.key.submit_atomic_bundle(
+                    legs,
+                    request.deadline_blocks,
+                    request.chain_id,
+                    request.nonce,
+                    self.genesis_hash,
+                    tx_nonce,
+                )?;
+                (
+                    extrinsic,
+                    Some(legs_hash),
+                    Some(executions),
+                    Some(request_clone),
+                    false,
                 )
             }
             AtomicGatewayCommand::AssignExecutor { bundle_id } => (
@@ -138,6 +166,7 @@ impl AtomicGatewayService {
                 None,
                 None,
                 None,
+                false,
             ),
             AtomicGatewayCommand::Rollback { bundle_id, reason } => (
                 self.key
@@ -145,6 +174,7 @@ impl AtomicGatewayService {
                 None,
                 None,
                 None,
+                false,
             ),
         };
         let best_hash = self.client.info().best_hash;
@@ -159,8 +189,10 @@ impl AtomicGatewayService {
             let bundle_id = self.wait_for_submission_and_assign(legs_hash).await?;
             if let Some(executions) = executions {
                 self.execute_legs(&executions, bundle_id).await?;
-                if let Some(request) = request_clone {
+                if should_finalize {
+                    if let Some(request) = request_clone {
                     self.finalize_bundle(&request, bundle_id).await?;
+                    }
                 }
             }
         }
