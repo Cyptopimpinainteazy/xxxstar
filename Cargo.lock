@@ -24168,6 +24168,7 @@ name = "x3-chain-node"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "atomic-swap-orchestrator",
  "bs58",
  "clap",
  "contention-predictor",
