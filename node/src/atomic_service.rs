@@ -7,8 +7,10 @@
 use crate::atomic_gateway::AtomicGatewayKey;
 use crate::service::FullClient;
 use atomic_swap_orchestrator::{
-    AtomicExecutionRequest, KernelBundleLeg, KernelVmType,
+    AtomicExecutionRequest, AtomicLegExecution, KernelBundleLeg, KernelVmType,
 };
+use pallet_x3_atomic_kernel::vm_revert::StateDiff;
+use pallet_x3_atomic_kernel::vm_revert::OverlayDomain;
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use sc_client_api::{BlockBackend, HeaderBackend};
 use sp_api::ProvideRuntimeApi;
@@ -19,6 +21,12 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use x3_chain_runtime::opaque::Block;
 use pallet_x3_atomic_kernel::BundleStatus;
+use x3_bridge_adapters::{
+    overlay_state_diff_for_domain, RuntimeCrossVmDispatcher, SubstrateClientBalanceAdapter,
+    SubstrateX3VmBridge,
+};
+use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher, CrossVmStatus, VmId};
+use x3_chain_runtime::{Runtime, RuntimeCall, UncheckedExtrinsic};
 
 /// Transaction pool type used by the node atomic gateway service.
 pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClient>;
@@ -42,6 +50,8 @@ pub struct AtomicGatewayService {
     pool: Arc<AtomicPool>,
     genesis_hash: H256,
     next_tx_nonce: Arc<AtomicU64>,
+    balances: Arc<SubstrateClientBalanceAdapter<FullClient, Block>>,
+    dispatcher: RuntimeCrossVmDispatcher<FullClient, Block>,
 }
 
 impl AtomicGatewayService {
@@ -57,12 +67,19 @@ impl AtomicGatewayService {
             .block_hash(0)
             .map_err(|e| format!("failed to read genesis hash: {e}"))?
             .ok_or_else(|| "genesis block not found".to_string())?;
+        let runtime_bridge =
+            Arc::new(SubstrateX3VmBridge::<FullClient, Block>::new(client.clone()));
+        let balances = runtime_bridge.balances.clone();
+        let dispatcher = RuntimeCrossVmDispatcher::<FullClient, Block>::new(client.clone())
+            .with_x3vm_bridge(runtime_bridge.bridge.clone());
         Ok(Self {
             key,
             client,
             pool,
             genesis_hash,
             next_tx_nonce: Arc::new(AtomicU64::new(0)),
+            balances,
+            dispatcher,
         })
     }
 
@@ -80,9 +97,10 @@ impl AtomicGatewayService {
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
         let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
-        let (extrinsic, legs_hash) = match command {
+        let (extrinsic, legs_hash, executions) = match command {
             AtomicGatewayCommand::SubmitBundle(request) => {
                 let legs_hash = request.legs_hash();
+                let executions = request.executions.clone();
                 let legs = request
                     .legs
                     .iter()
@@ -96,11 +114,12 @@ impl AtomicGatewayService {
                     self.genesis_hash,
                     tx_nonce,
                 )?;
-                (extrinsic, Some(legs_hash))
+                (extrinsic, Some(legs_hash), Some(executions))
             }
             AtomicGatewayCommand::AssignExecutor { bundle_id } => (
                 self.key
                     .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+                None,
                 None,
             ),
         };
@@ -113,7 +132,10 @@ impl AtomicGatewayService {
             .map(|_| ())?;
 
         if let Some(legs_hash) = legs_hash {
-            self.wait_for_submission_and_assign(legs_hash).await?;
+            let bundle_id = self.wait_for_submission_and_assign(legs_hash).await?;
+            if let Some(executions) = executions {
+                self.execute_legs(&executions, bundle_id).await?;
+            }
         }
         Ok(())
     }
@@ -121,7 +143,7 @@ impl AtomicGatewayService {
     async fn wait_for_submission_and_assign(
         &self,
         legs_hash: H256,
-    ) -> Result<(), String> {
+    ) -> Result<H256, String> {
         for _ in 0..50 {
             let at = self.client.info().best_hash;
             let submitter: sp_core::crypto::AccountId32 = self.key.account().into();
@@ -147,11 +169,103 @@ impl AtomicGatewayService {
                     )
                     .await
                     .map_err(|e| format!("assign_bundle_executor rejected: {e}"))?;
-                return Ok(());
+                for _ in 0..50 {
+                    let status = self
+                        .client
+                        .runtime_api()
+                        .get_bundle_status(self.client.info().best_hash, bundle_id)
+                        .map_err(|e| format!("bundle status runtime call failed: {e}"))?;
+                    if matches!(status, Some(BundleStatus::Executing)) {
+                        return Ok(bundle_id);
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+                return Err("bundle did not enter Executing state".to_string());
             }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
         Err("bundle submission was not found on-chain within timeout".to_string())
+    }
+
+    async fn execute_legs(
+        &self,
+        executions: &[AtomicLegExecution],
+        bundle_id: H256,
+    ) -> Result<(), String> {
+        for (index, execution) in executions.iter().enumerate() {
+            let state_diff = self.execute_x3_leg(execution, index as u64).await?;
+            self.record_leg_receipt(bundle_id, index as u32, state_diff)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn execute_x3_leg(
+        &self,
+        execution: &AtomicLegExecution,
+        index: u64,
+    ) -> Result<StateDiff, String> {
+        let AtomicLegExecution::X3 {
+            caller,
+            selector,
+            payload,
+        } = execution
+        else {
+            return Err(
+                "Path B executes atomic legs through the X3-native overlay bridge; \
+                 only X3 executions are supported"
+                    .to_string(),
+            );
+        };
+        let call = CrossVmCall::new(
+            VmId::X3Vm,
+            VmId::X3Vm,
+            *selector,
+            payload.clone(),
+            10_000_000,
+            index,
+            10_000,
+        )
+        .map_err(|e| format!("failed to build CrossVmCall: {e:?}"))?;
+
+        let receipt = self
+            .dispatcher
+            .execute_x3vm_tx(caller, &call)
+            .map_err(|e| format!("X3 leg execution failed: {e:?}"))?;
+        if receipt.status != CrossVmStatus::Success {
+            return Err(format!(
+                "X3 leg {} reverted: {:?}",
+                index, receipt.status
+            ));
+        }
+
+        let transitions = self.balances.take_overlay_transitions();
+        Ok(overlay_state_diff_for_domain(&transitions, OverlayDomain::X3))
+    }
+
+    async fn record_leg_receipt(
+        &self,
+        bundle_id: H256,
+        leg_index: u32,
+        state_diff: StateDiff,
+    ) -> Result<(), String> {
+        let call = RuntimeCall::X3AtomicKernel(
+            pallet_x3_atomic_kernel::Call::<Runtime>::record_leg_execution_receipt {
+                bundle_id,
+                leg_index,
+                state_diff,
+            },
+        );
+        let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+        self.pool
+            .submit_one(
+                self.client.info().best_hash,
+                TransactionSource::External,
+                extrinsic.into(),
+            )
+            .await
+            .map(|_| ())
+            .map_err(|e| format!("record_leg_execution_receipt rejected: {e}"))
     }
 }
 

@@ -325,6 +325,26 @@ where
             })
             .collect()
     }
+
+    /// Capture changed overlay transitions and advance each entry's snapshot
+    /// to its current value, so a subsequent leg only reports its own delta.
+    pub fn take_overlay_transitions(&self) -> Vec<OverlayTransition> {
+        let mut guard = self.overlay.write().expect("overlay write");
+        let mut transitions = Vec::new();
+        for (addr, entry) in guard.iter_mut() {
+            if entry.current == entry.chain_snapshot {
+                continue;
+            }
+            transitions.push(OverlayTransition {
+                address: addr.clone(),
+                key: balance_slot_key(addr),
+                old_value: h256_from_u128(entry.chain_snapshot),
+                new_value: h256_from_u128(entry.current),
+            });
+            entry.chain_snapshot = entry.current;
+        }
+        transitions
+    }
 }
 
 impl<C, Block> BalanceProvider for SubstrateClientBalanceAdapter<C, Block>
