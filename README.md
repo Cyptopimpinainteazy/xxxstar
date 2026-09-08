@@ -115,7 +115,7 @@ cargo test --workspace
 
 ## CI
 
-All merges to `master` require the `x3 / critical-path-all-pass` check (9 worker jobs + 1 aggregate job in `.github/workflows/ci.yml`; the branch-protection required status check name is `x3 / critical-path-all-pass`):
+The intended critical-path gate for `master` is `x3 / critical-path-all-pass`. Branch protection has not yet been verified, and GitHub Actions execution is currently blocked by an account billing lock. Do not treat the configured workflow as passing evidence (9 worker jobs + 1 aggregate job in `.github/workflows/ci.yml`; the branch-protection required status check name is `x3 / critical-path-all-pass`):
 
 - `cargo fmt --all -- --check` — format gate
 - `cargo check -p x3-chain-runtime` — runtime compile gate
