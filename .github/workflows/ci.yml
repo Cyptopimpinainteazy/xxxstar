@@ -1,7 +1,7 @@
 ##############################################################################
 # X3 ATOMIC STAR — CRITICAL PATH CI GATE
 #
-# This workflow enforces all required launch gates before merge to main.
+# This workflow enforces all required launch gates before merge to master.
 # Every job here is a HARD BLOCK. No continue-on-error. No || true.
 # No skips. A single failure prevents merge.
 #
