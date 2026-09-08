@@ -115,7 +115,7 @@ cargo test --workspace
 
 ## CI
 
-All merges to `main` require the `x3 / critical-path-all-pass` check (9 worker jobs + 1 aggregate job in `.github/workflows/ci.yml`; the branch-protection required status check name is `x3 / critical-path-all-pass`):
+All merges to `master` require the `x3 / critical-path-all-pass` check (9 worker jobs + 1 aggregate job in `.github/workflows/ci.yml`; the branch-protection required status check name is `x3 / critical-path-all-pass`):
 
 - `cargo fmt --all -- --check` — format gate
 - `cargo check -p x3-chain-runtime` — runtime compile gate
@@ -138,6 +138,16 @@ Features disabled at RC-1 (require governance + audit to enable):
 | `external-gateway` | `compile_error!` if combined with `mainnet-rc1` |
 | `parallel-executor` | `compile_error!` if combined with `mainnet-rc1` |
 | External bridges | `ExternalBridgesEnabled = false` in genesis |
+
+---
+
+## Grant and readiness evidence
+
+- [Grant readiness brief](./GRANT_READINESS.md) — current feature inventory, defensible completion score, funding use, and claims policy
+- [Cross-chain readiness](./docs/CROSS_CHAIN_READINESS.md) — internal routing and external bridge status with a reproducible scoring method
+- [Branch reconciliation](./docs/BRANCH_RECONCILIATION_2026-09-08.md) — why `main` must not be bulk-merged into `master` and how to recover useful work safely
+
+The repository-wide readiness score is **51%** from the 15 real entries in `FEATURE_REGISTRY.toml`. Internal cross-VM routing is tracked at **88%**. External cross-chain readiness is **44%** under the gate method documented above; external bridges remain disabled and are not ready for public funds.
 
 ---
 
