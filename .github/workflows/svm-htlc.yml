@@ -1,0 +1,42 @@
+name: svm-htlc
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "X3-contracts/svm/programs/x3_htlc/**"
+      - "X3-contracts/svm/Cargo.toml"
+      - "X3-contracts/svm/Cargo.lock"
+  pull_request:
+    branches: [main]
+    paths:
+      - "X3-contracts/svm/programs/x3_htlc/**"
+      - "X3-contracts/svm/Cargo.toml"
+      - "X3-contracts/svm/Cargo.lock"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: cargo test x3_htlc
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: svm-htlc
+
+      - name: Run HTLC tests
+        run: cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc --locked
+
+      - name: Verify HTLC coverage remains present
+        run: |
+          set -euo pipefail
+          coverage=$(grep -cE '^\s*#\[test\]' X3-contracts/svm/programs/x3_htlc/src/lib.rs)
+          test "$coverage" -ge 7
+          echo "HTLC unit tests present: $coverage"
