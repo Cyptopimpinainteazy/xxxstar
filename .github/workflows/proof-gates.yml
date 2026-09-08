@@ -394,7 +394,7 @@ jobs:
     name: Publish Dashboard to GitHub Pages
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'push')
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'schedule' || github.event_name == 'push')
     needs: [pre-commit-gate, s0-security-gate, s1-security-gate, testnet-gate]
     permissions:
       contents: write
@@ -546,7 +546,7 @@ jobs:
             echo "- Mainnet gate executes only on release tags."
             echo ""
             echo "### Next Steps"
-            echo "1. Merge this PR to main branch"
+            echo "1. Merge this PR to master branch"
             echo "2. For testnet: Deploy from develop branch"
             echo "3. For mainnet: Create release tag (e.g., v1.0.0)"
           } >> $GITHUB_STEP_SUMMARY
