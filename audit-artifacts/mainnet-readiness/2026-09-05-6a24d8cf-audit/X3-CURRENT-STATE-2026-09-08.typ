@@ -60,6 +60,15 @@ implemented and tested atomic lifecycle. The most important current facts:
 - HIGH-API-1 is closed in source: the gateway `/health` and `/readyz` endpoints run a real DB
   round-trip and return 503 when it fails, `/livez` preserves process liveness, and the registry no
   longer cites fabricated `/health/<feature>` paths.
+- HIGH-TX-2 is closed in source: `x3_submitCrossVmTransaction` is registered only on
+  Development/Local chain specs, no longer auto-submits wrapped register/mint under a
+  threshold-1 council call, and every Live chain spec requires at least two council members.
+- HIGH-CK-2 is closed in source: the simulated primitives are renamed `kyber_research` and
+  `dilithium_research`, and crate/package docs explicitly forbid real-security use until audited
+  PQC bindings are integrated.
+- HIGH-VM-1 is closed in source: `x3_htlc` is added to the SVM workspace with six HTLC-specific
+  unit tests (plus Anchor's `test_id`) covering timelock bounds, preimage hashlock checks,
+  expiry, and PDA derivation.
 - The fourth Critical, recoverable secrets in git history, remains open.
 
 #pagebreak()
@@ -75,6 +84,9 @@ implemented and tested atomic lifecycle. The most important current facts:
   [`cargo build --release -p x3-chain-runtime` with `SKIP_WASM_BUILD` unset and empty nested target], [0], [WASM rebuilt from source with `wasm32v1-none`; real compact/compressed blob emitted],
   [`bash scripts/ci/check_runtime_wasm_non_stub.sh`], [0], [No stubbed `wasm_binary.rs`; non-trivial WASM artifact present],
   [`cargo test -p x3-gateway router_serves_real_http_over_ephemeral_port_without_db`], [0], [`/livez` 200; `/health` and `/readyz` 503 with `db:false` against a dead pool],
+  [`cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc`], [0], [7 HTLC tests pass (timelock, hashlock, expiry, PDAs)],
+  [`cargo test -p quantum-crypto`], [0], [22 tests pass with renamed research/simulated modules],
+  [`cargo test -p x3-chain-node --lib`], [0], [48 pass; 3 ignored; live-node RPC integration included],
   [`cargo audit`], [0], [0 blocking; 27 allow-listed warnings],
   [`npm test`], [0], [All configured JS test packages pass],
   [`npm run build`], [0], [All configured JS builds pass],
@@ -109,10 +121,10 @@ open unless a new commit explicitly closes them; none are silently deleted.
   [CRITICAL-CN-1], [Closed in source], [`report_misbehavior` and `slash_bond` enforce `ensure_root`; tests cover root-only calls],
   [CRITICAL-TOK-1], [Closed in source], [`scripts/check-readiness-consistency.sh` now verifies `required_tests` against real functions; registry fiction was purged],
   [CRITICAL-CK-1], [Open], [`git log --all` still returns commits for `sepolia-deployer-wallet.txt` and validator seed summaries; history rewrite + rotation remains required],
-  [HIGH-TX-2], [Open], [No new quorum/threshold change verified in current source],
+  [HIGH-TX-2], [Closed in source], [`x3_submitCrossVmTransaction` is Development/Local-only and no longer auto-mints wrapped assets; Live chain specs require at least two council members],
   [HIGH-CN-2], [Closed in source], [`LAUNCH_SCOPE.md` now explicitly lists permissionless validator staking/bonding/nomination as NOT IMPLEMENTED and deferred to M3],
-  [HIGH-CK-2], [Open], [Quantum-crypto placeholder is not real Kyber/Dilithium lattice crypto],
-  [HIGH-VM-1], [Open], [No new Solana HTLC test coverage verified in this refresh],
+  [HIGH-CK-2], [Closed in source], [Simulated modules renamed `kyber_research`/`dilithium_research`; docs and Cargo description forbid production use],
+  [HIGH-VM-1], [Closed in source], [Six HTLC unit tests plus Anchor `test_id` pass in the SVM workspace],
   [HIGH-API-1], [Closed in source], [`/health` and `/readyz` run a real DB round-trip and return 503 when down; `/livez` is liveness; registry `health_endpoint` fiction removed],
   [MEDIUM / LOW / INFO rows], [Open unless code inspection confirms closure], [Carried from the 2026-09-06 register],
 )
