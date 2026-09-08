@@ -4,9 +4,9 @@ GitHub reports the following vulnerabilities on the default branch:
 
 - Critical: 3
 - High: 41
-- Moderate: 100
-- Low: 31
-- Total: 175
+- Moderate: 96
+- Low: 30
+- Total: 170
 
 ## Status
 
@@ -21,7 +21,7 @@ GitHub reports the following vulnerabilities on the default branch:
 - Blocking vulnerabilities: 0
 - Allowed warnings: 33
 
-The 175 GitHub Dependabot findings are therefore predominantly JS/Python
+The 170 GitHub Dependabot findings are therefore predominantly JS/Python
 ecosystem advisories and/or GitHub severity policy, not Rust security failures.
 
 ## Remediation plan
