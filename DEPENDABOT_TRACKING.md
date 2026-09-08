@@ -2,16 +2,16 @@
 
 GitHub reports the following vulnerabilities on the default branch:
 
-- Critical: 3
+- Critical: 0
 - High: 41
-- Moderate: 96
-- Low: 30
-- Total: 170
+- Medium: 85
+- Low: 27
+- Total: 153
 
 ## Status
 
 - Recorded: yes
-- Remediated: yes (critical advisories fixed; GitHub rescan pending on push)
+- Remediated: yes (critical advisories fixed and confirmed closed on GitHub)
 - Blocking mainnet merge: no, because these are dependency advisories rather than
   atomic-swap proof-path correctness issues.
 
@@ -26,8 +26,8 @@ ecosystem advisories and/or GitHub severity policy, not Rust security failures.
 
 Latest applied: Cargo-compatible updates, tracked npm/pnpm lockfile fixes,
 Next.js/postcss security bumps, and the Python requirements group. The three
-remaining critical findings were then identified and remediated in the final
-ecosystem-specific patch:
+critical findings were identified and remediated in the final
+ecosystem-specific patch (merged as #124):
 
 - #589 npm `vitest` in `apps/x3-studio/package.json`
   (`GHSA-5xrq-8626-4rwp`): manifest moved from `^1.6.0` to `^5.0.0`; the pnpm
@@ -41,6 +41,9 @@ ecosystem-specific patch:
 The `wasmtime` move required local `sc-executor-wasmtime` and
 `sp-wasm-interface` patches that depend on `wasmtime 36.0.7`, because the
 stable2512 polkadot-sdk line still pins the vulnerable 35.x series.
+
+Post-merge Dependabot verification confirms zero open critical alerts. The
+remaining high/medium/low findings are tracked in GitHub Security > Dependabot.
 
 ## Remediation plan
 
