@@ -1,8 +1,8 @@
 # Release Gates
 
-**Canonical source:** `FEATURE_REGISTRY.toml`  
-**Reviewed:** 2026-09-08  
-**Current readiness:** 51% average across 15 implemented registry entries  
+**Canonical source:** `FEATURE_REGISTRY.toml`
+**Reviewed:** 2026-09-08
+**Current readiness:** 51% average across 15 implemented registry entries
 **Release decision:** Blocked
 
 Readiness scores measure implementation, integration, tests, CI enforcement, security controls, and operational evidence. They do not measure lines of code.
