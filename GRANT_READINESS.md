@@ -1,7 +1,7 @@
 # Grant Readiness
 
-**Evidence date:** 2026-09-08  
-**Evidence branch:** `master` at `7ddf0f27fa922a7af25d278a4376b05ca631b055`  
+**Evidence date:** 2026-09-08
+**Evidence branch:** `master` at `7ddf0f27fa922a7af25d278a4376b05ca631b055`
 **Project phase:** v0.4 internal testnet candidate
 
 X3 Atomic Star is a Substrate-based blockchain research and engineering project focused on atomic execution across native, EVM, and SVM domains. The repository contains working runtime pallets, contracts, relayer code, test infrastructure, operator tooling, and experimental components. It is not mainnet-ready, and external bridges remain disabled by default.
