@@ -11,7 +11,7 @@ GitHub reports the following vulnerabilities on the default branch:
 ## Status
 
 - Recorded: yes
-- Remediated: no
+- Remediated: partially
 - Blocking mainnet merge: no, because these are dependency advisories rather than
   atomic-swap proof-path correctness issues.
 
@@ -23,6 +23,11 @@ GitHub reports the following vulnerabilities on the default branch:
 
 The 170 GitHub Dependabot findings are therefore predominantly JS/Python
 ecosystem advisories and/or GitHub severity policy, not Rust security failures.
+
+Latest applied: Cargo-compatible updates, tracked npm/pnpm lockfile fixes,
+Next.js/postcss security bumps, and the Python requirements group. The three
+remaining critical findings still need their exact ecosystem/package sources
+identified before a semver-major or ecosystem-specific remediation PR.
 
 ## Remediation plan
 
