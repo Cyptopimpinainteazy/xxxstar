@@ -30,12 +30,12 @@ name: x3 critical-path CI
 on:
   push:
     branches:
-      - main
+      - master
       - "release/**"
       - "hotfix/**"
   pull_request:
     branches:
-      - main
+      - master
       - "release/**"
   workflow_dispatch:
 
