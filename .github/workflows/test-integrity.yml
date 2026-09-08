@@ -2,9 +2,9 @@ name: Test Integrity Enforcement
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   integrity-check:
@@ -19,7 +19,7 @@ jobs:
       - name: Run X3 Test Integrity Enforcement
         run: |
           echo "🔍 CI: running X3 test integrity enforcement"
-          python3 scripts_infrastructure/enforce_x3_rules.py --base origin/main
+          python3 scripts_infrastructure/enforce_x3_rules.py --base origin/master
 
       - name: Run core test suite
         run: |
