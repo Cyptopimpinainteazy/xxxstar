@@ -25,8 +25,9 @@ source "$HOME/.cargo/env"
 sudo apt-get update
 sudo apt-get install -y protobuf-compiler clang llvm
 
-# WASM target (required for runtime build)
-rustup target add wasm32-unknown-unknown
+# WASM targets (required for runtime build; wasm32v1-none is the clean
+# no-std target used by the pinned polkadot-sdk stable2512 toolchain)
+rustup target add wasm32-unknown-unknown wasm32v1-none
 ```
 
 ### 2. Build the node binary

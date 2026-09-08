@@ -42,7 +42,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none, wasm32-unknown-unknown
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -130,7 +130,7 @@ for r in data.get('results', []):
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32v1-none, wasm32-unknown-unknown
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
