@@ -1,0 +1,59 @@
+name: four-validator-mesh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # weekly Monday maintenance run
+
+jobs:
+  drill:
+    name: four-validator finality and recovery drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler clang cmake
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: four-validator-mesh
+
+      - name: Install subkey
+        run: cargo install subkey --locked --git https://github.com/paritytech/polkadot-sdk --branch stable2512
+
+      - name: Build release node
+        run: env -u SKIP_WASM_BUILD cargo build --release -p x3-chain-node
+
+      - name: Generate four-validator testnet spec
+        run: |
+          python3 scripts/testnet/build-x3-testnet-spec.py 4
+          python3 scripts/testnet/build-x3-testnet-spec.py 4 --skip-raw
+
+      - name: Cold-start finality convergence
+        run: |
+          TESTNET_BASE="$RUNNER_TEMP/x3-mesh-4" \
+            python3 scripts/testnet/run-mesh.py cycles --count 4 --cycles 1
+
+      - name: Single-validator loss recovery
+        run: |
+          TESTNET_BASE="$RUNNER_TEMP/x3-mesh-4" \
+            python3 scripts/testnet/run-mesh.py kills --count 4
+
+      - name: Upload drill logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-validator-mesh-logs
+          path: |
+            ${{ runner.temp }}/x3-mesh-4/**/*.log
+          if-no-files-found: warn
