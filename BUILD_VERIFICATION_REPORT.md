@@ -1,8 +1,8 @@
 # Wallet Pallet Verification Record
 
-**Original report date:** 2026-05-08  
-**Reviewed:** 2026-09-08  
-**Current registry score:** 55%  
+**Original report date:** 2026-05-08
+**Reviewed:** 2026-09-08
+**Current registry score:** 55%
 **Mode:** `LIVE_TESTNET`
 
 The earlier version of this file described the wallet pallet as production-ready and assigned it a score of 100. Those claims conflict with the current `FEATURE_REGISTRY.toml` and are withdrawn.
