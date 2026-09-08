@@ -34,8 +34,8 @@ pub struct Config {
     /// Socket the HTTP server binds to.
     pub listen: SocketAddr,
     /// Optional Postgres backend. `None` runs the API surface in a degraded
-    /// mode where DB-backed endpoints fail and `/readyz` reports the DB as
-    /// down (health/liveness and DB-free endpoints still serve).
+    /// mode where DB-backed endpoints fail and `/health`/`/readyz` report the
+    /// DB as down (`/livez` liveness and DB-free endpoints still serve).
     pub db: Option<DatabaseConfig>,
     /// Optional Redis cache URL (e.g. `redis://127.0.0.1:6379`).
     pub redis_url: Option<String>,

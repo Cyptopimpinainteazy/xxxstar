@@ -58,6 +58,8 @@ These features are **intentionally disabled** for RC-1 and MUST remain off until
 | `advanced-dex` — Advanced DEX routing | Compile-time guard | Post-audit |
 | `ai-optimizer` — AI consensus optimizer | Compile-time guard | Post-audit |
 | `gpu-acceleration` — GPU-critical validator acceleration | Compile-time guard | Post-audit |
+| `permissionless-staking` — Public validator staking/bonding/nomination | NOT IMPLEMENTED — validator set is launch-operator/root-controlled only | M3 |
+| `pq-production` — Production post-quantum cryptography | NOT IMPLEMENTED — in-tree quantum-crypto is a research/simulated implementation gated off by the runtime `pq` feature | Post-audit |
 
 ## Status Correction
 
