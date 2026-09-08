@@ -20,7 +20,7 @@
     "@polkadot/types": "^14.0.1",
     "@polkadot/util": "^13.0.0",
     "@polkadot/util-crypto": "^13.0.0",
-    "fast-uri": "^3.1.2",
+    "fast-uri": "^3.1.7",
     "minimatch": "^10.2.5",
     "picomatch": "^4.0.4",
     "ws": "^8.20.1"
