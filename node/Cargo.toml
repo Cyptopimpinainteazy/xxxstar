@@ -146,4 +146,4 @@ try-runtime = [
 # Optional Frontier (EVM) JSON-RPC wiring
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = { version = "0.5", features = ["async_tokio"] }

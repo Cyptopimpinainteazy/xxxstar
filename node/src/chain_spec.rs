@@ -450,9 +450,13 @@ pub fn development_config() -> Result<ChainSpec, String> {
     endowed_accounts.extend(dev_evm_endowed_accounts());
     endowed_accounts.extend(atomic_gateway_endowed_accounts());
 
-    // Single-member dev council so EnsureRootOrHalfCouncil-gated calls can be
-    // executed via Council::propose(threshold=1, ...) without a Sudo pallet.
-    let council_members = vec![get_account_id_from_seed::<sr25519::Public>("Alice")?];
+    // Two-member dev council. Wrapped-asset register/mint and other
+    // EnsureRootOrHalfCouncil-gated calls now require a second independent
+    // council member's approval (threshold 2), never a single-key execution.
+    let council_members = vec![
+        get_account_id_from_seed::<sr25519::Public>("Alice")?,
+        get_account_id_from_seed::<sr25519::Public>("Bob")?,
+    ];
 
     let genesis_config = x3_chain_genesis(
         initial_authorities,
@@ -494,7 +498,10 @@ pub fn development_config_with_bridge_escrows(
     endowed_accounts.extend(dev_evm_endowed_accounts());
     endowed_accounts.extend(atomic_gateway_endowed_accounts());
 
-    let council_members = vec![get_account_id_from_seed::<sr25519::Public>("Alice")?];
+    let council_members = vec![
+        get_account_id_from_seed::<sr25519::Public>("Alice")?,
+        get_account_id_from_seed::<sr25519::Public>("Bob")?,
+    ];
     let genesis_config = x3_chain_genesis(
         initial_authorities,
         endowed_accounts,
@@ -667,9 +674,7 @@ pub fn staging_config() -> Result<ChainSpec, String> {
     assert_no_seed_accounts(&endowed_accounts)?;
     let council_members = parse_endowed_accounts_from_env("X3_STAGING_COUNCIL_MEMBERS")?;
     let treasury_signers = parse_endowed_accounts_from_env("X3_STAGING_TREASURY_SIGNERS")?;
-    if council_members.is_empty() {
-        return Err("Staging network requires at least one council member".to_string());
-    }
+    validate_live_council_quorum_count("Staging network", council_members.len())?;
     if treasury_signers.is_empty() {
         return Err("Staging network requires at least one treasury signer".to_string());
     }
@@ -730,9 +735,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
     assert_no_seed_accounts(&endowed_accounts)?;
     let council_members = parse_endowed_accounts_from_env("X3_TESTNET_COUNCIL_MEMBERS")?;
     let treasury_signers = parse_endowed_accounts_from_env("X3_TESTNET_TREASURY_SIGNERS")?;
-    if council_members.is_empty() {
-        return Err("Testnet network requires at least one council member".to_string());
-    }
+    validate_live_council_quorum_count("Testnet network", council_members.len())?;
     if treasury_signers.is_empty() {
         return Err("Testnet network requires at least one treasury signer".to_string());
     }
@@ -790,9 +793,7 @@ pub fn production_config() -> Result<ChainSpec, String> {
     assert_no_seed_accounts(&endowed_accounts)?;
     let council_members = parse_endowed_accounts_from_env("X3_PRODUCTION_COUNCIL_MEMBERS")?;
     let treasury_signers = parse_endowed_accounts_from_env("X3_PRODUCTION_TREASURY_SIGNERS")?;
-    if council_members.is_empty() {
-        return Err("Production network requires at least one council member".to_string());
-    }
+    validate_live_council_quorum_count("Production network", council_members.len())?;
     if treasury_signers.is_empty() {
         return Err("Production network requires at least one treasury signer".to_string());
     }
@@ -981,6 +982,18 @@ fn x3_chain_genesis(
     }
 }
 
+/// Live network council must have at least two independent members so
+/// wrapped-asset register/mint and other half-council-gated calls require a
+/// real quorum rather than a single-key proposal (HIGH-TX-2).
+fn validate_live_council_quorum_count(chain_name: &str, member_count: usize) -> Result<(), String> {
+    if member_count < 2 {
+        return Err(format!(
+            "{chain_name} requires at least two council members for wrapped-asset quorum"
+        ));
+    }
+    Ok(())
+}
+
 fn authority_keys_from_seed(seed: &str) -> Result<(AuraId, GrandpaId), String> {
     Ok((
         get_from_seed::<AuraId>(seed)?,
@@ -1010,4 +1023,20 @@ where
         .into();
 
     Ok(public)
+}
+
+#[cfg(test)]
+mod council_quorum_tests {
+    use super::validate_live_council_quorum_count;
+
+    #[test]
+    fn live_council_rejects_single_member() {
+        assert!(validate_live_council_quorum_count("Testnet network", 1).is_err());
+    }
+
+    #[test]
+    fn live_council_accepts_two_or_more_members() {
+        assert!(validate_live_council_quorum_count("Testnet network", 2).is_ok());
+        assert!(validate_live_council_quorum_count("Production network", 5).is_ok());
+    }
 }

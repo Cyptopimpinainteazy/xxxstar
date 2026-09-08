@@ -549,6 +549,7 @@ pub fn create_full<P>(
     limiter: Arc<RateLimiter>,
     _subscription_executor: sc_rpc::SubscriptionTaskExecutor,
     enable_demo_wallet_rpc: bool,
+    enable_bridge_ingress_rpc: bool,
     atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>>,
 ) -> Result<RpcModule<()>, RpcError>
 where
@@ -1383,15 +1384,24 @@ where
     )?;
 
     // ── x3_submitCrossVmTransaction ─────────────────────
-    // Local bridge-testnet ingress for relayer-submitted deposit payloads.
+    // Development/local bridge ingress for relayer-submitted deposit payloads.
     // Decodes the gateway event payload and submits the real kernel extrinsic
-    // so successful relays mutate CanonicalLedger.
+    // so successful relays mutate CanonicalLedger. It is intentionally not
+    // registered on Live chain specs, and it never auto-mints wrapped assets:
+    // wrapped register/mint require a two-member council proposal executed by
+    // independent governance tooling (see HIGH-TX-2).
     let submit_client = client.clone();
     let cross_vm_limiter = limiter.clone();
     module.register_method(
         "x3_submitCrossVmTransaction",
         move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
             use codec::Encode;
+
+            if !enable_bridge_ingress_rpc {
+                return Err(custom_error(
+                    "x3_submitCrossVmTransaction is only available on Development/Local chain specs",
+                ));
+            }
 
             cross_vm_limiter
                 .check_request(0, "x3_submitCrossVmTransaction")
@@ -1410,6 +1420,14 @@ where
 
             let envelope = decode_signed_deposit_relay_envelope(&proof)?;
             let relay_payload = decode_deposit_relay_payload(&envelope.deposit_payload)?;
+            if relay_payload.chain_id == 0 {
+                return Err(custom_error("Relay payload chain_id must be non-zero"));
+            }
+            if relay_payload.token_address == [0u8; 20] {
+                return Err(custom_error(
+                    "Relay payload token_address must not be the zero address",
+                ));
+            }
             let bridge_nonce = u64::try_from(relay_payload.nonce)
                 .map_err(|_| custom_error("Relay nonce does not fit u64"))?;
             let operation = CrossVmOperation::TransferToSvm {
@@ -1486,18 +1504,6 @@ where
                 .map_err(|e| custom_error(format!("Runtime extrinsic submission failed: {e}")))
             };
 
-            let council_call = |proposal: RuntimeCall| -> RuntimeCall {
-                let length_bound = proposal.encoded_size() as u32;
-                RuntimeCall::Council(pallet_collective::Call::<
-                    Runtime,
-                    pallet_collective::Instance1,
-                >::propose {
-                    threshold: 1,
-                    proposal: Box::new(proposal),
-                    length_bound,
-                })
-            };
-
             let kernel_call = RuntimeCall::AtlasKernel(
                 pallet_x3_kernel::Call::<Runtime>::submit_cross_vm_operation {
                     operation: operation.clone(),
@@ -1507,52 +1513,14 @@ where
                 },
             );
 
-            let wrapped_chain_id = u32::try_from(relay_payload.chain_id)
-                .map_err(|_| custom_error("Relay chain id does not fit u32"))?;
-            let wrapped_asset_id = wrapped_asset_id(wrapped_chain_id, &relay_payload.token_address);
-            let wrapped_recipient = AccountId::decode(&mut &relay_payload.recipient[..])
-                .map_err(|e| custom_error(format!("Wrapped recipient decode failed: {e}")))?;
-            let register_wrapped_call = council_call(RuntimeCall::X3Wrapped(
-                pallet_x3_wrapped::Call::<Runtime>::register_wrapped_asset {
-                    asset_id: wrapped_asset_id,
-                    config: pallet_x3_wrapped::WrappedAssetConfig {
-                        native_asset_id: [0u8; 32],
-                        max_wrapped_supply: u128::MAX,
-                        governance_weight_bps: 10_000,
-                        bridge_fee_bps: 0,
-                        status: pallet_x3_wrapped::WrappedAssetStatus::Active,
-                    },
-                },
-            ));
-            let mint_wrapped_call = council_call(RuntimeCall::X3Wrapped(
-                pallet_x3_wrapped::Call::<Runtime>::mint_wrapped {
-                    chain_id: wrapped_chain_id,
-                    asset_id: wrapped_asset_id,
-                    recipient: wrapped_recipient,
-                    amount: relay_payload.amount,
-                    nonce: bridge_nonce,
-                },
-            ));
-
             let tx_hash = submit_call(kernel_call, account_nonce)?;
-            let register_nonce = account_nonce
-                .checked_add(1)
-                .ok_or_else(|| custom_error("Account nonce overflow before wrapped register"))?;
-            let mint_nonce = account_nonce
-                .checked_add(2)
-                .ok_or_else(|| custom_error("Account nonce overflow before wrapped mint"))?;
-            let register_tx_hash = submit_call(register_wrapped_call, register_nonce)?;
-            let mint_tx_hash = submit_call(mint_wrapped_call, mint_nonce)?;
 
             let submission_hash = sp_core::hashing::blake2_256(&proof);
             Ok(serde_json::json!({
                 "status": "submitted",
                 "submission_hash": format!("0x{}", hex::encode(submission_hash)),
                 "extrinsic_hash": format!("{tx_hash:?}"),
-                "wrapped_register_extrinsic_hash": format!("{register_tx_hash:?}"),
-                "wrapped_mint_extrinsic_hash": format!("{mint_tx_hash:?}"),
-                "wrapped_chain_id": wrapped_chain_id,
-                "wrapped_asset_id": format!("0x{}", hex::encode(wrapped_asset_id)),
+                "wrapped_mint": "requires_two_member_council_proposal",
                 "recipient": format!("0x{}", hex::encode(match operation {
                     CrossVmOperation::TransferToSvm { ref destination, .. } => destination,
                     _ => unreachable!(),
