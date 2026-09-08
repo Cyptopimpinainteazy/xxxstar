@@ -3,12 +3,12 @@ name: X3 Fronend + GPU Swarm CI
 on:
   push:
     branches:
-      - main
+      - master
       - develop
       - 'sprint-*'
   pull_request:
     branches:
-      - main
+      - master
       - develop
       - 'sprint-*'
   workflow_dispatch:
