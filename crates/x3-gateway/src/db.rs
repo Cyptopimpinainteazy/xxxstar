@@ -522,7 +522,7 @@ impl Database {
     /// Build a lazy (deferred-connect) pool handle without running migrations
     /// or contacting the server. Used to start the API in degraded mode when no
     /// database is configured: DB-backed endpoints fail per-request, while
-    /// liveness and DB-free endpoints keep serving, and `healthy()` reports the
+    /// `/livez` and DB-free endpoints keep serving, and `healthy()` reports the
     /// real backend state. Prefer [`Database::connect`] for production, which
     /// connects and applies migrations before the server begins serving.
     pub fn connect_lazy(config: &DatabaseConfig) -> Result<Self> {
@@ -535,7 +535,7 @@ impl Database {
     }
 
     /// Report whether the Postgres backend is reachable right now. A lazy or
-    /// dead pool returns `false`; this powers `/readyz` and the GraphQL
+    /// dead pool returns `false`; this powers `/health`, `/readyz`, and the GraphQL
     /// `dbReachable` field without faking readiness.
     pub async fn healthy(&self) -> bool {
         match self.pool.acquire().await {

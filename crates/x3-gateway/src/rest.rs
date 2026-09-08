@@ -103,7 +103,9 @@ pub fn create_router(
         .allow_headers(Any);
 
     Router::new()
-        // Health and status
+        // Health and status. `/livez` is process liveness; `/health` and
+        // `/readyz` are dependency-checked readiness (real DB round-trip).
+        .route("/livez", get(liveness))
         .route("/health", get(health))
         .route("/status", get(status))
         .route("/readyz", get(readiness))
@@ -245,8 +247,13 @@ fn api_routes() -> Router<AppState> {
 // Health endpoints
 // ============================================================================
 
-async fn health() -> impl IntoResponse {
-    StatusCode::OK
+#[derive(Serialize)]
+struct LivenessResponse {
+    status: String,
+}
+
+async fn liveness() -> Json<LivenessResponse> {
+    Json(LivenessResponse { status: "alive".to_string() })
 }
 
 #[derive(Serialize)]
@@ -285,18 +292,16 @@ struct ReadinessResponse {
     redis: bool,
 }
 
-/// Liveness is unconditional (`/health` always 200). Readiness is honest: the
-/// DB pool must be reachable and the optional Redis cache present before the
-/// gateway advertises itself ready for traffic that depends on those backends.
-/// In DB-free (degraded) mode this returns 503 with `db: false`, which is the
-/// accurate state rather than a fabricated readiness.
-async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
+/// Dependency-checked health/readiness. The DB pool must be reachable before
+/// the gateway advertises itself ready; Redis is an optional accelerator and
+/// does not gate readiness. In DB-free (degraded) mode this returns 503 with
+/// `db: false`, which is the accurate state rather than a fabricated readiness.
+async fn check_health(state: &AppState) -> (StatusCode, Json<ReadinessResponse>) {
     let db_ready = state.db.healthy().await;
     // Redis is an optional accelerator; presence at startup is what we can
-    // report without adding operational complexity, and it never affects
-    // readiness beyond reflecting whether it is configured.
+    // report without adding operational complexity.
     let redis_configured = state.redis_cache.is_some();
-    let ready = db_ready && redis_configured;
+    let ready = db_ready;
     let status_code = if ready {
         StatusCode::OK
     } else {
@@ -310,6 +315,14 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
             redis: redis_configured,
         }),
     )
+}
+
+async fn health(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
+    check_health(&state).await
+}
+
+async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
+    check_health(&state).await
 }
 
 async fn status(State(state): State<AppState>) -> Result<Json<StatusResponse>, GatewayError> {
@@ -2013,10 +2026,12 @@ mod tests {
         let base = format!("http://{addr}");
         let client = reqwest::Client::new();
 
-        // Poll until the server is accepting connections.
+        // Poll `/livez` (process liveness) until the server is accepting
+        // connections; `/health` is dependency-checked and must not be 200
+        // while the DB backend is down.
         let mut got_health = None;
         for _ in 0..100 {
-            if let Ok(r) = client.get(format!("{base}/health")).send().await {
+            if let Ok(r) = client.get(format!("{base}/livez")).send().await {
                 if r.status().is_success() {
                     got_health = Some(r.status().as_u16());
                     break;
@@ -2024,7 +2039,18 @@ mod tests {
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
         }
-        assert_eq!(got_health, Some(200), "server should answer /health");
+        assert_eq!(got_health, Some(200), "server should answer /livez");
+
+        // `/health` must honestly report the DB backend is down in degraded
+        // mode (503 + db:false) rather than fabricate readiness.
+        let health = client
+            .get(format!("{base}/health"))
+            .send()
+            .await
+            .expect("health request");
+        assert_eq!(health.status().as_u16(), 503);
+        let health_body: Value = health.json().await.expect("health json");
+        assert_eq!(health_body["db"], json!(false));
 
         // /readyz must honestly report the DB backend is down in degraded
         // mode (503 + db:false) rather than fabricate readiness.

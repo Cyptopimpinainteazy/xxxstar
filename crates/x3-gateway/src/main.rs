@@ -8,10 +8,10 @@
 //! Production wiring: provide `X3_GATEWAY_DATABASE_URL` (or `DATABASE_URL`)
 //! so the gateway boots fully connected (schema/migrations applied on
 //! connect). Without a database DSN the server still starts in a documented
-//! degraded mode — liveness and DB-free endpoints serve, `/readyz` and the
-//! GraphQL `dbReachable` field report the backend is down, and DB-backed
-//! endpoints return 500 — so operators can run the API edge while the
-//! indexer/DB is being provisioned. See `x3_gateway::config` for the full
+//! degraded mode — `/livez` serves process liveness, `/health`, `/readyz`,
+//! and the GraphQL `dbReachable` field report the backend is down, and
+//! DB-backed endpoints return 500 — so operators can run the API edge while
+//! the indexer/DB is being provisioned. See `x3_gateway::config` for the full
 //! list of environment keys.
 
 use std::sync::Arc;
@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
         None => {
             tracing::warn!(
                 "no database configured; running in degraded DB-free mode \
-                 (readiness down, DB-backed endpoints return 500)"
+                 (/livez up, /health and /readyz down, DB-backed endpoints return 500)"
             );
             Database::connect_lazy(&DatabaseConfig::new(DEGRADED_DB_URL.to_string()))?
         }
