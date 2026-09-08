@@ -27,6 +27,7 @@ x3-rpc = { path = "../crates/x3-rpc" }
 x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
 atomic-swap-orchestrator = { path = "../crates/atomic-swap-orchestrator" }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge" }
+x3-vm = { path = "../crates/x3-vm" }
 pallet-x3-settlement-engine = { path = "../pallets/x3-settlement-engine", default-features = false, features = ["std"] }
 pallet-x3-cross-vm-router = { path = "../pallets/x3-cross-vm-router", default-features = false, features = ["std"] }
 pallet-agent-memory = { path = "../pallets/agent-memory", default-features = false, features = ["std"] }
@@ -146,4 +147,3 @@ try-runtime = [
 
 [dev-dependencies]
 criterion = "0.5"
-x3-vm = { path = "../crates/x3-vm" }

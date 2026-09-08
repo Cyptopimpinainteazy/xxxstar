@@ -118,6 +118,13 @@ pub enum AtomicLegExecution {
         selector: [u8; 4],
         payload: Vec<u8>,
     },
+    /// Canonical-ledger transfer within an internal execution domain.
+    Transfer {
+        vm: KernelVmType,
+        from: Vec<u8>,
+        to: Vec<u8>,
+        amount: u128,
+    },
 }
 
 /// Canonical node-side request: the on-chain kernel accounting legs AND the

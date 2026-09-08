@@ -498,6 +498,41 @@ fn parse_executions(value: &serde_json::Value) -> Result<Vec<AtomicLegExecution>
                         payload,
                     })
                 }
+                "transfer" => {
+                    let vm = match execution
+                        .get("vm")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                    {
+                        "evm" => KernelVmType::Evm,
+                        "svm" => KernelVmType::Svm,
+                        "x3" => KernelVmType::X3,
+                        other => {
+                            return Err(custom_error(format!("Invalid transfer vm: {other}")));
+                        }
+                    };
+                    let from = decode_hex_bytes(
+                        execution
+                            .get("from")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing transfer from"))?,
+                        "from",
+                    )?;
+                    let to = decode_hex_bytes(
+                        execution
+                            .get("to")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| custom_error("Missing transfer to"))?,
+                        "to",
+                    )?;
+                    let amount = parse_u128_value(execution.get("amount"), "amount")?;
+                    Ok(AtomicLegExecution::Transfer {
+                        vm,
+                        from,
+                        to,
+                        amount,
+                    })
+                }
                 other => Err(custom_error(format!("Invalid execution vm: {other}"))),
             }
         })
