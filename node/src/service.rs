@@ -1055,6 +1055,13 @@ pub fn new_full_with_atomic_gateway<
     // fabricated, non-cryptographic placeholder (see CRITICAL-TX-1). It must never
     // be reachable outside a `--dev`-type chain spec.
     let enable_demo_wallet_rpc = config.chain_spec.chain_type() == ChainType::Development;
+    // The bridge-ingress submission RPC carries a single node-controlled key
+    // and must never be reachable on Live chain specs. It remains available on
+    // Development/Local chains for the internal bridge test path.
+    let enable_bridge_ingress_rpc = matches!(
+        config.chain_spec.chain_type(),
+        ChainType::Development | ChainType::Local
+    );
     let rpc_builder = {
         let client = client.clone();
         let transaction_pool = transaction_pool.clone();
@@ -1070,6 +1077,7 @@ pub fn new_full_with_atomic_gateway<
                     limiter.clone(),
                     subscription_executor,
                     enable_demo_wallet_rpc,
+                    enable_bridge_ingress_rpc,
                     atomic_gateway_tx.clone(),
                 )
                 .map_err(Into::into)
