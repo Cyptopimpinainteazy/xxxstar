@@ -21,7 +21,7 @@
   #text(size: 12pt, style: "italic")[Current-state refresh at `master`]
   #v(1.3cm)
   #table(columns: (auto, auto), stroke: none, inset: 4pt, align: left,
-    [*Commit:*], [`f74ed4f29`],
+    [*Commit:*], [`d082f18de`],
     [*Refresh date:*], [2026-09-08],
     [*Predecessor:*], [2026-09-05 field manual frozen at `6a24d8cf`],
     [*Generator:*], [Typst `X3-CURRENT-STATE-2026-09-08.typ`],
@@ -50,16 +50,17 @@ implemented and tested atomic lifecycle. The most important current facts:
 - GitHub Dependabot critical alerts are 0 after PR #124; remaining alerts are 41 high / 85 medium / 27 low.
 - The atomic-kernel overlay diff/reverter, `x3leg:` receipt path, `x3fin:` finalization, and forced
   rollback control are present and covered by workspace tests.
+- The clean embedded runtime build now works from an empty nested target without `SKIP_WASM_BUILD`:
+  the pinned toolchain adds `wasm32v1-none`, the vendored `sp-wasm-interface` no longer leaks
+  `parity-scale-codec/std`, and `x3-cross-vm-bridge` std-only crypto (`blst`, `ed25519-dalek`) is
+  optional and std-gated. `scripts/ci/check_runtime_wasm_non_stub.sh` passes on the release artifact.
 - Three of the four Critical findings in the 2026-09-06 independent audit are closed in current source:
   fabricated wallet RPC is dev-only, `report_misbehavior`/`slash_bond` require root, and the readiness
   registry now has a real-test consistency check.
+- HIGH-API-1 is closed in source: the gateway `/health` and `/readyz` endpoints run a real DB
+  round-trip and return 503 when it fails, `/livez` preserves process liveness, and the registry no
+  longer cites fabricated `/health/<feature>` paths.
 - The fourth Critical, recoverable secrets in git history, remains open.
-
-One environmental note: the pre-existing nested WASM build failure (`duplicate lang item` in the
-Substrate `wasm32-unknown-unknown` builder) still occurs when `SKIP_WASM_BUILD` is unset. The
-repository's runtime build script now embeds a real cached runtime WASM when `SKIP_WASM_BUILD=1`, which
-let the full test suite and live-node tests execute in this environment. A clean, from-scratch embedded
-WASM compile without that workaround remains a release-gate item.
 
 #pagebreak()
 
@@ -67,10 +68,13 @@ WASM compile without that workaround remains a release-gate item.
 
 #table(columns: (3.4fr, 1fr, 2.8fr), stroke: 0.4pt + rgb("#ccc"), inset: 5pt,
   [*Command / check*], [*Exit*], [*Observed result*],
-  [`git status` / `git log -1`], [0], [`master` clean at `f74ed4f29`],
+  [`git status` / `git log -1`], [0], [`master` clean at `d082f18de`],
   [`cargo check --workspace --locked` with `SKIP_WASM_BUILD=1`], [0], [Workspace compiles; cached runtime WASM embedded],
   [`cargo test --workspace` with `SKIP_WASM_BUILD=1`], [0], [All active suites pass; 3 known manual node tests ignored],
   [`cargo clippy --workspace --all-targets -- -D warnings` with `SKIP_WASM_BUILD=1`], [0], [No workspace warnings as errors],
+  [`cargo build --release -p x3-chain-runtime` with `SKIP_WASM_BUILD` unset and empty nested target], [0], [WASM rebuilt from source with `wasm32v1-none`; real compact/compressed blob emitted],
+  [`bash scripts/ci/check_runtime_wasm_non_stub.sh`], [0], [No stubbed `wasm_binary.rs`; non-trivial WASM artifact present],
+  [`cargo test -p x3-gateway router_serves_real_http_over_ephemeral_port_without_db`], [0], [`/livez` 200; `/health` and `/readyz` 503 with `db:false` against a dead pool],
   [`cargo audit`], [0], [0 blocking; 27 allow-listed warnings],
   [`npm test`], [0], [All configured JS test packages pass],
   [`npm run build`], [0], [All configured JS builds pass],
@@ -106,10 +110,10 @@ open unless a new commit explicitly closes them; none are silently deleted.
   [CRITICAL-TOK-1], [Closed in source], [`scripts/check-readiness-consistency.sh` now verifies `required_tests` against real functions; registry fiction was purged],
   [CRITICAL-CK-1], [Open], [`git log --all` still returns commits for `sepolia-deployer-wallet.txt` and validator seed summaries; history rewrite + rotation remains required],
   [HIGH-TX-2], [Open], [No new quorum/threshold change verified in current source],
-  [HIGH-CN-2], [Open], [Validator set remains root-controlled; no permissionless staking implemented],
+  [HIGH-CN-2], [Closed in source], [`LAUNCH_SCOPE.md` now explicitly lists permissionless validator staking/bonding/nomination as NOT IMPLEMENTED and deferred to M3],
   [HIGH-CK-2], [Open], [Quantum-crypto placeholder is not real Kyber/Dilithium lattice crypto],
   [HIGH-VM-1], [Open], [No new Solana HTLC test coverage verified in this refresh],
-  [HIGH-API-1], [Open], [No current evidence that gateway health and per-feature health paths changed],
+  [HIGH-API-1], [Closed in source], [`/health` and `/readyz` run a real DB round-trip and return 503 when down; `/livez` is liveness; registry `health_endpoint` fiction removed],
   [MEDIUM / LOW / INFO rows], [Open unless code inspection confirms closure], [Carried from the 2026-09-06 register],
 )
 
