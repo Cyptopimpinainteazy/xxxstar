@@ -29,6 +29,7 @@ use x3_bridge_adapters::{
     SubstrateX3VmBridge,
 };
 use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher, CrossVmStatus, VmId};
+use x3_vm::bridge::BalanceProvider;
 use x3_chain_runtime::{Runtime, RuntimeCall, UncheckedExtrinsic};
 
 /// Transaction pool type used by the node atomic gateway service.
@@ -267,42 +268,62 @@ impl AtomicGatewayService {
         execution: &AtomicLegExecution,
         index: u64,
     ) -> Result<StateDiff, String> {
-        let AtomicLegExecution::X3 {
-            caller,
-            selector,
-            payload,
-        } = execution
-        else {
-            return Err(
-                "Path B executes atomic legs through the X3-native overlay bridge; \
-                 only X3 executions are supported"
+        match execution {
+            AtomicLegExecution::X3 {
+                caller,
+                selector,
+                payload,
+            } => {
+                let call = CrossVmCall::new(
+                    VmId::X3Vm,
+                    VmId::X3Vm,
+                    *selector,
+                    payload.clone(),
+                    10_000_000,
+                    index,
+                    10_000,
+                )
+                .map_err(|e| format!("failed to build CrossVmCall: {e:?}"))?;
+
+                let receipt = self
+                    .dispatcher
+                    .execute_x3vm_tx(caller, &call)
+                    .map_err(|e| format!("X3 leg execution failed: {e:?}"))?;
+                if receipt.status != CrossVmStatus::Success {
+                    return Err(format!(
+                        "X3 leg {} reverted: {:?}",
+                        index, receipt.status
+                    ));
+                }
+                let transitions = self.balances.take_overlay_transitions();
+                Ok(overlay_state_diff_for_domain(&transitions, OverlayDomain::X3))
+            }
+            AtomicLegExecution::Transfer {
+                vm,
+                from,
+                to,
+                amount,
+            } => {
+                let domain = match vm {
+                    KernelVmType::Evm => OverlayDomain::Evm,
+                    KernelVmType::Svm => OverlayDomain::Svm,
+                    KernelVmType::X3 => OverlayDomain::X3,
+                    KernelVmType::Cross => {
+                        return Err("cross-domain transfer requires two legs".to_string());
+                    }
+                };
+                self.balances
+                    .transfer(from, to, *amount)
+                    .map_err(|e| format!("canonical-ledger transfer failed: {e}"))?;
+                let transitions = self.balances.take_overlay_transitions();
+                Ok(overlay_state_diff_for_domain(&transitions, domain))
+            }
+            _ => Err(
+                "Path B executes X3 calls and canonical-ledger transfers; arbitrary \
+                 EVM/SVM bytecode is not implemented"
                     .to_string(),
-            );
-        };
-        let call = CrossVmCall::new(
-            VmId::X3Vm,
-            VmId::X3Vm,
-            *selector,
-            payload.clone(),
-            10_000_000,
-            index,
-            10_000,
-        )
-        .map_err(|e| format!("failed to build CrossVmCall: {e:?}"))?;
-
-        let receipt = self
-            .dispatcher
-            .execute_x3vm_tx(caller, &call)
-            .map_err(|e| format!("X3 leg execution failed: {e:?}"))?;
-        if receipt.status != CrossVmStatus::Success {
-            return Err(format!(
-                "X3 leg {} reverted: {:?}",
-                index, receipt.status
-            ));
+            ),
         }
-
-        let transitions = self.balances.take_overlay_transitions();
-        Ok(overlay_state_diff_for_domain(&transitions, OverlayDomain::X3))
     }
 
     async fn record_leg_receipt(
