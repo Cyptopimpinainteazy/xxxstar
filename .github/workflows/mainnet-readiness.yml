@@ -3,9 +3,9 @@ name: mainnet-readiness
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ master ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ master ]
 
 jobs:
   secret-scan:
@@ -111,7 +111,7 @@ jobs:
           done
           cat release_hashes.txt
       - name: Upload release artifacts
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
