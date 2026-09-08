@@ -2,7 +2,7 @@
 name = "quantum-crypto"
 version = "0.1.0"
 edition = "2021"
-description = "Quantum-Resistant Cryptography for X3 Chain - Post-quantum security primitives"
+description = "Research/simulated quantum-crypto plumbing for X3 Chain - NOT audited post-quantum security"
 license = "MIT"
 authors = ["X3 Chain Team"]
 

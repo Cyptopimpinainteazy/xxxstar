@@ -10,42 +10,33 @@
 //!
 //! # Algorithms
 //!
-//! - **SPHINCS+**: Stateless hash-based signatures (NIST PQC finalist)
-//! - **Kyber**: Lattice-based key encapsulation mechanism
-//! - **Dilithium**: Lattice-based digital signatures
-//! - **BLAKE3+**: Extended hash functions for quantum resistance
+//! - **SPHINCS+**: research implementation with standard-conforming sizes
+//! - **Kyber (research/simulated)**: `kyber_research` — deterministic hash
+//!   expansion, NOT the CRYSTALS-Kyber lattice algorithm
+//! - **Dilithium (research/simulated)**: `dilithium_research` — deterministic
+//!   hash expansion, NOT CRYSTALS-Dilithium lattice signatures
+//! - **BLAKE3+**: extended hash functions for quantum resistance
 //!
-//! # Security Levels
+//! # Security status
 //!
-//! | Algorithm | Classical | Post-Quantum |
-//! |-----------|-----------|--------------|
-//! | SPHINCS+  | 256-bit   | 128-bit      |
-//! | Kyber-768 | 192-bit   | 192-bit      |
-//! | Dilithium3| 192-bit   | 192-bit      |
-//!
-//! # Usage
-//!
-//! ```ignore
-//! use quantum_crypto::{sphincs, kyber, dilithium};
-//!
-//! // Generate quantum-resistant keys
-//! let (pk, sk) = sphincs::keygen();
-//!
-//! // Sign a message
-//! let signature = sphincs::sign(&sk, message);
-//!
-//! // Verify signature
-//! assert!(sphincs::verify(&pk, message, &signature));
-//! ```
+//! **This crate is a research/simulated implementation, not production
+//! post-quantum cryptography.** No standard PQC library (`pqcrypto`,
+//! `liboqs`, etc.) is linked here. Byte sizes mimic real parameter sets so
+//! downstream layout experiments are possible, but any use for real security
+//! is forbidden until audited bindings are integrated. The runtime exposes
+//! this crate only behind its `pq` feature, which is disabled by default and
+//! intentionally fails closed in release configuration.
 
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+#[path = "dilithium.rs"]
+pub mod dilithium_research;
 pub mod blake3ext;
-pub mod dilithium;
 pub mod error;
 pub mod hash;
-pub mod kyber;
+#[path = "kyber.rs"]
+pub mod kyber_research;
 pub mod sphincs;
 pub mod types;
 
@@ -90,10 +81,10 @@ impl SecurityLevel {
 pub struct QuantumKeypair {
     /// SPHINCS+ keypair for signatures
     pub sphincs: sphincs::SphincsKeypair,
-    /// Kyber keypair for key encapsulation
-    pub kyber: kyber::KyberKeypair,
-    /// Dilithium keypair for fast signatures
-    pub dilithium: dilithium::DilithiumKeypair,
+    /// Research/simulated Kyber-shaped keypair for key encapsulation
+    pub kyber_research: kyber_research::KyberKeypair,
+    /// Research/simulated Dilithium-shaped keypair for signatures
+    pub dilithium_research: dilithium_research::DilithiumKeypair,
 }
 
 impl QuantumKeypair {
@@ -101,8 +92,8 @@ impl QuantumKeypair {
     pub fn generate(level: SecurityLevel) -> Self {
         Self {
             sphincs: sphincs::SphincsKeypair::generate(level),
-            kyber: kyber::KyberKeypair::generate(level),
-            dilithium: dilithium::DilithiumKeypair::generate(level),
+            kyber_research: kyber_research::KyberKeypair::generate(level),
+            dilithium_research: dilithium_research::DilithiumKeypair::generate(level),
         }
     }
 
@@ -111,25 +102,25 @@ impl QuantumKeypair {
         self.sphincs.sign(message)
     }
 
-    /// Sign a message using Dilithium (faster, smaller signatures)
-    pub fn sign_dilithium(&self, message: &[u8]) -> dilithium::DilithiumSignature {
-        self.dilithium.sign(message)
+    /// Sign a message using the simulated Dilithium-shaped research keypair
+    pub fn sign_dilithium_research(&self, message: &[u8]) -> dilithium_research::DilithiumSignature {
+        self.dilithium_research.sign(message)
     }
 
-    /// Encapsulate a shared secret using Kyber
+    /// Encapsulate a shared secret using the simulated Kyber-shaped research keypair
     pub fn encapsulate(
         &self,
-        recipient_pk: &kyber::KyberPublicKey,
-    ) -> (kyber::KyberCiphertext, kyber::SharedSecret) {
-        kyber::encapsulate(recipient_pk)
+        recipient_pk: &kyber_research::KyberPublicKey,
+    ) -> (kyber_research::KyberCiphertext, kyber_research::SharedSecret) {
+        kyber_research::encapsulate(recipient_pk)
     }
 
     /// Decapsulate a shared secret using Kyber
     pub fn decapsulate(
         &self,
-        ciphertext: &kyber::KyberCiphertext,
-    ) -> QuantumResult<kyber::SharedSecret> {
-        self.kyber.decapsulate(ciphertext)
+        ciphertext: &kyber_research::KyberCiphertext,
+    ) -> QuantumResult<kyber_research::SharedSecret> {
+        self.kyber_research.decapsulate(ciphertext)
     }
 }
 

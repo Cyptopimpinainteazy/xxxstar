@@ -1,7 +1,9 @@
-//! Kyber Key Encapsulation Mechanism
+//! Research/simulated Kyber-shaped Key Encapsulation Mechanism.
 //!
-//! Kyber is a lattice-based key encapsulation mechanism (KEM) that is a NIST PQC winner.
-//! It provides efficient key exchange with post-quantum security.
+//! This module does NOT implement the CRYSTALS-Kyber lattice KEM. It expands
+//! deterministic hashes into the same byte sizes as Kyber so downstream code
+//! can exercise layout/plumbing. It must never be used for real post-quantum
+//! security until audited bindings are integrated.
 
 use crate::{QuantumError, QuantumResult, SecurityLevel};
 use rand::{thread_rng, Rng};
