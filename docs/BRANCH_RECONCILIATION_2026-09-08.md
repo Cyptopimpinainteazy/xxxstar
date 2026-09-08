@@ -70,3 +70,19 @@ Stop a port or merge if it:
 - reintroduces mocks, no-op validation, placeholder proofs, hardcoded keys, or unsupported completion claims;
 - cannot pass the active critical-path checks;
 - changes consensus, supply, bridge, or signing behavior without focused tests and rollback notes.
+
+## Recovery decisions recorded on 2026-09-08
+
+| Source branch or group | Decision | Evidence |
+|---|---|---|
+| `main` | Archived, do not merge | Preserved at `archive/main-pre-reconciliation-20260908` pointing to `5d9deab1138f0f40fd16f74bf8ea8d1c17955a85` |
+| `docs/x3-deployment-runbook` | Selective port | Deployment runbook and missing PR supervisor moved to fresh `ci/master-lineage-gates-20260908`; old toolchain and vendoring changes rejected |
+| `design/x3-funding-os-2026-09-03` | Do not port | 1,643 lines of internal design/planning material; no implementation evidence and poor grant-facing signal |
+| T5/PoH branches | Superseded | `master` contains `PoHVerifyBlockImport`, shadow-mode tests, and current node wiring |
+| Sidecar recovery branches | Superseded; no bulk port | `master` contains fail-closed signing, 32-slot confirmation logic, runtime metadata refresh, submission tests, and current operator code |
+| `fix/x3-lang-production-gate` | Superseded | `master` contains the combined X3 language/VM/EVM/SVM readiness workflow |
+| Git-corruption salvage branches | Preserve only through old-main archive | Broad snapshots and generated state are unsuitable for selective merge |
+| Old Dependabot branches based on `main` | Reject | Dependency state on active `master` has moved through later security and dependency commits |
+| Branches fully contained in `master` | Delete candidates | No unique commits relative to `master` |
+
+No unresolved code branch is approved for deletion until its tip SHA and disposition are present in this record.
