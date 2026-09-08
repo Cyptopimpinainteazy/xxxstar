@@ -1,7 +1,7 @@
 # Canonical Readiness
 
-**Generated from:** `FEATURE_REGISTRY.toml`  
-**Reviewed:** 2026-09-08  
+**Generated from:** `FEATURE_REGISTRY.toml`
+**Reviewed:** 2026-09-08
 **Average:** 51.07% across 15 implemented features
 
 This page is a readable snapshot. `FEATURE_REGISTRY.toml` remains authoritative. If a row differs from the registry, use the registry and correct this page.
