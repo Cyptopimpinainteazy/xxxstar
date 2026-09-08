@@ -15,7 +15,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("X3HtLc111111111111111111111111111111111111111");
+declare_id!("X3HTLC1111111111111111111111111111111111111");
 
 /// Maximum timelock duration (7 days in seconds)
 pub const MAX_TIMELOCK: i64 = 7 * 24 * 60 * 60;
@@ -57,14 +57,7 @@ pub mod x3_htlc {
         let current_time = clock.unix_timestamp;
 
         // Validate timelock
-        require!(
-            timelock > current_time + MIN_TIMELOCK,
-            HtlcError::TimelockTooShort
-        );
-        require!(
-            timelock < current_time + MAX_TIMELOCK,
-            HtlcError::TimelockTooLong
-        );
+        validate_htlc_timelock(timelock, current_time)?;
         require!(amount > 0, HtlcError::InvalidAmount);
 
         // Initialize HTLC state
@@ -116,9 +109,8 @@ pub mod x3_htlc {
         require!(htlc.status == HtlcStatus::Funded, HtlcError::HtlcNotClaimable);
 
         // Verify preimage matches hashlock (SHA256)
-        let computed_hash = anchor_lang::solana_program::hash::hash(&preimage);
         require!(
-            computed_hash.to_bytes() == htlc.hashlock,
+            hashlock_matches(&preimage, &htlc.hashlock),
             HtlcError::InvalidPreimage
         );
 
@@ -207,9 +199,7 @@ pub mod x3_htlc {
         let htlc = &ctx.accounts.htlc;
         let clock = Clock::get()?;
 
-        let effective_status = if htlc.status == HtlcStatus::Funded 
-            && clock.unix_timestamp >= htlc.timelock 
-        {
+        let effective_status = if htlc_is_expired(htlc.status, htlc.timelock, clock.unix_timestamp) {
             HtlcStatus::Expired
         } else {
             htlc.status
@@ -439,4 +429,108 @@ pub enum HtlcError {
     NotRecipient,
     #[msg("Only the initiator can refund")]
     NotInitiator,
+}
+
+/// Validate that a proposed timelock is inside the supported window relative
+/// to the current chain time.
+pub fn validate_htlc_timelock(timelock: i64, current_time: i64) -> Result<()> {
+    require!(
+        timelock > current_time + MIN_TIMELOCK,
+        HtlcError::TimelockTooShort
+    );
+    require!(
+        timelock < current_time + MAX_TIMELOCK,
+        HtlcError::TimelockTooLong
+    );
+    Ok(())
+}
+
+/// Verify that the supplied preimage SHA-256 hashes to the recorded hashlock.
+pub fn hashlock_matches(preimage: &[u8], hashlock: &[u8; 32]) -> bool {
+    anchor_lang::solana_program::hash::hash(preimage).to_bytes() == *hashlock
+}
+
+/// A funded HTLC is expired once the chain clock has passed its timelock.
+pub fn htlc_is_expired(status: HtlcStatus, timelock: i64, current_time: i64) -> bool {
+    status == HtlcStatus::Funded && current_time >= timelock
+}
+
+/// Deterministic program-derived address for an HTLC escrow account.
+pub fn derive_htlc_pda(
+    program_id: &Pubkey,
+    initiator: &Pubkey,
+    recipient: &Pubkey,
+    hashlock: &[u8; 32],
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"htlc", initiator.as_ref(), recipient.as_ref(), hashlock],
+        program_id,
+    )
+}
+
+/// Deterministic program-derived address for an HTLC's token vault.
+pub fn derive_htlc_vault_pda(program_id: &Pubkey, htlc: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"htlc_vault", htlc.as_ref()], program_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NOW: i64 = 1_700_000_000;
+
+    #[test]
+    fn timelock_must_be_more_than_one_hour_out() {
+        assert!(validate_htlc_timelock(NOW + MIN_TIMELOCK, NOW).is_err());
+        assert!(validate_htlc_timelock(NOW + MIN_TIMELOCK + 1, NOW).is_ok());
+    }
+
+    #[test]
+    fn timelock_cannot_exceed_seven_days() {
+        assert!(validate_htlc_timelock(NOW + MAX_TIMELOCK, NOW).is_err());
+        assert!(validate_htlc_timelock(NOW + MAX_TIMELOCK - 1, NOW).is_ok());
+    }
+
+    #[test]
+    fn preimage_hash_matches_recorded_hashlock() {
+        let preimage = b"x3-htlc-preimage";
+        let hashlock = anchor_lang::solana_program::hash::hash(preimage).to_bytes();
+        assert!(hashlock_matches(preimage, &hashlock));
+        assert!(!hashlock_matches(b"wrong-preimage", &hashlock));
+    }
+
+    #[test]
+    fn funded_htlc_expires_after_timelock() {
+        assert!(htlc_is_expired(HtlcStatus::Funded, NOW + 1, NOW + 1));
+        assert!(!htlc_is_expired(HtlcStatus::Funded, NOW + 2, NOW + 1));
+        assert!(!htlc_is_expired(HtlcStatus::Claimed, NOW, NOW + 100));
+        assert!(!htlc_is_expired(HtlcStatus::Refunded, NOW, NOW + 100));
+    }
+
+    #[test]
+    fn htlc_pda_is_deterministic_and_distinct() {
+        let initiator = Pubkey::new_from_array([1u8; 32]);
+        let recipient = Pubkey::new_from_array([2u8; 32]);
+        let hashlock = [3u8; 32];
+        let (pda1, bump1) = derive_htlc_pda(&id(), &initiator, &recipient, &hashlock);
+        let (pda2, bump2) = derive_htlc_pda(&id(), &initiator, &recipient, &hashlock);
+        assert_eq!(pda1, pda2);
+        assert_eq!(bump1, bump2);
+        assert_ne!(pda1, Pubkey::default());
+
+        let (other_pda, _) = derive_htlc_pda(&id(), &recipient, &initiator, &hashlock);
+        assert_ne!(pda1, other_pda);
+    }
+
+    #[test]
+    fn htlc_vault_pda_derives_from_escrow_account() {
+        let initiator = Pubkey::new_from_array([4u8; 32]);
+        let recipient = Pubkey::new_from_array([5u8; 32]);
+        let (htlc_pda, _) = derive_htlc_pda(&id(), &initiator, &recipient, &[6u8; 32]);
+        let (vault1, bump1) = derive_htlc_vault_pda(&id(), &htlc_pda);
+        let (vault2, bump2) = derive_htlc_vault_pda(&id(), &htlc_pda);
+        assert_eq!(vault1, vault2);
+        assert_eq!(bump1, bump2);
+        assert_ne!(vault1, htlc_pda);
+    }
 }
