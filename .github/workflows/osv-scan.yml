@@ -2,9 +2,9 @@ name: OSV-Scan
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "master", "develop" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "master" ]
   schedule:
     - cron: '0 7 * * 1'  # Weekly on Monday at 7 AM UTC
 
