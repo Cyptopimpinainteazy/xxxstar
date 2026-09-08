@@ -1,7 +1,7 @@
 # Final Verification Record
 
-**Status:** Incomplete  
-**Current release decision:** Blocked  
+**Status:** Incomplete
+**Current release decision:** Blocked
 **Canonical readiness source:** `FEATURE_REGISTRY.toml`
 
 This file is a release-evidence template. It is not proof that the repository is finished, secure, or deployable. Complete every field against one commit and attach the command output before changing the release decision.
