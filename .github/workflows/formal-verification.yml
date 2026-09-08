@@ -1,13 +1,13 @@
 name: Formal Verification Gate
 on:
-   pull_request:
-     branches: [master, develop]
-     paths:
-       - 'pallets/**'
-       - 'runtime/**'
-       - 'x3-vm/**'
-       - 'formal-proofs/**'
-       - 'proof-forge/src/runners/formal_proofs.rs'
+  pull_request:
+    branches: [master, develop]
+    paths:
+      - 'pallets/**'
+      - 'runtime/**'
+      - 'x3-vm/**'
+      - 'formal-proofs/**'
+      - 'proof-forge/src/runners/formal_proofs.rs'
   push:
     branches: [master]
   workflow_dispatch:
