@@ -304,7 +304,7 @@ Before scoring, scan the touched files for TODO/FIXME/unimplemented!/todo!/panic
 
 **X3** is a multi-VM blockchain built on `polkadot-sdk` (branch `stable2512`, rev `948fbd2`).
 
-- **Language:** Rust 1.90.0 (`rust-toolchain.toml`). Target: `wasm32-unknown-unknown` for runtime, `x86_64-unknown-linux-gnu` for node.
+- **Language:** Rust 1.90.0 (`rust-toolchain.toml`). Targets: `wasm32v1-none` and `wasm32-unknown-unknown` for runtime, `x86_64-unknown-linux-gnu` for node.
 - **Execution environments:**
   - `X3Native` — Substrate/FRAME pallets (Rust, no_std)
   - `X3Evm` — Frontier EVM (`pallet-evm`), Solidity contracts via Hardhat + Foundry

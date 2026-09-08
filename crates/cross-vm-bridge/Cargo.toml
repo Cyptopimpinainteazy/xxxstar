@@ -21,10 +21,10 @@ blake3 = { version = "1.5", default-features = false }
 log = { version = "0.4", default-features = false }
 
 # For BLS signature verification
-blst = { version = "0.3", default-features = false }
+blst = { version = "0.3", default-features = false, optional = true }
 
 # For ed25519 signature verification
-ed25519-dalek = { version = "2", default-features = false }
+ed25519-dalek = { version = "2", default-features = false, optional = true }
 
 # For LiveNodeDispatcher (std-only)
 jsonrpsee = { version = "0.22", features = ["http-client"], optional = true }
@@ -35,6 +35,8 @@ serde_json = { version = "1", default-features = false, features = ["alloc"], op
 [features]
 default = ["std"]
 std = [
+    "dep:blst",
+    "dep:ed25519-dalek",
     "frame-support/std",
     "frame-system/std",
     "parity-scale-codec/std",
