@@ -1,0 +1,19 @@
+{
+  "generated_at_utc": "2026-09-08T18:33:13Z",
+  "repository_commit_sha": "790263b0c0a28be2f08369e6d2abcde6072b972f",
+  "note": "Authenticates the refreshed current-state PDF and its Typst source only. Historical package files retain the original package manifest.",
+  "files": [
+    {
+      "path": "X3-CURRENT-STATE-2026-09-08.typ",
+      "purpose": "Maintainable Typst source for the refreshed current-state PDF",
+      "bytes": 10057,
+      "sha256": "15e1a3ac7395b4eb0c2c4bb7132e5def977f56dde7cba823b33e60672d5ccedf"
+    },
+    {
+      "path": "X3-ROAD-TO-MAINNET.pdf",
+      "purpose": "Current-state refresh booklet at master f74ed4f29 (7 pages)",
+      "bytes": 68233,
+      "sha256": "9237729f53606da5216531d3b4b1fd18b981c2160a050b6ede02287132a731e6"
+    }
+  ]
+}
