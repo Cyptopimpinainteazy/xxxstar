@@ -508,6 +508,10 @@ substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint"
 frame-support-procedural = { path = "patches/frame-support-procedural" }
 # X3 patch: disable WASM build for test runtime to avoid git checkout issues
 frame-storage-access-test-runtime = { path = "patches/frame-storage-access-test-runtime" }
+# X3 patch: move the Wasmtime-backed executor to the patched 36.0.7 line
+# to clear RUSTSEC-2026-0095 and RUSTSEC-2026-0096.
+sc-executor-wasmtime = { path = "patches/sc-executor-wasmtime" }
+sp-wasm-interface = { path = "patches/sp-wasm-interface" }
 # sc-network* patches removed for RC1: the patched tree is a snapshot of an older
 # polkadot-sdk era (monolithic libp2p 0.51) and is structurally incompatible with
 # stable2512's dual libp2p/litep2p backend. Using upstream sc-network directly.
