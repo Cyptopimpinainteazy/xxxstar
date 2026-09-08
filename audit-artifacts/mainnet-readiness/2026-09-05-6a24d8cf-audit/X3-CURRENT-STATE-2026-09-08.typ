@@ -69,6 +69,8 @@ implemented and tested atomic lifecycle. The most important current facts:
 - HIGH-VM-1 is closed in source: `x3_htlc` is added to the SVM workspace with six HTLC-specific
   unit tests (plus Anchor's `test_id`) covering timelock bounds, preimage hashlock checks,
   expiry, and PDA derivation.
+- A fresh four-validator reserved full-mesh drill converged to one finalized chain on cold start
+  and survived loss of each individual validator with the remaining three finalizing one chain.
 - The fourth Critical, recoverable secrets in git history, remains open.
 
 #pagebreak()
@@ -87,6 +89,8 @@ implemented and tested atomic lifecycle. The most important current facts:
   [`cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc`], [0], [7 HTLC tests pass (timelock, hashlock, expiry, PDAs)],
   [`cargo test -p quantum-crypto`], [0], [22 tests pass with renamed research/simulated modules],
   [`cargo test -p x3-chain-node --lib`], [0], [48 pass; 3 ignored; live-node RPC integration included],
+  [`TESTNET_BASE=/tmp/x3-mesh-4 python3 scripts/testnet/run-mesh.py cycles --count 4 --cycles 1`], [0], [Fresh four-validator full mesh converged in 14s with one finalized head],
+  [`TESTNET_BASE=/tmp/x3-mesh-4 python3 scripts/testnet/run-mesh.py kills --count 4`], [0], [4/4 single-validator losses left 3/3 survivors finalizing one common chain],
   [`cargo audit`], [0], [0 blocking; 27 allow-listed warnings],
   [`npm test`], [0], [All configured JS test packages pass],
   [`npm run build`], [0], [All configured JS builds pass],
