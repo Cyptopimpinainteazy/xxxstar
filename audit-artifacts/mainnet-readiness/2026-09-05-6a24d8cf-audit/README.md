@@ -2,6 +2,18 @@
 
 Read-only audit by **Codex / AI-assisted analysis**, 5 September 2026.
 
+> **Refreshed 2026-09-08.** `X3-ROAD-TO-MAINNET.pdf` at this path is now the
+> current-state refresh for `master` at `f74ed4f29` (regenerated at
+> `790263b0c`). The original 127-page field manual content remains represented
+> by the historical `report-source.json`, `source.md`, and evidence files below;
+> it is no longer the current PDF. The refresh source is
+> `X3-CURRENT-STATE-2026-09-08.typ`, with
+> `current-refresh.manifest.json` and `current-refresh.checksums.sha256`
+> authenticating the refreshed PDF/source pair. Original package-level
+> `manifest.json`/`manifest.sha256` describe the pre-refresh historical
+> artifact and should be regenerated separately if the full package is
+> re-baselined.
+
 **Public testnet: NO-GO. Mainnet: NO-GO. Evidence readiness: 20/100.**
 The 127-page manual records 29 findings: 3 Critical, 18 High, 7 Medium and 1 Low. Its 64 scoped capabilities comprise 2 VERIFIED, 18 IMPLEMENTED BUT UNVERIFIED, 29 PARTIAL, 3 BLOCKED, 4 DISCONNECTED, 5 PLACEHOLDER and 3 MISSING. This is an evidence score, not percent code written or a formal independent security certification.
 
