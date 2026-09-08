@@ -1,27 +1,36 @@
 # Release Gates
 
-**Canonical source: `FEATURE_REGISTRY.toml`** — all readiness scores and blockers derive from it. Run `scripts/check-readiness-consistency.sh` to validate.
+**Canonical source:** `FEATURE_REGISTRY.toml`  
+**Reviewed:** 2026-09-08  
+**Current readiness:** 51% average across 15 implemented registry entries  
+**Release decision:** Blocked
 
-**Overall readiness: ~36%** (average across 23 features). A mainnet-ready claim is forbidden unless every feature scores ≥95%.
+Readiness scores measure implementation, integration, tests, CI enforcement, security controls, and operational evidence. They do not measure lines of code.
 
 ## Gate commands
 
-- `make guard` — agent/stub/test-cheat guards
-- `make test` — focused Python + Rust compiler tests
-- `make audit` — invariant guard + mainnet release gate
-- `make mainnet-check` — mainnet release gate
-- `make fresh-machine-check` — bootstrap validation on fresh machine
+- `make guard`
+- `make test`
+- `make audit`
+- `make mainnet-check`
+- `make fresh-machine-check`
 
-## Mainnet release gate (`make mainnet-check` → `scripts/mainnet_release_gate.py`)
+A command counts only when its complete output is tied to the exact reviewed commit.
 
-Exit 0 = PASS. Exit 1 = FAIL — do NOT cut a release.
+## Current enforcement status
 
-Validates: documentation existence, build, chain-spec, critical test suites, reproducible builds, secret hygiene.
+The repository contains workflows for build, lint, tests, security scanning, provenance, and release checks. On 2026-09-08, GitHub refused to start jobs because the account was locked due to a billing issue. Configured workflows are not passing evidence while that condition remains.
 
-## CI enforcement
+Draft PR #126 retargets workflow triggers from the disconnected `main` lineage to the active `master` lineage. It must not merge until GitHub Actions can run and the required jobs pass.
 
-Enforced in `.github/workflows/mainnet-readiness.yml` on every push/PR to main.
+## Mainnet claim rule
 
-## Mainnet-ready claims
+Do not call X3 mainnet-ready or production-ready unless all of the following are true:
 
-Forbidden unless all gates pass AND `FEATURE_REGISTRY.toml` scores ≥95% for every feature. Currently: ~36%.
+1. every required gate passes on the exact release commit;
+2. every critical registry feature meets its approved threshold;
+3. external audits and public staging criteria in `LAUNCH_SCOPE.md` are complete;
+4. branch protection for `master` is verified and enforced;
+5. external bridge paths have production quorum, finalized-root validation, key custody, and recovery evidence.
+
+None of those conditions may be replaced by an old report, generated checklist, or expected command output.
