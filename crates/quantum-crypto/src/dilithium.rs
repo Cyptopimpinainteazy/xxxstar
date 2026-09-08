@@ -1,6 +1,9 @@
-//! Dilithium Digital Signatures
+//! Research/simulated Dilithium-shaped Digital Signatures.
 //!
-//! Dilithium is a lattice-based digital signature scheme that is a NIST PQC winner.
+//! This module does NOT implement CRYSTALS-Dilithium lattice signatures. It
+//! expands deterministic hashes into the same byte sizes as Dilithium so
+//! downstream code can exercise layout/plumbing. It must never be used for
+//! real post-quantum security until audited bindings are integrated.
 //! It provides fast signing and verification with post-quantum security.
 #![allow(clippy::needless_borrows_for_generic_args)]
 
