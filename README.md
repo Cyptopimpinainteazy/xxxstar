@@ -7,7 +7,7 @@ A Substrate-based blockchain with native cross-VM execution across X3Native, X3E
 > **Failure/TODO ledger:** See [`docs/current/FAILURES_AND_TODOS.md`](./docs/current/FAILURES_AND_TODOS.md).
 > ⚠️ **IMPORTANT:** See [LAUNCH_SCOPE.md](./LAUNCH_SCOPE.md) for the **single authoritative** scope statement. This supersedes all other status documents.
 > See [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) for the detailed subsystem scoreboard.
-> 
+>
 > > **x3-lang status:** The X3 language (`x3-lang/`) is in **MVP status** — the Python/pipeline track under `x3-lang/` is the **current authoritative implementation**. The Rust compiler work in `crates/x3-compiler` is experimental and not production-ready.
 
 ---
