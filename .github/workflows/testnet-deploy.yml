@@ -15,7 +15,7 @@
 #   Settings → Environments → testnet
 #     - Required reviewers: at least 1
 #     - Wait timer: 0 minutes (reviewer approval gates deployment)
-#     - Deployment branches: main
+#     - Deployment branches: master
 #     - Secrets: SEPOLIA_RPC_URL, ETHERSCAN_API_KEY (if bridge-enabled)
 # ─────────────────────────────────────────────────────────────────────────────
 
