@@ -1,8 +1,8 @@
 # X3 Atomic Star — Launch Scope (Authoritative)
 
-**Version:** 1.1  
-**Date:** 2026-06-10  
-**Status:** v0.4 Internal Testnet Candidate  
+**Version:** 1.1
+**Date:** 2026-06-10
+**Status:** v0.4 Internal Testnet Candidate
 **Supersedes:** README.md status claims, CURRENT_MAINNET_STATUS.md, MAINNET_RC1_SCOPE.md
 
 ---
