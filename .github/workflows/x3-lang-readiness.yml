@@ -14,7 +14,7 @@ on:
       - "x3-lang/**"
       - ".github/workflows/x3-lang-readiness.yml"
   push:
-    branches: [main, master]
+    branches: [master]
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
