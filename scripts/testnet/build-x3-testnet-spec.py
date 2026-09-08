@@ -61,14 +61,14 @@ counf = os.path.join(outdir, "council.json")
 treaf = os.path.join(outdir, "treasury.json")
 json.dump(aut, open(authf, "w"))
 json.dump(endowed, open(endf, "w"))
-json.dump(endowed[: max(1, COUNT // 3)], open(counf, "w"))
-json.dump(endowed[: max(1, COUNT // 3)], open(treaf, "w"))
+json.dump(endowed[: max(2, COUNT // 3)], open(counf, "w"))
+json.dump(endowed[: max(2, COUNT // 3)], open(treaf, "w"))
 
 env = dict(os.environ)
 env["X3_TESTNET_AUTHORITIES"] = json.dumps(aut)
 env["X3_TESTNET_ENDOWED_ACCOUNTS"] = json.dumps(endowed)
-env["X3_TESTNET_COUNCIL_MEMBERS"] = json.dumps(endowed[: max(1, COUNT // 3)])
-env["X3_TESTNET_TREASURY_SIGNERS"] = json.dumps(endowed[: max(1, COUNT // 3)])
+env["X3_TESTNET_COUNCIL_MEMBERS"] = json.dumps(endowed[: max(2, COUNT // 3)])
+env["X3_TESTNET_TREASURY_SIGNERS"] = json.dumps(endowed[: max(2, COUNT // 3)])
 env["X3_EVM_ESCROW_ADDR"] = "0x" + "11" * 20
 env["X3_SVM_ESCROW_ADDR"] = "0x" + "22" * 32
 cmd = [NODE, "build-spec", "--chain=testnet", "--disable-log-color"]
