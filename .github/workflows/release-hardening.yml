@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # release-hardening.yml — CodeQL + Semgrep + SBOM + attestation hardening
 #
-# Runs on every PR and push to main. Adds semantic analysis gates that
+# Runs on every PR and push to master. Adds semantic analysis gates that
 # complement the existing full-ci.yml (fmt, clippy, tests, audit, deny).
 #
 # Hard rules:
@@ -12,9 +12,9 @@ name: release-hardening
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 env:
