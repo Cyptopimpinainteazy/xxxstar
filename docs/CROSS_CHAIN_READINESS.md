@@ -1,7 +1,7 @@
 # Cross-Chain Readiness
 
-**Reviewed:** 2026-09-08  
-**Source lineage:** `master`  
+**Reviewed:** 2026-09-08
+**Source lineage:** `master`
 **Scope:** internal cross-VM routing and external EVM, SVM, and Bitcoin bridging
 
 ## Bottom line
