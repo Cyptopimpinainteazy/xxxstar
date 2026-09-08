@@ -1,6 +1,6 @@
 # X3 Atomic Star — Mainnet Status
 
-**Updated: 2026-09-05 — Honest ~54% average readiness (15/15 registry entries point at real code). Build compiles clean. Fictional registry rows purged.**
+**Reviewed: 2026-09-08 — 51.07% average readiness across 15 registry entries. Historical build evidence exists, but GitHub Actions is currently blocked by an account billing lock.**
 
 > `FEATURE_REGISTRY.toml` is the single canonical source. All percentages derive from it.
 > Run `scripts/check-readiness-consistency.sh` to validate (now also fails on fictional registry paths).
@@ -25,7 +25,7 @@ Repo Scanner Agent (scripts/swarm)                 ██░░░░░░░�
 Tauri OS (apps/tauri-os)                           █░░░░░░░░░  15%  GUARDED_TESTNET — Dead buttons report, Tauri wiring pending
 ```
 
-**Average readiness: ~51%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05; atomic_kernel corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 — its required_tests were fictional), core consensus features ready for guarded testnet deployment.
+**Average readiness: 51.07%** — 15 features tracked (8 aspirational/fictional rows purged 2026-09-05; atomic_kernel corrected from 85% to 40% on 2026-09-06 per CRITICAL-TOK-1 — its required_tests were fictional), core consensus features ready for guarded testnet deployment.
 
 ### 2026-09-07 Atomic lifecycle live evidence
 
