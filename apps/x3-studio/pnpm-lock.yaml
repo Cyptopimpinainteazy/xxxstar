@@ -82,7 +82,7 @@ importers:
         specifier: '>=6.4.3'
         version: 8.2.2(@types/node@20.19.43)
       vitest:
-        specifier: '>=3.2.6'
+        specifier: ^5.0.0
         version: 5.0.0(@types/node@20.19.43)(vite@8.2.2(@types/node@20.19.43))
 
 packages:
