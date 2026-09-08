@@ -274,9 +274,9 @@ describe('GraphQL Explorer', () => {
     expect(parsed.query).toContain('last: 5');
   });
 
-  it('should handle errors gracefully', () => {
+  it('should handle errors gracefully', async () => {
     const mockFetch = vi.fn().mockRejectedValue(new Error('Network error'));
-    expect(mockFetch()).rejects.toThrow('Network error');
+    await expect(mockFetch()).rejects.toThrow('Network error');
   });
 });
 
