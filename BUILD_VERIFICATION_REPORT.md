@@ -1,149 +1,35 @@
-# X3 Build Verification Report
-**Date**: May 8, 2026  
-**Status**: ✅ READY FOR BUILD
+# Wallet Pallet Verification Record
 
-## Changes Verified
+**Original report date:** 2026-05-08  
+**Reviewed:** 2026-09-08  
+**Current registry score:** 55%  
+**Mode:** `LIVE_TESTNET`
 
-### ✅ Wallet Pallet Integration
-- **File**: `pallets/x3-wallet-pallet/src/lib.rs`
-- **Status**: ✅ Complete and production-ready
-- **Security Fix**: S1-3 minter authorization + checked_add overflow protection
-- **Features**:
-  - Hardware wallet registration (8 storage types)
-  - Multisig wallet creation (with threshold validation)
-  - Token transfers (with balance checks)
-  - Biometric registration (with template/PIN hashing)
-  - Social recovery (with guardian accounts)
-  - Minter authorization (governed operations)
+The earlier version of this file described the wallet pallet as production-ready and assigned it a score of 100. Those claims conflict with the current `FEATURE_REGISTRY.toml` and are withdrawn.
 
-### ✅ Workspace Registration
-- **Issue Found**: `x3-wallet-pallet` was not in Cargo.toml workspace members
-- **Fix Applied**: Added `"pallets/x3-wallet-pallet"` to members list
-- **Impact**: Enables compilation as part of main project
+## Confirmed implementation surface
 
-### ✅ Test Suite
-- **File**: `pallets/x3-wallet-pallet/src/tests.rs`
-- **Coverage**:
-  - ✅ Hardware wallet tests (single & multiple registration)
-  - ✅ Multisig wallet tests (creation & threshold validation)
-  - ✅ Token transfer tests (valid & error conditions)
-  - ✅ Biometric registration tests
-  - ✅ Recovery tests (guardian validation)
-  - ✅ Minting tests (accumulation & authorization)
-  - ✅ Storage query tests
+The repository contains wallet-pallet code for hardware-wallet registration, multisig setup, token balances, biometric records, social recovery, minter authorization, and checked arithmetic. Test modules also exist.
 
-### ✅ Mock Runtime
-- **File**: `pallets/x3-wallet-pallet/src/mock.rs`
-- **Status**: Configured for test execution
+These facts do not establish production readiness. Production readiness requires fresh execution evidence, security review, runtime integration evidence, migration coverage, operational recovery tests, and CI enforcement for the exact commit.
 
-### ✅ Feature Registry
-- **File**: `FEATURE_REGISTRY.toml`
-- **Entry**: `x3_wallet_pallet`
-- **Mode**: `LIVE_TESTNET`
-- **Readiness Score**: 100
-- **Dangerous Paths Protected**:
-  - `minter_authority`
-  - `biometric_templates`
-  - `recovery_logic`
+## Current blockers
 
-## Build Dependencies
-- ✅ All workspace dependencies aligned
-- ✅ No circular dependencies detected
-- ✅ Runtime integration verified (referenced in `runtime/Cargo.toml`)
+- Biometric and recovery paths have not completed independent security review.
+- The active GitHub Actions jobs are blocked by an account billing lock.
+- Fresh wallet-specific build and test output has not been recorded in this file.
+- A `LIVE_TESTNET` registry mode is not a mainnet or production designation.
 
-## S1-3 Security Fix Details
-```rust
-// Before: Allowed ANY signed account to mint tokens
-pub fn mint_tokens(origin, token_id, to, amount) {
-    let who = ensure_signed(origin)?;  // ❌ No auth check
-    let current = TokenBalances::<T>::get((to.clone(), token_id));
-    TokenBalances::<T>::insert((to.clone(), token_id), current + amount);  // ❌ Unchecked
-}
+## Commands required for a new verification record
 
-// After: Only authorized minters can mint
-pub fn mint_tokens(origin, token_id, to, amount) {
-    let who = ensure_signed(origin)?;
-    Self::ensure_minter(&who)?;  // ✅ Authorization check
-    let current = TokenBalances::<T>::get((to.clone(), token_id));
-    let new_balance = current.checked_add(amount)?;  // ✅ Overflow protection
-    TokenBalances::<T>::insert((to.clone(), token_id), new_balance);
-}
-
-// Governance-controlled minter operations (root-only)
-pub fn add_minter(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
-    ensure_root(origin)?;  // ✅ Root authority required
-    Minters::<T>::insert(&who, ());
-    Ok(())
-}
-```
-
-## Build Checklist
-
-- [x] Wallet pallet code complete
-- [x] Workspace registration added
-- [x] Test suite comprehensive
-- [x] Security fixes verified
-- [x] Feature registry updated
-- [x] Runtime integration confirmed
-- [x] Dependencies resolved
-- [x] No unsafe code (uses `#![deny(unsafe_code)]`)
-
-## Next Steps for Build
-
-Run:
 ```bash
-cd /home/lojak/Desktop/X3_ATOMIC_STAR
-cargo build --release --all
-cargo test --package pallet-x3-wallet
-cargo build --features runtime-benchmarks
+cargo check -p pallet-x3-wallet-pallet
+cargo test -p pallet-x3-wallet-pallet
+cargo clippy -p pallet-x3-wallet-pallet --all-targets -- -D warnings
 ```
 
-## Readiness Assessment
+Use the actual package name returned by `cargo metadata` if it differs. Record the commit SHA, command output, test counts, and failures. Do not paste expected output and label it as observed output.
 
-### Test Coverage
-- **Unit Tests**: ✅ 10+ comprehensive test cases
-- **Error Handling**: ✅ InvalidThreshold, InsufficientBalance, Unauthorized
-- **Edge Cases**: ✅ Zero amounts, missing guardians, multiple wallets
+## Decision
 
-### Production Readiness
-- **Security Audit**: ✅ S1-3 fix verified
-- **Overflow Protection**: ✅ checked_add for balance operations
-- **Authorization**: ✅ ensure_minter guard on mint_tokens
-- **Governance**: ✅ ensure_root for minter management
-- **Constants**: ✅ Safe limits (MAX_WALLETS_PER_ACCOUNT: 10, MAX_MULTISIG_SIGNERS: 50, MAX_CONTACTS: 1000)
-
-### Integration Points
-- **Runtime**: ✅ Integrated in `runtime/Cargo.toml`
-- **Feature Registry**: ✅ Registered with score 100
-- **Dangerous Paths**: ✅ Protected and documented
-
-## Expected Build Output
-
-```
-   Compiling pallet-x3-wallet v0.1.0
-    Finished release [optimized] target(s) in X.XXs
-    
-    test register_hardware_wallet_works ... ok
-    test create_multisig_wallet_works ... ok
-    test transfer_tokens_works ... ok
-    test mint_tokens_accumulates ... ok
-    test mint_tokens_authorized_only ... ok
-    [... additional tests pass ...]
-```
-
-## Conclusion
-
-✅ **BUILD READY**
-
-All prerequisites for building `pallet-x3-wallet` with the X3 blockchain project are satisfied:
-1. Source code is complete and secure
-2. Workspace registration is fixed
-3. Test suite is comprehensive
-4. Integration is verified
-5. Security audit (S1-3) is implemented
-
-**Ready to proceed with: `cargo build --release --all`**
-
----
-*Report generated by build verification pipeline*
-*Last commit: feat(wallet-pallet): S1-3 minter authorization + feature inventory + consensus/kernel updates*
+The wallet pallet is implemented testnet code with open assurance work. It is not verified as production-ready.
