@@ -5,12 +5,12 @@
 
 ## Protected Branches
 
-### 1. `main` Branch
+### 1. `master` Branch
 **Purpose:** Production-ready releases only
 
 ```bash
 # Via GitHub CLI:
-gh repo rule create --include-default-rules --branch main \
+gh repo rule create --include-default-rules --branch master \
   --require-code-review-count 2 \
   --require-approvals-from-code-owners \
   --require-status-checks \
@@ -65,7 +65,7 @@ gh repo rule create --include-default-rules --branch "sprint-*" \
 
 1. **Navigate to:** Repository → Settings → Branches
 2. **Add Rule:**
-   - Branch name pattern: `main` / `develop` / `sprint-*`
+   - Branch name pattern: `master` / `develop` / `sprint-*`
    - Check all boxes below:
      - ✅ Require a pull request before merging
      - ✅ Require approvals (count = 2 for main, 1 for develop)
@@ -116,14 +116,14 @@ To bypass these rules temporarily (if needed):
 
 ```bash
 # Via GitHub CLI
-gh repo rule list --branch main
+gh repo rule list --branch master
 gh repo rule list --branch develop
 gh repo rule list --branch "sprint-*"
 ```
 
 Expected output:
 ```
-Branch pattern: main
+Branch pattern: master
   - Requires 2 approvals
   - Requires CODEOWNERS approval
   - Requires status checks
@@ -138,7 +138,7 @@ Branch pattern: main
 
 - [ ] `.github/CODEOWNERS` file created
 - [ ] `.github/workflows/build.yml` configured
-- [ ] Branch protection rules created for `main`
+- [ ] Branch protection rules created for `master`
 - [ ] Branch protection rules created for `develop`
 - [ ] Branch protection rules created for `sprint-*` pattern
 - [ ] All required status checks enabled
