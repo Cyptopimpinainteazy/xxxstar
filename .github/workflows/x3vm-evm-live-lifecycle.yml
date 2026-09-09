@@ -1,0 +1,88 @@
+name: x3vm-evm-live-lifecycle
+
+on:
+  pull_request:
+    paths:
+      - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "X3-contracts/evm/**"
+      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  workflow_dispatch:
+
+jobs:
+  live-x3vm-evm:
+    name: real X3VM to Anvil lock claim lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler clang cmake jq
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: x3vm-evm-live-lifecycle
+
+      - name: Build AtlasHTLC
+        working-directory: X3-contracts/evm
+        run: forge build --contracts contracts/AtlasHTLC.sol
+
+      - name: Start Anvil and deploy AtlasHTLC
+        shell: bash
+        run: |
+          set -euo pipefail
+          anvil --port 18545 --chain-id 1337 --block-time 1 > /tmp/x3-anvil.log 2>&1 &
+          echo $! > /tmp/x3-anvil.pid
+
+          for i in $(seq 1 60); do
+            if cast chain-id --rpc-url http://127.0.0.1:18545 >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.5
+          done
+          cast chain-id --rpc-url http://127.0.0.1:18545 >/dev/null
+
+          mapfile -t KEYS < <(grep -oE '0x[0-9a-fA-F]{64}' /tmp/x3-anvil.log | head -2)
+          test "${#KEYS[@]}" -eq 2
+          LOCKER_KEY="${KEYS[0]}"
+          CLAIMANT_KEY="${KEYS[1]}"
+          echo "::add-mask::$LOCKER_KEY"
+          echo "::add-mask::$CLAIMANT_KEY"
+
+          DEPLOY_OUTPUT=$(cd X3-contracts/evm && forge create \
+            --broadcast \
+            --private-key "$LOCKER_KEY" \
+            --rpc-url http://127.0.0.1:18545 \
+            contracts/AtlasHTLC.sol:AtlasHTLC)
+          CONTRACT=$(printf '%s\n' "$DEPLOY_OUTPUT" | awk '/Deployed to:/ {print $3; exit}')
+          test -n "$CONTRACT"
+
+          echo "X3_TEST_EVM_HTLC=$CONTRACT" >> "$GITHUB_ENV"
+          echo "X3_TEST_EVM_LOCKER_KEY=$LOCKER_KEY" >> "$GITHUB_ENV"
+          echo "X3_TEST_EVM_CLAIMANT_KEY=$CLAIMANT_KEY" >> "$GITHUB_ENV"
+
+      - name: Run live X3VM EVM lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_evm_live \
+            real_x3vm_evm_lock_claim_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Stop Anvil
+        if: always()
+        run: |
+          if [ -f /tmp/x3-anvil.pid ]; then
+            kill "$(cat /tmp/x3-anvil.pid)" 2>/dev/null || true
+          fi
