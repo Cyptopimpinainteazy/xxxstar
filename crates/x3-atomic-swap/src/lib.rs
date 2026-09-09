@@ -91,6 +91,18 @@ pub mod x3vm_live;
 #[cfg(feature = "std")]
 pub use x3vm_live::{LiveX3VmAdapter, X3VmLiveTransport};
 
+#[cfg(feature = "std")]
+mod x3vm_node;
+
+#[cfg(feature = "std")]
+pub mod x3vm_native;
+
+#[cfg(feature = "std")]
+pub use x3vm_native::NativeX3NodeTransport;
+
+#[cfg(feature = "std")]
+pub use x3vm_node::{X3ExtrinsicSigner, X3FinalizedInclusionProof, X3NodeTransportConfig};
+
 pub use adapter::{
     AdapterReadinessScore, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof, LockProof,
     RefundProof, VmFamily, VmType, X3VmAdapter,
