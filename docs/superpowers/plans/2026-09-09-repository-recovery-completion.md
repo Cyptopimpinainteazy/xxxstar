@@ -22,12 +22,12 @@
 
 ---
 
-### Task 1: Stabilize PR #126 CI
+### Task 1: Stabilize replacement PR #128 CI
 
 **Files:**
 - Modify: `.github/workflows/*.yml`
 - Modify only with log evidence: `Cargo.toml`, `Cargo.lock`, `patches/`, `scripts/`, `scripts_infrastructure/`
-- Record evidence: PR #126 conversation
+- Record evidence: PR #128 conversation and closed predecessor PR #126
 
 **Interfaces:**
 - Consumes: workflow run IDs, failed job IDs, and complete GitHub logs
@@ -61,7 +61,7 @@ Expected: local commands exit 0 and the exact PR head has no failed required Git
 
 **Rollback:** Revert only the CI repair commit whose rerun regresses.
 
-### Task 2: Review and squash-merge PR #126
+### Task 2: Review and squash-merge replacement PR #128
 
 **Files:**
 - Review: every file returned by GitHub's PR changed-files API
@@ -71,7 +71,8 @@ Expected: local commands exit 0 and the exact PR head has no failed required Git
 - Consumes: green exact-head suite from Task 1
 - Produces: one squash commit on `master`
 
-- [ ] Confirm PR #126 is based on current `master` and mergeable.
+- [x] Rebuild the reviewed branch on current `master` after its external history rewrite; archive old PR #126 head as `archive/pr126-pre-master-rewrite-20260909`.
+- [ ] Confirm PR #128 is based on current `master` and mergeable.
 - [ ] Run `git diff --check origin/master...HEAD` and parse every workflow YAML file.
 - [ ] Verify active workflows contain no `origin/main`, `refs/heads/main`, `default: main`, or `main` trigger.
 - [ ] Confirm no unrelated runtime or consensus changes.
@@ -170,4 +171,4 @@ Expected: every branch appears exactly once with its tip SHA and disposition.
 - [ ] State every remaining blocker and disabled feature.
 - [ ] Run final Markdown, YAML, Python, npm, and applicable Cargo verification.
 
-**Completion gate:** Recovery is complete only when PRs #126 and #125 are merged, `master` protection is enforced, the final ledger is committed, and every approved deletion is verified.
+**Completion gate:** Recovery is complete only when replacement PR #128 and the recreated grant-readiness PR are merged, `master` protection is enforced, the final ledger is committed, and every approved deletion is verified.
