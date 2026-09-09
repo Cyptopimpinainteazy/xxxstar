@@ -27,6 +27,13 @@ def run(*args: str) -> str:
     return proc.stdout
 
 
+def added_lines(diff: str) -> str:
+    """Return only content introduced by the pull request."""
+    return "\n".join(
+        line[1:] for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++")
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="origin/master")
@@ -42,8 +49,9 @@ def main() -> int:
 
     print(f"PR Supervisor: {len(names)} changed file(s)")
 
+    additions = added_lines(diff)
     for pattern in SECRET_PATTERNS:
-        if pattern.search(diff):
+        if pattern.search(additions):
             print("PR Supervisor: possible credential/private-key material detected in diff", file=sys.stderr)
             return 1
 
