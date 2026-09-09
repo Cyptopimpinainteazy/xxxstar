@@ -54,7 +54,7 @@ jobs:
         run: cargo build --release -p x3-chain-runtime --features std
 
       - name: Install try-runtime CLI
-        run: cargo install --locked try-runtime-cli
+        run: cargo install --git https://github.com/paritytech/try-runtime-cli --tag v0.42.0 --locked
 
       - name: Dry-run runtime upgrade (mock network)
         run: |
