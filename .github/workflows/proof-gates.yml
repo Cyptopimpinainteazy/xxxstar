@@ -23,7 +23,7 @@ on:
           - s0
           - s1
           - testnet
-          - masternet
+          - mainnet
         required: true
         default: 'all'
 
@@ -126,7 +126,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Read logs/artifacts for detailed findings." >> $GITHUB_STEP_SUMMARY
 
-  # S0 SECURITY GATE: Runs on PR and main branch
+  # S0 SECURITY GATE: Runs on PR and master branch
   s0-security-gate:
     name: S0 Security Gate
     runs-on: ubuntu-latest
@@ -175,7 +175,7 @@ jobs:
         run: |
           echo "S0 results file: s0-gate-results.txt" >> $GITHUB_STEP_SUMMARY
 
-  # S1 SECURITY GATE: Runs on PR and main branch
+  # S1 SECURITY GATE: Runs on PR and master branch
   s1-security-gate:
     name: S1 Security Gate
     runs-on: ubuntu-latest
