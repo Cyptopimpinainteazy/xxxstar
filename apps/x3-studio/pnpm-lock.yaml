@@ -73,7 +73,7 @@ importers:
         specifier: ^8.2.0
         version: 8.2.2
       electron:
-        specifier: '>=39.8.9'
+        specifier: '>=39.8.10'
         version: 44.2.0
       typescript:
         specifier: ^5.4.0
