@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,34 @@ class PrSupervisorTests(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(SUPERVISOR), "--base", "origin/master"],
                 cwd=repo,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_changed_cargo_manifest_is_skipped_when_cargo_is_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            git(repo, "init", "-b", "master")
+            git(repo, "config", "user.email", "ci@example.invalid")
+            git(repo, "config", "user.name", "CI Test")
+            manifest = repo / "Cargo.toml"
+            manifest.write_text('[workspace]\\nmembers = []\\n')
+            git(repo, "add", "Cargo.toml")
+            git(repo, "commit", "-m", "baseline")
+            git(repo, "branch", "origin/master")
+            manifest.write_text('[workspace]\\nmembers = []\\nresolver = "2"\\n')
+            git(repo, "add", "Cargo.toml")
+            git(repo, "commit", "-m", "change manifest")
+            env = os.environ.copy()
+            env["PATH"] = "/usr/bin:/bin"
+
+            result = subprocess.run(
+                [sys.executable, str(SUPERVISOR), "--base", "origin/master"],
+                cwd=repo,
+                env=env,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
