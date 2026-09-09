@@ -14,14 +14,17 @@ use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
 use crate::x3vm_live::X3VmLiveTransport;
 use crate::x3vm_node::{X3ExtrinsicSigner, X3NodeTransport, X3NodeTransportConfig};
+use crate::x3vm_proof_store::PersistentX3ProofLedger;
 use alloc::collections::BTreeMap;
 use core::fmt::Debug;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 #[derive(Debug)]
 pub struct NativeX3NodeTransport<S: X3ExtrinsicSigner> {
     inner: X3NodeTransport<S>,
     finalized: Mutex<BTreeMap<TxId, FinalityProof>>,
+    proof_ledger: Option<PersistentX3ProofLedger>,
 }
 
 impl<S: X3ExtrinsicSigner> NativeX3NodeTransport<S> {
@@ -29,7 +32,27 @@ impl<S: X3ExtrinsicSigner> NativeX3NodeTransport<S> {
         Self {
             inner: X3NodeTransport::new(config, signer),
             finalized: Mutex::new(BTreeMap::new()),
+            proof_ledger: None,
         }
+    }
+
+    pub fn new_with_proof_ledger(
+        config: X3NodeTransportConfig,
+        signer: S,
+        path: impl Into<PathBuf>,
+    ) -> Result<Self, SwapError> {
+        Ok(Self {
+            inner: X3NodeTransport::new(config, signer),
+            finalized: Mutex::new(BTreeMap::new()),
+            proof_ledger: Some(PersistentX3ProofLedger::open(path)?),
+        })
+    }
+
+    pub fn proof_ledger_snapshot(&self) -> Result<Option<crate::ledger::ProofLedger>, SwapError> {
+        self.proof_ledger
+            .as_ref()
+            .map(PersistentX3ProofLedger::snapshot)
+            .transpose()
     }
 
     fn remember_finality(
@@ -67,6 +90,9 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
     ) -> Result<LockProof, SwapError> {
         let proof = self.inner.lock(chain_id, escrow_address, intent)?;
         self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
+        if let Some(ledger) = &self.proof_ledger {
+            ledger.record_lock(intent.intent_id, &proof)?;
+        }
         Ok(proof)
     }
 
@@ -81,6 +107,9 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
             .inner
             .claim(chain_id, escrow_address, intent_id, preimage)?;
         self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
+        if let Some(ledger) = &self.proof_ledger {
+            ledger.record_claim(intent_id, &proof)?;
+        }
         Ok(proof)
     }
 
@@ -92,6 +121,9 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
     ) -> Result<RefundProof, SwapError> {
         let proof = self.inner.refund(chain_id, escrow_address, intent_id)?;
         self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
+        if let Some(ledger) = &self.proof_ledger {
+            ledger.record_refund(intent_id, &proof)?;
+        }
         Ok(proof)
     }
 
