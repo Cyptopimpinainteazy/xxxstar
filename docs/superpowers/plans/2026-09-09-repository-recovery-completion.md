@@ -1,12 +1,10 @@
 # Repository Recovery Completion Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Stabilize the active `master` lineage, land truthful grant-readiness documentation, protect the canonical branch, and retire only branches whose recovery decisions are recorded.
 
-**Architecture:** Treat `master` as the sole active lineage and preserve the unrelated historical `main` head under `archive/main-pre-reconciliation-20260908`. Repair CI on PR #126 before rebasing PR #125, require evidence-producing checks before either merge, and make branch deletion the final review boundary.
+**Architecture:** Treat `master` as the sole active lineage and preserve the unrelated historical `main` head under `archive/main-pre-reconciliation-20260908`. Repair CI on replacement PR #128 before rebasing PR #129, require evidence-producing checks before either merge, and make branch deletion the final review boundary.
 
-**Tech Stack:** Git, GitHub Actions, Rust/Cargo, Node.js/npm, Python, OSV-Scanner, Trivy, CodeQL, Semgrep, Snyk.
+**Tech Stack:** Git, GitHub Actions, Rust/Cargo, Node.js/npm, Python, OSV-Scanner, Trivy, CodeQL, and Semgrep.
 
 **Spec:** `docs/BRANCH_RECONCILIATION_2026-09-08.md` and `docs/BRANCH_RECOVERY_INVENTORY_2026-09-08.md`
 
@@ -65,7 +63,7 @@ Expected: local commands exit 0 and the exact PR head has no failed required Git
 
 **Files:**
 - Review: every file returned by GitHub's PR changed-files API
-- Update: PR #126 body and checklist
+- Update: PR #128 body and checklist
 
 **Interfaces:**
 - Consumes: green exact-head suite from Task 1
@@ -81,17 +79,17 @@ Expected: local commands exit 0 and the exact PR head has no failed required Git
 
 **Rollback:** Revert the squash commit; never move `master` backward.
 
-### Task 3: Rebase and verify PR #125
+### Task 3: Rebase and verify PR #129
 
 **Files:**
 - Rebase/recreate: `docs/grant-readiness-truth-20260908`
-- Verify: all Markdown changed by PR #125
+- Verify: all Markdown changed by PR #129
 
 **Interfaces:**
 - Consumes: Task 2 squash commit
 - Produces: a documentation-only grant-readiness PR
 
-- [ ] Record the current PR #125 head SHA.
+- [ ] Record the current PR #129 head SHA.
 - [ ] Recreate the branch from updated `master` and replay only documented changes.
 - [ ] Keep Task 2 workflow versions when resolving overlap.
 - [ ] Recalculate the 15-entry registry score and eight-gate cross-chain score.
@@ -121,12 +119,12 @@ Expected: local commands exit 0 and the exact PR head has no failed required Git
 
 **Rollback:** Restore the captured prior protection configuration.
 
-### Task 5: Review and merge PR #125
+### Task 5: Review and merge PR #129
 
 - [ ] Confirm every required check passes on the exact head.
 - [ ] Confirm no runtime, consensus, deployment, or bridge-enablement changes.
 - [ ] Confirm branch and cross-chain ledgers match repository state.
-- [ ] Merge PR #125 and verify the documents from `master`.
+- [ ] Merge PR #129 and verify the documents from `master`.
 
 **Rollback:** Revert the PR merge commit.
 
