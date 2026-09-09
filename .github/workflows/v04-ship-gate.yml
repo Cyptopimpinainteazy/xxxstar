@@ -55,7 +55,8 @@ jobs:
       # not block ship-critical PRs.
       - name: cargo fmt (v0.4 crates)
         run: |
-          cargo fmt -p x3-packet-standard -p x3-ixl -p x3-readiness-report -- --check
+          cargo fmt -p x3-packet-standard -p x3-ixl -- --check
+          cargo fmt --manifest-path crates/x3-readiness-report/Cargo.toml -- --check
 
       # Compile gate — every v0.4 crate, all targets, deny warnings.
       - name: cargo check (v0.4 crates, all targets)
@@ -63,9 +64,9 @@ jobs:
           cargo check \
             -p x3-packet-standard \
             -p x3-ixl \
-            -p x3-readiness-report \
             -p pallet-x3-cross-vm-router \
             --all-targets
+          cargo check --manifest-path crates/x3-readiness-report/Cargo.toml --all-targets
 
       # Clippy — same set, deny warnings.
       - name: cargo clippy (v0.4 crates, deny warnings)
@@ -73,9 +74,9 @@ jobs:
           cargo clippy \
             -p x3-packet-standard \
             -p x3-ixl \
-            -p x3-readiness-report \
             -p pallet-x3-cross-vm-router \
             --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/x3-readiness-report/Cargo.toml --all-targets -- -D warnings
 
       # Unit + property tests — these are the ones that prove invariants.
       - name: cargo test (v0.4 crates, lib)
@@ -83,8 +84,8 @@ jobs:
           cargo test \
             -p x3-packet-standard \
             -p x3-ixl \
-            -p x3-readiness-report \
             --lib
+          cargo test --manifest-path crates/x3-readiness-report/Cargo.toml --lib
 
       - name: cargo test (v0.4 crates, property tests)
         run: |
@@ -130,7 +131,7 @@ jobs:
       # single most likely place for "demo theater" to creep back in.
       - name: cargo test (readiness honesty)
         run: |
-          cargo test -p x3-readiness-report --lib -- \
+          cargo test --manifest-path crates/x3-readiness-report/Cargo.toml --lib -- \
             offline_collector_never_claims_readiness \
             live_collector_against_unreachable_endpoint_is_unknown_not_pass \
             unknown_blocks_ready
