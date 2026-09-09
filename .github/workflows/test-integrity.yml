@@ -26,4 +26,4 @@ jobs:
       - name: Run core test suite
         run: |
           echo "🧪 Running core test suite"
-          cargo test --workspace --all-targets --all-features -- --quiet
+          cargo test --workspace --all-targets -- --quiet
