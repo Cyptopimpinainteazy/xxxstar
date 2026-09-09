@@ -83,6 +83,12 @@ pub use evm_live::LiveEvmExecutor;
 #[cfg(feature = "std")]
 pub mod btc_live;
 
+#[cfg(feature = "std")]
+pub mod x3vm_live;
+
+#[cfg(feature = "std")]
+pub use x3vm_live::{LiveX3VmAdapter, X3VmLiveTransport};
+
 pub use adapter::{
     AdapterReadinessScore, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof, LockProof,
     RefundProof, VmFamily, VmType, X3VmAdapter,
