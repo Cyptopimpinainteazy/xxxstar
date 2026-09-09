@@ -1,6 +1,6 @@
 # X3 Atomic Star — Mainnet Status
 
-**Reviewed: 2026-09-08 — 51.07% average readiness across 15 registry entries. Historical build evidence exists, but GitHub Actions is currently blocked by an account billing lock.**
+**Reviewed: 2026-09-09 — 51.07% average readiness across 15 registry entries. GitHub Actions now executes after the earlier billing lock was cleared, but the rerun suite is not yet green.**
 
 > `FEATURE_REGISTRY.toml` is the single canonical source. All percentages derive from it.
 > Run `scripts/check-readiness-consistency.sh` to validate (now also fails on fictional registry paths).
