@@ -71,10 +71,10 @@ implemented and tested atomic lifecycle. The most important current facts:
   expiry, and PDA derivation.
 - A fresh four-validator reserved full-mesh drill converged to one finalized chain on cold start
   and survived loss of each individual validator with the remaining three finalizing one chain.
-- CRITICAL-CK-1 is partially remediated: `master` history was rewritten to remove the four
-  secret-bearing files, the old Sepolia deployer wallet and validator seeds are revoked and
-  quarantined, and the rotation record is committed. Full closure still requires rewriting or
-  deleting the remaining local/GitHub branches and re-creating pre-push clones.
+- CRITICAL-CK-1 is remediated on all repository refs: `master` was rewritten and force-pushed, 49
+  secret-bearing GitHub branches and the old RC tag were deleted, and local reflog/object GC removed
+  unreachable secret objects. Remaining work is coordination only: re-create pre-push clones and
+  request GitHub-side GC if old blobs persist in the service's object cache.
 
 #pagebreak()
 
@@ -96,6 +96,8 @@ implemented and tested atomic lifecycle. The most important current facts:
   [`TESTNET_BASE=/tmp/x3-mesh-4 python3 scripts/testnet/run-mesh.py kills --count 4`], [0], [4/4 single-validator losses left 3/3 survivors finalizing one common chain],
   [`git log --oneline master -- sepolia-deployer-wallet.txt deployment/keys/validator-0*-summary.txt`], [0], [0 secret-path commits remain in rewritten `master`],
   [`git push --force-with-lease ... origin master`], [0], [Rewritten master history pushed at `58982d258`],
+  [`git push origin --delete <49 secret-bearing branches>`], [0], [All GitHub branches containing pre-rewrite secret commits deleted; 5 clean branches remain],
+  [`git fsck --full --no-reflogs` after `git gc --prune=now`], [0], [No dangling/unreachable secret-bearing objects remain locally],
   [`cargo audit`], [0], [0 blocking; 27 allow-listed warnings],
   [`npm test`], [0], [All configured JS test packages pass],
   [`npm run build`], [0], [All configured JS builds pass],
@@ -129,7 +131,7 @@ open unless a new commit explicitly closes them; none are silently deleted.
   [CRITICAL-TX-1], [Closed in source], [`wallet_*` RPC registration is gated by `ChainType::Development` in `node/src/rpc.rs:890` and `node/src/service.rs:1054`],
   [CRITICAL-CN-1], [Closed in source], [`report_misbehavior` and `slash_bond` enforce `ensure_root`; tests cover root-only calls],
   [CRITICAL-TOK-1], [Closed in source], [`scripts/check-readiness-consistency.sh` now verifies `required_tests` against real functions; registry fiction was purged],
-  [CRITICAL-CK-1], [Partially remediated], [`master` rewritten and pushed at `58982d258`; old Sepolia/validator material revoked and quarantined; remaining branches/clones require coordinated purge],
+  [CRITICAL-CK-1], [Closed in source], [`master` rewritten at `58982d258`; old Sepolia/validator material revoked; 49 secret-bearing GitHub branches plus RC tag deleted; unreachable objects pruned locally],
   [HIGH-TX-2], [Closed in source], [`x3_submitCrossVmTransaction` is Development/Local-only and no longer auto-mints wrapped assets; Live chain specs require at least two council members],
   [HIGH-CN-2], [Closed in source], [`LAUNCH_SCOPE.md` now explicitly lists permissionless validator staking/bonding/nomination as NOT IMPLEMENTED and deferred to M3],
   [HIGH-CK-2], [Closed in source], [Simulated modules renamed `kyber_research`/`dilithium_research`; docs and Cargo description forbid production use],

@@ -35,9 +35,14 @@ The following files contained committed secret material and have been replaced w
   gitignored and are not part of the commit.
 - The old Sepolia deployer account and validator seeds must be treated as
   compromised and never reused.
-- Other local branches and GitHub PR branches still contain the pre-rewrite
-  commits; those branches must be rewritten or deleted before the purge is
-  complete. Clones created before the force-push must be re-created.
+- All local branches, scratch worktrees, stashes, and the old `v0.4.0-rc.1`
+  tag that still pointed into pre-rewrite history were deleted. The 49
+  secret-bearing GitHub branches were deleted from the remote, leaving only
+  `master` and branches verified clean of the removed paths. `git reflog
+  expire --expire=now --all` and `git gc --prune=now` removed unreachable
+  objects locally. Clones created before the force-push must be re-created;
+  GitHub's own object cache may require support-assisted garbage collection
+  before the old blobs are fully gone from the service.
 
 ### Rotation procedure
 
