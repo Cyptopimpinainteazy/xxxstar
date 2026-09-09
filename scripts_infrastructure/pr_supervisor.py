@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 
@@ -61,7 +62,7 @@ def main() -> int:
         return 1
 
     # Verify changed Cargo manifests remain parseable by Cargo when Cargo is present.
-    if any(name.endswith("Cargo.toml") for name in names):
+    if any(name.endswith("Cargo.toml") for name in names) and shutil.which("cargo"):
         try:
             run("cargo", "metadata", "--no-deps", "--format-version", "1")
         except RuntimeError as exc:
