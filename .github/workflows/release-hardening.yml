@@ -132,7 +132,7 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          cargo cyclonedx -p x3-chain-node --format json --output-file sbom.cdx.json
+          cargo cyclonedx --format json --output-file sbom.cdx.json
           echo "✅ SBOM generated at sbom.cdx.json"
 
       - name: Build runtime WASM
