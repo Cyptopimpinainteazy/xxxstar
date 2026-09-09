@@ -23,6 +23,9 @@ use sp_core::{crypto::AccountId32, Pair, H256};
 use sp_runtime::generic::Era;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_runtime::transaction_validity::TransactionSource;
+use sp_runtime::traits::BlakeTwo256;
+use sp_runtime::traits::Hash;
+use frame_support::storage::storage_prefix;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
@@ -307,6 +310,109 @@ fn account_from_public(public: sp_core::sr25519::Public) -> AccountId {
     <Signature as Verify>::Signer::from(public).into_account()
 }
 
+fn load_sr25519_pair_from_env(name: &str) -> Result<sp_core::sr25519::Pair, JsonRpseeError> {
+    let seed = std::env::var(name).map_err(|_| {
+        custom_error(format!(
+            "{name} env var not set — required for the two-member council flow"
+        ))
+    })?;
+    sp_core::sr25519::Pair::from_string(&seed, None)
+        .map_err(|e| custom_error(format!("load {name} key failed: {e:?}")))
+}
+
+fn read_u32_storage(
+    client: &FullClient,
+    at: H256,
+    pallet: &[u8],
+    item: &[u8],
+) -> Result<u32, JsonRpseeError> {
+    use codec::Decode;
+    let key = StorageKey(storage_prefix(pallet, item).to_vec());
+    let Some(data) = StorageProvider::storage(client, at, &key)
+        .map_err(|e| custom_error(format!("read {pallet:?}/{item:?} storage failed: {e}")))?
+    else {
+        // StorageValue counters are uninitialized until the first write.
+        return Ok(0);
+    };
+    u32::decode(&mut &data.0[..])
+        .map_err(|e| custom_error(format!("decode {pallet:?}/{item:?} storage failed: {e}")))
+}
+
+fn sign_runtime_call(
+    pair: &sp_core::sr25519::Pair,
+    account: &AccountId,
+    genesis_hash: H256,
+    nonce: u32,
+    call: RuntimeCall,
+) -> Result<UncheckedExtrinsic, JsonRpseeError> {
+    use codec::Encode;
+    let extra: SignedExtra = (
+        frame_system::CheckNonZeroSender::<Runtime>::new(),
+        frame_system::CheckSpecVersion::<Runtime>::new(),
+        frame_system::CheckTxVersion::<Runtime>::new(),
+        frame_system::CheckGenesis::<Runtime>::new(),
+        frame_system::CheckEra::<Runtime>::from(Era::Immortal),
+        frame_system::CheckNonce::<Runtime>::from(nonce),
+        frame_system::CheckWeight::<Runtime>::new(),
+        pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
+        pallet_x3_invariants::InvariantCheck::<Runtime>::new(),
+        decode_agent_law_check()?,
+    );
+    let payload = SignedPayload::from_raw(
+        call.clone(),
+        extra.clone(),
+        (
+            (),
+            VERSION.spec_version,
+            VERSION.transaction_version,
+            genesis_hash,
+            genesis_hash,
+            (),
+            (),
+            (),
+            (),
+            (),
+        ),
+    );
+    let signature = payload.using_encoded(|payload| Signature::from(pair.sign(payload)));
+    Ok(UncheckedExtrinsic::new_signed(
+        call,
+        Address::Id(account.clone()),
+        signature,
+        extra,
+    ))
+}
+
+fn submit_to_pool<P>(pool: &P, best_hash: H256, extrinsic: UncheckedExtrinsic) -> Result<H256, JsonRpseeError>
+where
+    P: TransactionPool<Block = Block, Hash = H256> + Sync,
+{
+    futures::executor::block_on(pool.submit_one(
+        best_hash,
+        TransactionSource::External,
+        extrinsic.into(),
+    ))
+    .map_err(|e| custom_error(format!("Runtime extrinsic submission failed: {e}")))
+}
+
+fn wait_for_best_block_advance(
+    client: &FullClient,
+    baseline: u32,
+    attempts: usize,
+    label: &str,
+) -> Result<(), JsonRpseeError> {
+    for _ in 0..attempts {
+        let current = client.info().best_number;
+        if current > baseline {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(750));
+    }
+    Err(custom_error(format!(
+        "{label}: best block did not advance from #{baseline} within timeout"
+    )))
+}
+
 fn decode_agent_law_check() -> Result<pallet_x3_agent_law::AgentLawCheck<Runtime>, JsonRpseeError> {
     codec::Decode::decode(&mut &[][..])
         .map_err(|e| custom_error(format!("decode agent law extension failed: {e}")))
@@ -553,7 +659,7 @@ pub fn create_full<P>(
     atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>>,
 ) -> Result<RpcModule<()>, RpcError>
 where
-    P: TransactionPool<Block = Block> + Sync + Send + 'static,
+    P: TransactionPool<Block = Block, Hash = H256> + Sync + Send + 'static,
     FullClient: ProvideRuntimeApi<Block>,
     FullClient: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError>,
     FullClient: BlockBackend<Block>,
@@ -1383,6 +1489,10 @@ where
         },
     )?;
 
+    // Shared pool handle for the two-member wrapped council flow. Captured
+    // before tx_pool is moved into the bridge-ingress closure below.
+    let council_flow_pool = tx_pool.clone();
+
     // ── x3_submitCrossVmTransaction ─────────────────────
     // Development/local bridge ingress for relayer-submitted deposit payloads.
     // Decodes the gateway event payload and submits the real kernel extrinsic
@@ -1528,6 +1638,267 @@ where
                 "amount": relay_payload.amount.to_string(),
                 "bridge_nonce": bridge_nonce,
                 "bytes": proof.len(),
+            }))
+        },
+    )?;
+
+    // ── x3_proposeWrappedCouncil ─────────────────────────
+    // Two-member wrapped-asset governance, step 1: a council member proposes
+    // register/mint with threshold 2 and the node waits for the motion to be
+    // stored. The returned proposal hash/index are consumed by
+    // x3_executeWrappedCouncil (step 2: Alice vote + Bob vote + close).
+    let propose_client = client.clone();
+    let propose_pool = council_flow_pool.clone();
+    let propose_limiter = limiter.clone();
+    module.register_method(
+        "x3_proposeWrappedCouncil",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            use codec::Encode;
+            use sp_core::crypto::Pair;
+
+            if !enable_bridge_ingress_rpc {
+                return Err(custom_error(
+                    "x3_proposeWrappedCouncil is only available on Development/Local chain specs",
+                ));
+            }
+            propose_limiter
+                .check_request(0, "x3_proposeWrappedCouncil")
+                .map_err(|e| custom_error(e.to_string()))?;
+
+            let (req,): (serde_json::Value,) =
+                params.parse().map_err(|e| custom_error(format!("Invalid params: {e}")))?;
+            let action = req
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| custom_error("Missing action (register|mint)"))?;
+            let chain_id = u32::try_from(
+                req.get("chain_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| custom_error("Missing chain_id"))?,
+            )
+            .map_err(|_| custom_error("chain_id does not fit u32"))?;
+            let token_address_hex = req
+                .get("token_address")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| custom_error("Missing token_address"))?;
+            let token_address = decode_hex_20(token_address_hex, "token_address")?;
+            let wrapped_id = wrapped_asset_id(chain_id, &token_address);
+
+            let proposer_pair =
+                load_sr25519_pair_from_env("X3_SUBMITTER_SEED")?;
+            let proposer_account = account_from_public(proposer_pair.public());
+            let best_hash = propose_client.info().best_hash;
+            let baseline_number = propose_client.info().best_number;
+            let genesis_hash = propose_client
+                .block_hash(0)
+                .map_err(|e| custom_error(format!("Genesis hash lookup failed: {e}")))?
+                .ok_or_else(|| custom_error("Genesis block hash not found"))?;
+            let proposer_nonce = propose_client
+                .runtime_api()
+                .account_nonce(best_hash, proposer_account.clone())
+                .map_err(|e| custom_error(format!("Proposer nonce lookup failed: {e}")))?;
+
+            let proposal = match action {
+                "register" => RuntimeCall::X3Wrapped(
+                    pallet_x3_wrapped::Call::<Runtime>::register_wrapped_asset {
+                        asset_id: wrapped_id,
+                        config: pallet_x3_wrapped::WrappedAssetConfig {
+                            native_asset_id: [0u8; 32],
+                            max_wrapped_supply: u128::MAX,
+                            governance_weight_bps: 10_000,
+                            bridge_fee_bps: 0,
+                            status: pallet_x3_wrapped::WrappedAssetStatus::Active,
+                        },
+                    },
+                ),
+                "mint" => {
+                    let recipient_hex = req
+                        .get("recipient")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing recipient"))?;
+                    let recipient = decode_hex_32(recipient_hex, "recipient")?;
+                    let amount = parse_u128_value(req.get("amount"), "amount")?;
+                    let nonce = req
+                        .get("nonce")
+                        .and_then(|v| v.as_str())
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .ok_or_else(|| custom_error("Missing numeric nonce"))?;
+                    RuntimeCall::X3Wrapped(
+                        pallet_x3_wrapped::Call::<Runtime>::mint_wrapped {
+                            chain_id,
+                            asset_id: wrapped_id,
+                            recipient: AccountId::new(recipient),
+                            amount,
+                            nonce,
+                        },
+                    )
+                }
+                _ => return Err(custom_error("action must be 'register' or 'mint'")),
+            };
+            let length_bound = proposal.encoded_size() as u32;
+            let council_call = RuntimeCall::Council(
+                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::propose {
+                    threshold: 2,
+                    proposal: Box::new(proposal.clone()),
+                    length_bound,
+                },
+            );
+            let extrinsic = sign_runtime_call(
+                &proposer_pair,
+                &proposer_account,
+                genesis_hash,
+                proposer_nonce,
+                council_call,
+            )?;
+            let before_count = read_u32_storage(&propose_client, best_hash, b"Council", b"ProposalCount")?;
+            submit_to_pool(propose_pool.as_ref(), best_hash, extrinsic)?;
+            wait_for_best_block_advance(&propose_client, baseline_number, 120, "council proposal inclusion")?;
+
+            let after_hash = propose_client.info().best_hash;
+            let after_count = read_u32_storage(&propose_client, after_hash, b"Council", b"ProposalCount")?;
+            if after_count <= before_count {
+                return Err(custom_error(
+                    "Council proposal was not stored; threshold/membership check failed",
+                ));
+            }
+            let proposal_hash = BlakeTwo256::hash_of(&proposal);
+            Ok(serde_json::json!({
+                "status": "pending_second_approval",
+                "proposal_hash": format!("0x{}", hex::encode(proposal_hash.as_bytes())),
+                "proposal_index": after_count - 1,
+                "wrapped_asset_id": format!("0x{}", hex::encode(wrapped_id)),
+                "action": action,
+            }))
+        },
+    )?;
+
+    // ── x3_executeWrappedCouncil ────────────────────────
+    // Two-member wrapped-asset governance, step 2: Alice and Bob each cast an
+    // Aye vote on the stored motion, then close it so the wrapped call executes.
+    let execute_client = client.clone();
+    let execute_pool = council_flow_pool.clone();
+    let execute_limiter = limiter.clone();
+    module.register_method(
+        "x3_executeWrappedCouncil",
+        move |params, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+            use sp_core::crypto::Pair;
+
+            if !enable_bridge_ingress_rpc {
+                return Err(custom_error(
+                    "x3_executeWrappedCouncil is only available on Development/Local chain specs",
+                ));
+            }
+            execute_limiter
+                .check_request(0, "x3_executeWrappedCouncil")
+                .map_err(|e| custom_error(e.to_string()))?;
+
+            let (req,): (serde_json::Value,) =
+                params.parse().map_err(|e| custom_error(format!("Invalid params: {e}")))?;
+            let proposal_hash_hex = req
+                .get("proposal_hash")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| custom_error("Missing proposal_hash"))?;
+            let proposal_hash_bytes = decode_hex_32(proposal_hash_hex, "proposal_hash")?;
+            let proposal_hash = H256::from(proposal_hash_bytes);
+            let proposal_index = req
+                .get("proposal_index")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| custom_error("Missing proposal_index"))? as u32;
+
+            let alice_pair = load_sr25519_pair_from_env("X3_SUBMITTER_SEED")?;
+            let bob_pair = load_sr25519_pair_from_env("X3_APPROVER_SEED")?;
+            if alice_pair.public() == bob_pair.public() {
+                return Err(custom_error(
+                    "X3_SUBMITTER_SEED and X3_APPROVER_SEED must be independent keys",
+                ));
+            }
+            let alice_account = account_from_public(alice_pair.public());
+            let bob_account = account_from_public(bob_pair.public());
+            let genesis_hash = execute_client
+                .block_hash(0)
+                .map_err(|e| custom_error(format!("Genesis hash lookup failed: {e}")))?
+                .ok_or_else(|| custom_error("Genesis block hash not found"))?;
+
+            let mut baseline = execute_client.info().best_number;
+            let best_hash = execute_client.info().best_hash;
+            let alice_nonce = execute_client
+                .runtime_api()
+                .account_nonce(best_hash, alice_account.clone())
+                .map_err(|e| custom_error(format!("Alice nonce lookup failed: {e}")))?;
+            let alice_vote = RuntimeCall::Council(
+                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::vote {
+                    proposal: proposal_hash,
+                    index: proposal_index,
+                    approve: true,
+                },
+            );
+            let extrinsic = sign_runtime_call(
+                &alice_pair,
+                &alice_account,
+                genesis_hash,
+                alice_nonce,
+                alice_vote,
+            )?;
+            submit_to_pool(execute_pool.as_ref(), best_hash, extrinsic)
+                .map_err(|e| custom_error(format!("Alice vote submit: {e}")))?;
+            wait_for_best_block_advance(&execute_client, baseline, 120, "Alice council vote")?;
+
+            baseline = execute_client.info().best_number;
+            let best_hash = execute_client.info().best_hash;
+            let bob_nonce = execute_client
+                .runtime_api()
+                .account_nonce(best_hash, bob_account.clone())
+                .map_err(|e| custom_error(format!("Bob nonce lookup failed: {e}")))?;
+            let bob_vote = RuntimeCall::Council(
+                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::vote {
+                    proposal: proposal_hash,
+                    index: proposal_index,
+                    approve: true,
+                },
+            );
+            let extrinsic = sign_runtime_call(
+                &bob_pair,
+                &bob_account,
+                genesis_hash,
+                bob_nonce,
+                bob_vote,
+            )?;
+            submit_to_pool(execute_pool.as_ref(), best_hash, extrinsic)
+                .map_err(|e| custom_error(format!("Bob vote submit: {e}")))?;
+            wait_for_best_block_advance(&execute_client, baseline, 120, "Bob council vote")?;
+
+            baseline = execute_client.info().best_number;
+            let best_hash = execute_client.info().best_hash;
+            let bob_close_nonce = execute_client
+                .runtime_api()
+                .account_nonce(best_hash, bob_account.clone())
+                .map_err(|e| custom_error(format!("Bob close nonce lookup failed: {e}")))?;
+            let close = RuntimeCall::Council(
+                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::close {
+                    proposal_hash,
+                    index: proposal_index,
+                    proposal_weight_bound: sp_runtime::Weight::from_parts(
+                        1_000_000_000,
+                        1_000_000,
+                    ),
+                    length_bound: 1_000_000,
+                },
+            );
+            let extrinsic = sign_runtime_call(
+                &bob_pair,
+                &bob_account,
+                genesis_hash,
+                bob_close_nonce,
+                close,
+            )?;
+            submit_to_pool(execute_pool.as_ref(), best_hash, extrinsic)
+                .map_err(|e| custom_error(format!("Council close submit: {e}")))?;
+            wait_for_best_block_advance(&execute_client, baseline, 120, "council close")?;
+
+            Ok(serde_json::json!({
+                "status": "executed",
+                "proposal_hash": format!("0x{}", hex::encode(proposal_hash.as_bytes())),
+                "proposal_index": proposal_index,
             }))
         },
     )?;
