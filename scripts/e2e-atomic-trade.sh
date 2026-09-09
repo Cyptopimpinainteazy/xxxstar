@@ -164,6 +164,11 @@ echo "       X3ExternalGateway deployed at: $GATEWAY_ADDR"
 
 echo "[4/5] Starting x3-chain-node..."
 NODE_DIR=$(mktemp -d)
+# The submission key only drives the canonical kernel extrinsic. Wrapped
+# register/mint require a two-thirds council (>=2 of 2 on the dev chain),
+# so the deposit proof is verified against canonical ledger accounting here;
+# wrapped accounting stays pending until a two-member council flow approves
+# the register/mint proposals.
 export X3_SUBMITTER_SEED="${X3_SUBMITTER_SEED:-//Alice}"
 "$NODE_BIN" \
   --chain "$CHAIN_SPEC" \
@@ -412,6 +417,8 @@ if [ "$DEPOSIT_EVENTS" -gt 0 ] \
   RESULT="PASSED"
 else
   echo "       ⚠️  X3 canonical ledger or wrapped accounting did not increase after relay"
+  echo "       ℹ️  Wrapped register/mint require a two-thirds council proposal (>=2 signers);"
+  echo "          wrapped accounting is expected to remain pending in this single-submitter script."
   RESULT="PARTIAL"
 fi
 

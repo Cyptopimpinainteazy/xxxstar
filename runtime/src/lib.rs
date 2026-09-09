@@ -1114,6 +1114,15 @@ pub type EnsureRootOrHalfCouncil = frame_support::traits::EitherOfDiverse<
     pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 2>,
 >;
 
+/// Wrapped-asset bridge authority requires at least two-thirds of the council.
+/// With the minimum two-member council this means both independent members
+/// must approve register/mint (HIGH-TX-2); root remains available for
+/// emergency governance but never bypasses the runtime accounting checks.
+pub type EnsureRootOrTwoThirdsCouncil = frame_support::traits::EitherOfDiverse<
+    frame_system::EnsureRoot<AccountId>,
+    pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>,
+>;
+
 pub type EnsureCouncilMember = pallet_collective::EnsureMember<AccountId, CouncilCollective>;
 
 ord_parameter_types! {
@@ -2901,8 +2910,8 @@ parameter_types! {
 
 impl pallet_x3_wrapped::Config for Runtime {
     type Balance = Balance;
-    type BridgeAuthority = EnsureRootOrHalfCouncil;
-    type GovernanceOrigin = EnsureRootOrHalfCouncil;
+    type BridgeAuthority = EnsureRootOrTwoThirdsCouncil;
+    type GovernanceOrigin = EnsureRootOrTwoThirdsCouncil;
     type MaxChainsPerAsset = MaxChainsPerAsset;
     type MaxWrappedAssets = MaxWrappedAssets;
 }
