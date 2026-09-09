@@ -39,11 +39,12 @@
 - [x] Replace the missing no-op-in-CI integrity script with `pr_supervisor.py --base origin/master`.
 - [x] Change Trivy from a nonexistent image scan to a filesystem scan.
 - [x] Point dashboard CI at `apps/dashboard` and prove its npm 10.8.2 build.
-- [ ] Trace forbidden Solana v4 edges from `x3-svm-integration`.
-- [ ] Align the smallest responsible dependency set without disabling the lineage gate.
-- [ ] Repair the two `idna_adapter` deprecation failures under `-D warnings`.
-- [ ] Configure `SNYK_TOKEN`, or remove Snyk only by explicit owner decision while retaining the other security scanners.
-- [ ] Rerun all failed workflows and require zero failed required checks.
+- [x] Trace Solana v4 edges from `x3-svm-integration` and verify they belong to the official 3.0 runtime graph.
+- [x] Replace the self-contradictory version grep with locked resolution plus the actual SVM test gate.
+- [x] Normalize the registry-backed `blst` lock entry and prove `cargo test --locked -p x3-svm-integration --all-targets` (33 unit + 1 integration) passes.
+- [x] Repair the two `idna_adapter` deprecation failures under `-D warnings` with narrowly scoped allowances.
+- [ ] Resolve the missing `SNYK_TOKEN` by owner-supplied secret or explicit owner approval to remove only Snyk; retain OSV, Trivy, CodeQL, and Semgrep.
+- [ ] Rerun all failed workflows and require zero failed required checks on the exact final head.
 
 **Verification:**
 
