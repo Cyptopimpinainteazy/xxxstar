@@ -50,7 +50,7 @@ jobs:
       - name: Setup Zombienet
         run: |
           npm install -g @zombienet/cli
-          zombienet --version
+          zombienet version
 
       - name: Generate chain spec for testing
         run: |
