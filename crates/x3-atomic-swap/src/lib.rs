@@ -90,12 +90,16 @@ pub mod x3vm_live;
 pub use x3vm_live::{LiveX3VmAdapter, X3VmLiveTransport};
 
 #[cfg(feature = "std")]
-pub mod x3vm_node;
+mod x3vm_node;
 
 #[cfg(feature = "std")]
-pub use x3vm_node::{
-    X3ExtrinsicSigner, X3FinalizedInclusionProof, X3NodeTransport, X3NodeTransportConfig,
-};
+pub mod x3vm_native;
+
+#[cfg(feature = "std")]
+pub use x3vm_native::NativeX3NodeTransport;
+
+#[cfg(feature = "std")]
+pub use x3vm_node::{X3ExtrinsicSigner, X3FinalizedInclusionProof, X3NodeTransportConfig};
 
 pub use adapter::{
     AdapterReadinessScore, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof, LockProof,
