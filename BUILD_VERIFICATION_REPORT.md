@@ -16,7 +16,7 @@ These facts do not establish production readiness. Production readiness requires
 ## Current blockers
 
 - Biometric and recovery paths have not completed independent security review.
-- The active GitHub Actions jobs are blocked by an account billing lock.
+- On 2026-09-09, rerun jobs began executing normal workflow steps, confirming the earlier billing lock is cleared. Passing results are still required before merge.
 - Fresh wallet-specific build and test output has not been recorded in this file.
 - A `LIVE_TESTNET` registry mode is not a mainnet or production designation.
 
