@@ -21,6 +21,23 @@ The following files contained committed secret material and have been replaced w
 |---|---|---|
 | `deployment/keys/bootnode-keys.json` | Secrets replaced with `REPLACED_RUN_KEY_ROTATION_SCRIPT` | Generate new keys, inject via env/secret manager |
 | `deployment/keys/bootnode-node-key` | Raw hex key replaced | Generate new key, inject via env/secret manager |
+| `sepolia-deployer-wallet.txt` | Removed from history 2026-09-08; Sepolia testnet key revoked | Generate a fresh deployer key via secret manager |
+| `deployment/keys/validator-01-summary.txt` … `-03` | Removed from history 2026-09-08; old testnet validator seeds revoked | Regenerate validator keys locally; do not commit |
+
+### 2026-09-08 rotation record
+
+- `master` history was rewritten with `git filter-branch` to remove the four
+  files above and force-pushed with `--force-with-lease`.
+- All working-tree copies found under `.wt-*` scratch worktrees were moved to
+  a quarantine directory outside the repository (`/tmp/x3-rotated-secrets.*`).
+- Fresh four-validator testnet key material was regenerated locally with
+  `scripts/testnet/build-x3-testnet-spec.py 4`; the generated `.suri` files are
+  gitignored and are not part of the commit.
+- The old Sepolia deployer account and validator seeds must be treated as
+  compromised and never reused.
+- Other local branches and GitHub PR branches still contain the pre-rewrite
+  commits; those branches must be rewritten or deleted before the purge is
+  complete. Clones created before the force-push must be re-created.
 
 ### Rotation procedure
 
