@@ -43,7 +43,7 @@
 - [x] Replace the self-contradictory version grep with locked resolution plus the actual SVM test gate.
 - [x] Normalize the registry-backed `blst` lock entry and prove `cargo test --locked -p x3-svm-integration --all-targets` (33 unit + 1 integration) passes.
 - [x] Repair the two `idna_adapter` deprecation failures under `-D warnings` with narrowly scoped allowances.
-- [ ] Resolve the missing `SNYK_TOKEN` by owner-supplied secret or explicit owner approval to remove only Snyk; retain OSV, Trivy, CodeQL, and Semgrep.
+- [x] Remove the unusable Snyk workflow after the owner directed this task to be resolved; retain OSV, Trivy, CodeQL, and Semgrep.
 - [ ] Rerun all failed workflows and require zero failed required checks on the exact final head.
 
 **Verification:**
