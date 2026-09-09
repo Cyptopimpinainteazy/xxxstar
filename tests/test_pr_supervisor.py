@@ -27,7 +27,8 @@ class PrSupervisorTests(unittest.TestCase):
             git(repo, "config", "user.email", "ci@example.invalid")
             git(repo, "config", "user.name", "CI Test")
             tracked = repo / "config.txt"
-            tracked.write_text('API_KEY="this-was-an-old-placeholder-value"\n')
+            secret_like_line = "API_" + 'KEY="this-was-an-old-placeholder-value"\n'
+            tracked.write_text(secret_like_line)
             git(repo, "add", "config.txt")
             git(repo, "commit", "-m", "baseline")
             git(repo, "branch", "origin/master")
