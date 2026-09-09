@@ -36,7 +36,7 @@ This file is a release-evidence template. It is not proof that the repository is
 
 ## Current blockers
 
-- GitHub Actions jobs are not starting because GitHub reports that the account is locked due to a billing issue.
+- On 2026-09-09, GitHub accepted reruns and jobs began executing normal workflow steps, confirming the earlier billing lock is cleared. The rerun suite is not yet green.
 - External bridge quorum, finalized-root trust, Bitcoin signing, and public multi-operator staging remain incomplete.
 - Branch protection for `master` has not been verified through an authenticated settings API.
 - `FEATURE_REGISTRY.toml` currently averages 51% across 15 implemented features.
