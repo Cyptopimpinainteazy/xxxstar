@@ -96,7 +96,13 @@ mod x3vm_node;
 pub mod x3vm_native;
 
 #[cfg(feature = "std")]
+pub mod x3vm_proof_store;
+
+#[cfg(feature = "std")]
 pub use x3vm_native::NativeX3NodeTransport;
+
+#[cfg(feature = "std")]
+pub use x3vm_proof_store::PersistentX3ProofLedger;
 
 #[cfg(feature = "std")]
 pub use x3vm_node::{X3ExtrinsicSigner, X3FinalizedInclusionProof, X3NodeTransportConfig};
