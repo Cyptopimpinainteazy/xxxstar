@@ -8,14 +8,14 @@
 #   4. Chain spec generation with dev-key scan.
 #
 # Usage:
-#   - Triggered manually via workflow_dispatch on main branch.
+#   - Triggered manually via workflow_dispatch on master branch.
 #   - Uses environment: testnet (configure in GitHub repo Settings → Environments).
 #
 # Required GitHub Environment setup:
 #   Settings → Environments → testnet
 #     - Required reviewers: at least 1
 #     - Wait timer: 0 minutes (reviewer approval gates deployment)
-#     - Deployment branches: main
+#     - Deployment branches: master
 #     - Secrets: SEPOLIA_RPC_URL, ETHERSCAN_API_KEY (if bridge-enabled)
 # ─────────────────────────────────────────────────────────────────────────────
 

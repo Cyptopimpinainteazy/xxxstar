@@ -2,12 +2,12 @@ name: X3 Desktop CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
     paths:
       - 'apps/x3-desktop/**'
       - '.github/workflows/x3-desktop-ci.yml'
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - 'apps/x3-desktop/**'
   workflow_dispatch:
@@ -90,7 +90,7 @@ jobs:
   # ── Build Installers ──
   build-installers:
     needs: [frontend-test, rust-check]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -140,7 +140,7 @@ jobs:
   # ── Notarization Check (macOS) ──
   notarize-macos:
     needs: [build-installers]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: macos-latest
     steps:
       - name: Download macOS installer

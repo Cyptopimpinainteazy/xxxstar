@@ -1,21 +1,21 @@
-name: X3 Fronend + GPU Swarm CI
+name: X3 Dashboard CI
 
 on:
   push:
     branches:
-      - main
+      - master
       - develop
       - 'sprint-*'
   pull_request:
     branches:
-      - main
+      - master
       - develop
       - 'sprint-*'
   workflow_dispatch:
 
 jobs:
   frontend-build:
-    name: Build X3 Fronend
+    name: Build X3 Dashboard
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -30,17 +30,16 @@ jobs:
           cache: 'npm'
 
       - name: Install frontend dependencies
-        run: |
-          cd x3fronend
-          npm ci
+        working-directory: apps/dashboard
+        run: npm ci
 
       - name: Build frontend assets
-        run: |
-          cd x3fronend
-          npm run build
+        working-directory: apps/dashboard
+        run: npm run build
 
   gpu-swarm-gate:
     name: GPU Swarm Gate
+    if: github.event_name == 'workflow_dispatch'
     needs: frontend-build
     runs-on: [self-hosted, linux, gpu]
     timeout-minutes: 180

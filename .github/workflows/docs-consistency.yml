@@ -12,7 +12,7 @@ on:
       - '**/*.md'
   push:
     branches:
-      - main
+      - master
       - master
     paths:
       - '.ai/SESSION_UPDATE_SUMMARY_*.md'

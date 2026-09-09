@@ -2,13 +2,13 @@ name: svm-htlc
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "X3-contracts/svm/programs/x3_htlc/**"
       - "X3-contracts/svm/Cargo.toml"
       - "X3-contracts/svm/Cargo.lock"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "X3-contracts/svm/programs/x3_htlc/**"
       - "X3-contracts/svm/Cargo.toml"

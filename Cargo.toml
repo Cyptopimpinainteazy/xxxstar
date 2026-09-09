@@ -421,8 +421,6 @@ wasm-instrument = { path = "patches/wasm-instrument" }
 # Note: wasmtime override removed due to patch conflicts - manual update needed
 # Fix environmental macro compatibility
 environmental = { path = "patches/environmental" }
-# Use the vendored blst crate so native Linux can build its no-assembly fallback.
-blst = { path = "vendor/blst" }
 # Fix substrate-prometheus-endpoint protobuf type mismatch (Vec -> RepeatedField)
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
 # Fix errno WASM compatibility by providing stub implementation for wasm32 targets
