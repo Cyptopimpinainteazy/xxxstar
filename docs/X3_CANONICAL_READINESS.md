@@ -31,6 +31,6 @@ This page is a readable snapshot. `FEATURE_REGISTRY.toml` remains authoritative.
 - `SIM_TESTNET` means simulation or regtest evidence only.
 - External bridge activation remains disabled.
 - Internal cross-VM routing is tracked separately from production external cross-chain transfer.
-- Current GitHub Actions execution is blocked by an account billing lock, so workflow configuration cannot be presented as a green run.
+- On 2026-09-09, GitHub Actions reruns began executing normal steps after the earlier billing lock was cleared. The workflow configuration cannot be presented as green until those runs pass.
 
 See `GRANT_READINESS.md`, `docs/CROSS_CHAIN_READINESS.md`, and `docs/current/FAILURES_AND_TODOS.md` for evidence and blockers.
