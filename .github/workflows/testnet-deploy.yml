@@ -8,7 +8,7 @@
 #   4. Chain spec generation with dev-key scan.
 #
 # Usage:
-#   - Triggered manually via workflow_dispatch on main branch.
+#   - Triggered manually via workflow_dispatch on master branch.
 #   - Uses environment: testnet (configure in GitHub repo Settings → Environments).
 #
 # Required GitHub Environment setup:
