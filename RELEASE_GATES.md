@@ -19,7 +19,7 @@ A command counts only when its complete output is tied to the exact reviewed com
 
 ## Current enforcement status
 
-The repository contains workflows for build, lint, tests, security scanning, provenance, and release checks. On 2026-09-08, GitHub refused to start jobs because the account was locked due to a billing issue. Configured workflows are not passing evidence while that condition remains.
+The repository contains workflows for build, lint, tests, security scanning, provenance, and release checks. On 2026-09-09, GitHub accepted reruns and jobs began executing normal steps, confirming the earlier billing lock is cleared. Configured workflows are not passing evidence until the rerun suite completes successfully.
 
 Draft PR #126 retargets workflow triggers from the disconnected `main` lineage to the active `master` lineage. It must not merge until GitHub Actions can run and the required jobs pass.
 
