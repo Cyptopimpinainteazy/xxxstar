@@ -68,7 +68,7 @@ gh repo rule create --include-default-rules --branch "sprint-*" \
    - Branch name pattern: `master` / `develop` / `sprint-*`
    - Check all boxes below:
      - ✅ Require a pull request before merging
-     - ✅ Require approvals (count = 2 for main, 1 for develop)
+     - ✅ Require approvals (count = 2 for master, 1 for develop)
      - ✅ Require review from Code Owners
      - ✅ Dismiss stale pull request approvals when new commits are pushed
      - ✅ Require status checks to pass before merging
