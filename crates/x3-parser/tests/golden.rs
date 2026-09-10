@@ -7,7 +7,16 @@ mod golden_fixtures {
 
     /// Generate golden JSON files for all fixture programs.
     /// Run this test to update the golden files when the AST changes.
+    ///
+    /// #[ignore] is required: this test overwrites the checked-in golden
+    /// fixture files as a side effect. Without it, `cargo test` runs this
+    /// concurrently with `test_golden_fixtures` (both are `#[test]` in the
+    /// same binary and run in parallel by default), creating a data race
+    /// where this test can truncate/rewrite a golden file while the other
+    /// test is reading it, causing spurious failures. Run explicitly with
+    /// `cargo test -p x3-parser --test golden -- --ignored` to regenerate.
     #[test]
+    #[ignore]
     fn generate_golden_fixtures() {
         let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
 
