@@ -6391,6 +6391,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
 
 [[package]]
+name = "hex-literal"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e712f64ec3850b98572bffac52e2c6f282b29fe6c5fa6d42334b30be438d95c1"
+
+[[package]]
 name = "hex_fmt"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10590,7 +10596,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "hash-db 0.16.0",
- "hex-literal",
+ "hex-literal 0.4.1",
  "impl-trait-for-tuples",
  "log",
  "parity-scale-codec",
@@ -12363,7 +12369,7 @@ source = "git+https://github.com/paritytech/polkadot-sdk?branch=stable2512#e1f0f
 dependencies = [
  "bitvec",
  "bounded-collections 0.3.2",
- "hex-literal",
+ "hex-literal 0.4.1",
  "log",
  "parity-scale-codec",
  "polkadot-core-primitives",
@@ -20658,7 +20664,7 @@ dependencies = [
  "derive-where",
  "environmental",
  "frame-support",
- "hex-literal",
+ "hex-literal 0.4.1",
  "impl-trait-for-tuples",
  "parity-scale-codec",
  "scale-info",
@@ -25236,7 +25242,7 @@ version = "0.1.0"
 name = "x3-verification-router"
 version = "0.1.0"
 dependencies = [
- "hex-literal",
+ "hex-literal 1.1.0",
  "rlp 0.5.2",
  "scale-info",
  "serde",
