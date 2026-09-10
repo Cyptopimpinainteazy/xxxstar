@@ -75,6 +75,13 @@ fn pick(key: &str, a: &[String]) -> Result<String, String> {
         .ok_or_else(|| format!("missing {key}"))
 }
 
+fn pick_opt(key: &str, a: &[String]) -> Option<String> {
+    a.iter()
+        .position(|x| x == key)
+        .and_then(|i| a.get(i + 1))
+        .cloned()
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let json = args.iter().any(|arg| arg == "--json");
@@ -256,6 +263,37 @@ fn lock(
     )
 }
 
+/// The program requires the claimant/refund-authority account to be a
+/// transaction signer, and this CLI only ever loads a single fee-payer
+/// keypair from `--payer-keypair`. That means the payer *is* the signer for
+/// the claim/refund instruction, so `--claimant`/`--refund-authority`, when
+/// supplied, must match the payer's own pubkey — otherwise the on-chain
+/// program will reject the transaction (or, worse, silently authorize the
+/// wrong account if we ever stop checking). Fail fast here instead of
+/// quietly substituting the payer key for whatever the caller asked for.
+fn require_signer_matches_payer(
+    flag: &str,
+    supplied: Option<&str>,
+    payer_pk: &Pubkey,
+) -> Result<Pubkey, String> {
+    match supplied {
+        None => Ok(*payer_pk),
+        Some(s) => {
+            let requested = s
+                .parse::<Pubkey>()
+                .map_err(|e| format!("{flag}: {e}"))?;
+            if requested != *payer_pk {
+                return Err(format!(
+                    "{flag} ({requested}) must equal the fee-payer pubkey ({payer_pk}): \
+                     the on-chain program requires this account to co-sign the transaction, \
+                     and this CLI only ever signs with --payer-keypair"
+                ));
+            }
+            Ok(requested)
+        }
+    }
+}
+
 fn claim(
     cfg: &SvmLiveConfig,
     payer: &solana_sdk::signature::Keypair,
@@ -266,7 +304,12 @@ fn claim(
     let preimage_hex = preimage_hex.strip_prefix("0x").unwrap_or(&preimage_hex);
     let preimage = hex::decode(preimage_hex).map_err(|e| format!("--preimage: bad hex ({e})"))?;
     let payer_pk = payer.pubkey();
-    x3_svm_client::broadcast_claim_htlc(cfg, payer, &payer_pk, &swap_id, &preimage)
+    let claimant = require_signer_matches_payer(
+        "--claimant",
+        pick_opt("--claimant", a).as_deref(),
+        &payer_pk,
+    )?;
+    x3_svm_client::broadcast_claim_htlc(cfg, payer, &claimant, &swap_id, &preimage)
 }
 
 fn refund(
@@ -276,5 +319,10 @@ fn refund(
 ) -> Result<x3_svm_client::LiveSubmission, String> {
     let swap_id = parse_hex32("--swap-id", &pick("--swap-id", a)?)?;
     let payer_pk = payer.pubkey();
-    x3_svm_client::broadcast_refund_htlc(cfg, payer, &payer_pk, &swap_id)
+    let refund_authority = require_signer_matches_payer(
+        "--refund-authority",
+        pick_opt("--refund-authority", a).as_deref(),
+        &payer_pk,
+    )?;
+    x3_svm_client::broadcast_refund_htlc(cfg, payer, &refund_authority, &swap_id)
 }
