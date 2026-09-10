@@ -2,6 +2,7 @@
 name = "pallet-x3-wallet"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }

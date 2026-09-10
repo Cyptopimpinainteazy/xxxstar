@@ -29,12 +29,9 @@ jobs:
 
       - name: Verify key files are placeholders only
         run: |
-          if grep -q "REPLACED_RUN_KEY_ROTATION_SCRIPT\|REPLACE_ME" deployment/keys/bootnode-keys.json deployment/keys/bootnode-node-key; then
-            echo "✅ Key files are placeholders only"
-          else
-            echo "❌ Key files may contain real material — check deployment/keys/"
-            exit 1
-          fi
+          test -f deployment/keys/README.md
+          ! find deployment/keys -type f ! -name README.md ! -name bootnode-info.txt -print -quit | grep -q .
+          echo "✅ Deployment key directory contains no private key material"
 
   cargo-audit:
     name: Cargo audit (dependency vulns)

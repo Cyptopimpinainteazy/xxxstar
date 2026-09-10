@@ -2,6 +2,7 @@
 name = "pallet-x3-reservation"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 authors = ["X3 Chain"]
 description = "X3 reservation engine: request, release, consume, and auto-expire inventory reservations"
 

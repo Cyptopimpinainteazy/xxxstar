@@ -2,6 +2,7 @@
 name = "x3-foundry-indexer"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Indexer for X3 Foundry on-chain events"
 
 [dependencies]
