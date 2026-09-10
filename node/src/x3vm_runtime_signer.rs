@@ -25,11 +25,23 @@ use x3_chain_runtime::{
     UncheckedExtrinsic, VERSION,
 };
 
-/// A signed create-intent transaction plus the exact runtime intent id it will create.
+/// A signed create-intent transaction. The runtime intent id CANNOT be known
+/// before the extrinsic executes on-chain: `generate_intent_id` hashes in
+/// `T::UnixTime::now()`, a value only the runtime observes at execution time.
+/// Callers must submit `signed_extrinsic`, wait for finality, then call
+/// [`X3RuntimeSigner::resolve_intent_id`] with the finalized block hash to
+/// deterministically reconstruct the exact id the runtime allocated.
 #[derive(Debug, Clone)]
 pub struct PreparedX3Intent {
-    /// Runtime `H256` source-of-truth intent id.
-    pub runtime_intent_id: H256,
+    /// Maker account (the signer) used as a hash input.
+    pub maker: AccountId,
+    /// Taker account used as a hash input.
+    pub taker: AccountId,
+    /// `TotalIntents` value observed before submission; this becomes the
+    /// intent's `nonce` hash input as long as no other `create_intent` from
+    /// any account lands in an earlier block first (true for single-signer
+    /// test/orchestration flows).
+    pub nonce: u64,
     /// Complete signed SCALE extrinsic encoded for `author_submitExtrinsic`.
     pub signed_extrinsic: String,
 }
@@ -118,9 +130,8 @@ impl X3RuntimeSigner {
             .rpc
             .lock()
             .map_err(|_| SwapError::RpcError("X3 signer RPC mutex poisoned".into()))?;
-        rpc.call(method, params)?
-            .result
-            .ok_or_else(|| SwapError::RpcError(format!("{method} returned no result")))
+        let response = rpc.call(method, params)?;
+        Ok(response.result.unwrap_or(Value::Null))
     }
 
     fn genesis_hash(&self) -> Result<H256, SwapError> {
@@ -228,8 +239,54 @@ impl X3RuntimeSigner {
         Ok(format!("0x{}", hex::encode(xt.encode())))
     }
 
-    /// Build the on-chain `create_intent` call and deterministically return the
-    /// H256 id the runtime will allocate from its current `TotalIntents` value.
+    /// Read `Timestamp::Now` (the `u64` unix-seconds moment set by the
+    /// mandatory `pallet_timestamp` inherent) as observed *at* a specific
+    /// block. This is the exact same value `T::UnixTime::now()` returns to
+    /// any pallet executing within that block, including
+    /// `generate_intent_id`'s internal timestamp read.
+    fn timestamp_at(&self, block_hash: H256) -> Result<u64, SwapError> {
+        let key = storage_prefix(b"Timestamp", b"Now");
+        let result = self.rpc_call(
+            "state_getStorage",
+            vec![
+                Value::String(format!("0x{}", hex::encode(key))),
+                Value::String(format!("0x{}", hex::encode(block_hash.as_bytes()))),
+            ],
+        )?;
+        let raw = result.as_str().ok_or_else(|| {
+            SwapError::RpcError("Timestamp::Now storage was not hex".into())
+        })?;
+        let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
+            .map_err(|e| SwapError::RpcError(format!("decode Timestamp::Now storage: {e}")))?;
+        // pallet_timestamp stores the moment in milliseconds; the settlement
+        // engine's `T::UnixTime::now().as_secs()` divides by 1000 internally
+        // via `sp_timestamp::InherentDataProvider`/`UnixTime` blanket impl.
+        let millis = u64::decode(&mut &bytes[..])
+            .map_err(|e| SwapError::RpcError(format!("SCALE decode Timestamp::Now: {e}")))?;
+        Ok(millis / 1000)
+    }
+
+    /// Reconstruct the exact `H256` id the runtime allocated to a
+    /// `create_intent` call once it has finalized, by re-deriving the same
+    /// `blake2_256(maker ++ taker ++ nonce ++ unix_secs)` hash the pallet
+    /// computes internally, using the real on-chain timestamp read from the
+    /// finalized block instead of guessing it beforehand.
+    pub fn resolve_intent_id(
+        &self,
+        prepared: &PreparedX3Intent,
+        finalized_block_hash: H256,
+    ) -> Result<H256, SwapError> {
+        let unix_secs = self.timestamp_at(finalized_block_hash)?;
+        let mut data = prepared.maker.encode();
+        data.extend(prepared.taker.encode());
+        data.extend(prepared.nonce.to_le_bytes());
+        data.extend(unix_secs.to_le_bytes());
+        Ok(H256::from(sp_core::hashing::blake2_256(&data)))
+    }
+
+    /// Build the on-chain `create_intent` call. The runtime intent id cannot
+    /// be predicted here (see [`PreparedX3Intent`]); callers must submit,
+    /// wait for finality, then call [`Self::resolve_intent_id`].
     pub fn prepare_create_intent(
         &self,
         taker: AccountId,
@@ -238,15 +295,10 @@ impl X3RuntimeSigner {
         secret_hash: H256,
         timeout_seconds: Option<u64>,
     ) -> Result<PreparedX3Intent, SwapError> {
-        let next = self.total_intents()?;
-        let runtime_intent_id = pallet_x3_settlement_engine::Pallet::<Runtime>::generate_intent_id(
-            &self.account(),
-            &taker,
-            next,
-        );
+        let nonce = self.total_intents()?;
         let call = RuntimeCall::X3SettlementEngine(
             pallet_x3_settlement_engine::Call::<Runtime>::create_intent {
-                taker,
+                taker: taker.clone(),
                 asset_a,
                 asset_b,
                 secret_hash,
@@ -254,7 +306,9 @@ impl X3RuntimeSigner {
             },
         );
         Ok(PreparedX3Intent {
-            runtime_intent_id,
+            maker: self.account(),
+            taker,
+            nonce,
             signed_extrinsic: self.signed_extrinsic(call)?,
         })
     }

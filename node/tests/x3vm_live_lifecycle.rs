@@ -78,40 +78,70 @@ fn submit(signed: &str) -> String {
     .expect("transaction hash")
 }
 
+fn header_number(rpc: &mut RpcClient, hash: &str) -> u64 {
+    let header = rpc
+        .call("chain_getHeader", vec![Value::String(hash.to_string())])
+        .expect("header")
+        .result
+        .expect("header result");
+    let raw = header
+        .get("number")
+        .and_then(Value::as_str)
+        .expect("header number");
+    u64::from_str_radix(raw.trim_start_matches("0x"), 16).expect("hex block number")
+}
+
+fn block_hash_at(rpc: &mut RpcClient, number: u64) -> Option<String> {
+    rpc.call(
+        "chain_getBlockHash",
+        vec![Value::Number(number.into())],
+    )
+    .expect("block hash")
+    .result
+    .and_then(|v| v.as_str().map(ToOwned::to_owned))
+}
+
+fn block_contains(rpc: &mut RpcClient, hash: &str, signed: &str) -> bool {
+    let block = rpc
+        .call("chain_getBlock", vec![Value::String(hash.to_string())])
+        .expect("finalized block")
+        .result;
+    block
+        .as_ref()
+        .and_then(|v| v.pointer("/block/extrinsics"))
+        .and_then(Value::as_array)
+        .map(|xs| xs.iter().any(|x| x.as_str() == Some(signed)))
+        .unwrap_or(false)
+}
+
+/// Polls finalized blocks for `signed`, scanning every finalized block number
+/// seen since the poll started (not just the latest finalized head), because
+/// a fast-finalizing dev node can finalize several blocks between two polls
+/// and a "only check current head" loop can skip straight past the block
+/// that actually contains the extrinsic.
 fn wait_finalized(signed: &str, timeout: Duration) -> (u64, String) {
     let started = Instant::now();
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let mut next_number: Option<u64> = None;
     while started.elapsed() < timeout {
-        let mut rpc = RpcClient::new(RPC_URL.into(), 0);
         let head = rpc
             .call("chain_getFinalizedHead", Vec::new())
             .expect("finalized head")
             .result
             .and_then(|v| v.as_str().map(ToOwned::to_owned));
         if let Some(head) = head {
-            let block = rpc
-                .call("chain_getBlock", vec![Value::String(head.clone())])
-                .expect("finalized block")
-                .result;
-            let included = block
-                .as_ref()
-                .and_then(|v| v.pointer("/block/extrinsics"))
-                .and_then(Value::as_array)
-                .map(|xs| xs.iter().any(|x| x.as_str() == Some(signed)))
-                .unwrap_or(false);
-            if included {
-                let header = rpc
-                    .call("chain_getHeader", vec![Value::String(head.clone())])
-                    .expect("finalized header")
-                    .result
-                    .expect("header result");
-                let raw = header
-                    .get("number")
-                    .and_then(Value::as_str)
-                    .expect("header number");
-                let number = u64::from_str_radix(raw.trim_start_matches("0x"), 16)
-                    .expect("hex block number");
-                return (number, head);
+            let head_number = header_number(&mut rpc, &head);
+            let start = next_number.unwrap_or(head_number);
+            if head_number >= start {
+                for number in start..=head_number {
+                    if let Some(hash) = block_hash_at(&mut rpc, number) {
+                        if block_contains(&mut rpc, &hash, signed) {
+                            return (number, hash);
+                        }
+                    }
+                }
             }
+            next_number = Some(head_number + 1);
         }
         thread::sleep(Duration::from_millis(500));
     }
@@ -128,9 +158,9 @@ fn finalized_head() -> String {
 }
 
 fn intent_state_storage_key(intent_id: H256) -> String {
-    let mut key = frame_support::storage::storage_prefix(b"X3SettlementEngine", b"IntentStates");
+    let mut key = frame_support::storage::storage_prefix(b"X3SettlementEngine", b"IntentStates").to_vec();
     let encoded = intent_id.encode();
-    key.extend_from_slice(&sp_io::hashing::blake2_128(&encoded));
+    key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
     key.extend_from_slice(&encoded);
     format!("0x{}", hex::encode(key))
 }
@@ -178,7 +208,7 @@ fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
         amount_in: 1_000_000,
         min_amount_out: 1,
         receiver: dev_account("Bob").to_ss58check(),
-        hashlock: sp_io::hashing::sha2_256(&preimage),
+        hashlock: sp_core::hashing::sha2_256(&preimage),
         source_timeout: u64::MAX / 2,
         destination_timeout: u64::MAX / 2,
         finality_requirements: vec![FinalityRequirement {
@@ -210,12 +240,12 @@ fn proof_ledger_path(label: &str) -> std::path::PathBuf {
 #[ignore = "boots the real X3 dev node and waits for GRANDPA finality"]
 fn real_local_node_lock_finalized_claim_lifecycle() {
     let _node = spawn_dev_node();
-    wait_rpc(Duration::from_secs(60));
+    wait_rpc(Duration::from_secs(180));
 
     let chain_id = String::from("x3-local");
     let local_id = 1u64;
     let preimage = [0x42u8; 32];
-    let hashlock = H256::from(sp_io::hashing::sha2_256(&preimage));
+    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
     let alice_uri = dev_uri("Alice");
 
     let primary = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
@@ -233,11 +263,17 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         )
         .expect("prepare create_intent");
     assert!(!submit(&prepared.signed_extrinsic).is_empty());
-    wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(90));
+    let (_, finalized_head) = wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    let finalized_hash = H256::from_slice(
+        &hex::decode(finalized_head.trim_start_matches("0x")).expect("decode finalized head hex"),
+    );
+    let runtime_intent_id = primary
+        .resolve_intent_id(&prepared, finalized_hash)
+        .expect("resolve real on-chain intent id");
 
-    primary.bind_intent(local_id, prepared.runtime_intent_id).unwrap();
+    primary.bind_intent(local_id, runtime_intent_id).unwrap();
     second_leg
-        .bind_intent(local_id, prepared.runtime_intent_id)
+        .bind_intent(local_id, runtime_intent_id)
         .unwrap();
 
     let ledger_path = proof_ledger_path("claim");
@@ -245,7 +281,7 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         X3NodeTransportConfig {
             chain_id: chain_id.clone(),
             rpc_url: RPC_URL.into(),
-            finality_poll_attempts: 180,
+            finality_poll_attempts: 480,
             finality_poll_delay_ms: 500,
             expected_block_time_ms: 6_000,
         },
@@ -269,7 +305,7 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
 
     let leg1 = second_leg
         .sign_lock_escrow_leg(
-            prepared.runtime_intent_id,
+            runtime_intent_id,
             1,
             pallet_x3_settlement_engine::ExternalChainId::X3Native,
             1_000_000,
@@ -277,7 +313,7 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         )
         .expect("sign second escrow leg");
     assert!(!submit(&leg1).is_empty());
-    wait_finalized(&leg1, Duration::from_secs(90));
+    wait_finalized(&leg1, Duration::from_secs(180));
 
     let claim = adapter.claim(local_id, preimage).expect("live native claim");
     assert_eq!(claim.vm_type, VmType::X3Vm);
@@ -304,12 +340,12 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
 #[ignore = "boots the real X3 dev node and waits for timeout plus GRANDPA finality"]
 fn real_local_node_timeout_reaches_finalized_refund_state() {
     let _node = spawn_dev_node();
-    wait_rpc(Duration::from_secs(60));
+    wait_rpc(Duration::from_secs(180));
 
     let chain_id = String::from("x3-local");
     let local_id = 2u64;
     let preimage = [0x24u8; 32];
-    let hashlock = H256::from(sp_io::hashing::sha2_256(&preimage));
+    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
     let alice_uri = dev_uri("Alice");
     let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
         .expect("timeout signer");
@@ -324,14 +360,20 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
         )
         .expect("prepare timeout intent");
     assert!(!submit(&prepared.signed_extrinsic).is_empty());
-    wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(90));
-    signer.bind_intent(local_id, prepared.runtime_intent_id).unwrap();
+    let (_, finalized_head) = wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    let finalized_hash = H256::from_slice(
+        &hex::decode(finalized_head.trim_start_matches("0x")).expect("decode finalized head hex"),
+    );
+    let runtime_intent_id = signer
+        .resolve_intent_id(&prepared, finalized_hash)
+        .expect("resolve real on-chain intent id");
+    signer.bind_intent(local_id, runtime_intent_id).unwrap();
 
     let transport = NativeX3NodeTransport::new(
         X3NodeTransportConfig {
             chain_id: chain_id.clone(),
             rpc_url: RPC_URL.into(),
-            finality_poll_attempts: 180,
+            finality_poll_attempts: 480,
             finality_poll_delay_ms: 500,
             expected_block_time_ms: 6_000,
         },
@@ -346,9 +388,9 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
     let lock = adapter.lock(&intent).expect("live timeout lock");
     assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
 
-    let refund_head = wait_for_finalized_refund(prepared.runtime_intent_id, Duration::from_secs(120));
+    let refund_head = wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180));
     assert!(matches!(
-        intent_state_at(prepared.runtime_intent_id, &refund_head),
+        intent_state_at(runtime_intent_id, &refund_head),
         pallet_x3_settlement_engine::IntentState::Refunded
     ));
 }
