@@ -20,6 +20,7 @@
 //!   --hashlock <32-byte-hex> \
 //!   --amount <lamports> --timeout-slots <slots>
 //! ```
+//! Add `--json` to emit a machine-readable submission or error object.
 //!
 //! For `claim` / `refund`, see the per-action branches below.
 
@@ -76,6 +77,7 @@ fn pick(key: &str, a: &[String]) -> Result<String, String> {
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let json = args.iter().any(|arg| arg == "--json");
 
     let rpc = match pick("--rpc", &args) {
         Ok(v) => v,
@@ -131,7 +133,7 @@ fn main() -> ExitCode {
         }
     };
 
-    match action.as_str() {
+    return match action.as_str() {
         "lock" => {
             let rest: Vec<String> = args
                 .iter()
@@ -141,14 +143,11 @@ fn main() -> ExitCode {
                 .collect();
             match lock(&cfg, &payer, &rest) {
                 Ok(s) => {
-                    println!(
-                        "LOCK_SUBMITTED sig={} htlc={} payer={}",
-                        s.signature, s.htlc_account, s.payer
-                    );
+                    print_submission("lock", &s, json);
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    eprintln!("lock failed: {e}");
+                    print_error("lock", &e, json);
                     ExitCode::from(1)
                 }
             }
@@ -162,14 +161,11 @@ fn main() -> ExitCode {
                 .collect();
             match claim(&cfg, &payer, &rest) {
                 Ok(s) => {
-                    println!(
-                        "CLAIM_SUBMITTED sig={} htlc={}",
-                        s.signature, s.htlc_account
-                    );
+                    print_submission("claim", &s, json);
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    eprintln!("claim failed: {e}");
+                    print_error("claim", &e, json);
                     ExitCode::from(1)
                 }
             }
@@ -183,14 +179,11 @@ fn main() -> ExitCode {
                 .collect();
             match refund(&cfg, &payer, &rest) {
                 Ok(s) => {
-                    println!(
-                        "REFUND_SUBMITTED sig={} htlc={}",
-                        s.signature, s.htlc_account
-                    );
+                    print_submission("refund", &s, json);
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    eprintln!("refund failed: {e}");
+                    print_error("refund", &e, json);
                     ExitCode::from(1)
                 }
             }
@@ -198,6 +191,38 @@ fn main() -> ExitCode {
         _ => {
             eprintln!("unknown action {action}");
             ExitCode::from(2)
+        }
+    };
+
+    fn print_submission(action: &str, submission: &x3_svm_client::LiveSubmission, json: bool) {
+        if json {
+            let mut value =
+                serde_json::to_value(submission).expect("LiveSubmission is serializable");
+            value["action"] = serde_json::Value::String(action.to_string());
+            value["status"] = serde_json::Value::String("submitted".to_string());
+            println!(
+                "{}",
+                serde_json::to_string(&value).expect("JSON serialization")
+            );
+        } else {
+            println!(
+                "{}_SUBMITTED sig={} htlc={} payer={}",
+                action.to_ascii_uppercase(),
+                submission.signature,
+                submission.htlc_account,
+                submission.payer
+            );
+        }
+    }
+
+    fn print_error(action: &str, error: &str, json: bool) {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"action": action, "status": "error", "error": error})
+            );
+        } else {
+            eprintln!("{action} failed: {error}");
         }
     }
 }
@@ -237,14 +262,11 @@ fn claim(
     a: &[String],
 ) -> Result<x3_svm_client::LiveSubmission, String> {
     let swap_id = parse_hex32("--swap-id", &pick("--swap-id", a)?)?;
-    let preimage = a
-        .iter()
-        .position(|x| x == "--preimage")
-        .and_then(|i| a.get(i + 1))
-        .ok_or_else(|| "missing --preimage".to_string())?
-        .clone();
+    let preimage_hex = pick("--preimage", a)?;
+    let preimage_hex = preimage_hex.strip_prefix("0x").unwrap_or(&preimage_hex);
+    let preimage = hex::decode(preimage_hex).map_err(|e| format!("--preimage: bad hex ({e})"))?;
     let payer_pk = payer.pubkey();
-    x3_svm_client::broadcast_claim_htlc(cfg, payer, &payer_pk, &swap_id, preimage.as_bytes())
+    x3_svm_client::broadcast_claim_htlc(cfg, payer, &payer_pk, &swap_id, &preimage)
 }
 
 fn refund(

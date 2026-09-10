@@ -26,3 +26,8 @@ std = ["serde/std", "serde_json/std", "sha2/std", "hex/std", "ureq", "k256", "sh
 name = "gen_wallet"
 path = "src/bin/gen_wallet.rs"
 required-features = ["std"]
+
+[[bin]]
+name = "x3-evm-broadcast"
+path = "src/bin/x3_evm_broadcast.rs"
+required-features = ["std"]

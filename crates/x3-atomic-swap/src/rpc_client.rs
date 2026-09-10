@@ -248,10 +248,27 @@ impl RpcClient {
 
     /// Estimate gas for a transaction.
     pub fn estimate_gas(&mut self, from: &str, to: &str, data: &str) -> Result<u64, SwapError> {
+        self.estimate_gas_with_value(from, to, data, 0)
+    }
+
+    /// Estimate gas for a transaction that also sends native-token `value` wei.
+    ///
+    /// This must be included for calls (like `createHTLC` with the native
+    /// token) that revert when `msg.value` is zero but the callee requires
+    /// funds to be attached — without it, `eth_estimateGas` reverts even
+    /// though the real transaction (which does set `value`) would succeed.
+    pub fn estimate_gas_with_value(
+        &mut self,
+        from: &str,
+        to: &str,
+        data: &str,
+        value: u128,
+    ) -> Result<u64, SwapError> {
         let tx_obj = json!({
             "from": from,
             "to": to,
             "data": data,
+            "value": format!("0x{:x}", value),
         });
         let params = vec![tx_obj];
         let resp = self.call("eth_estimateGas", params)?;
