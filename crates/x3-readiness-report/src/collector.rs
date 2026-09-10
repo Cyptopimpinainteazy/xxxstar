@@ -170,7 +170,7 @@ impl Collector {
             (Some(supply), Some(locked)) if supply > 0 && locked <= supply => ReadinessCheck::pass(
                 format!("kernel invariant holds: supply={supply}, locked={locked}, locked≤supply"),
             ),
-            (Some(_supply), Some(locked)) if locked == 0 => ReadinessCheck::pass(
+            (Some(_supply), Some(0)) => ReadinessCheck::pass(
                 "kernel invariant holds: no assets locked (genesis/idle state)",
             ),
             (Some(supply), Some(locked)) if locked > supply => ReadinessCheck::fail(format!(
