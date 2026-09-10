@@ -48,11 +48,18 @@ jobs:
 
       - name: Verify key files are placeholders only
         run: |
-          if grep -q "REPLACED_RUN_KEY_ROTATION_SCRIPT\|REPLACE_ME" deployment/keys/bootnode-keys.json deployment/keys/bootnode-node-key; then
-            echo "✅ Key files are placeholders only"
-          else
-            echo "❌ Key files may contain real material — check deployment/keys/"
+          key_files=(deployment/keys/bootnode-keys.json deployment/keys/bootnode-node-key)
+          present=()
+          for file in "${key_files[@]}"; do
+            [[ -f "$file" ]] && present+=("$file")
+          done
+          if (( ${#present[@]} == 0 )); then
+            echo "✅ No bootnode key material is tracked"
+          elif grep -Lq "REPLACED_RUN_KEY_ROTATION_SCRIPT\|REPLACE_ME" "${present[@]}"; then
+            echo "❌ A tracked key file is not an explicit placeholder"
             exit 1
+          else
+            echo "✅ Tracked key files are placeholders only"
           fi
 
   # ───── CARGO AUDIT — dependency vulnerability check ──────────────────
