@@ -755,6 +755,23 @@ pub mod pallet {
                         weight = weight.saturating_add(
                             <T as frame_system::Config>::DbWeight::get().reads_writes(4, 4),
                         );
+                    } else {
+                        // The block-time estimate used to schedule this deadline entry
+                        // (timeout_seconds / 6) under- or over-shot actual wall-clock
+                        // block production (e.g. a fast dev/test chain), so the Unix
+                        // timeout has not actually elapsed yet even though the estimated
+                        // deadline block was reached. Re-schedule one block ahead instead
+                        // of silently dropping the entry (it was already removed via
+                        // `take()` above), so the intent is still auto-refunded once its
+                        // real timeout passes, without requiring the manual
+                        // `refund_settlement` extrinsic.
+                        let next_block = n.saturating_add(1u32.into());
+                        IntentDeadlineIndex::<T>::mutate(next_block, |list| {
+                            let _ = list.try_push(*intent_id);
+                        });
+                        weight = weight.saturating_add(
+                            <T as frame_system::Config>::DbWeight::get().reads_writes(1, 1),
+                        );
                     }
                 }
             }
