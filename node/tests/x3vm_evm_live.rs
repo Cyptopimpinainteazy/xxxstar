@@ -78,28 +78,64 @@ fn submit_x3(signed: &str) -> String {
     .expect("X3 transaction hash")
 }
 
-fn wait_x3_finalized(signed: &str, timeout: Duration) {
+fn x3_header_number(rpc: &mut RpcClient, hash: &str) -> u64 {
+    let header = rpc
+        .call("chain_getHeader", vec![Value::String(hash.to_string())])
+        .expect("X3 header")
+        .result
+        .expect("X3 header result");
+    let raw = header
+        .get("number")
+        .and_then(Value::as_str)
+        .expect("header number");
+    u64::from_str_radix(raw.trim_start_matches("0x"), 16).expect("hex block number")
+}
+
+fn x3_block_hash_at(rpc: &mut RpcClient, number: u64) -> Option<String> {
+    rpc.call("chain_getBlockHash", vec![Value::Number(number.into())])
+        .expect("X3 block hash")
+        .result
+        .and_then(|v| v.as_str().map(ToOwned::to_owned))
+}
+
+fn x3_block_contains(rpc: &mut RpcClient, hash: &str, signed: &str) -> bool {
+    rpc.call("chain_getBlock", vec![Value::String(hash.to_string())])
+        .expect("X3 finalized block")
+        .result
+        .as_ref()
+        .and_then(|v| v.pointer("/block/extrinsics"))
+        .and_then(Value::as_array)
+        .map(|xs| xs.iter().any(|x| x.as_str() == Some(signed)))
+        .unwrap_or(false)
+}
+
+/// Scans every finalized block number seen since the poll started (not just
+/// the latest finalized head), since a fast-finalizing dev node can finalize
+/// several blocks between two polls and skip past the block that actually
+/// contains the extrinsic.
+fn wait_x3_finalized(signed: &str, timeout: Duration) -> String {
     let started = Instant::now();
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let mut next_number: Option<u64> = None;
     while started.elapsed() < timeout {
-        let mut rpc = RpcClient::new(X3_RPC.into(), 0);
         if let Some(head) = rpc
             .call("chain_getFinalizedHead", Vec::new())
             .expect("X3 finalized head")
             .result
             .and_then(|v| v.as_str().map(ToOwned::to_owned))
         {
-            let included = rpc
-                .call("chain_getBlock", vec![Value::String(head)])
-                .expect("X3 finalized block")
-                .result
-                .as_ref()
-                .and_then(|v| v.pointer("/block/extrinsics"))
-                .and_then(Value::as_array)
-                .map(|xs| xs.iter().any(|x| x.as_str() == Some(signed)))
-                .unwrap_or(false);
-            if included {
-                return;
+            let head_number = x3_header_number(&mut rpc, &head);
+            let start = next_number.unwrap_or(head_number);
+            if head_number >= start {
+                for number in start..=head_number {
+                    if let Some(hash) = x3_block_hash_at(&mut rpc, number) {
+                        if x3_block_contains(&mut rpc, &hash, signed) {
+                            return hash;
+                        }
+                    }
+                }
             }
+            next_number = Some(head_number + 1);
         }
         thread::sleep(Duration::from_millis(500));
     }
@@ -122,7 +158,7 @@ fn first_htlc_id(sender: [u8; 20], recipient: [u8; 20], hashlock: [u8; 32]) -> [
     let mut count = [0u8; 32];
     count[31] = 1;
     encoded.extend_from_slice(&count);
-    sp_io::hashing::keccak_256(&encoded)
+    sp_core::hashing::keccak_256(&encoded)
 }
 
 fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
@@ -135,7 +171,7 @@ fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
         amount_in: 1_000_000,
         min_amount_out: 1,
         receiver: dev_account("Bob").to_ss58check(),
-        hashlock: sp_io::hashing::sha2_256(&preimage),
+        hashlock: sp_core::hashing::sha2_256(&preimage),
         source_timeout: u64::MAX / 2,
         destination_timeout: u64::MAX / 2,
         finality_requirements: vec![
@@ -169,11 +205,11 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
     let claimant_key = std::env::var("X3_TEST_EVM_CLAIMANT_KEY").expect("X3_TEST_EVM_CLAIMANT_KEY");
 
     let _x3 = spawn_x3_node();
-    wait_x3_rpc(Duration::from_secs(60));
+    wait_x3_rpc(Duration::from_secs(180));
 
     let local_id = 1001u64;
     let preimage = [0x5au8; 32];
-    let hashlock = sp_io::hashing::sha2_256(&preimage);
+    let hashlock = sp_core::hashing::sha2_256(&preimage);
     let chain_id = String::from("x3-local");
     let alice_uri = dev_uri("Alice");
     let primary = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &alice_uri)
@@ -191,15 +227,21 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         )
         .expect("prepare X3 intent");
     assert!(!submit_x3(&prepared.signed_extrinsic).is_empty());
-    wait_x3_finalized(&prepared.signed_extrinsic, Duration::from_secs(90));
-    primary.bind_intent(local_id, prepared.runtime_intent_id).unwrap();
-    second_leg.bind_intent(local_id, prepared.runtime_intent_id).unwrap();
+    let finalized_head = wait_x3_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    let finalized_hash = H256::from_slice(
+        &hex::decode(finalized_head.trim_start_matches("0x")).expect("decode finalized head hex"),
+    );
+    let runtime_intent_id = primary
+        .resolve_intent_id(&prepared, finalized_hash)
+        .expect("resolve real on-chain intent id");
+    primary.bind_intent(local_id, runtime_intent_id).unwrap();
+    second_leg.bind_intent(local_id, runtime_intent_id).unwrap();
 
     let x3_transport = NativeX3NodeTransport::new(
         X3NodeTransportConfig {
             chain_id: chain_id.clone(),
             rpc_url: X3_RPC.into(),
-            finality_poll_attempts: 180,
+            finality_poll_attempts: 480,
             finality_poll_delay_ms: 500,
             expected_block_time_ms: 6_000,
         },
@@ -218,7 +260,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
     // Runtime settlement currently requires two escrow legs before claim.
     let leg1 = second_leg
         .sign_lock_escrow_leg(
-            prepared.runtime_intent_id,
+            runtime_intent_id,
             1,
             pallet_x3_settlement_engine::ExternalChainId::X3Native,
             1_000_000,
@@ -226,7 +268,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         )
         .expect("sign X3 second leg");
     assert!(!submit_x3(&leg1).is_empty());
-    wait_x3_finalized(&leg1, Duration::from_secs(90));
+    wait_x3_finalized(&leg1, Duration::from_secs(180));
 
     let mut evm_locker = LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key)
         .expect("live EVM locker");

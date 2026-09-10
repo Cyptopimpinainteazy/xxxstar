@@ -182,13 +182,37 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         })
     }
 
-    fn inclusion_at_finalized_head(
+    fn finalized_head_number(&self) -> Result<u64, SwapError> {
+        let head = self.finalized_head()?;
+        let mut rpc = self.rpc_lock()?;
+        let header = rpc
+            .call("chain_getHeader", vec![Value::String(head)])?
+            .result
+            .ok_or_else(|| SwapError::RpcError("chain_getHeader returned no header".into()))?;
+        Self::parse_hex_u64(
+            header
+                .get("number")
+                .ok_or_else(|| SwapError::RpcError("finalized header missing number".into()))?,
+            "header.number",
+        )
+    }
+
+    fn block_hash_at(&self, number: u64) -> Result<Option<String>, SwapError> {
+        let mut rpc = self.rpc_lock()?;
+        let resp = rpc.call(
+            "chain_getBlockHash",
+            vec![Value::Number(number.into())],
+        )?;
+        Ok(resp.result.and_then(|v| v.as_str().map(ToString::to_string)))
+    }
+
+    fn inclusion_at_block(
         &self,
         tx_id: &TxId,
         signed_extrinsic: &str,
+        block_hash: &str,
     ) -> Result<Option<X3FinalizedInclusionProof>, SwapError> {
-        let head = self.finalized_head()?;
-        let (block, header) = self.block_and_header(&head)?;
+        let (block, header) = self.block_and_header(block_hash)?;
         let extrinsics = block
             .pointer("/block/extrinsics")
             .and_then(Value::as_array)
@@ -215,7 +239,7 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
 
         Ok(Some(X3FinalizedInclusionProof {
             tx_id: tx_id.clone(),
-            block_hash: head,
+            block_hash: block_hash.to_string(),
             block_number,
             state_root,
             extrinsic_index: index as u32,
@@ -223,15 +247,31 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         }))
     }
 
+    /// Polls finalized blocks for `signed_extrinsic`, scanning every finalized
+    /// block number since the poll started (not just the latest finalized
+    /// head) so that a fast-finalizing dev node cannot skip past the block
+    /// that actually contains the extrinsic between two polls.
     fn wait_for_finalized_inclusion(
         &self,
         tx_id: &TxId,
         signed_extrinsic: &str,
     ) -> Result<X3FinalizedInclusionProof, SwapError> {
+        let mut next_number: Option<u64> = None;
         for attempt in 0..self.config.finality_poll_attempts {
-            if let Some(proof) = self.inclusion_at_finalized_head(tx_id, signed_extrinsic)? {
-                return Ok(proof);
+            let head_number = self.finalized_head_number()?;
+            let start = next_number.unwrap_or(head_number);
+            if head_number >= start {
+                for number in start..=head_number {
+                    if let Some(hash) = self.block_hash_at(number)? {
+                        if let Some(proof) =
+                            self.inclusion_at_block(tx_id, signed_extrinsic, &hash)?
+                        {
+                            return Ok(proof);
+                        }
+                    }
+                }
             }
+            next_number = Some(head_number + 1);
             if attempt + 1 < self.config.finality_poll_attempts {
                 thread::sleep(Duration::from_millis(self.config.finality_poll_delay_ms));
             }
