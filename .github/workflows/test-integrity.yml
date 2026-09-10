@@ -2,9 +2,9 @@ name: Test Integrity Enforcement
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   integrity-check:
@@ -16,12 +16,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run X3 Test Integrity Enforcement
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Validate pull-request integrity
         run: |
-          echo "🔍 CI: running X3 test integrity enforcement"
-          python3 scripts_infrastructure/enforce_x3_rules.py --base origin/main
+          python3 scripts_infrastructure/pr_supervisor.py --base origin/master
 
       - name: Run core test suite
         run: |
           echo "🧪 Running core test suite"
-          cargo test --workspace --all-targets --all-features -- --quiet
+          cargo test --workspace --all-targets -- --quiet

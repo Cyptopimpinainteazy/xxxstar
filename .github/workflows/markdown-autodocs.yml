@@ -3,7 +3,7 @@ name: markdown-autodocs
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - "FEATURE_REGISTRY.toml"
       - "TESTNET_FEATURE_FLAGS.toml"

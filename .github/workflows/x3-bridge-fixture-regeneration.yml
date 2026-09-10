@@ -9,7 +9,7 @@ on:
       - "scripts/proof/generate_eth_bridge_fixture.py"
       - "x3-lang/**"
   push:
-    branches: [main, master]
+    branches: [master]
     paths:
       - ".github/workflows/x3-bridge-fixture-regeneration.yml"
       - "docs/x3-lang/bridge-proof-schema.md"

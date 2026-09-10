@@ -18,4 +18,4 @@ jobs:
       - name: Run PR Supervisor enforcement
         run: |
           echo "🔎 PR Supervisor: checking PR diff and test integrity"
-          python3 scripts_infrastructure/pr_supervisor.py --base origin/main
+          python3 scripts_infrastructure/pr_supervisor.py --base origin/master

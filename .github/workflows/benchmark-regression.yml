@@ -2,7 +2,7 @@ name: X3 Benchmark Regression Gate
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'benches/**'
       - 'crates/x3-atomic-swap/**'
@@ -13,7 +13,7 @@ on:
       - 'pallets/**/src/**'
       - 'runtime/src/**'
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - 'benches/**'
       - 'crates/x3-atomic-swap/**'

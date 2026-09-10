@@ -12,7 +12,7 @@ provider = "native"  # "native" or "kubernetes"
 
 [relaychain]
 default_command = "./target/release/x3-chain-node"
-chain = "x3-local3-raw"
+chain = "chain-specs/x3-local3-current-raw.json"
 
 [[relaychain.nodes]]
 name = "alice"

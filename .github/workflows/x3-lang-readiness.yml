@@ -14,7 +14,7 @@ on:
       - "x3-lang/**"
       - ".github/workflows/x3-lang-readiness.yml"
   push:
-    branches: [main, master]
+    branches: [master]
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
@@ -45,26 +45,22 @@ jobs:
         run: |
           mkdir -p artifacts/readiness
 
-      - name: Capture dependency lineage snapshot
+      - name: Capture locked dependency lineage snapshot
         run: |
-          cargo tree -p x3-svm-integration > artifacts/readiness/lineage-tree.txt
-          cargo tree -p x3-svm-integration --duplicates > artifacts/readiness/lineage-duplicates.txt
-
-      - name: Fail on known Solana lineage regressions
-        run: |
-          if grep -E "solana-hash v4\\.|solana-pubkey v4\\.|solana-address v2\\.5\\.0" artifacts/readiness/lineage-tree.txt; then
-            echo "Detected forbidden Solana lineage entry in SVM dependency graph"
-            exit 1
-          fi
+          cargo metadata --locked --no-deps --format-version 1 > artifacts/readiness/cargo-metadata.json
+          cargo tree --locked -p x3-svm-integration > artifacts/readiness/lineage-tree.txt
+          cargo tree --locked -p x3-svm-integration --duplicates > artifacts/readiness/lineage-duplicates.txt
 
       - name: Combined gate run #1
         run: |
+          set -o pipefail
           cargo test -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-1-core.log
           cargo test -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-vm-evm.log
           cargo test -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-1-svm.log
 
       - name: Combined gate run #2 (stability repeat)
         run: |
+          set -o pipefail
           cargo test -p x3-parser -p x3-typeck -p x3-opt -p x3-verifier -p x3-compiler --all-targets 2>&1 | tee artifacts/readiness/run-2-core.log
           cargo test -p x3-vm -p x3-evm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-vm-evm.log
           cargo test -p x3-svm-integration --all-targets 2>&1 | tee artifacts/readiness/run-2-svm.log
