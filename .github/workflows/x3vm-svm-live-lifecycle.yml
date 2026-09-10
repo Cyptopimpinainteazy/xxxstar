@@ -1,0 +1,70 @@
+name: x3vm-svm-live-lifecycle
+
+# Real solana-test-validator lifecycle gate for the SVM HTLC program at
+# programs/svm/x3_atomic_swap. This is NOT a mock/simulation job: it installs
+# the Solana CLI + cargo-build-sbf, builds the actual SBF binary, deploys it
+# to a genuine local solana-test-validator, and drives the full HTLC
+# lifecycle (lock/claim/refund) plus adversarial rejections through the real
+# on-chain program, independently verifying resulting account state via raw
+# RPC getAccountInfo byte decoding. See
+# programs/svm/x3_atomic_swap/test-live-lifecycle.sh for the test itself.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "programs/svm/**"
+      - ".github/workflows/x3vm-svm-live-lifecycle.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "programs/svm/**"
+      - ".github/workflows/x3vm-svm-live-lifecycle.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  SOLANA_INSTALL_URL: https://release.anza.xyz/stable/install
+
+jobs:
+  live-lifecycle:
+    name: SVM HTLC live validator lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            programs/svm/x3_atomic_swap
+            programs/svm/x3_atomic_swap/client
+          shared-key: svm-live-lifecycle
+
+      - name: Install Solana CLI (agave) + cargo-build-sbf
+        run: |
+          set -euo pipefail
+          curl -sSfL "$SOLANA_INSTALL_URL" -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Solana toolchain
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo-build-sbf --version
+          solana-test-validator --version
+
+      - name: Run real solana-test-validator HTLC lifecycle gate
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          ./programs/svm/x3_atomic_swap/test-live-lifecycle.sh
+
+      - name: Run SVM program + client unit tests
+        run: |
+          cargo test --release --manifest-path programs/svm/x3_atomic_swap/Cargo.toml
+          cargo test --release --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml

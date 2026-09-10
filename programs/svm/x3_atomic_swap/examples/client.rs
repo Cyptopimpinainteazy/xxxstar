@@ -38,9 +38,8 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::Keypair,
     signer::Signer,
-    system_program,
-    transaction::Transaction,
 };
+use solana_system_interface::program as system_program;
 
 /// Program ID of the deployed X3 Atomic Swap HTLC BPF program.
 ///
@@ -199,12 +198,7 @@ fn main() {
     println!("Data len:   {} bytes", create_ix.data.len());
 
     // --- Step 2: Build ClaimHtlc instruction ---
-    let claim_ix = build_claim_htlc_ix(
-        &program_id,
-        &htlc_pda,
-        &claimant.pubkey(),
-        preimage,
-    );
+    let claim_ix = build_claim_htlc_ix(&program_id, &htlc_pda, &claimant.pubkey(), preimage);
 
     println!("\n--- ClaimHtlc Instruction ---");
     println!("Program ID: {}", claim_ix.program_id);
@@ -212,11 +206,7 @@ fn main() {
     println!("Data len:   {} bytes", claim_ix.data.len());
 
     // --- Step 3: Build RefundHtlc instruction (alternative to claim) ---
-    let refund_ix = build_refund_htlc_ix(
-        &program_id,
-        &htlc_pda,
-        &refund_authority.pubkey(),
-    );
+    let refund_ix = build_refund_htlc_ix(&program_id, &htlc_pda, &refund_authority.pubkey());
 
     println!("\n--- RefundHtlc Instruction ---");
     println!("Program ID: {}", refund_ix.program_id);

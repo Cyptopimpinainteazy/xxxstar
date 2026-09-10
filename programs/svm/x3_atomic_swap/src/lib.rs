@@ -37,14 +37,12 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+extern crate alloc;
+
 #[cfg(not(feature = "no-entrypoint"))]
 pub mod entrypoint {
     use solana_program::{
-        account_info::AccountInfo,
-        entrypoint,
-        entrypoint::ProgramResult,
-        msg,
-        pubkey::Pubkey,
+        account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg, pubkey::Pubkey,
     };
 
     entrypoint!(process_instruction);
@@ -58,7 +56,7 @@ pub mod entrypoint {
         instruction_data: &[u8],
     ) -> ProgramResult {
         msg!("X3 Atomic Swap HTLC: processing instruction");
-        processor::process(program_id, accounts, instruction_data)
+        crate::processor::process(program_id, accounts, instruction_data)
     }
 }
 
@@ -67,11 +65,7 @@ pub mod entrypoint {
 /// These map to [`solana_program::program_error::ProgramError::Custom`]
 /// with the discriminant as the custom error code.
 pub mod error {
-    use solana_program::{
-        decode_error::DecodeError,
-        msg,
-        program_error::{PrintProgramError, ProgramError},
-    };
+    use solana_program::program_error::ProgramError;
 
     /// Error codes for the X3 Atomic Swap HTLC program.
     ///
@@ -110,15 +104,23 @@ pub mod error {
         pub fn msg(&self) -> &'static str {
             match self {
                 Self::WrongPreimage => "WrongPreimage: preimage does not match stored hashlock",
-                Self::HashlockMismatch => "HashlockMismatch: computed hash does not equal stored hashlock",
-                Self::UnauthorizedClaimant => "UnauthorizedClaimant: caller is not the authorized claimant",
-                Self::UnauthorizedRefund => "UnauthorizedRefund: caller is not the refund authority",
+                Self::HashlockMismatch => {
+                    "HashlockMismatch: computed hash does not equal stored hashlock"
+                }
+                Self::UnauthorizedClaimant => {
+                    "UnauthorizedClaimant: caller is not the authorized claimant"
+                }
+                Self::UnauthorizedRefund => {
+                    "UnauthorizedRefund: caller is not the refund authority"
+                }
                 Self::HtlcExpired => "HtlcExpired: timelock has expired, cannot claim",
                 Self::HtlcNotExpired => "HtlcNotExpired: timelock has not expired, cannot refund",
                 Self::HtlcAlreadyClaimed => "HtlcAlreadyClaimed: HTLC has already been claimed",
                 Self::HtlcAlreadyRefunded => "HtlcAlreadyRefunded: HTLC has already been refunded",
                 Self::InvalidAmount => "InvalidAmount: amount must be greater than zero",
-                Self::TimelockInPast => "TimelockInPast: timelock must be greater than current slot",
+                Self::TimelockInPast => {
+                    "TimelockInPast: timelock must be greater than current slot"
+                }
                 Self::TimelockTooFar => "TimelockTooFar: timelock exceeds maximum allowed offset",
                 Self::Overflow => "Overflow: arithmetic overflow or underflow",
             }
@@ -130,18 +132,6 @@ pub mod error {
             ProgramError::Custom(e as u32)
         }
     }
-
-    impl<T> DecodeError<T> for HtlcError {
-        fn type_of() -> &'static str {
-            "HtlcError"
-        }
-    }
-
-    impl PrintProgramError for HtlcError {
-        fn print<E>(&self) {
-            msg!("X3 HTLC Error: {}", self.msg());
-        }
-    }
 }
 
 /// Instruction processor and handler functions.
@@ -151,17 +141,15 @@ pub mod processor {
         entrypoint::ProgramResult,
         hash::hashv,
         msg,
-        program::invoke,
+        program::invoke_signed,
         program_error::ProgramError,
         pubkey::Pubkey,
-        system_instruction,
         sysvar::{clock::Clock, rent::Rent, Sysvar},
     };
+    use solana_system_interface::instruction as system_instruction;
 
     use crate::error::HtlcError;
-    use crate::state::{
-        HtlcAccount, HtlcInstruction, HTLC_ACCOUNT_SEED, HTLC_ACCOUNT_SIZE,
-    };
+    use crate::state::{HtlcAccount, HtlcInstruction, HTLC_ACCOUNT_SEED, HTLC_ACCOUNT_SIZE};
 
     /// Main instruction dispatcher.
     ///
@@ -252,18 +240,15 @@ pub mod processor {
         }
 
         // Derive PDA
-        let (expected_pda, bump) =
-            Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, &create.swap_id], program_id);
-        if htlc_info.key != &expected_pda {
-            msg!("Error: HTLC account is not the expected PDA");
-            return Err(ProgramError::InvalidArgument);
-        }
+        let bump = validate_htlc_pda(program_id, htlc_info.key, &create.swap_id)?;
 
         // Create the account
         let rent = Rent::get()?;
         let lamports = rent.minimum_balance(HTLC_ACCOUNT_SIZE);
 
-        invoke(
+        let bump_seed = [bump];
+        let signer_seeds: &[&[u8]] = &[HTLC_ACCOUNT_SEED, &create.swap_id, &bump_seed];
+        invoke_signed(
             &system_instruction::create_account(
                 payer.key,
                 htlc_info.key,
@@ -271,11 +256,8 @@ pub mod processor {
                 HTLC_ACCOUNT_SIZE as u64,
                 program_id,
             ),
-            &[
-                payer.clone(),
-                htlc_info.clone(),
-                system_program.clone(),
-            ],
+            &[payer.clone(), htlc_info.clone(), system_program.clone()],
+            &[signer_seeds],
         )?;
 
         // Initialize account data
@@ -356,12 +338,7 @@ pub mod processor {
         let htlc = HtlcAccount::deserialize_from(&account_data)?;
 
         // Verify PDA matches
-        let (expected_pda, _) =
-            Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, &htlc.swap_id], program_id);
-        if htlc_info.key != &expected_pda {
-            msg!("Error: HTLC account PDA mismatch");
-            return Err(ProgramError::InvalidArgument);
-        }
+        validate_htlc_pda(program_id, htlc_info.key, &htlc.swap_id)?;
 
         // Check not already claimed/refunded
         if htlc.claimed {
@@ -456,12 +433,7 @@ pub mod processor {
         let htlc = HtlcAccount::deserialize_from(&account_data)?;
 
         // Verify PDA
-        let (expected_pda, _) =
-            Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, &htlc.swap_id], program_id);
-        if htlc_info.key != &expected_pda {
-            msg!("Error: HTLC account PDA mismatch");
-            return Err(ProgramError::InvalidArgument);
-        }
+        validate_htlc_pda(program_id, htlc_info.key, &htlc.swap_id)?;
 
         // Check not already claimed/refunded
         if htlc.claimed {
@@ -504,15 +476,27 @@ pub mod processor {
         msg!("HTLC refunded: swap_id={:?}", htlc.swap_id);
         Ok(())
     }
+
+    /// Validate the account address against the canonical HTLC derivation.
+    ///
+    /// The returned bump is also the signer seed used when creating the PDA.
+    pub(crate) fn validate_htlc_pda(
+        program_id: &Pubkey,
+        account: &Pubkey,
+        swap_id: &[u8; 32],
+    ) -> Result<u8, ProgramError> {
+        let (expected, bump) = crate::state::derive_htlc_pda(program_id, swap_id);
+        if account != &expected {
+            msg!("Error: HTLC account PDA mismatch");
+            return Err(ProgramError::InvalidArgument);
+        }
+        Ok(bump)
+    }
 }
 
 /// HTLC account state and instruction data types.
 pub mod state {
-    use solana_program::{
-        msg,
-        program_error::ProgramError,
-        pubkey::Pubkey,
-    };
+    use solana_program::{msg, program_error::ProgramError, pubkey::Pubkey};
 
     /// Seed prefix for HTLC PDA derivation.
     ///
@@ -521,6 +505,11 @@ pub mod state {
     /// Pubkey::find_program_address(&[b"htlc", &swap_id], program_id)
     /// ```
     pub const HTLC_ACCOUNT_SEED: &[u8] = b"htlc";
+
+    /// Derive the canonical HTLC PDA and bump for a swap identifier.
+    pub fn derive_htlc_pda(program_id: &Pubkey, swap_id: &[u8; 32]) -> (Pubkey, u8) {
+        Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, swap_id], program_id)
+    }
 
     /// Total byte size of a serialized [`HtlcAccount`].
     ///
@@ -643,7 +632,8 @@ pub mod state {
         /// The buffer must be at least [`HTLC_ACCOUNT_SIZE`] bytes long.
         /// Panics if the buffer is too small.
         pub fn serialize_into(&self, dst: &mut [u8]) {
-            dst[Self::INITIALIZER_OFF..Self::CLAIMANT_OFF].copy_from_slice(self.initializer.as_ref());
+            dst[Self::INITIALIZER_OFF..Self::CLAIMANT_OFF]
+                .copy_from_slice(self.initializer.as_ref());
             dst[Self::CLAIMANT_OFF..Self::REFUND_AUTH_OFF].copy_from_slice(self.claimant.as_ref());
             dst[Self::REFUND_AUTH_OFF..Self::HASHLOCK_OFF]
                 .copy_from_slice(self.refund_authority.as_ref());
@@ -768,7 +758,7 @@ mod tests {
 
     #[test]
     fn test_htlc_account_with_claimed_flag() {
-        let mut account = HtlcAccount {
+        let account = HtlcAccount {
             initializer: Pubkey::new_from_array([1u8; 32]),
             claimant: Pubkey::new_from_array([2u8; 32]),
             refund_authority: Pubkey::new_from_array([3u8; 32]),
@@ -883,5 +873,32 @@ mod tests {
         assert_eq!(account.amount, 0);
         assert!(!account.claimed);
         assert!(!account.refunded);
+    }
+
+    #[test]
+    fn test_canonical_pda_validation_accepts_only_matching_swap_id() {
+        let program_id = Pubkey::new_unique();
+        let swap_id = [9u8; 32];
+        let (pda, bump) = derive_htlc_pda(&program_id, &swap_id);
+        assert_eq!(
+            super::processor::validate_htlc_pda(&program_id, &pda, &swap_id),
+            Ok(bump)
+        );
+        assert_eq!(
+            super::processor::validate_htlc_pda(&program_id, &pda, &[8u8; 32]),
+            Err(solana_program::program_error::ProgramError::InvalidArgument)
+        );
+    }
+
+    #[test]
+    fn test_canonical_pda_bump_reconstructs_address() {
+        let program_id = Pubkey::new_unique();
+        let swap_id = [3u8; 32];
+        let (pda, bump) = derive_htlc_pda(&program_id, &swap_id);
+        let bump_seed = [bump];
+        let reconstructed =
+            Pubkey::create_program_address(&[HTLC_ACCOUNT_SEED, &swap_id, &bump_seed], &program_id)
+                .unwrap();
+        assert_eq!(reconstructed, pda);
     }
 }

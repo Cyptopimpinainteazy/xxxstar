@@ -2,7 +2,7 @@
 name = "x3-atomic-swap-solana"
 version = "0.1.0"
 edition = "2021"
-license.workspace = true
+license = "Apache-2.0"
 description = "Solana BPF program for X3 Atomic Swap HTLC"
 publish = false
 
@@ -12,6 +12,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 solana-program = "=3.0.0"
+solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 
 [dev-dependencies]
 solana-program-test = "=3.0.0"
@@ -20,3 +21,7 @@ solana-sdk = "=3.0.0"
 [features]
 no-entrypoint = []
 test-sbf = []
+
+# Keep the Solana program independent from the root workspace's incompatible
+# Solana dependency graph.
+[workspace]

@@ -28,6 +28,7 @@
 //! `programs/svm/x3_atomic_swap/deploy-devnet.sh`. Configure the returned
 //! program ID into [`SvmLiveConfig::program_id`].
 
+use serde::Serialize;
 use solana_sdk::{
     hash::{hashv, Hash},
     instruction::{AccountMeta, Instruction},
@@ -71,7 +72,7 @@ impl Default for SvmLiveConfig {
 }
 
 /// A live, signed transaction submission result.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct LiveSubmission {
     /// Payer pubkey that funded and signed the tx.
     pub payer: Pubkey,
@@ -86,6 +87,22 @@ pub struct LiveSubmission {
 /// Derive the HTLC PDA `(address, bump)` for a swap id, matching the program.
 pub fn derive_htlc_pda(program_id: &Pubkey, swap_id: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, swap_id], program_id)
+}
+
+/// Return the canonical PDA bump when `account` matches the swap derivation.
+pub fn validate_htlc_pda(
+    program_id: &Pubkey,
+    account: &Pubkey,
+    swap_id: &[u8; 32],
+) -> Result<u8, String> {
+    let (expected, bump) = derive_htlc_pda(program_id, swap_id);
+    if account != &expected {
+        return Err(format!(
+            "x3-svm-client: HTLC PDA mismatch (expected {}, got {})",
+            expected, account
+        ));
+    }
+    Ok(bump)
 }
 
 /// Build a `CreateHtlc` instruction with the on-chain data layout.
@@ -318,6 +335,16 @@ mod tests {
         let expect = Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, &swap_id], &pid);
         assert_eq!((pda, bump), expect);
         assert!(!pda.eq(&Pubkey::default()));
+    }
+
+    #[test]
+    fn pda_validation_rejects_wrong_account_or_swap_id() {
+        let pid = Pubkey::new_unique();
+        let swap_id = [7u8; 32];
+        let (pda, bump) = derive_htlc_pda(&pid, &swap_id);
+        assert_eq!(validate_htlc_pda(&pid, &pda, &swap_id), Ok(bump));
+        assert!(validate_htlc_pda(&pid, &Pubkey::new_unique(), &swap_id).is_err());
+        assert!(validate_htlc_pda(&pid, &pda, &[8u8; 32]).is_err());
     }
 
     #[test]

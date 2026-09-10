@@ -33,13 +33,11 @@
 //! invoke(&ix, &[htlc_account, payer, initializer, system_program])?;
 //! ```
 
+use alloc::{vec, vec::Vec};
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
-
-use crate::state::HTLC_ACCOUNT_SEED;
-
 /// Build a CPI instruction to create an HTLC.
 ///
 /// This is a thin wrapper around [`Instruction`] construction. The caller
@@ -168,9 +166,6 @@ pub fn refund_htlc(
 /// ```
 ///
 /// Returns `(pda_address, bump_seed)`.
-pub fn derive_htlc_pda(
-    program_id: &Pubkey,
-    swap_id: &[u8; 32],
-) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, swap_id], program_id)
+pub fn derive_htlc_pda(program_id: &Pubkey, swap_id: &[u8; 32]) -> (Pubkey, u8) {
+    crate::state::derive_htlc_pda(program_id, swap_id)
 }

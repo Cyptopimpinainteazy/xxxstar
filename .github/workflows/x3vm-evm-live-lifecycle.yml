@@ -1,0 +1,69 @@
+name: x3vm-evm-live-lifecycle
+
+# Real anvil lifecycle gate for the EVM HTLC contract at
+# X3-contracts/evm/contracts/AtlasHTLC.sol. This is NOT a mock/simulation
+# job: it builds the actual contract with forge, starts a genuine local
+# anvil chain, deploys the real bytecode, and drives the full HTLC
+# lifecycle (lock/claim/refund) plus adversarial rejections through the
+# real x3-evm-broadcast client and real signed/broadcast/mined
+# transactions, independently verifying resulting contract state via raw
+# `cast call getHTLC(...)` reads. See
+# X3-contracts/evm/test-live-lifecycle.sh for the test itself.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "X3-contracts/evm/**"
+      - "crates/x3-atomic-swap/**"
+      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "X3-contracts/evm/**"
+      - "crates/x3-atomic-swap/**"
+      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  live-lifecycle:
+    name: EVM HTLC live anvil lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+          shared-key: evm-live-lifecycle
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      # X3-contracts/evm/foundry.toml remaps forge-std/ and
+      # @openzeppelin/contracts/ to lib/forge-std and
+      # lib/openzeppelin-contracts. These are intentionally NOT vendored
+      # in the repo (see .gitignore) and are not tracked as git submodules;
+      # X3-contracts/evm/foundry.lock pins the exact versions to install.
+      - name: Install forge dependencies (pinned via foundry.lock)
+        working-directory: X3-contracts/evm
+        run: |
+          set -euo pipefail
+          FORGE_STD_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/forge-std']['tag']['name'])")"
+          OZ_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/openzeppelin-contracts']['tag']['name'])")"
+          forge install "foundry-rs/forge-std@${FORGE_STD_TAG}" --no-commit
+          forge install "OpenZeppelin/openzeppelin-contracts@${OZ_TAG}" --no-commit
+
+      - name: Build x3-evm-broadcast
+        run: cargo build --release -p x3-atomic-swap --features std --bin x3-evm-broadcast
+
+      - name: Run real anvil HTLC lifecycle gate
+        run: ./X3-contracts/evm/test-live-lifecycle.sh
