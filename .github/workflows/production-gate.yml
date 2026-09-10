@@ -24,6 +24,8 @@ jobs:
         run: make guard
       - name: Test (core + pallets)
         run: make test-all-pallets
+      - name: Build validated release node
+        run: cargo build --release -p x3-chain-node
       - name: Audit (invariants + readiness + consistency)
         run: make audit
       - name: Node Build Verification (mainnet-rc1)
