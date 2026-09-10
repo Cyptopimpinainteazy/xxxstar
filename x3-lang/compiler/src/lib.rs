@@ -24,6 +24,9 @@ pub mod parser;
 pub mod regalloc;
 pub mod risk;
 pub mod semantic;
+pub mod trading_lowering;
+pub mod trading_semantic;
+pub mod trading_verify;
 pub mod verify;
 pub mod spec {
     pub mod opcodes {
@@ -45,6 +48,11 @@ pub use ir::{Condition, FailureAction, Operation, ProgramMetadata, RequireKind, 
 
 // Re-export semantic types
 pub use semantic::{CompilationMode, InvariantRule, RiskScore};
+
+pub use ir::{AssetKey, TradingOperation, ValueRef};
+pub use trading_lowering::{lower_atomic_trade, LowerError};
+pub use trading_semantic::{amount_base_units, analyze_trading, decimal_to_base_units, TradingSymbols, TypedAmount};
+pub use trading_verify::{verify_atomic_trade, verify_trading_program, DebtFlowState};
 
 // Re-export register-allocation entry points so callers (and tests) can run
 // allocation as a standalone pass without going through the full pipeline.
@@ -69,9 +77,7 @@ pub fn compile_program(program: &Program) -> Result<Vec<u8>, X3Error> {
 /// pipeline. Without it, the linear-scan allocator at
 /// `x3-lang/compiler/src/regalloc.rs` is dead code as far as the compiled
 /// binary is concerned.
-pub fn compile_program_with_regalloc(
-    program: &Program,
-) -> Result<(Vec<u8>, AllocationResult), X3Error> {
+pub fn compile_program_with_regalloc(program: &Program) -> Result<(Vec<u8>, AllocationResult), X3Error> {
     let mut ir = compile_to_ir(program)?;
     let _alloc = allocate(&ir.operations);
     // The v0.1 pipeline records allocation metadata without rewriting
@@ -106,6 +112,15 @@ pub fn check_source(source: &str) -> Result<(Program, crate::ir::X3IR, Vec<X3Err
         return Ok((program, crate::ir::X3IR::new(), ast_errors.take_errors()));
     }
 
+    let trading_symbols = match analyze_trading(&program, CompilationMode::Dev) {
+        Ok(symbols) => symbols,
+        Err(trading_errors) => return Ok((program, crate::ir::X3IR::new(), trading_errors)),
+    };
+    let trading_errors = verify_trading_program(&program, &trading_symbols, CompilationMode::Dev);
+    if !trading_errors.is_empty() {
+        return Ok((program, crate::ir::X3IR::new(), trading_errors));
+    }
+
     let ir = compile_to_ir(&program)?;
     match verify_semantics(&ir, 8, 4, None) {
         Ok(()) => Ok((program, ir, Vec::new())),
@@ -137,6 +152,15 @@ pub fn check_source_with_mode(
     verify_atomic_swap_decls(&program, &mut ast_errors);
     if ast_errors.has_errors() {
         return Ok((program, crate::ir::X3IR::new(), ast_errors.take_errors()));
+    }
+
+    let trading_symbols = match analyze_trading(&program, mode) {
+        Ok(symbols) => symbols,
+        Err(trading_errors) => return Ok((program, crate::ir::X3IR::new(), trading_errors)),
+    };
+    let trading_errors = verify_trading_program(&program, &trading_symbols, mode);
+    if !trading_errors.is_empty() {
+        return Ok((program, crate::ir::X3IR::new(), trading_errors));
     }
 
     let ir = compile_to_ir(&program)?;
@@ -218,9 +242,7 @@ fn verify_bytecode(bytecode: &[u8]) -> Result<(), X3Error> {
 #[cfg(test)]
 mod regalloc_wiring_tests {
     use super::*;
-    use x3_lang_ast::ast::{
-        AssetRef, AtomicSwapDecl, ChainRef, Expression, HashlockSpec, Item, LiteralExpr, Program,
-    };
+    use x3_lang_ast::ast::{AssetRef, AtomicSwapDecl, ChainRef, Expression, HashlockSpec, Item, LiteralExpr, Program};
     use x3_lang_common::Spanned;
 
     /// The new `compile_program_with_regalloc` entry point runs the full
@@ -244,9 +266,7 @@ mod regalloc_wiring_tests {
             receiver: None,
             hashlock: Some(HashlockSpec {
                 hash_fn: "sha256".into(),
-                secret: Box::new(Expression::Literal(LiteralExpr::String(
-                    "my_secret".into(),
-                ))),
+                secret: Box::new(Expression::Literal(LiteralExpr::String("my_secret".into()))),
             }),
             body: vec![],
             requires: vec![],
