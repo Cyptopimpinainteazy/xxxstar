@@ -131,6 +131,8 @@ jobs:
   workspace-tests:
     name: cargo test (workspace)
     runs-on: ubuntu-latest
+    env:
+      X3_NODE_BIN: ${{ github.workspace }}/target/release/x3-chain-node
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -147,6 +149,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: full-ci-tests
+
+      - name: Build validated node for real-chain tests
+        run: cargo build --release -p x3-chain-node
 
       - name: cargo test --workspace
         run: cargo test --workspace --all-targets
@@ -266,6 +271,8 @@ jobs:
   e2e-live-node:
     name: e2e — live node (mandatory, boots ephemeral node)
     runs-on: ubuntu-latest
+    env:
+      X3_NODE_BIN: ${{ github.workspace }}/target/release/x3-chain-node
     timeout-minutes: 120
     needs: [fmt-clippy]
     steps:
