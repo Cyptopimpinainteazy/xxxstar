@@ -79,11 +79,29 @@ fn parse_hex_u64(value: &serde_json::Value, field: &str) -> Result<u64, SwapErro
         .map_err(|_| SwapError::RpcError(format!("receipt {} is invalid", field)))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RequiredEvent {
+    None,
+    Created,
+    Claimed,
+    Refunded,
+}
+
+fn event_topic(event: RequiredEvent) -> Option<String> {
+    let sig: &[u8] = match event {
+        RequiredEvent::None => return None,
+        RequiredEvent::Created => b"HTLCCreated(bytes32,address,address,address,uint256,bytes32,uint256)",
+        RequiredEvent::Claimed => b"HTLCClaimed(bytes32,address,bytes32)",
+        RequiredEvent::Refunded => b"HTLCRefunded(bytes32,address)",
+    };
+    Some(to_0x_hex(&Keccak256::digest(sig)))
+}
+
 fn parse_receipt(
     receipt: serde_json::Value,
     tx_hash: &str,
     contract: &str,
-    require_created_event: bool,
+    required_event: RequiredEvent,
 ) -> Result<ReceiptData, SwapError> {
     let status = parse_hex_u64(&receipt["status"], "status")?;
     if status != 1 {
@@ -111,17 +129,17 @@ fn parse_receipt(
         .ok_or_else(|| SwapError::RpcError("receipt blockHash is missing".into()))?
         .to_string();
     let block_number = parse_hex_u64(&receipt["blockNumber"], "blockNumber")?;
-    if require_created_event {
-        let topic = to_0x_hex(&Keccak256::digest(
-            b"HTLCCreated(bytes32,address,address,address,uint256,bytes32,uint256)",
-        ));
+    if let Some(topic) = event_topic(required_event) {
         let found = receipt["logs"].as_array().map_or(false, |logs| {
             logs.iter().any(|log| {
                 log["address"]
                     .as_str()
                     .is_some_and(|address| address.eq_ignore_ascii_case(contract))
                     && log["topics"].as_array().is_some_and(|topics| {
-                        topics.first().and_then(|v| v.as_str()) == Some(topic.as_str())
+                        topics
+                            .first()
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|t| t.eq_ignore_ascii_case(&topic))
                             && topics.get(1).and_then(|v| v.as_str()).is_some_and(|id| {
                                 id.strip_prefix("0x").map_or(false, |id| {
                                     id.len() == 64
@@ -133,9 +151,16 @@ fn parse_receipt(
             })
         });
         if !found {
-            return Err(SwapError::RpcError(
-                "receipt lacks a valid HTLCCreated event".into(),
-            ));
+            let name = match required_event {
+                RequiredEvent::None => unreachable!(),
+                RequiredEvent::Created => "HTLCCreated",
+                RequiredEvent::Claimed => "HTLCClaimed",
+                RequiredEvent::Refunded => "HTLCRefunded",
+            };
+            return Err(SwapError::RpcError(format!(
+                "receipt lacks a valid {} event",
+                name
+            )));
         }
     }
     Ok(ReceiptData {
@@ -205,29 +230,35 @@ impl LiveEvmExecutor {
         Transaction::address_from_private_key(&self.signer_private_key)
     }
 
+    /// Number of additional blocks that must be mined on top of a tx's block
+    /// before it is treated as final. Guards against reorgs invalidating a
+    /// receipt we've already acted on.
+    const FINALITY_CONFIRMATIONS: u64 = 2;
+
     /// Poll `eth_getTransactionReceipt` until a receipt appears or `timeout_ms`
-    /// elapses.
+    /// elapses, then wait for `FINALITY_CONFIRMATIONS` additional blocks to be
+    /// mined on top of it before returning.
     fn wait_for_receipt(
         &mut self,
         tx_hash: &str,
         timeout_ms: u64,
-        require_created_event: bool,
+        required_event: RequiredEvent,
     ) -> Result<ReceiptData, SwapError> {
         let deadline = std::time::Instant::now()
             .checked_add(std::time::Duration::from_millis(timeout_ms))
             .ok_or_else(|| SwapError::Internal("timer overflow".into()))?;
-        loop {
+        let receipt = loop {
             if let Some(receipt) = self
                 .rpc
                 .get_transaction_receipt(tx_hash)
                 .map_err(|e| SwapError::RpcError(e.to_string()))?
             {
-                return parse_receipt(
+                break parse_receipt(
                     receipt,
                     tx_hash,
                     &to_0x_hex(&self.contract),
-                    require_created_event,
-                );
+                    required_event,
+                )?;
             }
             if std::time::Instant::now() >= deadline {
                 return Err(SwapError::TxNotFound {
@@ -235,7 +266,55 @@ impl LiveEvmExecutor {
                 });
             }
             std::thread::sleep(std::time::Duration::from_millis(1_500));
+        };
+        self.wait_for_finality(&receipt, tx_hash, timeout_ms)?;
+        Ok(receipt)
+    }
+
+    /// Block until at least `FINALITY_CONFIRMATIONS` blocks have been mined
+    /// on top of the receipt's block, then re-check the receipt is still
+    /// present at the same block hash (i.e. no reorg replaced it).
+    fn wait_for_finality(
+        &mut self,
+        receipt: &ReceiptData,
+        tx_hash: &str,
+        timeout_ms: u64,
+    ) -> Result<(), SwapError> {
+        let deadline = std::time::Instant::now()
+            .checked_add(std::time::Duration::from_millis(timeout_ms))
+            .ok_or_else(|| SwapError::Internal("timer overflow".into()))?;
+        loop {
+            let head = self
+                .rpc
+                .get_block_number()
+                .map_err(|e| SwapError::RpcError(e.to_string()))?;
+            if head.saturating_sub(receipt.block_number) >= Self::FINALITY_CONFIRMATIONS {
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(SwapError::RpcError(
+                    "timed out waiting for transaction finality".into(),
+                ));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1_500));
         }
+        // Re-fetch the receipt to confirm no reorg replaced/dropped it.
+        let current = self
+            .rpc
+            .get_transaction_receipt(tx_hash)
+            .map_err(|e| SwapError::RpcError(e.to_string()))?
+            .ok_or_else(|| {
+                SwapError::RpcError("transaction disappeared before finality".into())
+            })?;
+        let current_block_hash = current["blockHash"]
+            .as_str()
+            .ok_or_else(|| SwapError::RpcError("receipt blockHash is missing".into()))?;
+        if !current_block_hash.eq_ignore_ascii_case(&receipt.block_hash) {
+            return Err(SwapError::RpcError(
+                "transaction was reorged out before reaching finality".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// Broadcast a signed raw transaction and wait for confirmation.
@@ -246,8 +325,16 @@ impl LiveEvmExecutor {
     ) -> Result<(String, ReceiptData), SwapError> {
         let signed = tx.sign(&self.signer_private_key)?;
         let tx_hash = self.rpc.send_raw_transaction(&signed)?;
-        let require_created_event = tx.data.starts_with(&to_0x_hex(&selector::CREATE));
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, require_created_event)?;
+        let required_event = if tx.data.starts_with(&to_0x_hex(&selector::CREATE)) {
+            RequiredEvent::Created
+        } else if tx.data.starts_with(&to_0x_hex(&selector::CLAIM)) {
+            RequiredEvent::Claimed
+        } else if tx.data.starts_with(&to_0x_hex(&selector::REFUND)) {
+            RequiredEvent::Refunded
+        } else {
+            RequiredEvent::None
+        };
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, required_event)?;
         Ok((tx_hash, receipt))
     }
 
@@ -427,7 +514,7 @@ impl LiveEvmExecutor {
             vm_type: VmType::Evm,
             block_number: block,
             block_hash,
-            confirmations: 1,
+            confirmations: Self::FINALITY_CONFIRMATIONS,
             lock_address: format!("0x{}", contract.encode_hex::<String>()),
             locked_amount: amount,
             hashlock,
@@ -455,7 +542,7 @@ impl LiveEvmExecutor {
         timeout_ms: u64,
     ) -> Result<LockProof, SwapError> {
         let tx_hash = self.create_lock(receiver, hashlock, timelock, asset, amount, timeout_ms)?;
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, true)?;
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, RequiredEvent::Created)?;
         // AtlasHTLC has no refund param: the sender is the only party able to
         // refund after the timelock, so we surface the signer as refund address.
         Ok(self.lock_proof_from_tx(
@@ -504,7 +591,7 @@ impl LiveEvmExecutor {
         timeout_ms: u64,
     ) -> Result<ClaimProof, SwapError> {
         let tx_hash = self.claim(id, secret, timeout_ms)?;
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, false)?;
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, RequiredEvent::Claimed)?;
         Ok(self.claim_proof_from_tx(
             chain_label,
             intent_id,
@@ -524,7 +611,7 @@ impl LiveEvmExecutor {
         timeout_ms: u64,
     ) -> Result<RefundProof, SwapError> {
         let tx_hash = self.refund(id, timeout_ms)?;
-        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, false)?;
+        let receipt = self.wait_for_receipt(&tx_hash, timeout_ms, RequiredEvent::Refunded)?;
         Ok(RefundProof {
             tx_id: tx_hash.clone(),
             intent_id,
@@ -613,7 +700,7 @@ mod tests {
             "blockNumber": "0x2a",
             "blockHash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         });
-        let parsed = parse_receipt(receipt, tx, contract, false).expect("valid receipt");
+        let parsed = parse_receipt(receipt, tx, contract, RequiredEvent::None).expect("valid receipt");
         assert_eq!(parsed.block_number, 42);
         assert_eq!(
             parsed.block_hash,
@@ -636,7 +723,7 @@ mod tests {
             });
             invalid[field] = value;
             assert!(
-                parse_receipt(invalid, tx, contract, false).is_err(),
+                parse_receipt(invalid, tx, contract, RequiredEvent::None).is_err(),
                 "{field}"
             );
         }
@@ -660,7 +747,7 @@ mod tests {
                 "topics": [topic, format!("0x{}", "11".repeat(32))]
             }]
         });
-        assert!(parse_receipt(receipt, tx, contract, true).is_ok());
+        assert!(parse_receipt(receipt, tx, contract, RequiredEvent::Created).is_ok());
     }
 
     #[test]
