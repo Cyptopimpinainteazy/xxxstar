@@ -2,6 +2,7 @@
 name = "x3-proving-harness"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 description = "Unified testnet proving pipeline — runs all Phase 1 checks and emits a compatibility scorecard"
 
 [[bin]]

@@ -71,6 +71,21 @@ ignore = [
     "RUSTSEC-2025-0134",   # rustls-pemfile (reqwest transitive; pem parsing only)
     "RUSTSEC-2024-0320",   # yaml-rust (config crate -> analytics-service only)
     "RUSTSEC-2024-0370",   # proc-macro-error 1.0.4 (frame-executive -> aquamarine -> proc-macro-error; pinned by polkadot-sdk stable2512)
+
+    # ===== Unmaintained (RUSTSEC "unmaintained" advisories, not vulnerabilities) =====
+    # All transitive deps pulled in by polkadot-sdk / solana-runtime / clap
+    # chains; none are directly depended on by X3 code, and none have known
+    # active CVEs — just no longer receiving upstream maintenance.
+    "RUSTSEC-2021-0139",   # ansi_term (clap v2 transitive, dev/CLI-only)
+    "RUSTSEC-2024-0384",   # instant (polkadot-sdk transitive timing shim)
+    "RUSTSEC-2024-0388",   # derivative (polkadot-sdk transitive derive macro)
+    "RUSTSEC-2024-0436",   # paste (polkadot-sdk/solana transitive derive macro)
+    "RUSTSEC-2025-0057",   # fxhash (polkadot-sdk transitive hasher)
+    "RUSTSEC-2025-0119",   # bincode 1.x (polkadot-sdk/solana transitive serialization)
+    "RUSTSEC-2025-0141",   # bitmaps (polkadot-sdk transitive, via im)
+    "RUSTSEC-2025-0161",   # im (polkadot-sdk transitive persistent collections)
+    "RUSTSEC-2026-0247",   # libsecp256k1 (polkadot-sdk/solana transitive, superseded by k256/secp256k1)
+    "RUSTSEC-2026-0248",   # number_prefix (indicatif transitive, CLI progress bars only)
 ]
 
 [bans]
@@ -96,4 +111,22 @@ allow = [
     # into our runtime binary. Acceptable for build-deps. (For runtime binary
     # licensing we stay Apache-2.0 per workspace.package.license.)
     "GPL-3.0-only",
+    # keccak-hash 0.1.2 (GPL-3.0-only variant tag used by parity-common):
+    # transitive dev/test-only dependency, not linked into the production
+    # runtime binary.
+    "GPL-3.0",
+    # BlueOak-1.0.0: minicbor / minicbor-derive, pulled in transitively by
+    # pallet-x3-kernel for CBOR encoding. OSI-approved permissive license,
+    # just not previously in the allow-list.
+    "BlueOak-1.0.0",
+    # GPL-3.0-or-later WITH Classpath-exception-2.0: substrate sc-* client
+    # crates (sc-service, sc-network, sc-rpc, ...) from polkadot-sdk. The
+    # Classpath exception explicitly permits linking without the resulting
+    # binary being subject to GPL, so this is safe for our Apache-2.0 node
+    # binary.
+    "GPL-3.0-or-later WITH Classpath-exception-2.0",
+    # CDLA-Permissive-2.0: webpki-roots / webpki-root-certs (Mozilla CA
+    # bundle republished under CDLA), pulled in transitively via reqwest /
+    # ureq TLS stacks. Permissive data-license, not a code license.
+    "CDLA-Permissive-2.0",
 ]

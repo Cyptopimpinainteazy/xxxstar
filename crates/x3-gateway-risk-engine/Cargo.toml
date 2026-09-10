@@ -2,6 +2,7 @@
 name = "x3-gateway-risk-engine"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 authors = ["X3 Chain Team"]
 description = "Risk classification engine for X3 Chain cross-chain operations"
 

@@ -2,6 +2,7 @@
 name = "pallet-x3-rebalance"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 authors = ["X3 Chain"]
 description = "X3 rebalance engine (Module 4): trigger-driven vault rebalancing for the Phase 4.5 liquidity control plane"
 

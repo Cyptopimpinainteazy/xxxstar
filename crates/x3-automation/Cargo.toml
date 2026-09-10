@@ -2,6 +2,7 @@
 name = "x3-automation"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 authors = ["X3 Chain Team"]
 description = "Automation and keeper network for X3 Chain"
 

@@ -2,6 +2,7 @@
 name = "pallet-x3-partner"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 authors = ["X3 Chain"]
 description = "X3 partner capacity manager: partner health scoring, exposure caps, and lane approval"
 
