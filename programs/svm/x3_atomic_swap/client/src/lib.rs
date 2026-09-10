@@ -136,7 +136,9 @@ pub fn build_create_htlc_ix(
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
             AccountMeta::new(*payer, true),
-            AccountMeta::new_readonly(*initializer, true),
+            // Writable: the program debits `amount` lamports from this
+            // account to escrow them into the HTLC PDA.
+            AccountMeta::new(*initializer, true),
             AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
         ],
         data,
@@ -159,7 +161,9 @@ pub fn build_claim_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*claimant, true),
+            // Writable + signer: the program credits the escrowed lamports
+            // directly to this account when the claim succeeds.
+            AccountMeta::new(*claimant, true),
         ],
         data,
     }
@@ -175,7 +179,9 @@ pub fn build_refund_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*refund_authority, true),
+            // Writable + signer: the program credits the escrowed lamports
+            // directly to this account when the refund succeeds.
+            AccountMeta::new(*refund_authority, true),
         ],
         data: vec![2u8],
     }

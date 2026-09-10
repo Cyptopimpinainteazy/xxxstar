@@ -141,7 +141,7 @@ pub mod processor {
         entrypoint::ProgramResult,
         hash::hashv,
         msg,
-        program::invoke_signed,
+        program::{invoke, invoke_signed},
         program_error::ProgramError,
         pubkey::Pubkey,
         sysvar::{clock::Clock, rent::Rent, Sysvar},
@@ -259,6 +259,27 @@ pub mod processor {
             &[payer.clone(), htlc_info.clone(), system_program.clone()],
             &[signer_seeds],
         )?;
+
+        // Escrow the locked amount: transfer `create.amount` lamports from the
+        // initializer into the freshly created PDA. Without this transfer the
+        // HTLC account would only ever hold rent-exemption lamports while
+        // claiming to have `create.amount` locked — funds would never
+        // actually be escrowed and claim/refund would pay out from nothing.
+        if create.token_mint == Pubkey::default() {
+            invoke(
+                &system_instruction::transfer(initializer.key, htlc_info.key, create.amount),
+                &[
+                    initializer.clone(),
+                    htlc_info.clone(),
+                    system_program.clone(),
+                ],
+            )?;
+        } else {
+            // SPL token escrow is not yet implemented by this program; only
+            // native SOL (token_mint == default Pubkey) is supported today.
+            msg!("Error: SPL token HTLCs are not supported yet");
+            return Err(ProgramError::InvalidArgument);
+        }
 
         // Initialize account data
         let account = HtlcAccount {
@@ -386,6 +407,14 @@ pub mod processor {
         drop(account_data);
         let mut data_mut = htlc_info.try_borrow_mut_data()?;
         data_mut[HtlcAccount::CLAIMED_OFFSET] = 1;
+        drop(data_mut);
+
+        // Pay out the escrowed amount to the claimant. The HTLC PDA is
+        // owned by this program, so we can debit its lamports directly;
+        // only the rent-exempt reserve remains behind (the account itself
+        // stays alive so its `claimed` flag can still be read/audited).
+        **htlc_info.try_borrow_mut_lamports()? -= htlc.amount;
+        **claimant.try_borrow_mut_lamports()? += htlc.amount;
 
         // Emit event
         let event_parts = [
@@ -463,6 +492,13 @@ pub mod processor {
         drop(account_data);
         let mut data_mut = htlc_info.try_borrow_mut_data()?;
         data_mut[HtlcAccount::REFUNDED_OFFSET] = 1;
+        drop(data_mut);
+
+        // Return the escrowed amount to the refund authority. The HTLC PDA
+        // is owned by this program, so lamports are debited/credited
+        // directly; only the rent-exempt reserve remains behind.
+        **htlc_info.try_borrow_mut_lamports()? -= htlc.amount;
+        **refund_authority.try_borrow_mut_lamports()? += htlc.amount;
 
         // Emit event
         let event_parts = [
