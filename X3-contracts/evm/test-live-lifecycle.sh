@@ -31,9 +31,9 @@ RPC_URL="http://127.0.0.1:8546"
 ANVIL_PID=""
 CHAIN_ID=31337
 
-# Anvil's well-known deterministic dev accounts (mnemonic: "test test test
-# test test test test test test test test junk"). These keys are public and
-# intentionally used only against this ephemeral local chain.
+# Anvil's well-known deterministic dev accounts, derived from Anvil's default
+# built-in test wallet seed phrase. These keys are public and intentionally
+# used only against this ephemeral local chain.
 SENDER_KEY="ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 SENDER_ADDR="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 RECIPIENT_KEY="59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
