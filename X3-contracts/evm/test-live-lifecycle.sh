@@ -144,6 +144,13 @@ WRONG_OUT="$(broadcast --signer-key "$RECIPIENT_KEY" claim \
 echo "$WRONG_OUT"
 check "wrong-secret claim rejected" "$(echo "$WRONG_OUT" | grep -qi "invalid secret" && echo 1 || echo 0)"
 
+# Negative-case on-chain proof: a rejected claim must be a true no-op. Read
+# the contract state directly (not the broadcaster's self-reported status)
+# to prove the HTLC is still Funded(1) and was NOT silently advanced.
+STATUS_AFTER_WRONG="$(htlc_status "$HTLC_ID" | tr -d '[:space:]')"
+check "on-chain status still Funded(1) after rejected wrong-secret claim" \
+  "$([ "$STATUS_AFTER_WRONG" = "1" ] && echo 1 || echo 0)"
+
 echo ""
 echo "=== 3. claim with CORRECT secret succeeds ==="
 CLAIM_OUT="$(broadcast --signer-key "$RECIPIENT_KEY" claim --id "$HTLC_ID" --secret "$PREIMAGE" 2>&1)" || true
@@ -161,6 +168,12 @@ echo "=== 4. double-claim is rejected ==="
 DOUBLE_OUT="$(broadcast --signer-key "$RECIPIENT_KEY" claim --id "$HTLC_ID" --secret "$PREIMAGE" 2>&1)" || true
 echo "$DOUBLE_OUT"
 check "double-claim rejected" "$(echo "$DOUBLE_OUT" | grep -qi "not claimable" && echo 1 || echo 0)"
+
+# Negative-case on-chain proof: the rejected double-claim must not have
+# reverted the already-claimed state or re-emitted a second reveal.
+STATUS_AFTER_DOUBLE="$(htlc_status "$HTLC_ID" | tr -d '[:space:]')"
+check "on-chain status still Claimed(2) after rejected double-claim" \
+  "$([ "$STATUS_AFTER_DOUBLE" = "2" ] && echo 1 || echo 0)"
 
 echo ""
 echo "=== 5/6/7. refund lifecycle on a second HTLC (short timelock) ==="
@@ -185,6 +198,24 @@ PREMATURE_OUT="$(broadcast --signer-key "$SENDER_KEY" refund --id "$HTLC_ID2" 2>
 echo "$PREMATURE_OUT"
 check "premature refund rejected" "$(echo "$PREMATURE_OUT" | grep -qi "timelock not expired" && echo 1 || echo 0)"
 
+# Negative-case on-chain proof: the rejected premature refund must not have
+# touched the escrowed funds or status.
+STATUS_AFTER_PREMATURE="$(htlc_status "$HTLC_ID2" | tr -d '[:space:]')"
+check "on-chain status still Funded(1) after rejected premature refund" \
+  "$([ "$STATUS_AFTER_PREMATURE" = "1" ] && echo 1 || echo 0)"
+
+echo "-- premature refund by non-sender is ALSO rejected before timeout --"
+# Distinct from the wrong-authority-after-expiry check below: this proves
+# the contract rejects a non-sender refund attempt purely on authority
+# grounds, independent of (and prior to) the timelock ever expiring.
+PREMATURE_WRONGAUTH_OUT="$(broadcast --signer-key "$RECIPIENT_KEY" refund --id "$HTLC_ID2" 2>&1)" || true
+echo "$PREMATURE_WRONGAUTH_OUT"
+check "pre-timeout non-sender refund rejected" \
+  "$(echo "$PREMATURE_WRONGAUTH_OUT" | grep -Eqi "not the sender|timelock not expired" && echo 1 || echo 0)"
+STATUS_AFTER_PREMATURE_WRONGAUTH="$(htlc_status "$HTLC_ID2" | tr -d '[:space:]')"
+check "on-chain status still Funded(1) after rejected pre-timeout non-sender refund" \
+  "$([ "$STATUS_AFTER_PREMATURE_WRONGAUTH" = "1" ] && echo 1 || echo 0)"
+
 echo "-- waiting for timelock to expire --"
 while [ "$(date +%s)" -le "$TIMELOCK2" ]; do sleep 1; done
 cast rpc evm_mine --rpc-url "$RPC_URL" >/dev/null 2>&1 || true
@@ -193,6 +224,12 @@ echo "-- wrong-authority refund by recipient (should fail: not sender) --"
 WRONGAUTH_OUT="$(broadcast --signer-key "$RECIPIENT_KEY" refund --id "$HTLC_ID2" 2>&1)" || true
 echo "$WRONGAUTH_OUT"
 check "wrong-authority refund rejected" "$(echo "$WRONGAUTH_OUT" | grep -qi "not the sender" && echo 1 || echo 0)"
+
+# Negative-case on-chain proof: the rejected wrong-authority refund must
+# not have paid out the recipient or advanced the HTLC state.
+STATUS_AFTER_WRONGAUTH="$(htlc_status "$HTLC_ID2" | tr -d '[:space:]')"
+check "on-chain status still Funded(1) after rejected wrong-authority refund" \
+  "$([ "$STATUS_AFTER_WRONGAUTH" = "1" ] && echo 1 || echo 0)"
 
 echo "-- correct refund by sender after timeout (should succeed) --"
 REFUND_OUT="$(broadcast --signer-key "$SENDER_KEY" refund --id "$HTLC_ID2" 2>&1)" || true

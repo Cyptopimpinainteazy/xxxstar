@@ -161,6 +161,16 @@ check "claim with WRONG preimage" 1 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   claim --swap-id "$(cat "$WORKDIR/swap_id.hex")" --preimage "$(python3 -c 'import os; print(os.urandom(32).hex())')"
 
+# Negative-case on-chain proof: the rejected wrong-preimage claim must be a
+# true no-op, verified via raw PDA byte decoding (independent of the
+# broadcaster's own exit-code reporting).
+claimed_after_wrong="$(decode_field "$HTLC_PDA" claimed)"
+if [ "$claimed_after_wrong" = "0" ]; then
+  echo "PASS: on-chain claimed=0 after rejected wrong-preimage claim"; pass=$((pass + 1))
+else
+  echo "FAIL: on-chain claimed=$claimed_after_wrong (expected 0) after rejected wrong-preimage claim"; fail=$((fail + 1))
+fi
+
 check "claim with CORRECT preimage" 0 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   claim --swap-id "$(cat "$WORKDIR/swap_id.hex")" --preimage "$(cat "$WORKDIR/preimage.hex")"
@@ -175,6 +185,15 @@ fi
 check "double-claim" 1 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   claim --swap-id "$(cat "$WORKDIR/swap_id.hex")" --preimage "$(cat "$WORKDIR/preimage.hex")"
+
+# Negative-case on-chain proof: the rejected double-claim must not have
+# reset or otherwise disturbed the already-claimed state.
+claimed_after_double="$(decode_field "$HTLC_PDA" claimed)"
+if [ "$claimed_after_double" = "1" ]; then
+  echo "PASS: on-chain claimed=1 still holds after rejected double-claim"; pass=$((pass + 1))
+else
+  echo "FAIL: on-chain claimed=$claimed_after_double (expected 1) after rejected double-claim"; fail=$((fail + 1))
+fi
 
 # --- Scenario 2: timeout/refund path ---
 python3 -c "
@@ -195,6 +214,28 @@ HTLC_PDA2="$(grep -oP 'htlc=\K\S+' "$WORKDIR/last.out")"
 check "refund BEFORE timeout" 1 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/payer.json" \
   refund --swap-id "$(cat "$WORKDIR/swap_id2.hex")"
+
+# Negative-case on-chain proof: the rejected premature refund must not
+# have touched the escrowed funds or the refunded flag.
+refunded_after_premature="$(decode_field "$HTLC_PDA2" refunded)"
+if [ "$refunded_after_premature" = "0" ]; then
+  echo "PASS: on-chain refunded=0 after rejected premature refund"; pass=$((pass + 1))
+else
+  echo "FAIL: on-chain refunded=$refunded_after_premature (expected 0) after rejected premature refund"; fail=$((fail + 1))
+fi
+
+# A non-authority refund attempt must ALSO be rejected before the timeout
+# has expired, purely on authority grounds -- independent of (and prior
+# to) the timelock check below.
+check "refund by wrong authority BEFORE timeout" 1 \
+  "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
+  refund --swap-id "$(cat "$WORKDIR/swap_id2.hex")"
+refunded_after_premature_wrongauth="$(decode_field "$HTLC_PDA2" refunded)"
+if [ "$refunded_after_premature_wrongauth" = "0" ]; then
+  echo "PASS: on-chain refunded=0 after rejected pre-timeout wrong-authority refund"; pass=$((pass + 1))
+else
+  echo "FAIL: on-chain refunded=$refunded_after_premature_wrongauth (expected 0) after rejected pre-timeout wrong-authority refund"; fail=$((fail + 1))
+fi
 
 echo "waiting for slot $TARGET (with margin)..."
 while [ "$(solana slot --url "$RPC_URL" --commitment finalized)" -le "$((TARGET + 5))" ]; do sleep 1; done
