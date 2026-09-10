@@ -1,0 +1,55 @@
+name: X3 Lang Trading Core
+
+on:
+  pull_request:
+    branches:
+      - master
+      - codex/x3-trading-core-v1-hardening
+    paths:
+      - "x3-lang/**"
+      - ".github/workflows/x3-lang-trading-core.yml"
+  push:
+    branches:
+      - master
+      - codex/x3-trading-core-v1-hardening
+    paths:
+      - "x3-lang/**"
+      - ".github/workflows/x3-lang-trading-core.yml"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  x3-lang-trading-core:
+    name: x3-lang trading core gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: x3-lang
+
+      - name: Run focused Trading Core v1 tests
+        run: |
+          cargo test --manifest-path x3-lang/Cargo.toml --locked \
+            -p x3-lang-compiler --test test_trading_core_e2e --all-features
+          cargo test --manifest-path x3-lang/Cargo.toml --locked \
+            -p x3-lang-vm --test trading_execution --test trading_receipts --all-features
+
+      - name: Check nested-workspace formatting
+        run: cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check
+
+      - name: Run complete nested workspace test suite
+        run: cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features
+
+      - name: Lint nested workspace with warnings denied
+        run: cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings
