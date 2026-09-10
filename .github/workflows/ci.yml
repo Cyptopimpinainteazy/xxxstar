@@ -662,19 +662,23 @@ jobs:
           echo "  ✅ binary (release build x3-chain-node)"
 
       - name: Check if any required gate failed
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
         run: |
-          FAILED=""
-          for gate in test-dex test-launchpad test-token-factory test-dapp-hub \
-                      test-auction test-wallet test-northern-swarm test-lp-locker \
-                      format check-runtime check-node test-router test-ledger \
-                      test-settle test-kernel secret-scan cargo-audit cargo-deny \
-                      clippy binary; do
-            if [ "${{ needs.${gate}.result }}" != "success" ]; then
-              FAILED="${FAILED} ${gate}"
-            fi
-          done
-          if [ -n "${FAILED}" ]; then
-            echo "❌ FAILED gates:${FAILED}"
-            exit 1
-          fi
-          echo "✅ ALL gates passed."
+          python3 - <<'EOF'
+          import json, os, sys
+
+          needs = json.loads(os.environ["NEEDS_CONTEXT"])
+          required = [
+              "test-dex", "test-launchpad", "test-token-factory", "test-dapp-hub",
+              "test-auction", "test-wallet", "test-northern-swarm", "test-lp-locker",
+              "format", "check-runtime", "check-node", "test-router", "test-ledger",
+              "test-settle", "test-kernel", "secret-scan", "cargo-audit", "cargo-deny",
+              "clippy", "binary",
+          ]
+          failed = [g for g in required if needs.get(g, {}).get("result") != "success"]
+          if failed:
+              print(f"❌ FAILED gates: {' '.join(failed)}")
+              sys.exit(1)
+          print("✅ ALL gates passed.")
+          EOF
