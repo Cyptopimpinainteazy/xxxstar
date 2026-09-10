@@ -12,9 +12,9 @@ name: x3 zombienet integration
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 env:
@@ -50,11 +50,10 @@ jobs:
       - name: Setup Zombienet
         run: |
           npm install -g @zombienet/cli
-          zombienet --version
+          zombienet version
 
-      - name: Generate chain spec for testing
-        run: |
-          ./target/release/x3-chain-node build-spec --chain x3-local3-raw --raw > /tmp/x3-test-chain-spec.json
+      - name: Verify tracked chain spec
+        run: test -s chain-specs/x3-local3-current-raw.json
 
       - name: Run Zombienet smoke tests
         run: |

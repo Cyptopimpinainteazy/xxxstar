@@ -9,10 +9,10 @@ on:
   # Manual trigger
   workflow_dispatch:
   
-  # Also trigger on push to main
+  # Also trigger on push to master
   push:
     branches:
-      - main
+      - master
       - sprint-0/foundation/kernel-audit
 
 permissions:

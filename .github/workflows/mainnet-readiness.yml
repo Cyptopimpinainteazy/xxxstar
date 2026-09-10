@@ -3,9 +3,9 @@ name: mainnet-readiness
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ master ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ master ]
 
 jobs:
   secret-scan:
@@ -31,11 +31,18 @@ jobs:
 
       - name: Verify key files are placeholders only
         run: |
-          if grep -q "REPLACED_RUN_KEY_ROTATION_SCRIPT\|REPLACE_ME" deployment/keys/bootnode-keys.json deployment/keys/bootnode-node-key; then
-            echo "✅ Key files are placeholders only"
-          else
-            echo "❌ Key files may contain real material — check deployment/keys/"
+          key_files=(deployment/keys/bootnode-keys.json deployment/keys/bootnode-node-key)
+          present=()
+          for file in "${key_files[@]}"; do
+            [[ -f "$file" ]] && present+=("$file")
+          done
+          if (( ${#present[@]} == 0 )); then
+            echo "✅ No bootnode key material is tracked"
+          elif grep -Lq "REPLACED_RUN_KEY_ROTATION_SCRIPT\|REPLACE_ME" "${present[@]}"; then
+            echo "❌ A tracked key file is not an explicit placeholder"
             exit 1
+          else
+            echo "✅ Tracked key files are placeholders only"
           fi
 
   cargo-audit:
@@ -111,7 +118,7 @@ jobs:
           done
           cat release_hashes.txt
       - name: Upload release artifacts
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts

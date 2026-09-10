@@ -6,7 +6,7 @@ on:
       candidate_ref:
         description: Candidate tag or commit SHA to rehearse
         required: true
-        default: main
+        default: master
 
 env:
   CARGO_TERM_COLOR: always

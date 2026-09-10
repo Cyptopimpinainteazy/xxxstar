@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # release-hardening.yml — CodeQL + Semgrep + SBOM + attestation hardening
 #
-# Runs on every PR and push to main. Adds semantic analysis gates that
+# Runs on every PR and push to master. Adds semantic analysis gates that
 # complement the existing full-ci.yml (fmt, clippy, tests, audit, deny).
 #
 # Hard rules:
@@ -12,9 +12,9 @@ name: release-hardening
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 env:
@@ -86,23 +86,10 @@ jobs:
       - name: Check for critical findings
         run: |
           if [ -f semgrep-results.json ]; then
-            CRITICAL=$(python3 -c "
-import json
-with open('semgrep-results.json') as f:
-    data = json.load(f)
-critical = [r for r in data.get('results', []) if r.get('extra', {}).get('severity') == 'ERROR']
-print(len(critical))
-")
+            CRITICAL=$(python3 -c "import json; data=json.load(open('semgrep-results.json')); print(sum(1 for r in data.get('results', []) if r.get('extra', {}).get('severity') == 'ERROR'))")
             if [ "$CRITICAL" -gt 0 ]; then
               echo "❌ $CRITICAL critical Semgrep findings detected"
-              python3 -c "
-import json
-with open('semgrep-results.json') as f:
-    data = json.load(f)
-for r in data.get('results', []):
-    if r.get('extra', {}).get('severity') == 'ERROR':
-        print(f\"  - {r['path']}:{r.get('start', {}).get('line', '?')} - {r['extra']['message']}\")
-"
+              python3 -c "import json; data=json.load(open('semgrep-results.json')); [print(f\"  - {r['path']}:{r.get('start', {}).get('line', '?')} - {r['extra']['message']}\") for r in data.get('results', []) if r.get('extra', {}).get('severity') == 'ERROR']"
               exit 1
             fi
             echo "✅ No critical Semgrep findings"
@@ -145,7 +132,8 @@ for r in data.get('results', []):
 
       - name: Generate SBOM
         run: |
-          cargo cyclonedx -p x3-chain-node --format json --output-file sbom.cdx.json
+          cargo cyclonedx --manifest-path node/Cargo.toml --format json --override-filename sbom.cdx.json
+          mv node/sbom.cdx.json sbom.cdx.json
           echo "✅ SBOM generated at sbom.cdx.json"
 
       - name: Build runtime WASM

@@ -3,21 +3,27 @@ name: production-gate
 on:
   pull_request:
   push:
-    branches: [ main, master, develop ]
+    branches: [ master, develop ]
 
 jobs:
   gate:
     runs-on: ubuntu-latest
+    env:
+      X3_NODE_BIN: ${{ github.workspace }}/target/release/x3-chain-node
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Guard
         run: make guard
       - name: Test (core + pallets)
         run: make test-all-pallets
+      - name: Build validated node for real-chain tests
+        run: cargo build --release -p x3-chain-node
       - name: Audit (invariants + readiness + consistency)
         run: make audit
       - name: Node Build Verification (mainnet-rc1)

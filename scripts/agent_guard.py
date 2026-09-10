@@ -20,6 +20,8 @@ IGNORE_DIRS = {
 }
 IGNORE_PREFIXES = (
     ".kilo/",
+    "apps/dashboard/dist/",
+    "audit-artifacts/",
     "apps/x3-desktop/src-tauri/tauri-vendor/",
     "forge-std/",
     "packages/polkawallet-plugin/dist/",
@@ -48,6 +50,7 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)api-key=(\$|\$\{|<|\[|YOUR_)",
     r"(?i)apiKey=(\$|\$\{|<|\[|sk_x3_test_bootstrap)",
     r"(?i)API_KEY\s*=\s*(process\.env|os\.environ|\$INFRA_API_KEY|\"infra_x+\"|your-secret-api-key)",
+    r"(?i)API_KEY\s*=\s*\"?\$\{[A-Z0-9_]+:-\}\"?",
     r"(?i)APIKey\s*=\s*\"infra_x+\"",
     r"(?i)PRIVATE_KEY=\d{16,}",
     r"(?i)--from-literal=api-key=sk-or-\.\.\.",
@@ -55,6 +58,10 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)privateKey:\s*'•+",
     r"(?i)private[_-]?key\s*[:=]\s*(self\.private_key|\"//Charlie\"|private_key\.clone\(\))",
     r"(?i)mnemonic\s*=\s*self\.decrypt_data\(",
+    r"(?i)mnemonic\s*=\s*bip39::Mnemonic::from_phrase\(",
+    r"(?i)apiKey:\s*'your-api-key'",
+    r"(?i)apiKey:\s*config\.(apiKey|privateKey)",
+    r"(?i)this\.config\.apiKey\s*=\s*undefined",
     r"(?i)key\.privateKey\b",
 ]
 

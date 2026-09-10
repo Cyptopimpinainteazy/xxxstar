@@ -12,6 +12,8 @@ exclude = [
     # Solana BPF programs are standalone crates that conflict with the
     # workspace's solana-program dependency graph.
     "programs/svm/*",
+    # Readiness reporting is intentionally a standalone crate with its own lock context.
+    "crates/x3-readiness-report",
 ]
 members = [
     "pallets/x3-kernel",
