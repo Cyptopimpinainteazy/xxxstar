@@ -43,6 +43,8 @@ jobs:
           cargo test --manifest-path x3-lang/Cargo.toml --locked \
             -p x3-lang-compiler --test test_trading_core_e2e --all-features
           cargo test --manifest-path x3-lang/Cargo.toml --locked \
+            -p x3-lang-compiler --test test_trading_semantic_hardening --all-features
+          cargo test --manifest-path x3-lang/Cargo.toml --locked \
             -p x3-lang-vm --test trading_execution --test trading_receipts --all-features
 
       - name: Check nested-workspace formatting
