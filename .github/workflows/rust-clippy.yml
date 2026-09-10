@@ -20,8 +20,15 @@ jobs:
       - name: Install Protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run Clippy (workspace default features)
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Run Clippy (tests)
-        run: cargo clippy --workspace --all-targets --all-features --tests -- -D warnings
+      # `production` and `test-verifier` are intentionally incompatible:
+      # production must never compile a test verifier. Check both valid
+      # configurations independently rather than disabling that fail-closed
+      # compile-time guard with a workspace-wide --all-features invocation.
+      - name: Run Clippy (verification router production)
+        run: cargo clippy -p x3-verification-router --all-targets --features production -- -D warnings
+
+      - name: Run Clippy (verification router test verifier)
+        run: cargo clippy -p x3-verification-router --all-targets --features test-verifier -- -D warnings

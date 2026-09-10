@@ -18,6 +18,8 @@ jobs:
         run: cargo install --locked --git https://github.com/chevdor/srtool-cli --rev 0485b5507a0b63cf7699376f15d9cb5c849bbcd0 srtool-cli
       - name: Add Cargo binaries to PATH
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Guard
         run: make guard
       - name: Test (core + pallets)
