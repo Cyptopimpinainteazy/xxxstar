@@ -132,7 +132,8 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          cargo cyclonedx --format json --output-file sbom.cdx.json
+          cargo cyclonedx --manifest-path node/Cargo.toml --format json --override-filename sbom.cdx.json
+          mv node/sbom.cdx.json sbom.cdx.json
           echo "✅ SBOM generated at sbom.cdx.json"
 
       - name: Build runtime WASM
