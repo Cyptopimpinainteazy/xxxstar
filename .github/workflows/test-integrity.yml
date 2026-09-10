@@ -10,6 +10,8 @@ jobs:
   integrity-check:
     name: Test Integrity Enforcement
     runs-on: ubuntu-latest
+    env:
+      X3_NODE_BIN: ${{ github.workspace }}/target/release/x3-chain-node
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,6 +24,9 @@ jobs:
       - name: Validate pull-request integrity
         run: |
           python3 scripts_infrastructure/pr_supervisor.py --base origin/master
+
+      - name: Build validated node for real-chain tests
+        run: cargo build --release -p x3-chain-node
 
       - name: Run core test suite
         run: |
