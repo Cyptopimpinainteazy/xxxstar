@@ -1,8 +1,8 @@
 # X3 Lang Trading Core v1 Design
 
-**Status:** Approved design  
-**Date:** 2026-09-09  
-**Target:** `x3-lang` Rust compiler and VM workspace  
+**Status:** Approved design
+**Date:** 2026-09-09
+**Target:** `x3-lang` Rust compiler and VM workspace
 **Branch:** `codex/x3-trading-core-v1`
 
 ## 1. Purpose

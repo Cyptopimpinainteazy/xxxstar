@@ -1,8 +1,8 @@
 # X3 Lang Trading Core v1 — Verification Evidence
 
-**Date:** 2026-09-09  
-**Branch:** `codex/x3-trading-core-v1`  
-**Verified code head before this evidence commit:** `811b46cee`  
+**Date:** 2026-09-09
+**Branch:** `codex/x3-trading-core-v1`
+**Verified code head before this evidence commit:** `811b46cee`
 **Remote:** `origin/codex/x3-trading-core-v1`
 
 ## Scope delivered
