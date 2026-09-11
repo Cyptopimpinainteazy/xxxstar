@@ -142,6 +142,15 @@ pub trait OffchainStorageProvider: Send + Sync + 'static {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn remove(&self, key: &[u8]);
     fn keys_with_prefix(&self, prefix: &[u8]) -> Vec<Vec<u8>>;
+
+    /// Atomic compare-and-swap. Returns true only when the current value
+    /// exactly matches `old_value` and `new_value` was committed.
+    fn compare_and_set(
+        &self,
+        key: &[u8],
+        old_value: Option<&[u8]>,
+        new_value: &[u8],
+    ) -> bool;
 }
 
 #[cfg(feature = "offchain")]
@@ -311,6 +320,21 @@ impl<Backend: sp_core::offchain::OffchainStorage + Send + Sync + 'static> Offcha
             None => vec![],
         }
     }
+
+    fn compare_and_set(
+        &self,
+        key: &[u8],
+        old_value: Option<&[u8]>,
+        new_value: &[u8],
+    ) -> bool {
+        let mut guard = self.inner.write().unwrap();
+        guard.compare_and_set(
+            sp_core::offchain::STORAGE_PREFIX,
+            key,
+            old_value,
+            new_value,
+        )
+    }
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -447,6 +471,21 @@ mod tests {
                     .filter(|k| k.starts_with(prefix))
                     .cloned()
                     .collect()
+            }
+
+            fn compare_and_set(
+                &self,
+                key: &[u8],
+                old_value: Option<&[u8]>,
+                new_value: &[u8],
+            ) -> bool {
+                let mut guard = self.store.write().unwrap();
+                let current = guard.get(key).map(Vec::as_slice);
+                if current != old_value {
+                    return false;
+                }
+                guard.insert(key.to_vec(), new_value.to_vec());
+                true
             }
         }
 
