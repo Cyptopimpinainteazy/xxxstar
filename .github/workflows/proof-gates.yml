@@ -97,6 +97,10 @@ jobs:
             echo "::endgroup::"
           done
       - name: Receipt Schema Gate
+        env:
+          # Historical receipts remain valid evidence; freshness is evaluated
+          # by proof regeneration/readiness gates, not by schema validation.
+          RECEIPT_SKIP_FRESHNESS_CHECK: "1"
         run: |
           chmod +x scripts/proof/*.sh
           bash scripts/proof/verify-receipts.sh
