@@ -546,3 +546,192 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         self.coordinator.session(session_id)
     }
 }
+
+
+/// Append-only operation-attempt store on Redis/Valkey.
+///
+/// Each attempt snapshot is immutable. One canonical result key exists per
+/// (session, operation) and may only be created once or re-set identically.
+#[cfg(feature = "valkey")]
+#[derive(Clone)]
+pub struct ValkeyAttemptStore {
+    client: Client,
+    namespace: String,
+}
+
+#[cfg(feature = "valkey")]
+impl ValkeyAttemptStore {
+    pub fn new(redis_url: &str) -> Result<Self, CoordinatorError> {
+        Self::with_namespace(redis_url, "x3")
+    }
+
+    pub fn with_namespace(
+        redis_url: &str,
+        namespace: impl Into<String>,
+    ) -> Result<Self, CoordinatorError> {
+        Ok(Self {
+            client: Client::open(redis_url).map_err(|e| backend_error("client creation", e))?,
+            namespace: namespace.into(),
+        })
+    }
+
+    fn list_key(&self, session_id: &str) -> String {
+        format!("{}:attempts:{{{session_id}}}", self.namespace)
+    }
+
+    fn event_key(&self, attempt: &crate::OperationAttempt) -> String {
+        format!(
+            "{}:attempt-event:{{{}}}:{}",
+            self.namespace, attempt.session_id, attempt.attempt_id
+        )
+    }
+
+    fn canonical_key(
+        &self,
+        session_id: &str,
+        operation: crate::CoordinatorOperation,
+    ) -> String {
+        format!(
+            "{}:canonical:{{{session_id}}}:{:?}",
+            self.namespace, operation
+        )
+    }
+
+    fn connection(&self) -> Result<redis::Connection, CoordinatorError> {
+        self.client
+            .get_connection()
+            .map_err(|e| backend_error("connection", e))
+    }
+}
+
+#[cfg(feature = "valkey")]
+impl crate::AttemptStore for ValkeyAttemptStore {
+    fn append_attempt(
+        &self,
+        attempt: &crate::OperationAttempt,
+    ) -> Result<(), CoordinatorError> {
+        let payload = serde_json::to_string(attempt)
+            .map_err(|e| CoordinatorError::Internal(format!("attempt serialize failed: {e}")))?;
+        let event_key = self.event_key(attempt);
+        let list_key = self.list_key(&attempt.session_id);
+        let script = Script::new(
+            r#"
+local existing = redis.call('GET', KEYS[1])
+if existing then
+  if existing == ARGV[1] then
+    return 1
+  end
+  return 0
+end
+redis.call('SET', KEYS[1], ARGV[1])
+redis.call('RPUSH', KEYS[2], ARGV[1])
+return 1
+"#,
+        );
+
+        let mut conn = self.connection()?;
+        let accepted: i64 = script
+            .key(event_key)
+            .key(list_key)
+            .arg(&payload)
+            .invoke(&mut conn)
+            .map_err(|e| backend_error("attempt append script", e))?;
+        if accepted == 1 {
+            Ok(())
+        } else {
+            Err(CoordinatorError::Internal(format!(
+                "attempt id '{}' reused with different immutable contents",
+                attempt.attempt_id
+            )))
+        }
+    }
+
+    fn attempts(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<crate::OperationAttempt>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let raw: Vec<String> = redis::cmd("LRANGE")
+            .arg(self.list_key(session_id))
+            .arg(0)
+            .arg(-1)
+            .query(&mut conn)
+            .map_err(|e| backend_error("attempt history lookup", e))?;
+
+        raw.into_iter()
+            .map(|entry| {
+                serde_json::from_str(&entry).map_err(|e| {
+                    CoordinatorError::Internal(format!(
+                        "invalid Valkey attempt history entry: {e}"
+                    ))
+                })
+            })
+            .collect()
+    }
+
+    fn canonical(
+        &self,
+        session_id: &str,
+        operation: crate::CoordinatorOperation,
+    ) -> Result<Option<crate::CanonicalOperationResult>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let raw: Option<String> = redis::cmd("GET")
+            .arg(self.canonical_key(session_id, operation))
+            .query(&mut conn)
+            .map_err(|e| backend_error("canonical result lookup", e))?;
+
+        raw.map(|entry| {
+            serde_json::from_str(&entry).map_err(|e| {
+                CoordinatorError::Internal(format!("invalid canonical result: {e}"))
+            })
+        })
+        .transpose()
+    }
+
+    fn set_canonical(
+        &self,
+        result: &crate::CanonicalOperationResult,
+    ) -> Result<(), CoordinatorError> {
+        let payload = serde_json::to_string(result).map_err(|e| {
+            CoordinatorError::Internal(format!("canonical result serialize failed: {e}"))
+        })?;
+        let key = self.canonical_key(&result.session_id, result.operation);
+        let script = Script::new(
+            r#"
+local existing = redis.call('GET', KEYS[1])
+if not existing then
+  redis.call('SET', KEYS[1], ARGV[1])
+  return 1
+end
+if existing == ARGV[1] then
+  return 1
+end
+return 0
+"#,
+        );
+
+        let mut conn = self.connection()?;
+        let accepted: i64 = script
+            .key(key)
+            .arg(&payload)
+            .invoke(&mut conn)
+            .map_err(|e| backend_error("canonical result script", e))?;
+
+        if accepted == 1 {
+            Ok(())
+        } else {
+            let existing = self
+                .canonical(&result.session_id, result.operation)?
+                .ok_or_else(|| {
+                    CoordinatorError::Internal(
+                        "canonical result conflict disappeared during readback".into(),
+                    )
+                })?;
+            Err(CoordinatorError::IdempotencyConflict {
+                operation: result.operation,
+                existing: hex::encode(existing.proof_hash),
+                incoming: hex::encode(result.proof_hash),
+            })
+        }
+    }
+}
