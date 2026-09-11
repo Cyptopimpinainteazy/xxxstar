@@ -80,6 +80,65 @@ impl<O: crate::persistence::OffchainStorageProvider> DistributedLeaseStore
     }
 }
 
+
+/// Distributed secret-ownership registry backed by the same CAS store as leases.
+///
+/// This closes the cross-session race where two independent coordinator
+/// processes could otherwise update a last-write-wins used-secret vector.
+#[derive(Clone)]
+pub struct DurableSecretRegistry<S: DistributedLeaseStore> {
+    store: Arc<S>,
+}
+
+impl<S: DistributedLeaseStore> DurableSecretRegistry<S> {
+    const PREFIX: &'static [u8] = b"x3secret:";
+
+    pub fn new(store: Arc<S>) -> Self {
+        Self { store }
+    }
+
+    fn key(secret_hash: [u8; 32]) -> Vec<u8> {
+        let mut key = Self::PREFIX.to_vec();
+        key.extend_from_slice(&secret_hash);
+        key
+    }
+
+    /// Claim a secret hash for exactly one session.
+    ///
+    /// Same-session retries are idempotent. Any other owner is rejected.
+    pub fn claim(
+        &self,
+        secret_hash: [u8; 32],
+        session_id: &str,
+    ) -> Result<(), CoordinatorError> {
+        let key = Self::key(secret_hash);
+        let owner = session_id.as_bytes();
+
+        loop {
+            match self.store.load(&key) {
+                Some(existing) if existing == owner => return Ok(()),
+                Some(existing) => {
+                    return Err(CoordinatorError::Internal(format!(
+                        "distributed secret replay: hash already owned by session '{}'",
+                        String::from_utf8_lossy(&existing)
+                    )));
+                }
+                None => {
+                    if self.store.compare_and_set(&key, None, owner) {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn owner(&self, secret_hash: [u8; 32]) -> Option<String> {
+        self.store
+            .load(&Self::key(secret_hash))
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct DurableLeaseState {
     owner_id: String,
@@ -464,6 +523,41 @@ mod tests {
     use super::*;
     use std::sync::Barrier;
     use std::thread;
+
+    #[test]
+    fn distributed_secret_registry_allows_same_session_retry_only() {
+        let store = Arc::new(InMemoryDistributedLeaseStore::default());
+        let a = DurableSecretRegistry::new(store.clone());
+        let b = DurableSecretRegistry::new(store);
+        let hash = [0xabu8; 32];
+
+        a.claim(hash, "swap-a").unwrap();
+        b.claim(hash, "swap-a").expect("same-session retry");
+        assert!(b.claim(hash, "swap-b").is_err());
+        assert_eq!(a.owner(hash).as_deref(), Some("swap-a"));
+    }
+
+    #[test]
+    fn concurrent_distributed_secret_claim_has_single_owner() {
+        let store = Arc::new(InMemoryDistributedLeaseStore::default());
+        let barrier = Arc::new(Barrier::new(3));
+        let hash = [0xcdu8; 32];
+        let mut handles = Vec::new();
+
+        for owner in ["swap-a", "swap-b"] {
+            let registry = DurableSecretRegistry::new(store.clone());
+            let barrier = barrier.clone();
+            handles.push(thread::spawn(move || {
+                barrier.wait();
+                registry.claim(hash, owner)
+            }));
+        }
+
+        barrier.wait();
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert_eq!(results.iter().filter(|r| r.is_err()).count(), 1);
+    }
 
     #[test]
     fn distributed_authorities_share_one_fencing_epoch() {
