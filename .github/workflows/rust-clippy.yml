@@ -14,6 +14,9 @@ concurrency:
 jobs:
   clippy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +36,25 @@ jobs:
       # producing configurations Cargo cannot build. Lint the complete default
       # workspace, then check each supported feature mode independently below.
       - name: Run Clippy (workspace defaults)
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: |
+          set -o pipefail
+          cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee clippy-workspace-defaults.txt
+
+      - name: Report Clippy failure on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('clippy-workspace-defaults.txt')) return;
+            const output = fs.readFileSync('clippy-workspace-defaults.txt', 'utf8');
+            const tail = output.slice(-12000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Rust Clippy workspace-default failure\n\n\`\`\`text\n${tail}\n\`\`\``
+            });
 
       - name: Run Clippy (runtime RC-1)
         run: cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
