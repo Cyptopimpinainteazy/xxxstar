@@ -383,6 +383,102 @@ return 1
 }
 
 
+/// Content-addressed canonical proof-bundle vault on Redis/Valkey.
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+#[derive(Clone)]
+pub struct ValkeyProofBundleStore {
+    client: Client,
+    namespace: String,
+}
+
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+impl ValkeyProofBundleStore {
+    pub fn new(redis_url: &str) -> Result<Self, CoordinatorError> {
+        Self::with_namespace(redis_url, "x3")
+    }
+
+    pub fn with_namespace(
+        redis_url: &str,
+        namespace: impl Into<String>,
+    ) -> Result<Self, CoordinatorError> {
+        Ok(Self {
+            client: Client::open(redis_url)
+                .map_err(|e| backend_error("client creation", e))?,
+            namespace: namespace.into(),
+        })
+    }
+
+    fn key(&self, proof_hash: [u8; 32]) -> String {
+        format!("{}:proof:{}", self.namespace, hex::encode(proof_hash))
+    }
+
+    fn connection(&self) -> Result<redis::Connection, CoordinatorError> {
+        self.client
+            .get_connection()
+            .map_err(|e| backend_error("connection", e))
+    }
+}
+
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+impl crate::ProofBundleStore for ValkeyProofBundleStore {
+    fn put_bundle(
+        &self,
+        bundle: &x3_atomic_swap::CrossDomainProofBundle,
+    ) -> Result<(), CoordinatorError> {
+        let payload = serde_json::to_string(bundle).map_err(|e| {
+            CoordinatorError::Internal(format!("proof bundle serialize failed: {e}"))
+        })?;
+        let script = Script::new(
+            r#"
+local existing = redis.call('GET', KEYS[1])
+if not existing then
+  redis.call('SET', KEYS[1], ARGV[1])
+  return 1
+end
+if existing == ARGV[1] then
+  return 1
+end
+return 0
+"#,
+        );
+
+        let mut conn = self.connection()?;
+        let accepted: i64 = script
+            .key(self.key(bundle.proof_hash))
+            .arg(&payload)
+            .invoke(&mut conn)
+            .map_err(|e| backend_error("proof bundle put script", e))?;
+
+        if accepted == 1 {
+            Ok(())
+        } else {
+            Err(CoordinatorError::Internal(format!(
+                "proof hash {} already maps to different bundle contents",
+                hex::encode(bundle.proof_hash)
+            )))
+        }
+    }
+
+    fn get_bundle(
+        &self,
+        proof_hash: [u8; 32],
+    ) -> Result<Option<x3_atomic_swap::CrossDomainProofBundle>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let raw: Option<String> = redis::cmd("GET")
+            .arg(self.key(proof_hash))
+            .query(&mut conn)
+            .map_err(|e| backend_error("proof bundle lookup", e))?;
+
+        raw.map(|entry| {
+            serde_json::from_str(&entry).map_err(|e| {
+                CoordinatorError::Internal(format!("invalid proof bundle in Valkey: {e}"))
+            })
+        })
+        .transpose()
+    }
+}
+
+
 /// Production multi-process coordinator using Valkey/Redis for the hot-path
 /// lease/fencing and global secret-ownership decisions.
 #[cfg(feature = "valkey")]
@@ -391,6 +487,8 @@ pub struct ValkeyDistributedCoordinator<P: crate::SessionPersistence> {
     leases: ValkeyLeaseAuthority,
     secrets: ValkeySecretRegistry,
     attempts: ValkeyAttemptStore,
+    #[cfg(feature = "canonical-proofs")]
+    proofs: ValkeyProofBundleStore,
 }
 
 #[cfg(feature = "valkey")]
@@ -401,6 +499,8 @@ impl<P: crate::SessionPersistence> Clone for ValkeyDistributedCoordinator<P> {
             leases: self.leases.clone(),
             secrets: self.secrets.clone(),
             attempts: self.attempts.clone(),
+            #[cfg(feature = "canonical-proofs")]
+            proofs: self.proofs.clone(),
         }
     }
 }
@@ -424,6 +524,8 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             leases: ValkeyLeaseAuthority::with_namespace(redis_url, namespace)?,
             secrets: ValkeySecretRegistry::with_namespace(redis_url, namespace)?,
             attempts: ValkeyAttemptStore::with_namespace(redis_url, namespace)?,
+            #[cfg(feature = "canonical-proofs")]
+            proofs: ValkeyProofBundleStore::with_namespace(redis_url, namespace)?,
         })
     }
 
@@ -623,8 +725,40 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         }
 
         let proof_hash = crate::verify_bundle_for_attempt(prior, intent, bundle)?;
+        crate::ProofBundleStore::put_bundle(&self.proofs, bundle)?;
         crate::OperationAttemptLedger::new(self.attempts.clone())
             .record_finalized(prior, proof_hash, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn assemble_canonical_proof_set(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+    ) -> Result<x3_atomic_swap::CrossDomainProofSet, CoordinatorError> {
+        let mut canonical_results = Vec::new();
+        for operation in [
+            crate::CoordinatorOperation::FastHtlcLock,
+            crate::CoordinatorOperation::SlowHtlcLock,
+            crate::CoordinatorOperation::FastClaim,
+            crate::CoordinatorOperation::SlowClaim,
+            crate::CoordinatorOperation::RefundBoth,
+        ] {
+            if let Some(result) =
+                crate::AttemptStore::canonical(&self.attempts, session_id, operation)?
+            {
+                canonical_results.push(result);
+            }
+        }
+        crate::assemble_proof_set(intent, &canonical_results, &self.proofs)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn canonical_proof_bundle(
+        &self,
+        proof_hash: [u8; 32],
+    ) -> Result<Option<x3_atomic_swap::CrossDomainProofBundle>, CoordinatorError> {
+        crate::ProofBundleStore::get_bundle(&self.proofs, proof_hash)
     }
 
     pub fn attempt_history(
