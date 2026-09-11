@@ -85,6 +85,28 @@ jobs:
             cargo build -p proof-forge --release
           fi
 
+      - name: Re-prove registered claim receipts
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          receipts=(proof/receipts/claims/*.receipt.json)
+          if (( ${#receipts[@]} == 0 )); then
+            echo "No claim receipts found; refusing to pass ProofForge pre-commit gate."
+            exit 1
+          fi
+
+          for receipt in "${receipts[@]}"; do
+            claim="$(basename "$receipt" .receipt.json)"
+            if ! grep -Fq "  ${claim}:" proof/claims/registry.yml; then
+              echo "Orphan receipt has no registered claim: $receipt"
+              exit 1
+            fi
+
+            echo "::group::Re-prove ${claim}"
+            ./target/release/x3-proof verify "$claim" --strict
+            echo "::endgroup::"
+          done
+
       - name: Receipt Schema Gate
         run: |
           chmod +x scripts/proof/*.sh
