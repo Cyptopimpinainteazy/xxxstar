@@ -73,6 +73,7 @@ impl ProofBundleStore for InMemoryProofBundleStore {
 #[cfg(feature = "canonical-proofs")]
 pub fn assemble_proof_set<S: ProofBundleStore>(
     intent: &AtomicIntent,
+    runtime_intent_id: [u8; 32],
     canonical_results: &[CanonicalOperationResult],
     store: &S,
 ) -> Result<CrossDomainProofSet, CoordinatorError> {
@@ -82,7 +83,7 @@ pub fn assemble_proof_set<S: ProofBundleStore>(
         ));
     }
 
-    let mut set = CrossDomainProofSet::new(intent);
+    let mut set = CrossDomainProofSet::new(intent, runtime_intent_id);
 
     for result in canonical_results {
         let bundle = store
@@ -109,6 +110,11 @@ pub fn assemble_proof_set<S: ProofBundleStore>(
         bundle.verify(intent).map_err(|e| {
             CoordinatorError::Internal(format!(
                 "vault proof failed canonical verification: {e}"
+            ))
+        })?;
+        bundle.verify_runtime_binding(runtime_intent_id).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "vault proof failed runtime-intent verification: {e}"
             ))
         })?;
 
@@ -164,6 +170,7 @@ mod tests {
         let block_hash = format!("block-{block}");
         CrossDomainProofBundle::new(
             intent,
+            [0xabu8; 32],
             chain.into(),
             vm,
             op,
@@ -229,7 +236,7 @@ mod tests {
             result(CoordinatorOperation::FastClaim, "a", &x3),
             result(CoordinatorOperation::SlowClaim, "b", &eth),
         ];
-        let set = assemble_proof_set(&intent, &results, &store).unwrap();
+        let set = assemble_proof_set(&intent, [0xabu8; 32], &results, &store).unwrap();
 
         set.verify_claim_set(
             &intent,
@@ -254,7 +261,7 @@ mod tests {
             11,
         );
         let results = vec![result(CoordinatorOperation::FastClaim, "a", &proof)];
-        assert!(assemble_proof_set(&intent, &results, &store).is_err());
+        assert!(assemble_proof_set(&intent, [0xabu8; 32], &results, &store).is_err());
     }
 
     #[test]
@@ -274,6 +281,6 @@ mod tests {
         let mut canonical = result(CoordinatorOperation::FastClaim, "a", &proof);
         canonical.tx_id = "different-tx".into();
 
-        assert!(assemble_proof_set(&intent, &[canonical], &store).is_err());
+        assert!(assemble_proof_set(&intent, [0xabu8; 32], &[canonical], &store).is_err());
     }
 }
