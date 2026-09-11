@@ -35,6 +35,7 @@ pub enum SettlementOutboxRecovery {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SettlementOutboxRecord {
     pub submission_id: [u8; 32],
+    pub session_id: String,
     pub runtime_intent_id: [u8; 32],
     /// 0 = Claim, 1 = Refund.
     pub purpose: u8,
@@ -130,6 +131,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
     #[cfg(feature = "canonical-proofs")]
     pub fn prepare(
         &self,
+        session_id: &str,
         envelope: &SettlementSubmissionEnvelope,
         now: u64,
     ) -> Result<SettlementOutboxRecord, CoordinatorError> {
@@ -147,6 +149,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
 
         let record = SettlementOutboxRecord {
             submission_id,
+            session_id: session_id.to_string(),
             runtime_intent_id: envelope.runtime_intent_id,
             purpose,
             call_index: envelope.call_index(),
@@ -338,6 +341,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
         incoming: &SettlementOutboxRecord,
     ) -> Result<(), CoordinatorError> {
         if existing.submission_id != incoming.submission_id
+            || existing.session_id != incoming.session_id
             || existing.runtime_intent_id != incoming.runtime_intent_id
             || existing.purpose != incoming.purpose
             || existing.call_index != incoming.call_index
@@ -367,6 +371,7 @@ mod tests {
     fn prepared() -> SettlementOutboxRecord {
         SettlementOutboxRecord {
             submission_id: [1u8; 32],
+            session_id: "swap-a".into(),
             runtime_intent_id: [2u8; 32],
             purpose: 0,
             call_index: 33,
