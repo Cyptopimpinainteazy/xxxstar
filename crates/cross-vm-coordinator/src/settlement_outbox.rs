@@ -17,6 +17,8 @@ use crate::{SettlementProofPurpose, SettlementSubmissionEnvelope};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SettlementOutboxStatus {
     Prepared,
+    /// Exact signed extrinsic bytes + tx hash persisted before network send.
+    Signed,
     Broadcast,
     Included,
     TerminalObserved,
@@ -25,7 +27,9 @@ pub enum SettlementOutboxStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettlementOutboxRecovery {
-    BroadcastPrepared,
+    SignPrepared,
+    /// Query tx hash first; if absent, rebroadcast the exact persisted bytes.
+    QueryOrRebroadcastExactSignedExtrinsic,
     QueryBroadcastStatus,
     ObserveSettlementState,
     Done,
@@ -44,6 +48,8 @@ pub struct SettlementOutboxRecord {
     pub proof_hashes: Vec<[u8; 32]>,
     pub status: SettlementOutboxStatus,
     pub tx_id: Option<String>,
+    /// Exact signed extrinsic bytes. Persisted before any network send.
+    pub signed_extrinsic: Option<Vec<u8>>,
     pub block_number: Option<u64>,
     pub owner_id: Option<String>,
     pub fence: Option<u64>,
@@ -157,6 +163,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             proof_hashes: envelope.proof_hashes(),
             status: SettlementOutboxStatus::Prepared,
             tx_id: None,
+            signed_extrinsic: None,
             block_number: None,
             owner_id: None,
             fence: None,
@@ -174,42 +181,111 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
         Ok(record)
     }
 
-    pub fn record_broadcast(
+    /// Persist the exact signed extrinsic and deterministic tx hash BEFORE
+    /// the caller is allowed to send anything to the network.
+    pub fn record_signed(
         &self,
         prepared: &SettlementOutboxRecord,
         tx_id: &str,
+        signed_extrinsic: Vec<u8>,
         owner_id: &str,
         fence: u64,
         now: u64,
     ) -> Result<SettlementOutboxRecord, CoordinatorError> {
+        if signed_extrinsic.is_empty() {
+            return Err(CoordinatorError::Internal(
+                "signed settlement extrinsic cannot be empty".into(),
+            ));
+        }
+
         let latest = self.require_latest(prepared.submission_id)?;
         self.ensure_same_submission_identity(&latest, prepared)?;
 
-        if latest.status == SettlementOutboxStatus::Broadcast {
-            if latest.tx_id.as_deref() == Some(tx_id) {
+        if latest.status == SettlementOutboxStatus::Signed {
+            if latest.tx_id.as_deref() == Some(tx_id)
+                && latest.signed_extrinsic.as_deref() == Some(signed_extrinsic.as_slice())
+            {
                 return Ok(latest);
             }
             return Err(CoordinatorError::Internal(
-                "settlement submission already broadcast with a different tx id".into(),
+                "settlement submission already signed with different bytes or tx id".into(),
             ));
         }
 
         if latest.status != SettlementOutboxStatus::Prepared {
             return Err(CoordinatorError::Internal(format!(
-                "cannot broadcast settlement submission from status {:?}",
+                "cannot sign settlement submission from status {:?}",
                 latest.status
             )));
         }
 
         let next = SettlementOutboxRecord {
-            status: SettlementOutboxStatus::Broadcast,
+            status: SettlementOutboxStatus::Signed,
             tx_id: Some(tx_id.to_string()),
+            signed_extrinsic: Some(signed_extrinsic),
             owner_id: Some(owner_id.to_string()),
             fence: Some(fence),
             updated_at: now,
             ..latest
         };
-        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
+        self.store
+            .compare_and_append(next.submission_id, Some(&prepared.clone()), &next)
+            .or_else(|_| {
+                // Another process may have won the transition after our read.
+                // Re-read and accept only the exact same signed transaction.
+                let current = self.require_latest(prepared.submission_id)?;
+                if current.status == SettlementOutboxStatus::Signed
+                    && current.tx_id == next.tx_id
+                    && current.signed_extrinsic == next.signed_extrinsic
+                {
+                    Ok(())
+                } else {
+                    Err(CoordinatorError::Internal(
+                        "settlement signing transition conflict".into(),
+                    ))
+                }
+            })?;
+        self.require_latest(prepared.submission_id)
+    }
+
+    /// Record that the exact persisted signed extrinsic was submitted to RPC.
+    /// This transition happens after send; a crash before it leaves status
+    /// Signed, which recovery handles by querying/rebroadcasting the SAME bytes.
+    pub fn record_broadcast(
+        &self,
+        signed: &SettlementOutboxRecord,
+        now: u64,
+    ) -> Result<SettlementOutboxRecord, CoordinatorError> {
+        let latest = self.require_latest(signed.submission_id)?;
+        self.ensure_same_submission_identity(&latest, signed)?;
+
+        if latest.status == SettlementOutboxStatus::Broadcast {
+            return Ok(latest);
+        }
+        if latest.status != SettlementOutboxStatus::Signed {
+            return Err(CoordinatorError::Internal(format!(
+                "cannot mark settlement broadcast from status {:?}",
+                latest.status
+            )));
+        }
+        if latest.tx_id.is_none()
+            || latest
+                .signed_extrinsic
+                .as_ref()
+                .map_or(true, Vec::is_empty)
+        {
+            return Err(CoordinatorError::Internal(
+                "signed settlement record is missing tx id or extrinsic bytes".into(),
+            ));
+        }
+
+        let next = SettlementOutboxRecord {
+            status: SettlementOutboxStatus::Broadcast,
+            updated_at: now,
+            ..latest.clone()
+        };
+        self.store
+            .compare_and_append(next.submission_id, Some(&latest), &next)?;
         Ok(next)
     }
 
@@ -317,7 +393,10 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             return Ok(None);
         };
         let action = match latest.status {
-            SettlementOutboxStatus::Prepared => SettlementOutboxRecovery::BroadcastPrepared,
+            SettlementOutboxStatus::Prepared => SettlementOutboxRecovery::SignPrepared,
+            SettlementOutboxStatus::Signed => {
+                SettlementOutboxRecovery::QueryOrRebroadcastExactSignedExtrinsic
+            }
             SettlementOutboxStatus::Broadcast => SettlementOutboxRecovery::QueryBroadcastStatus,
             SettlementOutboxStatus::Included => SettlementOutboxRecovery::ObserveSettlementState,
             SettlementOutboxStatus::TerminalObserved => SettlementOutboxRecovery::Done,
@@ -379,6 +458,7 @@ mod tests {
             proof_hashes: vec![[4u8; 32]],
             status: SettlementOutboxStatus::Prepared,
             tx_id: None,
+            signed_extrinsic: None,
             block_number: None,
             owner_id: None,
             fence: None,
@@ -395,10 +475,16 @@ mod tests {
         );
         let p = prepared();
         outbox.store.compare_and_append(p.submission_id, None, &p).unwrap();
-        let b = outbox
-            .record_broadcast(&p, "0xabc", "worker-a", 7, 101)
+        let signed = outbox
+            .record_signed(&p, "0xabc", vec![1, 2, 3], "worker-a", 7, 101)
             .unwrap();
 
+        assert_eq!(
+            outbox.recovery(signed.submission_id).unwrap(),
+            Some(SettlementOutboxRecovery::QueryOrRebroadcastExactSignedExtrinsic)
+        );
+
+        let b = outbox.record_broadcast(&signed, 102).unwrap();
         assert_eq!(
             outbox.recovery(b.submission_id).unwrap(),
             Some(SettlementOutboxRecovery::QueryBroadcastStatus)
@@ -413,11 +499,11 @@ mod tests {
         let p = prepared();
         outbox.store.compare_and_append(p.submission_id, None, &p).unwrap();
         outbox
-            .record_broadcast(&p, "0xabc", "worker-a", 7, 101)
+            .record_signed(&p, "0xabc", vec![1, 2, 3], "worker-a", 7, 101)
             .unwrap();
 
         assert!(outbox
-            .record_broadcast(&p, "0xdef", "worker-b", 8, 102)
+            .record_signed(&p, "0xdef", vec![4, 5, 6], "worker-b", 8, 102)
             .is_err());
     }
 
@@ -428,10 +514,11 @@ mod tests {
         );
         let p = prepared();
         outbox.store.compare_and_append(p.submission_id, None, &p).unwrap();
-        let b = outbox
-            .record_broadcast(&p, "0xabc", "worker-a", 7, 101)
+        let signed = outbox
+            .record_signed(&p, "0xabc", vec![1, 2, 3], "worker-a", 7, 101)
             .unwrap();
-        let i = outbox.record_included(&b, 55, 102).unwrap();
+        let b = outbox.record_broadcast(&signed, 102).unwrap();
+        let i = outbox.record_included(&b, 55, 103).unwrap();
 
         assert!(outbox.record_failed(&i, "late timeout", 103).is_err());
     }
