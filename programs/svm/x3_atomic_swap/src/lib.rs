@@ -97,6 +97,8 @@ pub mod error {
         TimelockTooFar = 10,
         /// Arithmetic overflow or underflow occurred.
         Overflow = 11,
+        /// SPL/token custody is not implemented by this native-SOL HTLC program.
+        UnsupportedTokenMint = 12,
     }
 
     impl HtlcError {
@@ -123,6 +125,9 @@ pub mod error {
                 }
                 Self::TimelockTooFar => "TimelockTooFar: timelock exceeds maximum allowed offset",
                 Self::Overflow => "Overflow: arithmetic overflow or underflow",
+                Self::UnsupportedTokenMint => {
+                    "UnsupportedTokenMint: only native SOL HTLC custody is supported"
+                }
             }
         }
     }
@@ -141,7 +146,7 @@ pub mod processor {
         entrypoint::ProgramResult,
         hash::hashv,
         msg,
-        program::invoke_signed,
+        program::{invoke, invoke_signed},
         program_error::ProgramError,
         pubkey::Pubkey,
         sysvar::{clock::Clock, rent::Rent, Sysvar},
@@ -189,7 +194,7 @@ pub mod processor {
     /// |-------|----------|--------|------------------|-------------------------------------|
     /// | 0     | ✅       | ❌     | `htlc_account`   | PDA to create (seeds: ["htlc", swap_id]) |
     /// | 1     | ✅       | ✅     | `payer`          | Account funding rent                 |
-    /// | 2     | ❌       | ✅     | `initializer`    | Party locking funds                  |
+    /// | 2     | ✅       | ✅     | `initializer`    | Party locking funds                  |
     /// | 3     | ❌       | ❌     | `system_program` | System program                      |
     ///
     /// ### Data (after 1-byte tag)
@@ -238,6 +243,10 @@ pub mod processor {
             msg!("Error: amount must be > 0");
             return Err(HtlcError::InvalidAmount.into());
         }
+        if create.token_mint != Pubkey::default() {
+            msg!("Error: token mints are not supported by native SOL custody path");
+            return Err(HtlcError::UnsupportedTokenMint.into());
+        }
 
         // Derive PDA
         let bump = validate_htlc_pda(program_id, htlc_info.key, &create.swap_id)?;
@@ -258,6 +267,15 @@ pub mod processor {
             ),
             &[payer.clone(), htlc_info.clone(), system_program.clone()],
             &[signer_seeds],
+        )?;
+
+        invoke(
+            &system_instruction::transfer(initializer.key, htlc_info.key, create.amount),
+            &[
+                initializer.clone(),
+                htlc_info.clone(),
+                system_program.clone(),
+            ],
         )?;
 
         // Initialize account data
@@ -312,7 +330,7 @@ pub mod processor {
     /// | Index | Writable | Signer | Account          | Description                         |
     /// |-------|----------|--------|------------------|-------------------------------------|
     /// | 0     | ✅       | ❌     | `htlc_account`   | PDA lock account                    |
-    /// | 1     | ❌       | ✅     | `claimant`       | Authorized claimant                 |
+    /// | 1     | ✅       | ✅     | `claimant`       | Authorized claimant and payout account |
     ///
     /// ### Data (after 1-byte tag)
     ///
@@ -355,6 +373,10 @@ pub mod processor {
             msg!("Error: caller is not the authorized claimant");
             return Err(HtlcError::UnauthorizedClaimant.into());
         }
+        if htlc.token_mint != Pubkey::default() {
+            msg!("Error: token mints are not supported by native SOL custody path");
+            return Err(HtlcError::UnsupportedTokenMint.into());
+        }
 
         // Check timeout — must not have expired for claim
         let clock = Clock::get()?;
@@ -382,10 +404,21 @@ pub mod processor {
             return Err(HtlcError::WrongPreimage.into());
         }
 
-        // Mark as claimed
+        let htlc_lamports = htlc_info.lamports();
+        let claimant_lamports = claimant.lamports();
+        let updated_htlc_lamports = htlc_lamports
+            .checked_sub(htlc.amount)
+            .ok_or(HtlcError::InvalidAmount)?;
+        let updated_claimant_lamports = claimant_lamports
+            .checked_add(htlc.amount)
+            .ok_or(HtlcError::Overflow)?;
+
+        // Mark as claimed and release native SOL to the claimant.
         drop(account_data);
         let mut data_mut = htlc_info.try_borrow_mut_data()?;
         data_mut[HtlcAccount::CLAIMED_OFFSET] = 1;
+        **htlc_info.try_borrow_mut_lamports()? = updated_htlc_lamports;
+        **claimant.try_borrow_mut_lamports()? = updated_claimant_lamports;
 
         // Emit event
         let event_parts = [
@@ -410,7 +443,7 @@ pub mod processor {
     /// | Index | Writable | Signer | Account             | Description                         |
     /// |-------|----------|--------|---------------------|-------------------------------------|
     /// | 0     | ✅       | ❌     | `htlc_account`      | PDA lock account                    |
-    /// | 1     | ❌       | ✅     | `refund_authority`  | Authorized refund authority         |
+    /// | 1     | ✅       | ✅     | `refund_authority`  | Authorized refund authority and payout account |
     ///
     /// ### Data
     ///
@@ -450,6 +483,10 @@ pub mod processor {
             msg!("Error: caller is not the refund authority");
             return Err(HtlcError::UnauthorizedRefund.into());
         }
+        if htlc.token_mint != Pubkey::default() {
+            msg!("Error: token mints are not supported by native SOL custody path");
+            return Err(HtlcError::UnsupportedTokenMint.into());
+        }
 
         // Check timeout expired
         let clock = Clock::get()?;
@@ -459,10 +496,21 @@ pub mod processor {
             return Err(HtlcError::HtlcNotExpired.into());
         }
 
-        // Mark as refunded
+        let htlc_lamports = htlc_info.lamports();
+        let refund_lamports = refund_authority.lamports();
+        let updated_htlc_lamports = htlc_lamports
+            .checked_sub(htlc.amount)
+            .ok_or(HtlcError::InvalidAmount)?;
+        let updated_refund_lamports = refund_lamports
+            .checked_add(htlc.amount)
+            .ok_or(HtlcError::Overflow)?;
+
+        // Mark as refunded and release native SOL to the refund authority.
         drop(account_data);
         let mut data_mut = htlc_info.try_borrow_mut_data()?;
         data_mut[HtlcAccount::REFUNDED_OFFSET] = 1;
+        **htlc_info.try_borrow_mut_lamports()? = updated_htlc_lamports;
+        **refund_authority.try_borrow_mut_lamports()? = updated_refund_lamports;
 
         // Emit event
         let event_parts = [
