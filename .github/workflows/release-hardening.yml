@@ -86,23 +86,31 @@ jobs:
       - name: Check for critical findings
         run: |
           if [ -f semgrep-results.json ]; then
-            CRITICAL=$(python3 -c "
-import json
-with open('semgrep-results.json') as f:
-    data = json.load(f)
-critical = [r for r in data.get('results', []) if r.get('extra', {}).get('severity') == 'ERROR']
-print(len(critical))
-")
+            CRITICAL=$(python3 - <<'PY'
+          import json
+
+          with open("semgrep-results.json") as findings:
+              data = json.load(findings)
+          critical = [
+              result
+              for result in data.get("results", [])
+              if result.get("extra", {}).get("severity") == "ERROR"
+          ]
+          print(len(critical))
+          PY
+            )
             if [ "$CRITICAL" -gt 0 ]; then
               echo "❌ $CRITICAL critical Semgrep findings detected"
-              python3 -c "
-import json
-with open('semgrep-results.json') as f:
-    data = json.load(f)
-for r in data.get('results', []):
-    if r.get('extra', {}).get('severity') == 'ERROR':
-        print(f\"  - {r['path']}:{r.get('start', {}).get('line', '?')} - {r['extra']['message']}\")
-"
+              python3 - <<'PY'
+          import json
+
+          with open("semgrep-results.json") as findings:
+              data = json.load(findings)
+          for result in data.get("results", []):
+              if result.get("extra", {}).get("severity") == "ERROR":
+                  start = result.get("start", {}).get("line", "?")
+                  print(f"  - {result['path']}:{start} - {result['extra']['message']}")
+          PY
               exit 1
             fi
             echo "✅ No critical Semgrep findings"
