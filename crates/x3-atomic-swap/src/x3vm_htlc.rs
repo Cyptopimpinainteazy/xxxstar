@@ -1426,6 +1426,36 @@ mod tests {
     }
 
     #[test]
+    fn test_failed_claim_does_not_poison_recovery_state() {
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let preimage = make_hashlock(b"correct_after_restart");
+        let hashlock = make_hashlock(&preimage);
+        let intent = make_test_intent(165, hashlock);
+        adapter.lock(&intent).expect("lock");
+
+        let wrong = [0x55u8; 32];
+        assert!(adapter.claim(165, wrong).is_err());
+        assert!(!adapter.is_claimed(165));
+
+        let snapshot = adapter.recovery_snapshot();
+        let mut restored =
+            StatefulX3VmAdapter::from_recovery_snapshot(snapshot).expect("restore snapshot");
+
+        restored
+            .claim(165, preimage)
+            .expect("correct claim after restart");
+        assert!(restored.is_claimed(165));
+
+        let err = restored
+            .claim(165, preimage)
+            .expect_err("second claim must still fail");
+        match err {
+            SwapError::ClaimFailed { reason, .. } => assert_eq!(reason, "already claimed"),
+            _ => panic!("expected ClaimFailed on duplicate claim"),
+        }
+    }
+
+    #[test]
     fn test_recovery_snapshot_rejects_conflicting_terminal_state() {
         let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
         let intent = make_test_intent(170, make_hashlock(b"corrupt_terminal"));
