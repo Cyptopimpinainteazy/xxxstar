@@ -758,9 +758,8 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
     ///   accepting a wrong or forged preimage.
     ///
     /// # Replay Protection
-    /// The secret bytes are inserted into `used_secrets`. Any subsequent call
-    /// with the same secret — for this session or any other — will be rejected
-    /// with `CoordinatorError::SecretAlreadyUsed`.
+    /// The secret hash is persisted with its owning session. A retry from the
+    /// same session is idempotent; reuse by a different session is rejected.
     pub fn record_fast_claim(
         &mut self,
         session_id: &str,
@@ -1176,6 +1175,52 @@ mod state_machine_regression_tests {
                 .filter(|r| r.operation == CoordinatorOperation::FastClaim)
                 .count(),
             1
+        );
+    }
+
+    #[test]
+    fn fast_claim_recovers_when_secret_ownership_persisted_before_session() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x44; 32]);
+        let secret_fingerprint = *blake3::hash(secret.as_bytes()).as_bytes();
+        let persistence = Arc::new(InMemoryPersistence::new());
+
+        let mut session = idempotency_test_session(
+            "idem-split-write",
+            SwapPhase::ClaimingFast,
+            secret.hash(),
+            now,
+        );
+        session.htlc_fast = Some(idempotency_htlc(7, secret.hash(), now));
+        persistence.save(&session);
+
+        // Simulate the exact crash window: the global ownership write made it
+        // to disk, but the mutated session/journal did not.
+        persistence.save_used_secret_claims(&vec![(
+            secret_fingerprint,
+            "idem-split-write".to_string(),
+        )]);
+        persistence.save_used_secrets(&vec![secret_fingerprint]);
+
+        let mut recovered =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        recovered
+            .record_fast_claim("idem-split-write", secret, now + 1)
+            .expect("same-session retry must finish the interrupted local mutation");
+
+        let session = recovered.get_session("idem-split-write").unwrap();
+        assert_eq!(session.phase, SwapPhase::ClaimingSlow);
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::FastClaim)
+                .count(),
+            1
+        );
+        assert_eq!(
+            session.htlc_fast.as_ref().unwrap().status,
+            HtlcStatus::Claimed
         );
     }
 
