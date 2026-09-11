@@ -381,3 +381,168 @@ return 1
             .unwrap_or(false)
     }
 }
+
+
+/// Production multi-process coordinator using Valkey/Redis for the hot-path
+/// lease/fencing and global secret-ownership decisions.
+#[cfg(feature = "valkey")]
+pub struct ValkeyDistributedCoordinator<P: crate::SessionPersistence> {
+    coordinator: crate::ConcurrentSwapCoordinator<P>,
+    leases: ValkeyLeaseAuthority,
+    secrets: ValkeySecretRegistry,
+}
+
+#[cfg(feature = "valkey")]
+impl<P: crate::SessionPersistence> Clone for ValkeyDistributedCoordinator<P> {
+    fn clone(&self) -> Self {
+        Self {
+            coordinator: self.coordinator.clone(),
+            leases: self.leases.clone(),
+            secrets: self.secrets.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "valkey")]
+impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
+    pub fn new(
+        coordinator: crate::ConcurrentSwapCoordinator<P>,
+        redis_url: &str,
+    ) -> Result<Self, CoordinatorError> {
+        Self::with_namespace(coordinator, redis_url, "x3")
+    }
+
+    pub fn with_namespace(
+        coordinator: crate::ConcurrentSwapCoordinator<P>,
+        redis_url: &str,
+        namespace: &str,
+    ) -> Result<Self, CoordinatorError> {
+        Ok(Self {
+            coordinator,
+            leases: ValkeyLeaseAuthority::with_namespace(redis_url, namespace)?,
+            secrets: ValkeySecretRegistry::with_namespace(redis_url, namespace)?,
+        })
+    }
+
+    pub fn acquire_session_lease(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+        now_unix: u64,
+        ttl_secs: u64,
+    ) -> Result<SessionLease, CoordinatorError> {
+        let lease = self
+            .leases
+            .acquire(session_id, owner_id, now_unix, ttl_secs)?;
+        self.coordinator
+            .execute(|inner| inner.refresh_from_persistence(session_id))?;
+        Ok(lease)
+    }
+
+    pub fn renew_session_lease(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+        ttl_secs: u64,
+    ) -> Result<SessionLease, CoordinatorError> {
+        self.leases.renew(lease, now_unix, ttl_secs)
+    }
+
+    pub fn release_session_lease(
+        &self,
+        lease: &SessionLease,
+    ) -> Result<(), CoordinatorError> {
+        self.leases.release(lease)
+    }
+
+    fn validate(&self, lease: &SessionLease, now_unix: u64) -> Result<(), CoordinatorError> {
+        self.leases.validate(lease, now_unix)
+    }
+
+    pub fn record_htlc_fast(
+        &self,
+        lease: &SessionLease,
+        record: crate::HtlcRecord,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        self.coordinator
+            .record_htlc_fast(&lease.session_id, record, now_unix)
+    }
+
+    pub fn record_htlc_slow(
+        &self,
+        lease: &SessionLease,
+        record: crate::HtlcRecord,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        self.coordinator
+            .record_htlc_slow(&lease.session_id, record, now_unix)
+    }
+
+    pub fn record_fast_claim(
+        &self,
+        lease: &SessionLease,
+        secret: crate::HtlcSecret,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate(lease, now_unix)?;
+
+        let session = self
+            .coordinator
+            .session(&lease.session_id)?
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: lease.session_id.clone(),
+            })?;
+
+        if secret.hash() != session.hash_lock {
+            return Err(CoordinatorError::Internal(format!(
+                "secret hash mismatch for Valkey claim on session '{}'",
+                lease.session_id
+            )));
+        }
+
+        let already_claimed = session.operation_journal.iter().any(|receipt| {
+            receipt.operation == crate::CoordinatorOperation::FastClaim
+        });
+        if session.phase != crate::SwapPhase::ClaimingFast && !already_claimed {
+            return Err(CoordinatorError::InvalidPhaseTransition {
+                from: session.phase.to_string(),
+                to: crate::SwapPhase::ClaimingFast.to_string(),
+            });
+        }
+
+        let secret_hash = *blake3::hash(secret.as_bytes()).as_bytes();
+        self.secrets.claim(secret_hash, &lease.session_id)?;
+        self.coordinator
+            .record_fast_claim(&lease.session_id, secret, now_unix)
+    }
+
+    pub fn record_slow_claim(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        self.coordinator
+            .record_slow_claim(&lease.session_id, now_unix)
+    }
+
+    pub fn record_refunds(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        self.coordinator
+            .record_refunds(&lease.session_id, now_unix)
+    }
+
+    pub fn session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<crate::SwapSession>, CoordinatorError> {
+        self.coordinator.session(session_id)
+    }
+}
