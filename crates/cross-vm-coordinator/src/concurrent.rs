@@ -8,7 +8,7 @@
 use crate::{
     CoordinatorConfig, CoordinatorError, CoordinatorOperation, HtlcRecord, HtlcSecret,
     DistributedLeaseStore, DurableLeaseAuthority, DurableSecretRegistry, InMemoryPersistence,
-    SessionLease, SessionLeaseManager, SessionPersistence, SwapCoordinator, SwapPhase, SwapSession,
+    SessionLease, SessionLeaseManager, SessionPersistence, SwapCoordinator, SwapSession,
 };
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -140,10 +140,10 @@ impl<P: SessionPersistence, S: DistributedLeaseStore>
         let already_claimed = session.operation_journal.iter().any(|receipt| {
             receipt.operation == CoordinatorOperation::FastClaim
         });
-        if session.phase != SwapPhase::ClaimingFast && !already_claimed {
+        if session.phase != crate::SwapPhase::ClaimingFast && !already_claimed {
             return Err(CoordinatorError::InvalidPhaseTransition {
                 from: session.phase.to_string(),
-                to: SwapPhase::ClaimingFast.to_string(),
+                to: crate::SwapPhase::ClaimingFast.to_string(),
             });
         }
 
