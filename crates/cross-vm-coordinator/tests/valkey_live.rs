@@ -275,6 +275,16 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
         .unwrap();
     assert_eq!(canonical.proof_hash, bundle.proof_hash);
 
+    // Exact rebind is idempotent.
+    coordinator
+        .bind_session_intent(&lease, &intent, runtime_intent_id, 104)
+        .unwrap();
+
+    // The same coordinator session can never be rebound to another runtime H256.
+    assert!(coordinator
+        .bind_session_intent(&lease, &intent, [0xcdu8; 32], 105)
+        .is_err());
+
     let restored = coordinator
         .canonical_proof_bundle(bundle.proof_hash)
         .unwrap()
