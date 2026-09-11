@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Value-moving operation proven by this bundle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
 pub enum CrossDomainOperation {
     Lock,
     Claim,
@@ -20,7 +20,7 @@ pub enum CrossDomainOperation {
 }
 
 /// Canonical evidence package for one operation on one execution domain.
-#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
 pub struct CrossDomainProofBundle {
     pub version: u32,
     pub intent_id: IntentId,
@@ -120,6 +120,35 @@ impl CrossDomainProofBundle {
         Ok(())
     }
 
+    /// Runtime-facing verification that does not depend on the coordinator's
+    /// local u64 intent id. The consensus layer binds to the canonical H256 id.
+    pub fn verify_runtime_binding(
+        &self,
+        runtime_intent_id: [u8; 32],
+    ) -> Result<(), SwapError> {
+        if self.version != Self::VERSION {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "cross-domain proof bundle",
+                reason: alloc::format!("unsupported bundle version {}", self.version),
+            });
+        }
+        if self.runtime_intent_id != runtime_intent_id {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "cross-domain runtime intent binding",
+                reason: "bundle belongs to a different runtime intent".into(),
+            });
+        }
+        self.validate_bindings()?;
+        let expected_hash = self.compute_hash()?;
+        if expected_hash != self.proof_hash {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "cross-domain proof integrity",
+                reason: "proof_hash mismatch".into(),
+            });
+        }
+        Ok(())
+    }
+
     fn validate_bindings(&self) -> Result<(), SwapError> {
         if self.tx_id.is_empty() || self.block_hash.is_empty() || self.execution_evidence.is_empty() {
             return Err(SwapError::MissingProof {
@@ -162,7 +191,7 @@ impl CrossDomainProofBundle {
 }
 
 /// A set of domain proofs for one atomic intent.
-#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
+#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
 pub struct CrossDomainProofSet {
     pub intent_id: IntentId,
     pub runtime_intent_id: [u8; 32],
@@ -205,6 +234,37 @@ impl CrossDomainProofSet {
             });
         }
         self.bundles.push(bundle);
+        Ok(())
+    }
+
+    /// Runtime-facing verification of every bundle against the canonical H256 id.
+    pub fn verify_runtime_binding(
+        &self,
+        runtime_intent_id: [u8; 32],
+    ) -> Result<(), SwapError> {
+        if self.runtime_intent_id != runtime_intent_id {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "cross-domain proof set runtime binding",
+                reason: "proof set belongs to a different runtime intent".into(),
+            });
+        }
+
+        let mut seen: Vec<(String, VmType, CrossDomainOperation)> = Vec::new();
+        for bundle in &self.bundles {
+            bundle.verify_runtime_binding(runtime_intent_id)?;
+            let key = (
+                bundle.chain_id.clone(),
+                bundle.vm_type,
+                bundle.operation,
+            );
+            if seen.contains(&key) {
+                return Err(SwapError::ProofVerificationFailed {
+                    proof_name: "cross-domain proof replay",
+                    reason: "duplicate domain operation proof".into(),
+                });
+            }
+            seen.push(key);
+        }
         Ok(())
     }
 
