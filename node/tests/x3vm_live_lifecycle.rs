@@ -394,3 +394,76 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
         pallet_x3_settlement_engine::IntentState::Refunded
     ));
 }
+
+
+#[test]
+#[ignore = "boots the real X3 dev node and proves early refund dispatch fails"]
+fn real_local_node_refund_before_timeout_fails_closed() {
+    let _node = spawn_dev_node();
+    wait_rpc(Duration::from_secs(180));
+
+    let chain_id = String::from("x3-local");
+    let local_id = 3u64;
+    let preimage = [0x36u8; 32];
+    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
+    let alice_uri = dev_uri("Alice");
+    let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+        .expect("early-refund signer");
+
+    let prepared = signer
+        .prepare_create_intent(
+            dev_account("Bob"),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            hashlock,
+            Some(300),
+        )
+        .expect("prepare early-refund intent");
+    assert!(!submit(&prepared.signed_extrinsic).is_empty());
+    let (_, finalized_head_hash) =
+        wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    let finalized_hash = H256::from_slice(
+        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
+            .expect("decode finalized head hex"),
+    );
+    let runtime_intent_id = signer
+        .resolve_intent_id(&prepared, finalized_hash)
+        .expect("resolve real on-chain intent id");
+    signer.bind_intent(local_id, runtime_intent_id).unwrap();
+
+    let transport = NativeX3NodeTransport::new(
+        X3NodeTransportConfig {
+            chain_id: chain_id.clone(),
+            rpc_url: RPC_URL.into(),
+            finality_poll_attempts: 480,
+            finality_poll_delay_ms: 500,
+            expected_block_time_ms: 6_000,
+        },
+        signer,
+    );
+    let adapter = LiveX3VmAdapter::new(
+        chain_id,
+        b"x3-native-early-refund-escrow".to_vec(),
+        transport,
+    );
+    let intent = atomic_intent(local_id, preimage);
+    let lock = adapter.lock(&intent).expect("live early-refund lock");
+    assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
+
+    let err = adapter
+        .refund(local_id)
+        .expect_err("refund before timeout must fail closed");
+    assert!(
+        err.to_string().contains("ExtrinsicFailed"),
+        "unexpected early-refund error: {err}"
+    );
+
+    let head = finalized_head();
+    assert!(
+        !matches!(
+            intent_state_at(runtime_intent_id, &head),
+            pallet_x3_settlement_engine::IntentState::Refunded
+        ),
+        "failed early refund must not mutate intent into Refunded"
+    );
+}
