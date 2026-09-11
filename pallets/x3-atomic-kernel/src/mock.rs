@@ -3,8 +3,6 @@
 //! This mock provides a complete FRAME runtime for testing the full bundle
 //! lifecycle: submit → assign → finalize → rollback.
 
-#![cfg(test)]
-
 use crate as pallet_x3_atomic_kernel;
 use frame_support::{
     construct_runtime, derive_impl, parameter_types,
@@ -23,9 +21,12 @@ pub type AccountId = u64;
 pub type BlockNumber = u64;
 pub type Balance = u128;
 
+#[allow(dead_code)]
 pub const ALICE: AccountId = 1;
+#[allow(dead_code)]
 pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
+#[allow(dead_code)]
 pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 pub const MIN_BOND: Balance = 10_000_000;
 
@@ -176,6 +177,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
 
 // ── Test Externalities Builder ────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct ExtBuilder {
     balances: Vec<(AccountId, Balance)>,
 }
@@ -192,6 +194,7 @@ impl Default for ExtBuilder {
     }
 }
 
+#[allow(dead_code)]
 impl ExtBuilder {
     pub fn build(self) -> TestExternalities {
         let mut storage = frame_system::GenesisConfig::<Test>::default()
@@ -212,6 +215,7 @@ impl ExtBuilder {
 }
 
 /// Convenience function to create a test environment with default balances.
+#[allow(dead_code)]
 pub fn new_test_ext() -> TestExternalities {
     ExtBuilder::default().build()
 }

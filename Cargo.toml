@@ -183,6 +183,7 @@ members = [
     "crates/x3-court",
     "crates/x3-agent",
     "crates/x3-intent",
+    "crates/x3-flashloan",
     # CI canonical crate paths: required workspace members
     "crates/atomic-swap-orchestrator",
     "crates/x3-relayer",

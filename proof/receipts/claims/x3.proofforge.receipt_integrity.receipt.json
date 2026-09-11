@@ -1,12 +1,12 @@
 {
-  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.proofforge.receipt_integrity",
   "artifact_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "proof/receipts/claims"
   ],
-  "timestamp": "2026-05-06T12:38:57.654643194Z",
+  "timestamp": "2026-09-11T18:29:54.119196369Z",
   "result": {
     "claim_id": "x3.proofforge.receipt_integrity",
     "claim": "ProofForge receipt integrity and freshness",
@@ -23,23 +23,23 @@
       "x3-proof verify <claim> --strict"
     ],
     "passed_checks": [
-      "11 fresh receipts"
+      "21 fresh receipts"
     ],
     "failed_checks": [
-      "16 stale/not-fresh receipts",
-      "stale receipts: x3.consensus.equivocation_detection, x3.consensus.finality_safety, x3.consensus.validator_rotation, x3.contracts.some_unimplemented, x3.dex.amm_math_safety, x3.dex.liquidity_provision, x3.dex.swapping_mechanism, x3.evolution.no_regression, x3.flashloans.attack_resistance, x3.funding.milestone_receipts, x3.gpu.cpu_gpu_parity, x3.observability.telemetry_pipeline, x3.onboarding.developer_first_value, x3.runtime.full_proof, x3.treasury.full_proof, x3.x3vm.full_proof"
+      "6 stale/not-fresh receipts",
+      "stale receipts: x3.proofforge.receipt_integrity, x3.runtime.full_proof, x3.treasury.full_proof, x3.x3lang.compiler_reproducibility, x3.x3vm.determinism, x3.x3vm.full_proof"
     ],
     "missing_proofs": [],
     "blockers": [],
     "score": 0.5,
     "evidence": {
-      "fresh_receipts": "11",
+      "fresh_receipts": "21",
       "invalid_receipts": "0",
-      "stale_receipts": "16"
+      "stale_receipts": "6"
     },
-    "timestamp": "2026-05-06T12:38:57.650811863Z",
+    "timestamp": "2026-09-11T18:29:54.115519590Z",
     "duration_ms": 0
   },
   "limitations": [],
-  "binding_hash": "75d64a5d6268e48ec9efb78cdca1f5ad7a1852dad877ce3596004f258cd886d3"
+  "binding_hash": "95541c52e64e6e1e27b373a06a8d98292900c3564b06bec39cb562ef170b6647"
 }

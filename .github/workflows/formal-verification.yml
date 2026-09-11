@@ -88,7 +88,7 @@ jobs:
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y git maven
+          sudo apt-get install -y git maven pkg-config libsecp256k1-dev
           cd /opt
           sudo rm -rf k
           sudo git clone --depth=1 --recurse-submodules https://github.com/runtimeverification/k.git

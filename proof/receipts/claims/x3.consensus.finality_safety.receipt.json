@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.consensus.finality_safety",
-  "artifact_hash": "0ffeff7b8b2381740ccd057a1f33c181c2b4b8d5e7016ff8edaafc01339ac3d7",
+  "artifact_hash": "0c1b350e4db4489bf2356e085e2e58c153401328907d6650447236f802336ab8",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "formal-proofs/tla/consensus/X3Consensus.tla",
@@ -9,7 +9,7 @@
     "proof/receipts/claims/x3.consensus.finality_safety.receipt.json",
     "proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json"
   ],
-  "timestamp": "2026-05-02T02:31:03.906705709Z",
+  "timestamp": "2026-09-11T18:21:02.454911177Z",
   "result": {
     "claim_id": "x3.consensus.finality_safety",
     "claim": "Consensus proof artifacts and receipts are present",
@@ -41,14 +41,14 @@
     "score": 1.0,
     "evidence": {
       "proof/receipts/claims/x3.consensus.equivocation_detection.receipt.json": "true",
-      "proof/receipts/claims/x3.consensus.finality_safety.receipt.json": "true",
-      "formal-proofs/tla/consensus/X3Consensus.tla": "true",
       "formal-proofs/tla/consensus/X3Consensus.cfg": "true",
+      "formal-proofs/tla/consensus/X3Consensus.tla": "true",
+      "proof/receipts/claims/x3.consensus.finality_safety.receipt.json": "true",
       "consensus_governance_check": "true"
     },
-    "timestamp": "2026-05-02T02:31:03.902247683Z",
-    "duration_ms": 50260
+    "timestamp": "2026-09-11T18:21:02.448629644Z",
+    "duration_ms": 13470
   },
   "limitations": [],
-  "binding_hash": "936d9160c79e8336e736c55c0c14c707807af7ed7cbf360431046d104bc078e8"
+  "binding_hash": "52002110d729efa1be8d5df022a9d6d53ee27d986290312f25d0ede7810aa0ca"
 }
