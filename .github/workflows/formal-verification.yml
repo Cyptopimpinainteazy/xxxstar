@@ -25,6 +25,11 @@ env:
   CARGO_TERM_COLOR: always
   K_INSTALL_SHA256: a485a0af380bb34d9874db11432b6422c019ff4a55a01e81b61e04dbfcd96f44
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   formal-verification:
     name: Run Formal Verification Proofs
