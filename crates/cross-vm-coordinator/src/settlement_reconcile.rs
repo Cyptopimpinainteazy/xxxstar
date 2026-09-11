@@ -173,6 +173,212 @@ pub async fn observe_and_decide<O: SettlementChainObserver>(
     }
 }
 
+
+
+/// HTTP JSON-RPC observer backed by the canonical X3 node RPC.
+///
+/// Transaction lookup scans a bounded window of finalized blocks and compares
+/// the exact Substrate extrinsic hash. A missing hash is deliberately reported
+/// as Unknown rather than Rejected: after restart, absence from the bounded
+/// finalized window is not enough evidence to manufacture a replacement tx.
+#[derive(Clone)]
+pub struct X3JsonRpcSettlementObserver {
+    rpc_url: String,
+    client: reqwest::Client,
+    finalized_scan_depth: u64,
+}
+
+impl X3JsonRpcSettlementObserver {
+    pub fn new(rpc_url: impl Into<String>) -> Self {
+        Self {
+            rpc_url: rpc_url.into(),
+            client: reqwest::Client::new(),
+            finalized_scan_depth: 256,
+        }
+    }
+
+    pub fn with_finalized_scan_depth(
+        rpc_url: impl Into<String>,
+        finalized_scan_depth: u64,
+    ) -> Self {
+        Self {
+            rpc_url: rpc_url.into(),
+            client: reqwest::Client::new(),
+            finalized_scan_depth: finalized_scan_depth.max(1),
+        }
+    }
+
+    async fn rpc(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, CoordinatorError> {
+        let response = self
+            .client
+            .post(&self.rpc_url)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1u64,
+                "method": method,
+                "params": params,
+            }))
+            .send()
+            .await
+            .map_err(|e| {
+                CoordinatorError::Internal(format!(
+                    "X3 reconciliation RPC {method} request failed: {e}"
+                ))
+            })?;
+
+        if !response.status().is_success() {
+            return Err(CoordinatorError::Internal(format!(
+                "X3 reconciliation RPC {method} HTTP status {}",
+                response.status()
+            )));
+        }
+
+        let body: serde_json::Value = response.json().await.map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "X3 reconciliation RPC {method} JSON decode failed: {e}"
+            ))
+        })?;
+        if let Some(error) = body.get("error") {
+            return Err(CoordinatorError::Internal(format!(
+                "X3 reconciliation RPC {method} returned error: {error}"
+            )));
+        }
+        Ok(body.get("result").cloned().unwrap_or(serde_json::Value::Null))
+    }
+
+    fn parse_hex_u64(value: &serde_json::Value, label: &str) -> Result<u64, CoordinatorError> {
+        let raw = value.as_str().ok_or_else(|| {
+            CoordinatorError::Internal(format!("{label} must be a hex string"))
+        })?;
+        u64::from_str_radix(raw.trim_start_matches("0x"), 16).map_err(|e| {
+            CoordinatorError::Internal(format!("invalid {label} '{raw}': {e}"))
+        })
+    }
+
+    fn normalize_hash(value: &str) -> Result<[u8; 32], CoordinatorError> {
+        let raw = value.strip_prefix("0x").unwrap_or(value);
+        let bytes = hex::decode(raw).map_err(|e| {
+            CoordinatorError::Internal(format!("invalid transaction hash '{value}': {e}"))
+        })?;
+        if bytes.len() != 32 {
+            return Err(CoordinatorError::Internal(format!(
+                "transaction hash must be 32 bytes, got {}",
+                bytes.len()
+            )));
+        }
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&bytes);
+        Ok(out)
+    }
+
+    fn substrate_extrinsic_hash(encoded_extrinsic: &[u8]) -> Result<[u8; 32], CoordinatorError> {
+        use blake2::digest::{Update, VariableOutput};
+        use blake2::Blake2bVar;
+
+        let mut hasher = Blake2bVar::new(32).map_err(|e| {
+            CoordinatorError::Internal(format!("create blake2b-256 hasher failed: {e}"))
+        })?;
+        hasher.update(encoded_extrinsic);
+        let mut out = [0u8; 32];
+        hasher.finalize_variable(&mut out).map_err(|e| {
+            CoordinatorError::Internal(format!("finalize blake2b-256 failed: {e}"))
+        })?;
+        Ok(out)
+    }
+
+    fn classify_runtime_state(state: &str) -> RuntimeSettlementObservation {
+        match state {
+            "Finalized" => RuntimeSettlementObservation::Finalized,
+            "Refunded" => RuntimeSettlementObservation::Refunded,
+            "Unknown" => RuntimeSettlementObservation::Unknown,
+            _ => RuntimeSettlementObservation::NonTerminal,
+        }
+    }
+}
+
+#[async_trait]
+impl SettlementChainObserver for X3JsonRpcSettlementObserver {
+    async fn transaction_status(
+        &self,
+        tx_id: &str,
+    ) -> Result<SettlementTxObservation, CoordinatorError> {
+        let expected = Self::normalize_hash(tx_id)?;
+        let finalized_head = self
+            .rpc("chain_getFinalizedHead", serde_json::json!([]))
+            .await?;
+        let finalized_hash = finalized_head.as_str().ok_or_else(|| {
+            CoordinatorError::Internal(
+                "chain_getFinalizedHead did not return a block hash".into(),
+            )
+        })?;
+
+        let header = self
+            .rpc("chain_getHeader", serde_json::json!([finalized_hash]))
+            .await?;
+        let head_number = Self::parse_hex_u64(
+            header.get("number").unwrap_or(&serde_json::Value::Null),
+            "finalized block number",
+        )?;
+        let lower = head_number.saturating_sub(self.finalized_scan_depth.saturating_sub(1));
+
+        for number in (lower..=head_number).rev() {
+            let block_hash = self
+                .rpc("chain_getBlockHash", serde_json::json!([number]))
+                .await?;
+            let Some(block_hash) = block_hash.as_str() else {
+                continue;
+            };
+            let block = self
+                .rpc("chain_getBlock", serde_json::json!([block_hash]))
+                .await?;
+            let Some(extrinsics) = block
+                .pointer("/block/extrinsics")
+                .and_then(serde_json::Value::as_array)
+            else {
+                continue;
+            };
+
+            for encoded in extrinsics.iter().filter_map(serde_json::Value::as_str) {
+                let bytes = hex::decode(encoded.trim_start_matches("0x")).map_err(|e| {
+                    CoordinatorError::Internal(format!(
+                        "decode finalized X3 extrinsic failed: {e}"
+                    ))
+                })?;
+                if Self::substrate_extrinsic_hash(&bytes)? == expected {
+                    return Ok(SettlementTxObservation::Included {
+                        block_number: number,
+                    });
+                }
+            }
+        }
+
+        Ok(SettlementTxObservation::Unknown)
+    }
+
+    async fn settlement_state(
+        &self,
+        runtime_intent_id: [u8; 32],
+    ) -> Result<RuntimeSettlementObservation, CoordinatorError> {
+        let intent = format!("0x{}", hex::encode(runtime_intent_id));
+        let value = self
+            .rpc("x3_settlementState", serde_json::json!([intent]))
+            .await?;
+        let state = value
+            .get("state")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                CoordinatorError::Internal(
+                    "x3_settlementState response missing state".into(),
+                )
+            })?;
+        Ok(Self::classify_runtime_state(state))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
