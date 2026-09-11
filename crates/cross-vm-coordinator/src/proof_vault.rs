@@ -83,6 +83,21 @@ pub fn assemble_proof_set<S: ProofBundleStore>(
         ));
     }
 
+    let has_claim = canonical_results.iter().any(|result| {
+        matches!(
+            result.operation,
+            crate::CoordinatorOperation::FastClaim | crate::CoordinatorOperation::SlowClaim
+        )
+    });
+    let has_refund = canonical_results
+        .iter()
+        .any(|result| result.operation == crate::CoordinatorOperation::RefundBoth);
+    if has_claim && has_refund {
+        return Err(CoordinatorError::Internal(
+            "canonical evidence contains both claim and refund terminal paths".into(),
+        ));
+    }
+
     let mut set = CrossDomainProofSet::new(intent, runtime_intent_id);
 
     for result in canonical_results {
@@ -283,4 +298,59 @@ mod tests {
 
         assert!(assemble_proof_set(&intent, [0xabu8; 32], &[canonical], &store).is_err());
     }
+
+    #[test]
+    fn claim_and_refund_canonical_results_cannot_share_a_proof_set() {
+        let intent = intent();
+        let store = InMemoryProofBundleStore::default();
+
+        let claim = bundle(
+            &intent,
+            "eth-mainnet",
+            VmType::Evm,
+            CrossDomainOperation::Claim,
+            "eth-claim",
+            11,
+        );
+        let refund = bundle(
+            &intent,
+            "x3-local",
+            VmType::X3Vm,
+            CrossDomainOperation::Refund,
+            "x3-refund",
+            12,
+        );
+        store.put_bundle(&claim).unwrap();
+        store.put_bundle(&refund).unwrap();
+
+        let results = vec![
+            result(CoordinatorOperation::FastClaim, "claim", &claim),
+            result(CoordinatorOperation::RefundBoth, "refund", &refund),
+        ];
+
+        assert!(
+            assemble_proof_set(&intent, [0xabu8; 32], &results, &store).is_err()
+        );
+    }
+
+    #[test]
+    fn runtime_intent_mismatch_fails_closed() {
+        let intent = intent();
+        let store = InMemoryProofBundleStore::default();
+        let proof = bundle(
+            &intent,
+            "eth-mainnet",
+            VmType::Evm,
+            CrossDomainOperation::Claim,
+            "eth-claim",
+            11,
+        );
+        store.put_bundle(&proof).unwrap();
+        let results = vec![result(CoordinatorOperation::FastClaim, "a", &proof)];
+
+        assert!(
+            assemble_proof_set(&intent, [0xcdu8; 32], &results, &store).is_err()
+        );
+    }
+
 }
