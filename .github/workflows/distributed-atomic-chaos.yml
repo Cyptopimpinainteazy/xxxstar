@@ -1,0 +1,51 @@
+name: distributed-atomic-chaos
+
+on:
+  pull_request:
+    paths:
+      - "crates/cross-vm-coordinator/**"
+      - ".github/workflows/distributed-atomic-chaos.yml"
+  workflow_dispatch:
+
+jobs:
+  chaos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      valkey:
+        image: valkey/valkey:8.1.10-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      X3_TEST_VALKEY_URL: redis://127.0.0.1:6379/
+      X3_REQUIRE_VALKEY_TESTS: "1"
+      RUST_BACKTRACE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.90.0
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build distributed chaos harness
+        run: cargo test -p x3-cross-vm-coordinator --features valkey --test distributed_chaos --no-run
+
+      - name: Run distributed chaos matrix
+        run: |
+          set -euo pipefail
+          for run in $(seq 1 10); do
+            echo "=== chaos iteration $run/10 ==="
+            cargo test -p x3-cross-vm-coordinator --features valkey --test distributed_chaos -- --test-threads=6 --nocapture
+          done
