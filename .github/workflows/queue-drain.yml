@@ -1,0 +1,69 @@
+name: X3 CI Queue Drain
+
+on:
+  push:
+    branches:
+      - ops/drain-actions-queue-20260911
+    paths:
+      - .github/workflows/queue-drain.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: x3-ci-queue-drain
+  cancel-in-progress: true
+
+jobs:
+  drain:
+    name: Cancel stale and blocked PR runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Keep only priority PR exact-head runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          declare -A priority_sha=()
+          for pr in 130 181; do
+            sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq '.head.sha')"
+            priority_sha["$sha"]=1
+            echo "priority PR #$pr -> $sha"
+          done
+
+          declare -A newest_priority_run=()
+          cancelled=0
+          kept=0
+
+          while IFS=$'\t' read -r run_id head_sha workflow_name status; do
+            [[ -z "$run_id" ]] && continue
+            [[ "$run_id" == "$GITHUB_RUN_ID" ]] && continue
+
+            if [[ -n "${priority_sha[$head_sha]:-}" ]]; then
+              key="$head_sha|$workflow_name"
+              if [[ -z "${newest_priority_run[$key]:-}" ]]; then
+                newest_priority_run["$key"]="$run_id"
+                echo "KEEP   $status $run_id $workflow_name $head_sha"
+                kept=$((kept + 1))
+                continue
+              fi
+            fi
+
+            echo "CANCEL $status $run_id $workflow_name $head_sha"
+            gh api --method POST               "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel"               >/dev/null 2>&1 || true
+            cancelled=$((cancelled + 1))
+          done < <(
+            gh api --paginate               "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100"               --jq '.workflow_runs[]
+                | select(.event == "pull_request")
+                | select(.status == "queued" or .status == "in_progress")
+                | [.id, .head_sha, .name, .status]
+                | @tsv'
+          )
+
+          echo "kept=$kept cancelled=$cancelled"
