@@ -141,7 +141,7 @@ jobs:
   s0-security-gate:
     name: S0 Security Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 's0')
     needs: pre-commit-gate
     
@@ -154,6 +154,24 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+
+      - name: Install Formal Verification Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coq curl xz-utils
+          sudo mkdir -p /opt
+          if [ ! -f /opt/tla2tools.jar ]; then
+            sudo wget -q https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar -O /opt/tla2tools.jar
+          fi
+          curl -fsSL https://kframework.org/install | bash
+          export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
+          kup install k
+          {
+            echo "$HOME/.local/bin"
+            echo "$HOME/.nix-profile/bin"
+          } >> "$GITHUB_PATH"
+          coqc --version
+          kprove --version
 
       - name: Build ProofForge
         run: cargo build -p proof-forge --release 2>&1 | tail -5
