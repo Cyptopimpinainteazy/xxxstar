@@ -7,8 +7,8 @@
 
 use crate::{
     CoordinatorConfig, CoordinatorError, CoordinatorOperation, HtlcRecord, HtlcSecret,
-    DistributedLeaseStore, DurableLeaseAuthority, InMemoryPersistence, SessionLease,
-    SessionLeaseManager, SessionPersistence, SwapCoordinator, SwapSession,
+    DistributedLeaseStore, DurableLeaseAuthority, DurableSecretRegistry, InMemoryPersistence,
+    SessionLease, SessionLeaseManager, SessionPersistence, SwapCoordinator, SwapPhase, SwapSession,
 };
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -24,6 +24,7 @@ pub struct DistributedConcurrentSwapCoordinator<
 > {
     coordinator: ConcurrentSwapCoordinator<P>,
     authority: DurableLeaseAuthority<S>,
+    secrets: DurableSecretRegistry<S>,
 }
 
 impl<P: SessionPersistence, S: DistributedLeaseStore> Clone
@@ -33,6 +34,7 @@ impl<P: SessionPersistence, S: DistributedLeaseStore> Clone
         Self {
             coordinator: self.coordinator.clone(),
             authority: self.authority.clone(),
+            secrets: self.secrets.clone(),
         }
     }
 }
@@ -44,9 +46,11 @@ impl<P: SessionPersistence, S: DistributedLeaseStore>
         coordinator: ConcurrentSwapCoordinator<P>,
         authority: DurableLeaseAuthority<S>,
     ) -> Self {
+        let secrets = DurableSecretRegistry::new(authority.shared_store());
         Self {
             coordinator,
             authority,
+            secrets,
         }
     }
 
@@ -118,6 +122,33 @@ impl<P: SessionPersistence, S: DistributedLeaseStore>
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
         self.validate_before_commit(lease, now_unix)?;
+
+        let session = self
+            .coordinator
+            .session(&lease.session_id)?
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: lease.session_id.clone(),
+            })?;
+
+        if secret.hash() != session.hash_lock {
+            return Err(CoordinatorError::Internal(format!(
+                "secret hash mismatch for distributed claim on session '{}'",
+                lease.session_id
+            )));
+        }
+
+        let already_claimed = session.operation_journal.iter().any(|receipt| {
+            receipt.operation == CoordinatorOperation::FastClaim
+        });
+        if session.phase != SwapPhase::ClaimingFast && !already_claimed {
+            return Err(CoordinatorError::InvalidPhaseTransition {
+                from: session.phase.to_string(),
+                to: SwapPhase::ClaimingFast.to_string(),
+            });
+        }
+
+        let secret_hash = *blake3::hash(secret.as_bytes()).as_bytes();
+        self.secrets.claim(secret_hash, &lease.session_id)?;
         self.coordinator
             .record_fast_claim(&lease.session_id, secret, now_unix)
     }
@@ -403,6 +434,62 @@ mod tests {
             persistence.clone(),
         );
         (persistence, coordinator)
+    }
+
+    #[test]
+    fn distributed_secret_replay_is_rejected_across_sessions() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x57; 32]);
+        let persistence = Arc::new(InMemoryPersistence::new());
+
+        for id in ["secret-a", "secret-b"] {
+            let mut session = SwapSession {
+                session_id: id.to_string(),
+                hash_lock: secret.hash(),
+                htlc_fast: Some(record(13, secret.hash(), now)),
+                htlc_slow: None,
+                flash_legs: vec![],
+                leg_outcomes: vec![],
+                phase: SwapPhase::ClaimingFast,
+                timelock_fast: now + 3_600,
+                timelock_slow: now + 7_200,
+                created_at: now,
+                updated_at: now,
+                operation_journal: vec![],
+                requires_merkle_verification: false,
+            };
+            persistence.save(&session);
+        }
+
+        let store = Arc::new(crate::InMemoryDistributedLeaseStore::default());
+        let proc_a = DistributedConcurrentSwapCoordinator::new(
+            ConcurrentSwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence.clone(),
+            ),
+            crate::DurableLeaseAuthority::new(store.clone()),
+        );
+        let proc_b = DistributedConcurrentSwapCoordinator::new(
+            ConcurrentSwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence,
+            ),
+            crate::DurableLeaseAuthority::new(store),
+        );
+
+        let lease_a = proc_a
+            .acquire_session_lease("secret-a", "proc-a", now, 30)
+            .unwrap();
+        let lease_b = proc_b
+            .acquire_session_lease("secret-b", "proc-b", now, 30)
+            .unwrap();
+
+        proc_a
+            .record_fast_claim(&lease_a, secret.clone(), now + 1)
+            .expect("first distributed secret owner");
+        assert!(proc_b
+            .record_fast_claim(&lease_b, secret, now + 1)
+            .is_err());
     }
 
     #[test]
