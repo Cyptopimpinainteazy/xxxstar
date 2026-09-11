@@ -35,6 +35,7 @@
 
 pub mod abi;
 pub mod config;
+pub mod concurrent;
 pub mod flashloan_adapter;
 pub mod htlc;
 pub mod merkle_settlement; // Gap #3: Merkle-backed settlement for atomic swaps
@@ -48,6 +49,7 @@ pub mod types;
 mod bridge_integration_tests; // Phase 13b: Bridge integration test suite
 
 pub use config::*;
+pub use concurrent::*;
 pub use persistence::*;
 pub use state_machine::*;
 pub use types::*;
