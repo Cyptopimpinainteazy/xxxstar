@@ -303,4 +303,16 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
     assert_eq!(set.runtime_intent_id, runtime_intent_id);
     assert_eq!(set.bundles.len(), 1);
     assert_eq!(set.bundles[0].proof_hash, bundle.proof_hash);
+
+    let envelope = coordinator
+        .claim_submission_envelope(
+            "swap-proof-vault",
+            &intent,
+            runtime_intent_id,
+            &[("eth-mainnet".into(), VmType::Evm)],
+        )
+        .unwrap();
+    assert_eq!(envelope.call_index(), 33);
+    assert!(envelope.scale_call_args().starts_with(&runtime_intent_id));
+    assert_eq!(envelope.proof_hashes(), vec![bundle.proof_hash]);
 }
