@@ -390,6 +390,7 @@ pub struct ValkeyDistributedCoordinator<P: crate::SessionPersistence> {
     coordinator: crate::ConcurrentSwapCoordinator<P>,
     leases: ValkeyLeaseAuthority,
     secrets: ValkeySecretRegistry,
+    attempts: ValkeyAttemptStore,
 }
 
 #[cfg(feature = "valkey")]
@@ -399,6 +400,7 @@ impl<P: crate::SessionPersistence> Clone for ValkeyDistributedCoordinator<P> {
             coordinator: self.coordinator.clone(),
             leases: self.leases.clone(),
             secrets: self.secrets.clone(),
+            attempts: self.attempts.clone(),
         }
     }
 }
@@ -421,6 +423,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             coordinator,
             leases: ValkeyLeaseAuthority::with_namespace(redis_url, namespace)?,
             secrets: ValkeySecretRegistry::with_namespace(redis_url, namespace)?,
+            attempts: ValkeyAttemptStore::with_namespace(redis_url, namespace)?,
         })
     }
 
@@ -537,6 +540,81 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         self.validate(lease, now_unix)?;
         self.coordinator
             .record_refunds(&lease.session_id, now_unix)
+    }
+
+    pub fn record_attempt_started(
+        &self,
+        lease: &SessionLease,
+        operation: crate::CoordinatorOperation,
+        attempt_id: &str,
+        domain: &str,
+        now_unix: u64,
+    ) -> Result<crate::OperationAttempt, CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        crate::OperationAttemptLedger::new(self.attempts.clone()).record_started(
+            &lease.session_id,
+            operation,
+            attempt_id,
+            &lease.owner_id,
+            lease.fence,
+            domain,
+            now_unix,
+        )
+    }
+
+    pub fn record_attempt_broadcast(
+        &self,
+        lease: &SessionLease,
+        started: &crate::OperationAttempt,
+        tx_id: &str,
+        now_unix: u64,
+    ) -> Result<crate::OperationAttempt, CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        if started.session_id != lease.session_id
+            || started.owner_id != lease.owner_id
+            || started.fence != lease.fence
+        {
+            return Err(CoordinatorError::Internal(
+                "attempt identity does not match active fencing lease".into(),
+            ));
+        }
+        crate::OperationAttemptLedger::new(self.attempts.clone())
+            .record_broadcast(started, tx_id, now_unix)
+    }
+
+    pub fn record_attempt_finalized(
+        &self,
+        lease: &SessionLease,
+        prior: &crate::OperationAttempt,
+        proof_hash: [u8; 32],
+        now_unix: u64,
+    ) -> Result<crate::CanonicalOperationResult, CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        if prior.session_id != lease.session_id
+            || prior.owner_id != lease.owner_id
+            || prior.fence != lease.fence
+        {
+            return Err(CoordinatorError::Internal(
+                "attempt identity does not match active fencing lease".into(),
+            ));
+        }
+        crate::OperationAttemptLedger::new(self.attempts.clone())
+            .record_finalized(prior, proof_hash, now_unix)
+    }
+
+    pub fn attempt_history(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<crate::OperationAttempt>, CoordinatorError> {
+        crate::AttemptStore::attempts(&self.attempts, session_id)
+    }
+
+    pub fn canonical_operation_result(
+        &self,
+        session_id: &str,
+        operation: crate::CoordinatorOperation,
+    ) -> Result<Option<crate::CanonicalOperationResult>, CoordinatorError> {
+        crate::AttemptStore::canonical(&self.attempts, session_id, operation)
     }
 
     pub fn session(
