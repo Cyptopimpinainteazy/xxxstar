@@ -20,6 +20,7 @@ on:
       - "node/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "patches/**"
   push:
     branches: [master, 'release/**']
     paths:
@@ -28,6 +29,7 @@ on:
       - "node/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "patches/**"
   schedule:
     - cron: '30 4 * * *'
   workflow_dispatch:
