@@ -301,6 +301,7 @@ mod tests {
             timelock_slow: 2000,
             created_at: 123456,
             updated_at: 123456,
+            operation_journal: vec![],
             requires_merkle_verification: false,
         }
     }
