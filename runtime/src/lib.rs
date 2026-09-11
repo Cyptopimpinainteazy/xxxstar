@@ -3202,9 +3202,15 @@ impl GetSessionNumber for SessionHandler {
 #[cfg(feature = "runtime-benchmarks")]
 #[allow(unused_imports)] // define_benchmarks! consumes these pallet aliases as macro metadata.
 mod benches {
+    // These aliases are consumed by define_benchmarks! token expansion; rustc
+    // does not observe the generated use-site when linting this module.
+    #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
+    #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
+    #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
 
     frame_benchmarking::define_benchmarks!(
