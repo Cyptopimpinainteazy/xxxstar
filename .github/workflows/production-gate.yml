@@ -10,12 +10,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-x3vm-live:
+    uses: ./.github/workflows/x3vm-live-lifecycle.yml
+
+  evm-live:
+    uses: ./.github/workflows/x3vm-evm-live-lifecycle.yml
+
+  svm-live:
+    uses: ./.github/workflows/x3vm-svm-live-lifecycle.yml
+
   gate:
     # pull_request has no branch filter here, so this repo (public) accepts
     # runs from any fork PR on this trigger. Keep pull_request on
     # ubuntu-latest; only push (already-merged) and manual dispatch go to
     # the x3 self-hosted runner. Do not remove this split without
     # re-reviewing the self-hosted-runner-on-public-repo RCE risk.
+    needs:
+      - native-x3vm-live
+      - evm-live
+      - svm-live
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 90
     env:
