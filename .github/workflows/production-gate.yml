@@ -6,7 +6,20 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
+  native-x3vm-live:
+    uses: ./.github/workflows/x3vm-live-lifecycle.yml
+
+  evm-live:
+    uses: ./.github/workflows/x3vm-evm-live-lifecycle.yml
+
+  svm-live:
+    uses: ./.github/workflows/x3vm-svm-live-lifecycle.yml
+
   gate:
+    needs:
+      - native-x3vm-live
+      - evm-live
+      - svm-live
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

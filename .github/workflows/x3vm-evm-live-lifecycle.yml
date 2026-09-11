@@ -1,29 +1,28 @@
 name: x3vm-evm-live-lifecycle
 
-# Real anvil lifecycle gate for the EVM HTLC contract at
-# X3-contracts/evm/contracts/AtlasHTLC.sol. This is NOT a mock/simulation
-# job: it builds the actual contract with forge, starts a genuine local
-# anvil chain, deploys the real bytecode, and drives the full HTLC
-# lifecycle (lock/claim/refund) plus adversarial rejections through the
-# real x3-evm-broadcast client and real signed/broadcast/mined
-# transactions, independently verifying resulting contract state via raw
-# `cast call getHTLC(...)` reads. See
-# X3-contracts/evm/test-live-lifecycle.sh for the test itself.
+# Real anvil lifecycle gates for the EVM HTLC contract at
+# X3-contracts/evm/contracts/AtlasHTLC.sol. These jobs build/deploy the actual
+# contract and execute real signed local-chain transactions; they are not mocks.
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "X3-contracts/evm/**"
       - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-evm-live-lifecycle.yml"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "X3-contracts/evm/**"
       - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-evm-live-lifecycle.yml"
   workflow_dispatch:
+  workflow_call:
 
 env:
   CARGO_TERM_COLOR: always
@@ -36,8 +35,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler clang cmake openssl
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
@@ -48,11 +54,6 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      # X3-contracts/evm/foundry.toml remaps forge-std/ and
-      # @openzeppelin/contracts/ to lib/forge-std and
-      # lib/openzeppelin-contracts. These are intentionally NOT vendored
-      # in the repo (see .gitignore) and are not tracked as git submodules;
-      # X3-contracts/evm/foundry.lock pins the exact versions to install.
       - name: Install forge dependencies (pinned via foundry.lock)
         working-directory: X3-contracts/evm
         run: |
@@ -67,3 +68,95 @@ jobs:
 
       - name: Run real anvil HTLC lifecycle gate
         run: ./X3-contracts/evm/test-live-lifecycle.sh
+
+  live-x3vm-evm:
+    name: real X3VM to Anvil lock claim lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler clang cmake jq openssl
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: x3vm-evm-live-lifecycle
+
+      - name: Build AtlasHTLC
+        working-directory: X3-contracts/evm
+        run: forge build --contracts contracts/AtlasHTLC.sol
+
+      - name: Start isolated Anvil for X3VM-EVM atomic lifecycle
+        run: |
+          set -euo pipefail
+          anvil --port 18545 --chain-id 1337 --silent > /tmp/x3vm-evm-anvil.log 2>&1 &
+          echo $! > /tmp/x3vm-evm-anvil.pid
+          for _ in $(seq 1 30); do
+            if cast chain-id --rpc-url http://127.0.0.1:18545 >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/x3vm-evm-anvil.log
+          exit 1
+
+      - name: Generate ephemeral EVM actors and deploy AtlasHTLC
+        working-directory: X3-contracts/evm
+        run: |
+          set -euo pipefail
+          LOCKER_KEY="$(openssl rand -hex 32)"
+          CLAIMANT_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$LOCKER_KEY"
+          echo "::add-mask::$CLAIMANT_KEY"
+          LOCKER_ADDR="$(cast wallet address --private-key "$LOCKER_KEY")"
+          CLAIMANT_ADDR="$(cast wallet address --private-key "$CLAIMANT_KEY")"
+          cast rpc anvil_setBalance "$LOCKER_ADDR" 0x3635C9ADC5DEA00000 --rpc-url http://127.0.0.1:18545 >/dev/null
+          cast rpc anvil_setBalance "$CLAIMANT_ADDR" 0x3635C9ADC5DEA00000 --rpc-url http://127.0.0.1:18545 >/dev/null
+          DEPLOY_OUT="$(forge create contracts/AtlasHTLC.sol:AtlasHTLC \
+            --rpc-url http://127.0.0.1:18545 \
+            --private-key "$LOCKER_KEY" \
+            --broadcast 2>&1)"
+          CONTRACT="$(echo "$DEPLOY_OUT" | grep -oE 'Deployed to: 0x[0-9a-fA-F]{40}' | awk '{print $3}')"
+          test -n "$CONTRACT"
+          {
+            echo "X3_TEST_EVM_HTLC=$CONTRACT"
+            echo "X3_TEST_EVM_LOCKER_KEY=$LOCKER_KEY"
+            echo "X3_TEST_EVM_CLAIMANT_KEY=$CLAIMANT_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Run real X3VM-EVM atomic lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_evm_live \
+            real_x3vm_evm_lock_claim_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Run real X3VM-EVM timeout/refund atomic lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_evm_live \
+            real_x3vm_evm_timeout_refund_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Dump isolated Anvil log on failure
+        if: failure()
+        run: cat /tmp/x3vm-evm-anvil.log || true
+
+      - name: Stop isolated Anvil
+        if: always()
+        run: |
+          if [ -f /tmp/x3vm-evm-anvil.pid ]; then
+            kill "$(cat /tmp/x3vm-evm-anvil.pid)" 2>/dev/null || true
+          fi

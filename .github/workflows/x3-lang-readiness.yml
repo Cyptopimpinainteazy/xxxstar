@@ -57,10 +57,28 @@ jobs:
       # incompatible with the supported SVM dependency lineage.
       - name: Fail on production Solana lineage regressions
         run: |
-          if grep -E "solana-hash v4\\.|solana-pubkey v4\\.|solana-address v2\\.5\\.0" artifacts/readiness/lineage-tree.txt; then
-            echo "Detected forbidden Solana lineage entry in SVM dependency graph"
+          # Solana 3.0.0 legitimately depends on modular leaf crates whose
+          # independent semver is already v4 (for example solana-hash and
+          # solana-pubkey). Gate the compatibility boundary we actually own:
+          # the program/SDK/test stack must remain on v3, and the known-bad
+          # solana-address 2.5.0 lineage must remain absent.
+          if grep -E "solana-(program|sdk|program-test) v4\\.|solana-address v2\\.5\\.0" artifacts/readiness/lineage-tree.txt; then
+            echo "Detected forbidden Solana compatibility-line regression in SVM dependency graph"
             exit 1
           fi
+
+          grep -q "solana-program v3\\.0\\.0" artifacts/readiness/lineage-tree.txt || {
+            echo "Expected pinned solana-program v3.0.0 lineage is missing"
+            exit 1
+          }
+          grep -q "solana-sdk v3\\.0\\.0" artifacts/readiness/lineage-tree.txt || {
+            echo "Expected pinned solana-sdk v3.0.0 lineage is missing"
+            exit 1
+          }
+          grep -q "solana-program-test v3\\.0\\.0" artifacts/readiness/lineage-tree.txt || {
+            echo "Expected pinned solana-program-test v3.0.0 lineage is missing"
+            exit 1
+          }
 
       - name: Combined gate run #1
         run: |

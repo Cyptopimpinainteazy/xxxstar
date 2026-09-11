@@ -28,7 +28,7 @@ use icu_properties::props::GeneralCategory;
 use icu_properties::CodePointMapDataBorrowed;
 
 /// Turns a joining type into a mask for comparing with multiple type at once.
-#[allow(deprecated)]
+#[allow(deprecated)] // Required by idna_adapter's ICU4C-compatible mask ABI.
 const fn joining_type_to_mask(jt: icu_properties::props::JoiningType) -> u32 {
     1u32 << jt.to_icu4c_value()
 }
@@ -46,7 +46,7 @@ pub const RIGHT_OR_DUAL_JOINING_MASK: JoiningTypeMask = JoiningTypeMask(
 );
 
 /// Turns a bidi class into a mask for comparing with multiple classes at once.
-#[allow(deprecated)]
+#[allow(deprecated)] // Required by idna_adapter's ICU4C-compatible mask ABI.
 const fn bidi_class_to_mask(bc: icu_properties::props::BidiClass) -> u32 {
     1u32 << bc.to_icu4c_value()
 }
