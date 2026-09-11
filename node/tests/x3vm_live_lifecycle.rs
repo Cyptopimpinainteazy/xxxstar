@@ -315,6 +315,18 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     assert!(!submit(&leg1).is_empty());
     wait_finalized(&leg1, Duration::from_secs(180));
 
+    // A finalized extrinsic with a bad secret must never be promoted into a
+    // claim proof. The transport must bind finalized inclusion to
+    // System::ExtrinsicSuccess and fail closed on ExtrinsicFailed.
+    let wrong_preimage = [0x99u8; 32];
+    let err = adapter
+        .claim(local_id, wrong_preimage)
+        .expect_err("wrong-secret claim must fail closed");
+    assert!(
+        err.to_string().contains("ExtrinsicFailed"),
+        "unexpected wrong-secret claim error: {err}"
+    );
+
     let claim = adapter.claim(local_id, preimage).expect("live native claim");
     assert_eq!(claim.vm_type, VmType::X3Vm);
     assert_eq!(claim.intent_id, local_id);
