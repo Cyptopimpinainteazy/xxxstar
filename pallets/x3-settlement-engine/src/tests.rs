@@ -2813,3 +2813,75 @@ fn adaptor_swap_real_full_lifecycle() {
         assert!(replay.is_err(), "replay of final sig must be rejected");
     });
 }
+
+
+#[test]
+fn local_claims_do_not_finalize_without_cross_domain_proof_set() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        let maker = ALICE;
+        let taker = BOB;
+        let secret = H256::from([0x5au8; 32]);
+        let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
+
+        assert_ok!(Pallet::<Test>::create_intent(
+            RuntimeOrigin::signed(maker),
+            taker,
+            AssetSpec {
+                chain: ExternalChainId::Ethereum,
+                token: TokenId::Native,
+                amount: 1_000,
+            },
+            AssetSpec {
+                chain: ExternalChainId::Solana,
+                token: TokenId::Native,
+                amount: 500,
+            },
+            secret_hash,
+            Some(3_600),
+        ));
+
+        let intent_id = SettlementIntents::<Test>::iter()
+            .find(|(_, intent)| intent.maker == maker && intent.secret_hash == secret_hash)
+            .map(|(id, _)| id)
+            .expect("intent exists");
+
+        assert_ok!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(taker),
+            intent_id,
+            0,
+            ExternalChainId::Ethereum,
+            1_000,
+            vec![],
+        ));
+        assert_ok!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(maker),
+            intent_id,
+            1,
+            ExternalChainId::Solana,
+            500,
+            vec![],
+        ));
+
+        // Intentionally do NOT submit legacy SettlementProof fixtures or a
+        // CrossDomainProofSet. Local claims must therefore be insufficient to
+        // enter the terminal Finalized state.
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(taker),
+            intent_id,
+            secret,
+        ));
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(maker),
+            intent_id,
+            secret,
+        ));
+
+        let intent = SettlementIntents::<Test>::get(intent_id).expect("intent exists");
+        assert_eq!(intent.legs_claimed, intent.legs_total);
+        assert!(matches!(
+            crate::IntentStates::<Test>::get(intent_id),
+            IntentState::Claiming
+        ));
+    });
+}
