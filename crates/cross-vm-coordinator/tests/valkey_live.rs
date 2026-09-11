@@ -328,8 +328,8 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
         )
         .unwrap();
 
-    // Simulate two processes broadcasting the exact same runtime call with
-    // different transaction ids. Atomic compare-and-append permits one only.
+    // Simulate two processes signing the exact same runtime call differently.
+    // The outbox persists one exact signed extrinsic BEFORE any network send.
     let barrier = Arc::new(Barrier::new(3));
     let a = {
         let coordinator = coordinator.clone();
@@ -338,10 +338,11 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
         let barrier = barrier.clone();
         thread::spawn(move || {
             barrier.wait();
-            coordinator.record_settlement_submission_broadcast(
+            coordinator.record_settlement_submission_signed(
                 &lease,
                 &prepared,
                 "0xsubmit-a",
+                vec![0xaa, 0x01],
                 107,
             )
         })
@@ -353,10 +354,11 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
         let barrier = barrier.clone();
         thread::spawn(move || {
             barrier.wait();
-            coordinator.record_settlement_submission_broadcast(
+            coordinator.record_settlement_submission_signed(
                 &lease,
                 &prepared,
                 "0xsubmit-b",
+                vec![0xbb, 0x02],
                 107,
             )
         })
@@ -367,10 +369,25 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
     assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
     assert_eq!(results.iter().filter(|r| r.is_err()).count(), 1);
 
-    let broadcast = results
+    let signed = results
         .into_iter()
         .find_map(Result::ok)
-        .expect("one broadcast winner");
+        .expect("one signed extrinsic winner");
+    assert_eq!(
+        coordinator
+            .settlement_submission_recovery(prepared.submission_id)
+            .unwrap(),
+        Some(
+            x3_cross_vm_coordinator::SettlementOutboxRecovery::
+                QueryOrRebroadcastExactSignedExtrinsic
+        )
+    );
+
+    // Network send uses exactly signed.signed_extrinsic. Only after the RPC
+    // send returns do we move durable state to Broadcast.
+    let broadcast = coordinator
+        .record_settlement_submission_broadcast(&signed, 108)
+        .unwrap();
     assert_eq!(
         coordinator
             .settlement_submission_recovery(prepared.submission_id)
@@ -379,7 +396,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
     );
 
     let included = coordinator
-        .record_settlement_submission_included(&broadcast, 777, 108)
+        .record_settlement_submission_included(&broadcast, 777, 109)
         .unwrap();
     assert_eq!(
         coordinator
@@ -389,7 +406,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
     );
 
     coordinator
-        .record_settlement_terminal_observed(&included, 109)
+        .record_settlement_terminal_observed(&included, 110)
         .unwrap();
     assert_eq!(
         coordinator
