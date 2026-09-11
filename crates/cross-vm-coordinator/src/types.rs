@@ -244,6 +244,25 @@ pub enum FlashLegOutcome {
     Reverted { reason: String },
 }
 
+/// Value-moving coordinator operation protected by the idempotency journal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CoordinatorOperation {
+    FastHtlcLock,
+    SlowHtlcLock,
+    FastClaim,
+    SlowClaim,
+    RefundBoth,
+}
+
+/// Persisted receipt proving that one semantic operation has already been applied.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CoordinatorOperationReceipt {
+    pub operation: CoordinatorOperation,
+    /// Blake3 fingerprint of the immutable evidence supplied for this operation.
+    pub evidence_fingerprint: [u8; 32],
+    pub completed_at: u64,
+}
+
 // ─── Swap Session Types ───────────────────────────────────────────────────────
 
 /// The overall atomic swap session.
@@ -271,6 +290,12 @@ pub struct SwapSession {
     pub created_at: u64,
     /// Last update timestamp.
     pub updated_at: u64,
+    /// Persisted semantic idempotency journal.
+    ///
+    /// serde(default) preserves backwards compatibility with sessions written
+    /// before the journal existed.
+    #[serde(default)]
+    pub operation_journal: Vec<CoordinatorOperationReceipt>,
     /// Whether this session requires Merkle proof verification during settlement.
     ///
     /// Set `true` for cross-chain swaps that involve chains requiring
@@ -361,6 +386,13 @@ pub enum CoordinatorError {
 
     #[error("Session not found: {session_id}")]
     SessionNotFound { session_id: String },
+
+    #[error("Idempotency conflict for {operation:?}: existing evidence {existing}, new evidence {incoming}")]
+    IdempotencyConflict {
+        operation: CoordinatorOperation,
+        existing: String,
+        incoming: String,
+    },
 
     #[error("Internal error: {0}")]
     Internal(String),
