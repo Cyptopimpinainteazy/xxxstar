@@ -617,6 +617,40 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         crate::AttemptStore::canonical(&self.attempts, session_id, operation)
     }
 
+    pub fn recovery_action(
+        &self,
+        session_id: &str,
+    ) -> Result<crate::RecoveryAction, CoordinatorError> {
+        let session = self
+            .coordinator
+            .session(session_id)?
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: session_id.to_string(),
+            })?;
+
+        let attempts = crate::AttemptStore::attempts(&self.attempts, session_id)?;
+        let mut canonical_results = Vec::new();
+        for operation in [
+            crate::CoordinatorOperation::FastHtlcLock,
+            crate::CoordinatorOperation::SlowHtlcLock,
+            crate::CoordinatorOperation::FastClaim,
+            crate::CoordinatorOperation::SlowClaim,
+            crate::CoordinatorOperation::RefundBoth,
+        ] {
+            if let Some(result) =
+                crate::AttemptStore::canonical(&self.attempts, session_id, operation)?
+            {
+                canonical_results.push(result);
+            }
+        }
+
+        let evidence = crate::RecoveryEvidence {
+            attempts: &attempts,
+            canonical_results: &canonical_results,
+        };
+        Ok(crate::RecoveryReconciler::decide(&session, &evidence))
+    }
+
     pub fn session(
         &self,
         session_id: &str,
