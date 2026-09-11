@@ -99,7 +99,9 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use parity_scale_codec::Decode;
     use sp_core::H256;
-    use sp_io::hashing::{blake2_256, sha2_256};
+    #[cfg(not(any(feature = "dev", feature = "testnet")))]
+    use sp_io::hashing::blake2_256;
+    use sp_io::hashing::sha2_256;
     use sp_runtime::offchain::StorageKind;
     use sp_runtime::traits::{AccountIdConversion, SaturatedConversion, Saturating};
     use sp_runtime::transaction_validity::{

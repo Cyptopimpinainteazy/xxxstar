@@ -49,8 +49,8 @@ jobs:
 
       - name: Capture dependency lineage snapshot
         run: |
-          cargo tree -p x3-svm-integration > artifacts/readiness/lineage-tree.txt
-          cargo tree -p x3-svm-integration --duplicates > artifacts/readiness/lineage-duplicates.txt
+          cargo tree -p x3-svm-integration --edges normal > artifacts/readiness/lineage-tree.txt
+          cargo tree -p x3-svm-integration --edges normal --duplicates > artifacts/readiness/lineage-duplicates.txt
 
       - name: Fail on known Solana lineage regressions
         run: |

@@ -10,7 +10,11 @@ import sys
 
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PRIVATE )?PRIVATE KEY-----"),
-    re.compile(r"(?:X3_SIGNER_SEED_HEX|PRIVATE_KEY|SECRET_KEY|API_KEY|BEARER_TOKEN)\s*=\s*['\"][^'\"]{16,}['\"]"),
+    re.compile(
+        r"\b(?:X3(?:VM)?_SIGNER_(?:SURI|SEED_HEX)|PRIVATE_KEY|SECRET_KEY|API_KEY|BEARER_TOKEN)"
+        r"\s*[:=]\s*(?:['\"][^'\"]{16,}['\"]|[^\s#'\"`]{16,})",
+        re.I,
+    ),
     re.compile(r"(?:mnemonic|seed_phrase|seed phrase)\s*[:=]\s*['\"][^'\"]{12,}['\"]", re.I),
 ]
 
@@ -36,7 +40,10 @@ def main() -> int:
         return 2
 
     print(f"PR Supervisor: {len(names)} changed file(s)")
-    if any(pattern.search(diff) for pattern in SECRET_PATTERNS):
+    added_lines = "\n".join(
+        line[1:] for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++")
+    )
+    if any(pattern.search(added_lines) for pattern in SECRET_PATTERNS):
         print("PR Supervisor: possible credential/private-key material detected in diff", file=sys.stderr)
         return 1
     if len(names) > 1000:

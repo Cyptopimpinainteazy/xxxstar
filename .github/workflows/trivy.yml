@@ -15,20 +15,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build container image
-        run: docker build -f Dockerfile.mainnet-check -t x3-mainnet-check:test .
-
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        if: success()
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # v0.33.1
         with:
-          scan-type: 'image'
-          scan-ref: 'x3-mainnet-check:test'
+          scan-type: 'fs'
+          scan-ref: '.'
+          scanners: 'vuln,secret,misconfig'
           format: 'sarif'
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@311b4ee155dcdab395044f00946f664bd51ff173 # v4
         if: always() && hashFiles('trivy-results.sarif') != ''
         with:
           sarif_file: 'trivy-results.sarif'

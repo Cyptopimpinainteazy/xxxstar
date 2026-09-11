@@ -103,10 +103,10 @@ allow = [
     "Unicode-3.0",
     "CC0-1.0",
     "MPL-2.0",
-    # GPL-3.0-only: polkadot-sdk stable2512 xcm-procedural macro uses this;
-    # the produced code is consumed as a build-time codegen tool, not linked
-    # into our runtime binary. Acceptable for build-deps. (For runtime binary
-    # licensing we stay Apache-2.0 per workspace.package.license.)
+    # GPL-3.0-only is used by a polkadot-sdk build-time code generator.
+    # GPL-3.0 and GPL-3.0-or-later WITH Classpath-exception-2.0 are transitively
+    # linked by node networking/executor crates. The Classpath Exception permits
+    # linking without imposing GPL terms on the distributed Apache-2.0 binary.
     "GPL-3.0-only",
     "GPL-3.0",
     "BlueOak-1.0.0",

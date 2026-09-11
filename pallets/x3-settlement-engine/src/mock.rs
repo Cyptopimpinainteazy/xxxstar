@@ -121,6 +121,10 @@ impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
             _ => Err(o),
         }
     }
+
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(0))
+    }
 }
 
 pub struct RootOnlySettlement;
@@ -132,6 +136,10 @@ impl EnsureOrigin<RuntimeOrigin> for RootOnlySettlement {
             Ok(frame_system::RawOrigin::Root) => Ok(()),
             _ => Err(o),
         }
+    }
+
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::root())
     }
 }
 
