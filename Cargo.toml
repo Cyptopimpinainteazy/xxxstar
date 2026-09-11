@@ -149,7 +149,8 @@ members = [
     "crates/x3-bridge",                # <- node/Cargo.toml
     "crates/x3-bridge-adapters",       # <- node/Cargo.toml
     "crates/x3-fees",                  # <- tests/e2e/Cargo.toml
-    "crates/x3-finality-oracle",       # <- node/Cargo.toml
+    "crates/x3-finality-oracle",
+    "crates/x3-flashloan",       # <- node/Cargo.toml
     "crates/x3-proof-dispute",         # <- node/Cargo.toml
     "crates/x3-security-events",       # <- pallets/atomic-trade-engine, pallets/x3-invariants, runtime
     "crates/x3-universal-contracts",   # <- tests/e2e/Cargo.toml
