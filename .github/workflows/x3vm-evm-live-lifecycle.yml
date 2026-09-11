@@ -143,6 +143,13 @@ jobs:
             real_x3vm_evm_lock_claim_atomic_lifecycle \
             -- --ignored --nocapture
 
+      - name: Run real X3VM-EVM timeout/refund atomic lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_evm_live \
+            real_x3vm_evm_timeout_refund_atomic_lifecycle \
+            -- --ignored --nocapture
+
       - name: Dump isolated Anvil log on failure
         if: failure()
         run: cat /tmp/x3vm-evm-anvil.log || true
