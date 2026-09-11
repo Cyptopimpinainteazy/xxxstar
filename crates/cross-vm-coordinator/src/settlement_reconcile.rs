@@ -484,4 +484,35 @@ mod tests {
             SettlementReconcileDecision::MarkIncluded { block_number: 77 }
         );
     }
+
+    #[test]
+    fn rpc_state_classification_is_fail_closed() {
+        assert_eq!(
+            X3JsonRpcSettlementObserver::classify_runtime_state("Finalized"),
+            RuntimeSettlementObservation::Finalized
+        );
+        assert_eq!(
+            X3JsonRpcSettlementObserver::classify_runtime_state("Refunded"),
+            RuntimeSettlementObservation::Refunded
+        );
+        assert_eq!(
+            X3JsonRpcSettlementObserver::classify_runtime_state("Unknown"),
+            RuntimeSettlementObservation::Unknown
+        );
+        assert_eq!(
+            X3JsonRpcSettlementObserver::classify_runtime_state("Claiming"),
+            RuntimeSettlementObservation::NonTerminal
+        );
+    }
+
+    #[test]
+    fn extrinsic_hash_is_deterministic_and_32_bytes() {
+        let a = X3JsonRpcSettlementObserver::substrate_extrinsic_hash(&[1, 2, 3, 4]).unwrap();
+        let b = X3JsonRpcSettlementObserver::substrate_extrinsic_hash(&[1, 2, 3, 4]).unwrap();
+        let c = X3JsonRpcSettlementObserver::substrate_extrinsic_hash(&[1, 2, 3, 5]).unwrap();
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        assert_eq!(a.len(), 32);
+    }
+
 }
