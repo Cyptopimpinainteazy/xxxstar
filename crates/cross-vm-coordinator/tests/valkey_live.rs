@@ -1,8 +1,8 @@
 #![cfg(feature = "valkey")]
 
 use x3_cross_vm_coordinator::{
-    AttemptStore, CoordinatorOperation, OperationAttempt, OperationAttemptLedger,
-    OperationAttemptStatus, DistributedLeaseStore, ValkeyAttemptStore, ValkeyCasStore,
+    CoordinatorOperation, OperationAttemptLedger, OperationAttemptStatus, DistributedLeaseStore,
+    ValkeyAttemptStore, ValkeyCasStore,
     ValkeyLeaseAuthority, ValkeySecretRegistry,
 };
 
