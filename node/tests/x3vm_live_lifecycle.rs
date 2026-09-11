@@ -338,6 +338,21 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     assert!(claim_finality.finalized);
     assert_eq!(claim_finality.block_hash, claim.block_hash);
 
+    let double_claim = adapter
+        .claim(local_id, preimage)
+        .expect_err("double claim must fail closed");
+    assert!(
+        double_claim.to_string().contains("ExtrinsicFailed"),
+        "unexpected double-claim error: {double_claim}"
+    );
+    let refund_after_claim = adapter
+        .refund(local_id)
+        .expect_err("refund after claim must fail closed");
+    assert!(
+        refund_after_claim.to_string().contains("ExtrinsicFailed"),
+        "unexpected refund-after-claim error: {refund_after_claim}"
+    );
+
     let persisted = x3_atomic_swap::PersistentX3ProofLedger::open(&ledger_path)
         .expect("reopen persisted proof ledger")
         .snapshot()
@@ -445,6 +460,21 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
         intent_state_at(runtime_intent_id, &refund_head),
         pallet_x3_settlement_engine::IntentState::Refunded
     ));
+
+    let duplicate_refund = adapter
+        .refund(local_id)
+        .expect_err("duplicate refund must fail closed");
+    assert!(
+        duplicate_refund.to_string().contains("ExtrinsicFailed"),
+        "unexpected duplicate-refund error: {duplicate_refund}"
+    );
+    let claim_after_refund = adapter
+        .claim(local_id, preimage)
+        .expect_err("claim after refund must fail closed");
+    assert!(
+        claim_after_refund.to_string().contains("ExtrinsicFailed"),
+        "unexpected claim-after-refund error: {claim_after_refund}"
+    );
 }
 
 
