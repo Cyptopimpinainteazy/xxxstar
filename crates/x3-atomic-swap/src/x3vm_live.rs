@@ -39,8 +39,7 @@ pub trait X3VmLiveTransport: Send + Sync + Debug {
         &self,
         chain_id: &ChainId,
         escrow_address: &[u8],
-        intent_id: IntentId,
-        preimage: [u8; 32],
+        permit: &SecretReleasePermit,
     ) -> Result<ClaimProof, SwapError>;
 
     fn refund(
@@ -106,7 +105,7 @@ impl<T: X3VmLiveTransport> LiveX3VmAdapter<T> {
         &self.escrow_address
     }
 
-    pub fn transport(&self) -> &T {
+    pub(crate) fn transport(&self) -> &T {
         &self.transport
     }
 
@@ -120,12 +119,9 @@ impl<T: X3VmLiveTransport> LiveX3VmAdapter<T> {
     ) -> Result<ClaimProof, SwapError> {
         let intent_id = permit.intent_id();
         let preimage = permit.preimage();
-        let proof = self.transport.claim(
-            &self.chain_id,
-            &self.escrow_address,
-            intent_id,
-            preimage,
-        )?;
+        let proof = self
+            .transport
+            .claim(&self.chain_id, &self.escrow_address, permit)?;
         self.validate_claim(&proof)?;
         if proof.intent_id != intent_id {
             return Err(Self::invalid_proof(
@@ -445,16 +441,15 @@ mod tests {
             &self,
             _chain_id: &ChainId,
             _escrow_address: &[u8],
-            intent_id: IntentId,
-            preimage: [u8; 32],
+            permit: &SecretReleasePermit,
         ) -> Result<ClaimProof, SwapError> {
             self.counts.claim.fetch_add(1, Ordering::SeqCst);
             Ok(ClaimProof {
                 tx_id: "0xlive-claim".into(),
-                intent_id,
+                intent_id: permit.intent_id(),
                 chain_id: self.proof_chain(),
                 vm_type: self.proof_vm(),
-                preimage,
+                preimage: permit.preimage(),
                 block_number: 11,
                 block_hash: "0xblock11".into(),
                 raw_proof: vec![4, 5, 6],
@@ -690,7 +685,7 @@ mod tests {
                 proof.raw_proof.clear();
                 Ok(proof)
             }
-            fn claim(&self, c: &ChainId, e: &[u8], id: IntentId, p: [u8; 32]) -> Result<ClaimProof, SwapError> { self.0.claim(c, e, id, p) }
+            fn claim(&self, c: &ChainId, e: &[u8], permit: &SecretReleasePermit) -> Result<ClaimProof, SwapError> { self.0.claim(c, e, permit) }
             fn refund(&self, c: &ChainId, e: &[u8], id: IntentId) -> Result<RefundProof, SwapError> { self.0.refund(c, e, id) }
             fn verify_lock(&self, p: &LockProof) -> Result<bool, SwapError> { self.0.verify_lock(p) }
             fn verify_claim(&self, p: &ClaimProof) -> Result<bool, SwapError> { self.0.verify_claim(p) }
