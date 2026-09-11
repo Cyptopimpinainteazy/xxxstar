@@ -40,6 +40,13 @@ pub trait SessionPersistence: Send + Sync + 'static {
     /// Load the persisted set of used HTLC secrets.
     /// Returns an empty set if nothing was previously persisted.
     fn load_used_secrets(&self) -> Vec<[u8; 32]>;
+
+    /// Persist secret-hash ownership so crash recovery can distinguish a
+    /// legitimate retry from cross-session replay.
+    fn save_used_secret_claims(&self, claims: &Vec<([u8; 32], String)>);
+
+    /// Load secret-hash ownership records.
+    fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)>;
 }
 
 // ─── InMemoryPersistence ──────────────────────────────────────────────────────
@@ -50,6 +57,7 @@ pub trait SessionPersistence: Send + Sync + 'static {
 pub struct InMemoryPersistence {
     inner: std::sync::RwLock<HashMap<String, SwapSession>>,
     used_secrets: std::sync::RwLock<Vec<[u8; 32]>>,
+    used_secret_claims: std::sync::RwLock<Vec<([u8; 32], String)>>,
 }
 
 impl Default for InMemoryPersistence {
@@ -63,6 +71,7 @@ impl InMemoryPersistence {
         Self {
             inner: std::sync::RwLock::new(HashMap::new()),
             used_secrets: std::sync::RwLock::new(Vec::new()),
+            used_secret_claims: std::sync::RwLock::new(Vec::new()),
         }
     }
 }
@@ -101,6 +110,15 @@ impl SessionPersistence for InMemoryPersistence {
     fn load_used_secrets(&self) -> Vec<[u8; 32]> {
         let guard = self.used_secrets.read().unwrap();
         guard.clone()
+    }
+
+    fn save_used_secret_claims(&self, claims: &Vec<([u8; 32], String)>) {
+        let mut guard = self.used_secret_claims.write().unwrap();
+        *guard = claims.clone();
+    }
+
+    fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
+        self.used_secret_claims.read().unwrap().clone()
     }
 }
 
@@ -186,6 +204,20 @@ impl<O: OffchainStorageProvider> SessionPersistence for OffchainPersistence<O> {
 
     fn load_used_secrets(&self) -> Vec<[u8; 32]> {
         let key = b"x3secrets:used".to_vec();
+        self.storage_provider
+            .get(&key)
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default()
+    }
+
+    fn save_used_secret_claims(&self, claims: &Vec<([u8; 32], String)>) {
+        let key = b"x3secrets:claims".to_vec();
+        let value = serde_json::to_vec(claims).expect("secret claims serialize");
+        self.storage_provider.set(&key, &value);
+    }
+
+    fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
+        let key = b"x3secrets:claims".to_vec();
         self.storage_provider
             .get(&key)
             .and_then(|b| serde_json::from_slice(&b).ok())
