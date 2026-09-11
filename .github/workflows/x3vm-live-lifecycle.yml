@@ -8,6 +8,7 @@ on:
       - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-live-lifecycle.yml"
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   live-x3vm-lifecycle:
