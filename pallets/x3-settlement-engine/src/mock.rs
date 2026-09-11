@@ -3,7 +3,7 @@
 use crate as pallet_x3_settlement_engine;
 use frame_support::{
     derive_impl, parameter_types,
-    traits::{ConstBool, ConstU32, ConstU64, EnsureOrigin},
+    traits::{ConstBool, ConstU32, ConstU64},
 };
 use sp_core::H160;
 use sp_runtime::{
@@ -110,39 +110,6 @@ parameter_types! {
     pub const AtomicBundleDeadlineBlocks: u64 = 100;
 }
 
-pub struct RootOrSignedAccount;
-impl EnsureOrigin<RuntimeOrigin> for RootOrSignedAccount {
-    type Success = u64;
-
-    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
-        match o.clone().into() {
-            Ok(frame_system::RawOrigin::Root) => Ok(0),
-            Ok(frame_system::RawOrigin::Signed(who)) => Ok(who),
-            _ => Err(o),
-        }
-    }
-
-    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
-        Ok(RuntimeOrigin::signed(0))
-    }
-}
-
-pub struct RootOnlySettlement;
-impl EnsureOrigin<RuntimeOrigin> for RootOnlySettlement {
-    type Success = ();
-
-    fn try_origin(o: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
-        match o.clone().into() {
-            Ok(frame_system::RawOrigin::Root) => Ok(()),
-            _ => Err(o),
-        }
-    }
-
-    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
-        Ok(RuntimeOrigin::root())
-    }
-}
-
 impl pallet_x3_kernel::Config for Test {
     type Currency = Balances;
     type Balance = u128;
@@ -183,8 +150,8 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MaxLegsPerBundle = AtomicMaxLegsPerBundle;
     type BundleDeadlineBlocks = AtomicBundleDeadlineBlocks;
     type EconomicHalt = NoEconomicHalt;
-    type X3LangOrigin = RootOrSignedAccount;
-    type SettlementOrigin = RootOnlySettlement;
+    type X3LangOrigin = frame_system::EnsureSigned<u64>;
+    type SettlementOrigin = frame_system::EnsureRoot<u64>;
     type VmReverter = pallet_x3_atomic_kernel::vm_revert::NoopVmReverter;
 }
 
