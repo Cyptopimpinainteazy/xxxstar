@@ -386,6 +386,18 @@ mod tests {
     }
 
     #[test]
+    fn inmemory_secret_claim_ownership_roundtrip() {
+        let persistence = InMemoryPersistence::new();
+        let claims = vec![
+            ([9u8; 32], "swap-a".to_string()),
+            ([8u8; 32], "swap-b".to_string()),
+        ];
+
+        persistence.save_used_secret_claims(&claims);
+        assert_eq!(persistence.load_used_secret_claims(), claims);
+    }
+
+    #[test]
     fn inmemory_used_secrets_empty_default() {
         let persistence = InMemoryPersistence::new();
         let loaded = persistence.load_used_secrets();
@@ -532,6 +544,18 @@ mod tests {
             assert_eq!(loaded.len(), 2);
             assert_eq!(loaded[0], [10u8; 32]);
             assert_eq!(loaded[1], [20u8; 32]);
+        }
+
+        #[test]
+        fn offchain_secret_claim_ownership_roundtrip() {
+            let p = make_persistence();
+            let claims = vec![
+                ([7u8; 32], "oc-a".to_string()),
+                ([6u8; 32], "oc-b".to_string()),
+            ];
+
+            p.save_used_secret_claims(&claims);
+            assert_eq!(p.load_used_secret_claims(), claims);
         }
 
         #[test]
