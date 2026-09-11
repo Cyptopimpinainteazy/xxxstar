@@ -164,6 +164,63 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         purged
     }
 
+    fn fingerprint_serialized<T: serde::Serialize>(
+        value: &T,
+    ) -> Result<[u8; 32], CoordinatorError> {
+        let bytes = serde_json::to_vec(value).map_err(|e| {
+            CoordinatorError::Internal(format!("failed to serialize idempotency evidence: {e}"))
+        })?;
+        Ok(*blake3::hash(&bytes).as_bytes())
+    }
+
+    fn fingerprint_bytes(bytes: &[u8]) -> [u8; 32] {
+        *blake3::hash(bytes).as_bytes()
+    }
+
+    fn operation_already_applied(
+        &self,
+        session_id: &str,
+        operation: CoordinatorOperation,
+        fingerprint: [u8; 32],
+    ) -> Result<bool, CoordinatorError> {
+        let session = self
+            .sessions
+            .get(session_id)
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: session_id.to_string(),
+            })?;
+
+        if let Some(existing) = session
+            .operation_journal
+            .iter()
+            .find(|receipt| receipt.operation == operation)
+        {
+            if existing.evidence_fingerprint == fingerprint {
+                return Ok(true);
+            }
+            return Err(CoordinatorError::IdempotencyConflict {
+                operation,
+                existing: hex::encode(existing.evidence_fingerprint),
+                incoming: hex::encode(fingerprint),
+            });
+        }
+
+        Ok(false)
+    }
+
+    fn record_operation(
+        session: &mut SwapSession,
+        operation: CoordinatorOperation,
+        fingerprint: [u8; 32],
+        completed_at: u64,
+    ) {
+        session.operation_journal.push(CoordinatorOperationReceipt {
+            operation,
+            evidence_fingerprint: fingerprint,
+            completed_at,
+        });
+    }
+
     // ── Phase 1: Setup ────────────────────────────────────────────────────
 
     /// Initialize a new atomic swap session.
@@ -223,6 +280,7 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             timelock_slow: t_slow,
             created_at: now_unix,
             updated_at: now_unix,
+            operation_journal: Vec::new(),
             requires_merkle_verification: matches!(
                 (&fast_vm, &slow_vm),
                 (VmTarget::Evm { .. }, _)
@@ -312,6 +370,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         record: HtlcRecord,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_serialized(&record)?;
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::FastHtlcLock,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         let current_phase = self
             .sessions
             .get(session_id)
@@ -335,6 +402,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             session.htlc_fast = Some(record);
             session.phase = SwapPhase::LockingHtlcs;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::FastHtlcLock,
+                fingerprint,
+                now_unix,
+            );
         }
 
         self.persist_by_id(session_id);
@@ -348,6 +421,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         record: HtlcRecord,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_serialized(&record)?;
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::SlowHtlcLock,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -375,6 +457,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.htlc_slow = Some(record);
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::SlowHtlcLock,
+                fingerprint,
+                now_unix,
+            );
 
             // If both HTLCs are now recorded, advance phase
             if session.htlc_fast.is_some() && session.htlc_slow.is_some() {
@@ -672,6 +760,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         secret: HtlcSecret,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = *blake3::hash(secret.as_bytes()).as_bytes();
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::FastClaim,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -720,6 +817,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.phase = SwapPhase::ClaimingSlow;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::FastClaim,
+                fingerprint,
+                now_unix,
+            );
         }
 
         // Persist the updated secret set BEFORE persisting the session, so
@@ -738,6 +841,17 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         session_id: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_bytes(
+            format!("slow-claim:{session_id}").as_bytes(),
+        );
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::SlowClaim,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -762,6 +876,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.phase = SwapPhase::Complete;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::SlowClaim,
+                fingerprint,
+                now_unix,
+            );
         }
 
         self.persist_by_id(session_id);
@@ -801,6 +921,17 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         session_id: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_bytes(
+            format!("refund-both:{session_id}").as_bytes(),
+        );
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::RefundBoth,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -828,6 +959,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.phase = SwapPhase::Refunded;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::RefundBoth,
+                fingerprint,
+                now_unix,
+            );
         }
 
         self.persist_by_id(session_id);
@@ -888,6 +1025,7 @@ mod state_machine_regression_tests {
             timelock_slow: updated_at + 20,
             created_at: updated_at,
             updated_at,
+            operation_journal: Vec::new(),
             requires_merkle_verification: false,
         }
     }
