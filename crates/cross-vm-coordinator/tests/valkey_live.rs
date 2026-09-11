@@ -2,8 +2,21 @@
 
 use x3_cross_vm_coordinator::{
     CoordinatorOperation, OperationAttemptLedger, OperationAttemptStatus, DistributedLeaseStore,
-    ValkeyAttemptStore, ValkeyCasStore,
-    ValkeyLeaseAuthority, ValkeySecretRegistry,
+    ValkeyAttemptStore, ValkeyCasStore, ValkeyLeaseAuthority, ValkeySecretRegistry,
+};
+
+#[cfg(feature = "canonical-proofs")]
+use std::sync::Arc;
+#[cfg(feature = "canonical-proofs")]
+use x3_cross_vm_coordinator::{
+    ConcurrentSwapCoordinator, CoordinatorConfig, HtlcHash, InMemoryPersistence,
+    SessionPersistence, SwapPhase, SwapSession, ValkeyDistributedCoordinator,
+};
+#[cfg(feature = "canonical-proofs")]
+use x3_atomic_swap::{
+    adapter::{FinalityProof, VmType},
+    intent::{AtomicIntentBuilder, ChainKind, RefundPath},
+    CrossDomainOperation, CrossDomainProofBundle,
 };
 
 fn test_url() -> Option<String> {
@@ -153,4 +166,131 @@ fn live_valkey_canonical_proof_hash_cannot_be_replaced() {
         .unwrap();
     assert_eq!(canonical.proof_hash, [0x72; 32]);
     assert_eq!(canonical.tx_id, "sig-a");
+}
+
+
+#[cfg(feature = "canonical-proofs")]
+#[test]
+fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("proof-vault");
+    let runtime_intent_id = [0xabu8; 32];
+
+    let intent = AtomicIntentBuilder::new()
+        .source_chain(ChainKind::X3)
+        .destination_chain(ChainKind::Ethereum)
+        .source_asset("X3")
+        .destination_asset("ETH")
+        .amount_in(1_000)
+        .min_amount_out(900)
+        .receiver("receiver")
+        .hashlock([7u8; 32])
+        .source_timeout(2_000)
+        .destination_timeout(1_000)
+        .refund_path(RefundPath {
+            chain: ChainKind::X3,
+            address: "refund".into(),
+            asset: None,
+        })
+        .build(9001)
+        .unwrap();
+
+    let persistence = Arc::new(InMemoryPersistence::new());
+    persistence.save(&SwapSession {
+        session_id: "swap-proof-vault".into(),
+        hash_lock: HtlcHash([7u8; 32]),
+        htlc_fast: None,
+        htlc_slow: None,
+        flash_legs: vec![],
+        leg_outcomes: vec![],
+        phase: SwapPhase::ClaimingFast,
+        timelock_fast: 2_000,
+        timelock_slow: 1_000,
+        created_at: 100,
+        updated_at: 100,
+        operation_journal: vec![],
+        requires_merkle_verification: false,
+    });
+
+    let coordinator = ValkeyDistributedCoordinator::with_namespace(
+        ConcurrentSwapCoordinator::with_persistence(
+            CoordinatorConfig::default(),
+            persistence,
+        ),
+        &url,
+        &ns,
+    )
+    .unwrap();
+
+    let lease = coordinator
+        .acquire_session_lease("swap-proof-vault", "relayer-a", 100, 30)
+        .unwrap();
+    let started = coordinator
+        .record_attempt_started(
+            &lease,
+            CoordinatorOperation::FastClaim,
+            "claim-attempt-1",
+            "eth-mainnet",
+            101,
+        )
+        .unwrap();
+    let broadcast = coordinator
+        .record_attempt_broadcast(&lease, &started, "0xclaim", 102)
+        .unwrap();
+
+    let block_hash = "0xblock55".to_string();
+    let bundle = CrossDomainProofBundle::new(
+        &intent,
+        runtime_intent_id,
+        "eth-mainnet".into(),
+        VmType::Evm,
+        CrossDomainOperation::Claim,
+        "0xclaim".into(),
+        55,
+        block_hash.clone(),
+        vec![1, 2, 3],
+        FinalityProof {
+            chain_id: "eth-mainnet".into(),
+            vm_type: VmType::Evm,
+            tx_id: "0xclaim".into(),
+            block_number: 55,
+            block_hash,
+            confirmations: 12,
+            finalized: true,
+            finality_source: "live-valkey-test".into(),
+            safe_to_reveal_secret: true,
+        },
+    )
+    .unwrap();
+
+    let canonical = coordinator
+        .record_attempt_finalized_with_bundle(
+            &lease,
+            &broadcast,
+            &intent,
+            runtime_intent_id,
+            &bundle,
+            103,
+        )
+        .unwrap();
+    assert_eq!(canonical.proof_hash, bundle.proof_hash);
+
+    let restored = coordinator
+        .canonical_proof_bundle(bundle.proof_hash)
+        .unwrap()
+        .expect("bundle persisted by proof hash");
+    assert_eq!(restored.proof_hash, bundle.proof_hash);
+    restored.verify_runtime_binding(runtime_intent_id).unwrap();
+
+    let set = coordinator
+        .assemble_verified_claim_proof_set(
+            "swap-proof-vault",
+            &intent,
+            runtime_intent_id,
+            &[("eth-mainnet".into(), VmType::Evm)],
+        )
+        .unwrap();
+    assert_eq!(set.runtime_intent_id, runtime_intent_id);
+    assert_eq!(set.bundles.len(), 1);
+    assert_eq!(set.bundles[0].proof_hash, bundle.proof_hash);
 }
