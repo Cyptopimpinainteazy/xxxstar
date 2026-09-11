@@ -36,6 +36,7 @@
 pub mod abi;
 pub mod attempt_ledger;
 pub mod config;
+pub mod intent_binding;
 pub mod concurrent;
 pub mod flashloan_adapter;
 pub mod htlc;
@@ -57,6 +58,7 @@ mod bridge_integration_tests; // Phase 13b: Bridge integration test suite
 
 pub use attempt_ledger::*;
 pub use config::*;
+pub use intent_binding::*;
 pub use lease::*;
 pub use concurrent::*;
 pub use persistence::*;
