@@ -21,7 +21,7 @@ use std::sync::Mutex;
 use x3_atomic_swap::intent::IntentId;
 use x3_atomic_swap::{AtomicIntent, ChainId, RpcClient, SwapError, X3ExtrinsicSigner};
 use x3_chain_runtime::{
-    AccountId, Address, Runtime, RuntimeCall, Signature, SignedExtra, SignedPayload,
+    AccountId, Address, Runtime, RuntimeCall, RuntimeEvent, Signature, SignedExtra, SignedPayload,
     UncheckedExtrinsic, VERSION,
 };
 
@@ -402,6 +402,57 @@ impl X3ExtrinsicSigner for X3RuntimeSigner {
             },
         );
         self.signed_extrinsic(call)
+    }
+
+    fn verify_finalized_dispatch(
+        &self,
+        block_hash: &str,
+        extrinsic_index: u32,
+    ) -> Result<(), SwapError> {
+        let key = storage_prefix(b"System", b"Events");
+        let result = self.rpc_call(
+            "state_getStorage",
+            vec![
+                Value::String(format!("0x{}", hex::encode(key))),
+                Value::String(block_hash.to_string()),
+            ],
+        )?;
+        let raw = result
+            .as_str()
+            .ok_or_else(|| SwapError::RpcError("System::Events storage was not hex".into()))?;
+        let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
+            .map_err(|e| SwapError::RpcError(format!("decode System::Events storage: {e}")))?;
+        let records =
+            Vec::<frame_system::EventRecord<RuntimeEvent, H256>>::decode(&mut &bytes[..]).map_err(
+                |e| SwapError::RpcError(format!("SCALE decode System::Events: {e}")),
+            )?;
+
+        let mut saw_failed_dispatch = false;
+        for record in records {
+            let frame_system::Phase::ApplyExtrinsic(index) = record.phase else {
+                continue;
+            };
+            if index != extrinsic_index {
+                continue;
+            }
+            match record.event {
+                RuntimeEvent::System(frame_system::Event::ExtrinsicSuccess { .. }) => return Ok(()),
+                RuntimeEvent::System(frame_system::Event::ExtrinsicFailed { .. }) => {
+                    saw_failed_dispatch = true;
+                }
+                _ => {}
+            }
+        }
+
+        if saw_failed_dispatch {
+            Err(SwapError::RpcError(format!(
+                "X3 extrinsic at finalized index {extrinsic_index} dispatched with ExtrinsicFailed"
+            )))
+        } else {
+            Err(SwapError::RpcError(format!(
+                "no terminal System dispatch event found for finalized extrinsic index {extrinsic_index}"
+            )))
+        }
     }
 }
 
