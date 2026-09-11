@@ -13,7 +13,9 @@ use crate::adapter::{
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
 use crate::x3vm_live::X3VmLiveTransport;
-use crate::x3vm_node::{X3ExtrinsicSigner, X3NodeTransport, X3NodeTransportConfig};
+use crate::x3vm_node::{
+    X3ExtrinsicSigner, X3FinalizedInclusionProof, X3NodeTransport, X3NodeTransportConfig,
+};
 use crate::x3vm_proof_store::PersistentX3ProofLedger;
 use alloc::collections::BTreeMap;
 use core::fmt::Debug;
@@ -24,6 +26,7 @@ use std::sync::Mutex;
 pub struct NativeX3NodeTransport<S: X3ExtrinsicSigner> {
     inner: X3NodeTransport<S>,
     finalized: Mutex<BTreeMap<TxId, FinalityProof>>,
+    persisted_finality: Mutex<BTreeMap<TxId, X3FinalizedInclusionProof>>,
     proof_ledger: Option<PersistentX3ProofLedger>,
 }
 
@@ -32,6 +35,7 @@ impl<S: X3ExtrinsicSigner> NativeX3NodeTransport<S> {
         Self {
             inner: X3NodeTransport::new(config, signer),
             finalized: Mutex::new(BTreeMap::new()),
+            persisted_finality: Mutex::new(BTreeMap::new()),
             proof_ledger: None,
         }
     }
@@ -41,11 +45,72 @@ impl<S: X3ExtrinsicSigner> NativeX3NodeTransport<S> {
         signer: S,
         path: impl Into<PathBuf>,
     ) -> Result<Self, SwapError> {
+        let proof_ledger = PersistentX3ProofLedger::open(path)?;
+        let snapshot = proof_ledger.snapshot()?;
+        let persisted_finality = Self::restore_persisted_finality(&snapshot)?;
         Ok(Self {
             inner: X3NodeTransport::new(config, signer),
             finalized: Mutex::new(BTreeMap::new()),
-            proof_ledger: Some(PersistentX3ProofLedger::open(path)?),
+            persisted_finality: Mutex::new(persisted_finality),
+            proof_ledger: Some(proof_ledger),
         })
+    }
+
+    fn restore_persisted_finality(
+        ledger: &crate::ledger::ProofLedger,
+    ) -> Result<BTreeMap<TxId, X3FinalizedInclusionProof>, SwapError> {
+        let mut restored = BTreeMap::new();
+        for record in &ledger.records {
+            for entry in &record.entries {
+                if entry.proof_kind != crate::ledger::ProofKind::FinalityVerified || !entry.verified {
+                    continue;
+                }
+                let tx_id = entry.tx_hash.as_ref().ok_or_else(|| {
+                    SwapError::Internal(
+                        "verified X3 finality ledger entry is missing tx hash".into(),
+                    )
+                })?;
+                let block_number = entry.block_number.ok_or_else(|| {
+                    SwapError::Internal(
+                        "verified X3 finality ledger entry is missing block number".into(),
+                    )
+                })?;
+                let raw = entry.data.as_ref().ok_or_else(|| {
+                    SwapError::Internal(
+                        "verified X3 finality ledger entry is missing raw inclusion proof".into(),
+                    )
+                })?;
+                let inclusion: X3FinalizedInclusionProof =
+                    serde_json::from_slice(raw).map_err(|e| {
+                        SwapError::Internal(alloc::format!(
+                            "decode persisted X3 finalized inclusion proof: {}",
+                            e
+                        ))
+                    })?;
+                if inclusion.tx_id != *tx_id
+                    || inclusion.block_number != block_number
+                    || inclusion.block_hash.is_empty()
+                    || inclusion.state_root.is_empty()
+                    || inclusion.signed_extrinsic.is_empty()
+                {
+                    return Err(SwapError::Internal(alloc::format!(
+                        "persisted X3 finality evidence mismatch for transaction {}",
+                        tx_id
+                    )));
+                }
+                if let Some(existing) = restored.get(tx_id) {
+                    if existing != &inclusion {
+                        return Err(SwapError::Internal(alloc::format!(
+                            "conflicting persisted X3 finality evidence for transaction {}",
+                            tx_id
+                        )));
+                    }
+                } else {
+                    restored.insert(tx_id.clone(), inclusion);
+                }
+            }
+        }
+        Ok(restored)
     }
 
     pub fn proof_ledger_snapshot(&self) -> Result<Option<crate::ledger::ProofLedger>, SwapError> {
@@ -153,10 +218,27 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
         chain_id: &ChainId,
         tx_id: &TxId,
     ) -> Result<FinalityProof, SwapError> {
-        let proof = self
+        if let Some(proof) = self
             .finalized
             .lock()
             .map_err(|_| SwapError::RpcError("X3 finality cache mutex poisoned".into()))?
+            .get(tx_id)
+            .cloned()
+        {
+            if &proof.chain_id != chain_id {
+                return Err(SwapError::RpcError(alloc::format!(
+                    "X3 finality chain mismatch: proof {}, requested {}",
+                    proof.chain_id,
+                    chain_id
+                )));
+            }
+            return Ok(proof);
+        }
+
+        let persisted = self
+            .persisted_finality
+            .lock()
+            .map_err(|_| SwapError::RpcError("X3 persisted finality mutex poisoned".into()))?
             .get(tx_id)
             .cloned()
             .ok_or_else(|| {
@@ -165,14 +247,30 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
                     tx_id
                 ))
             })?;
-        if &proof.chain_id != chain_id {
+
+        if !self.inner.revalidate_finalized_inclusion(&persisted)? {
             return Err(SwapError::RpcError(alloc::format!(
-                "X3 finality chain mismatch: proof {}, requested {}",
-                proof.chain_id,
-                chain_id
+                "persisted X3 finality evidence failed live revalidation for transaction {}",
+                tx_id
             )));
         }
-        Ok(proof)
+        self.remember_finality(
+            chain_id,
+            tx_id,
+            persisted.block_number,
+            &persisted.block_hash,
+        )?;
+        self.finalized
+            .lock()
+            .map_err(|_| SwapError::RpcError("X3 finality cache mutex poisoned".into()))?
+            .get(tx_id)
+            .cloned()
+            .ok_or_else(|| {
+                SwapError::RpcError(alloc::format!(
+                    "revalidated X3 finality evidence was not cached for transaction {}",
+                    tx_id
+                ))
+            })
     }
 
     fn chain_health(&self, chain_id: &ChainId) -> Result<ChainHealth, SwapError> {
@@ -297,20 +395,11 @@ mod tests {
             .unwrap();
         drop(store);
 
-        let transport = NativeX3NodeTransport::new_with_proof_ledger(
-            X3NodeTransportConfig::local("http://127.0.0.1:9944".into()),
-            NeverSigner,
-            path.clone(),
-        )
-        .unwrap();
-        let proof = transport
-            .finality_status(&"x3-local".into(), &inclusion.tx_id)
-            .expect("durable finality should survive process-style reopen");
-        assert_eq!(proof.tx_id, inclusion.tx_id);
-        assert_eq!(proof.block_number, inclusion.block_number);
-        assert_eq!(proof.block_hash, inclusion.block_hash);
-        assert!(proof.finalized);
-        assert!(proof.safe_to_reveal_secret);
+        let reopened = PersistentX3ProofLedger::open(&path).unwrap();
+        let snapshot = reopened.snapshot().unwrap();
+        let restored =
+            NativeX3NodeTransport::<NeverSigner>::restore_persisted_finality(&snapshot).unwrap();
+        assert_eq!(restored.get(&inclusion.tx_id), Some(&inclusion));
 
         let _ = std::fs::remove_file(path);
     }
