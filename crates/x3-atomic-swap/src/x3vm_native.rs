@@ -12,6 +12,7 @@ use crate::adapter::{
 };
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
+use crate::secret_release::SecretReleasePermit;
 use crate::x3vm_live::X3VmLiveTransport;
 use crate::x3vm_node::{X3ExtrinsicSigner, X3NodeTransport, X3NodeTransportConfig};
 use crate::x3vm_proof_store::PersistentX3ProofLedger;
@@ -100,15 +101,14 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
         &self,
         chain_id: &ChainId,
         escrow_address: &[u8],
-        intent_id: IntentId,
-        preimage: [u8; 32],
+        permit: &SecretReleasePermit,
     ) -> Result<ClaimProof, SwapError> {
         let proof = self
             .inner
-            .claim(chain_id, escrow_address, intent_id, preimage)?;
+            .claim(chain_id, escrow_address, permit)?;
         self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
         if let Some(ledger) = &self.proof_ledger {
-            ledger.record_claim(intent_id, &proof)?;
+            ledger.record_claim(permit.intent_id(), &proof)?;
         }
         Ok(proof)
     }
