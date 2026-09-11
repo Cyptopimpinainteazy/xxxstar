@@ -338,6 +338,36 @@ fn read_u32_storage(
         .map_err(|e| custom_error(format!("decode {pallet:?}/{item:?} storage failed: {e}")))
 }
 
+
+
+fn read_settlement_intent_state(
+    client: &FullClient,
+    at: H256,
+    intent_id: H256,
+) -> Result<Option<pallet_x3_settlement_engine::IntentState>, JsonRpseeError> {
+    let intent_key = StorageKey(
+        pallet_x3_settlement_engine::SettlementIntents::<Runtime>::hashed_key_for(intent_id),
+    );
+    let intent_exists = StorageProvider::storage(client, at, &intent_key)
+        .map_err(|e| custom_error(format!("read settlement intent failed: {e}")))?
+        .is_some();
+    if !intent_exists {
+        return Ok(None);
+    }
+
+    let state_key = StorageKey(
+        pallet_x3_settlement_engine::IntentStates::<Runtime>::hashed_key_for(intent_id),
+    );
+    let state = match StorageProvider::storage(client, at, &state_key)
+        .map_err(|e| custom_error(format!("read settlement intent state failed: {e}")))?
+    {
+        Some(data) => pallet_x3_settlement_engine::IntentState::decode(&mut &data.0[..])
+            .map_err(|e| custom_error(format!("decode settlement intent state failed: {e}")))?,
+        None => pallet_x3_settlement_engine::IntentState::default(),
+    };
+    Ok(Some(state))
+}
+
 fn sign_runtime_call(
     pair: &sp_core::sr25519::Pair,
     account: &AccountId,
@@ -677,6 +707,33 @@ where
         pallet_x3_atomic_kernel::X3AtomicKernelApi<Block>,
 {
     let mut module = RpcModule::new(());
+
+    let client_for_settlement_state = client.clone();
+    module.register_method(
+        "x3_settlementState",
+        move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
+            let (intent_hex,): (String,) = params.parse()?;
+            let intent_id = H256(decode_hex_32(&intent_hex, "runtime intent id")?);
+            let at = client_for_settlement_state.info().best_hash;
+            match read_settlement_intent_state(
+                client_for_settlement_state.as_ref(),
+                at,
+                intent_id,
+            )? {
+                Some(state) => Ok(serde_json::json!({
+                    "intent_id": intent_hex,
+                    "state": format!("{state:?}"),
+                    "at": format!("0x{}", hex::encode(at)),
+                })),
+                None => Ok(serde_json::json!({
+                    "intent_id": intent_hex,
+                    "state": "Unknown",
+                    "at": format!("0x{}", hex::encode(at)),
+                })),
+            }
+        },
+    )?;
+
 
     if let Some(atomic_gateway_tx) = atomic_gateway_tx {
         let rollback_tx = atomic_gateway_tx.clone();
