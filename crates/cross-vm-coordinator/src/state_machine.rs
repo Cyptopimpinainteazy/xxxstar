@@ -14,7 +14,7 @@ use crate::persistence::{InMemoryPersistence, SessionPersistence};
 use crate::types::*;
 use blake2::{Blake2b512, Digest};
 use blake3;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -38,7 +38,7 @@ pub struct SwapCoordinator<P: SessionPersistence = InMemoryPersistence> {
     ///
     /// BTreeSet gives O(log n) membership checks vs O(n) for Vec, and eliminates
     /// any risk of duplicate entries accumulating over time.
-    used_secrets: BTreeSet<[u8; 32]>,
+    used_secrets: BTreeMap<[u8; 32], String>,
     /// Persistence backend for sessions.
     persistence: Arc<P>,
 }
@@ -73,8 +73,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         // Restore the used-secrets set so that HTLC secret replay protection
         // survives node restarts.  Without this, an adversary could restart the
         // node and reuse a previously-revealed secret to steal funds.
-        let used_secrets: BTreeSet<[u8; 32]> =
-            persistence.load_used_secrets().into_iter().collect();
+        let mut used_secrets: BTreeMap<[u8; 32], String> =
+            persistence.load_used_secret_claims().into_iter().collect();
+        if used_secrets.is_empty() {
+            // Backwards-compatible fail-closed import of legacy secret hashes.
+            // Unknown ownership means they remain globally blocked from reuse.
+            for secret_hash in persistence.load_used_secrets() {
+                used_secrets.insert(secret_hash, "__legacy_unknown__".to_string());
+            }
+        }
         let secrets_count = used_secrets.len();
 
         if session_count > 0 {
@@ -780,13 +787,19 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
         Self::validate_phase_transition(current_phase, SwapPhase::ClaimingFast)?;
 
-        // Global replay guard: O(log n) BTreeSet lookup, constant-time via subtle for
-        // resistance to timing side-channels even on the fast path.
+        // Global replay guard with persisted ownership.
+        //
+        // If the secret is already owned by this same session, we are
+        // recovering from the crash window where secret ownership was
+        // durably written before the session mutation. That retry is safe.
+        // A different owner remains a hard cross-session replay failure.
         let secret_hash = *blake3::hash(&secret.0).as_bytes();
-        if self.used_secrets.contains(&secret_hash) {
-            return Err(CoordinatorError::Internal(
-                format!("HTLC secret replay detected for session '{session_id}' — secret already used in a previous claim")
-            ));
+        if let Some(owner) = self.used_secrets.get(&secret_hash) {
+            if owner != session_id {
+                return Err(CoordinatorError::Internal(format!(
+                    "HTLC secret replay detected for session '{session_id}' — secret already owned by session '{owner}'"
+                )));
+            }
         }
         {
             let session = self.sessions.get_mut(session_id).ok_or_else(|| {
@@ -809,7 +822,8 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             //  duplicate will be caught on retry, which is the safe outcome).
             // Register the secret hash globally (never store plaintext)
             let secret_hash = *blake3::hash(&secret.0).as_bytes();
-            self.used_secrets.insert(secret_hash);
+            self.used_secrets
+                .insert(secret_hash, session_id.to_string());
 
             if let Some(ref mut htlc) = session.htlc_fast {
                 htlc.status = HtlcStatus::Claimed;
@@ -828,7 +842,17 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         // Persist the updated secret set BEFORE persisting the session, so
         // that on crash-recovery the replay guard is at least as restrictive
         // as the session state (safe direction).
-        let secrets_vec: Vec<[u8; 32]> = self.used_secrets.iter().copied().collect();
+        let secret_claims: Vec<([u8; 32], String)> = self
+            .used_secrets
+            .iter()
+            .map(|(hash, owner)| (*hash, owner.clone()))
+            .collect();
+        // Persist ownership first. If the process crashes before the session
+        // write, a retry can prove that this secret belongs to this session
+        // and safely finish the local mutation instead of misclassifying it as
+        // a cross-session replay.
+        self.persistence.save_used_secret_claims(&secret_claims);
+        let secrets_vec: Vec<[u8; 32]> = self.used_secrets.keys().copied().collect();
         self.persistence.save_used_secrets(&secrets_vec);
         self.persist_by_id(session_id);
         info!(session = %session_id, "Fast chain claimed — now claiming slow chain");
