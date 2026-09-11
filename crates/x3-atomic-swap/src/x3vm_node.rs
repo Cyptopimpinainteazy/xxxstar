@@ -352,6 +352,20 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         Ok(proof.block_number <= finalized_number)
     }
 
+
+    pub(crate) fn revalidate_finalized_inclusion(
+        &self,
+        proof: &X3FinalizedInclusionProof,
+    ) -> Result<bool, SwapError> {
+        let raw = Self::encode_inclusion(proof)?;
+        if !self.verify_inclusion(&proof.tx_id, &proof.block_hash, &raw)? {
+            return Ok(false);
+        }
+        self.signer
+            .verify_finalized_dispatch(&proof.block_hash, proof.extrinsic_index)?;
+        Ok(true)
+    }
+
     fn latest_header_numbers(&self) -> Result<(u64, u64), SwapError> {
         let finalized_hash = self.finalized_head()?;
         let (_, finalized_header) = self.block_and_header(&finalized_hash)?;
