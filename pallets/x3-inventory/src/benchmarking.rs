@@ -1,10 +1,10 @@
 //! Benchmarking setup for pallet-x3-inventory
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use crate::types::*;
-use frame_benchmarking::{benchmarks, impl_benchmark_test_suite};
+use frame_benchmarking::benchmarks;
+#[cfg(test)]
+use frame_benchmarking::impl_benchmark_test_suite;
 use frame_support::BoundedVec;
 use frame_system::RawOrigin;
 use sp_runtime::traits::Zero;
@@ -132,5 +132,7 @@ benchmarks! {
         ).unwrap();
     }: _(RawOrigin::Root, vault_id, zero)
 
-    impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);
 }
+
+#[cfg(test)]
+impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);

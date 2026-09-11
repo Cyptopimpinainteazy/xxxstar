@@ -53,6 +53,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.90.0
           targets: wasm32v1-none, wasm32-unknown-unknown
 
       - name: Cache cargo

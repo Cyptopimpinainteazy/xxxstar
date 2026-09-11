@@ -22,6 +22,8 @@ jobs:
         run: cargo install --locked --git https://github.com/chevdor/srtool-cli --rev 0485b5507a0b63cf7699376f15d9cb5c849bbcd0 srtool-cli
       - name: Add Cargo binaries to PATH
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Verify srtool CLI
+        run: srtool version
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Guard
@@ -30,8 +32,6 @@ jobs:
         run: make test-all-pallets
       - name: Build validated release node
         run: cargo build --release -p x3-chain-node --features mainnet-rc1
-      - name: Build deterministic runtime WASM
-        run: scripts/run-srtool.sh build
       - name: Audit (invariants + readiness + consistency)
         run: make audit
       - name: Node Build Verification (mainnet-rc1)
