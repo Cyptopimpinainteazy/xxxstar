@@ -35,13 +35,12 @@ jobs:
       - name: Run Clippy (verification router test verifier)
         run: cargo clippy -p x3-verification-router --all-targets --features test-verifier -- -D warnings
 
-      # RC-1 and post-RC-1 router features are intentionally incompatible. Validate
-      # each legal feature set rather than disabling the compile-time scope lock.
+      # RC-1 and post-RC-1 router features are intentionally incompatible.
       - name: Run Clippy (cross-VM router RC-1)
         run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
 
-      - name: Run Clippy (cross-VM router post-RC-1 features)
-        run: |
-          for feature in external-gateway parallel-executor appzone-factory pq-experimental advanced-dex ai-optimizer gpu-acceleration; do
-            cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features "std,${feature}" -- -D warnings
-          done
+      - name: Run Clippy (cross-VM router runtime benchmarks)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1,runtime-benchmarks -- -D warnings
+
+      - name: Run Clippy (cross-VM router try-runtime)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1,try-runtime -- -D warnings

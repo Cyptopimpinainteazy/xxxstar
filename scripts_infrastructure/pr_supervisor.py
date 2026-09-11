@@ -11,8 +11,10 @@ import sys
 SECRET_PATTERNS = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PRIVATE )?PRIVATE KEY-----"),
     re.compile(
-        r"\b(?:X3(?:VM)?_SIGNER_(?:SURI|SEED_HEX)|PRIVATE_KEY|SECRET_KEY|API_KEY|BEARER_TOKEN)"
-        r"\s*[:=]\s*(?:['\"][^'\"]{16,}['\"]|[^\s#'\"`]{16,})",
+        r"(?:[A-Za-z][A-Za-z0-9_]*_)?"
+        r"(?:X3(?:VM)?_SIGNER_(?:SURI|SEED_HEX)|PRIVATE_KEY|SECRET_KEY|API_KEY|BEARER_TOKEN)"
+        r"\s*[:=]\s*(?:['\"](?!\$(?:\{|[A-Za-z_])|(?:env|process\.env|secrets)\.)[^'\"]{16,}['\"]"
+        r"|(?!\$(?:\{|[A-Za-z_])|(?:env|process\.env|secrets)\.)[^\s#'\"`]{16,})",
         re.I,
     ),
     re.compile(r"(?:mnemonic|seed_phrase|seed phrase)\s*[:=]\s*['\"][^'\"]{12,}['\"]", re.I),
@@ -24,6 +26,27 @@ def run(*args: str) -> str:
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or "command failed")
     return proc.stdout
+
+
+def added_hunks_with_context(diff: str) -> str:
+    """Return additions and unchanged hunk context, never removed file content."""
+    hunks: list[str] = []
+    current_hunk: list[str] | None = None
+    for line in diff.splitlines():
+        if line.startswith("@@"):
+            if current_hunk is not None:
+                hunks.append("\n".join(current_hunk))
+            current_hunk = []
+        elif line.startswith("diff --git "):
+            if current_hunk is not None:
+                hunks.append("\n".join(current_hunk))
+            current_hunk = None
+        elif current_hunk is not None:
+            if line.startswith("+") or line.startswith(" "):
+                current_hunk.append(line[1:])
+    if current_hunk is not None:
+        hunks.append("\n".join(current_hunk))
+    return "\n".join(hunks)
 
 
 def main() -> int:
@@ -40,10 +63,8 @@ def main() -> int:
         return 2
 
     print(f"PR Supervisor: {len(names)} changed file(s)")
-    added_lines = "\n".join(
-        line[1:] for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++")
-    )
-    if any(pattern.search(added_lines) for pattern in SECRET_PATTERNS):
+    changed_hunks = added_hunks_with_context(diff)
+    if any(pattern.search(changed_hunks) for pattern in SECRET_PATTERNS):
         print("PR Supervisor: possible credential/private-key material detected in diff", file=sys.stderr)
         return 1
     if len(names) > 1000:

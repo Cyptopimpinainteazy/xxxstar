@@ -47,12 +47,15 @@ jobs:
         run: |
           mkdir -p artifacts/readiness
 
-      - name: Capture dependency lineage snapshot
+      - name: Capture production dependency lineage snapshot
         run: |
           cargo tree -p x3-svm-integration --edges normal > artifacts/readiness/lineage-tree.txt
           cargo tree -p x3-svm-integration --edges normal --duplicates > artifacts/readiness/lineage-duplicates.txt
 
-      - name: Fail on known Solana lineage regressions
+      # solana-program-test is an intentional test-only dependency. This gate
+      # protects the executable production graph, where these versions are
+      # incompatible with the supported SVM dependency lineage.
+      - name: Fail on production Solana lineage regressions
         run: |
           if grep -E "solana-hash v4\\.|solana-pubkey v4\\.|solana-address v2\\.5\\.0" artifacts/readiness/lineage-tree.txt; then
             echo "Detected forbidden Solana lineage entry in SVM dependency graph"

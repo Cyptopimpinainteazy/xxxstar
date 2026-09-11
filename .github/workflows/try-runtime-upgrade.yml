@@ -5,9 +5,8 @@
 # This workflow remains available for an explicit future integration but must
 # not report a fictitious PR gate until a compatible state-replay runner exists.
 #
-# Usage:
-#   Triggers automatically on PRs that modify runtime/
-#   Can also be triggered manually to rehearse against specific snapshot.
+# Usage: manual dispatch only. This intentionally fails until a compatible
+# state-replay runner is implemented; it is not a PR validation gate.
 # ─────────────────────────────────────────────────────────────────────────────
 name: x3 try-runtime upgrade
 
@@ -29,11 +28,6 @@ on:
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
-    inputs:
-      snapshot_url:
-        description: "URL to chain state snapshot (leave empty for auto)"
-        required: false
-        default: ""
 
 env:
   CARGO_TERM_COLOR: always

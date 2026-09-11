@@ -29,10 +29,10 @@ This repository uses multiple GitHub Actions workflows to maintain enterprise-gr
 - **Output**: SARIF security findings
 
 ### 5. Trivy (`trivy.yml`)
-- **Purpose**: Container image vulnerability scanning
-- **Scope**: Docker images built from repository
+- **Purpose**: Repository filesystem vulnerability, secret, and misconfiguration scanning
+- **Scope**: Checked-out source and dependency manifests; no container image is built
 - **Triggers**: Push/PR + Weekly schedule
-- **Output**: Container vulnerability reports
+- **Output**: SARIF security findings
 
 ### 6. Snyk Security (`snyk.yml`)
 - **Purpose**: Comprehensive dependency and infrastructure scanning
@@ -63,12 +63,12 @@ SNYK_TOKEN=your_snyk_token_here
 
 | Component | CodeQL | OSV | Clippy | Semgrep | Trivy | Snyk | Dashboard |
 |-----------|--------|-----|--------|---------|-------|------|-----------|
-| Rust Code | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| JavaScript/TypeScript | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ |
-| Python | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ |
-| Dependencies | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Containers | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| Infrastructure | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| Rust Code | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| JavaScript/TypeScript | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Python | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Dependencies | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Repository secrets | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Infrastructure | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
 
 ## 🔧 Maintenance
 
@@ -96,7 +96,7 @@ SNYK_TOKEN=your_snyk_token_here
 These workflows provide:
 - **Multi-layered scanning**: Different tools catch different vulnerabilities
 - **Continuous monitoring**: Automated scanning on every change
-- **Comprehensive coverage**: Code, dependencies, containers, infrastructure
+- **Comprehensive coverage**: Code, dependencies, repository secrets, infrastructure
 - **SARIF integration**: All results in GitHub Security tab
 - **Scheduled assessments**: Weekly deep dives
 

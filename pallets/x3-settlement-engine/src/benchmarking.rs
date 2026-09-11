@@ -197,21 +197,29 @@ benchmarks! {
     }
 
     submit_btc_header {
-        BtcBestHeight::<T>::put(1u64);
+        BtcHeaders::<T>::insert(H256::zero(), BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::zero(),
+            merkle_root: H256::zero(),
+            timestamp: 0,
+            bits: 0x21000001,
+            nonce: 0,
+            height: 0,
+        });
         let header = BtcBlockHeader {
             version: 1,
-            prev_block_hash: H256::from_low_u64_be(0),
+            prev_block_hash: H256::zero(),
             merkle_root: H256::from_low_u64_be(1),
             timestamp: 1234567890u32,
-            bits: 0x207fffff,
+            bits: 0x21000001,
             nonce: 0,
-            height: 0u64,
+            height: 1u64,
         };
 
         let origin = RawOrigin::Root;
     }: _(origin, header)
     verify {
-        assert!(BtcBestHeight::<T>::get() > 0);
+        assert_eq!(BtcBestHeight::<T>::get(), 1);
     }
 
     submit_proof {
