@@ -711,6 +711,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         lease: &SessionLease,
         prior: &crate::OperationAttempt,
         intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
         bundle: &x3_atomic_swap::CrossDomainProofBundle,
         now_unix: u64,
     ) -> Result<crate::CanonicalOperationResult, CoordinatorError> {
@@ -724,7 +725,8 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             ));
         }
 
-        let proof_hash = crate::verify_bundle_for_attempt(prior, intent, bundle)?;
+        let proof_hash =
+            crate::verify_bundle_for_attempt(prior, intent, runtime_intent_id, bundle)?;
         crate::ProofBundleStore::put_bundle(&self.proofs, bundle)?;
         crate::OperationAttemptLedger::new(self.attempts.clone())
             .record_finalized(prior, proof_hash, now_unix)
@@ -735,6 +737,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         &self,
         session_id: &str,
         intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
     ) -> Result<x3_atomic_swap::CrossDomainProofSet, CoordinatorError> {
         let mut canonical_results = Vec::new();
         for operation in [
@@ -750,7 +753,12 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
                 canonical_results.push(result);
             }
         }
-        crate::assemble_proof_set(intent, &canonical_results, &self.proofs)
+        crate::assemble_proof_set(
+            intent,
+            runtime_intent_id,
+            &canonical_results,
+            &self.proofs,
+        )
     }
 
     #[cfg(feature = "canonical-proofs")]
