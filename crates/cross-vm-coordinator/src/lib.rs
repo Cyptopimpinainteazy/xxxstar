@@ -34,6 +34,7 @@
 //!    committed on-chain in both HTLCs. `S` is only revealed when ALL legs succeed.
 
 pub mod abi;
+pub mod attempt_ledger;
 pub mod config;
 pub mod concurrent;
 pub mod flashloan_adapter;
@@ -51,6 +52,7 @@ pub mod valkey;
 #[cfg(test)]
 mod bridge_integration_tests; // Phase 13b: Bridge integration test suite
 
+pub use attempt_ledger::*;
 pub use config::*;
 pub use lease::*;
 pub use concurrent::*;
