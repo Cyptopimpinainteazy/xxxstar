@@ -51,6 +51,7 @@ pub mod ledger;
 pub mod move_vm_htlc;
 pub mod near_htlc;
 pub mod plutus_htlc;
+pub mod proof_bundle;
 pub mod polkadot_ink_htlc;
 pub mod registry;
 pub mod relayer;
@@ -132,6 +133,7 @@ pub use plutus_htlc::{
     StatefulPlutusAdapter,
 };
 pub use polkadot_ink_htlc::{InkHtlcAdapter, InkHtlcContract, InkNetwork, StatefulInkAdapter};
+pub use proof_bundle::{CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet};
 pub use registry::{RelayerModel, RelayerRegistry, SolverModel, SolverRegistry};
 pub use relayer::{scan_for_alerts, Relayer, RelayerObservation, RelayerState, WatcherAlert};
 pub use rpc_client::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, RpcClient, RpcClientConfig};
