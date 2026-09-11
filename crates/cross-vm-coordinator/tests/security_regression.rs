@@ -293,7 +293,6 @@ fn high_003_settlement_requires_both_claims() {
         Initial,
         LockingHTLCs,
         ClaimingFast,
-        ClaimingSlow,
         Complete,
     }
 
@@ -513,7 +512,7 @@ fn high_007_flash_leg_execution_order_enforced() {
         depends_on: Option<usize>, // Depends on output of leg with this id
     }
 
-    let legs = vec![
+    let legs = [
         FlashLeg {
             id: 0,
             depends_on: None,
@@ -792,32 +791,26 @@ fn medium_005_relayer_rpc_disconnection() {
         Reconnecting,
     }
 
-    let mut state = RelayerState::Connected;
-
     // Simulate RPC disconnection
     let rpc_error = Err::<String, String>("Connection lost".to_string());
 
-    match rpc_error {
+    let mut state = match rpc_error {
         Err(_) => {
-            state = RelayerState::Disconnected;
-            // Immediately attempt reconnection
-            state = RelayerState::Reconnecting;
+            let disconnected = RelayerState::Disconnected;
+            assert!(matches!(disconnected, RelayerState::Disconnected));
+            RelayerState::Reconnecting
         }
-        Ok(_) => {
-            state = RelayerState::Connected;
-        }
-    }
+        Ok(_) => RelayerState::Connected,
+    };
 
     if let RelayerState::Reconnecting = state {
         state = RelayerState::Connected;
     }
 
-    match state {
-        RelayerState::Connected => {
-            assert!(true, "Relayer reconnected after disconnection");
-        }
-        _ => panic!("Relayer did not reconnect"),
-    }
+    assert!(
+        matches!(state, RelayerState::Connected),
+        "Relayer did not reconnect"
+    );
 
     println!("✓ MEDIUM-005: Relayer handles RPC reconnection");
 }
@@ -835,13 +828,13 @@ async fn medium_008_async_executor_concurrency() {
 
     #[derive(Clone, Debug)]
     struct SwapSession {
-        id: String,
+        _id: String,
         phase: String,
         modified_count: u32,
     }
 
     let session = Arc::new(Mutex::new(SwapSession {
-        id: "swap1".to_string(),
+        _id: "swap1".to_string(),
         phase: "Setup".to_string(),
         modified_count: 0,
     }));
@@ -963,7 +956,6 @@ fn medium_018_atomic_settlement_layers() {
     enum SettlementPhase {
         Initial,
         FastChainSettled,
-        SlowChainSettled,
         BothChainsFinal,
         Reverted,
     }
@@ -1029,7 +1021,7 @@ fn medium_002_recipient_address_validation() {
         is_valid: bool,
     }
 
-    let validations = vec![
+    let validations = [
         RecipientValidation {
             address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb".to_string(),
             chain: "ethereum",
@@ -1079,7 +1071,7 @@ fn medium_004_amount_sanity_checks() {
     let min_swap_amount: u128 = 1_000_000; // 1 token (assuming 6 decimals)
     let max_swap_amount: u128 = 1_000_000_000_000_000; // 1 million tokens
 
-    let test_amounts = vec![
+    let test_amounts = [
         (999_999, false, "Below minimum"),
         (1_000_000, true, "At minimum"),
         (500_000_000, true, "Within range"),
@@ -1109,7 +1101,7 @@ fn medium_006_htlc_timelock_limits() {
     let max_timelock_seconds: u64 = 30 * 24 * 60 * 60; // 30 days
     let min_timelock_seconds: u64 = 5 * 60; // 5 minutes minimum
 
-    let test_cases = vec![
+    let test_cases = [
         (299, false, "Below 5 minutes"),
         (300, true, "Exactly 5 minutes"),
         (3600, true, "1 hour"),
@@ -1139,14 +1131,12 @@ fn medium_007_cross_chain_state_consistency() {
 
     #[derive(Clone, Debug, PartialEq)]
     enum OrderState {
-        Initiated,
         Funded,
         Claimed,
-        Refunded,
     }
 
     struct CrossChainOrder {
-        id: String,
+        _id: String,
         evm_state: OrderState,
         svm_state: OrderState,
         x3vm_state: OrderState,
@@ -1154,7 +1144,7 @@ fn medium_007_cross_chain_state_consistency() {
 
     // Valid: All chains in same state
     let valid_order = CrossChainOrder {
-        id: "order-1".to_string(),
+        _id: "order-1".to_string(),
         evm_state: OrderState::Funded,
         svm_state: OrderState::Funded,
         x3vm_state: OrderState::Funded,
@@ -1166,7 +1156,7 @@ fn medium_007_cross_chain_state_consistency() {
 
     // Invalid: Chains diverged
     let diverged_order = CrossChainOrder {
-        id: "order-2".to_string(),
+        _id: "order-2".to_string(),
         evm_state: OrderState::Funded,
         svm_state: OrderState::Claimed,
         x3vm_state: OrderState::Funded,
@@ -1234,7 +1224,7 @@ fn medium_009_gas_estimation_all_paths() {
     let fallback_overhead = 75_000u64;
     let emergency_overhead = 150_000u64;
 
-    let estimates: HashMap<GasPath, u64> = vec![
+    let estimates: HashMap<GasPath, u64> = [
         (GasPath::Normal, base_gas),
         (GasPath::WithRetry, base_gas + retry_overhead),
         (GasPath::WithFallback, base_gas + fallback_overhead),
@@ -1271,7 +1261,7 @@ fn medium_011_multisig_timelock_ordering() {
 
     #[derive(Clone, Debug)]
     struct AuthorizedAction {
-        signers: Vec<String>,
+        _signers: Vec<String>,
         required_sigs: usize,
         timelock_expires: u64,
         collected_sigs: usize,
@@ -1280,7 +1270,7 @@ fn medium_011_multisig_timelock_ordering() {
     let now = 1000u64;
 
     let valid_action = AuthorizedAction {
-        signers: vec![
+        _signers: vec![
             "signer1".to_string(),
             "signer2".to_string(),
             "signer3".to_string(),
@@ -1299,7 +1289,7 @@ fn medium_011_multisig_timelock_ordering() {
     );
 
     let expired_action = AuthorizedAction {
-        signers: vec!["signer1".to_string(), "signer2".to_string()],
+        _signers: vec!["signer1".to_string(), "signer2".to_string()],
         required_sigs: 1,
         timelock_expires: now - 100, // Already expired
         collected_sigs: 2,           // Has sigs but timelock expired
@@ -1326,7 +1316,7 @@ fn medium_014_slippage_bounds_enforced() {
     let max_allowed = expected_price * (100 + max_slippage_percent) / 100;
     let min_allowed = expected_price * (100 - max_slippage_percent) / 100;
 
-    let test_prices = vec![
+    let test_prices = [
         (949_999, false, "Below downside limit"),
         (950_000, true, "At downside limit"),
         (1_000_000, true, "Exact match"),

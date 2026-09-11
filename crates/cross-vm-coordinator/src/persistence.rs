@@ -35,7 +35,7 @@ pub trait SessionPersistence: Send + Sync + 'static {
     ///
     /// This MUST be called after every secret insertion to prevent
     /// cross-session replay attacks surviving a node restart.
-    fn save_used_secrets(&self, secrets: &Vec<[u8; 32]>);
+    fn save_used_secrets(&self, secrets: &[[u8; 32]]);
 
     /// Load the persisted set of used HTLC secrets.
     /// Returns an empty set if nothing was previously persisted.
@@ -43,7 +43,7 @@ pub trait SessionPersistence: Send + Sync + 'static {
 
     /// Persist secret-hash ownership so crash recovery can distinguish a
     /// legitimate retry from cross-session replay.
-    fn save_used_secret_claims(&self, claims: &Vec<([u8; 32], String)>);
+    fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]);
 
     /// Load secret-hash ownership records.
     fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)>;
@@ -102,9 +102,9 @@ impl SessionPersistence for InMemoryPersistence {
         guard.len()
     }
 
-    fn save_used_secrets(&self, secrets: &Vec<[u8; 32]>) {
+    fn save_used_secrets(&self, secrets: &[[u8; 32]]) {
         let mut guard = self.used_secrets.write().unwrap();
-        *guard = secrets.clone();
+        *guard = secrets.to_vec();
     }
 
     fn load_used_secrets(&self) -> Vec<[u8; 32]> {
@@ -112,9 +112,9 @@ impl SessionPersistence for InMemoryPersistence {
         guard.clone()
     }
 
-    fn save_used_secret_claims(&self, claims: &Vec<([u8; 32], String)>) {
+    fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]) {
         let mut guard = self.used_secret_claims.write().unwrap();
-        *guard = claims.clone();
+        *guard = claims.to_vec();
     }
 
     fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
@@ -196,7 +196,7 @@ impl<O: OffchainStorageProvider> SessionPersistence for OffchainPersistence<O> {
         self.storage_provider.keys_with_prefix(Self::PREFIX).len()
     }
 
-    fn save_used_secrets(&self, secrets: &Vec<[u8; 32]>) {
+    fn save_used_secrets(&self, secrets: &[[u8; 32]]) {
         let key = b"x3secrets:used".to_vec();
         let value = serde_json::to_vec(secrets).expect("HashSet serializes");
         self.storage_provider.set(&key, &value);
@@ -210,7 +210,7 @@ impl<O: OffchainStorageProvider> SessionPersistence for OffchainPersistence<O> {
             .unwrap_or_default()
     }
 
-    fn save_used_secret_claims(&self, claims: &Vec<([u8; 32], String)>) {
+    fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]) {
         let key = b"x3secrets:claims".to_vec();
         let value = serde_json::to_vec(claims).expect("secret claims serialize");
         self.storage_provider.set(&key, &value);
@@ -386,6 +386,18 @@ mod tests {
     }
 
     #[test]
+    fn inmemory_secret_claim_ownership_roundtrip() {
+        let persistence = InMemoryPersistence::new();
+        let claims = vec![
+            ([9u8; 32], "swap-a".to_string()),
+            ([8u8; 32], "swap-b".to_string()),
+        ];
+
+        persistence.save_used_secret_claims(&claims);
+        assert_eq!(persistence.load_used_secret_claims(), claims);
+    }
+
+    #[test]
     fn inmemory_used_secrets_empty_default() {
         let persistence = InMemoryPersistence::new();
         let loaded = persistence.load_used_secrets();
@@ -532,6 +544,18 @@ mod tests {
             assert_eq!(loaded.len(), 2);
             assert_eq!(loaded[0], [10u8; 32]);
             assert_eq!(loaded[1], [20u8; 32]);
+        }
+
+        #[test]
+        fn offchain_secret_claim_ownership_roundtrip() {
+            let p = make_persistence();
+            let claims = vec![
+                ([7u8; 32], "oc-a".to_string()),
+                ([6u8; 32], "oc-b".to_string()),
+            ];
+
+            p.save_used_secret_claims(&claims);
+            assert_eq!(p.load_used_secret_claims(), claims);
         }
 
         #[test]

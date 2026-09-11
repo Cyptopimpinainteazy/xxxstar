@@ -195,17 +195,17 @@ impl FlashloanProvider {
 
     /// Whether this provider is available on the given VM.
     pub fn supports_vm(&self, vm: &VmTarget) -> bool {
-        match (self, vm) {
-            (Self::AaveV3, VmTarget::Evm { .. }) => true,
-            (Self::BalancerV2, VmTarget::Evm { .. }) => true,
-            (Self::UniswapV3 { .. }, VmTarget::Evm { .. }) => true,
-            (Self::Euler, VmTarget::Evm { .. }) => true,
-            (Self::Solend, VmTarget::Svm) => true,
-            (Self::MarginFi, VmTarget::Svm) => true,
-            (Self::Kamino, VmTarget::Svm) => true,
-            (Self::X3Native, VmTarget::X3Vm) => true,
-            _ => false,
-        }
+        matches!(
+            (self, vm),
+            (Self::AaveV3, VmTarget::Evm { .. })
+                | (Self::BalancerV2, VmTarget::Evm { .. })
+                | (Self::UniswapV3 { .. }, VmTarget::Evm { .. })
+                | (Self::Euler, VmTarget::Evm { .. })
+                | (Self::Solend, VmTarget::Svm)
+                | (Self::MarginFi, VmTarget::Svm)
+                | (Self::Kamino, VmTarget::Svm)
+                | (Self::X3Native, VmTarget::X3Vm)
+        )
     }
 }
 

@@ -190,12 +190,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         operation: CoordinatorOperation,
         fingerprint: [u8; 32],
     ) -> Result<bool, CoordinatorError> {
-        let session = self
-            .sessions
-            .get(session_id)
-            .ok_or_else(|| CoordinatorError::SessionNotFound {
-                session_id: session_id.to_string(),
-            })?;
+        let session =
+            self.sessions
+                .get(session_id)
+                .ok_or_else(|| CoordinatorError::SessionNotFound {
+                    session_id: session_id.to_string(),
+                })?;
 
         if let Some(existing) = session
             .operation_journal
@@ -740,9 +740,9 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             session.updated_at = now_unix;
         }
 
-        if abort_error.is_some() {
+        if let Some(err) = abort_error {
             self.persist_by_id(session_id);
-            return Err(abort_error.unwrap());
+            return Err(err);
         }
 
         let hash_lock = self.sessions.get(session_id).unwrap().hash_lock;
@@ -864,9 +864,7 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         session_id: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
-        let fingerprint = Self::fingerprint_bytes(
-            format!("slow-claim:{session_id}").as_bytes(),
-        );
+        let fingerprint = Self::fingerprint_bytes(format!("slow-claim:{session_id}").as_bytes());
         if self.operation_already_applied(
             session_id,
             CoordinatorOperation::SlowClaim,
@@ -944,9 +942,7 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         session_id: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
-        let fingerprint = Self::fingerprint_bytes(
-            format!("refund-both:{session_id}").as_bytes(),
-        );
+        let fingerprint = Self::fingerprint_bytes(format!("refund-both:{session_id}").as_bytes());
         if self.operation_already_applied(
             session_id,
             CoordinatorOperation::RefundBoth,
@@ -1196,11 +1192,9 @@ mod state_machine_regression_tests {
 
         // Simulate the exact crash window: the global ownership write made it
         // to disk, but the mutated session/journal did not.
-        persistence.save_used_secret_claims(&vec![(
-            secret_fingerprint,
-            "idem-split-write".to_string(),
-        )]);
-        persistence.save_used_secrets(&vec![secret_fingerprint]);
+        persistence
+            .save_used_secret_claims(&[(secret_fingerprint, "idem-split-write".to_string())]);
+        persistence.save_used_secrets(&[secret_fingerprint]);
 
         let mut recovered =
             SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
@@ -1235,10 +1229,8 @@ mod state_machine_regression_tests {
         claim_session.htlc_slow = Some(idempotency_htlc(4, secret.hash(), now));
         persistence.save(&claim_session);
 
-        let mut coordinator = SwapCoordinator::with_persistence(
-            CoordinatorConfig::default(),
-            persistence.clone(),
-        );
+        let mut coordinator =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence.clone());
         coordinator
             .record_slow_claim("idem-slow", now)
             .expect("first slow claim");
