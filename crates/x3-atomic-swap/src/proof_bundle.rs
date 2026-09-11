@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Value-moving operation proven by this bundle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
 pub enum CrossDomainOperation {
     Lock,
     Claim,
@@ -20,10 +20,12 @@ pub enum CrossDomainOperation {
 }
 
 /// Canonical evidence package for one operation on one execution domain.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
 pub struct CrossDomainProofBundle {
     pub version: u32,
     pub intent_id: IntentId,
+    /// Canonical H256 settlement intent id used by the X3 runtime.
+    pub runtime_intent_id: [u8; 32],
     pub intent_hash: [u8; 32],
     pub chain_id: ChainId,
     pub vm_type: VmType,
@@ -45,6 +47,7 @@ impl CrossDomainProofBundle {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         intent: &AtomicIntent,
+        runtime_intent_id: [u8; 32],
         chain_id: ChainId,
         vm_type: VmType,
         operation: CrossDomainOperation,
@@ -57,6 +60,7 @@ impl CrossDomainProofBundle {
         let mut bundle = Self {
             version: Self::VERSION,
             intent_id: intent.intent_id,
+            runtime_intent_id,
             intent_hash: intent.intent_hash,
             chain_id,
             vm_type,
@@ -158,17 +162,19 @@ impl CrossDomainProofBundle {
 }
 
 /// A set of domain proofs for one atomic intent.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
 pub struct CrossDomainProofSet {
     pub intent_id: IntentId,
+    pub runtime_intent_id: [u8; 32],
     pub intent_hash: [u8; 32],
     pub bundles: Vec<CrossDomainProofBundle>,
 }
 
 impl CrossDomainProofSet {
-    pub fn new(intent: &AtomicIntent) -> Self {
+    pub fn new(intent: &AtomicIntent, runtime_intent_id: [u8; 32]) -> Self {
         Self {
             intent_id: intent.intent_id,
+            runtime_intent_id,
             intent_hash: intent.intent_hash,
             bundles: Vec::new(),
         }
@@ -180,7 +186,9 @@ impl CrossDomainProofSet {
         bundle: CrossDomainProofBundle,
     ) -> Result<(), SwapError> {
         bundle.verify(intent)?;
-        if self.intent_id != intent.intent_id || self.intent_hash != intent.intent_hash {
+        if self.intent_id != intent.intent_id
+            || self.runtime_intent_id != bundle.runtime_intent_id
+            || self.intent_hash != intent.intent_hash {
             return Err(SwapError::ProofVerificationFailed {
                 proof_name: "cross-domain proof set",
                 reason: "proof set belongs to a different intent".into(),
@@ -310,6 +318,7 @@ mod tests {
         let block_hash = alloc::format!("0xblock{block}");
         CrossDomainProofBundle::new(
             intent,
+            [0xabu8; 32],
             chain.into(),
             vm,
             operation,
@@ -418,7 +427,7 @@ mod tests {
     #[test]
     fn proof_set_rejects_duplicate_domain_operation() {
         let intent = intent();
-        let mut set = CrossDomainProofSet::new(&intent);
+        let mut set = CrossDomainProofSet::new(&intent, [0xabu8; 32]);
         let first = bundle(
             &intent,
             "eth-mainnet",
