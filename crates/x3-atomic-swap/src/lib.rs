@@ -57,6 +57,7 @@ pub mod relayer;
 pub mod rpc_client;
 pub mod rpc_quorum;
 pub mod scoreboard;
+pub mod secret_release;
 pub mod slashing;
 pub mod solana_watcher;
 pub mod soroban_htlc;
@@ -163,6 +164,9 @@ pub use rpc_quorum::{
     ConsensusResult, ConsolidatedQuorum, RpcProvider, RpcQuorumOracle, RpcVote, SimpleRpcQuorum,
 };
 pub use scoreboard::{AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SwapScoreboard};
+pub use secret_release::{
+    SecretReleaseEvidence, SecretReleaseFirewall, SecretReleasePermit, SecretReleaseRequirement,
+};
 pub use slashing::{
     SlashCaseStatus, SlashReason, SlashRecord, SlashSummary, SlashableActor, SlashingEngine,
 };

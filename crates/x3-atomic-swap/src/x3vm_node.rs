@@ -15,6 +15,7 @@ use crate::adapter::{
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
 use crate::rpc_client::RpcClient;
+use crate::secret_release::SecretReleasePermit;
 use crate::x3vm_live::X3VmLiveTransport;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -414,10 +415,11 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
         &self,
         chain_id: &ChainId,
         _escrow_address: &[u8],
-        intent_id: IntentId,
-        preimage: [u8; 32],
+        permit: &SecretReleasePermit,
     ) -> Result<ClaimProof, SwapError> {
         self.require_chain(chain_id)?;
+        let intent_id = permit.intent_id();
+        let preimage = permit.preimage();
         let signed = self
             .signer
             .sign_claim_settlement(chain_id, intent_id, preimage)?;

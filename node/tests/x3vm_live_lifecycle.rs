@@ -10,8 +10,8 @@ use x3_atomic_swap::intent::{
     RouteMode,
 };
 use x3_atomic_swap::{
-    LiveX3VmAdapter, NativeX3NodeTransport, ProofKind, RpcClient, VmType, X3NodeTransportConfig,
-    X3VmAdapter,
+    LiveX3VmAdapter, NativeX3NodeTransport, ProofKind, RpcClient, SecretReleaseEvidence,
+    SecretReleaseFirewall, SecretReleaseRequirement, VmType, X3NodeTransportConfig, X3VmAdapter,
 };
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
 use x3_chain_runtime::{AccountId, Signature};
@@ -315,19 +315,44 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     assert!(!submit(&leg1).is_empty());
     wait_finalized(&leg1, Duration::from_secs(180));
 
-    // A finalized extrinsic with a bad secret must never be promoted into a
-    // claim proof. The transport must bind finalized inclusion to
-    // System::ExtrinsicSuccess and fail closed on ExtrinsicFailed.
+    // Wrong secrets are now rejected before signing/broadcast: the live claim
+    // boundary accepts only a permit issued by the secret-release firewall.
+    let lock_finality = adapter
+        .finality_status(&lock.tx_id)
+        .expect("lock finality for release firewall");
+    let requirement = SecretReleaseRequirement {
+        chain_id: chain_id.clone(),
+        vm_type: VmType::X3Vm,
+        min_confirmations: 1,
+    };
+    let evidence = SecretReleaseEvidence {
+        lock: lock.clone(),
+        finality: lock_finality,
+        rpc_quorum_agreed: true,
+        refunded: false,
+    };
     let wrong_preimage = [0x99u8; 32];
-    let err = adapter
-        .claim(local_id, wrong_preimage)
-        .expect_err("wrong-secret claim must fail closed");
     assert!(
-        err.to_string().contains("ExtrinsicFailed"),
-        "unexpected wrong-secret claim error: {err}"
+        SecretReleaseFirewall::authorize(
+            &intent,
+            wrong_preimage,
+            core::slice::from_ref(&requirement),
+            core::slice::from_ref(&evidence),
+        )
+        .is_err(),
+        "wrong secret must be rejected before a live claim can be signed"
     );
 
-    let claim = adapter.claim(local_id, preimage).expect("live native claim");
+    let permit = SecretReleaseFirewall::authorize(
+        &intent,
+        preimage,
+        core::slice::from_ref(&requirement),
+        core::slice::from_ref(&evidence),
+    )
+    .expect("secret-release permit");
+    let claim = adapter
+        .claim_with_permit(&permit)
+        .expect("live native claim with permit");
     assert_eq!(claim.vm_type, VmType::X3Vm);
     assert_eq!(claim.intent_id, local_id);
     assert_eq!(claim.preimage, preimage);

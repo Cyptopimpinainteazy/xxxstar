@@ -9,7 +9,9 @@ use x3_atomic_swap::intent::{
     RouteMode,
 };
 use x3_atomic_swap::{
-    LiveX3VmAdapter, NativeX3NodeTransport, RpcClient, VmType, X3NodeTransportConfig, X3VmAdapter,
+    FinalityProof, LiveX3VmAdapter, LockProof, NativeX3NodeTransport, RpcClient,
+    SecretReleaseEvidence, SecretReleaseFirewall, SecretReleaseRequirement, VmType,
+    X3NodeTransportConfig, X3VmAdapter,
 };
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
 use x3_chain_runtime::{AccountId, Signature};
@@ -190,6 +192,64 @@ fn wait_svm_finalized(signature: &str, timeout: Duration) {
     panic!("Solana signature did not reach finalized commitment: {signature}");
 }
 
+fn svm_finalized_lock_evidence(
+    signature: &str,
+    hashlock: [u8; 32],
+    amount: u128,
+) -> (LockProof, FinalityProof) {
+    let tx = svm_call(
+        "getTransaction",
+        vec![
+            Value::String(signature.to_string()),
+            serde_json::json!({"commitment":"finalized","encoding":"json"}),
+        ],
+    );
+    let slot = tx
+        .get("slot")
+        .and_then(Value::as_u64)
+        .expect("finalized Solana transaction slot");
+    let block = svm_call(
+        "getBlock",
+        vec![
+            Value::Number(slot.into()),
+            serde_json::json!({"commitment":"finalized","transactionDetails":"none","rewards":false}),
+        ],
+    );
+    let block_hash = block
+        .get("blockhash")
+        .and_then(Value::as_str)
+        .expect("finalized Solana blockhash")
+        .to_string();
+    let chain_id = String::from("solana-local");
+    let lock = LockProof {
+        tx_id: signature.to_string(),
+        chain_id: chain_id.clone(),
+        vm_type: VmType::Svm,
+        block_number: slot,
+        block_hash: block_hash.clone(),
+        confirmations: 1,
+        lock_address: std::env::var("X3_TEST_SVM_PROGRAM_ID").expect("program id"),
+        locked_amount: amount,
+        hashlock,
+        receiver: Vec::new(),
+        refund_address: Vec::new(),
+        timeout: slot.saturating_add(1),
+        raw_proof: signature.as_bytes().to_vec(),
+    };
+    let finality = FinalityProof {
+        chain_id,
+        vm_type: VmType::Svm,
+        tx_id: signature.to_string(),
+        block_number: slot,
+        block_hash,
+        confirmations: 1,
+        finalized: true,
+        finality_source: "solana-finalized-commitment".into(),
+        safe_to_reveal_secret: true,
+    };
+    (lock, finality)
+}
+
 fn run_svm_broadcast(action: &[String], payer_keypair: &str) -> Value {
     let bin = std::env::var("X3_SVM_BROADCAST_BIN").expect("X3_SVM_BROADCAST_BIN");
     let program_id = std::env::var("X3_TEST_SVM_PROGRAM_ID").expect("X3_TEST_SVM_PROGRAM_ID");
@@ -353,13 +413,33 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         .expect("SVM lock signature");
     wait_svm_finalized(lock_signature, Duration::from_secs(120));
 
-    // Only after the SVM lock reaches FINALIZED do we reveal the preimage.
+    // Only after the SVM lock reaches FINALIZED may the firewall release
+    // the preimage to the live SVM claim path.
+    let (svm_lock_proof, svm_finality) =
+        svm_finalized_lock_evidence(lock_signature, hashlock, 500_000);
+    let permit = SecretReleaseFirewall::authorize(
+        &intent,
+        preimage,
+        &[SecretReleaseRequirement {
+            chain_id: svm_lock_proof.chain_id.clone(),
+            vm_type: VmType::Svm,
+            min_confirmations: 1,
+        }],
+        &[SecretReleaseEvidence {
+            lock: svm_lock_proof,
+            finality: svm_finality,
+            rpc_quorum_agreed: true,
+            refunded: false,
+        }],
+    )
+    .expect("SVM-finalized secret-release permit");
+
     let claim_args = vec![
         "claim".to_string(),
         "--swap-id".to_string(),
         hex::encode(swap_id),
         "--preimage".to_string(),
-        hex::encode(preimage),
+        hex::encode(permit.preimage()),
     ];
     let svm_claim = run_svm_broadcast(&claim_args, &claimant_keypair);
     assert_eq!(
@@ -373,8 +453,8 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
     wait_svm_finalized(claim_signature, Duration::from_secs(120));
 
     let x3_claim = x3_adapter
-        .claim(local_id, preimage)
-        .expect("X3 claim using SVM-finalized preimage");
+        .claim_with_permit(&permit)
+        .expect("X3 claim using SVM-finalized release permit");
     assert_eq!(x3_claim.preimage, preimage);
     assert!(x3_adapter.finality_status(&x3_claim.tx_id).unwrap().finalized);
 }
