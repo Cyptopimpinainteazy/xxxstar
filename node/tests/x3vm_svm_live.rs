@@ -1,3 +1,4 @@
+use codec::{Decode, Encode};
 use serde_json::Value;
 use sp_core::{crypto::Ss58Codec, Pair as _, H256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
@@ -136,6 +137,59 @@ fn wait_x3_finalized(signed: &str, timeout: Duration) -> String {
     panic!("X3 extrinsic not observed in finalized block");
 }
 
+fn finalized_head() -> String {
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    rpc.call("chain_getFinalizedHead", Vec::new())
+        .expect("X3 finalized head")
+        .result
+        .and_then(|v| v.as_str().map(ToOwned::to_owned))
+        .expect("X3 finalized head hash")
+}
+
+fn intent_state_storage_key(intent_id: H256) -> String {
+    let mut key =
+        frame_support::storage::storage_prefix(b"X3SettlementEngine", b"IntentStates").to_vec();
+    let encoded = intent_id.encode();
+    key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
+    key.extend_from_slice(&encoded);
+    format!("0x{}", hex::encode(key))
+}
+
+fn intent_state_at(
+    intent_id: H256,
+    block_hash: &str,
+) -> pallet_x3_settlement_engine::IntentState {
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let value = rpc
+        .call(
+            "state_getStorage",
+            vec![
+                Value::String(intent_state_storage_key(intent_id)),
+                Value::String(block_hash.to_string()),
+            ],
+        )
+        .expect("state_getStorage")
+        .result
+        .expect("intent state storage result");
+    let raw = value.as_str().expect("intent state storage hex");
+    let bytes = hex::decode(raw.trim_start_matches("0x")).expect("decode intent state hex");
+    pallet_x3_settlement_engine::IntentState::decode(&mut &bytes[..]).expect("decode IntentState")
+}
+
+fn wait_x3_refunded(intent_id: H256, timeout: Duration) -> String {
+    let started = Instant::now();
+    while started.elapsed() < timeout {
+        let head = finalized_head();
+        if matches!(
+            intent_state_at(intent_id, &head),
+            pallet_x3_settlement_engine::IntentState::Refunded
+        ) {
+            return head;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+    panic!("X3 intent did not reach finalized Refunded state");
+}
 fn svm_rpc_url() -> String {
     std::env::var("X3_TEST_SVM_RPC").expect("X3_TEST_SVM_RPC")
 }
@@ -215,6 +269,28 @@ fn run_svm_broadcast(action: &[String], payer_keypair: &str) -> Value {
     serde_json::from_str(stdout.trim()).expect("SVM broadcaster JSON")
 }
 
+fn run_svm_broadcast_expect_failure(action: &[String], payer_keypair: &str) {
+    let bin = std::env::var("X3_SVM_BROADCAST_BIN").expect("X3_SVM_BROADCAST_BIN");
+    let program_id = std::env::var("X3_TEST_SVM_PROGRAM_ID").expect("X3_TEST_SVM_PROGRAM_ID");
+    let mut command = Command::new(bin);
+    command
+        .arg("--rpc")
+        .arg(svm_rpc_url())
+        .arg("--program-id")
+        .arg(program_id)
+        .arg("--payer-keypair")
+        .arg(payer_keypair)
+        .arg("--json");
+    for arg in action {
+        command.arg(arg);
+    }
+    let output = command.output().expect("run failing x3-svm-broadcast");
+    assert!(
+        !output.status.success(),
+        "SVM broadcaster unexpectedly succeeded: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
 fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
     AtomicIntent {
         intent_id: local_id,
@@ -377,4 +453,135 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         .expect("X3 claim using SVM-finalized preimage");
     assert_eq!(x3_claim.preimage, preimage);
     assert!(x3_adapter.finality_status(&x3_claim.tx_id).unwrap().finalized);
+}
+
+#[test]
+#[ignore = "requires solana-test-validator + real SBF program/client and boots a real X3 dev node"]
+fn real_x3vm_svm_refund_is_terminal_on_both_domains() {
+    let payer_keypair =
+        std::env::var("X3_TEST_SVM_PAYER_KEYPAIR").expect("X3_TEST_SVM_PAYER_KEYPAIR");
+    let claimant_keypair =
+        std::env::var("X3_TEST_SVM_CLAIMANT_KEYPAIR").expect("X3_TEST_SVM_CLAIMANT_KEYPAIR");
+    let payer_pubkey = std::env::var("X3_TEST_SVM_PAYER_PUBKEY").expect("payer pubkey");
+    let claimant_pubkey =
+        std::env::var("X3_TEST_SVM_CLAIMANT_PUBKEY").expect("claimant pubkey");
+
+    let _x3 = spawn_x3_node();
+    wait_x3_rpc(Duration::from_secs(180));
+
+    let local_id = 2002u64;
+    let preimage = [0x8du8; 32];
+    let hashlock = sp_core::hashing::sha2_256(&preimage);
+    let chain_id = String::from("x3-local");
+    let alice_uri = dev_uri("Alice");
+    let signer = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &alice_uri)
+        .expect("X3 refund signer");
+
+    let prepared = signer
+        .prepare_create_intent(
+            dev_account("Bob"),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            H256::from(hashlock),
+            Some(12),
+        )
+        .expect("prepare short-timeout X3 intent");
+    assert!(!submit_x3(&prepared.signed_extrinsic).is_empty());
+    let finalized_head_hash =
+        wait_x3_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    let finalized_hash = H256::from_slice(
+        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
+            .expect("decode finalized head"),
+    );
+    let runtime_intent_id = signer
+        .resolve_intent_id(&prepared, finalized_hash)
+        .expect("resolve runtime intent id");
+    signer.bind_intent(local_id, runtime_intent_id).unwrap();
+
+    let x3_transport = NativeX3NodeTransport::new(
+        X3NodeTransportConfig {
+            chain_id: chain_id.clone(),
+            rpc_url: X3_RPC.into(),
+            finality_poll_attempts: 480,
+            finality_poll_delay_ms: 500,
+            expected_block_time_ms: 6_000,
+        },
+        signer,
+    );
+    let x3_adapter = LiveX3VmAdapter::new(
+        chain_id,
+        b"x3-native-svm-refund-escrow".to_vec(),
+        x3_transport,
+    );
+    let intent = atomic_intent(local_id, preimage);
+    let x3_lock = x3_adapter.lock(&intent).expect("real X3 lock");
+    assert!(x3_adapter.finality_status(&x3_lock.tx_id).unwrap().finalized);
+
+    let swap_id = [0x88u8; 32];
+    let timeout_slot = svm_finalized_slot().saturating_add(5);
+    let lock_args = vec![
+        "lock".to_string(),
+        "--swap-id".to_string(),
+        hex::encode(swap_id),
+        "--claimant".to_string(),
+        claimant_pubkey,
+        "--refund-authority".to_string(),
+        payer_pubkey,
+        "--hashlock".to_string(),
+        hex::encode(hashlock),
+        "--amount".to_string(),
+        "500000".to_string(),
+        "--timeout-slots".to_string(),
+        timeout_slot.to_string(),
+    ];
+    let svm_lock = run_svm_broadcast(&lock_args, &payer_keypair);
+    let lock_signature = svm_lock
+        .get("signature")
+        .and_then(Value::as_str)
+        .expect("SVM lock signature");
+    wait_svm_finalized(lock_signature, Duration::from_secs(120));
+
+    let slot_wait_started = Instant::now();
+    while svm_finalized_slot() <= timeout_slot {
+        assert!(
+            slot_wait_started.elapsed() < Duration::from_secs(60),
+            "Solana finalized slot did not advance beyond refund timeout"
+        );
+        thread::sleep(Duration::from_millis(250));
+    }
+
+    let refund_args = vec![
+        "refund".to_string(),
+        "--swap-id".to_string(),
+        hex::encode(swap_id),
+    ];
+    let svm_refund = run_svm_broadcast(&refund_args, &payer_keypair);
+    let refund_signature = svm_refund
+        .get("signature")
+        .and_then(Value::as_str)
+        .expect("SVM refund signature");
+    wait_svm_finalized(refund_signature, Duration::from_secs(120));
+
+    let claim_args = vec![
+        "claim".to_string(),
+        "--swap-id".to_string(),
+        hex::encode(swap_id),
+        "--preimage".to_string(),
+        hex::encode(preimage),
+    ];
+    run_svm_broadcast_expect_failure(&claim_args, &claimant_keypair);
+
+    let refund_head = wait_x3_refunded(runtime_intent_id, Duration::from_secs(120));
+    assert!(matches!(
+        intent_state_at(runtime_intent_id, &refund_head),
+        pallet_x3_settlement_engine::IntentState::Refunded
+    ));
+
+    let x3_claim_err = x3_adapter
+        .claim(local_id, preimage)
+        .expect_err("X3 claim after finalized refund must fail closed");
+    assert!(
+        x3_claim_err.to_string().contains("ExtrinsicFailed"),
+        "unexpected X3 post-refund claim error: {x3_claim_err}"
+    );
 }
