@@ -22,8 +22,18 @@ jobs:
       - name: Install Protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
+      # Frontier is deliberately post-RC1 and currently incompatible with the
+      # pinned stable2512 FRAME API. Do not combine it with the RC1 runtime
+      # through workspace --all-features; lint the supported runtime/node
+      # configurations separately below.
       - name: Run Clippy (workspace all features except incompatible modes)
-        run: cargo clippy --workspace --all-targets --all-features --exclude x3-verification-router --exclude pallet-x3-cross-vm-router -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --exclude x3-verification-router --exclude pallet-x3-cross-vm-router --exclude x3-chain-runtime --exclude x3-chain-node -- -D warnings
+
+      - name: Run Clippy (runtime RC-1)
+        run: cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (node RC-1)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1 -- -D warnings
 
       # `production` and `test-verifier` are intentionally incompatible:
       # production must never compile a test verifier. Check both valid
