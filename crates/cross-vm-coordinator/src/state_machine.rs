@@ -117,6 +117,34 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
     pub fn get_session(&self, session_id: &str) -> Option<&SwapSession> {
         self.sessions.get(session_id)
     }
+    /// Refresh one session plus persisted secret-ownership security state.
+    ///
+    /// Distributed lease holders call this immediately after acquiring a new
+    /// fencing epoch so a long-lived process cannot commit from stale memory.
+    pub fn refresh_from_persistence(
+        &mut self,
+        session_id: &str,
+    ) -> Result<(), CoordinatorError> {
+        let session = self.persistence.load(session_id).ok_or_else(|| {
+            CoordinatorError::SessionNotFound {
+                session_id: session_id.to_string(),
+            }
+        })?;
+        self.sessions.insert(session_id.to_string(), session);
+
+        let persisted_claims = self.persistence.load_used_secret_claims();
+        if !persisted_claims.is_empty() {
+            self.used_secrets = persisted_claims.into_iter().collect();
+        } else {
+            for secret_hash in self.persistence.load_used_secrets() {
+                self.used_secrets
+                    .entry(secret_hash)
+                    .or_insert_with(|| "__legacy_unknown__".to_string());
+            }
+        }
+        Ok(())
+    }
+
 
     /// Get a mutable session by ID.
     pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut SwapSession> {
