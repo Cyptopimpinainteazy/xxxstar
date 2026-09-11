@@ -255,4 +255,64 @@ mod tests {
         assert!(proof.finalized);
         assert!(proof.safe_to_reveal_secret);
     }
+    #[test]
+    fn reopened_transport_restores_exact_finality_from_durable_ledger() {
+        let path = std::env::temp_dir().join(format!(
+            "x3-native-restart-{}-{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        let inclusion = crate::x3vm_node::X3FinalizedInclusionProof {
+            tx_id: "0xrestart".into(),
+            block_hash: "0xblock77".into(),
+            block_number: 77,
+            state_root: "0xstate77".into(),
+            extrinsic_index: 3,
+            signed_extrinsic: "0x010203".into(),
+        };
+        let store = PersistentX3ProofLedger::open(&path).unwrap();
+        store
+            .record_lock(
+                99,
+                &LockProof {
+                    tx_id: inclusion.tx_id.clone(),
+                    chain_id: "x3-local".into(),
+                    vm_type: crate::adapter::VmType::X3Vm,
+                    block_number: inclusion.block_number,
+                    block_hash: inclusion.block_hash.clone(),
+                    confirmations: 1,
+                    lock_address: "x3-native-escrow".into(),
+                    locked_amount: 10,
+                    hashlock: [1u8; 32],
+                    receiver: vec![2u8; 32],
+                    refund_address: vec![3u8; 32],
+                    timeout: 100,
+                    raw_proof: serde_json::to_vec(&inclusion).unwrap(),
+                },
+            )
+            .unwrap();
+        drop(store);
+
+        let transport = NativeX3NodeTransport::new_with_proof_ledger(
+            X3NodeTransportConfig::local("http://127.0.0.1:9944".into()),
+            NeverSigner,
+            path.clone(),
+        )
+        .unwrap();
+        let proof = transport
+            .finality_status(&"x3-local".into(), &inclusion.tx_id)
+            .expect("durable finality should survive process-style reopen");
+        assert_eq!(proof.tx_id, inclusion.tx_id);
+        assert_eq!(proof.block_number, inclusion.block_number);
+        assert_eq!(proof.block_hash, inclusion.block_hash);
+        assert!(proof.finalized);
+        assert!(proof.safe_to_reveal_secret);
+
+        let _ = std::fs::remove_file(path);
+    }
+
 }
