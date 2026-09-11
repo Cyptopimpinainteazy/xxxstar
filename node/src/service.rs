@@ -1,5 +1,5 @@
-use crate::flash_finality::FlashFinalityBridge;
 use crate::atomic_service::{AtomicGatewayCommand, AtomicGatewayService};
+use crate::flash_finality::FlashFinalityBridge;
 use crate::metrics::X3PrometheusMetrics;
 use crate::rpc_middleware::{RateLimitConfig, RateLimiter};
 use contention_predictor::{ContentionPredictor, PredictorConfig};
@@ -9,7 +9,6 @@ use parallel_proposer::{extract_tx_metadata, ParallelProposerFactory};
 use poh_generator::PoHState;
 use poh_generator::{PoHDigest, PoHVerifier, POH_ENGINE_ID};
 use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
-use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResult};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
@@ -18,8 +17,9 @@ use sc_service::{
     TaskManager,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
+use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
-use sp_core::{crypto::KeyTypeId, H256, Pair};
+use sp_core::{crypto::KeyTypeId, Pair, H256};
 use sp_runtime::traits::Header as HeaderT;
 use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
@@ -843,33 +843,31 @@ pub fn new_full_with_atomic_gateway<
 
     // Optional node-side atomic gateway service: signs and submits
     // atomic-kernel extrinsics through this node's transaction pool.
-    let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags.enable_atomic_kernel {
+    let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags
+        .enable_atomic_kernel
+    {
         match atomic_gateway_uri {
-            Some(uri) => match AtomicGatewayService::new(
-                &uri,
-                client.clone(),
-                transaction_pool.clone(),
-            ) {
-                Ok(service) => {
-                    let uri_for_log = uri.clone();
-                    let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
-                    task_manager.spawn_handle().spawn(
-                        "atomic-gateway-service",
-                        Some("x3"),
-                        async move {
-                            service.run(rx).await;
-                        },
-                    );
-                    log::info!(
-                        "🧩 Atomic gateway service spawned (uri: {uri_for_log})"
-                    );
-                    Some(tx)
+            Some(uri) => {
+                match AtomicGatewayService::new(&uri, client.clone(), transaction_pool.clone()) {
+                    Ok(service) => {
+                        let uri_for_log = uri.clone();
+                        let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
+                        task_manager.spawn_handle().spawn(
+                            "atomic-gateway-service",
+                            Some("x3"),
+                            async move {
+                                service.run(rx).await;
+                            },
+                        );
+                        log::info!("🧩 Atomic gateway service spawned (uri: {uri_for_log})");
+                        Some(tx)
+                    }
+                    Err(e) => {
+                        log::error!("🧩 Atomic gateway service failed to start: {e}");
+                        None
+                    }
                 }
-                Err(e) => {
-                    log::error!("🧩 Atomic gateway service failed to start: {e}");
-                    None
-                }
-            },
+            }
             None => {
                 log::warn!(
                     "🧩 enable-atomic-kernel requires --atomic-gateway-uri or X3_ATOMIC_GATEWAY_URI; service not spawned"
@@ -2006,7 +2004,10 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 ///
 /// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
 /// Value:      `cert_hash (32 bytes)`
-async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::atomic_service::AtomicPool>) {
+async fn run_grandpa_finality_anchor(
+    client: Arc<FullClient>,
+    pool: Arc<crate::atomic_service::AtomicPool>,
+) {
     log::info!("⚡ GRANDPA finality anchor task started");
     let mut last_finalized_hash = sp_core::H256::zero();
     loop {
@@ -2021,30 +2022,28 @@ async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::a
             let hash: [u8; 32] = info.finalized_hash.as_ref().try_into().unwrap_or([0u8; 32]);
             last_finalized_hash = info.finalized_hash;
             let cert_hash = sp_core::blake2_256(&hash);
-            log::info!(
-                "⚡ [GRANDPA] finality head reached block {number}"
+            log::info!("⚡ [GRANDPA] finality head reached block {number}");
+            let call = RuntimeCall::X3AtomicKernel(
+                pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
+                    block_num: number,
+                    cert: H256(cert_hash),
+                },
             );
-        let call = RuntimeCall::X3AtomicKernel(
-            pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
-                block_num: number,
-                cert: H256(cert_hash),
-            },
-        );
-        let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
-        if let Err(e) = pool
-            .submit_one(
-                client.info().best_hash,
-                TransactionSource::Local,
-                extrinsic.into(),
-            )
-            .await
-        {
-            log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
-        }
-        log::info!(
-            "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
-            hex::encode(&cert_hash[..8])
-        );
+            let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+            if let Err(e) = pool
+                .submit_one(
+                    client.info().best_hash,
+                    TransactionSource::Local,
+                    extrinsic.into(),
+                )
+                .await
+            {
+                log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
+            }
+            log::info!(
+                "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
+                hex::encode(&cert_hash[..8])
+            );
         }
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
@@ -2461,7 +2460,7 @@ mod tests {
             tick_before,
             &{
                 let s2 = PoHState::default();
-                
+
                 s2.hash()
             },
             &[],

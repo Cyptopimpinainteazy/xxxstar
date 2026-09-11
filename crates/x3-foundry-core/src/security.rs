@@ -465,7 +465,10 @@ mod tests {
     #[test]
     fn test_fee_sanity() {
         let auditor = SecurityAuditor::new("test".into());
-        let config = RevenueConfig { platform_fee_bps: 9999, ..Default::default() };
+        let config = RevenueConfig {
+            platform_fee_bps: 9999,
+            ..Default::default()
+        };
         let (_, findings) = auditor.check_fee_sanity(&config);
         assert!(!findings.is_empty());
     }

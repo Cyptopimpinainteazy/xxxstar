@@ -4,14 +4,17 @@
 //! Merges substrate system RPCs, transaction-payment RPCs, chain RPCs,
 //! and the Frontier-compatible ETH/SVM RPC provided by `rpc_frontier`.
 
-use codec::{Decode, Encode};
 use crate::atomic_service::AtomicGatewayCommand;
 use atomic_swap_orchestrator::{
-    AtomicExecutionRequest, AtomicLegExecution, AtomicPair, KernelBundleLeg,
-    KernelDeclaredAccess, KernelVmType,
+    AtomicExecutionRequest, AtomicLegExecution, AtomicPair, KernelBundleLeg, KernelDeclaredAccess,
+    KernelVmType,
 };
+use codec::{Decode, Encode};
 use flash_finality::FlashFinalityGadget;
+use frame_support::storage::storage_prefix;
 use jsonrpsee::{types::ErrorObjectOwned, RpcModule};
+use pallet_x3_atomic_kernel::BundleRollbackReason;
+use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sc_client_api::{BlockBackend, StorageProvider};
 use sc_transaction_pool_api::TransactionPool;
@@ -21,17 +24,14 @@ use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_core::storage::StorageKey;
 use sp_core::{crypto::AccountId32, Pair, H256};
 use sp_runtime::generic::Era;
-use sp_runtime::traits::{IdentifyAccount, Verify};
-use sp_runtime::transaction_validity::TransactionSource;
 use sp_runtime::traits::BlakeTwo256;
 use sp_runtime::traits::Hash;
-use frame_support::storage::storage_prefix;
+use sp_runtime::traits::{IdentifyAccount, Verify};
+use sp_runtime::transaction_validity::TransactionSource;
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
 use substrate_frame_rpc_system::AccountNonceApi;
+use tokio::sync::mpsc;
 use x3_atomic_trade::{AMMPool, SwapRPCServer};
-use pallet_x3_atomic_kernel::X3AtomicKernelApi;
-use pallet_x3_atomic_kernel::BundleRollbackReason;
 use x3_chain_runtime::{
     opaque::Block, AccountId, Address, AssetId, Balance, Runtime, RuntimeCall, Signature,
     SignedExtra, SignedPayload, UncheckedExtrinsic, VERSION,
@@ -383,7 +383,11 @@ fn sign_runtime_call(
     ))
 }
 
-fn submit_to_pool<P>(pool: &P, best_hash: H256, extrinsic: UncheckedExtrinsic) -> Result<H256, JsonRpseeError>
+fn submit_to_pool<P>(
+    pool: &P,
+    best_hash: H256,
+    extrinsic: UncheckedExtrinsic,
+) -> Result<H256, JsonRpseeError>
 where
     P: TransactionPool<Block = Block, Hash = H256> + Sync,
 {
@@ -425,11 +429,7 @@ fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<KernelBundleLeg>,
         .ok_or_else(|| custom_error("Missing legs array"))?;
     legs.iter()
         .map(|leg| {
-            let vm_type = match leg
-                .get("vm_type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-            {
+            let vm_type = match leg.get("vm_type").and_then(|v| v.as_str()).unwrap_or("") {
                 "evm" => KernelVmType::Evm,
                 "svm" => KernelVmType::Svm,
                 "x3" => KernelVmType::X3,
@@ -451,8 +451,7 @@ fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<KernelBundleLeg>,
                 "token_out",
             )?;
             let amount_in = parse_u128_value(leg.get("amount_in"), "amount_in")?;
-            let min_amount_out =
-                parse_u128_value(leg.get("min_amount_out"), "min_amount_out")?;
+            let min_amount_out = parse_u128_value(leg.get("min_amount_out"), "min_amount_out")?;
             let deadline = parse_u128_value(leg.get("deadline"), "deadline")? as u64;
             let reads = leg
                 .get("access")
@@ -486,10 +485,7 @@ fn parse_overlay_legs(value: &serde_json::Value) -> Result<Vec<KernelBundleLeg>,
                 })
                 .transpose()?
                 .unwrap_or_default();
-            let access = KernelDeclaredAccess {
-                reads,
-                writes,
-            };
+            let access = KernelDeclaredAccess { reads, writes };
             Ok(KernelBundleLeg {
                 vm_type,
                 token_in: H256(token_in),
@@ -510,10 +506,7 @@ fn parse_executions(value: &serde_json::Value) -> Result<Vec<AtomicLegExecution>
     executions
         .iter()
         .map(|execution| {
-            let vm = execution
-                .get("vm")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let vm = execution.get("vm").and_then(|v| v.as_str()).unwrap_or("");
             match vm {
                 "evm" => {
                     let caller = decode_hex_20(
@@ -605,11 +598,7 @@ fn parse_executions(value: &serde_json::Value) -> Result<Vec<AtomicLegExecution>
                     })
                 }
                 "transfer" => {
-                    let vm = match execution
-                        .get("vm")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                    {
+                    let vm = match execution.get("vm").and_then(|v| v.as_str()).unwrap_or("") {
                         "evm" => KernelVmType::Evm,
                         "svm" => KernelVmType::Svm,
                         "x3" => KernelVmType::X3,
@@ -683,69 +672,73 @@ where
         module.register_method(
             "atomic_submitAtomicBundle",
             move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
-            let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
-            let legs = parse_overlay_legs(&req)?;
-            let deadline_blocks = req
-                .get("deadline_blocks")
-                .and_then(|v| v.as_u64())
-                .ok_or_else(|| custom_error("Missing deadline_blocks"))? as u32;
-            let chain_id = req
-                .get("chain_id")
-                .and_then(|v| v.as_u64())
-                .ok_or_else(|| custom_error("Missing chain_id"))? as u32;
-            let nonce = req
-                .get("nonce")
-                .and_then(|v| v.as_u64())
-                .ok_or_else(|| custom_error("Missing nonce"))?;
-            let svm_tx = decode_hex_bytes(
-                req.get("svm_tx")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing svm_tx"))?,
-                "svm_tx",
-            )?;
-            let evm_tx = decode_hex_bytes(
-                req.get("evm_tx")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| custom_error("Missing evm_tx"))?,
-                "evm_tx",
-            )?;
-            let sequence_nonce = req
-                .get("sequence_nonce")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
-            let request = AtomicExecutionRequest {
-                pair: AtomicPair {
-                    swap_id: Vec::new(),
-                    svm_tx,
-                    evm_tx,
-                    sequence_nonce,
-                    pallet_bundle_id: None,
-                },
-                legs,
-                deadline_blocks,
-                chain_id,
-                nonce,
-                executions: parse_executions(&req)?,
-            };
-            let hold_for_rollback = req
-                .get("hold_for_rollback")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let command = if hold_for_rollback {
-                AtomicGatewayCommand::SubmitBundleHoldForRollback(request)
-            } else {
-                AtomicGatewayCommand::SubmitBundle(request)
-            };
-            atomic_gateway_tx
-                .try_send(command)
-                .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
-            Ok(serde_json::json!({ "status": "accepted" }))
+                let req: serde_json::Value =
+                    params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+                let legs = parse_overlay_legs(&req)?;
+                let deadline_blocks = req
+                    .get("deadline_blocks")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| custom_error("Missing deadline_blocks"))?
+                    as u32;
+                let chain_id = req
+                    .get("chain_id")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| custom_error("Missing chain_id"))?
+                    as u32;
+                let nonce = req
+                    .get("nonce")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| custom_error("Missing nonce"))?;
+                let svm_tx = decode_hex_bytes(
+                    req.get("svm_tx")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing svm_tx"))?,
+                    "svm_tx",
+                )?;
+                let evm_tx = decode_hex_bytes(
+                    req.get("evm_tx")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| custom_error("Missing evm_tx"))?,
+                    "evm_tx",
+                )?;
+                let sequence_nonce = req
+                    .get("sequence_nonce")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let request = AtomicExecutionRequest {
+                    pair: AtomicPair {
+                        swap_id: Vec::new(),
+                        svm_tx,
+                        evm_tx,
+                        sequence_nonce,
+                        pallet_bundle_id: None,
+                    },
+                    legs,
+                    deadline_blocks,
+                    chain_id,
+                    nonce,
+                    executions: parse_executions(&req)?,
+                };
+                let hold_for_rollback = req
+                    .get("hold_for_rollback")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let command = if hold_for_rollback {
+                    AtomicGatewayCommand::SubmitBundleHoldForRollback(request)
+                } else {
+                    AtomicGatewayCommand::SubmitBundle(request)
+                };
+                atomic_gateway_tx
+                    .try_send(command)
+                    .map_err(|e| custom_error(format!("atomic gateway queue full: {e}")))?;
+                Ok(serde_json::json!({ "status": "accepted" }))
             },
         )?;
         module.register_method(
             "atomic_rollbackBundle",
             move |params, _, _| -> Result<serde_json::Value, ErrorObjectOwned> {
-                let req: serde_json::Value = params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
+                let req: serde_json::Value =
+                    params.parse::<(serde_json::Value,)>().map(|(v,)| v)?;
                 let bundle_id = H256(decode_hex_32(
                     req.get("bundle_id")
                         .and_then(|v| v.as_str())
@@ -787,7 +780,10 @@ where
                 "legs_hash",
             )?);
             let at = client_for_find.info().best_hash;
-            match client_for_find.runtime_api().find_bundle(at, submitter, legs_hash) {
+            match client_for_find
+                .runtime_api()
+                .find_bundle(at, submitter, legs_hash)
+            {
                 Ok(Some((bundle_id, status))) => Ok(serde_json::json!({
                     "bundle_id": format!("0x{}", hex::encode(bundle_id)),
                     "status": format!("{status:?}"),
@@ -995,199 +991,199 @@ where
     // AGENTS.md rule against reachable fake stubs in production paths. It MUST
     // NOT be reachable on any non-dev chain spec.
     if enable_demo_wallet_rpc {
-    // Initialize Wallet Service RPC
-    let wallet_service = Arc::new(WalletServiceRpc::<Block, FullClient>::new(client.clone()));
+        // Initialize Wallet Service RPC
+        let wallet_service = Arc::new(WalletServiceRpc::<Block, FullClient>::new(client.clone()));
 
-    // Register wallet service RPC methods
-    module.register_method("wallet_createWallet", {
-        let wallet_service = wallet_service.clone();
-        let create_wallet_limiter = limiter.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            create_wallet_limiter
-                .check_request(0, "wallet_createWallet")
-                .map_err(|e| custom_error(e.to_string()))?;
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::CreateWalletRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .create_wallet(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_createWallet failed: {e}")))
-        }
-    })?;
+        // Register wallet service RPC methods
+        module.register_method("wallet_createWallet", {
+            let wallet_service = wallet_service.clone();
+            let create_wallet_limiter = limiter.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                create_wallet_limiter
+                    .check_request(0, "wallet_createWallet")
+                    .map_err(|e| custom_error(e.to_string()))?;
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::CreateWalletRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .create_wallet(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_createWallet failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_importWallet", {
-        let wallet_service = wallet_service.clone();
-        let import_wallet_limiter = limiter.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            import_wallet_limiter
-                .check_request(0, "wallet_importWallet")
-                .map_err(|e| custom_error(e.to_string()))?;
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::ImportWalletRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .import_wallet(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_importWallet failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_importWallet", {
+            let wallet_service = wallet_service.clone();
+            let import_wallet_limiter = limiter.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                import_wallet_limiter
+                    .check_request(0, "wallet_importWallet")
+                    .map_err(|e| custom_error(e.to_string()))?;
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::ImportWalletRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .import_wallet(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_importWallet failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_backupWallet", {
-        let wallet_service = wallet_service.clone();
-        let backup_wallet_limiter = limiter.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            backup_wallet_limiter
-                .check_request(0, "wallet_backupWallet")
-                .map_err(|e| custom_error(e.to_string()))?;
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::BackupWalletRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .backup_wallet(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_backupWallet failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_backupWallet", {
+            let wallet_service = wallet_service.clone();
+            let backup_wallet_limiter = limiter.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                backup_wallet_limiter
+                    .check_request(0, "wallet_backupWallet")
+                    .map_err(|e| custom_error(e.to_string()))?;
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::BackupWalletRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .backup_wallet(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_backupWallet failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_getBalance", {
-        let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::GetBalanceRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .get_balance(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_getBalance failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_getBalance", {
+            let wallet_service = wallet_service.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::GetBalanceRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .get_balance(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_getBalance failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_signTransaction", {
-        let wallet_service = wallet_service.clone();
-        let sign_tx_limiter = limiter.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            sign_tx_limiter
-                .check_request(0, "wallet_signTransaction")
-                .map_err(|e| custom_error(e.to_string()))?;
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::SignTransactionRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .sign_transaction(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_signTransaction failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_signTransaction", {
+            let wallet_service = wallet_service.clone();
+            let sign_tx_limiter = limiter.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                sign_tx_limiter
+                    .check_request(0, "wallet_signTransaction")
+                    .map_err(|e| custom_error(e.to_string()))?;
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::SignTransactionRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .sign_transaction(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_signTransaction failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_submitTransaction", {
-        let wallet_service = wallet_service.clone();
-        let submit_tx_limiter = limiter.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            submit_tx_limiter
-                .check_request(0, "wallet_submitTransaction")
-                .map_err(|e| custom_error(e.to_string()))?;
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::SubmitTransactionRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .submit_transaction(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_submitTransaction failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_submitTransaction", {
+            let wallet_service = wallet_service.clone();
+            let submit_tx_limiter = limiter.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                submit_tx_limiter
+                    .check_request(0, "wallet_submitTransaction")
+                    .map_err(|e| custom_error(e.to_string()))?;
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::SubmitTransactionRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .submit_transaction(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_submitTransaction failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_getTransactions", {
-        let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::GetTransactionsRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .get_transactions(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_getTransactions failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_getTransactions", {
+            let wallet_service = wallet_service.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::GetTransactionsRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .get_transactions(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_getTransactions failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_getWalletStatus", {
-        let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::GetWalletStatusRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .get_wallet_status(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_getWalletStatus failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_getWalletStatus", {
+            let wallet_service = wallet_service.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::GetWalletStatusRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .get_wallet_status(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_getWalletStatus failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_listWallets", {
-        let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::ListWalletsRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .list_wallets(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_listWallets failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_listWallets", {
+            let wallet_service = wallet_service.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::ListWalletsRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .list_wallets(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_listWallets failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_setNetwork", {
-        let wallet_service = wallet_service.clone();
-        move |params: jsonrpsee::types::Params<'_>,
-              _,
-              _|
-              -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            let params: serde_json::Value = params.parse()?;
-            let request: x3_rpc::SetNetworkRequest = serde_json::from_value(params)
-                .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
-            wallet_service
-                .set_network(request)
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_setNetwork failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_setNetwork", {
+            let wallet_service = wallet_service.clone();
+            move |params: jsonrpsee::types::Params<'_>,
+                  _,
+                  _|
+                  -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                let params: serde_json::Value = params.parse()?;
+                let request: x3_rpc::SetNetworkRequest = serde_json::from_value(params)
+                    .map_err(|e| custom_error(format!("Invalid request: {e}")))?;
+                wallet_service
+                    .set_network(request)
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_setNetwork failed: {e}")))
+            }
+        })?;
 
-    module.register_method("wallet_getNetworks", {
-        let wallet_service = wallet_service.clone();
-        move |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
-            wallet_service
-                .get_networks()
-                .map(|r| serde_json::to_value(r).unwrap_or_default())
-                .map_err(|e| custom_error(format!("wallet_getNetworks failed: {e}")))
-        }
-    })?;
+        module.register_method("wallet_getNetworks", {
+            let wallet_service = wallet_service.clone();
+            move |_, _, _| -> Result<serde_json::Value, jsonrpsee::types::ErrorObjectOwned> {
+                wallet_service
+                    .get_networks()
+                    .map(|r| serde_json::to_value(r).unwrap_or_default())
+                    .map_err(|e| custom_error(format!("wallet_getNetworks failed: {e}")))
+            }
+        })?;
     } // enable_demo_wallet_rpc
 
     // Register signing RPC methods
@@ -1665,8 +1661,9 @@ where
                 .check_request(0, "x3_proposeWrappedCouncil")
                 .map_err(|e| custom_error(e.to_string()))?;
 
-            let (req,): (serde_json::Value,) =
-                params.parse().map_err(|e| custom_error(format!("Invalid params: {e}")))?;
+            let (req,): (serde_json::Value,) = params
+                .parse()
+                .map_err(|e| custom_error(format!("Invalid params: {e}")))?;
             let action = req
                 .get("action")
                 .and_then(|v| v.as_str())
@@ -1684,8 +1681,7 @@ where
             let token_address = decode_hex_20(token_address_hex, "token_address")?;
             let wrapped_id = wrapped_asset_id(chain_id, &token_address);
 
-            let proposer_pair =
-                load_sr25519_pair_from_env("X3_SUBMITTER_SEED")?;
+            let proposer_pair = load_sr25519_pair_from_env("X3_SUBMITTER_SEED")?;
             let proposer_account = account_from_public(proposer_pair.public());
             let best_hash = propose_client.info().best_hash;
             let baseline_number = propose_client.info().best_number;
@@ -1723,26 +1719,25 @@ where
                         .and_then(|v| v.as_str())
                         .and_then(|v| v.parse::<u64>().ok())
                         .ok_or_else(|| custom_error("Missing numeric nonce"))?;
-                    RuntimeCall::X3Wrapped(
-                        pallet_x3_wrapped::Call::<Runtime>::mint_wrapped {
-                            chain_id,
-                            asset_id: wrapped_id,
-                            recipient: AccountId::new(recipient),
-                            amount,
-                            nonce,
-                        },
-                    )
+                    RuntimeCall::X3Wrapped(pallet_x3_wrapped::Call::<Runtime>::mint_wrapped {
+                        chain_id,
+                        asset_id: wrapped_id,
+                        recipient: AccountId::new(recipient),
+                        amount,
+                        nonce,
+                    })
                 }
                 _ => return Err(custom_error("action must be 'register' or 'mint'")),
             };
             let length_bound = proposal.encoded_size() as u32;
-            let council_call = RuntimeCall::Council(
-                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::propose {
-                    threshold: 2,
-                    proposal: Box::new(proposal.clone()),
-                    length_bound,
-                },
-            );
+            let council_call = RuntimeCall::Council(pallet_collective::Call::<
+                Runtime,
+                pallet_collective::Instance1,
+            >::propose {
+                threshold: 2,
+                proposal: Box::new(proposal.clone()),
+                length_bound,
+            });
             let extrinsic = sign_runtime_call(
                 &proposer_pair,
                 &proposer_account,
@@ -1750,12 +1745,19 @@ where
                 proposer_nonce,
                 council_call,
             )?;
-            let before_count = read_u32_storage(&propose_client, best_hash, b"Council", b"ProposalCount")?;
+            let before_count =
+                read_u32_storage(&propose_client, best_hash, b"Council", b"ProposalCount")?;
             submit_to_pool(propose_pool.as_ref(), best_hash, extrinsic)?;
-            wait_for_best_block_advance(&propose_client, baseline_number, 120, "council proposal inclusion")?;
+            wait_for_best_block_advance(
+                &propose_client,
+                baseline_number,
+                120,
+                "council proposal inclusion",
+            )?;
 
             let after_hash = propose_client.info().best_hash;
-            let after_count = read_u32_storage(&propose_client, after_hash, b"Council", b"ProposalCount")?;
+            let after_count =
+                read_u32_storage(&propose_client, after_hash, b"Council", b"ProposalCount")?;
             if after_count <= before_count {
                 return Err(custom_error(
                     "Council proposal was not stored; threshold/membership check failed",
@@ -1792,18 +1794,19 @@ where
                 .check_request(0, "x3_executeWrappedCouncil")
                 .map_err(|e| custom_error(e.to_string()))?;
 
-            let (req,): (serde_json::Value,) =
-                params.parse().map_err(|e| custom_error(format!("Invalid params: {e}")))?;
+            let (req,): (serde_json::Value,) = params
+                .parse()
+                .map_err(|e| custom_error(format!("Invalid params: {e}")))?;
             let proposal_hash_hex = req
                 .get("proposal_hash")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| custom_error("Missing proposal_hash"))?;
             let proposal_hash_bytes = decode_hex_32(proposal_hash_hex, "proposal_hash")?;
             let proposal_hash = H256::from(proposal_hash_bytes);
-            let proposal_index = req
-                .get("proposal_index")
-                .and_then(|v| v.as_u64())
-                .ok_or_else(|| custom_error("Missing proposal_index"))? as u32;
+            let proposal_index =
+                req.get("proposal_index")
+                    .and_then(|v| v.as_u64())
+                    .ok_or_else(|| custom_error("Missing proposal_index"))? as u32;
 
             let alice_pair = load_sr25519_pair_from_env("X3_SUBMITTER_SEED")?;
             let bob_pair = load_sr25519_pair_from_env("X3_APPROVER_SEED")?;
@@ -1825,13 +1828,14 @@ where
                 .runtime_api()
                 .account_nonce(best_hash, alice_account.clone())
                 .map_err(|e| custom_error(format!("Alice nonce lookup failed: {e}")))?;
-            let alice_vote = RuntimeCall::Council(
-                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::vote {
-                    proposal: proposal_hash,
-                    index: proposal_index,
-                    approve: true,
-                },
-            );
+            let alice_vote = RuntimeCall::Council(pallet_collective::Call::<
+                Runtime,
+                pallet_collective::Instance1,
+            >::vote {
+                proposal: proposal_hash,
+                index: proposal_index,
+                approve: true,
+            });
             let extrinsic = sign_runtime_call(
                 &alice_pair,
                 &alice_account,
@@ -1849,20 +1853,16 @@ where
                 .runtime_api()
                 .account_nonce(best_hash, bob_account.clone())
                 .map_err(|e| custom_error(format!("Bob nonce lookup failed: {e}")))?;
-            let bob_vote = RuntimeCall::Council(
-                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::vote {
-                    proposal: proposal_hash,
-                    index: proposal_index,
-                    approve: true,
-                },
-            );
-            let extrinsic = sign_runtime_call(
-                &bob_pair,
-                &bob_account,
-                genesis_hash,
-                bob_nonce,
-                bob_vote,
-            )?;
+            let bob_vote = RuntimeCall::Council(pallet_collective::Call::<
+                Runtime,
+                pallet_collective::Instance1,
+            >::vote {
+                proposal: proposal_hash,
+                index: proposal_index,
+                approve: true,
+            });
+            let extrinsic =
+                sign_runtime_call(&bob_pair, &bob_account, genesis_hash, bob_nonce, bob_vote)?;
             submit_to_pool(execute_pool.as_ref(), best_hash, extrinsic)
                 .map_err(|e| custom_error(format!("Bob vote submit: {e}")))?;
             wait_for_best_block_advance(&execute_client, baseline, 120, "Bob council vote")?;
@@ -1873,17 +1873,15 @@ where
                 .runtime_api()
                 .account_nonce(best_hash, bob_account.clone())
                 .map_err(|e| custom_error(format!("Bob close nonce lookup failed: {e}")))?;
-            let close = RuntimeCall::Council(
-                pallet_collective::Call::<Runtime, pallet_collective::Instance1>::close {
-                    proposal_hash,
-                    index: proposal_index,
-                    proposal_weight_bound: sp_runtime::Weight::from_parts(
-                        1_000_000_000,
-                        1_000_000,
-                    ),
-                    length_bound: 1_000_000,
-                },
-            );
+            let close = RuntimeCall::Council(pallet_collective::Call::<
+                Runtime,
+                pallet_collective::Instance1,
+            >::close {
+                proposal_hash,
+                index: proposal_index,
+                proposal_weight_bound: sp_runtime::Weight::from_parts(1_000_000_000, 1_000_000),
+                length_bound: 1_000_000,
+            });
             let extrinsic = sign_runtime_call(
                 &bob_pair,
                 &bob_account,

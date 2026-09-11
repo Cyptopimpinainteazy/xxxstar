@@ -92,7 +92,7 @@ fn test_literal_type_inference() {
             Ok(typed) => {
                 // Verify we inferred types for expressions
                 assert!(
-            !typed.expr_types.is_empty(),
+                    !typed.expr_types.is_empty(),
                     "Should have inferred some expression types"
                 );
                 println!(

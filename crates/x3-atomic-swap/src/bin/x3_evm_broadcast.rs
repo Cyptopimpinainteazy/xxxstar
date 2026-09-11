@@ -128,13 +128,8 @@ fn main() -> ExitCode {
 
                 let proof = exec
                     .execute_lock(
-                        "evm-live",
-                        recipient,
-                        hashlock,
-                        timelock,
-                        [0u8; 20], // native ETH
-                        amount,
-                        timeout_ms,
+                        "evm-live", recipient, hashlock, timelock, [0u8; 20], // native ETH
+                        amount, timeout_ms,
                     )
                     .map_err(|e| format!("lock failed: {e}"))?;
                 // AtlasHTLC derives `id` inside the contract

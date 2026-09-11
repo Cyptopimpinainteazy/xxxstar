@@ -20,8 +20,7 @@ use sp_std::vec::Vec;
 const SEED: u32 = 0;
 
 fn fund_account<T: Config>(account: &T::AccountId) {
-    let _ =
-        <T as pallet::Config>::Currency::make_free_balance_be(account, 10_000_000u32.into());
+    let _ = <T as pallet::Config>::Currency::make_free_balance_be(account, 10_000_000u32.into());
 }
 
 fn setup_intent<T: Config>() -> (T::AccountId, T::AccountId, H256, AssetSpec, AssetSpec) {

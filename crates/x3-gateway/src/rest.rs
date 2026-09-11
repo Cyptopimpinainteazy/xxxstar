@@ -3,7 +3,7 @@
 use crate::cache::RedisCache;
 use crate::db::{
     ChainStats, Database, FundingSwarmGrant, FundingSwarmScoreboard, FundingSwarmTimelineItem,
-    NewFundingSwarmGrant, NewFundingSwarmPublication, NewApprovalCase, NewEvidenceBundle,
+    NewApprovalCase, NewEvidenceBundle, NewFundingSwarmGrant, NewFundingSwarmPublication,
     NewOrchestraIntent, NewVoteReceipt, NewVoteWindow, StoredBenchmarkReport,
 };
 use crate::error::GatewayError;
@@ -24,10 +24,10 @@ use std::sync::{
 };
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-use x3_orchestra_control_plane::{ControlPlaneClient, DispatchEvidenceRequest, VoteTally};
-use x3_rpc::benchmark::{BenchmarkProfile, BenchmarkReport};
-use x3_relayer::types::{EvmProof, SvmProof, ValidatorSignature};
 use x3_bridge::bitcoin_htlc::{HTLCContract, HTLCState, Preimage};
+use x3_orchestra_control_plane::{ControlPlaneClient, DispatchEvidenceRequest, VoteTally};
+use x3_relayer::types::{EvmProof, SvmProof, ValidatorSignature};
+use x3_rpc::benchmark::{BenchmarkProfile, BenchmarkReport};
 
 /// Application state.
 #[derive(Clone)]
@@ -140,7 +140,10 @@ fn api_routes() -> Router<AppState> {
             "/public/funding-swarm/scoreboard",
             get(get_funding_swarm_scoreboard),
         )
-        .route("/public/funding-swarm/grants", get(get_funding_swarm_grants))
+        .route(
+            "/public/funding-swarm/grants",
+            get(get_funding_swarm_grants),
+        )
         .route(
             "/public/funding-swarm/timeline",
             get(get_funding_swarm_timeline),
@@ -152,7 +155,10 @@ fn api_routes() -> Router<AppState> {
         // Cross-chain bridge HTLC inspection (consumes x3-bridge types —
         // promotes `x3-bridge` from a workspace island to a real compiled
         // consumer of the gateway REST surface).
-        .route("/bridge/htlc/preimage-verify", post(post_htlc_preimage_verify))
+        .route(
+            "/bridge/htlc/preimage-verify",
+            post(post_htlc_preimage_verify),
+        )
         // ── Funding Swarm admin (requires X-Admin-Token header — human-gate placeholder) ──
         .route(
             "/admin/funding-swarm/grants",
@@ -197,7 +203,10 @@ fn api_routes() -> Router<AppState> {
             "/orchestra/approval-cases",
             post(create_approval_case).get(list_approval_cases),
         )
-        .route("/orchestra/approval-cases/{case_id}", get(get_approval_case))
+        .route(
+            "/orchestra/approval-cases/{case_id}",
+            get(get_approval_case),
+        )
         .route(
             "/orchestra/vote-windows",
             post(create_vote_window).get(list_vote_windows),
@@ -239,7 +248,10 @@ fn api_routes() -> Router<AppState> {
         .route("/comits/{hash}", get(get_comit))
         // Accounts
         .route("/accounts/{address}", get(get_account))
-        .route("/accounts/{address}/extrinsics", get(get_account_extrinsics))
+        .route(
+            "/accounts/{address}/extrinsics",
+            get(get_account_extrinsics),
+        )
         .route("/accounts/{address}/comits", get(get_account_comits))
 }
 
@@ -253,7 +265,9 @@ struct LivenessResponse {
 }
 
 async fn liveness() -> Json<LivenessResponse> {
-    Json(LivenessResponse { status: "alive".to_string() })
+    Json(LivenessResponse {
+        status: "alive".to_string(),
+    })
 }
 
 #[derive(Serialize)]
@@ -310,7 +324,11 @@ async fn check_health(state: &AppState) -> (StatusCode, Json<ReadinessResponse>)
     (
         status_code,
         Json(ReadinessResponse {
-            status: if ready { "ready".to_string() } else { "not_ready".to_string() },
+            status: if ready {
+                "ready".to_string()
+            } else {
+                "not_ready".to_string()
+            },
             db: db_ready,
             redis: redis_configured,
         }),
@@ -916,10 +934,7 @@ async fn admin_list_funding_swarm_grants(
     authorize_funding_swarm_admin(&headers)?;
     let grants = state
         .db
-        .admin_list_funding_swarm_grants(
-            bounded_limit(pagination.limit),
-            pagination.offset.max(0),
-        )
+        .admin_list_funding_swarm_grants(bounded_limit(pagination.limit), pagination.offset.max(0))
         .await?;
     Ok(Json(grants))
 }
@@ -946,7 +961,9 @@ async fn admin_research_funding_swarm_grant(
         .await?
     {
         Some(g) => Ok(Json(g)),
-        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+        None => Err(GatewayError::NotFound(format!(
+            "grant {grant_id} not found"
+        ))),
     }
 }
 
@@ -962,7 +979,9 @@ async fn admin_draft_funding_swarm_grant(
         .await?
     {
         Some(g) => Ok(Json(g)),
-        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+        None => Err(GatewayError::NotFound(format!(
+            "grant {grant_id} not found"
+        ))),
     }
 }
 
@@ -981,7 +1000,9 @@ async fn admin_approve_funding_swarm_grant(
         .await?
     {
         Some(g) => Ok(Json(g)),
-        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+        None => Err(GatewayError::NotFound(format!(
+            "grant {grant_id} not found"
+        ))),
     }
 }
 
@@ -997,7 +1018,9 @@ async fn admin_submit_award_paid_funding_swarm_grant(
         .await?
     {
         Some(g) => Ok(Json(g)),
-        None => Err(GatewayError::NotFound(format!("grant {grant_id} not found"))),
+        None => Err(GatewayError::NotFound(format!(
+            "grant {grant_id} not found"
+        ))),
     }
 }
 
@@ -1668,8 +1691,8 @@ mod tests {
     use super::*;
     use crate::db::{NewEvidenceBundle, NewOrchestraIntent, NewVoteWindow};
     use crate::graphql::create_schema;
-    use axum::{body::Body, http::Request, Router};
     use axum::body::to_bytes;
+    use axum::{body::Body, http::Request, Router};
     use serde_json::{json, Value};
     use std::sync::Arc;
     use tower::ServiceExt;

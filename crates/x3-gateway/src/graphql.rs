@@ -30,10 +30,7 @@ pub struct ServiceInfo {
 /// The gateway Postgres handle and (optionally) the orchestra control-plane
 /// client are attached as GraphQL context data so resolvers reach the same
 /// state the REST handlers use.
-pub fn create_schema(
-    db: Database,
-    _control_plane: Option<Arc<ControlPlaneClient>>,
-) -> AppSchema {
+pub fn create_schema(db: Database, _control_plane: Option<Arc<ControlPlaneClient>>) -> AppSchema {
     Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
         .data(db)
         .finish()
@@ -89,8 +86,8 @@ mod tests {
         // return "not reachable" when the pool is down, they never compile
         // differently. Constructing here exercises a real `create_schema`
         // path against a lazy non-connecting pool.
-        use crate::error::Result;
         use crate::config::DatabaseConfig;
+        use crate::error::Result;
         fn build_lazy_db() -> Result<Database> {
             Database::connect_lazy(&DatabaseConfig::new(
                 "postgres://user:pass@127.0.0.1:1/x3_gateway_test".to_string(),

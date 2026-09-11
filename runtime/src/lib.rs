@@ -119,6 +119,8 @@ use scale_info::TypeInfo;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
+#[cfg(not(feature = "mainnet-rc1"))]
+use sp_runtime::DispatchResult;
 #[allow(deprecated)] // create_runtime_str! accepted: required by the runtime_version grammar.
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
@@ -128,8 +130,6 @@ use sp_runtime::{
     transaction_validity::{InvalidTransaction, TransactionValidityError},
     DispatchError, MultiAddress, MultiSignature, Perbill,
 };
-#[cfg(not(feature = "mainnet-rc1"))]
-use sp_runtime::DispatchResult;
 use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;

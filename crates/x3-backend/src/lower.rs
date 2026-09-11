@@ -828,14 +828,12 @@ impl BytecodeCompiler {
                 Literal::Bool(b) => self.emitter.const_pool.add_bool(*b),
                 Literal::Unit => self.emitter.const_pool.add_integer(0),
             },
-            _ => {
-                Err(BackendError::new(
-                    BackendErrorKind::NotImplemented(
-                        "non-constant global initializer: only literals are supported".to_string(),
-                    ),
-                    expr.span,
-                ))
-            }
+            _ => Err(BackendError::new(
+                BackendErrorKind::NotImplemented(
+                    "non-constant global initializer: only literals are supported".to_string(),
+                ),
+                expr.span,
+            )),
         }
     }
 

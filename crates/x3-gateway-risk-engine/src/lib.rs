@@ -257,7 +257,10 @@ mod tests {
 
         let assessment = AiRiskClassifier::classify_risk(&tx);
         assert_eq!(assessment.level, RiskLevel::Low);
-        assert_eq!(assessment.factors, vec![RiskFactor::VolatilityNotConfigured]);
+        assert_eq!(
+            assessment.factors,
+            vec![RiskFactor::VolatilityNotConfigured]
+        );
     }
 
     #[test]

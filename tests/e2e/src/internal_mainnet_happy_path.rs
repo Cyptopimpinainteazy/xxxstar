@@ -653,9 +653,7 @@ impl TestEnvironment {
         }
 
         let amount_out = 900u128.max(_min_out);
-        state
-            .balances
-            .insert(native_key, native_bal - _amount_in);
+        state.balances.insert(native_key, native_bal - _amount_in);
         let evm_bal = *state.balances.get(&evm_key).unwrap_or(&0);
         state
             .balances

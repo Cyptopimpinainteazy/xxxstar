@@ -4,11 +4,13 @@ use super::*;
 use crate::Pallet as DEXPallet;
 use frame_benchmarking::{v2::benchmarks, whitelisted_caller};
 use frame_system::RawOrigin;
-use x3_dex::amm_pools::TokenId;
+use x3_dex::amm_pools::{AMMPool, TokenId};
 
 #[benchmarks]
 mod benchmarks {
     use super::*;
+    use frame_benchmarking::impl_test_function;
+    use frame_support::assert_ok;
 
     #[benchmark]
     fn create_pool() {
@@ -44,7 +46,9 @@ mod benchmarks {
             asset_id: 1,
         };
 
-        // Create pool first
+        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
+            .expect("benchmark token pair is valid")
+            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
@@ -53,7 +57,7 @@ mod benchmarks {
         ));
 
         #[extrinsic_call]
-        add_liquidity(RawOrigin::Signed(caller), 0, 1000, 1000, 900, 900);
+        add_liquidity(RawOrigin::Signed(caller), pool_id, 1000, 1000, 900, 900);
     }
 
     #[benchmark]
@@ -68,7 +72,9 @@ mod benchmarks {
             asset_id: 1,
         };
 
-        // Create pool and add liquidity first
+        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
+            .expect("benchmark token pair is valid")
+            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
@@ -77,7 +83,7 @@ mod benchmarks {
         ));
         assert_ok!(DEXPallet::<T>::add_liquidity(
             RawOrigin::Signed(caller.clone()).into(),
-            0,
+            pool_id,
             100000,
             100000,
             90000,
@@ -103,7 +109,9 @@ mod benchmarks {
             asset_id: 1,
         };
 
-        // Create pool and add liquidity first
+        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
+            .expect("benchmark token pair is valid")
+            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
@@ -112,7 +120,7 @@ mod benchmarks {
         ));
         assert_ok!(DEXPallet::<T>::add_liquidity(
             RawOrigin::Signed(caller.clone()).into(),
-            0,
+            pool_id,
             100000,
             100000,
             90000,
@@ -120,7 +128,7 @@ mod benchmarks {
         ));
 
         #[extrinsic_call]
-        swap(RawOrigin::Signed(caller), 0, token_a, 1000, 900);
+        swap(RawOrigin::Signed(caller), pool_id, token_a, 1000, 900);
     }
 
     impl_benchmark_test_suite!(DEXPallet, crate::mock::new_test_ext(), crate::mock::Test);

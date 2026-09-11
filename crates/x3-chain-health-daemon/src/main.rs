@@ -98,21 +98,29 @@ impl ChainHealthDaemon {
 
         for chain in &self.chains {
             let result = self.check_chain(chain).await;
-            self.last_health.insert(chain.chain_id, ChainHealth {
-                chain_id: chain.chain_id,
-                vm_type: "generic".into(),
-                latest_block: 0,
-                finalized_block: 0,
-                block_delay_ms: 0,
-                finality_delay_ms: 0,
-                rpc_quorum_status: if result.rpc_agreement { "agreed" } else { "disagreed" }.into(),
-                gas_price: 0,
-                sequencer_status: None,
-                halted: result.halted,
-                degraded: result.degraded,
-                safe_for_new_intents: result.healthy && !result.halted,
-                observed_at: Utc::now().to_rfc3339(),
-            });
+            self.last_health.insert(
+                chain.chain_id,
+                ChainHealth {
+                    chain_id: chain.chain_id,
+                    vm_type: "generic".into(),
+                    latest_block: 0,
+                    finalized_block: 0,
+                    block_delay_ms: 0,
+                    finality_delay_ms: 0,
+                    rpc_quorum_status: if result.rpc_agreement {
+                        "agreed"
+                    } else {
+                        "disagreed"
+                    }
+                    .into(),
+                    gas_price: 0,
+                    sequencer_status: None,
+                    halted: result.halted,
+                    degraded: result.degraded,
+                    safe_for_new_intents: result.healthy && !result.halted,
+                    observed_at: Utc::now().to_rfc3339(),
+                },
+            );
 
             // Write health proof to ledger
             if !result.healthy {
@@ -154,7 +162,11 @@ impl ChainHealthDaemon {
                     }
                     if obs.error.is_some() {
                         degraded = true;
-                        warnings.push(format!("RPC {}: degraded ({})", rpc_url, obs.error.as_ref().unwrap()));
+                        warnings.push(format!(
+                            "RPC {}: degraded ({})",
+                            rpc_url,
+                            obs.error.as_ref().unwrap()
+                        ));
                     }
                     observations.push(obs);
                 }
@@ -168,11 +180,17 @@ impl ChainHealthDaemon {
         // RPC quorum check: compare block hashes across providers
         if observations.len() >= 2 {
             let first_hash = &observations[0].block_hash;
-            let agreeing = observations.iter().filter(|o| &o.block_hash == first_hash).count();
+            let agreeing = observations
+                .iter()
+                .filter(|o| &o.block_hash == first_hash)
+                .count();
             let required = config.rpc_quorum_required as usize;
             if agreeing < required {
                 rpc_agreement = false;
-                warnings.push(format!("RPC quorum failed: {}/{} agree", agreeing, config.rpc_quorum_required));
+                warnings.push(format!(
+                    "RPC quorum failed: {}/{} agree",
+                    agreeing, config.rpc_quorum_required
+                ));
             }
         } else if observations.is_empty() {
             rpc_agreement = false;
@@ -209,7 +227,8 @@ impl ChainHealthDaemon {
             .send_json(body)
             .map_err(|e| format!("RPC call failed: {}", e))?;
 
-        let json: serde_json::Value = response.into_json()
+        let json: serde_json::Value = response
+            .into_json()
             .map_err(|e| format!("Invalid JSON: {}", e))?;
 
         let block_number = json
@@ -232,7 +251,8 @@ impl ChainHealthDaemon {
             .send_json(hash_body)
             .map_err(|e| format!("Hash RPC call failed: {}", e))?;
 
-        let hash_json: serde_json::Value = hash_response.into_json()
+        let hash_json: serde_json::Value = hash_response
+            .into_json()
             .map_err(|e| format!("Invalid hash JSON: {}", e))?;
 
         let block_hash = hash_json
@@ -247,7 +267,11 @@ impl ChainHealthDaemon {
             chain_id: 1,
             block_number,
             block_hash,
-            tx_status: if block_number > 0 { TxStatus::Confirmed } else { TxStatus::Failed },
+            tx_status: if block_number > 0 {
+                TxStatus::Confirmed
+            } else {
+                TxStatus::Failed
+            },
             observed_at: Utc::now().to_rfc3339(),
             error: None,
         })
@@ -279,10 +303,19 @@ impl ChainHealthDaemon {
         for chain in &self.chains {
             report.push_str(&format!("## Chain {}\n", chain.chain_id));
             if let Some(health) = self.last_health.get(&chain.chain_id) {
-                let status = if health.halted { "🔴 HALTED" } else if health.degraded { "🟡 DEGRADED" } else { "🟢 HEALTHY" };
+                let status = if health.halted {
+                    "🔴 HALTED"
+                } else if health.degraded {
+                    "🟡 DEGRADED"
+                } else {
+                    "🟢 HEALTHY"
+                };
                 report.push_str(&format!("  Status: {}\n", status));
                 report.push_str(&format!("  RPC Quorum: {}\n", health.rpc_quorum_status));
-                report.push_str(&format!("  Safe for new intents: {}\n", health.safe_for_new_intents));
+                report.push_str(&format!(
+                    "  Safe for new intents: {}\n",
+                    health.safe_for_new_intents
+                ));
                 report.push_str(&format!("  Last observed: {}\n", health.observed_at));
             } else {
                 report.push_str("  No health data available.\n");
@@ -299,16 +332,14 @@ async fn main() {
     log::info!("X3 Chain Health Daemon starting...");
 
     // Default chains to monitor — configure via env vars or config file in production
-    let chains = vec![
-        ChainCheckConfig {
-            chain_id: 1,
-            rpc_urls: vec!["http://localhost:8545".into()],
-            max_block_delay_ms: 30_000,
-            max_finality_delay_ms: 120_000,
-            max_gas_price: 500_000_000_000,
-            rpc_quorum_required: 1,
-        },
-    ];
+    let chains = vec![ChainCheckConfig {
+        chain_id: 1,
+        rpc_urls: vec!["http://localhost:8545".into()],
+        max_block_delay_ms: 30_000,
+        max_finality_delay_ms: 120_000,
+        max_gas_price: 500_000_000_000,
+        rpc_quorum_required: 1,
+    }];
 
     let mut daemon = ChainHealthDaemon::new(chains);
 
@@ -342,16 +373,14 @@ mod tests {
 
     #[test]
     fn test_daemon_creation() {
-        let daemon = ChainHealthDaemon::new(vec![
-            ChainCheckConfig {
-                chain_id: 1,
-                rpc_urls: vec!["http://localhost:8545".into()],
-                max_block_delay_ms: 30_000,
-                max_finality_delay_ms: 120_000,
-                max_gas_price: 500_000_000_000,
-                rpc_quorum_required: 1,
-            }
-        ]);
+        let daemon = ChainHealthDaemon::new(vec![ChainCheckConfig {
+            chain_id: 1,
+            rpc_urls: vec!["http://localhost:8545".into()],
+            max_block_delay_ms: 30_000,
+            max_finality_delay_ms: 120_000,
+            max_gas_price: 500_000_000_000,
+            rpc_quorum_required: 1,
+        }]);
         assert_eq!(daemon.chains.len(), 1);
         assert!(daemon.last_health.is_empty());
     }

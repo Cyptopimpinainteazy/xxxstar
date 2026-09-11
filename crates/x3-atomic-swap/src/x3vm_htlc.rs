@@ -150,8 +150,7 @@ impl X3VmAdapter for X3VmAdapterImpl {
     fn lock(&self, intent: &AtomicIntent) -> Result<LockProof, SwapError> {
         if !self.simulation {
             return Err(SwapError::Internal(
-                "X3VM live transport is not implemented; refusing to fabricate a lock proof"
-                    .into(),
+                "X3VM live transport is not implemented; refusing to fabricate a lock proof".into(),
             ));
         }
 

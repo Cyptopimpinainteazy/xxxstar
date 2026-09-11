@@ -38,7 +38,7 @@ benchmarks! {
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(legs)
             .expect("legs within MaxLegsPerBundle");
 
-    }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into(), 0u32, 0u64)
+    }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into(), 0u32, 1u64)
     verify {
         // Verify bundle was created and is in Pending status
         let bundle_id = Bundles::<T>::iter_keys().next().expect("bundle should exist");
@@ -66,7 +66,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: _(RawOrigin::Signed(executor.clone()), bundle_id)
@@ -97,7 +97,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(executor.clone()).into(), bundle_id).unwrap();
@@ -105,6 +105,7 @@ benchmarks! {
         let receipt_root = H256::repeat_byte(0x11);
         let finality_cert = H256::repeat_byte(0x22);
         let block_number: BlockNumberFor<T> = 1u32.into();
+        FinalityCertAnchors::<T>::insert(1u64, finality_cert);
     }: _(RawOrigin::Signed(executor), bundle_id, receipt_root, finality_cert, block_number)
     verify {
         let bundle = Bundles::<T>::get(bundle_id).unwrap();
@@ -132,8 +133,9 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
+        X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(caller.clone()).into(), bundle_id).unwrap();
 
     }: _(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::ExecutionFailed)
     verify {
@@ -159,7 +161,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: rollback_atomic_bundle(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::SubmitterCancelled)
@@ -186,14 +188,15 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(caller.clone()).into(), bundle_id).unwrap();
 
         let receipt_root = H256::repeat_byte(0x11);
-        let finality_cert = H256::zero(); // Zero cert when Flash Finality not running
+        let finality_cert = H256::repeat_byte(0x22);
         let committed_at_ns = 1000000000u64;
+        FinalityCertAnchors::<T>::insert(1u64, finality_cert);
 
     }: _(RawOrigin::None, bundle_id, receipt_root, finality_cert, committed_at_ns)
     verify {
@@ -212,5 +215,5 @@ benchmarks! {
         assert_eq!(anchored, cert);
     }
 
-    impl_benchmark_test_suite!(X3AtomicKernel, crate::tests::new_test_ext(), crate::tests::Test);
+    impl_benchmark_test_suite!(X3AtomicKernel, crate::mock::new_test_ext(), crate::mock::Test);
 }

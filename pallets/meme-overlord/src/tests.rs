@@ -2,5 +2,4 @@
 
 #[cfg(test)]
 #[test]
-fn placeholder() {
-}
+fn placeholder() {}

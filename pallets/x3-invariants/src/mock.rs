@@ -1,9 +1,6 @@
 //! Test mock for pallet-x3-invariants.
 
-use frame_support::{
-    derive_impl, parameter_types,
-    traits::ConstU32,
-};
+use frame_support::{derive_impl, parameter_types, traits::ConstU32};
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},

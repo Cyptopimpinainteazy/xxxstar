@@ -22,10 +22,8 @@ mod benchmarks {
         let max_fee = T::BaseFee::get().saturating_mul(2u32.into());
 
         // Give caller enough balance
-        let _ = T::Currency::make_free_balance_be(
-            &caller,
-            max_fee.saturating_mul(2u32.into()).into(),
-        );
+        let _ =
+            T::Currency::make_free_balance_be(&caller, max_fee.saturating_mul(2u32.into()).into());
 
         #[extrinsic_call]
         request_randomness(RawOrigin::Signed(caller), seed, max_fee);
@@ -64,10 +62,8 @@ mod benchmarks {
         let max_fee = T::BaseFee::get().saturating_mul(2u32.into());
 
         // Give caller enough balance
-        let _ = T::Currency::make_free_balance_be(
-            &caller,
-            max_fee.saturating_mul(2u32.into()).into(),
-        );
+        let _ =
+            T::Currency::make_free_balance_be(&caller, max_fee.saturating_mul(2u32.into()).into());
 
         // Create a request
         assert_ok!(VrfPallet::<T>::request_randomness(

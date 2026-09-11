@@ -69,6 +69,8 @@
 pub use pallet::*;
 
 #[cfg(test)]
+mod mock;
+#[cfg(test)]
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -1532,9 +1534,7 @@ pub mod pallet {
             legs_hash: H256,
         ) -> Option<(H256, BundleStatus)> {
             Bundles::<T>::iter()
-                .find(|(_, record)| {
-                    &record.submitter == submitter && record.legs_hash == legs_hash
-                })
+                .find(|(_, record)| &record.submitter == submitter && record.legs_hash == legs_hash)
                 .map(|(bundle_id, record)| (bundle_id, record.status))
         }
 

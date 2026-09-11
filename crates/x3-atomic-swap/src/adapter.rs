@@ -518,7 +518,8 @@ mod cross_adapter_tests {
 
     #[test]
     fn test_cross_adapter_bitcoin_to_evm() {
-        let btc = crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet);
+        let btc =
+            crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet);
         let evm = crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20]);
         let intent = sample_intent(3, "btc", "eth");
         let (lock, claim) = lock_and_claim(&btc, &evm, &intent).unwrap();
@@ -652,7 +653,8 @@ mod cross_adapter_tests {
 
     #[test]
     fn test_cross_adapter_bitcoin_to_cardano() {
-        let btc = crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet);
+        let btc =
+            crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet);
         let cardano = crate::plutus_htlc::PlutusHtlcAdapter::new(
             "cardano-mainnet".into(),
             crate::plutus_htlc::PlutusNetwork::Mainnet,
@@ -690,19 +692,44 @@ mod cross_adapter_tests {
         let adapters: Vec<Box<dyn X3VmAdapter>> = vec![
             Box::new(crate::evm_htlc::EvmAdapter::at_address([0x01u8; 20])),
             Box::new(crate::svm_htlc::SvmAdapter::at_program_id([0x02u8; 32])),
-            Box::new(crate::substrate_htlc::SubstrateHtlcAdapter::new("sub".into())),
-            Box::new(crate::bitcoin_htlc::BtcHtlcAdapter::new(crate::bitcoin_htlc::BitcoinNetwork::Mainnet)),
+            Box::new(crate::substrate_htlc::SubstrateHtlcAdapter::new(
+                "sub".into(),
+            )),
+            Box::new(crate::bitcoin_htlc::BtcHtlcAdapter::new(
+                crate::bitcoin_htlc::BitcoinNetwork::Mainnet,
+            )),
             Box::new(crate::x3vm_htlc::X3VmAdapterImpl::simulation("x3".into())),
             Box::new(crate::move_vm_htlc::MoveVmAdapter::new("sui".into())),
             Box::new(crate::cosmwasm_htlc::CosmWasmAdapter::new("osmo".into())),
             Box::new(crate::cairo_vm_htlc::CairoVmAdapter::new("stark".into())),
-            Box::new(crate::plutus_htlc::PlutusHtlcAdapter::new("cardano".into(), crate::plutus_htlc::PlutusNetwork::Mainnet)),
-            Box::new(crate::fuel_htlc::FuelHtlcAdapter::new("fuel".into(), crate::fuel_htlc::FuelNetwork::Mainnet)),
-            Box::new(crate::ton_htlc::TonHtlcAdapter::new("ton".into(), crate::ton_htlc::TonNetwork::Mainnet)),
-            Box::new(crate::near_htlc::NearHtlcAdapter::new("near".into(), crate::near_htlc::NearNetwork::Mainnet)),
-            Box::new(crate::soroban_htlc::SorobanHtlcAdapter::new("soroban".into(), crate::soroban_htlc::SorobanNetwork::Mainnet)),
-            Box::new(crate::polkadot_ink_htlc::InkHtlcAdapter::new("ink".into(), crate::polkadot_ink_htlc::InkNetwork::PolkadotMainnet)),
-            Box::new(crate::wasm_l1_htlc::WasmL1Adapter::new("icp".into(), crate::wasm_l1_htlc::WasmL1Runtime::InternetComputer)),
+            Box::new(crate::plutus_htlc::PlutusHtlcAdapter::new(
+                "cardano".into(),
+                crate::plutus_htlc::PlutusNetwork::Mainnet,
+            )),
+            Box::new(crate::fuel_htlc::FuelHtlcAdapter::new(
+                "fuel".into(),
+                crate::fuel_htlc::FuelNetwork::Mainnet,
+            )),
+            Box::new(crate::ton_htlc::TonHtlcAdapter::new(
+                "ton".into(),
+                crate::ton_htlc::TonNetwork::Mainnet,
+            )),
+            Box::new(crate::near_htlc::NearHtlcAdapter::new(
+                "near".into(),
+                crate::near_htlc::NearNetwork::Mainnet,
+            )),
+            Box::new(crate::soroban_htlc::SorobanHtlcAdapter::new(
+                "soroban".into(),
+                crate::soroban_htlc::SorobanNetwork::Mainnet,
+            )),
+            Box::new(crate::polkadot_ink_htlc::InkHtlcAdapter::new(
+                "ink".into(),
+                crate::polkadot_ink_htlc::InkNetwork::PolkadotMainnet,
+            )),
+            Box::new(crate::wasm_l1_htlc::WasmL1Adapter::new(
+                "icp".into(),
+                crate::wasm_l1_htlc::WasmL1Runtime::InternetComputer,
+            )),
         ];
 
         // ZkVmAdapter intentionally returns SourceLockFailed (zkVMs don't support lock),
@@ -715,12 +742,37 @@ mod cross_adapter_tests {
             }
             let lock = adapter.lock(&intent).unwrap();
             // Every adapter must produce a lock proof with these fields populated:
-            assert!(!lock.tx_id.is_empty(), "{}: tx_id empty", adapter.adapter_name());
-            assert!(!lock.chain_id.is_empty(), "{}: chain_id empty", adapter.adapter_name());
-            assert_eq!(lock.vm_type, adapter.vm_type(), "{}: vm_type mismatch", adapter.adapter_name());
-            assert!(lock.block_number > 0 || adapter.vm_type() == VmType::WasmL1, "{}: block_number zero", adapter.adapter_name());
-            assert!(lock.locked_amount > 0, "{}: locked_amount zero", adapter.adapter_name());
-            assert!(adapter.verify_lock(&lock).unwrap(), "{}: verify_lock failed", adapter.adapter_name());
+            assert!(
+                !lock.tx_id.is_empty(),
+                "{}: tx_id empty",
+                adapter.adapter_name()
+            );
+            assert!(
+                !lock.chain_id.is_empty(),
+                "{}: chain_id empty",
+                adapter.adapter_name()
+            );
+            assert_eq!(
+                lock.vm_type,
+                adapter.vm_type(),
+                "{}: vm_type mismatch",
+                adapter.adapter_name()
+            );
+            assert!(
+                lock.block_number > 0 || adapter.vm_type() == VmType::WasmL1,
+                "{}: block_number zero",
+                adapter.adapter_name()
+            );
+            assert!(
+                lock.locked_amount > 0,
+                "{}: locked_amount zero",
+                adapter.adapter_name()
+            );
+            assert!(
+                adapter.verify_lock(&lock).unwrap(),
+                "{}: verify_lock failed",
+                adapter.adapter_name()
+            );
         }
     }
 }
