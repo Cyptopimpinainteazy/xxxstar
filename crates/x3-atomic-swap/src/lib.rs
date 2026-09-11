@@ -156,7 +156,7 @@ pub use wasm_l1_htlc::{
     StatefulWasmL1Adapter, WasmL1Adapter, WasmL1Contract, WasmL1LockState, WasmL1Runtime,
 };
 pub use x3vm_htlc::{
-    StatefulX3VmAdapter, X3VmAdapterImpl, X3VmRecoverySnapshot,
+    InternalX3Lock, StatefulX3VmAdapter, X3VmAdapterImpl, X3VmRecoverySnapshot,
     X3VM_RECOVERY_SNAPSHOT_VERSION,
 };
 pub use zkvm_htlc::{ZkProofRecord, ZkProofType, ZkVmAdapter, ZkVmTarget};
