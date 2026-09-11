@@ -1251,11 +1251,12 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
     }
 
     #[cfg(feature = "canonical-proofs")]
-    pub fn record_settlement_submission_broadcast(
+    pub fn record_settlement_submission_signed(
         &self,
         lease: &SessionLease,
         prepared: &crate::SettlementOutboxRecord,
         tx_id: &str,
+        signed_extrinsic: Vec<u8>,
         now_unix: u64,
     ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
         self.validate(lease, now_unix)?;
@@ -1267,7 +1268,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
                 )?
                 .ok_or_else(|| {
                     CoordinatorError::Internal(
-                        "missing canonical intent binding for settlement broadcast".into(),
+                        "missing canonical intent binding for settlement signing".into(),
                     )
                 })?
                 .runtime_intent_id
@@ -1278,13 +1279,24 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         }
 
         crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
-            .record_broadcast(
+            .record_signed(
                 prepared,
                 tx_id,
+                signed_extrinsic,
                 &lease.owner_id,
                 lease.fence,
                 now_unix,
             )
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn record_settlement_submission_broadcast(
+        &self,
+        signed: &crate::SettlementOutboxRecord,
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .record_broadcast(signed, now_unix)
     }
 
     #[cfg(feature = "canonical-proofs")]
