@@ -137,6 +137,13 @@ jobs:
             real_x3vm_svm_lock_claim_atomic_lifecycle \
             -- --ignored --nocapture
 
+      - name: Run real X3VM-SVM timeout/refund atomic lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_svm_live \
+            real_x3vm_svm_timeout_refund_atomic_lifecycle \
+            -- --ignored --nocapture
+
       - name: Dump isolated Solana validator log on failure
         if: failure()
         run: |
