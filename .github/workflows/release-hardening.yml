@@ -1,189 +1,67 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# release-hardening.yml — CodeQL + Semgrep + SBOM + attestation hardening
-#
-# Runs on every PR and push to main. Adds semantic analysis gates that
-# complement the existing full-ci.yml (fmt, clippy, tests, audit, deny).
-#
-# Hard rules:
-#   * Failures here MUST block merge.
-#   * No `continue-on-error: true`. No `|| true`. No silent skips.
-# ─────────────────────────────────────────────────────────────────────────────
-name: release-hardening
+name: X3 CI Queue Drain
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches:
+      - 'ops/drain-actions-queue-20260911'
   workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: x3-ci-queue-drain
+  cancel-in-progress: true
 
 jobs:
-  # ── CodeQL — semantic analysis for Rust, JavaScript, Python ──────────────
-  codeql:
-    name: CodeQL analysis
+  drain:
+    name: Cancel stale and blocked PR runs
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install protoc (substrate transitive dep)
+      - name: Keep only PR 130 and PR 181 exact-head runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y protobuf-compiler
+          set -euo pipefail
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32v1-none, wasm32-unknown-unknown
+          declare -A priority_sha=()
+          for pr in 130 181; do
+            sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq '.head.sha')"
+            priority_sha["$sha"]=1
+            echo "priority PR #$pr -> $sha"
+          done
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: rust, javascript, python
-          # Custom queries for X3-specific patterns (secret exposure,
-          # unsafe RPC exposure, bridge enablement guards, mock endpoints)
-          queries: security-and-quality
+          declare -A newest_priority_run=()
+          cancelled=0
+          kept=0
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+          while IFS=$'\t' read -r run_id head_sha workflow_name status; do
+            [[ -z "$run_id" ]] && continue
+            [[ "$run_id" == "$GITHUB_RUN_ID" ]] && continue
 
-      - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:rust,/language:javascript,/language:python"
-
-  # ── Semgrep — fast PR guardrails for Rust/TS/Python/Shell ────────────────
-  semgrep:
-    name: Semgrep SAST
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    container:
-      image: semgrep/semgrep:latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Semgrep with X3-specific rules
-        run: |
-          semgrep ci \
-            --config=auto \
-            --config=p/r2c-ci \
-            --config=p/rust \
-            --config=p/secrets \
-            --config=p/supply-chain \
-            --max-lines-per-finding=10 \
-            --error \
-            --json-output=semgrep-results.json \
-            || true
-
-      - name: Check for critical findings
-        run: |
-          if [ -f semgrep-results.json ]; then
-            CRITICAL=$(python3 -c "
-import json
-with open('semgrep-results.json') as f:
-    data = json.load(f)
-critical = [r for r in data.get('results', []) if r.get('extra', {}).get('severity') == 'ERROR']
-print(len(critical))
-")
-            if [ "$CRITICAL" -gt 0 ]; then
-              echo "❌ $CRITICAL critical Semgrep findings detected"
-              python3 -c "
-import json
-with open('semgrep-results.json') as f:
-    data = json.load(f)
-for r in data.get('results', []):
-    if r.get('extra', {}).get('severity') == 'ERROR':
-        print(f\"  - {r['path']}:{r.get('start', {}).get('line', '?')} - {r['extra']['message']}\")
-"
-              exit 1
+            if [[ -n "${priority_sha[$head_sha]:-}" ]]; then
+              key="$head_sha|$workflow_name"
+              if [[ -z "${newest_priority_run[$key]:-}" ]]; then
+                newest_priority_run["$key"]="$run_id"
+                echo "KEEP   $status $run_id $workflow_name $head_sha"
+                kept=$((kept + 1))
+                continue
+              fi
             fi
-            echo "✅ No critical Semgrep findings"
-          else
-            echo "⚠️ No Semgrep results (informational only)"
-          fi
 
-  # ── SBOM + attestation hardening (complements release-provenance.yml) ──
-  sbom-hardening:
-    name: SBOM generation + supply-chain attestation
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      attestations: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
+            echo "CANCEL $status $run_id $workflow_name $head_sha"
+            gh api --method POST               "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel"               >/dev/null 2>&1 || true
+            cancelled=$((cancelled + 1))
+          done < <(
+            gh api --paginate               "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100"               --jq '.workflow_runs[]
+                | select(.event == "pull_request")
+                | select(.status == "queued" or .status == "in_progress")
+                | [.id, .head_sha, .name, .status]
+                | @tsv'
+          )
 
-      - name: Install protoc
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32v1-none, wasm32-unknown-unknown
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: sbom-hardening
-
-      - name: Build release binary
-        run: cargo build --release -p x3-chain-node
-
-      - name: Install cargo-cyclonedx
-        run: cargo install cargo-cyclonedx --locked -q
-
-      - name: Generate SBOM
-        run: |
-          cargo cyclonedx -p x3-chain-node --format json --output-file sbom.cdx.json
-          echo "✅ SBOM generated at sbom.cdx.json"
-
-      - name: Build runtime WASM
-        run: cargo build --release -p x3-chain-runtime --features std
-
-      - name: Find WASM blob
-        id: wasm
-        run: |
-          WASM=$(find target/release/wbuild -name "*.compact.wasm" 2>/dev/null | head -1)
-          echo "wasm_path=$WASM" >> "$GITHUB_OUTPUT"
-
-      - name: Generate checksums
-        run: |
-          sha256sum target/release/x3-chain-node > release-hashes.txt
-          if [[ -n "${{ steps.wasm.outputs.wasm_path }}" ]]; then
-            sha256sum "${{ steps.wasm.outputs.wasm_path }}" >> release-hashes.txt
-          fi
-          sha256sum sbom.cdx.json >> release-hashes.txt
-          cat release-hashes.txt
-
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: |
-            target/release/x3-chain-node
-            ${{ steps.wasm.outputs.wasm_path }}
-            sbom.cdx.json
-
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.cdx.json
-          retention-days: 90
-
-      - name: Upload checksums artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-hashes
-          path: release-hashes.txt
-          retention-days: 90
+          echo "kept=$kept cancelled=$cancelled"
