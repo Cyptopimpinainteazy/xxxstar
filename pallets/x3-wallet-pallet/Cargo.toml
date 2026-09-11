@@ -25,6 +25,7 @@ std = [
     "codec/std",
     "frame-support/std",
     "frame-system/std",
+    "frame-benchmarking?/std",
     "log/std",
     "scale-info/std",
     "sp-core/std",
