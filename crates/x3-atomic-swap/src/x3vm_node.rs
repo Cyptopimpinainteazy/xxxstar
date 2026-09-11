@@ -50,6 +50,21 @@ pub trait X3ExtrinsicSigner: Send + Sync + Debug {
         chain_id: &ChainId,
         intent_id: IntentId,
     ) -> Result<String, SwapError>;
+
+    /// Verify that the finalized extrinsic actually dispatched successfully.
+    ///
+    /// Inclusion alone is insufficient: Substrate includes failed dispatches in
+    /// blocks. Production signers must bind the exact finalized extrinsic index
+    /// to a successful runtime dispatch event.
+    fn verify_finalized_dispatch(
+        &self,
+        _block_hash: &str,
+        _extrinsic_index: u32,
+    ) -> Result<(), SwapError> {
+        Err(SwapError::RpcError(
+            "X3 signer does not implement finalized dispatch verification".into(),
+        ))
+    }
 }
 
 /// Finalized inclusion evidence captured directly from the X3 node.
@@ -375,6 +390,8 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
             .sign_lock_escrow(chain_id, escrow_address, intent)?;
         let tx_id = self.submit_extrinsic(&signed)?;
         let inclusion = self.wait_for_finalized_inclusion(&tx_id, &signed)?;
+        self.signer
+            .verify_finalized_dispatch(&inclusion.block_hash, inclusion.extrinsic_index)?;
         Ok(LockProof {
             tx_id,
             chain_id: chain_id.clone(),
@@ -406,6 +423,8 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
             .sign_claim_settlement(chain_id, intent_id, preimage)?;
         let tx_id = self.submit_extrinsic(&signed)?;
         let inclusion = self.wait_for_finalized_inclusion(&tx_id, &signed)?;
+        self.signer
+            .verify_finalized_dispatch(&inclusion.block_hash, inclusion.extrinsic_index)?;
         Ok(ClaimProof {
             tx_id,
             intent_id,
@@ -428,6 +447,8 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
         let signed = self.signer.sign_refund_settlement(chain_id, intent_id)?;
         let tx_id = self.submit_extrinsic(&signed)?;
         let inclusion = self.wait_for_finalized_inclusion(&tx_id, &signed)?;
+        self.signer
+            .verify_finalized_dispatch(&inclusion.block_hash, inclusion.extrinsic_index)?;
         Ok(RefundProof {
             tx_id,
             intent_id,
