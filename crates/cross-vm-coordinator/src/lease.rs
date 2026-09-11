@@ -177,9 +177,12 @@ impl SessionLeaseManager {
     }
 
     /// Release only if the supplied token is still current.
+    ///
+    /// The state is retained with an empty owner and expired timestamp so the
+    /// next acquisition increments the previous fence instead of reusing 1.
     pub fn release(&self, lease: &SessionLease) -> Result<(), CoordinatorError> {
         let mut shard = self.shard(&lease.session_id)?;
-        let state = shard.get(&lease.session_id).ok_or_else(|| {
+        let state = shard.get_mut(&lease.session_id).ok_or_else(|| {
             CoordinatorError::Internal(format!(
                 "no active lease for session '{}'",
                 lease.session_id
@@ -191,7 +194,8 @@ impl SessionLeaseManager {
                 lease.session_id
             )));
         }
-        shard.remove(&lease.session_id);
+        state.owner_id.clear();
+        state.expires_at = 0;
         Ok(())
     }
 }
@@ -237,6 +241,18 @@ mod tests {
         let second = manager.acquire("swap-a", "b", 105, 5).unwrap();
         assert!(manager.release(&first).is_err());
         manager.validate(&second, 106).unwrap();
+    }
+
+    #[test]
+    fn release_does_not_reuse_fencing_epoch() {
+        let manager = SessionLeaseManager::new(8);
+        let first = manager.acquire("swap-a", "a", 100, 10).unwrap();
+        manager.release(&first).unwrap();
+
+        let second = manager.acquire("swap-a", "b", 101, 10).unwrap();
+        assert_eq!(second.fence, first.fence + 1);
+        assert!(manager.validate(&first, 102).is_err());
+        manager.validate(&second, 102).unwrap();
     }
 
     #[test]
