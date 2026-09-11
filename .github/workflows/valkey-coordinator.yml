@@ -1,0 +1,37 @@
+name: valkey-coordinator
+
+on:
+  pull_request:
+    paths:
+      - "crates/cross-vm-coordinator/**"
+      - ".github/workflows/valkey-coordinator.yml"
+  workflow_dispatch:
+
+jobs:
+  live-valkey:
+    runs-on: ubuntu-latest
+    services:
+      valkey:
+        image: valkey/valkey:8.1.10-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      X3_TEST_VALKEY_URL: redis://127.0.0.1:6379/
+      X3_REQUIRE_VALKEY_TESTS: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.90.0
+
+      - name: Test Valkey/Redis fencing backend
+        run: cargo test -p x3-cross-vm-coordinator --features valkey --test valkey_live -- --nocapture
