@@ -12,6 +12,8 @@ exclude = [
     # Solana BPF programs are standalone crates that conflict with the
     # workspace's solana-program dependency graph.
     "programs/svm/*",
+    # Cross-VM coordinator is intentionally a standalone crate.
+    "crates/cross-vm-coordinator",
 ]
 members = [
     "pallets/x3-kernel",
