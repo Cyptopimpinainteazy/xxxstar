@@ -9,7 +9,8 @@ use x3_atomic_swap::intent::{
     RouteMode,
 };
 use x3_atomic_swap::{
-    LiveEvmExecutor, LiveX3VmAdapter, NativeX3NodeTransport, RpcClient, VmType,
+    FinalityProof, LiveEvmExecutor, LiveX3VmAdapter, NativeX3NodeTransport, RpcClient,
+    SecretReleaseEvidence, SecretReleaseFirewall, SecretReleaseRequirement, VmType,
     X3NodeTransportConfig, X3VmAdapter,
 };
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
@@ -289,18 +290,46 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
     assert_eq!(evm_lock.hashlock, x3_lock.hashlock);
     assert!(!evm_lock.tx_id.is_empty());
 
+    let evm_finality = FinalityProof {
+        chain_id: evm_lock.chain_id.clone(),
+        vm_type: VmType::Evm,
+        tx_id: evm_lock.tx_id.clone(),
+        block_number: evm_lock.block_number,
+        block_hash: evm_lock.block_hash.clone(),
+        confirmations: evm_lock.confirmations.max(1),
+        finalized: true,
+        finality_source: "anvil-mined-receipt".into(),
+        safe_to_reveal_secret: true,
+    };
+    let permit = SecretReleaseFirewall::authorize(
+        &intent,
+        preimage,
+        &[SecretReleaseRequirement {
+            chain_id: evm_lock.chain_id.clone(),
+            vm_type: VmType::Evm,
+            min_confirmations: 1,
+        }],
+        &[SecretReleaseEvidence {
+            lock: evm_lock.clone(),
+            finality: evm_finality,
+            rpc_quorum_agreed: true,
+            refunded: false,
+        }],
+    )
+    .expect("EVM-finalized secret-release permit");
+
     let evm_id = first_htlc_id(sender, recipient, hashlock);
     let evm_claim = evm_claimant
-        .execute_claim("anvil", evm_id, local_id, preimage, 30_000)
+        .execute_claim("anvil", evm_id, local_id, permit.preimage(), 30_000)
         .expect("real EVM claim");
     assert_eq!(evm_claim.vm_type, VmType::Evm);
     assert_eq!(evm_claim.preimage, preimage);
     assert!(!evm_claim.tx_id.is_empty());
 
-    // The same preimage revealed on the EVM leg must settle the finalized X3 leg.
+    // The same firewall-authorized preimage settles the finalized X3 leg.
     let x3_claim = x3_adapter
-        .claim(local_id, evm_claim.preimage)
-        .expect("X3 claim using EVM-revealed preimage");
+        .claim_with_permit(&permit)
+        .expect("X3 claim using EVM-finalized release permit");
     assert_eq!(x3_claim.preimage, preimage);
     assert!(x3_adapter.finality_status(&x3_claim.tx_id).unwrap().finalized);
 }
