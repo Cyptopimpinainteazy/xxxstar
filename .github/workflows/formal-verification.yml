@@ -23,6 +23,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
+  K_INSTALL_SHA256: a485a0af380bb34d9874db11432b6422c019ff4a55a01e81b61e04dbfcd96f44
 
 jobs:
   formal-verification:
@@ -41,7 +42,7 @@ jobs:
         with:
           toolchain: 1.90.0
           components: rustfmt, clippy, rust-src
-          targets: wasm32-unknown-unknown, wasm32v1-none
+          target: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Cache Cargo Dependencies
         uses: actions/cache@v4
@@ -91,7 +92,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y curl xz-utils
-          curl -fsSL https://kframework.org/install | bash
+          curl -fsSL https://kframework.org/install -o "$RUNNER_TEMP/kframework-install"
+          echo "${K_INSTALL_SHA256}  ${RUNNER_TEMP}/kframework-install" | sha256sum --check --status
+          bash "$RUNNER_TEMP/kframework-install"
           export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
           kup install k
           command -v kprove
@@ -178,6 +181,7 @@ jobs:
       - name: Comment on PR (On Failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             github.rest.issues.createComment({
@@ -213,6 +217,7 @@ jobs:
       - name: Comment on PR (On Success)
         if: success() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             github.rest.issues.createComment({
