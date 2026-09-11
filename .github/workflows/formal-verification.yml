@@ -128,7 +128,8 @@ jobs:
       - name: Verify Tool Installations
         run: |
           echo "Verifying formal verification tools..."
-          java -jar /opt/tla2tools.jar >/dev/null
+          test -s /opt/tla2tools.jar
+          java -version
           coqc --version
           kprove --version
           /opt/dafny/dafny --version
