@@ -3203,6 +3203,7 @@ impl GetSessionNumber for SessionHandler {
 // sp_session::SessionKeys trait implementation for session key generation/decoding
 
 #[cfg(feature = "runtime-benchmarks")]
+#[allow(unused_imports)] // define_benchmarks! consumes these pallet aliases as macro metadata.
 mod benches {
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;

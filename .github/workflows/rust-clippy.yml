@@ -22,8 +22,8 @@ jobs:
       - name: Install Protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Run Clippy (workspace all features except incompatible router modes)
-        run: cargo clippy --workspace --all-targets --all-features --exclude x3-verification-router -- -D warnings
+      - name: Run Clippy (workspace all features except incompatible modes)
+        run: cargo clippy --workspace --all-targets --all-features --exclude x3-verification-router --exclude pallet-x3-cross-vm-router -- -D warnings
 
       # `production` and `test-verifier` are intentionally incompatible:
       # production must never compile a test verifier. Check both valid
@@ -34,3 +34,14 @@ jobs:
 
       - name: Run Clippy (verification router test verifier)
         run: cargo clippy -p x3-verification-router --all-targets --features test-verifier -- -D warnings
+
+      # RC-1 and post-RC-1 router features are intentionally incompatible. Validate
+      # each legal feature set rather than disabling the compile-time scope lock.
+      - name: Run Clippy (cross-VM router RC-1)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (cross-VM router post-RC-1 features)
+        run: |
+          for feature in external-gateway parallel-executor appzone-factory pq-experimental advanced-dex ai-optimizer gpu-acceleration; do
+            cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features "std,${feature}" -- -D warnings
+          done
