@@ -3,9 +3,7 @@ name: mainnet-readiness
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [master, 'release/**']
 
 jobs:
   secret-scan:
