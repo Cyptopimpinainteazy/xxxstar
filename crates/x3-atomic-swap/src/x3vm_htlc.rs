@@ -13,6 +13,7 @@ use crate::adapter::{
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
 use alloc::vec::Vec;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ pub struct X3VmAdapterImpl {
 }
 
 /// Internal lock state tracked by the stateful adapter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct InternalX3Lock {
     intent_id: IntentId,
@@ -460,6 +461,25 @@ impl X3VmAdapter for X3VmAdapterImpl {
 // Stateful Wrapper with Double-Claim Protection
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Current on-disk/in-memory recovery snapshot schema version.
+pub const X3VM_RECOVERY_SNAPSHOT_VERSION: u32 = 1;
+
+/// Versioned recovery image for StatefulX3VmAdapter.
+///
+/// This captures every piece of local state that prevents replay or conflicting
+/// terminal operations after a coordinator restart. Restore validates the image
+/// before any lifecycle operation is allowed to resume.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct X3VmRecoverySnapshot {
+    pub version: u32,
+    pub chain_id: ChainId,
+    pub finalized_block: u64,
+    pub escrow_address: Vec<u8>,
+    pub simulation: bool,
+    pub used_nonces: Vec<u64>,
+    locks: Vec<InternalX3Lock>,
+}
+
 /// A stateful wrapper around [`X3VmAdapterImpl`] that tracks lock state
 /// in order to reject double claims, double refunds, and enforce nonce
 /// replay protection.
@@ -502,6 +522,104 @@ impl StatefulX3VmAdapter {
 
     pub fn set_escrow_address(&mut self, escrow: Vec<u8>) {
         self.inner.set_escrow_address(escrow);
+    }
+
+    /// Capture a versioned recovery image suitable for durable persistence.
+    pub fn recovery_snapshot(&self) -> X3VmRecoverySnapshot {
+        X3VmRecoverySnapshot {
+            version: X3VM_RECOVERY_SNAPSHOT_VERSION,
+            chain_id: self.inner.chain_id.clone(),
+            finalized_block: self.inner.finalized_block,
+            escrow_address: self.inner.escrow_address.clone(),
+            simulation: self.inner.simulation,
+            used_nonces: self.inner.used_nonces.clone(),
+            locks: self.locks.clone(),
+        }
+    }
+
+    /// Restore state after a process restart.
+    ///
+    /// The snapshot is rejected if it contains duplicate intent IDs, duplicate
+    /// nonces, a lock nonce missing from the replay set, or an impossible state
+    /// where the same lock is both claimed and refunded.
+    pub fn from_recovery_snapshot(
+        snapshot: X3VmRecoverySnapshot,
+    ) -> Result<Self, SwapError> {
+        if snapshot.version != X3VM_RECOVERY_SNAPSHOT_VERSION {
+            return Err(SwapError::generic(alloc::format!(
+                "unsupported X3VM recovery snapshot version {}",
+                snapshot.version
+            )));
+        }
+
+        let mut seen_intents = Vec::new();
+        let mut seen_lock_nonces = Vec::new();
+
+        for lock in &snapshot.locks {
+            if lock.claimed && lock.refunded {
+                return Err(SwapError::generic(alloc::format!(
+                    "invalid X3VM recovery snapshot: intent {} is both claimed and refunded",
+                    lock.intent_id
+                )));
+            }
+            if seen_intents.contains(&lock.intent_id) {
+                return Err(SwapError::generic(alloc::format!(
+                    "invalid X3VM recovery snapshot: duplicate intent {}",
+                    lock.intent_id
+                )));
+            }
+            if seen_lock_nonces.contains(&lock.nonce) {
+                return Err(SwapError::generic(alloc::format!(
+                    "invalid X3VM recovery snapshot: duplicate lock nonce {}",
+                    lock.nonce
+                )));
+            }
+            if !snapshot.used_nonces.contains(&lock.nonce) {
+                return Err(SwapError::generic(alloc::format!(
+                    "invalid X3VM recovery snapshot: lock nonce {} missing from replay set",
+                    lock.nonce
+                )));
+            }
+            seen_intents.push(lock.intent_id);
+            seen_lock_nonces.push(lock.nonce);
+        }
+
+        let mut seen_used_nonces = Vec::new();
+        for nonce in &snapshot.used_nonces {
+            if seen_used_nonces.contains(nonce) {
+                return Err(SwapError::generic(alloc::format!(
+                    "invalid X3VM recovery snapshot: duplicate used nonce {}",
+                    nonce
+                )));
+            }
+            seen_used_nonces.push(*nonce);
+        }
+
+        let claimed_intents = snapshot
+            .locks
+            .iter()
+            .filter(|lock| lock.claimed)
+            .map(|lock| lock.intent_id)
+            .collect();
+        let refunded_intents = snapshot
+            .locks
+            .iter()
+            .filter(|lock| lock.refunded)
+            .map(|lock| lock.intent_id)
+            .collect();
+
+        Ok(Self {
+            inner: X3VmAdapterImpl {
+                chain_id: snapshot.chain_id,
+                finalized_block: snapshot.finalized_block,
+                escrow_address: snapshot.escrow_address,
+                used_nonces: snapshot.used_nonces,
+                claimed_intents,
+                refunded_intents,
+                simulation: snapshot.simulation,
+            },
+            locks: snapshot.locks,
+        })
     }
 
     /// Lock funds and record the lock state internally with nonce tracking.
@@ -1234,6 +1352,107 @@ mod tests {
             SwapError::AlreadyLocked { .. } => {} // expected
             _ => panic!("Expected AlreadyLocked error"),
         }
+    }
+
+    #[test]
+    fn test_recovery_snapshot_preserves_claim_terminal_state() {
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let preimage = make_hashlock(b"restart_claim");
+        let hashlock = make_hashlock(&preimage);
+        let intent = make_test_intent(140, hashlock);
+
+        adapter.lock(&intent).expect("lock");
+        adapter.claim(140, preimage).expect("claim");
+
+        let snapshot = adapter.recovery_snapshot();
+        let mut restored =
+            StatefulX3VmAdapter::from_recovery_snapshot(snapshot).expect("restore snapshot");
+
+        assert!(restored.is_claimed(140));
+        assert!(!restored.is_refunded(140));
+
+        let err = restored
+            .refund(140, intent.source_timeout + 1)
+            .expect_err("refund after restored claim must fail");
+        match err {
+            SwapError::RefundFailed { reason, .. } => assert_eq!(reason, "already claimed"),
+            _ => panic!("expected RefundFailed after restored claim"),
+        }
+    }
+
+    #[test]
+    fn test_recovery_snapshot_preserves_refund_terminal_state() {
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let preimage = make_hashlock(b"restart_refund");
+        let hashlock = make_hashlock(&preimage);
+        let intent = make_test_intent(150, hashlock);
+
+        adapter.lock(&intent).expect("lock");
+        adapter
+            .refund(150, intent.source_timeout + 1)
+            .expect("refund");
+
+        let snapshot = adapter.recovery_snapshot();
+        let mut restored =
+            StatefulX3VmAdapter::from_recovery_snapshot(snapshot).expect("restore snapshot");
+
+        assert!(restored.is_refunded(150));
+        assert!(!restored.is_claimed(150));
+
+        let err = restored
+            .claim(150, preimage)
+            .expect_err("claim after restored refund must fail");
+        match err {
+            SwapError::ClaimFailed { reason, .. } => assert_eq!(reason, "already refunded"),
+            _ => panic!("expected ClaimFailed after restored refund"),
+        }
+    }
+
+    #[test]
+    fn test_recovery_snapshot_preserves_nonce_replay_protection() {
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let intent = make_test_intent(160, make_hashlock(b"restart_nonce"));
+        adapter.lock(&intent).expect("lock");
+
+        let snapshot = adapter.recovery_snapshot();
+        let mut restored =
+            StatefulX3VmAdapter::from_recovery_snapshot(snapshot).expect("restore snapshot");
+
+        let replay = make_test_intent(160, make_hashlock(b"different_payload"));
+        let err = restored.lock(&replay).expect_err("replayed intent must fail");
+        assert!(
+            matches!(err, SwapError::AlreadyLocked { .. }),
+            "restored adapter must retain duplicate-lock protection"
+        );
+    }
+
+    #[test]
+    fn test_recovery_snapshot_rejects_conflicting_terminal_state() {
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let intent = make_test_intent(170, make_hashlock(b"corrupt_terminal"));
+        adapter.lock(&intent).expect("lock");
+
+        let mut snapshot = adapter.recovery_snapshot();
+        snapshot.locks[0].claimed = true;
+        snapshot.locks[0].refunded = true;
+
+        let err = StatefulX3VmAdapter::from_recovery_snapshot(snapshot)
+            .expect_err("conflicting terminal state must fail closed");
+        assert!(err.to_string().contains("both claimed and refunded"));
+    }
+
+    #[test]
+    fn test_recovery_snapshot_rejects_missing_replay_nonce() {
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let intent = make_test_intent(180, make_hashlock(b"missing_nonce"));
+        adapter.lock(&intent).expect("lock");
+
+        let mut snapshot = adapter.recovery_snapshot();
+        snapshot.used_nonces.clear();
+
+        let err = StatefulX3VmAdapter::from_recovery_snapshot(snapshot)
+            .expect_err("missing replay nonce must fail closed");
+        assert!(err.to_string().contains("missing from replay set"));
     }
 
     // ── Nonce Replay Protection Tests ─────────────────────────────────────
