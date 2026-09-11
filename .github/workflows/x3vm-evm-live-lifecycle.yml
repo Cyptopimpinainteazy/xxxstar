@@ -12,13 +12,13 @@ name: x3vm-evm-live-lifecycle
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "X3-contracts/evm/**"
       - "crates/x3-atomic-swap/**"
       - ".github/workflows/x3vm-evm-live-lifecycle.yml"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "X3-contracts/evm/**"
       - "crates/x3-atomic-swap/**"
