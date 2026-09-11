@@ -22,6 +22,7 @@ on:
       - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-evm-live-lifecycle.yml"
   workflow_dispatch:
+  workflow_call:
 
 env:
   CARGO_TERM_COLOR: always
