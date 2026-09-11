@@ -748,6 +748,113 @@ impl StatefulX3VmAdapter {
         Ok(proof)
     }
 
+    #[cfg(feature = "std")]
+    /// Persist the current recovery snapshot with checksum + atomic replace.
+    pub fn save_recovery_snapshot<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+    ) -> Result<(), SwapError> {
+        use std::fs::{self, File, OpenOptions};
+        use std::io::Write;
+
+        #[derive(Serialize)]
+        struct RecoveryEnvelope<'a> {
+            checksum_sha256: String,
+            snapshot: &'a X3VmRecoverySnapshot,
+        }
+
+        let path = path.as_ref();
+        let parent = path.parent().ok_or_else(|| {
+            SwapError::generic("X3VM recovery path has no parent directory")
+        })?;
+        fs::create_dir_all(parent).map_err(|e| {
+            SwapError::generic(alloc::format!("create recovery directory failed: {e}"))
+        })?;
+
+        let snapshot = self.recovery_snapshot();
+        let snapshot_bytes = serde_json::to_vec(&snapshot).map_err(|e| {
+            SwapError::generic(alloc::format!("serialize X3VM recovery snapshot failed: {e}"))
+        })?;
+        let checksum_sha256 = hex::encode(Sha256::digest(&snapshot_bytes));
+        let envelope = RecoveryEnvelope {
+            checksum_sha256,
+            snapshot: &snapshot,
+        };
+        let payload = serde_json::to_vec(&envelope).map_err(|e| {
+            SwapError::generic(alloc::format!("serialize X3VM recovery envelope failed: {e}"))
+        })?;
+
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| SwapError::generic("invalid X3VM recovery file name"))?;
+        let temp_path = parent.join(alloc::format!(
+            ".{file_name}.{}.tmp",
+            std::process::id()
+        ));
+
+        let mut temp = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&temp_path)
+            .map_err(|e| SwapError::generic(alloc::format!(
+                "open X3VM recovery temp file failed: {e}"
+            )))?;
+        temp.write_all(&payload).map_err(|e| {
+            SwapError::generic(alloc::format!("write X3VM recovery snapshot failed: {e}"))
+        })?;
+        temp.sync_all().map_err(|e| {
+            SwapError::generic(alloc::format!("sync X3VM recovery snapshot failed: {e}"))
+        })?;
+        drop(temp);
+
+        fs::rename(&temp_path, path).map_err(|e| {
+            let _ = fs::remove_file(&temp_path);
+            SwapError::generic(alloc::format!("commit X3VM recovery snapshot failed: {e}"))
+        })?;
+
+        #[cfg(unix)]
+        {
+            File::open(parent)
+                .and_then(|dir| dir.sync_all())
+                .map_err(|e| SwapError::generic(alloc::format!(
+                    "sync X3VM recovery directory failed: {e}"
+                )))?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "std")]
+    /// Load, verify, and restore a persisted recovery snapshot.
+    pub fn load_recovery_snapshot<P: AsRef<std::path::Path>>(
+        path: P,
+    ) -> Result<Self, SwapError> {
+        #[derive(Deserialize)]
+        struct RecoveryEnvelope {
+            checksum_sha256: String,
+            snapshot: X3VmRecoverySnapshot,
+        }
+
+        let payload = std::fs::read(path.as_ref()).map_err(|e| {
+            SwapError::generic(alloc::format!("read X3VM recovery snapshot failed: {e}"))
+        })?;
+        let envelope: RecoveryEnvelope = serde_json::from_slice(&payload).map_err(|e| {
+            SwapError::generic(alloc::format!("parse X3VM recovery snapshot failed: {e}"))
+        })?;
+        let snapshot_bytes = serde_json::to_vec(&envelope.snapshot).map_err(|e| {
+            SwapError::generic(alloc::format!("re-serialize X3VM recovery snapshot failed: {e}"))
+        })?;
+        let actual = hex::encode(Sha256::digest(&snapshot_bytes));
+        if actual != envelope.checksum_sha256 {
+            return Err(SwapError::generic(
+                "X3VM recovery snapshot checksum mismatch",
+            ));
+        }
+
+        Self::from_recovery_snapshot(envelope.snapshot)
+    }
     /// Check if a given intent has been claimed.
     pub fn is_claimed(&self, intent_id: IntentId) -> bool {
         self.locks
@@ -1456,6 +1563,77 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_durable_recovery_roundtrip_preserves_terminal_state() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let preimage = make_hashlock(b"durable_roundtrip");
+        let hashlock = make_hashlock(&preimage);
+        let intent = make_test_intent(166, hashlock);
+        adapter.lock(&intent).expect("lock");
+        adapter.claim(166, preimage).expect("claim");
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = std::env::temp_dir().join(alloc::format!(
+            "x3vm-recovery-{}-{unique}.json",
+            std::process::id()
+        ));
+
+        adapter
+            .save_recovery_snapshot(&path)
+            .expect("persist recovery snapshot");
+        let mut restored = StatefulX3VmAdapter::load_recovery_snapshot(&path)
+            .expect("load recovery snapshot");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(restored.is_claimed(166));
+        assert!(!restored.is_refunded(166));
+        assert!(restored
+            .refund(166, intent.source_timeout + 1)
+            .is_err());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_durable_recovery_rejects_corrupted_file() {
+        use std::io::{Seek, SeekFrom, Write};
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
+        let intent = make_test_intent(167, make_hashlock(b"durable_corrupt"));
+        adapter.lock(&intent).expect("lock");
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = std::env::temp_dir().join(alloc::format!(
+            "x3vm-recovery-corrupt-{}-{unique}.json",
+            std::process::id()
+        ));
+        adapter
+            .save_recovery_snapshot(&path)
+            .expect("persist recovery snapshot");
+
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect("open persisted snapshot");
+        file.seek(SeekFrom::Start(0)).expect("seek");
+        file.write_all(b"{\"checksum_sha256\":\"00\",\"snapshot\":")
+            .expect("corrupt snapshot");
+        file.sync_all().expect("sync corruption");
+
+        let result = StatefulX3VmAdapter::load_recovery_snapshot(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(result.is_err(), "corrupted recovery file must fail closed");
+    }
     #[test]
     fn test_recovery_snapshot_rejects_conflicting_terminal_state() {
         let mut adapter = StatefulX3VmAdapter::simulation("x3-mainnet".into());
