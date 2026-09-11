@@ -2,13 +2,19 @@
 
 use super::*;
 use crate::Pallet as AutomationPallet;
-use frame_benchmarking::{benchmarks, whitelisted_caller};
+use frame_benchmarking::{v2::benchmarks, whitelisted_caller};
 use frame_system::RawOrigin;
 use x3_automation::{Action, Condition};
 
 #[benchmarks]
 mod benchmarks {
     use super::*;
+    use frame_benchmarking::impl_test_function;
+    use frame_support::{
+        assert_ok,
+        traits::{Currency, Get},
+    };
+    use sp_runtime::traits::Saturating;
 
     #[benchmark]
     fn register_task() {
@@ -73,7 +79,7 @@ mod benchmarks {
 
         // Register a task
         assert_ok!(AutomationPallet::<T>::register_task(
-            RawOrigin::Signed(caller).into(),
+            RawOrigin::Signed(caller.clone()).into(),
             condition,
             action,
             max_fee

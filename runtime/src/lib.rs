@@ -128,10 +128,14 @@ use sp_runtime::{
     transaction_validity::{InvalidTransaction, TransactionValidityError},
     DispatchError, MultiAddress, MultiSignature, Perbill,
 };
+#[cfg(not(feature = "mainnet-rc1"))]
+use sp_runtime::DispatchResult;
 use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
+#[cfg(not(feature = "mainnet-rc1"))]
+use x3_dex::amm_pools::TokenId as DexTokenId;
 
 #[cfg(feature = "frontier")]
 mod precompiles;
