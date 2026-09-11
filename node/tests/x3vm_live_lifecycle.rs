@@ -345,6 +345,46 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     assert!(persisted.has_verified_kind_for_intent(local_id, ProofKind::SourceLock));
     assert!(persisted.has_verified_kind_for_intent(local_id, ProofKind::Claim));
     assert!(persisted.has_verified_kind_for_intent(local_id, ProofKind::FinalityVerified));
+
+    // Simulate a relayer/coordinator process restart. The fresh transport must
+    // recover durable evidence, then re-read the exact finalized block and
+    // dispatch result before it can return safe finality again.
+    drop(adapter);
+    let restarted_signer =
+        X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+            .expect("restart signer");
+    let restarted_transport = NativeX3NodeTransport::new_with_proof_ledger(
+        X3NodeTransportConfig {
+            chain_id: chain_id.clone(),
+            rpc_url: RPC_URL.into(),
+            finality_poll_attempts: 480,
+            finality_poll_delay_ms: 500,
+            expected_block_time_ms: 6_000,
+        },
+        restarted_signer,
+        ledger_path.clone(),
+    )
+    .expect("reopen native transport after process-style restart");
+    let restarted_adapter = LiveX3VmAdapter::new(
+        chain_id,
+        b"x3-native-escrow".to_vec(),
+        restarted_transport,
+    );
+
+    let restored_lock = restarted_adapter
+        .finality_status(&lock.tx_id)
+        .expect("revalidate persisted lock finality after restart");
+    assert_eq!(restored_lock.block_hash, lock.block_hash);
+    assert!(restored_lock.finalized);
+    assert!(restored_lock.safe_to_reveal_secret);
+
+    let restored_claim = restarted_adapter
+        .finality_status(&claim.tx_id)
+        .expect("revalidate persisted claim finality after restart");
+    assert_eq!(restored_claim.block_hash, claim.block_hash);
+    assert!(restored_claim.finalized);
+    assert!(restored_claim.safe_to_reveal_secret);
+
     let _ = std::fs::remove_file(ledger_path);
 }
 
