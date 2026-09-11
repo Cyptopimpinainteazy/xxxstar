@@ -35,6 +35,15 @@ jobs:
       - name: Run Clippy (node RC-1)
         run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1 -- -D warnings
 
+      - name: Run Clippy (node runtime benchmarks)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,runtime-benchmarks -- -D warnings
+
+      - name: Run Clippy (node try-runtime)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,try-runtime -- -D warnings
+
+      - name: Run Clippy (node GPU validator)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,gpu-validator -- -D warnings
+
       # `production` and `test-verifier` are intentionally incompatible:
       # production must never compile a test verifier. Check both valid
       # configurations independently rather than disabling that fail-closed

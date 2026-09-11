@@ -1,7 +1,5 @@
 //! Benchmarks for the x3-slash pallet.
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use sp_std::vec;
 use frame_benchmarking::benchmarks;

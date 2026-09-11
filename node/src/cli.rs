@@ -189,7 +189,7 @@ pub enum Commands {
     /// Run built-in benchmarking harnesses.
     #[cfg(feature = "runtime-benchmarks")]
     #[command(subcommand)]
-    Benchmark(frame_benchmarking_cli::BenchmarkCmd),
+    Benchmark(Box<frame_benchmarking_cli::BenchmarkCmd>),
     /// Execute try-runtime checks against on-chain state.
     #[cfg(feature = "try-runtime")]
     TryRuntime,

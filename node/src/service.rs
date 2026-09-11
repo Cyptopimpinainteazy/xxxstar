@@ -28,6 +28,8 @@ use sp_runtime::{
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
+#[cfg(feature = "gpu-validator")]
+use tokio::task::JoinHandle;
 use x3_bridge_adapters::{
     OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
@@ -67,9 +69,9 @@ const GPU_SIDECAR_RESTART_THRESHOLD: u32 = 3;
 #[allow(dead_code)]
 const GPU_SIDECAR_SHUTDOWN_TIMEOUT_SECS: u64 = 30;
 
-/// ───────────────────────────────────────────────────────────────
-/// GPU Sidecar Lifecycle Management
-/// ───────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+// GPU Sidecar Lifecycle Management
+// ───────────────────────────────────────────────────────────────
 
 /// Configuration for GPU sidecar spawning
 #[cfg(feature = "gpu-validator")]
@@ -142,7 +144,7 @@ impl GpuSidecarHandle {
         );
 
         // Signal shutdown
-        if let Err(_) = self.shutdown_tx.send(()) {
+        if self.shutdown_tx.send(()).is_err() {
             log::warn!("GPU sidecar shutdown signal already closed");
         }
 
@@ -151,7 +153,7 @@ impl GpuSidecarHandle {
         let start = std::time::Instant::now();
 
         loop {
-            let mut task_handle = self.task_handle.lock().await;
+            let task_handle = self.task_handle.lock().await;
             if task_handle.is_none() {
                 log::info!("✅ GPU sidecar gracefully shut down");
                 self.is_running
@@ -266,7 +268,7 @@ impl GpuSidecarHealthMonitor {
     }
 
     /// Check sidecar health and return true if operational
-    pub fn check_health(&mut self, current_block: u32) -> bool {
+    pub fn check_health(&mut self, _current_block: u32) -> bool {
         // Health status is tracked via `record_check` and restart thresholds;
         // this method returns the current tracked state.
         self.is_healthy
@@ -306,6 +308,14 @@ impl GpuSidecarHealthMonitor {
         log::info!("🔄 GPU sidecar health monitor reset");
     }
 }
+
+#[cfg(feature = "gpu-validator")]
+impl Default for GpuSidecarHealthMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Executor for X3 Chain — WASM-only in stable2512 (native eliminated).
 pub type Executor = sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>;
 
@@ -1454,7 +1464,6 @@ pub fn new_full_with_atomic_gateway<
             // Spawn sidecar task into the task manager
             let gpu_sidecar_for_spawn = gpu_sidecar_handle_arc.clone();
             let gpu_sidecar_is_running = gpu_sidecar_for_spawn.is_running.clone();
-            let gpu_sidecar_task_handle = gpu_sidecar_for_spawn.task_handle.clone();
             let orchestrator_for_sidecar = orchestrator.clone();
 
             task_manager.spawn_handle().spawn(
@@ -1893,7 +1902,7 @@ async fn spawn_gpu_sidecar(
                     }
                 }
 
-                if health_check_counter % 6 == 0 {
+                if health_check_counter.is_multiple_of(6) {
                     let orch = orchestrator.read().await;
                     let metrics = orch.get_swarm_metrics();
                     log::info!(
