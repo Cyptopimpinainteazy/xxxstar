@@ -769,6 +769,52 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         crate::ProofBundleStore::get_bundle(&self.proofs, proof_hash)
     }
 
+    #[cfg(feature = "canonical-proofs")]
+    pub fn assemble_verified_claim_proof_set(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+    ) -> Result<x3_atomic_swap::CrossDomainProofSet, CoordinatorError> {
+        let set =
+            self.assemble_canonical_proof_set(session_id, intent, runtime_intent_id)?;
+        set.verify_runtime_binding(runtime_intent_id).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "assembled claim proof set failed runtime binding: {e}"
+            ))
+        })?;
+        set.verify_claim_set(intent, required_domains).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "assembled claim proof set is incomplete or invalid: {e}"
+            ))
+        })?;
+        Ok(set)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn assemble_verified_refund_proof_set(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+    ) -> Result<x3_atomic_swap::CrossDomainProofSet, CoordinatorError> {
+        let set =
+            self.assemble_canonical_proof_set(session_id, intent, runtime_intent_id)?;
+        set.verify_runtime_binding(runtime_intent_id).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "assembled refund proof set failed runtime binding: {e}"
+            ))
+        })?;
+        set.verify_refund_set(intent, required_domains).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "assembled refund proof set is incomplete or invalid: {e}"
+            ))
+        })?;
+        Ok(set)
+    }
+
     pub fn attempt_history(
         &self,
         session_id: &str,
