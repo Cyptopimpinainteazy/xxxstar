@@ -26,11 +26,17 @@ fn expected_operation(operation: CoordinatorOperation) -> CrossDomainOperation {
 pub fn verify_bundle_for_attempt(
     prior: &OperationAttempt,
     intent: &AtomicIntent,
+    runtime_intent_id: [u8; 32],
     bundle: &CrossDomainProofBundle,
 ) -> Result<[u8; 32], CoordinatorError> {
     bundle.verify(intent).map_err(|e| {
         CoordinatorError::Internal(format!(
             "canonical cross-domain proof verification failed: {e}"
+        ))
+    })?;
+    bundle.verify_runtime_binding(runtime_intent_id).map_err(|e| {
+        CoordinatorError::Internal(format!(
+            "canonical runtime-intent proof binding failed: {e}"
         ))
     })?;
 
@@ -116,6 +122,7 @@ mod tests {
         let block_hash = "0xblock".to_string();
         CrossDomainProofBundle::new(
             intent,
+            [0xabu8; 32],
             "ethereum-mainnet".into(),
             VmType::Evm,
             CrossDomainOperation::Claim,
@@ -143,7 +150,7 @@ mod tests {
         let intent = intent();
         let proof = bundle(&intent);
         assert_eq!(
-            verify_bundle_for_attempt(&attempt(), &intent, &proof).unwrap(),
+            verify_bundle_for_attempt(&attempt(), &intent, [0xabu8; 32], &proof).unwrap(),
             proof.proof_hash
         );
     }
@@ -154,18 +161,18 @@ mod tests {
 
         let mut wrong_tx = bundle(&intent);
         wrong_tx.tx_id = "0xother".into();
-        assert!(verify_bundle_for_attempt(&attempt(), &intent, &wrong_tx).is_err());
+        assert!(verify_bundle_for_attempt(&attempt(), &intent, [0xabu8; 32], &wrong_tx).is_err());
 
         let mut wrong_domain = attempt();
         wrong_domain.domain = "base-mainnet".into();
-        assert!(verify_bundle_for_attempt(&wrong_domain, &intent, &bundle(&intent)).is_err());
+        assert!(verify_bundle_for_attempt(&wrong_domain, &intent, [0xabu8; 32], &bundle(&intent)).is_err());
 
         let mut wrong_operation = attempt();
         wrong_operation.operation = CoordinatorOperation::RefundBoth;
-        assert!(verify_bundle_for_attempt(&wrong_operation, &intent, &bundle(&intent)).is_err());
+        assert!(verify_bundle_for_attempt(&wrong_operation, &intent, [0xabu8; 32], &bundle(&intent)).is_err());
 
         let mut tampered = bundle(&intent);
         tampered.block_number += 1;
-        assert!(verify_bundle_for_attempt(&attempt(), &intent, &tampered).is_err());
+        assert!(verify_bundle_for_attempt(&attempt(), &intent, [0xabu8; 32], &tampered).is_err());
     }
 }
