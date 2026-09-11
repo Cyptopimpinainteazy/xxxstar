@@ -97,6 +97,10 @@ impl<S: DistributedLeaseStore> DurableSecretRegistry<S> {
         Self { store }
     }
 
+    pub fn shared_store(&self) -> Arc<S> {
+        Arc::clone(&self.store)
+    }
+
     fn key(secret_hash: [u8; 32]) -> Vec<u8> {
         let mut key = Self::PREFIX.to_vec();
         key.extend_from_slice(&secret_hash);
