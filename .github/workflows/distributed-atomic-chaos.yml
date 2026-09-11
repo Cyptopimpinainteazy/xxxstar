@@ -40,12 +40,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build distributed chaos harness
-        run: cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey --test distributed_chaos --no-run
+        run: cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey,canonical-proofs --test distributed_chaos --no-run
 
       - name: Run distributed chaos matrix
         run: |
           set -euo pipefail
           for run in $(seq 1 10); do
             echo "=== chaos iteration $run/10 ==="
-            cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey --test distributed_chaos -- --test-threads=6 --nocapture
+            cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey,canonical-proofs --test distributed_chaos -- --test-threads=6 --nocapture
           done
