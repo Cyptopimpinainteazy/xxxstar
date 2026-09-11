@@ -13,9 +13,23 @@ name: x3 frame-benchmarking
 
 on:
   pull_request:
+    branches: [master]
     paths:
       - "pallets/**"
       - "runtime/**"
+      - "node/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  push:
+    branches: [master, 'release/**']
+    paths:
+      - "pallets/**"
+      - "runtime/**"
+      - "node/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  schedule:
+    - cron: '30 4 * * *'
   workflow_dispatch:
 
 env:

@@ -1,19 +1,8 @@
 name: X3 Benchmark Regression Gate
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'benches/**'
-      - 'crates/x3-atomic-swap/**'
-      - 'crates/x3-dex/**'
-      - 'crates/x3-bridge-adapters/**'
-      - 'crates/x3-vm/**'
-      - 'crates/x3-rpc/**'
-      - 'pallets/**/src/**'
-      - 'runtime/src/**'
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - 'benches/**'
       - 'crates/x3-atomic-swap/**'
@@ -23,8 +12,23 @@ on:
       - 'crates/x3-rpc/**'
       - 'pallets/**/src/**'
       - 'runtime/src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  push:
+    branches: [master, 'release/**']
+    paths:
+      - 'benches/**'
+      - 'crates/x3-atomic-swap/**'
+      - 'crates/x3-dex/**'
+      - 'crates/x3-bridge-adapters/**'
+      - 'crates/x3-vm/**'
+      - 'crates/x3-rpc/**'
+      - 'pallets/**/src/**'
+      - 'runtime/src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
   schedule:
-    - cron: '0 4 * * *'  # Daily at 4am UTC
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 permissions:

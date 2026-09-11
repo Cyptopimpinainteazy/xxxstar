@@ -11,10 +11,28 @@
 name: x3 zombienet integration
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+    branches: [master]
+    paths:
+      - 'node/**'
+      - 'runtime/**'
+      - 'pallets/**'
+      - 'chain-specs/**'
+      - 'tests/zombienet/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  push:
+    branches: [master, 'release/**']
+    paths:
+      - 'node/**'
+      - 'runtime/**'
+      - 'pallets/**'
+      - 'chain-specs/**'
+      - 'tests/zombienet/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  schedule:
+    - cron: '30 6 * * *'
   workflow_dispatch:
 
 env:

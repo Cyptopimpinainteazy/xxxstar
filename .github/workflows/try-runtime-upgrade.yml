@@ -12,11 +12,21 @@ name: x3 try-runtime upgrade
 
 on:
   pull_request:
+    branches: [master]
     paths:
       - "runtime/**"
       - "pallets/**"
       - "Cargo.toml"
       - "Cargo.lock"
+  push:
+    branches: [master, 'release/**']
+    paths:
+      - "runtime/**"
+      - "pallets/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  schedule:
+    - cron: '0 5 * * *'
   workflow_dispatch:
     inputs:
       snapshot_url:
