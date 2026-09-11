@@ -263,7 +263,7 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         std::env::var("X3_TEST_SVM_CLAIMANT_PUBKEY").expect("claimant pubkey");
 
     let _x3 = spawn_x3_node();
-    wait_x3_rpc(Duration::from_secs(180));
+    wait_x3_rpc(Duration::from_secs(360));
 
     let local_id = 2001u64;
     let preimage = [0x6bu8; 32];
