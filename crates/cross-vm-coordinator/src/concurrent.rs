@@ -7,10 +7,148 @@
 
 use crate::{
     CoordinatorConfig, CoordinatorError, CoordinatorOperation, HtlcRecord, HtlcSecret,
-    InMemoryPersistence, SessionLease, SessionLeaseManager, SessionPersistence, SwapCoordinator,
-    SwapSession,
+    DistributedLeaseStore, DurableLeaseAuthority, InMemoryPersistence, SessionLease,
+    SessionLeaseManager, SessionPersistence, SwapCoordinator, SwapSession,
 };
 use std::sync::{Arc, Mutex, MutexGuard};
+
+
+/// Multi-process coordinator façade backed by a shared durable fencing authority.
+///
+/// Lease acquisition refreshes the latest persisted session/security state.
+/// Every value-moving commit revalidates the shared fence before entering the
+/// process-local coordinator mutation boundary.
+pub struct DistributedConcurrentSwapCoordinator<
+    P: SessionPersistence,
+    S: DistributedLeaseStore,
+> {
+    coordinator: ConcurrentSwapCoordinator<P>,
+    authority: DurableLeaseAuthority<S>,
+}
+
+impl<P: SessionPersistence, S: DistributedLeaseStore> Clone
+    for DistributedConcurrentSwapCoordinator<P, S>
+{
+    fn clone(&self) -> Self {
+        Self {
+            coordinator: self.coordinator.clone(),
+            authority: self.authority.clone(),
+        }
+    }
+}
+
+impl<P: SessionPersistence, S: DistributedLeaseStore>
+    DistributedConcurrentSwapCoordinator<P, S>
+{
+    pub fn new(
+        coordinator: ConcurrentSwapCoordinator<P>,
+        authority: DurableLeaseAuthority<S>,
+    ) -> Self {
+        Self {
+            coordinator,
+            authority,
+        }
+    }
+
+    pub fn acquire_session_lease(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+        now_unix: u64,
+        ttl_secs: u64,
+    ) -> Result<SessionLease, CoordinatorError> {
+        let lease = self
+            .authority
+            .acquire(session_id, owner_id, now_unix, ttl_secs)?;
+        self.coordinator
+            .execute(|inner| inner.refresh_from_persistence(session_id))?;
+        Ok(lease)
+    }
+
+    pub fn renew_session_lease(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+        ttl_secs: u64,
+    ) -> Result<SessionLease, CoordinatorError> {
+        self.authority.renew(lease, now_unix, ttl_secs)
+    }
+
+    pub fn release_session_lease(
+        &self,
+        lease: &SessionLease,
+    ) -> Result<(), CoordinatorError> {
+        self.authority.release(lease)
+    }
+
+    fn validate_before_commit(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.authority.validate(lease, now_unix)
+    }
+
+    pub fn record_htlc_fast(
+        &self,
+        lease: &SessionLease,
+        record: HtlcRecord,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_before_commit(lease, now_unix)?;
+        self.coordinator
+            .record_htlc_fast(&lease.session_id, record, now_unix)
+    }
+
+    pub fn record_htlc_slow(
+        &self,
+        lease: &SessionLease,
+        record: HtlcRecord,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_before_commit(lease, now_unix)?;
+        self.coordinator
+            .record_htlc_slow(&lease.session_id, record, now_unix)
+    }
+
+    pub fn record_fast_claim(
+        &self,
+        lease: &SessionLease,
+        secret: HtlcSecret,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_before_commit(lease, now_unix)?;
+        self.coordinator
+            .record_fast_claim(&lease.session_id, secret, now_unix)
+    }
+
+    pub fn record_slow_claim(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_before_commit(lease, now_unix)?;
+        self.coordinator
+            .record_slow_claim(&lease.session_id, now_unix)
+    }
+
+    pub fn record_refunds(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_before_commit(lease, now_unix)?;
+        self.coordinator
+            .record_refunds(&lease.session_id, now_unix)
+    }
+
+    pub fn session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SwapSession>, CoordinatorError> {
+        self.coordinator.session(session_id)
+    }
+}
 
 /// Shared coordinator handle for concurrent relayers/workers.
 ///
@@ -265,6 +403,75 @@ mod tests {
             persistence.clone(),
         );
         (persistence, coordinator)
+    }
+
+    #[test]
+    fn distributed_takeover_refreshes_state_and_rejects_stale_commit() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x56; 32]);
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let session = SwapSession {
+            session_id: "dist-refresh".to_string(),
+            hash_lock: secret.hash(),
+            htlc_fast: None,
+            htlc_slow: None,
+            flash_legs: vec![],
+            leg_outcomes: vec![],
+            phase: SwapPhase::Setup,
+            timelock_fast: now + 3_600,
+            timelock_slow: now + 7_200,
+            created_at: now,
+            updated_at: now,
+            operation_journal: vec![],
+            requires_merkle_verification: false,
+        };
+        persistence.save(&session);
+
+        let lease_store = Arc::new(crate::InMemoryDistributedLeaseStore::default());
+        let authority_a = crate::DurableLeaseAuthority::new(lease_store.clone());
+        let authority_b = crate::DurableLeaseAuthority::new(lease_store);
+
+        let proc_a = DistributedConcurrentSwapCoordinator::new(
+            ConcurrentSwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence.clone(),
+            ),
+            authority_a,
+        );
+        let proc_b = DistributedConcurrentSwapCoordinator::new(
+            ConcurrentSwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence.clone(),
+            ),
+            authority_b,
+        );
+
+        let lease_a = proc_a
+            .acquire_session_lease("dist-refresh", "proc-a", now, 5)
+            .unwrap();
+        proc_a
+            .record_htlc_fast(&lease_a, record(11, secret.hash(), now), now + 1)
+            .unwrap();
+
+        let lease_b = proc_b
+            .acquire_session_lease("dist-refresh", "proc-b", now + 5, 30)
+            .unwrap();
+
+        // proc-b was constructed before proc-a committed, so this assertion
+        // proves lease acquisition refreshed the persisted session.
+        let refreshed = proc_b.session("dist-refresh").unwrap().unwrap();
+        assert!(refreshed.htlc_fast.is_some());
+
+        assert!(proc_a
+            .record_htlc_slow(&lease_a, record(12, secret.hash(), now), now + 6)
+            .is_err());
+        proc_b
+            .record_htlc_slow(&lease_b, record(12, secret.hash(), now), now + 6)
+            .unwrap();
+
+        let final_state = persistence.load("dist-refresh").unwrap();
+        assert!(final_state.htlc_fast.is_some());
+        assert!(final_state.htlc_slow.is_some());
     }
 
     #[test]
