@@ -13,7 +13,7 @@ SECRET_PATTERNS = [
     re.compile(
         r"(?:[A-Za-z][A-Za-z0-9_]*_)?"
         r"(?:X3(?:VM)?_SIGNER_(?:SURI|SEED_HEX)|PRIVATE_KEY|SECRET_KEY|API_KEY|BEARER_TOKEN)"
-        r"\s*[:=]\s*(?:['\"](?!\$(?:\{|[A-Za-z_])|(?:env|process\.env|secrets)\.)[^'\"]{16,}['\"]"
+        r"\s*[:=]\s*(?:['\"](?!\$(?:\{|[A-Za-z_]))[^'\"]{16,}['\"]"
         r"|(?!\$(?:\{|[A-Za-z_])|(?:env|process\.env|secrets)\.)[^\s#'\"`]{16,})",
         re.I,
     ),
