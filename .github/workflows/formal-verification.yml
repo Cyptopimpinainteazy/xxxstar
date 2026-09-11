@@ -115,10 +115,14 @@ jobs:
       - name: Install Dafny (Optional)
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          cd /opt
-          sudo wget -q https://github.com/dafny-lang/dafny/releases/download/v4.2.0/dafny-4.2.0-x64-ubuntu-20.04.zip
-          sudo unzip -q dafny-4.2.0-x64-ubuntu-20.04.zip -d /opt/
-          sudo mv dafny /opt/dafny
+          if [ ! -x /opt/dafny/dafny ]; then
+            rm -rf "$RUNNER_TEMP/dafny-install"
+            mkdir -p "$RUNNER_TEMP/dafny-install"
+            wget -q https://github.com/dafny-lang/dafny/releases/download/v4.2.0/dafny-4.2.0-x64-ubuntu-20.04.zip -O "$RUNNER_TEMP/dafny-install/dafny.zip"
+            unzip -q "$RUNNER_TEMP/dafny-install/dafny.zip" -d "$RUNNER_TEMP/dafny-install"
+            sudo rm -rf /opt/dafny
+            sudo mv "$RUNNER_TEMP/dafny-install/dafny" /opt/dafny
+          fi
           echo "✅ Dafny installed"
 
       - name: Verify Tool Installations
