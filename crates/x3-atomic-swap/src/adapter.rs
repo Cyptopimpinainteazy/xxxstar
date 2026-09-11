@@ -67,7 +67,7 @@ impl VmFamily {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Supported VM execution environments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
 pub enum VmType {
     Evm,
     Svm,
@@ -215,7 +215,7 @@ pub struct ChainHealth {
 }
 
 /// Finality proof - confirms a transaction is finalised on a particular chain.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, codec::Encode, codec::Decode, scale_info::TypeInfo)]
 pub struct FinalityProof {
     pub chain_id: ChainId,
     pub vm_type: VmType,
