@@ -2,9 +2,25 @@ name: Economic Attack Gate
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [master]
+    paths:
+      - 'proof-forge/**'
+      - 'pallets/x3-dex/**'
+      - 'pallets/x3-settlement-engine/**'
+      - 'pallets/x3-atomic-kernel/**'
+      - 'runtime/**'
+      - 'economics/**'
   push:
-    branches: [main]
+    branches: [master, 'release/**']
+    paths:
+      - 'proof-forge/**'
+      - 'pallets/x3-dex/**'
+      - 'pallets/x3-settlement-engine/**'
+      - 'pallets/x3-atomic-kernel/**'
+      - 'runtime/**'
+      - 'economics/**'
+  schedule:
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 env:
