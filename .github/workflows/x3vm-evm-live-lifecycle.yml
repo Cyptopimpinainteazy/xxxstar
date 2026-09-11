@@ -20,7 +20,7 @@ on:
       - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-evm-live-lifecycle.yml"
   pull_request:
-    branches: [master]
+    branches: [master, finish/x3vm-live-transport]
     paths:
       - "X3-contracts/evm/**"
       - "crates/x3-atomic-swap/**"
