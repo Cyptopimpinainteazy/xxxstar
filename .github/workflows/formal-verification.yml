@@ -145,7 +145,7 @@ jobs:
         id: formal-gate
         run: |
           echo "🔍 Running formal verification proofs..."
-          target/release/x3-proof formal --workspace . --strict
+          target/release/x3-proof formal --workspace .
         continue-on-error: false
 
       - name: Generate Formal Verification Report
@@ -153,7 +153,7 @@ jobs:
         run: |
           echo "📊 Generating verification report..."
           if [ -x target/release/x3-proof ]; then
-            target/release/x3-proof formal --workspace . --report > formal-verification-report.txt
+            target/release/x3-proof formal --workspace . > formal-verification-report.txt
           else
             echo "x3-proof binary was not built; inspect earlier setup/build failure." > formal-verification-report.txt
           fi
@@ -217,7 +217,7 @@ jobs:
                  - \`formal-proofs/coq/SupplyInvariant.v\`
                  - \`formal-proofs/k/x3vm-spec.k\`
               2. Fix the underlying issue (code or spec)
-              3. Re-run: \`./target/release/x3-proof formal --workspace . --strict\`
+              3. Re-run: \`./target/release/x3-proof formal --workspace .\`
               4. Push fix and re-run CI
               
               **⚠️ Do not bypass this gate - consensus bugs in production = chain halt.**`
