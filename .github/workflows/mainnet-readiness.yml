@@ -83,7 +83,10 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+run: |
+  curl -sSfL https://github.com/protocolbuffers/protobuf/releases/download/v25.3/protoc-25.3-linux-x86_64.zip -o /tmp/protoc.zip
+  sudo unzip -o /tmp/protoc.zip -d /usr/local bin/protoc
+  rm -f /tmp/protoc.zip
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
