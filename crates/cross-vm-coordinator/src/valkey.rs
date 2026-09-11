@@ -383,6 +383,144 @@ return 1
 }
 
 
+/// Durable settlement-submission outbox on Redis/Valkey.
+///
+/// Uses atomic compare-and-append against the current last snapshot so two
+/// coordinator processes cannot both advance one submission from the same
+/// prior state with conflicting transactions.
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+#[derive(Clone)]
+pub struct ValkeySettlementOutboxStore {
+    client: Client,
+    namespace: String,
+}
+
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+impl ValkeySettlementOutboxStore {
+    pub fn new(redis_url: &str) -> Result<Self, CoordinatorError> {
+        Self::with_namespace(redis_url, "x3")
+    }
+
+    pub fn with_namespace(
+        redis_url: &str,
+        namespace: impl Into<String>,
+    ) -> Result<Self, CoordinatorError> {
+        Ok(Self {
+            client: Client::open(redis_url)
+                .map_err(|e| backend_error("client creation", e))?,
+            namespace: namespace.into(),
+        })
+    }
+
+    fn key(&self, submission_id: [u8; 32]) -> String {
+        format!(
+            "{}:settlement-outbox:{}",
+            self.namespace,
+            hex::encode(submission_id)
+        )
+    }
+
+    fn connection(&self) -> Result<redis::Connection, CoordinatorError> {
+        self.client
+            .get_connection()
+            .map_err(|e| backend_error("connection", e))
+    }
+}
+
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+impl crate::SettlementOutboxStore for ValkeySettlementOutboxStore {
+    fn compare_and_append(
+        &self,
+        submission_id: [u8; 32],
+        expected: Option<&crate::SettlementOutboxRecord>,
+        next: &crate::SettlementOutboxRecord,
+    ) -> Result<(), CoordinatorError> {
+        if next.submission_id != submission_id {
+            return Err(CoordinatorError::Internal(
+                "settlement outbox key does not match record submission id".into(),
+            ));
+        }
+
+        let expected_payload = expected
+            .map(serde_json::to_string)
+            .transpose()
+            .map_err(|e| {
+                CoordinatorError::Internal(format!(
+                    "settlement outbox expected snapshot serialize failed: {e}"
+                ))
+            })?
+            .unwrap_or_default();
+        let next_payload = serde_json::to_string(next).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "settlement outbox snapshot serialize failed: {e}"
+            ))
+        })?;
+
+        let script = Script::new(
+            r#"
+local current = redis.call('LINDEX', KEYS[1], -1)
+local expect_none = ARGV[1] == '1'
+local expected = ARGV[2]
+local next = ARGV[3]
+
+if current == next then
+  return 1
+end
+
+if expect_none then
+  if current then return 0 end
+else
+  if not current or current ~= expected then return 0 end
+end
+
+redis.call('RPUSH', KEYS[1], next)
+return 1
+"#,
+        );
+
+        let mut conn = self.connection()?;
+        let accepted: i64 = script
+            .key(self.key(submission_id))
+            .arg(if expected.is_none() { "1" } else { "0" })
+            .arg(expected_payload)
+            .arg(next_payload)
+            .invoke(&mut conn)
+            .map_err(|e| backend_error("settlement outbox transition script", e))?;
+
+        if accepted == 1 {
+            Ok(())
+        } else {
+            Err(CoordinatorError::Internal(
+                "settlement outbox concurrent transition conflict".into(),
+            ))
+        }
+    }
+
+    fn history(
+        &self,
+        submission_id: [u8; 32],
+    ) -> Result<Vec<crate::SettlementOutboxRecord>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let raw: Vec<String> = redis::cmd("LRANGE")
+            .arg(self.key(submission_id))
+            .arg(0)
+            .arg(-1)
+            .query(&mut conn)
+            .map_err(|e| backend_error("settlement outbox history lookup", e))?;
+
+        raw.into_iter()
+            .map(|entry| {
+                serde_json::from_str(&entry).map_err(|e| {
+                    CoordinatorError::Internal(format!(
+                        "invalid settlement outbox entry in Valkey: {e}"
+                    ))
+                })
+            })
+            .collect()
+    }
+}
+
+
 /// Immutable coordinator-session to canonical intent binding on Redis/Valkey.
 #[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
 #[derive(Clone)]
@@ -587,6 +725,8 @@ pub struct ValkeyDistributedCoordinator<P: crate::SessionPersistence> {
     proofs: ValkeyProofBundleStore,
     #[cfg(feature = "canonical-proofs")]
     bindings: ValkeyIntentBindingStore,
+    #[cfg(feature = "canonical-proofs")]
+    settlement_outbox: ValkeySettlementOutboxStore,
 }
 
 #[cfg(feature = "valkey")]
@@ -601,6 +741,8 @@ impl<P: crate::SessionPersistence> Clone for ValkeyDistributedCoordinator<P> {
             proofs: self.proofs.clone(),
             #[cfg(feature = "canonical-proofs")]
             bindings: self.bindings.clone(),
+            #[cfg(feature = "canonical-proofs")]
+            settlement_outbox: self.settlement_outbox.clone(),
         }
     }
 }
@@ -628,6 +770,9 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             proofs: ValkeyProofBundleStore::with_namespace(redis_url, namespace)?,
             #[cfg(feature = "canonical-proofs")]
             bindings: ValkeyIntentBindingStore::with_namespace(redis_url, namespace)?,
+            #[cfg(feature = "canonical-proofs")]
+            settlement_outbox:
+                ValkeySettlementOutboxStore::with_namespace(redis_url, namespace)?,
         })
     }
 
@@ -1065,6 +1210,123 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             canonical_results: &canonical_results,
         };
         Ok(crate::RecoveryReconciler::decide(&session, &evidence))
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn prepare_claim_submission(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        let envelope = self.claim_submission_envelope(
+            session_id,
+            intent,
+            runtime_intent_id,
+            required_domains,
+        )?;
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .prepare(session_id, &envelope, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn prepare_refund_submission(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        let envelope = self.refund_submission_envelope(
+            session_id,
+            intent,
+            runtime_intent_id,
+            required_domains,
+        )?;
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .prepare(session_id, &envelope, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn record_settlement_submission_signed(
+        &self,
+        lease: &SessionLease,
+        prepared: &crate::SettlementOutboxRecord,
+        tx_id: &str,
+        signed_extrinsic: Vec<u8>,
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        if prepared.session_id != lease.session_id
+            || prepared.runtime_intent_id
+                != crate::IntentBindingStore::load(
+                    &self.bindings,
+                    &lease.session_id,
+                )?
+                .ok_or_else(|| {
+                    CoordinatorError::Internal(
+                        "missing canonical intent binding for settlement signing".into(),
+                    )
+                })?
+                .runtime_intent_id
+        {
+            return Err(CoordinatorError::Internal(
+                "settlement outbox record does not match active session binding".into(),
+            ));
+        }
+
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .record_signed(
+                prepared,
+                tx_id,
+                signed_extrinsic,
+                &lease.owner_id,
+                lease.fence,
+                now_unix,
+            )
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn record_settlement_submission_broadcast(
+        &self,
+        signed: &crate::SettlementOutboxRecord,
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .record_broadcast(signed, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn record_settlement_submission_included(
+        &self,
+        broadcast: &crate::SettlementOutboxRecord,
+        block_number: u64,
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .record_included(broadcast, block_number, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn record_settlement_terminal_observed(
+        &self,
+        included: &crate::SettlementOutboxRecord,
+        now_unix: u64,
+    ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .record_terminal_observed(included, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn settlement_submission_recovery(
+        &self,
+        submission_id: [u8; 32],
+    ) -> Result<Option<crate::SettlementOutboxRecovery>, CoordinatorError> {
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .recovery(submission_id)
     }
 
     pub fn session(
