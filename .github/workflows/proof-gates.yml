@@ -166,7 +166,7 @@ jobs:
           fi
           curl -fsSL https://kframework.org/install -o "$RUNNER_TEMP/kframework-install"
           echo "${K_INSTALL_SHA256}  ${RUNNER_TEMP}/kframework-install" | sha256sum --check --status
-          bash "$RUNNER_TEMP/kframework-install"
+          bash "$RUNNER_TEMP/kframework-install" <<< "y"
           export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
           kup install k
           {
