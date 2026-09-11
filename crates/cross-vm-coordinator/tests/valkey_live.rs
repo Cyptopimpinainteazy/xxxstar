@@ -1,7 +1,9 @@
 #![cfg(feature = "valkey")]
 
 use x3_cross_vm_coordinator::{
-    DistributedLeaseStore, ValkeyCasStore, ValkeyLeaseAuthority, ValkeySecretRegistry,
+    AttemptStore, CoordinatorOperation, OperationAttempt, OperationAttemptLedger,
+    OperationAttemptStatus, DistributedLeaseStore, ValkeyAttemptStore, ValkeyCasStore,
+    ValkeyLeaseAuthority, ValkeySecretRegistry,
 };
 
 fn test_url() -> Option<String> {
@@ -66,4 +68,89 @@ fn live_valkey_binary_cas_matches_generic_contract() {
     assert!(!store.compare_and_set(key, Some(b"wrong"), second));
     assert!(store.compare_and_set(key, Some(first), second));
     assert_eq!(store.load(key).as_deref(), Some(second.as_slice()));
+}
+
+
+#[test]
+fn live_valkey_attempt_history_survives_store_restart() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("attempt-history");
+
+    let started = {
+        let ledger = OperationAttemptLedger::new(
+            ValkeyAttemptStore::with_namespace(&url, &ns).unwrap(),
+        );
+        let started = ledger
+            .record_started(
+                "swap-ledger",
+                CoordinatorOperation::FastClaim,
+                "attempt-1",
+                "relayer-a",
+                7,
+                "ethereum",
+                100,
+            )
+            .unwrap();
+        ledger.record_broadcast(&started, "0xabc", 101).unwrap()
+    };
+
+    // Fresh client/store instance simulates process restart.
+    let restarted = OperationAttemptLedger::new(
+        ValkeyAttemptStore::with_namespace(&url, &ns).unwrap(),
+    );
+    let history = restarted.history("swap-ledger").unwrap();
+    assert_eq!(history.len(), 2);
+    assert!(history.iter().any(|entry| {
+        entry.status == OperationAttemptStatus::Broadcast
+            && entry.tx_id.as_deref() == Some("0xabc")
+    }));
+
+    let canonical = restarted
+        .record_finalized(&started, [0x71; 32], 102)
+        .unwrap();
+    assert_eq!(canonical.proof_hash, [0x71; 32]);
+}
+
+#[test]
+fn live_valkey_canonical_proof_hash_cannot_be_replaced() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("attempt-canonical");
+    let ledger = OperationAttemptLedger::new(
+        ValkeyAttemptStore::with_namespace(&url, &ns).unwrap(),
+    );
+
+    let first = ledger
+        .record_started(
+            "swap-ledger",
+            CoordinatorOperation::SlowClaim,
+            "attempt-a",
+            "relayer-a",
+            8,
+            "solana",
+            100,
+        )
+        .unwrap();
+    let first = ledger.record_broadcast(&first, "sig-a", 101).unwrap();
+    ledger.record_finalized(&first, [0x72; 32], 102).unwrap();
+
+    let second = ledger
+        .record_started(
+            "swap-ledger",
+            CoordinatorOperation::SlowClaim,
+            "attempt-b",
+            "relayer-b",
+            9,
+            "solana",
+            103,
+        )
+        .unwrap();
+    let second = ledger.record_broadcast(&second, "sig-b", 104).unwrap();
+    assert!(ledger.record_finalized(&second, [0x73; 32], 105).is_err());
+
+    let canonical = ledger
+        .canonical("swap-ledger", CoordinatorOperation::SlowClaim)
+        .unwrap()
+        .unwrap();
+    assert_eq!(canonical.proof_hash, [0x72; 32]);
+    assert_eq!(canonical.tx_id, "sig-a");
 }
