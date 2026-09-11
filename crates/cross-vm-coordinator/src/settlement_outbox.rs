@@ -229,7 +229,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             ..latest
         };
         self.store
-            .compare_and_append(next.submission_id, Some(&prepared.clone()), &next)
+            .compare_and_append(next.submission_id, Some(&latest), &next)
             .or_else(|_| {
                 // Another process may have won the transition after our read.
                 // Re-read and accept only the exact same signed transaction.
