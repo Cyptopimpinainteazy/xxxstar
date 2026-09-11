@@ -1030,6 +1030,183 @@ mod state_machine_regression_tests {
         }
     }
 
+    fn idempotency_test_session(
+        session_id: &str,
+        phase: SwapPhase,
+        hash_lock: HtlcHash,
+        now: u64,
+    ) -> SwapSession {
+        SwapSession {
+            session_id: session_id.to_string(),
+            hash_lock,
+            htlc_fast: None,
+            htlc_slow: None,
+            flash_legs: vec![],
+            leg_outcomes: vec![],
+            phase,
+            timelock_fast: now + 3_600,
+            timelock_slow: now + 7_200,
+            created_at: now,
+            updated_at: now,
+            operation_journal: Vec::new(),
+            requires_merkle_verification: false,
+        }
+    }
+
+    fn idempotency_htlc(id: u8, hash_lock: HtlcHash, now: u64) -> HtlcRecord {
+        HtlcRecord {
+            id: HtlcId(vec![id; 32]),
+            params: HtlcCreateParams {
+                vm: VmTarget::Svm,
+                recipient: vec![1; 32],
+                hash_lock,
+                timelock: now + 3_600,
+                asset: vec![2; 32],
+                amount: 1_000,
+            },
+            status: HtlcStatus::Funded,
+            created_at_block: 100,
+            confirmations_required: 1,
+            confirmations: 1,
+            params_hash: [id; 32],
+        }
+    }
+
+    #[test]
+    fn identical_fast_lock_replay_is_successful_noop_but_conflict_fails() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x41; 32]);
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let mut session =
+            idempotency_test_session("idem-lock", SwapPhase::Setup, secret.hash(), now);
+        persistence.save(&session);
+
+        let mut coordinator =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        let first = idempotency_htlc(1, secret.hash(), now);
+        coordinator
+            .record_htlc_fast("idem-lock", first.clone(), now)
+            .expect("first lock observation");
+        coordinator
+            .record_htlc_fast("idem-lock", first, now + 1)
+            .expect("identical retry is idempotent");
+
+        let session = coordinator.get_session("idem-lock").unwrap();
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::FastHtlcLock)
+                .count(),
+            1
+        );
+
+        let conflicting = idempotency_htlc(2, secret.hash(), now);
+        let err = coordinator
+            .record_htlc_fast("idem-lock", conflicting, now + 2)
+            .expect_err("different lock evidence must conflict");
+        assert!(matches!(
+            err,
+            CoordinatorError::IdempotencyConflict {
+                operation: CoordinatorOperation::FastHtlcLock,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn fast_claim_retry_survives_coordinator_restart() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x42; 32]);
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let mut session =
+            idempotency_test_session("idem-claim", SwapPhase::ClaimingFast, secret.hash(), now);
+        session.htlc_fast = Some(idempotency_htlc(3, secret.hash(), now));
+        persistence.save(&session);
+
+        {
+            let mut coordinator = SwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence.clone(),
+            );
+            coordinator
+                .record_fast_claim("idem-claim", secret.clone(), now)
+                .expect("first fast claim");
+            assert_eq!(
+                coordinator.get_session("idem-claim").unwrap().phase,
+                SwapPhase::ClaimingSlow
+            );
+        }
+
+        let mut recovered =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        recovered
+            .record_fast_claim("idem-claim", secret, now + 10)
+            .expect("same claim after restart must be successful no-op");
+        let session = recovered.get_session("idem-claim").unwrap();
+        assert_eq!(session.phase, SwapPhase::ClaimingSlow);
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::FastClaim)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn duplicate_slow_claim_and_refund_completion_are_idempotent() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x43; 32]);
+
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let mut claim_session =
+            idempotency_test_session("idem-slow", SwapPhase::ClaimingSlow, secret.hash(), now);
+        claim_session.htlc_slow = Some(idempotency_htlc(4, secret.hash(), now));
+        persistence.save(&claim_session);
+
+        let mut coordinator = SwapCoordinator::with_persistence(
+            CoordinatorConfig::default(),
+            persistence.clone(),
+        );
+        coordinator
+            .record_slow_claim("idem-slow", now)
+            .expect("first slow claim");
+        coordinator
+            .record_slow_claim("idem-slow", now + 1)
+            .expect("duplicate slow claim");
+        assert_eq!(
+            coordinator.get_session("idem-slow").unwrap().phase,
+            SwapPhase::Complete
+        );
+
+        let mut refund_session =
+            idempotency_test_session("idem-refund", SwapPhase::Aborting, secret.hash(), now);
+        refund_session.htlc_fast = Some(idempotency_htlc(5, secret.hash(), now));
+        refund_session.htlc_slow = Some(idempotency_htlc(6, secret.hash(), now));
+        persistence.save(&refund_session);
+
+        let mut recovered =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        recovered
+            .record_refunds("idem-refund", now)
+            .expect("first refund completion");
+        recovered
+            .record_refunds("idem-refund", now + 1)
+            .expect("duplicate refund completion");
+        let session = recovered.get_session("idem-refund").unwrap();
+        assert_eq!(session.phase, SwapPhase::Refunded);
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::RefundBoth)
+                .count(),
+            1
+        );
+    }
+
     #[test]
     fn stale_session_batch_filters_before_limiting_and_seeks_from_cursor() {
         let mut coordinator = SwapCoordinator::with_default_config();
