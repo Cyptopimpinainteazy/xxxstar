@@ -262,12 +262,16 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
             let start = next_number.unwrap_or(head_number);
             if head_number >= start {
                 for number in start..=head_number {
-                    if let Some(hash) = self.block_hash_at(number)? {
-                        if let Some(proof) =
-                            self.inclusion_at_block(tx_id, signed_extrinsic, &hash)?
-                        {
-                            return Ok(proof);
-                        }
+                    let hash = self.block_hash_at(number)?.ok_or_else(|| {
+                        SwapError::RpcError(alloc::format!(
+                            "chain_getBlockHash returned no hash for finalized block {}",
+                            number
+                        ))
+                    })?;
+                    if let Some(proof) =
+                        self.inclusion_at_block(tx_id, signed_extrinsic, &hash)?
+                    {
+                        return Ok(proof);
                     }
                 }
             }
@@ -298,27 +302,39 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         if proof.tx_id != tx_id || proof.block_hash != block_hash {
             return Ok(false);
         }
-        let finalized = self.finalized_head()?;
-        if finalized != proof.block_hash {
-            // A newer finalized head is normal. Confirm the recorded block still resolves
-            // and contains the exact signed extrinsic at the recorded index.
-            let (block, header) = self.block_and_header(&proof.block_hash)?;
-            let extrinsics = block
-                .pointer("/block/extrinsics")
-                .and_then(Value::as_array)
-                .ok_or_else(|| SwapError::RpcError("proof block missing extrinsics".into()))?;
-            if extrinsics
-                .get(proof.extrinsic_index as usize)
-                .and_then(Value::as_str)
-                != Some(proof.signed_extrinsic.as_str())
-            {
-                return Ok(false);
-            }
-            if header.get("stateRoot").and_then(Value::as_str) != Some(proof.state_root.as_str()) {
-                return Ok(false);
-            }
+        // Always re-read the recorded finalized block. A proof must remain bound
+        // to the exact block, height, state root and extrinsic index even when
+        // that block is also the node's current finalized head.
+        let (block, header) = self.block_and_header(&proof.block_hash)?;
+        let extrinsics = block
+            .pointer("/block/extrinsics")
+            .and_then(Value::as_array)
+            .ok_or_else(|| SwapError::RpcError("proof block missing extrinsics".into()))?;
+        if extrinsics
+            .get(proof.extrinsic_index as usize)
+            .and_then(Value::as_str)
+            != Some(proof.signed_extrinsic.as_str())
+        {
+            return Ok(false);
         }
-        Ok(true)
+        if header.get("stateRoot").and_then(Value::as_str) != Some(proof.state_root.as_str()) {
+            return Ok(false);
+        }
+        let recorded_number = Self::parse_hex_u64(
+            header
+                .get("number")
+                .ok_or_else(|| SwapError::RpcError("proof header missing number".into()))?,
+            "proof header.number",
+        )?;
+        if recorded_number != proof.block_number {
+            return Ok(false);
+        }
+
+        // Finally prove that the recorded block is no newer than the current
+        // GRANDPA-finalized head. Inclusion in a non-finalized fork is never
+        // sufficient.
+        let finalized_number = self.finalized_head_number()?;
+        Ok(proof.block_number <= finalized_number)
     }
 
     fn latest_header_numbers(&self) -> Result<(u64, u64), SwapError> {
@@ -438,13 +454,15 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
     fn estimate_fee(
         &self,
         chain_id: &ChainId,
-        _escrow_address: &[u8],
+        escrow_address: &[u8],
         intent: &AtomicIntent,
     ) -> Result<FeeEstimate, SwapError> {
         self.require_chain(chain_id)?;
-        // Fee estimation for a signed dynamic runtime call requires the final signed
-        // extrinsic. Reuse the signer to produce the lock call, then ask the node.
-        let signed = self.signer.sign_lock_escrow(chain_id, &[], intent)?;
+        // Fee estimation must query the exact lock payload that would be
+        // submitted, including the real escrow address.
+        let signed = self
+            .signer
+            .sign_lock_escrow(chain_id, escrow_address, intent)?;
         let mut rpc = self.rpc_lock()?;
         let info = rpc
             .call(
