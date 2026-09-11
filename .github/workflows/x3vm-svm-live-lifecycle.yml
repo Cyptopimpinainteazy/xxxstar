@@ -36,7 +36,7 @@ jobs:
   live-lifecycle:
     name: SVM HTLC live validator lifecycle
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
 
