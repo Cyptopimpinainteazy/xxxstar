@@ -19,7 +19,7 @@ on:
       - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-svm-live-lifecycle.yml"
   pull_request:
-    branches: [master]
+    branches: [master, finish/x3vm-live-transport]
     paths:
       - "programs/svm/**"
       - "crates/x3-atomic-swap/**"
@@ -134,6 +134,13 @@ jobs:
           env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
             --test x3vm_svm_live \
             real_x3vm_svm_lock_claim_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Run real X3VM-SVM refund recovery lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_svm_live \
+            real_x3vm_svm_refund_is_terminal_on_both_domains \
             -- --ignored --nocapture
 
       - name: Dump isolated Solana validator log on failure

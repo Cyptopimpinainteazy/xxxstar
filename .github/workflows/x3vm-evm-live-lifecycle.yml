@@ -20,7 +20,7 @@ on:
       - "pallets/x3-settlement-engine/**"
       - ".github/workflows/x3vm-evm-live-lifecycle.yml"
   pull_request:
-    branches: [master]
+    branches: [master, finish/x3vm-live-transport]
     paths:
       - "X3-contracts/evm/**"
       - "crates/x3-atomic-swap/**"
@@ -118,6 +118,10 @@ jobs:
       - name: Run real X3VM-EVM atomic lifecycle
         run: |
           env -u SKIP_WASM_BUILD cargo test -p x3-chain-node             --test x3vm_evm_live             real_x3vm_evm_lock_claim_atomic_lifecycle             -- --ignored --nocapture
+
+      - name: Run real X3VM-EVM refund recovery lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node             --test x3vm_evm_live             real_x3vm_evm_refund_is_terminal_on_both_domains             -- --ignored --nocapture
 
       - name: Dump isolated Anvil log on failure
         if: failure()
