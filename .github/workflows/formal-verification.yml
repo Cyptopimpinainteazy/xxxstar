@@ -23,7 +23,6 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
-  K_INSTALL_SHA256: a485a0af380bb34d9874db11432b6422c019ff4a55a01e81b61e04dbfcd96f44
 
 
 concurrency:
@@ -33,8 +32,11 @@ concurrency:
 jobs:
   formal-verification:
     name: Run Formal Verification Proofs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
     
     steps:
       - name: Checkout Repository
@@ -68,10 +70,6 @@ jobs:
         with:
           path: |
             /opt/tla2tools.jar
-            ~/.opam
-            ~/.kup
-            ~/.local/bin
-            ~/.nix-profile
             /opt/dafny
           key: ${{ runner.os }}-fv-tools-v2
           restore-keys: |
@@ -80,7 +78,7 @@ jobs:
       - name: Install formal verification system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y pkg-config libsecp256k1-dev libboost-all-dev libcurl4-openssl-dev libedit-dev libfmt-dev
+          sudo apt-get install -y pkg-config libsecp256k1-dev libboost-all-dev libcurl4-openssl-dev libedit-dev libfmt-dev coq unzip
 
       - name: Install TLA+ Model Checker
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
@@ -91,36 +89,21 @@ jobs:
           echo "✅ TLA+ installed"
 
       - name: Install Coq Proof Assistant
-        if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y coq
+          coqc --version
           echo "✅ Coq installed"
 
       - name: Install K Framework
-        if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y curl xz-utils
-          curl -fsSL https://kframework.org/install -o "$RUNNER_TEMP/kframework-install"
-          echo "${K_INSTALL_SHA256}  ${RUNNER_TEMP}/kframework-install" | sha256sum --check --status
-          bash "$RUNNER_TEMP/kframework-install" <<< "y"
-          if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
-            . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          fi
-          export PATH="/nix/var/nix/profiles/default/bin:$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
-          kup install k
+          set -euo pipefail
+          cd /tmp
+          curl --fail --location --retry 3 \
+            -o kframework.deb \
+            https://github.com/runtimeverification/k/releases/download/v6.3.11/kframework_6.3.11_amd64_ubuntu_jammy.deb
+          sudo apt-get install -y ./kframework.deb
           command -v kprove
-          command -v kompile
-          echo "✅ K Framework installed"
-
-      - name: Add Formal Verification Tools to PATH
-        run: |
-          {
-            echo "/nix/var/nix/profiles/default/bin"
-            echo "$HOME/.local/bin"
-            echo "$HOME/.nix-profile/bin"
-          } >> "$GITHUB_PATH"
+          kprove --version
+          echo "✅ K Framework v6.3.11 installed from pinned Ubuntu Jammy package"
 
       - name: Install Dafny (Optional)
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
@@ -203,7 +186,7 @@ jobs:
         continue-on-error: true
         with:
           script: |
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -239,7 +222,7 @@ jobs:
         continue-on-error: true
         with:
           script: |
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
