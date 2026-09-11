@@ -52,7 +52,16 @@ pub struct SettlementOutboxRecord {
 }
 
 pub trait SettlementOutboxStore: Send + Sync + 'static {
-    fn append(&self, record: &SettlementOutboxRecord) -> Result<(), CoordinatorError>;
+    /// Atomically append `next` only when the current latest record exactly
+    /// equals `expected`. `expected=None` means the history must be empty.
+    /// Re-appending an identical current latest record is idempotent.
+    fn compare_and_append(
+        &self,
+        submission_id: [u8; 32],
+        expected: Option<&SettlementOutboxRecord>,
+        next: &SettlementOutboxRecord,
+    ) -> Result<(), CoordinatorError>;
+
     fn history(
         &self,
         submission_id: [u8; 32],
@@ -65,19 +74,35 @@ pub struct InMemorySettlementOutboxStore {
 }
 
 impl SettlementOutboxStore for InMemorySettlementOutboxStore {
-    fn append(&self, record: &SettlementOutboxRecord) -> Result<(), CoordinatorError> {
+    fn compare_and_append(
+        &self,
+        submission_id: [u8; 32],
+        expected: Option<&SettlementOutboxRecord>,
+        next: &SettlementOutboxRecord,
+    ) -> Result<(), CoordinatorError> {
+        if next.submission_id != submission_id {
+            return Err(CoordinatorError::Internal(
+                "settlement outbox key does not match record submission id".into(),
+            ));
+        }
+
         let mut guard = self
             .entries
             .write()
             .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))?;
-        let history = guard.entry(record.submission_id).or_default();
+        let history = guard.entry(submission_id).or_default();
+        let current = history.last();
 
-        if let Some(last) = history.last() {
-            if last == record {
-                return Ok(());
-            }
+        if current == Some(next) {
+            return Ok(());
         }
-        history.push(record.clone());
+        if current != expected {
+            return Err(CoordinatorError::Internal(
+                "settlement outbox concurrent transition conflict".into(),
+            ));
+        }
+
+        history.push(next.clone());
         Ok(())
     }
 
@@ -142,7 +167,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             return Ok(existing);
         }
 
-        self.store.append(&record)?;
+        self.store.compare_and_append(submission_id, None, &record)?;
         Ok(record)
     }
 
@@ -181,7 +206,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             updated_at: now,
             ..latest
         };
-        self.store.append(&next)?;
+        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
         Ok(next)
     }
 
@@ -216,7 +241,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             updated_at: now,
             ..latest
         };
-        self.store.append(&next)?;
+        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
         Ok(next)
     }
 
@@ -243,7 +268,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             updated_at: now,
             ..latest
         };
-        self.store.append(&next)?;
+        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
         Ok(next)
     }
 
@@ -270,7 +295,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             updated_at: now,
             ..latest
         };
-        self.store.append(&next)?;
+        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
         Ok(next)
     }
 
@@ -364,7 +389,7 @@ mod tests {
             InMemorySettlementOutboxStore::default(),
         );
         let p = prepared();
-        outbox.store.append(&p).unwrap();
+        outbox.store.compare_and_append(p.submission_id, None, &p).unwrap();
         let b = outbox
             .record_broadcast(&p, "0xabc", "worker-a", 7, 101)
             .unwrap();
@@ -381,7 +406,7 @@ mod tests {
             InMemorySettlementOutboxStore::default(),
         );
         let p = prepared();
-        outbox.store.append(&p).unwrap();
+        outbox.store.compare_and_append(p.submission_id, None, &p).unwrap();
         outbox
             .record_broadcast(&p, "0xabc", "worker-a", 7, 101)
             .unwrap();
@@ -397,7 +422,7 @@ mod tests {
             InMemorySettlementOutboxStore::default(),
         );
         let p = prepared();
-        outbox.store.append(&p).unwrap();
+        outbox.store.compare_and_append(p.submission_id, None, &p).unwrap();
         let b = outbox
             .record_broadcast(&p, "0xabc", "worker-a", 7, 101)
             .unwrap();
