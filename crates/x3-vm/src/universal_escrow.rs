@@ -71,11 +71,7 @@ pub trait UniversalEscrow: Send + Sync {
     /// Returns a 32-byte escrow ticket that authorises release on the
     /// destination chain.  The ticket is opaque to the caller — only the
     /// escrow provider that created it can redeem it.
-    fn lock(
-        &self,
-        sender: &ExternalAccount,
-        amount: u128,
-    ) -> Result<EscrowTicket, &'static str>;
+    fn lock(&self, sender: &ExternalAccount, amount: u128) -> Result<EscrowTicket, &'static str>;
 
     /// Release `amount` of tokens to `recipient` on this external chain.
     ///
@@ -117,7 +113,10 @@ impl UniversalEscrowRegistry {
         chain_ids: &[u64],
         provider: Arc<dyn UniversalEscrow>,
     ) -> Result<(), &'static str> {
-        let mut guard = self.providers.lock().map_err(|_| "registry lock poisoned")?;
+        let mut guard = self
+            .providers
+            .lock()
+            .map_err(|_| "registry lock poisoned")?;
         for &id in chain_ids {
             guard.insert(id, provider.clone());
         }
@@ -189,11 +188,7 @@ impl InMemoryEscrowProvider {
 }
 
 impl UniversalEscrow for InMemoryEscrowProvider {
-    fn lock(
-        &self,
-        sender: &ExternalAccount,
-        amount: u128,
-    ) -> Result<EscrowTicket, &'static str> {
+    fn lock(&self, sender: &ExternalAccount, amount: u128) -> Result<EscrowTicket, &'static str> {
         let ticket = self.make_ticket(sender, amount);
         self.tickets
             .lock()

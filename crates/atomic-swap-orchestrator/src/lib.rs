@@ -7,7 +7,10 @@
 use anyhow::{anyhow, Result};
 use parity_scale_codec::Encode;
 use serde::{Deserialize, Serialize};
-use sp_core::{hashing::{blake2_256, sha2_256}, H256};
+use sp_core::{
+    hashing::{blake2_256, sha2_256},
+    H256,
+};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use x3_vm::{
@@ -621,7 +624,10 @@ mod tests {
             &hex::decode("92167022b179ca59a63262fa9547834ae63325bac145b793931835fbc47fc200")
                 .expect("hex vector"),
         );
-        assert_eq!(root, expected, "receipt-root encoding must match pallet commitment");
+        assert_eq!(
+            root, expected,
+            "receipt-root encoding must match pallet commitment"
+        );
     }
 
     #[test]
@@ -826,7 +832,10 @@ mod tests {
         let req = req.unwrap();
         assert_eq!(req.bundle_id, result.bundle_id);
         assert_ne!(req.receipt_root, H256::zero());
-        assert_eq!(req.finality_cert, cert, "must carry the provided finality cert");
+        assert_eq!(
+            req.finality_cert, cert,
+            "must carry the provided finality cert"
+        );
         assert_eq!(req.committed_at_ns, 1_700_000_000_000_000_000);
     }
 

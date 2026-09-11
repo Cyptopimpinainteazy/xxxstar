@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
+use std::str::FromStr;
 
 /// Unique flashloan identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -21,8 +22,16 @@ impl FlashloanId {
         Self(hex::encode(&hash[..16]))
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_literal(s: &str) -> Self {
         Self(s.to_string())
+    }
+}
+
+impl FromStr for FlashloanId {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
     }
 }
 

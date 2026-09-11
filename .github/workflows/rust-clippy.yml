@@ -15,13 +15,58 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          toolchain: 1.90.0
+          components: clippy, rust-src
+          targets: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Install Protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      # A workspace-wide `--all-features` unifies unrelated optional features
+      # through shared FRAME dependencies. That enables benchmark-only trait
+      # requirements in crates whose own `runtime-benchmarks` feature is off,
+      # producing configurations Cargo cannot build. Lint the complete default
+      # workspace, then check each supported feature mode independently below.
+      - name: Run Clippy (workspace defaults)
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Run Clippy (tests)
-        run: cargo clippy --workspace --all-targets --all-features --tests -- -D warnings
+      - name: Run Clippy (runtime RC-1)
+        run: cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (node RC-1)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (node runtime benchmarks)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,runtime-benchmarks -- -D warnings
+
+      - name: Run Clippy (node try-runtime)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,try-runtime -- -D warnings
+
+      - name: Run Clippy (node GPU validator)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,gpu-validator -- -D warnings
+
+      # `production` and `test-verifier` are intentionally incompatible:
+      # production must never compile a test verifier. Check both valid
+      # configurations independently rather than disabling that fail-closed
+      # compile-time guard with a workspace-wide --all-features invocation.
+      - name: Run Clippy (verification router production)
+        run: cargo clippy -p x3-verification-router --all-targets --features production -- -D warnings
+
+      - name: Run Clippy (verification router test verifier)
+        run: cargo clippy -p x3-verification-router --all-targets --features test-verifier -- -D warnings
+
+      - name: Run Clippy (finality oracle production)
+        run: cargo clippy -p x3-finality-oracle --all-targets --features production -- -D warnings
+
+      - name: Run Clippy (finality oracle test verifier)
+        run: cargo clippy -p x3-finality-oracle --all-targets --features test-verifier -- -D warnings
+
+      # RC-1 and post-RC-1 router features are intentionally incompatible.
+      - name: Run Clippy (cross-VM router RC-1)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (cross-VM router runtime benchmarks)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1,runtime-benchmarks -- -D warnings
+
+      - name: Run Clippy (cross-VM router try-runtime)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1,try-runtime -- -D warnings

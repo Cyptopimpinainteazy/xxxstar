@@ -1,54 +1,70 @@
 {
-  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.x3lang.compiler_reproducibility",
-  "artifact_hash": "b4b0e454e83efcd703e36bf5df1528784732bdba89734437b311cda4222f2bed",
+  "artifact_hash": "54719f339fa7aebe594084b785a05140866876596b3d6e73e242bf27588be593",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
-    "x3-lang/Cargo.toml",
-    "x3-lang/compiler/Cargo.toml",
-    "x3-lang/vm/Cargo.toml",
-    "x3-lang/tests/verify_bytecode.rs",
-    "docs/x3-lang/README.md"
+    "examples/intents/eth_usdc_to_sol_sol.x3",
+    "examples/intents/x3_internal_swap.x3"
   ],
-  "timestamp": "2026-05-06T12:38:56.281325382Z",
+  "timestamp": "2026-09-11T18:37:03.214680747Z",
   "result": {
     "claim_id": "x3.x3lang.compiler_reproducibility",
-    "claim": "X3Language compiler/VM/test artifacts are present",
+    "claim": "X3Language: compiler adapter, atomic journal, proof backends, and example intents",
     "status": "verified",
-    "proof_level": "P5",
-    "edge_case_level": "E6",
+    "proof_level": "P6",
+    "edge_case_level": "E5",
     "hack_level": "H7",
     "operator_level": "I6",
     "degraded_level": "D5",
     "files_inspected": [
-      "x3-lang/Cargo.toml",
-      "x3-lang/compiler/Cargo.toml",
-      "x3-lang/vm/Cargo.toml",
-      "x3-lang/tests/verify_bytecode.rs",
-      "docs/x3-lang/README.md"
+      "examples/intents/eth_usdc_to_sol_sol.x3",
+      "examples/intents/x3_internal_swap.x3"
     ],
-    "commands_run": [],
+    "commands_run": [
+      "[OK] x3-crosschain-intent compiles (exit=0)",
+      "[OK] IntentSpecDraft adapter tests pass (exit=0)",
+      "[OK] Atomic journal tests pass (exit=0)",
+      "[OK] x3-lang workspace compiles (exit=0)",
+      "[OK] x3-lang compiler tests pass (exit=0)",
+      "[OK] from_intent_decl() exists in compiler (exit=0)",
+      "[OK] from_draft adapter exists (exit=0)",
+      "[OK] Atomic journal exists (exit=0)",
+      "[OK] All three proof backends exist (exit=0)"
+    ],
     "passed_checks": [
-      "x3-lang workspace manifest exists",
-      "x3-lang compiler crate exists",
-      "x3-lang VM crate exists",
-      "x3-lang bytecode verification test exists",
-      "x3-lang docs entry exists"
+      "x3-crosschain-intent compiles",
+      "IntentSpecDraft adapter tests pass",
+      "Atomic journal tests pass",
+      "x3-lang workspace compiles",
+      "x3-lang compiler tests pass",
+      "from_intent_decl() exists in compiler",
+      "from_draft adapter exists",
+      "Atomic journal exists",
+      "All three proof backends exist",
+      "Example intent exists: examples/intents/eth_usdc_to_sol_sol.x3",
+      "Example intent exists: examples/intents/x3_internal_swap.x3"
     ],
     "failed_checks": [],
     "missing_proofs": [],
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "x3-lang/compiler/Cargo.toml": "true",
-      "docs/x3-lang/README.md": "true",
-      "x3-lang/vm/Cargo.toml": "true",
-      "x3-lang/Cargo.toml": "true",
-      "x3-lang/tests/verify_bytecode.rs": "true"
+      "cmd:x3-crosschain-intent compiles": "exit=0 stdout=warning: Patch `fastbloom v0.14.1 (/tmp/x3-production-gate-fix/patches/fastbloom)` was not used in the crate graph.\nPatch `quinn-proto v0.11.14 (/tmp/x3-production-gate-fix/patches/quinn-proto)` was n... (1365 chars) stderr=",
+      "cmd:Atomic journal tests pass": "exit=0 stdout=test journal::tests::journal_rejects_append_without_begin - should panic ... ok\ntest journal::tests::journal_rollback_plan_many_entries ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measu... (241 chars) stderr=",
+      "cmd:x3-lang compiler tests pass": "exit=0 stdout=test unknown_debt_repayment_is_rejected ... ok\ntest verifier_api_accepts_well_formed_borrowed_trade_when_called_directly ... ok\n\ntest result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered ... (224 chars) stderr=",
+      "cmd:from_draft adapter exists": "exit=0 stdout=crates/x3-crosschain-intent/src/from_draft.rs\npresent\n stderr=",
+      "cmd:Atomic journal exists": "exit=0 stdout=crates/x3-crosschain-intent/src/journal.rs\npresent\n stderr=",
+      "cmd:All three proof backends exist": "exit=0 stdout=crates/x3-crosschain-intent/src/proof/btc.rs\ncrates/x3-crosschain-intent/src/proof/evm.rs\ncrates/x3-crosschain-intent/src/proof/svm.rs\npresent\n stderr=",
+      "file:examples/intents/x3_internal_swap.x3": "true",
+      "file:examples/intents/eth_usdc_to_sol_sol.x3": "true",
+      "cmd:IntentSpecDraft adapter tests pass": "exit=0 stdout=test from_draft::tests::x3_only_intent_does_not_require_bridge_proofs ... ok\ntest from_draft::tests::draft_round_trips_through_json ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured;... (237 chars) stderr=",
+      "cmd:from_intent_decl() exists in compiler": "exit=0 stdout=x3-lang/compiler/src/intent_emit.rs\npresent\n stderr=",
+      "cmd:x3-lang workspace compiles": "exit=0 stdout=    Checking x3-lang-vm v0.1.0 (/tmp/x3-production-gate-fix/x3-lang/vm)\n    Checking x3-tools v0.1.0 (/tmp/x3-production-gate-fix/x3-lang/crates/x3-tools)\n    Finished `dev` profile [optimized + debug... (226 chars) stderr="
     },
-    "timestamp": "2026-05-06T12:38:56.276236327Z",
-    "duration_ms": 0
+    "timestamp": "2026-09-11T18:37:03.201566549Z",
+    "duration_ms": 66975
   },
   "limitations": [],
-  "binding_hash": "cfc06aed714841a6231da369e8cf0f4b5ea934d070959b8ed69537431ce4be7b"
+  "binding_hash": "6ec38c1b5b20851fe76541888fb34a6c8e26bace20c72f00799df6180d117465"
 }

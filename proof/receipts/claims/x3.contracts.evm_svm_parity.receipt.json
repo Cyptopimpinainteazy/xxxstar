@@ -1,5 +1,5 @@
 {
-  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.contracts.evm_svm_parity",
   "artifact_hash": "50531fdf4b5530309f74a3d0a25243e5f9e2d203470ddc0f47909e5f2699a3ec",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
@@ -10,7 +10,7 @@
     "X3-contracts/shared/parity-core/src/lib.rs",
     "X3-contracts/shared/parity-core/tests/parity_vectors.rs"
   ],
-  "timestamp": "2026-05-06T12:38:56.331763339Z",
+  "timestamp": "2026-09-11T18:21:44.195089276Z",
   "result": {
     "claim_id": "x3.contracts.evm_svm_parity",
     "claim": "Core EVM contracts and SVM programs implement equivalent X3 behavior",
@@ -31,8 +31,8 @@
       "cargo test --manifest-path X3-contracts/shared/parity-core/Cargo.toml --test parity_vectors"
     ],
     "passed_checks": [
-      "EVM contracts present (2 .sol files)",
-      "SVM programs present (1 .rs files)",
+      "EVM contracts present (26 .sol files)",
+      "SVM programs present (6 .rs files)",
       "Parity vectors present (1296 bytes)",
       "EVM↔SVM parity vector harness PASSED"
     ],
@@ -41,14 +41,14 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "svm_rs_files": "1",
-      "evm_sol_files": "2",
+      "svm_rs_files": "6",
       "vectors_bytes": "1296",
-      "parity_harness": "ok"
+      "parity_harness": "ok",
+      "evm_sol_files": "26"
     },
-    "timestamp": "2026-05-06T12:38:56.326909941Z",
-    "duration_ms": 41
+    "timestamp": "2026-09-11T18:21:44.189783760Z",
+    "duration_ms": 8557
   },
   "limitations": [],
-  "binding_hash": "63427d96fea6bdddee50cca2eab12e87e3da54ab3a0be19e82b8d11e86492dd3"
+  "binding_hash": "3d615fe58d2569acf461d9c193f02bd1de52f7604516328bd63f5f121eb48950"
 }

@@ -149,7 +149,10 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_evm_only() {
-        let header = PacketHeader { domain_mask: 0b0001, ..Default::default() };
+        let header = PacketHeader {
+            domain_mask: 0b0001,
+            ..Default::default()
+        };
         assert!(header.targets_evm());
         assert!(!header.targets_svm());
         assert!(!header.targets_x3vm());
@@ -157,7 +160,10 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_svm_only() {
-        let header = PacketHeader { domain_mask: 0b0010, ..Default::default() };
+        let header = PacketHeader {
+            domain_mask: 0b0010,
+            ..Default::default()
+        };
         assert!(!header.targets_evm());
         assert!(header.targets_svm());
         assert!(!header.targets_x3vm());
@@ -165,7 +171,10 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_x3vm_only() {
-        let header = PacketHeader { domain_mask: 0b0100, ..Default::default() };
+        let header = PacketHeader {
+            domain_mask: 0b0100,
+            ..Default::default()
+        };
         assert!(!header.targets_evm());
         assert!(!header.targets_svm());
         assert!(header.targets_x3vm());
@@ -173,7 +182,10 @@ mod tests {
 
     #[test]
     fn test_header_domain_mask_all() {
-        let header = PacketHeader { domain_mask: 0b0111, ..Default::default() };
+        let header = PacketHeader {
+            domain_mask: 0b0111,
+            ..Default::default()
+        };
         assert!(header.targets_evm());
         assert!(header.targets_svm());
         assert!(header.targets_x3vm());
@@ -181,7 +193,10 @@ mod tests {
 
     #[test]
     fn test_header_expiry_validation() {
-        let header = PacketHeader { expires_at: 1000, ..Default::default() };
+        let header = PacketHeader {
+            expires_at: 1000,
+            ..Default::default()
+        };
 
         assert!(!header.is_expired(999));
         assert!(header.is_expired(1000));
@@ -197,22 +212,34 @@ mod tests {
 
     #[test]
     fn test_header_validation_rejects_invalid_version() {
-        let header = PacketHeader { version: 99, ..Default::default() };
+        let header = PacketHeader {
+            version: 99,
+            ..Default::default()
+        };
         assert!(header.validate().is_err());
     }
 
     #[test]
     fn test_header_validation_rejects_large_payload() {
-        let header = PacketHeader { payload_size: 65535, ..Default::default() };
+        let header = PacketHeader {
+            payload_size: 65535,
+            ..Default::default()
+        };
         assert!(header.validate().is_ok());
 
-        let header = PacketHeader { payload_size: 65000, ..Default::default() };
+        let header = PacketHeader {
+            payload_size: 65000,
+            ..Default::default()
+        };
         assert!(header.validate().is_ok());
     }
 
     #[test]
     fn test_header_validation_rejects_no_domain() {
-        let header = PacketHeader { domain_mask: 0, ..Default::default() };
+        let header = PacketHeader {
+            domain_mask: 0,
+            ..Default::default()
+        };
         assert!(header.validate().is_err());
     }
 

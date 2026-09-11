@@ -7,30 +7,30 @@
 use crate::atomic_gateway::AtomicGatewayKey;
 use crate::service::FullClient;
 use atomic_swap_orchestrator::{
-    kernel_compatible_receipt_root, AtomicExecutionRequest, AtomicLegExecution,
-    KernelBundleLeg, KernelReceiptRootData, KernelVmType,
+    kernel_compatible_receipt_root, AtomicExecutionRequest, AtomicLegExecution, KernelBundleLeg,
+    KernelReceiptRootData, KernelVmType,
 };
 use codec::Encode;
-use pallet_x3_atomic_kernel::vm_revert::StateDiff;
 use pallet_x3_atomic_kernel::vm_revert::OverlayDomain;
+use pallet_x3_atomic_kernel::vm_revert::StateDiff;
+use pallet_x3_atomic_kernel::BundleStatus;
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use sc_client_api::{BlockBackend, HeaderBackend};
-use sp_api::ProvideRuntimeApi;
 use sc_transaction_pool_api::{TransactionPool, TransactionSource};
+use sp_api::ProvideRuntimeApi;
 use sp_core::H256;
 use sp_runtime::traits::SaturatedConversion;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use x3_chain_runtime::opaque::Block;
-use pallet_x3_atomic_kernel::BundleStatus;
 use x3_bridge_adapters::{
     overlay_state_diff_for_domain, RuntimeCrossVmDispatcher, SubstrateClientBalanceAdapter,
     SubstrateX3VmBridge,
 };
+use x3_chain_runtime::opaque::Block;
+use x3_chain_runtime::{Runtime, RuntimeCall, UncheckedExtrinsic};
 use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher, CrossVmStatus, VmId};
 use x3_vm::bridge::BalanceProvider;
-use x3_chain_runtime::{Runtime, RuntimeCall, UncheckedExtrinsic};
 
 /// Transaction pool type used by the node atomic gateway service.
 pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClient>;
@@ -70,18 +70,15 @@ pub struct AtomicGatewayService {
 impl AtomicGatewayService {
     /// Create the service. `uri` is the sr25519 secret URI for the runtime's
     /// configured `X3LangGatewayAccount`.
-    pub fn new(
-        uri: &str,
-        client: Arc<FullClient>,
-        pool: Arc<AtomicPool>,
-    ) -> Result<Self, String> {
+    pub fn new(uri: &str, client: Arc<FullClient>, pool: Arc<AtomicPool>) -> Result<Self, String> {
         let key = AtomicGatewayKey::from_uri(uri)?;
         let genesis_hash = client
             .block_hash(0)
             .map_err(|e| format!("failed to read genesis hash: {e}"))?
             .ok_or_else(|| "genesis block not found".to_string())?;
-        let runtime_bridge =
-            Arc::new(SubstrateX3VmBridge::<FullClient, Block>::new(client.clone()));
+        let runtime_bridge = Arc::new(SubstrateX3VmBridge::<FullClient, Block>::new(
+            client.clone(),
+        ));
         let balances = runtime_bridge.balances.clone();
         let dispatcher = RuntimeCrossVmDispatcher::<FullClient, Block>::new(client.clone())
             .with_x3vm_bridge(runtime_bridge.bridge.clone());
@@ -97,10 +94,7 @@ impl AtomicGatewayService {
     }
 
     /// Run the service until the command channel closes.
-    pub async fn run(
-        self,
-        mut commands: mpsc::Receiver<AtomicGatewayCommand>,
-    ) {
+    pub async fn run(self, mut commands: mpsc::Receiver<AtomicGatewayCommand>) {
         while let Some(cmd) = commands.recv().await {
             if let Err(e) = self.handle(cmd).await {
                 log::error!(target: "x3-atomic-gateway", "atomic gateway command failed: {e}");
@@ -194,7 +188,7 @@ impl AtomicGatewayService {
                 self.execute_legs(&executions, bundle_id).await?;
                 if should_finalize {
                     if let Some(request) = request_clone {
-                    self.finalize_bundle(&request, bundle_id).await?;
+                        self.finalize_bundle(&request, bundle_id).await?;
                     }
                 }
             }
@@ -202,10 +196,7 @@ impl AtomicGatewayService {
         Ok(())
     }
 
-    async fn wait_for_submission_and_assign(
-        &self,
-        legs_hash: H256,
-    ) -> Result<H256, String> {
+    async fn wait_for_submission_and_assign(&self, legs_hash: H256) -> Result<H256, String> {
         for _ in 0..50 {
             let at = self.client.info().best_hash;
             let submitter = self.key.account();
@@ -216,13 +207,10 @@ impl AtomicGatewayService {
                 .map_err(|e| format!("find_bundle runtime call failed: {e}"))?;
 
             if let Some((bundle_id, BundleStatus::Pending)) = found {
-                let assign_nonce =
-                    self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
-                let extrinsic = self.key.assign_bundle_executor(
-                    bundle_id,
-                    self.genesis_hash,
-                    assign_nonce,
-                )?;
+                let assign_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+                let extrinsic =
+                    self.key
+                        .assign_bundle_executor(bundle_id, self.genesis_hash, assign_nonce)?;
                 self.pool
                     .submit_one(
                         self.client.info().best_hash,
@@ -290,13 +278,13 @@ impl AtomicGatewayService {
                     .execute_x3vm_tx(caller, &call)
                     .map_err(|e| format!("X3 leg execution failed: {e:?}"))?;
                 if receipt.status != CrossVmStatus::Success {
-                    return Err(format!(
-                        "X3 leg {} reverted: {:?}",
-                        index, receipt.status
-                    ));
+                    return Err(format!("X3 leg {} reverted: {:?}", index, receipt.status));
                 }
                 let transitions = self.balances.take_overlay_transitions();
-                Ok(overlay_state_diff_for_domain(&transitions, OverlayDomain::X3))
+                Ok(overlay_state_diff_for_domain(
+                    &transitions,
+                    OverlayDomain::X3,
+                ))
             }
             AtomicLegExecution::Transfer {
                 vm,
@@ -375,9 +363,7 @@ impl AtomicGatewayService {
                     continue;
                 }
                 Err(e) => {
-                    return Err(format!(
-                        "finality cert anchor runtime call failed: {e}"
-                    ));
+                    return Err(format!("finality cert anchor runtime call failed: {e}"));
                 }
             };
 
@@ -391,8 +377,7 @@ impl AtomicGatewayService {
                 finalized_block: block_num,
                 finality_cert,
             });
-            let finalize_nonce =
-                self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+            let finalize_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
             let extrinsic = self.key.finalize_atomic_bundle(
                 bundle_id,
                 receipt_root,

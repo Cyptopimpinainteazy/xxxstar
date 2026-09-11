@@ -2,8 +2,6 @@
 //!
 //! Run with: `cargo bench --package pallet-x3-agent-registry`
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use crate::Pallet as AgentRegistry;
 use frame_benchmarking::v2::*;

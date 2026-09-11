@@ -65,14 +65,14 @@ pub(crate) mod migrations;
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
+    #[allow(deprecated)]
+    use frame_support::traits::schedule::Named as ScheduleNamed;
     use frame_support::{
         dispatch::{GetDispatchInfo, PostDispatchInfo},
         pallet_prelude::*,
         traits::{Currency, LockableCurrency, ReservableCurrency},
         Blake2_128Concat,
     };
-    #[allow(deprecated)]
-    use frame_support::traits::schedule::Named as ScheduleNamed;
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::Dispatchable;
     use sp_runtime::{

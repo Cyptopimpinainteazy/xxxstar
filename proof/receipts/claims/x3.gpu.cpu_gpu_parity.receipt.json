@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.gpu.cpu_gpu_parity",
-  "artifact_hash": "6d45e66489c55d4fe48b1eb8367817e0c5679c8339056fe0ea98b9074ebc092f",
+  "artifact_hash": "aff74b56446262fff9f48b9f09ebb87e7a5eab223092db8d2f9c97dc69f2ed55",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "crates/x3-gpu-validator-swarm/src/lib.rs",
@@ -10,7 +10,7 @@
     "X3-contracts/shared/gpu-parity-core/Cargo.toml",
     "X3-contracts/shared/test-vectors/gpu_hash_parity.json"
   ],
-  "timestamp": "2026-05-02T02:25:41.393980768Z",
+  "timestamp": "2026-09-11T18:29:24.448509200Z",
   "result": {
     "claim_id": "x3.gpu.cpu_gpu_parity",
     "claim": "GPU-accelerated execution/verification matches CPU reference results",
@@ -35,28 +35,27 @@
       "crates/x3-gpu-validator-swarm/src/lib.rs exists",
       "crates/x3-gpu-validator-swarm/src/deterministic.rs exists",
       "crates/x3-gpu-validator-swarm/src/cpu_validator.rs exists",
-      "63 CPU/GPU parity references found",
+      "127 CPU/GPU parity references found",
+      "GPU validator tests passed (14 tests)",
+      "Deterministic/parity test confirmed in output",
       "CPU fallback path found in deterministic.rs",
+      "Swarm capability budget / kill-switch evidence found in swarm pallet (6 hits)",
       "X3-contracts gpu-parity-core hash-vector harness PASSED"
     ],
     "failed_checks": [],
-    "missing_proofs": [
-      "Auxiliary x3-gpu-validator-swarm crate test run did not exit cleanly; canonical CPU↔GPU parity is asserted by the gpu-parity-core JSON-vector harness (binding proof). See evidence.swarm_aux_tests_snippet."
-    ],
+    "missing_proofs": [],
     "blockers": [],
     "score": 1.0,
     "evidence": {
       "gpu_parity_vectors": "ok",
       "cpu_fallback": "present",
-      "swarm_aux_tests_snippet": "  process didn't exit successfully: `/home/lojak/Desktop/X3_ATOMIC_STAR/target/debug/build/prometheus-ff47d1800b0bee46/build-script-build` (signal: 11, SIGSEGV: invalid memory reference) | Caused by: | error: failed to run custom build command for `prometheus v0.14.0` |    Compiling prometheus v0.14.0 |     Blocking waiting for file lock on build directory |     Blocking waiting for file lock on package cache |     Blocking waiting for file lock on package cache |     Blocking waiting for file lock on packa",
-      "parity_references": "63",
-      "swarm_aux_tests": "failed"
+      "parity_references": "127",
+      "tests_passed": "14",
+      "swarm_budget_evidence": "6"
     },
-    "timestamp": "2026-05-02T02:25:41.387919603Z",
-    "duration_ms": 5281
+    "timestamp": "2026-09-11T18:29:24.432967080Z",
+    "duration_ms": 104726
   },
-  "limitations": [
-    "Auxiliary x3-gpu-validator-swarm crate test run did not exit cleanly; canonical CPU↔GPU parity is asserted by the gpu-parity-core JSON-vector harness (binding proof). See evidence.swarm_aux_tests_snippet."
-  ],
-  "binding_hash": "67ac3646e30ccd7022594d978d81f6fb75125b7b80e7749146e95dbaa1e55a49"
+  "limitations": [],
+  "binding_hash": "0485db81a933e1d5b4c1d9daba1d07e2c53c2c955c6902148c36bd2c6270fe37"
 }

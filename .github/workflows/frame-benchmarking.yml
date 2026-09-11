@@ -20,6 +20,7 @@ on:
       - "node/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "patches/**"
   push:
     branches: [master, 'release/**']
     paths:
@@ -28,6 +29,7 @@ on:
       - "node/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "patches/**"
   schedule:
     - cron: '30 4 * * *'
   workflow_dispatch:
@@ -53,6 +55,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.90.0
           targets: wasm32v1-none, wasm32-unknown-unknown
 
       - name: Cache cargo

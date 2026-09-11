@@ -2,6 +2,7 @@
 name = "pallet-x3-oracle"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 authors = ["X3 Chain Team"]
 description = "Native oracle pallet for X3 Chain providing signed price feed submissions"
 

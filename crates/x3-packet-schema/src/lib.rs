@@ -678,7 +678,10 @@ mod integration_tests {
 
     #[test]
     fn test_packet_header_validation_all_domains() {
-        let header = PacketHeader { domain_mask: 0b0111, ..Default::default() };
+        let header = PacketHeader {
+            domain_mask: 0b0111,
+            ..Default::default()
+        };
         assert!(header.targets_evm());
         assert!(header.targets_svm());
         assert!(header.targets_x3vm());
@@ -686,9 +689,18 @@ mod integration_tests {
 
     #[test]
     fn test_packet_header_validation_single_domains() {
-        let h_evm = PacketHeader { domain_mask: 0b0001, ..Default::default() };
-        let h_svm = PacketHeader { domain_mask: 0b0010, ..Default::default() };
-        let h_x3 = PacketHeader { domain_mask: 0b0100, ..Default::default() };
+        let h_evm = PacketHeader {
+            domain_mask: 0b0001,
+            ..Default::default()
+        };
+        let h_svm = PacketHeader {
+            domain_mask: 0b0010,
+            ..Default::default()
+        };
+        let h_x3 = PacketHeader {
+            domain_mask: 0b0100,
+            ..Default::default()
+        };
 
         assert!(h_evm.targets_evm() && !h_evm.targets_svm() && !h_evm.targets_x3vm());
         assert!(h_svm.targets_svm() && !h_svm.targets_evm() && !h_svm.targets_x3vm());

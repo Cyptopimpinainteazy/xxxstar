@@ -361,7 +361,10 @@ fn graduate_launch_happy_path() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
-        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(
+            RuntimeOrigin::signed(1),
+            id
+        ));
 
         // Creator graduates the launch.
         assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));
@@ -379,7 +382,10 @@ fn graduate_launch_fails_for_non_creator() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
-        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(
+            RuntimeOrigin::signed(1),
+            id
+        ));
 
         // Non-creator (account 2) cannot graduate.
         assert_noop!(
@@ -409,7 +415,10 @@ fn graduate_launch_fails_when_already_graduated() {
         assert_ok!(Launchpad::contribute(RuntimeOrigin::signed(10), id, 800));
         jump_to(13);
         assert_ok!(Launchpad::finalize_launch(RuntimeOrigin::signed(99), id));
-        assert_ok!(Launchpad::withdraw_raised_funds(RuntimeOrigin::signed(1), id));
+        assert_ok!(Launchpad::withdraw_raised_funds(
+            RuntimeOrigin::signed(1),
+            id
+        ));
 
         // First graduation succeeds.
         assert_ok!(Launchpad::graduate_launch(RuntimeOrigin::signed(1), id));

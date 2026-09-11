@@ -2,6 +2,7 @@
 name = "x3-foundry-revenue"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Revenue calculation and distribution for X3 Foundry"
 
 [dependencies]

@@ -2,6 +2,7 @@
 name = "x3-chain-health-daemon"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "X3 Chain Health Monitor Daemon — polls chain metrics, detects anomalies, writes health proofs to ledger"
 
 [dependencies]

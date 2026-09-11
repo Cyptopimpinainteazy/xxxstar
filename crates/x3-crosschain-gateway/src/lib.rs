@@ -298,7 +298,11 @@ impl ValidatorAttestationEngine {
         }
         let mut signers = HashSet::new();
         let threshold = set.threshold.max(attestation.threshold);
-        for (signer, sig) in attestation.signers.iter().zip(attestation.signatures.iter()) {
+        for (signer, sig) in attestation
+            .signers
+            .iter()
+            .zip(attestation.signatures.iter())
+        {
             if sig.is_empty() {
                 return Err(AttestationError::EmptySignature);
             }
@@ -310,10 +314,12 @@ impl ValidatorAttestationEngine {
             }
         }
         if (signers.len() as u64) < threshold {
-            self.statuses.insert(proof_id, AttestationStatus::BelowThreshold);
+            self.statuses
+                .insert(proof_id, AttestationStatus::BelowThreshold);
             return Err(AttestationError::BelowThreshold);
         }
-        self.statuses.insert(proof_id, AttestationStatus::QuorumReached);
+        self.statuses
+            .insert(proof_id, AttestationStatus::QuorumReached);
         Ok(())
     }
 
@@ -418,7 +424,8 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
     }
 
     pub fn register_validator_set(&mut self, validator_set: ValidatorSet) {
-        self.attestation_engine.register_validator_set(validator_set);
+        self.attestation_engine
+            .register_validator_set(validator_set);
     }
 
     pub fn index_circuit_breaker_record(&mut self, record: &CircuitBreakerRecord) {
@@ -444,7 +451,10 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
             .registry
             .get_gateway_route(route_id)
             .ok_or(RegistryError::RouteNotFound)?;
-        if !matches!(route.verification_level, VerificationStrategy::ValidatorQuorum { .. }) {
+        if !matches!(
+            route.verification_level,
+            VerificationStrategy::ValidatorQuorum { .. }
+        ) {
             return Err(GatewayError::VerificationFailed(
                 "route_does_not_accept_validator_quorum".to_string(),
             ));
@@ -455,7 +465,8 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
             proof_envelope.proof_id,
             &attestation,
         )?;
-        self.attestation_engine.mark_verified(proof_envelope.proof_id);
+        self.attestation_engine
+            .mark_verified(proof_envelope.proof_id);
         self.submit_deposit_proof(route_id, proof_envelope)
     }
 
@@ -510,8 +521,7 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
                     | GatewayTransferStatus::Failed => {}
                     _ => {
                         pending = pending.saturating_add(1);
-                        outstanding_value =
-                            outstanding_value.saturating_add(t.amount);
+                        outstanding_value = outstanding_value.saturating_add(t.amount);
                     }
                 }
             }
@@ -521,9 +531,7 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
                     limit.per_route_pending
                 )]));
             }
-            if outstanding_value.saturating_add(proof_envelope.amount)
-                > limit.route_value_usd
-            {
+            if outstanding_value.saturating_add(proof_envelope.amount) > limit.route_value_usd {
                 return Err(GatewayError::RiskBlocked(vec![format!(
                     "route outstanding value would exceed cap ({})",
                     limit.route_value_usd
@@ -536,20 +544,22 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
             verifier_quorum_met: true,
         });
         if !decision.allow_route {
-            self.indexer.index_gateway_risk_report(&GatewayRouteRiskReport {
-                route_id,
-                status: GatewayRiskStatus::High,
-                allow_transfer: false,
-                reasons: vec![decision.reason.clone()],
-            });
+            self.indexer
+                .index_gateway_risk_report(&GatewayRouteRiskReport {
+                    route_id,
+                    status: GatewayRiskStatus::High,
+                    allow_transfer: false,
+                    reasons: vec![decision.reason.clone()],
+                });
             return Err(GatewayError::RiskBlocked(vec![decision.reason]));
         }
-        self.indexer.index_gateway_risk_report(&GatewayRouteRiskReport {
-            route_id,
-            status: GatewayRiskStatus::Low,
-            allow_transfer: true,
-            reasons: Vec::new(),
-        });
+        self.indexer
+            .index_gateway_risk_report(&GatewayRouteRiskReport {
+                route_id,
+                status: GatewayRiskStatus::Low,
+                allow_transfer: true,
+                reasons: Vec::new(),
+            });
 
         let verification = self.verify_deposit_proof(&route, &proof_envelope);
         self.indexer.index_verification_result(&verification);
@@ -563,20 +573,14 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
 
         let status = if route.require_dispute_window {
             let window_blocks: u64 = 10;
-            let tracker = DisputeTracker::new(
-                proof_envelope.proof_id,
-                self.current_block,
-                window_blocks,
-            )
-            .map_err(GatewayError::from)?;
-            self.disputes
-                .insert(proof_envelope.proof_id, tracker);
+            let tracker =
+                DisputeTracker::new(proof_envelope.proof_id, self.current_block, window_blocks)
+                    .map_err(GatewayError::from)?;
+            self.disputes.insert(proof_envelope.proof_id, tracker);
             self.indexer.index_dispute_window(&DisputeWindow {
                 proof_id: proof_envelope.proof_id,
                 opens_at_block: self.current_block,
-                closes_at_block: self
-                    .current_block
-                    .saturating_add(window_blocks),
+                closes_at_block: self.current_block.saturating_add(window_blocks),
                 status: DisputeStatus::Open,
             });
             GatewayTransferStatus::DisputeWindowOpen
@@ -888,7 +892,10 @@ mod tests {
             daily_limit: 10_000,
             pending_limit: 10,
             finality_requirement: 32,
-            verification_level: VerificationStrategy::ValidatorQuorum { threshold: 2, total: 3 },
+            verification_level: VerificationStrategy::ValidatorQuorum {
+                threshold: 2,
+                total: 3,
+            },
             fee_bps: 10,
             mode,
             require_dispute_window: false,
@@ -933,9 +940,9 @@ mod tests {
     /// verifiers registered for the route strategies. Tests emulate that here so
     /// deposits on the default ValidatorQuorum route can actually verify.
     fn register_default_verifiers(gateway: &mut CrosschainGateway<InMemoryGatewayLedger>) {
-        gateway.verification_router.register_verifier(Arc::new(
-            ValidatorQuorumVerifier::new(2, 3),
-        ));
+        gateway
+            .verification_router
+            .register_verifier(Arc::new(ValidatorQuorumVerifier::new(2, 3)));
     }
 
     fn validator_set() -> ValidatorSet {

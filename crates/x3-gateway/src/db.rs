@@ -1707,7 +1707,9 @@ fn integration_tier_as_str(value: &BenchmarkIntegrationTier) -> &'static str {
 
 pub(crate) fn validate_new_funding_swarm_grant(input: &NewFundingSwarmGrant) -> Result<()> {
     if input.external_id.trim().is_empty() {
-        return Err(GatewayError::BadRequest("external_id must not be empty".into()));
+        return Err(GatewayError::BadRequest(
+            "external_id must not be empty".into(),
+        ));
     }
     if input.title.trim().is_empty() {
         return Err(GatewayError::BadRequest("title must not be empty".into()));
@@ -1718,7 +1720,9 @@ pub(crate) fn validate_new_funding_swarm_grant(input: &NewFundingSwarmGrant) -> 
     Ok(())
 }
 
-pub(crate) fn validate_new_funding_swarm_publication(input: &NewFundingSwarmPublication) -> Result<()> {
+pub(crate) fn validate_new_funding_swarm_publication(
+    input: &NewFundingSwarmPublication,
+) -> Result<()> {
     if input.kind.trim().is_empty() {
         return Err(GatewayError::BadRequest("kind must not be empty".into()));
     }
@@ -1742,7 +1746,10 @@ pub fn is_high_priority_grant(grant: &FundingSwarmGrant) -> bool {
 /// first occurrence (lowest index).  Does not touch the database.
 pub fn dedupe_grants_by_external_id(grants: Vec<FundingSwarmGrant>) -> Vec<FundingSwarmGrant> {
     let mut seen = std::collections::HashSet::new();
-    grants.into_iter().filter(|g| seen.insert(g.external_id.clone())).collect()
+    grants
+        .into_iter()
+        .filter(|g| seen.insert(g.external_id.clone()))
+        .collect()
 }
 
 /// Returns `true` for timeline items that are safe to expose publicly
@@ -1773,14 +1780,14 @@ pub enum SwarmJobStage {
 impl SwarmJobStage {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Discovery           => "discovery",
-            Self::Research            => "research",
-            Self::Draft               => "draft",
+            Self::Discovery => "discovery",
+            Self::Research => "research",
+            Self::Draft => "draft",
             Self::PendingHumanApproval => "pending_human_approval",
-            Self::Approved            => "approved",
-            Self::Submitted           => "submitted",
-            Self::AwardPaid           => "award_paid",
-            Self::Rejected            => "rejected",
+            Self::Approved => "approved",
+            Self::Submitted => "submitted",
+            Self::AwardPaid => "award_paid",
+            Self::Rejected => "rejected",
         }
     }
 
@@ -1789,15 +1796,15 @@ impl SwarmJobStage {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "discovery"             => Some(Self::Discovery),
-            "research"              => Some(Self::Research),
-            "draft"                 => Some(Self::Draft),
+            "discovery" => Some(Self::Discovery),
+            "research" => Some(Self::Research),
+            "draft" => Some(Self::Draft),
             "pending_human_approval" => Some(Self::PendingHumanApproval),
-            "approved"              => Some(Self::Approved),
-            "submitted"             => Some(Self::Submitted),
-            "award_paid"            => Some(Self::AwardPaid),
-            "rejected"              => Some(Self::Rejected),
-            _                       => None,
+            "approved" => Some(Self::Approved),
+            "submitted" => Some(Self::Submitted),
+            "award_paid" => Some(Self::AwardPaid),
+            "rejected" => Some(Self::Rejected),
+            _ => None,
         }
     }
 }
@@ -1834,28 +1841,48 @@ pub fn compute_swarm_transition(
     action: &str,
 ) -> Result<(SwarmJobStage, &'static str, SwarmAuditEvent)> {
     let (next, new_status, visibility, event_type) = match (current_stage, action) {
-        (SwarmJobStage::Discovery, "research") =>
-            (SwarmJobStage::Research, "open",
-             AuditVisibility::Private, "ai_research_started"),
-        (SwarmJobStage::Research, "draft") =>
-            (SwarmJobStage::Draft, "pending_human_approval",
-             AuditVisibility::Private, "ai_draft_ready"),
-        (SwarmJobStage::Draft, "approve") =>
-            (SwarmJobStage::Approved, "approved",
-             AuditVisibility::Public, "human_approved"),
-        (SwarmJobStage::Draft, "reject") =>
-            (SwarmJobStage::Rejected, "rejected",
-             AuditVisibility::Private, "human_rejected"),
-        (SwarmJobStage::Approved, "submit") =>
-            (SwarmJobStage::Submitted, "submitted",
-             AuditVisibility::Public, "submitted_to_funder"),
-        (SwarmJobStage::Submitted, "award_paid") =>
-            (SwarmJobStage::AwardPaid, "award_paid",
-             AuditVisibility::Public, "award_paid"),
-        _ => return Err(GatewayError::BadRequest(format!(
-            "illegal swarm transition: stage={:?} action='{}'",
-            current_stage, action
-        ))),
+        (SwarmJobStage::Discovery, "research") => (
+            SwarmJobStage::Research,
+            "open",
+            AuditVisibility::Private,
+            "ai_research_started",
+        ),
+        (SwarmJobStage::Research, "draft") => (
+            SwarmJobStage::Draft,
+            "pending_human_approval",
+            AuditVisibility::Private,
+            "ai_draft_ready",
+        ),
+        (SwarmJobStage::Draft, "approve") => (
+            SwarmJobStage::Approved,
+            "approved",
+            AuditVisibility::Public,
+            "human_approved",
+        ),
+        (SwarmJobStage::Draft, "reject") => (
+            SwarmJobStage::Rejected,
+            "rejected",
+            AuditVisibility::Private,
+            "human_rejected",
+        ),
+        (SwarmJobStage::Approved, "submit") => (
+            SwarmJobStage::Submitted,
+            "submitted",
+            AuditVisibility::Public,
+            "submitted_to_funder",
+        ),
+        (SwarmJobStage::Submitted, "award_paid") => (
+            SwarmJobStage::AwardPaid,
+            "award_paid",
+            AuditVisibility::Public,
+            "award_paid",
+        ),
+        _ => {
+            return Err(GatewayError::BadRequest(format!(
+                "illegal swarm transition: stage={:?} action='{}'",
+                current_stage, action
+            )))
+        }
     };
 
     let event = SwarmAuditEvent {
@@ -2146,7 +2173,10 @@ mod tests {
             make_item("internal"),
             make_item("draft"),
         ];
-        let visible: Vec<_> = items.iter().filter(|i| is_public_timeline_item(i)).collect();
+        let visible: Vec<_> = items
+            .iter()
+            .filter(|i| is_public_timeline_item(i))
+            .collect();
         assert_eq!(visible.len(), 2);
         assert_eq!(visible[0].item_id, "public");
         assert_eq!(visible[1].item_id, "published");
@@ -2249,8 +2279,14 @@ mod tests {
         };
         let provider = StubAiProvider;
         let draft = provider.draft_application(&grant);
-        assert!(draft.contains("ZK-Rollup Research Grant"), "title missing from draft");
-        assert!(draft.contains("Ethereum Foundation"), "sponsor missing from draft");
+        assert!(
+            draft.contains("ZK-Rollup Research Grant"),
+            "title missing from draft"
+        );
+        assert!(
+            draft.contains("Ethereum Foundation"),
+            "sponsor missing from draft"
+        );
     }
 
     #[test]

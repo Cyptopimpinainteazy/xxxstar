@@ -69,6 +69,8 @@
 pub use pallet::*;
 
 #[cfg(test)]
+mod mock;
+#[cfg(test)]
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -99,7 +101,9 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use parity_scale_codec::Decode;
     use sp_core::H256;
-    use sp_io::hashing::{blake2_256, sha2_256};
+    #[cfg(not(any(feature = "dev", feature = "testnet")))]
+    use sp_io::hashing::blake2_256;
+    use sp_io::hashing::sha2_256;
     use sp_runtime::offchain::StorageKind;
     use sp_runtime::traits::{AccountIdConversion, SaturatedConversion, Saturating};
     use sp_runtime::transaction_validity::{
@@ -1530,9 +1534,7 @@ pub mod pallet {
             legs_hash: H256,
         ) -> Option<(H256, BundleStatus)> {
             Bundles::<T>::iter()
-                .find(|(_, record)| {
-                    &record.submitter == submitter && record.legs_hash == legs_hash
-                })
+                .find(|(_, record)| &record.submitter == submitter && record.legs_hash == legs_hash)
                 .map(|(bundle_id, record)| (bundle_id, record.status))
         }
 

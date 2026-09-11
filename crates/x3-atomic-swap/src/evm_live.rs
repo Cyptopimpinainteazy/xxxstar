@@ -115,7 +115,7 @@ fn parse_receipt(
         let topic = to_0x_hex(&Keccak256::digest(
             b"HTLCCreated(bytes32,address,address,address,uint256,bytes32,uint256)",
         ));
-        let found = receipt["logs"].as_array().map_or(false, |logs| {
+        let found = receipt["logs"].as_array().is_some_and(|logs| {
             logs.iter().any(|log| {
                 log["address"]
                     .as_str()
@@ -123,7 +123,7 @@ fn parse_receipt(
                     && log["topics"].as_array().is_some_and(|topics| {
                         topics.first().and_then(|v| v.as_str()) == Some(topic.as_str())
                             && topics.get(1).and_then(|v| v.as_str()).is_some_and(|id| {
-                                id.strip_prefix("0x").map_or(false, |id| {
+                                id.strip_prefix("0x").is_some_and(|id| {
                                     id.len() == 64
                                         && id != "0".repeat(64)
                                         && hex::decode(id).is_ok()

@@ -11,7 +11,11 @@ fn test_post_bond() {
         let agent = AccountId32::from([0u8; 32]);
         let amount = 5_000_000u128;
 
-        assert_ok!(Slash::post_bond(RuntimeOrigin::signed(agent.clone()), amount, None));
+        assert_ok!(Slash::post_bond(
+            RuntimeOrigin::signed(agent.clone()),
+            amount,
+            None
+        ));
 
         let bonds = crate::BondsByAgent::<Test>::get(&agent);
         assert_eq!(bonds.len(), 1);
@@ -24,7 +28,11 @@ fn test_release_bond() {
         let agent = AccountId32::from([0u8; 32]);
         let amount = 5_000_000u128;
 
-        assert_ok!(Slash::post_bond(RuntimeOrigin::signed(agent.clone()), amount, None));
+        assert_ok!(Slash::post_bond(
+            RuntimeOrigin::signed(agent.clone()),
+            amount,
+            None
+        ));
 
         let bonds = crate::BondsByAgent::<Test>::get(&agent);
         let bond_id = bonds[0];
@@ -42,12 +50,21 @@ fn test_slash_bond() {
         let agent = AccountId32::from([0u8; 32]);
         let amount = 5_000_000u128;
 
-        assert_ok!(Slash::post_bond(RuntimeOrigin::signed(agent.clone()), amount, None));
+        assert_ok!(Slash::post_bond(
+            RuntimeOrigin::signed(agent.clone()),
+            amount,
+            None
+        ));
 
         let bonds = crate::BondsByAgent::<Test>::get(&agent);
         let bond_id = bonds[0];
 
-        assert_ok!(Slash::slash_bond(RuntimeOrigin::root(), bond_id, 2, vec![1u8; 64]));
+        assert_ok!(Slash::slash_bond(
+            RuntimeOrigin::root(),
+            bond_id,
+            2,
+            vec![1u8; 64]
+        ));
 
         let bond = Bonds::<Test>::get(bond_id).unwrap();
         assert_eq!(bond.status, crate::BondStatus::FullySlashed);

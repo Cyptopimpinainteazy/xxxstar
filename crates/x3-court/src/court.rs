@@ -495,7 +495,7 @@ impl Court {
         } else {
             hasher.update([0x00]);
         }
-            hasher.update(verdict.slash_amount.to_le_bytes());
+        hasher.update(verdict.slash_amount.to_le_bytes());
         let result = hasher.finalize();
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&result);

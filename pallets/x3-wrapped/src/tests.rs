@@ -459,9 +459,7 @@ fn total_supply_invariant_holds_after_mixed_ops() {
 
         // Expected: 300 - 50 + 200 + 100 = 550.
         let stored_total = TotalWrappedSupply::<Test>::get();
-        let manual_sum: u128 = WrappedSupply::<Test>::iter()
-            .map(|(_, _, bal)| bal)
-            .sum();
+        let manual_sum: u128 = WrappedSupply::<Test>::iter().map(|(_, _, bal)| bal).sum();
         assert_eq!(stored_total, 550);
         assert_eq!(stored_total, manual_sum);
     });

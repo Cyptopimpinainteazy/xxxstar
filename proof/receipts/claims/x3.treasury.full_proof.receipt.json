@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.treasury.full_proof",
-  "artifact_hash": "07a7094c3bf332cc8c00ea1685b3712727906bd469855d35b04c458bff4c9e2e",
+  "artifact_hash": "a522f70c3c15417933264a402d79825e368e41911ce5d009b70b49f3036ba313",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "pallets/treasury/Cargo.toml",
@@ -9,7 +9,7 @@
     "proof/funding/milestone-receipt-map.yml",
     "proof/receipts/claims/x3.funding.milestone_receipts.receipt.json"
   ],
-  "timestamp": "2026-05-02T02:31:04.864610903Z",
+  "timestamp": "2026-09-11T18:34:26.292414410Z",
   "result": {
     "claim_id": "x3.treasury.full_proof",
     "claim": "Treasury and funding receipt artifacts are present",
@@ -40,15 +40,15 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "treasury_check": "true",
-      "pallets/treasury/src/lib.rs": "true",
-      "proof/funding/milestone-receipt-map.yml": "true",
       "pallets/treasury/Cargo.toml": "true",
-      "proof/receipts/claims/x3.funding.milestone_receipts.receipt.json": "true"
+      "pallets/treasury/src/lib.rs": "true",
+      "proof/receipts/claims/x3.funding.milestone_receipts.receipt.json": "true",
+      "treasury_check": "true",
+      "proof/funding/milestone-receipt-map.yml": "true"
     },
-    "timestamp": "2026-05-02T02:31:04.857994808Z",
-    "duration_ms": 51253
+    "timestamp": "2026-09-11T18:34:26.269675495Z",
+    "duration_ms": 93966
   },
   "limitations": [],
-  "binding_hash": "4f5cf83943bd69c1f2a5c2200d5ff367ba4ef005705428b4e7c02cecfd525264"
+  "binding_hash": "c6d394ca18e791a6d81cd21bd8e41ecf65864eb37cb711c24a7e02b7b821a4b2"
 }

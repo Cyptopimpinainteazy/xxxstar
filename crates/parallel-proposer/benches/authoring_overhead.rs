@@ -19,9 +19,7 @@
 use codec::{Decode, Encode};
 use parallel_proposer::extract_tx_metadata;
 use sp_core::{sr25519, Pair};
-use sp_runtime::{
-    traits::{BlakeTwo256, Hash, Verify},
-};
+use sp_runtime::traits::{BlakeTwo256, Hash, Verify};
 use std::time::Instant;
 use x3_chain_runtime::{
     AccountId, Address, RuntimeCall, Signature, SignedExtra, SignedPayload, UncheckedExtrinsic,
@@ -54,9 +52,7 @@ fn make_remark(pair: sr25519::Pair, raw: Vec<u8>, nonce: u32, genesis: [u8; 32])
         frame_system::CheckEra::<x3_chain_runtime::Runtime>::from(Era::Immortal),
         frame_system::CheckNonce::<x3_chain_runtime::Runtime>::from(nonce),
         frame_system::CheckWeight::<x3_chain_runtime::Runtime>::new(),
-        pallet_transaction_payment::ChargeTransactionPayment::<x3_chain_runtime::Runtime>::from(
-            0,
-        ),
+        pallet_transaction_payment::ChargeTransactionPayment::<x3_chain_runtime::Runtime>::from(0),
         InvariantCheck::<x3_chain_runtime::Runtime>::new(),
         AgentLawCheck::<x3_chain_runtime::Runtime>::decode(&mut &[][..])
             .expect("AgentLawCheck decodes from empty bytes"),
@@ -80,8 +76,7 @@ fn make_remark(pair: sr25519::Pair, raw: Vec<u8>, nonce: u32, genesis: [u8; 32])
         ),
     );
     let signature = payload.using_encoded(|payload| Signature::from(pair.sign(payload)));
-    let extrinsic =
-        UncheckedExtrinsic::new_signed(call, Address::Id(account), signature, extra);
+    let extrinsic = UncheckedExtrinsic::new_signed(call, Address::Id(account), signature, extra);
     extrinsic.encode()
 }
 
@@ -122,7 +117,11 @@ fn main() {
         let meta_ns = t1.elapsed().as_nanos() as f64 / (rounds as f64);
 
         let overhead = meta_ns - hash_ns;
-        let x = if hash_ns > 0.0 { meta_ns / hash_ns } else { 0.0 };
+        let x = if hash_ns > 0.0 {
+            meta_ns / hash_ns
+        } else {
+            0.0
+        };
         println!(
             "{:<10} {:<18.1} {:<18.1} {:<14.1} {:<10.2}x",
             sz, hash_ns, meta_ns, overhead, x
@@ -171,7 +170,11 @@ fn main() {
             }
         }
         let full = tb.elapsed().as_nanos() as f64 / (50.0 * pool as f64);
-        let x = if hash_only > 0.0 { full / hash_only } else { 0.0 };
+        let x = if hash_only > 0.0 {
+            full / hash_only
+        } else {
+            0.0
+        };
         println!(
             "{:<10} {:<18.1} {:<20.1} {:<14.2}x",
             pool, hash_only, full, x

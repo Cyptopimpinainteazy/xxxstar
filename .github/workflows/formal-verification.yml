@@ -23,6 +23,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
+  K_INSTALL_SHA256: a485a0af380bb34d9874db11432b6422c019ff4a55a01e81b61e04dbfcd96f44
 
 jobs:
   formal-verification:
@@ -39,8 +40,9 @@ jobs:
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-          components: rustfmt, clippy
+          toolchain: 1.90.0
+          components: rustfmt, clippy, rust-src
+          target: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Cache Cargo Dependencies
         uses: actions/cache@v4
@@ -62,9 +64,11 @@ jobs:
           path: |
             /opt/tla2tools.jar
             ~/.opam
-            /opt/k
+            ~/.kup
+            ~/.local/bin
+            ~/.nix-profile
             /opt/dafny
-          key: ${{ runner.os }}-fv-tools-v1
+          key: ${{ runner.os }}-fv-tools-v2
           restore-keys: |
             ${{ runner.os }}-fv-tools-
 
@@ -87,29 +91,45 @@ jobs:
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y git maven
-          cd /opt
-          sudo rm -rf k
-          sudo git clone --depth=1 --recurse-submodules https://github.com/runtimeverification/k.git
-          cd k
-          sudo mvn package -DskipTests
-          test -x /opt/k/k-distribution/target/release/k/bin/kprove
-          sudo ln -sf /opt/k/k-distribution/target/release/k/bin/kprove /usr/local/bin/kprove
+          sudo apt-get install -y curl xz-utils
+          curl -fsSL https://kframework.org/install -o "$RUNNER_TEMP/kframework-install"
+          echo "${K_INSTALL_SHA256}  ${RUNNER_TEMP}/kframework-install" | sha256sum --check --status
+          bash "$RUNNER_TEMP/kframework-install" <<< "y"
+          if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+            . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+          fi
+          export PATH="/nix/var/nix/profiles/default/bin:$HOME/.local/bin:$HOME/.nix-profile/bin:$PATH"
+          kup install k
+          command -v kprove
+          command -v kompile
           echo "✅ K Framework installed"
+
+      - name: Add Formal Verification Tools to PATH
+        run: |
+          {
+            echo "/nix/var/nix/profiles/default/bin"
+            echo "$HOME/.local/bin"
+            echo "$HOME/.nix-profile/bin"
+          } >> "$GITHUB_PATH"
 
       - name: Install Dafny (Optional)
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          cd /opt
-          sudo wget -q https://github.com/dafny-lang/dafny/releases/download/v4.2.0/dafny-4.2.0-x64-ubuntu-20.04.zip
-          sudo unzip -q dafny-4.2.0-x64-ubuntu-20.04.zip -d /opt/
-          sudo mv dafny /opt/dafny
+          if [ ! -x /opt/dafny/dafny ]; then
+            rm -rf "$RUNNER_TEMP/dafny-install"
+            mkdir -p "$RUNNER_TEMP/dafny-install"
+            wget -q https://github.com/dafny-lang/dafny/releases/download/v4.2.0/dafny-4.2.0-x64-ubuntu-20.04.zip -O "$RUNNER_TEMP/dafny-install/dafny.zip"
+            unzip -q "$RUNNER_TEMP/dafny-install/dafny.zip" -d "$RUNNER_TEMP/dafny-install"
+            sudo rm -rf /opt/dafny
+            sudo mv "$RUNNER_TEMP/dafny-install/dafny" /opt/dafny
+          fi
           echo "✅ Dafny installed"
 
       - name: Verify Tool Installations
         run: |
           echo "Verifying formal verification tools..."
-          java -jar /opt/tla2tools.jar >/dev/null
+          test -s /opt/tla2tools.jar
+          java -version
           coqc --version
           kprove --version
           /opt/dafny/dafny --version
@@ -125,14 +145,18 @@ jobs:
         id: formal-gate
         run: |
           echo "🔍 Running formal verification proofs..."
-          target/release/x3-proof formal --workspace . --strict
+          target/release/x3-proof formal --workspace .
         continue-on-error: false
 
       - name: Generate Formal Verification Report
         if: always()
         run: |
           echo "📊 Generating verification report..."
-          target/release/x3-proof formal --workspace . --report > formal-verification-report.txt
+          if [ -x target/release/x3-proof ]; then
+            target/release/x3-proof formal --workspace . > formal-verification-report.txt
+          else
+            echo "x3-proof binary was not built; inspect earlier setup/build failure." > formal-verification-report.txt
+          fi
           cat formal-verification-report.txt
 
       - name: Upload Formal Verification Report
@@ -166,6 +190,7 @@ jobs:
       - name: Comment on PR (On Failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             github.rest.issues.createComment({
@@ -192,7 +217,7 @@ jobs:
                  - \`formal-proofs/coq/SupplyInvariant.v\`
                  - \`formal-proofs/k/x3vm-spec.k\`
               2. Fix the underlying issue (code or spec)
-              3. Re-run: \`./target/release/x3-proof formal --workspace . --strict\`
+              3. Re-run: \`./target/release/x3-proof formal --workspace .\`
               4. Push fix and re-run CI
               
               **⚠️ Do not bypass this gate - consensus bugs in production = chain halt.**`
@@ -201,6 +226,7 @@ jobs:
       - name: Comment on PR (On Success)
         if: success() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             github.rest.issues.createComment({

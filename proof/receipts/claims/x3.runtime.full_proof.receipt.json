@@ -1,7 +1,7 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.runtime.full_proof",
-  "artifact_hash": "604f00717ac2dbdd7e502199362804485e38c0fc76517dc0b76def19d5c4749a",
+  "artifact_hash": "2a49d90a8fb22623f5248039664a8ae05af95761aeaa31792b59c591f4c91652",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "runtime/Cargo.toml",
@@ -9,11 +9,11 @@
     "scripts/run-try-runtime.sh",
     "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json"
   ],
-  "timestamp": "2026-05-02T02:12:33.285410342Z",
+  "timestamp": "2026-09-11T18:32:42.585375723Z",
   "result": {
     "claim_id": "x3.runtime.full_proof",
     "claim": "Runtime upgrade-safety artifacts are present",
-    "status": "partial",
+    "status": "verified",
     "proof_level": "P6",
     "edge_case_level": "E7",
     "hack_level": "H8",
@@ -32,24 +32,23 @@
       "Runtime crate manifest exists",
       "Runtime implementation exists",
       "Try-runtime script exists",
-      "Proof-gated runtime upgrade receipt exists"
+      "Proof-gated runtime upgrade receipt exists",
+      "Runtime executable check passed"
     ],
-    "failed_checks": [
-      "Runtime executable check failed: warning: use of deprecated constant `pallet::RuntimeEvent::_w`: "
-    ],
+    "failed_checks": [],
     "missing_proofs": [],
     "blockers": [],
-    "score": 0.8,
+    "score": 1.0,
     "evidence": {
+      "runtime_check": "true",
       "scripts/run-try-runtime.sh": "true",
       "runtime/src/lib.rs": "true",
-      "runtime/Cargo.toml": "true",
       "proof/receipts/claims/x3.governance.proof_gated_upgrade.receipt.json": "true",
-      "runtime_check": "false"
+      "runtime/Cargo.toml": "true"
     },
-    "timestamp": "2026-05-02T02:12:33.270381728Z",
-    "duration_ms": 714600
+    "timestamp": "2026-09-11T18:32:42.549562377Z",
+    "duration_ms": 158474
   },
   "limitations": [],
-  "binding_hash": "a8c64f58bcc55f0605e8325e4fc35e595216f14d0962f1e9e236b351edf3a28f"
+  "binding_hash": "eb72de02bd62904dee250a9d7156ec8b2b74b8996daff5c26ce699636bb8abc9"
 }

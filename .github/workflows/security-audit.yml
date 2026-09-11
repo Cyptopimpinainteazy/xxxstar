@@ -15,5 +15,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Build release node for real-chain tests
+        run: cargo build --release -p x3-chain-node --features mainnet-rc1
       - name: Audit
         run: make audit

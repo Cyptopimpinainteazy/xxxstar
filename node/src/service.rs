@@ -1,5 +1,5 @@
-use crate::flash_finality::FlashFinalityBridge;
 use crate::atomic_service::{AtomicGatewayCommand, AtomicGatewayService};
+use crate::flash_finality::FlashFinalityBridge;
 use crate::metrics::X3PrometheusMetrics;
 use crate::rpc_middleware::{RateLimitConfig, RateLimiter};
 use contention_predictor::{ContentionPredictor, PredictorConfig};
@@ -9,7 +9,6 @@ use parallel_proposer::{extract_tx_metadata, ParallelProposerFactory};
 use poh_generator::PoHState;
 use poh_generator::{PoHDigest, PoHVerifier, POH_ENGINE_ID};
 use sc_client_api::{Backend, BlockBackend, BlockchainEvents, HeaderBackend};
-use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sc_consensus::{BlockCheckParams, BlockImport, BlockImportParams, ImportResult};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
@@ -18,8 +17,9 @@ use sc_service::{
     TaskManager,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
+use sc_transaction_pool_api::{TransactionPool, TransactionSource};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
-use sp_core::{crypto::KeyTypeId, H256, Pair};
+use sp_core::{crypto::KeyTypeId, Pair, H256};
 use sp_runtime::traits::Header as HeaderT;
 use sp_runtime::{
     traits::{BlakeTwo256, Block as BlockT, Hash as HashT},
@@ -28,6 +28,8 @@ use sp_runtime::{
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
+#[cfg(feature = "gpu-validator")]
+use tokio::task::JoinHandle;
 use x3_bridge_adapters::{
     OffchainEscrowPersistence, RuntimeCrossVmDispatcher, SubstrateX3VmBridge,
 };
@@ -67,9 +69,9 @@ const GPU_SIDECAR_RESTART_THRESHOLD: u32 = 3;
 #[allow(dead_code)]
 const GPU_SIDECAR_SHUTDOWN_TIMEOUT_SECS: u64 = 30;
 
-/// ───────────────────────────────────────────────────────────────
-/// GPU Sidecar Lifecycle Management
-/// ───────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+// GPU Sidecar Lifecycle Management
+// ───────────────────────────────────────────────────────────────
 
 /// Configuration for GPU sidecar spawning
 #[cfg(feature = "gpu-validator")]
@@ -142,7 +144,7 @@ impl GpuSidecarHandle {
         );
 
         // Signal shutdown
-        if let Err(_) = self.shutdown_tx.send(()) {
+        if self.shutdown_tx.send(()).is_err() {
             log::warn!("GPU sidecar shutdown signal already closed");
         }
 
@@ -151,7 +153,7 @@ impl GpuSidecarHandle {
         let start = std::time::Instant::now();
 
         loop {
-            let mut task_handle = self.task_handle.lock().await;
+            let task_handle = self.task_handle.lock().await;
             if task_handle.is_none() {
                 log::info!("✅ GPU sidecar gracefully shut down");
                 self.is_running
@@ -266,7 +268,7 @@ impl GpuSidecarHealthMonitor {
     }
 
     /// Check sidecar health and return true if operational
-    pub fn check_health(&mut self, current_block: u32) -> bool {
+    pub fn check_health(&mut self, _current_block: u32) -> bool {
         // Health status is tracked via `record_check` and restart thresholds;
         // this method returns the current tracked state.
         self.is_healthy
@@ -306,6 +308,14 @@ impl GpuSidecarHealthMonitor {
         log::info!("🔄 GPU sidecar health monitor reset");
     }
 }
+
+#[cfg(feature = "gpu-validator")]
+impl Default for GpuSidecarHealthMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Executor for X3 Chain — WASM-only in stable2512 (native eliminated).
 pub type Executor = sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>;
 
@@ -833,33 +843,31 @@ pub fn new_full_with_atomic_gateway<
 
     // Optional node-side atomic gateway service: signs and submits
     // atomic-kernel extrinsics through this node's transaction pool.
-    let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags.enable_atomic_kernel {
+    let atomic_gateway_tx: Option<mpsc::Sender<AtomicGatewayCommand>> = if feature_flags
+        .enable_atomic_kernel
+    {
         match atomic_gateway_uri {
-            Some(uri) => match AtomicGatewayService::new(
-                &uri,
-                client.clone(),
-                transaction_pool.clone(),
-            ) {
-                Ok(service) => {
-                    let uri_for_log = uri.clone();
-                    let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
-                    task_manager.spawn_handle().spawn(
-                        "atomic-gateway-service",
-                        Some("x3"),
-                        async move {
-                            service.run(rx).await;
-                        },
-                    );
-                    log::info!(
-                        "🧩 Atomic gateway service spawned (uri: {uri_for_log})"
-                    );
-                    Some(tx)
+            Some(uri) => {
+                match AtomicGatewayService::new(&uri, client.clone(), transaction_pool.clone()) {
+                    Ok(service) => {
+                        let uri_for_log = uri.clone();
+                        let (tx, rx) = mpsc::channel::<AtomicGatewayCommand>(64);
+                        task_manager.spawn_handle().spawn(
+                            "atomic-gateway-service",
+                            Some("x3"),
+                            async move {
+                                service.run(rx).await;
+                            },
+                        );
+                        log::info!("🧩 Atomic gateway service spawned (uri: {uri_for_log})");
+                        Some(tx)
+                    }
+                    Err(e) => {
+                        log::error!("🧩 Atomic gateway service failed to start: {e}");
+                        None
+                    }
                 }
-                Err(e) => {
-                    log::error!("🧩 Atomic gateway service failed to start: {e}");
-                    None
-                }
-            },
+            }
             None => {
                 log::warn!(
                     "🧩 enable-atomic-kernel requires --atomic-gateway-uri or X3_ATOMIC_GATEWAY_URI; service not spawned"
@@ -1454,7 +1462,6 @@ pub fn new_full_with_atomic_gateway<
             // Spawn sidecar task into the task manager
             let gpu_sidecar_for_spawn = gpu_sidecar_handle_arc.clone();
             let gpu_sidecar_is_running = gpu_sidecar_for_spawn.is_running.clone();
-            let gpu_sidecar_task_handle = gpu_sidecar_for_spawn.task_handle.clone();
             let orchestrator_for_sidecar = orchestrator.clone();
 
             task_manager.spawn_handle().spawn(
@@ -1893,7 +1900,7 @@ async fn spawn_gpu_sidecar(
                     }
                 }
 
-                if health_check_counter % 6 == 0 {
+                if health_check_counter.is_multiple_of(6) {
                     let orch = orchestrator.read().await;
                     let metrics = orch.get_swarm_metrics();
                     log::info!(
@@ -1997,7 +2004,10 @@ async fn spawn_sidecar_service(service_id: &str) -> Result<(), String> {
 ///
 /// Key format: `b"x3ff:" (5 bytes) + block_number (8 bytes LE) = 13 bytes`
 /// Value:      `cert_hash (32 bytes)`
-async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::atomic_service::AtomicPool>) {
+async fn run_grandpa_finality_anchor(
+    client: Arc<FullClient>,
+    pool: Arc<crate::atomic_service::AtomicPool>,
+) {
     log::info!("⚡ GRANDPA finality anchor task started");
     let mut last_finalized_hash = sp_core::H256::zero();
     loop {
@@ -2012,30 +2022,28 @@ async fn run_grandpa_finality_anchor(client: Arc<FullClient>, pool: Arc<crate::a
             let hash: [u8; 32] = info.finalized_hash.as_ref().try_into().unwrap_or([0u8; 32]);
             last_finalized_hash = info.finalized_hash;
             let cert_hash = sp_core::blake2_256(&hash);
-            log::info!(
-                "⚡ [GRANDPA] finality head reached block {number}"
+            log::info!("⚡ [GRANDPA] finality head reached block {number}");
+            let call = RuntimeCall::X3AtomicKernel(
+                pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
+                    block_num: number,
+                    cert: H256(cert_hash),
+                },
             );
-        let call = RuntimeCall::X3AtomicKernel(
-            pallet_x3_atomic_kernel::Call::<Runtime>::record_flash_finality_anchor {
-                block_num: number,
-                cert: H256(cert_hash),
-            },
-        );
-        let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
-        if let Err(e) = pool
-            .submit_one(
-                client.info().best_hash,
-                TransactionSource::Local,
-                extrinsic.into(),
-            )
-            .await
-        {
-            log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
-        }
-        log::info!(
-            "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
-            hex::encode(&cert_hash[..8])
-        );
+            let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
+            if let Err(e) = pool
+                .submit_one(
+                    client.info().best_hash,
+                    TransactionSource::Local,
+                    extrinsic.into(),
+                )
+                .await
+            {
+                log::warn!("failed to anchor GRANDPA cert for block {number}: {e}");
+            }
+            log::info!(
+                "⚡ [GRANDPA] cert anchored for block {number} → cert_hash=0x{}",
+                hex::encode(&cert_hash[..8])
+            );
         }
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
@@ -2452,7 +2460,7 @@ mod tests {
             tick_before,
             &{
                 let s2 = PoHState::default();
-                
+
                 s2.hash()
             },
             &[],

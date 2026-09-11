@@ -1,55 +1,50 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.funding.milestone_receipts",
-  "artifact_hash": "a7fe0536d66372d0b485272a4a6ee4c5a0cad16cba611926f87a2fb387ec3f68",
+  "artifact_hash": "da234b1e08d6a41cc014d05814eadc0ed05b750e80cd5afc021d5eaef65a3902",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
-    "docs/ATLAS_SPHERE_ROADMAP.md",
-    "docs/BUILD_PHASES.md",
-    "MASTER_STATUS.md",
-    "PHASE_1_2_KICKOFF.md",
     "proof/receipts/claims/",
     "proof/funding/milestone-receipt-map.yml"
   ],
-  "timestamp": "2026-05-02T04:16:45.602709350Z",
+  "timestamp": "2026-09-11T18:25:23.221411622Z",
   "result": {
     "claim_id": "x3.funding.milestone_receipts",
     "claim": "Every funding ask maps to a milestone, deliverable, budget, and proof receipt",
-    "status": "verified",
+    "status": "unverified",
     "proof_level": null,
     "edge_case_level": null,
     "hack_level": null,
     "operator_level": null,
     "degraded_level": null,
     "files_inspected": [
-      "docs/ATLAS_SPHERE_ROADMAP.md",
-      "docs/BUILD_PHASES.md",
-      "MASTER_STATUS.md",
-      "PHASE_1_2_KICKOFF.md",
       "proof/receipts/claims/",
       "proof/funding/milestone-receipt-map.yml"
     ],
     "commands_run": [],
     "passed_checks": [
-      "4 milestone/phase documents found",
-      "27 proof receipts exist as deliverable evidence",
-      "All 14 funding milestones map to existing verified receipts",
-      "Funding map total budget = $795000 USD"
+      "27 proof receipts exist as deliverable evidence"
     ],
-    "failed_checks": [],
+    "failed_checks": [
+      "No milestone tracking documents found",
+      "milestones[6] (`M7.flashloan-repay-or-revert`): receipt status is `blocked`, not `verified`",
+      "milestones[7] (`M8.flashloan-attack-resistance`): receipt status is `blocked`, not `verified`",
+      "milestones[8] (`M9.governance-proof-gated-upgrade`): receipt status is `blocked`, not `verified`",
+      "milestones[11] (`M12.proofforge-receipt-integrity`): receipt status is `partial`, not `verified`"
+    ],
     "missing_proofs": [],
     "blockers": [],
-    "score": 1.0,
+    "score": 0.16666666666666666,
     "evidence": {
-      "milestone_docs": "4",
       "proof_receipts": "27",
       "funding_milestones_total": "14",
-      "funding_milestones_verified": "14",
-      "funding_total_budget_usd": "795000"
+      "funding_total_budget_usd": "580000",
+      "milestone_docs": "0",
+      "funding_milestones_verified": "10"
     },
-    "timestamp": "2026-05-02T04:16:45.597552734Z",
-    "duration_ms": 3
+    "timestamp": "2026-09-11T18:25:23.215977345Z",
+    "duration_ms": 4
   },
   "limitations": [],
-  "binding_hash": "a9db650cf5efb949584d41a697b2c7b4d5c777d996cf0da079828e10992c9e40"
+  "binding_hash": "4f72fbcc46b35859a1a4c24df72f8eeeefe4e2505d0ba402bc76aaeaaf3c49b1"
 }

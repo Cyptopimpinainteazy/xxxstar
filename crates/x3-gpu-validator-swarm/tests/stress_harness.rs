@@ -124,8 +124,7 @@ mod tests {
                         latencies.lock().await.push(latency_ms);
 
                         #[allow(clippy::manual_is_multiple_of)]
-                        let injected_failure = inject_gpu_failures
-                            && (task_seq % 10 == 0);
+                        let injected_failure = inject_gpu_failures && (task_seq % 10 == 0);
                         if gpu_healthy.load(Ordering::Acquire) && !injected_failure {
                             tasks_completed.fetch_add(1, Ordering::Relaxed);
                         } else {

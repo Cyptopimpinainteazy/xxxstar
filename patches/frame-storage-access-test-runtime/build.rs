@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    println!("cargo::rustc-check-cfg=cfg(enable_alloc_error_handler)");
+
     // Generate stub wasm_binary.rs to avoid building actual WASM
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("wasm_binary.rs");

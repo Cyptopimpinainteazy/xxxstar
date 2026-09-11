@@ -11,11 +11,11 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Run PR Supervisor enforcement
         run: |
           echo "🔎 PR Supervisor: checking PR diff and test integrity"
-          python3 scripts_infrastructure/pr_supervisor.py --base origin/main
+          python3 scripts_infrastructure/pr_supervisor.py --base "origin/${GITHUB_BASE_REF}"

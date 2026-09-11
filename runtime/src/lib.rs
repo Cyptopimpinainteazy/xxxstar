@@ -71,10 +71,8 @@ use pallet_collective;
 use pallet_cross_chain_validator;
 #[cfg(feature = "frontier")]
 use pallet_ethereum;
-use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
-use pallet_meme_overlord;
 use pallet_offences;
 use pallet_preimage;
 use pallet_scheduler;
@@ -82,7 +80,6 @@ use pallet_session;
 #[cfg(feature = "dev")]
 use pallet_sudo;
 use pallet_svm_runtime;
-use pallet_swarm;
 use pallet_timestamp;
 #[allow(deprecated)]
 use pallet_transaction_payment::CurrencyAdapter;
@@ -92,12 +89,9 @@ use pallet_x3_agent_law;
 use pallet_x3_agent_registry;
 use pallet_x3_asset_registry;
 use pallet_x3_atomic_kernel;
-use pallet_x3_auction;
-use pallet_x3_compute_market;
 use pallet_x3_cross_vm_router;
 use pallet_x3_crosschain_gateway;
 use pallet_x3_custody;
-use pallet_x3_dapp_hub;
 use pallet_x3_invariants;
 use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
@@ -122,11 +116,11 @@ use x3_accounting_events::{AccountingEvent, AccountingSpine};
 use x3_security_events::{SecurityEvent, SecurityEventHook};
 
 use scale_info::TypeInfo;
-// IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
-use frame_support::dispatch::DispatchResult;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
+#[cfg(not(feature = "mainnet-rc1"))]
+use sp_runtime::DispatchResult;
 #[allow(deprecated)] // create_runtime_str! accepted: required by the runtime_version grammar.
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
@@ -140,7 +134,8 @@ use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
-use x3_dex::TokenId as DexTokenId;
+#[cfg(not(feature = "mainnet-rc1"))]
+use x3_dex::amm_pools::TokenId as DexTokenId;
 
 #[cfg(feature = "frontier")]
 mod precompiles;
@@ -2642,7 +2637,9 @@ impl pallet_x3_sequencer::Config for Runtime {
 // These wire the fraud-proof pallet's `SchedulerCommitmentQuery` and
 // `ProposerQuery` traits to the sequencer and consensus pallets respectively.
 
-use crate::fraud_proofs::types::{ProposerQuery, SchedulerCommitmentQuery};
+use crate::fraud_proofs::types::ProposerQuery;
+#[cfg(not(feature = "mainnet-rc1"))]
+use crate::fraud_proofs::types::SchedulerCommitmentQuery;
 
 /// Reads the scheduler commitment from the sequencer pallet's per-block storage.
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -3203,6 +3200,7 @@ impl GetSessionNumber for SessionHandler {
 // sp_session::SessionKeys trait implementation for session key generation/decoding
 
 #[cfg(feature = "runtime-benchmarks")]
+#[allow(unused_imports)] // define_benchmarks! consumes these pallet aliases as macro metadata.
 mod benches {
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;

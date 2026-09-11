@@ -1,14 +1,14 @@
 {
-  "repo_commit_hash": "2e0c3bdac9de8b60b05daa3bfdc545362d726150",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.dex.liquidity_provision",
-  "artifact_hash": "a30ef655a6e05d603148a95d2ca558f9070bdb22099f931cf76419386374beec",
+  "artifact_hash": "c878a2d6a5e61cc8380e3e9a9822fdf0ce2cc51fcbc74d4a0b0144d28ac7f7bd",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "crates/x3-dex/src/lib.rs",
     "crates/x3-dex/src/tests/attack_sandwich.rs",
     "crates/x3-dex/src/tests/attack_liquidation_frontrun.rs"
   ],
-  "timestamp": "2026-05-02T01:53:00.458861748Z",
+  "timestamp": "2026-09-11T18:23:38.143418178Z",
   "result": {
     "claim_id": "x3.dex.liquidity_provision",
     "claim": "DEX economic attack resistance",
@@ -35,13 +35,13 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "failed_attack_tests": "0",
+      "passed_attack_tests": "2",
       "expected_attack_tests": "2",
-      "passed_attack_tests": "2"
+      "failed_attack_tests": "0"
     },
-    "timestamp": "2026-05-02T01:53:00.455546885Z",
-    "duration_ms": 5094
+    "timestamp": "2026-09-11T18:23:38.135692844Z",
+    "duration_ms": 13859
   },
   "limitations": [],
-  "binding_hash": "f2e06ef661291ed7915d00246601fb9a5975ae7b9081a0a7d0304b875519c702"
+  "binding_hash": "887fa7cd9b6b645d0d26828489b26b01c73fa5f37f5d7d4d0b34533887fc73e3"
 }

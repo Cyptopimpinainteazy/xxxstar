@@ -626,7 +626,12 @@ fn freeze_reason(text: &[u8]) -> BoundedVec<u8, pallet_x3_sentinel::pallet::MaxF
 #[test]
 fn test_sentinel_frozen_mint_authority_blocks_mint() {
     new_test_ext().execute_with(|| {
-        let asset_id = launch(capped_config(b"SEN-A", 500_000, 1_000_000, all_three_domains()));
+        let asset_id = launch(capped_config(
+            b"SEN-A",
+            500_000,
+            1_000_000,
+            all_three_domains(),
+        ));
         // Baseline: authority can mint before any freeze.
         assert_ok!(Factory::mint(
             RuntimeOrigin::signed(CREATOR),
@@ -673,7 +678,12 @@ fn test_sentinel_frozen_mint_authority_blocks_mint() {
 #[test]
 fn test_sentinel_asset_freeze_blocks_mint() {
     new_test_ext().execute_with(|| {
-        let asset_id = launch(capped_config(b"SEN-B", 500_000, 1_000_000, all_three_domains()));
+        let asset_id = launch(capped_config(
+            b"SEN-B",
+            500_000,
+            1_000_000,
+            all_three_domains(),
+        ));
         assert_ok!(Sentinel::freeze_asset(
             RuntimeOrigin::signed(CREATOR),
             asset_id,
@@ -741,7 +751,12 @@ fn test_sentinel_enrolled_burn_requires_approval() {
 #[test]
 fn test_sentinel_frozen_authority_cannot_transfer() {
     new_test_ext().execute_with(|| {
-        let asset_id = launch(capped_config(b"SEN-D", 500_000, 1_000_000, all_three_domains()));
+        let asset_id = launch(capped_config(
+            b"SEN-D",
+            500_000,
+            1_000_000,
+            all_three_domains(),
+        ));
         assert_ok!(Sentinel::freeze_authority(
             RuntimeOrigin::signed(CREATOR),
             asset_id,
@@ -749,11 +764,7 @@ fn test_sentinel_frozen_authority_cannot_transfer() {
             freeze_reason(b"quarantine"),
         ));
         assert_noop!(
-            Factory::transfer_mint_authority(
-                RuntimeOrigin::signed(CREATOR),
-                asset_id,
-                7u64,
-            ),
+            Factory::transfer_mint_authority(RuntimeOrigin::signed(CREATOR), asset_id, 7u64,),
             Error::<Test>::AuthorityFrozenBySentinel
         );
     });

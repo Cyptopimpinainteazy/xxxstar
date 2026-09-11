@@ -518,11 +518,8 @@ pub fn generate_tauri_wiring_report() -> String {
 pub fn generate_marketing_claims_audit() -> String {
     match load_feature_registry() {
         Ok(reg) => {
-            let mut out =
-                String::from("# Marketing Claims Audit\n\n");
-            out.push_str(
-                "- Only verified reports may drive marketing claims.\n",
-            );
+            let mut out = String::from("# Marketing Claims Audit\n\n");
+            out.push_str("- Only verified reports may drive marketing claims.\n");
             out.push_str("- Unsupported claims must be marked UNSUPPORTED_CLAIM.\n");
             let mut flagged = 0usize;
             for (name, entry) in &reg {
@@ -650,23 +647,15 @@ pub fn generate_grant_pipeline_report() -> String {
         Ok(reg) => {
             let mut out = String::from("# Grant Pipeline Report\n\n");
             out.push_str("- Grant schema and tracking are under development.\n");
-            out.push_str(
-                "- Not grant-eligible below the 50% readiness barrier.\n",
-            );
-            let below = reg
-                .iter()
-                .filter(|(_, e)| e.readiness_score < 50)
-                .count();
+            out.push_str("- Not grant-eligible below the 50% readiness barrier.\n");
+            let below = reg.iter().filter(|(_, e)| e.readiness_score < 50).count();
             out.push_str(&format!(
                 "- {} feature(s) below 50% readiness (not grant-eligible until they pass 50% barrier).\n",
                 below
             ));
             for (name, entry) in &reg {
                 if entry.readiness_score < 50 {
-                    out.push_str(&format!(
-                        "  - {}: score={}\n",
-                        name, entry.readiness_score
-                    ));
+                    out.push_str(&format!("  - {}: score={}\n", name, entry.readiness_score));
                 }
             }
             out
