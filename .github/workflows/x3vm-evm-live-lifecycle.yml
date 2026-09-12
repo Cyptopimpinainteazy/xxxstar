@@ -89,6 +89,15 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install forge dependencies (pinned via foundry.lock)
+        working-directory: X3-contracts/evm
+        run: |
+          set -euo pipefail
+          FORGE_STD_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/forge-std']['tag']['name'])")"
+          OZ_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/openzeppelin-contracts']['tag']['name'])")"
+          forge install "foundry-rs/forge-std@${FORGE_STD_TAG}" --no-commit
+          forge install "OpenZeppelin/openzeppelin-contracts@${OZ_TAG}" --no-commit
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
