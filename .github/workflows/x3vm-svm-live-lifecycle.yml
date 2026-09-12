@@ -26,6 +26,11 @@ env:
   CARGO_TERM_COLOR: always
   SOLANA_INSTALL_URL: https://release.anza.xyz/stable/install
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   live-lifecycle:
     name: SVM HTLC live validator lifecycle

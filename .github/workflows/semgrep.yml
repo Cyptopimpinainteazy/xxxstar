@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '0 8 * * 1'  # Weekly on Monday at 8 AM UTC
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   semgrep:
     name: Scan

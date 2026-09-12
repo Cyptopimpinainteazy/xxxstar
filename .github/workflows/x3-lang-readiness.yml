@@ -27,6 +27,11 @@ on:
       - "x3-lang/**"
       - ".github/workflows/x3-lang-readiness.yml"
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   x3_lang_combined_gate:
     name: x3-lang + vm + evm + svm combined gate
