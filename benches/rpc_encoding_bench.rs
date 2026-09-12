@@ -6,7 +6,7 @@
 //! - H256 / Address hex encoding
 //! - Large payload serialization (event logs, block bodies)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ struct RpcBatchResponse {
     responses: Vec<RpcResponse>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct TransactionReceipt {
     tx_hash: String,
     block_hash: String,
@@ -39,7 +39,7 @@ struct TransactionReceipt {
     logs_bloom: String,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct EventLog {
     address: String,
     topics: Vec<String>,
@@ -89,7 +89,10 @@ fn make_receipt(rng: &mut impl RngCore) -> TransactionReceipt {
             topics: (0..((rng.next_u32() as usize % 3) + 1))
                 .map(|_| rand_hex_32(rng))
                 .collect(),
-            data: format!("0x{}", hex::encode((0..64).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())),
+            data: format!(
+                "0x{}",
+                hex::encode((0..64).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())
+            ),
             block_number: rng.next_u64(),
             tx_index: rng.next_u32(),
             log_index: rng.next_u32(),
@@ -107,7 +110,10 @@ fn make_receipt(rng: &mut impl RngCore) -> TransactionReceipt {
         gas_price: rng.next_u64() % 100_000_000_000,
         status: 1,
         logs,
-        logs_bloom: format!("0x{}", hex::encode((0..256).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())),
+        logs_bloom: format!(
+            "0x{}",
+            hex::encode((0..256).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())
+        ),
     }
 }
 
@@ -146,9 +152,7 @@ fn bench_rpc_serialization(c: &mut Criterion) {
     });
 
     // Batch of 100 receipts
-    let receipts: Vec<TransactionReceipt> = (0..100)
-        .map(|_| make_receipt(&mut rng))
-        .collect();
+    let receipts: Vec<TransactionReceipt> = (0..100).map(|_| make_receipt(&mut rng)).collect();
     group.bench_function("serialize_100_receipts", |b| {
         b.iter(|| serde_json::to_string(black_box(&receipts)).unwrap())
     });
@@ -212,17 +216,13 @@ fn bench_data_encoding(c: &mut Criterion) {
         let data: Vec<u8> = (0..*size).map(|_| rng.next_u32() as u8).collect();
         let hex_str = format!("0x{}", hex::encode(&data));
 
-        group.bench_with_input(
-            BenchmarkId::new("hex_encode_bytes", size),
-            size,
-            |b, _| b.iter(|| hex::encode(black_box(&data))),
-        );
+        group.bench_with_input(BenchmarkId::new("hex_encode_bytes", size), size, |b, _| {
+            b.iter(|| hex::encode(black_box(&data)))
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("hex_decode_bytes", size),
-            size,
-            |b, _| b.iter(|| hex::decode(black_box(hex_str.trim_start_matches("0x"))).unwrap()),
-        );
+        group.bench_with_input(BenchmarkId::new("hex_decode_bytes", size), size, |b, _| {
+            b.iter(|| hex::decode(black_box(hex_str.trim_start_matches("0x"))).unwrap())
+        });
     }
 
     group.finish();
@@ -244,7 +244,10 @@ fn bench_json_parse(c: &mut Criterion) {
         .map(|_| EventLog {
             address: rand_hex_20(&mut rng),
             topics: (0..2).map(|_| rand_hex_32(&mut rng)).collect(),
-            data: format!("0x{}", hex::encode((0..32).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())),
+            data: format!(
+                "0x{}",
+                hex::encode((0..32).map(|_| rng.next_u32() as u8).collect::<Vec<u8>>())
+            ),
             block_number: rng.next_u64(),
             tx_index: rng.next_u32(),
             log_index: rng.next_u32(),

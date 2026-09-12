@@ -8,10 +8,10 @@
 //! - Intent parsing and validation
 //! - Swap ledger write (SCALE encode + hash)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use rand::RngCore;
-use sha2::{Sha256, Digest};
 use blake2::Blake2b512;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use rand::RngCore;
+use sha2::{Digest, Sha256};
 
 // ─── HTLC Hashlock Benchmarks ───────────────────────────────────────────────
 
@@ -62,7 +62,11 @@ struct Timelock {
 
 impl Timelock {
     fn new(expires_at: u64, grace_period: u64, chain_id: u32) -> Self {
-        Self { expires_at, grace_period, chain_id }
+        Self {
+            expires_at,
+            grace_period,
+            chain_id,
+        }
     }
 
     fn is_expired(&self, current_time: u64) -> bool {
@@ -106,9 +110,7 @@ fn bench_timelock_ops(c: &mut Criterion) {
         b.iter(|| lock.remaining_seconds(black_box(current)))
     });
 
-    group.bench_function("to_bytes", |b| {
-        b.iter(|| lock.to_bytes())
-    });
+    group.bench_function("to_bytes", |b| b.iter(|| lock.to_bytes()));
 
     group.finish();
 }
@@ -281,7 +283,7 @@ fn bench_batch_hashlock_verify(c: &mut Criterion) {
             .map(|i| {
                 let mut preimage = vec![0u8; 64];
                 rng.fill_bytes(&mut preimage);
-                preimage[0..8].copy_from_slice(&i.to_le_bytes());
+                preimage[0..8].copy_from_slice(&(i as u64).to_le_bytes());
 
                 let mut hasher = Sha256::new();
                 hasher.update(&preimage);
@@ -332,15 +334,13 @@ fn bench_intent_serialization(c: &mut Criterion) {
     };
 
     group.bench_function("minimal_json_serialize", |b| {
-        b.iter(|| {
-            serde_json::to_string(&intent.id).unwrap()
-        })
+        b.iter(|| serde_json::to_string(&intent.id).unwrap())
     });
 
     group.bench_function("full_json_serialize", |b| {
         b.iter(|| {
             let json = format!(
-                r#"{{"id":"{:x}","from_chain":{},"to_chain":{},"amount":{},"state":"{}"}}"#,
+                r#"{{"id":"{}","from_chain":{},"to_chain":{},"amount":{},"state":"{}"}}"#,
                 hex::encode(intent.id),
                 intent.from_chain,
                 intent.to_chain,

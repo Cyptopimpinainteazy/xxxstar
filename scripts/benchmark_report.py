@@ -73,7 +73,7 @@ def detect_criterion_results(criterion_dir: Path) -> Dict[str, Dict[str, float]]
 
             bench_path = estimates_file.parent.parent.relative_to(criterion_dir)
             bench_name = bench_path.as_posix()
-            slope = data["slope"]
+            slope = data.get("slope") or data["mean"]
             std_dev = data.get("std_dev", {})
             results[bench_name] = {
                 "mean_ns": slope["point_estimate"],

@@ -8,7 +8,7 @@
 //! - Gas metering
 //! - Cross-VM call dispatch (EVM→SVM, SVM→EVM)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // ─── VM Opcodes ─────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ impl Opcode {
             0x57 => Some(Opcode::Jumpi),
             0x58 => Some(Opcode::Pc),
             0x5b => Some(Opcode::Jumpdest),
-            n @ 0x60..=0x7f => Some(Opcode::Push1), // all push variants
+            0x60..=0x7f => Some(Opcode::Push1), // all push variants
             0xf1 => Some(Opcode::Call),
             0xf3 => Some(Opcode::Return),
             _ => None,
@@ -78,8 +78,15 @@ impl Opcode {
     fn min_gas(&self) -> u64 {
         match self {
             Opcode::Stop | Opcode::Pop | Opcode::Pc | Opcode::Jumpdest => 2,
-            Opcode::Add | Opcode::Sub | Opcode::And | Opcode::Or | Opcode::Xor | Opcode::Not
-            | Opcode::Lt | Opcode::Gt | Opcode::Eq => 3,
+            Opcode::Add
+            | Opcode::Sub
+            | Opcode::And
+            | Opcode::Or
+            | Opcode::Xor
+            | Opcode::Not
+            | Opcode::Lt
+            | Opcode::Gt
+            | Opcode::Eq => 3,
             Opcode::Mul | Opcode::Div => 5,
             Opcode::Push1 | Opcode::Push32 => 3,
             Opcode::SLoad => 200,
@@ -126,7 +133,9 @@ impl VmState {
     }
 
     fn stack_push(&mut self, val: u64) -> bool {
-        if self.stack.len() >= 1024 { return false; }
+        if self.stack.len() >= 1024 {
+            return false;
+        }
         self.stack.push(val);
         true
     }
@@ -156,39 +165,55 @@ impl VmState {
                 for &b in &self.code[self.pc + 1..end] {
                     val = (val << 8) | (b as u64);
                 }
-                self.stack_push(val)?;
+                if !self.stack_push(val) {
+                    return None;
+                }
                 self.pc += n; // +1 at bottom
             }
-            Opcode::Pop => { self.stack_pop()?; }
+            Opcode::Pop => {
+                self.stack_pop()?;
+            }
             Opcode::Add => {
                 let b = self.stack_pop()?;
                 let a = self.stack_pop()?;
-                self.stack_push(a.wrapping_add(b))?;
+                if !self.stack_push(a.wrapping_add(b)) {
+                    return None;
+                }
             }
             Opcode::Mul => {
                 let b = self.stack_pop()?;
                 let a = self.stack_pop()?;
-                self.stack_push(a.wrapping_mul(b))?;
+                if !self.stack_push(a.wrapping_mul(b)) {
+                    return None;
+                }
             }
             Opcode::Sub => {
                 let b = self.stack_pop()?;
                 let a = self.stack_pop()?;
-                self.stack_push(a.wrapping_sub(b))?;
+                if !self.stack_push(a.wrapping_sub(b)) {
+                    return None;
+                }
             }
             Opcode::Eq => {
                 let b = self.stack_pop()?;
                 let a = self.stack_pop()?;
-                self.stack_push(if a == b { 1 } else { 0 })?;
+                if !self.stack_push(if a == b { 1 } else { 0 }) {
+                    return None;
+                }
             }
             Opcode::Lt => {
                 let b = self.stack_pop()?;
                 let a = self.stack_pop()?;
-                self.stack_push(if a < b { 1 } else { 0 })?;
+                if !self.stack_push(if a < b { 1 } else { 0 }) {
+                    return None;
+                }
             }
             Opcode::Gt => {
                 let b = self.stack_pop()?;
                 let a = self.stack_pop()?;
-                self.stack_push(if a > b { 1 } else { 0 })?;
+                if !self.stack_push(if a > b { 1 } else { 0 }) {
+                    return None;
+                }
             }
             Opcode::Jump => {
                 let target = self.stack_pop()? as usize;
@@ -337,9 +362,9 @@ fn bench_vm_execution_loop(c: &mut Criterion) {
     let code: Vec<u8> = vec![
         0x60, 0x01, // PUSH1 1
         0x60, 0x02, // PUSH1 2
-        0x01,       // ADD
-        0x50,       // POP
-        0x00,       // STOP
+        0x01, // ADD
+        0x50, // POP
+        0x00, // STOP
     ];
 
     group.bench_function("simple_loop_5byte", |b| {
