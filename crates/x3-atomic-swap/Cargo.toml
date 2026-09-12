@@ -16,7 +16,7 @@ ureq = { version = "2.9", optional = true }
 k256 = { version = "0.13", optional = true, default-features = false, features = ["ecdsa", "std"] }
 sha3 = { version = "0.10", optional = true, default-features = false }
 rlp = { version = "0.5", optional = true, default-features = false }
-rand = { version = "0.8", optional = true }
+rand = { version = "0.10", optional = true }
 
 [features]
 default = []

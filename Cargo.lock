@@ -1730,8 +1730,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90dbd31c98227229239363921e60fcf5e558e43ec69094d46fc4996f08d1d5bc"
 dependencies = [
  "bitcoin_hashes",
- "rand 0.8.8",
- "rand_core 0.6.4",
+ "rand 0.7.3",
+ "rand_core 0.4.3",
  "serde",
  "unicode-normalization",
 ]
@@ -11568,7 +11568,7 @@ dependencies = [
  "pallet-x3-kernel",
  "parity-scale-codec",
  "proptest",
- "rand 0.8.8",
+ "rand 0.10.2",
  "ripemd",
  "scale-info",
  "secp256k1 0.28.2",
@@ -11760,7 +11760,7 @@ dependencies = [
  "pallet-x3-agent-law",
  "pallet-x3-invariants",
  "parity-scale-codec",
- "rand 0.8.8",
+ "rand 0.10.2",
  "rayon",
  "sc-block-builder",
  "sc-client-api",
@@ -13267,7 +13267,7 @@ dependencies = [
  "criterion",
  "hex",
  "log",
- "rand 0.8.8",
+ "rand 0.10.2",
  "serde",
  "serde_json",
  "sha3",
@@ -22278,7 +22278,7 @@ checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if",
  "digest 0.10.7",
- "rand 0.8.8",
+ "rand 0.4.6",
  "static_assertions",
 ]
 
@@ -24118,7 +24118,7 @@ dependencies = [
  "blake2 0.10.6",
  "hex",
  "k256",
- "rand 0.8.8",
+ "rand 0.10.2",
  "rlp 0.5.2",
  "serde",
  "serde_json",
@@ -24823,7 +24823,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.5",
  "prometheus 0.14.0",
- "rand 0.8.8",
+ "rand 0.10.2",
  "reqwest 0.11.27",
  "secp256k1 0.28.2",
  "serde",
@@ -25072,7 +25072,7 @@ dependencies = [
  "hex",
  "log",
  "parity-scale-codec",
- "rand 0.8.8",
+ "rand 0.10.2",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
