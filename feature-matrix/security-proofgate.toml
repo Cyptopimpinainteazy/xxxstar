@@ -1,0 +1,245 @@
+# Security / ProofGate feature matrix fragment.
+
+[[feature]]
+id = "X3-SEC-001"
+name = "Reproducible srtool runtime build"
+subsystem = "security_proofgate"
+source = "open_pr"
+paths = [".github/workflows/production-gate.yml"]
+implemented = 85
+tested = 55
+mainnet_ready = 60
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["New exact-head workflow has not completed green yet"]
+evidence = [".github/workflows/production-gate.yml", "note: Branch hardening builds runtime with scripts/run-srtool.sh and records hashes"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-SEC-002"
+name = "Runtime artifact hash evidence"
+subsystem = "security_proofgate"
+source = "open_pr"
+paths = [".github/workflows/production-gate.yml"]
+implemented = 85
+tested = 55
+mainnet_ready = 60
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending exact-head Actions proof"]
+evidence = [".github/workflows/production-gate.yml", "note: Branch records commit, BLAKE2-256, SHA-256, WASM size/path"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-SEC-003"
+name = "Mainnet release audit script"
+subsystem = "security_proofgate"
+source = "master"
+paths = ["scripts/mainnet_release_gate.py"]
+implemented = 82
+tested = 70
+mainnet_ready = 65
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Must remain aligned with actual production build artifacts"]
+evidence = ["scripts/mainnet_release_gate.py", "note: Checks docs, builds, specs, critical tests, srtool prerequisites, secrets"]
+
+[[feature]]
+id = "X3-SEC-004"
+name = "Production gate"
+subsystem = "security_proofgate"
+source = "open_pr"
+paths = [".github/workflows/production-gate.yml"]
+implemented = 88
+tested = 75
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["srtool hardening is on #166 branch, not master yet"]
+evidence = [".github/workflows/production-gate.yml", "note: Runs guard/tests/release build/audit/node build/mainnet check"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-SEC-005"
+name = "Formal verification workflow"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/formal-verification.yml"]
+implemented = 65
+tested = 50
+mainnet_ready = 45
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Selected proof coverage only; K/toolchain reliability historically required repair"]
+evidence = [".github/workflows/formal-verification.yml", "note: Formal verification CI exists"]
+
+[[feature]]
+id = "X3-SEC-006"
+name = "CodeQL analysis"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/codeql.yml"]
+implemented = 75
+tested = 65
+mainnet_ready = 60
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Not all languages/modes may be covered"]
+evidence = [".github/workflows/codeql.yml", "note: CI recovery retained supported CodeQL modes"]
+
+[[feature]]
+id = "X3-SEC-007"
+name = "ProofForge gates"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/proof-gates.yml"]
+implemented = 78
+tested = 65
+mainnet_ready = 60
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Coverage does not equal whole-protocol formal proof"]
+evidence = [".github/workflows/proof-gates.yml", "note: Automated proof verification workflow exists"]
+
+[[feature]]
+id = "X3-SEC-008"
+name = "Test-cheat / placeholder detection"
+subsystem = "security_proofgate"
+source = "master"
+paths = ["scripts/x3-detect-test-cheats.sh"]
+implemented = 75
+tested = 60
+mainnet_ready = 60
+priority = "P1"
+confidence = "medium"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs broad language coverage and CI enforcement"]
+evidence = ["scripts/x3-detect-test-cheats.sh", "note: GPU audit references anti-cheat proof tooling"]
+
+[[feature]]
+id = "X3-SEC-009"
+name = "Feature registry truth source"
+subsystem = "security_proofgate"
+source = "master"
+paths = ["FEATURE_REGISTRY.toml"]
+implemented = 85
+tested = 70
+mainnet_ready = 65
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Still incomplete as full inventory; several subsystems untracked"]
+evidence = ["FEATURE_REGISTRY.toml", "note: Registry corrected fictional rows and scores"]
+
+[[feature]]
+id = "X3-SEC-010"
+name = "Forbidden-secret scanning"
+subsystem = "security_proofgate"
+source = "master"
+paths = ["scripts/mainnet_release_gate.py"]
+implemented = 80
+tested = 65
+mainnet_ready = 65
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Regex scanning is supplementary, not a full secret-management system"]
+evidence = ["scripts/mainnet_release_gate.py", "note: Mainnet gate scans private keys/mnemonics/AWS-like keys"]
+
+[[feature]]
+id = "X3-SEC-011"
+name = "PR supervisor gate"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/pr-supervisor.yml"]
+implemented = 80
+tested = 70
+mainnet_ready = 65
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs continued exact-head enforcement"]
+evidence = [".github/workflows/pr-supervisor.yml", "note: Recent CI recovery added real PR integrity checks"]
+
+[[feature]]
+id = "X3-SEC-012"
+name = "Readiness consistency checker"
+subsystem = "security_proofgate"
+source = "master"
+paths = ["scripts/check-readiness-consistency.sh"]
+implemented = 85
+tested = 75
+mainnet_ready = 70
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs continuous maintenance as feature registry evolves"]
+evidence = ["scripts/check-readiness-consistency.sh", "note: Repo uses it to reject fictional registry paths/tests"]
+
+[[feature]]
+id = "X3-SEC-013"
+name = "Semgrep scanning"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/semgrep.yml"]
+implemented = 85
+tested = 78
+mainnet_ready = 72
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Ruleset coverage needs periodic review"]
+evidence = [".github/workflows/semgrep.yml", "note: Exact-head Semgrep checks active"]
+
+[[feature]]
+id = "X3-SEC-014"
+name = "Trivy scanning"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/trivy.yml"]
+implemented = 85
+tested = 78
+mainnet_ready = 72
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Keep filesystem scope current"]
+evidence = [".github/workflows/trivy.yml", "note: Exact-head Trivy checks active"]
+
+[[feature]]
+id = "X3-SEC-015"
+name = "Rust Clippy hard-fail gate"
+subsystem = "security_proofgate"
+source = "master"
+paths = [".github/workflows/rust-clippy.yml"]
+implemented = 88
+tested = 80
+mainnet_ready = 75
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Keep -D warnings and avoid coverage weakening"]
+evidence = [".github/workflows/rust-clippy.yml", "note: Workflow repaired to retain hard fail and diagnostics"]
+test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
