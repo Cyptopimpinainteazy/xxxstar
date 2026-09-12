@@ -1,0 +1,49 @@
+# Agents / Experimental feature matrix fragment.
+
+[[feature]]
+id = "X3-AGENT-001"
+name = "X3 control pallet"
+subsystem = "agents_experimental"
+source = "master"
+paths = ["pallets/pallet-x3-control"]
+implemented = 50
+tested = 25
+mainnet_ready = 25
+priority = "P2"
+confidence = "medium"
+launch_scope = "dev_tooling"
+claim_risk = false
+blockers = ["Privileged control surface needs security review"]
+evidence = ["pallets/pallet-x3-control", "note: Pallet exists on master"]
+
+[[feature]]
+id = "X3-AGENT-002"
+name = "AI-generated code governance boundary"
+subsystem = "agents_experimental"
+source = "master"
+paths = ["scripts/agent_guard.py"]
+implemented = 65
+tested = 55
+mainnet_ready = 45
+priority = "P2"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = false
+blockers = ["Needs full policy enforcement and credential isolation proof"]
+evidence = ["scripts/agent_guard.py", "note: CI recovery strengthened agent_guard patterns"]
+
+[[feature]]
+id = "X3-AGENT-003"
+name = "Agent kill-switch concept"
+subsystem = "agents_experimental"
+source = "master"
+paths = ["crates/x3-swarm-core"]
+implemented = 30
+tested = 10
+mainnet_ready = 15
+priority = "P3"
+confidence = "high"
+launch_scope = "dev_tooling"
+claim_risk = false
+blockers = ["Previously claimed tests were fictional and removed"]
+evidence = ["crates/x3-swarm-core", "note: FEATURE_REGISTRY explicitly records missing kill-switch test"]
