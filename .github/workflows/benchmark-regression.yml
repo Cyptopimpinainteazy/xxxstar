@@ -39,7 +39,7 @@ permissions:
 jobs:
   criterion-benchmarks:
     name: Criterion Microbenchmarks
-    runs-on: [self-hosted, x3-benchmark]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
 
   pallet-weight-check:
     name: Pallet Weight Consistency Check
-    runs-on: [self-hosted, x3-benchmark]
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
