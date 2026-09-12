@@ -1,0 +1,250 @@
+# Economic / DeFi feature matrix fragment.
+
+[[feature]]
+id = "X3-ECO-001"
+name = "Biometric wallet registration"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-wallet-pallet"]
+implemented = 60
+tested = 45
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Biometric template handling unaudited"]
+evidence = ["pallets/x3-wallet-pallet", "note: Registry explicitly flags biometric security review"]
+registry_feature = "x3_wallet_pallet"
+
+[[feature]]
+id = "X3-ECO-002"
+name = "Pending supply returns-to-zero invariant"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-supply-ledger/src/lib.rs"]
+implemented = 55
+tested = 25
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs property tests across success/refund/rollback"]
+evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Registry corrections call out missing supply invariant tests"]
+
+[[feature]]
+id = "X3-ECO-003"
+name = "Supply conservation ledger"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-supply-ledger/src/lib.rs"]
+implemented = 60
+tested = 35
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["End-to-end supply conservation remains P0"]
+evidence = ["pallets/x3-supply-ledger/src/lib.rs", "note: Independent audit previously scored supply ledger partial"]
+
+[[feature]]
+id = "X3-ECO-004"
+name = "Wallet recovery flow"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-wallet-pallet"]
+implemented = 65
+tested = 50
+mainnet_ready = 40
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Recovery logic security review pending"]
+evidence = ["pallets/x3-wallet-pallet", "note: Registry required initiate_recovery_works"]
+registry_feature = "x3_wallet_pallet"
+
+[[feature]]
+id = "X3-ECO-005"
+name = "Minter authority management"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-wallet-pallet"]
+implemented = 75
+tested = 65
+mainnet_ready = 55
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs role-transition/governance tests"]
+evidence = ["pallets/x3-wallet-pallet", "note: Registry lists add/remove minter root-only tests"]
+
+[[feature]]
+id = "X3-ECO-006"
+name = "Wallet multisig"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-wallet-pallet"]
+implemented = 75
+tested = 65
+mainnet_ready = 55
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs external security review"]
+evidence = ["pallets/x3-wallet-pallet", "note: Registry required create_multisig_wallet_works"]
+registry_feature = "x3_wallet_pallet"
+
+[[feature]]
+id = "X3-ECO-007"
+name = "Launchpad → token factory integration"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-token-factory"]
+implemented = 78
+tested = 55
+mainnet_ready = 60
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs full lifecycle CI proof"]
+evidence = ["pallets/x3-token-factory", "note: Status doc says graduate() calls TokenFactoryCreate bridge"]
+registry_feature = "x3_forge"
+
+[[feature]]
+id = "X3-ECO-008"
+name = "Sentinel freeze-authority checks"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-sentinel"]
+implemented = 80
+tested = 75
+mainnet_ready = 60
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["No live governance simulation"]
+evidence = ["pallets/x3-sentinel", "note: required sentinel_checks_freeze_authority"]
+registry_feature = "x3_sentinel"
+
+[[feature]]
+id = "X3-ECO-009"
+name = "Sentinel mint-authority checks"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-sentinel"]
+implemented = 80
+tested = 75
+mainnet_ready = 60
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["No live governance simulation"]
+evidence = ["pallets/x3-sentinel", "note: Registry says real pallet + tests now exist"]
+registry_feature = "x3_sentinel"
+
+[[feature]]
+id = "X3-ECO-010"
+name = "LP locker"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-lp-locker"]
+implemented = 82
+tested = 70
+mainnet_ready = 65
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Launchpad → locker integration not verified in CI"]
+evidence = ["pallets/x3-lp-locker", "note: Status says full lib/mock/tests exist"]
+
+[[feature]]
+id = "X3-ECO-011"
+name = "Liquidity lock schedule"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-lp-locker"]
+implemented = 85
+tested = 75
+mainnet_ready = 68
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs timestamp/block-boundary fuzzing"]
+evidence = ["pallets/x3-lp-locker", "note: Atomic Lock registry lists lock/unlock tests"]
+
+[[feature]]
+id = "X3-ECO-012"
+name = "DEX fee accounting"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-dex"]
+implemented = 82
+tested = 72
+mainnet_ready = 70
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs economic fuzzing"]
+evidence = ["pallets/x3-dex", "note: required axe_fee_accounting"]
+registry_feature = "axe"
+
+[[feature]]
+id = "X3-ECO-013"
+name = "Early unlock rejection"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-lp-locker"]
+implemented = 88
+tested = 78
+mainnet_ready = 70
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs governance bypass audit"]
+evidence = ["pallets/x3-lp-locker", "note: required test early_unlock_rejected"]
+
+[[feature]]
+id = "X3-ECO-014"
+name = "AXE DEX pool creation"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-dex"]
+implemented = 85
+tested = 75
+mainnet_ready = 72
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["No concentrated liquidity or production liquidity stress test"]
+evidence = ["pallets/x3-dex", "note: FEATURE_REGISTRY AXE=75; required axe_create_pool"]
+registry_feature = "axe"
+
+[[feature]]
+id = "X3-ECO-015"
+name = "Token factory / X3 Forge"
+subsystem = "economic_defi"
+source = "master"
+paths = ["pallets/x3-token-factory"]
+implemented = 82
+tested = 70
+mainnet_ready = 72
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Sentinel score not fully wired into create origin"]
+evidence = ["pallets/x3-token-factory", "note: FEATURE_REGISTRY x3_forge=75"]
+registry_feature = "x3_forge"
