@@ -181,6 +181,9 @@ def validate_matrix(matrix: dict[str, Any], root: Path, registry: dict[str, Any]
         return ["matrix must contain at least one feature"], []
     errors: list[str] = []
     warnings: list[str] = []
+    expected = matrix.get("meta", {}).get("feature_count_expected")
+    if expected is not None and expected != len(features):
+        errors.append(f"feature count mismatch: expected {expected}, loaded {len(features)}")
     ids: set[str] = set(); names: set[str] = set()
     for feature in features:
         if not isinstance(feature, dict):
