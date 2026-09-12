@@ -1,0 +1,302 @@
+# Cross-VM / Atomic feature matrix fragment.
+
+[[feature]]
+id = "X3-XVM-001"
+name = "Settlement engine"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-settlement-engine/src/lib.rs"]
+implemented = 75
+tested = 55
+mainnet_ready = 60
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs end-to-end external finality proof"]
+evidence = ["pallets/x3-settlement-engine/src/lib.rs", "note: Real settlement pallet with timeout/atomic integration"]
+
+[[feature]]
+id = "X3-XVM-002"
+name = "Pending-supply accounting"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 85
+tested = 72
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs global conservation proof across all bridges"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Router invariant suite covers pending supply behavior"]
+
+[[feature]]
+id = "X3-XVM-003"
+name = "Canonical supply preservation across routes"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 88
+tested = 78
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Supply ledger broader system still partial"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes canonical supply never breaks"]
+
+[[feature]]
+id = "X3-XVM-004"
+name = "SHA-256 HTLC hash compatibility across VMs"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-settlement-engine/src/lib.rs"]
+implemented = 90
+tested = 65
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs cross-language fixture proof for every adapter"]
+evidence = ["pallets/x3-settlement-engine/src/lib.rs", "note: Code explicitly standardizes SHA-256 for EVM/SVM/X3 HTLC secrets"]
+
+[[feature]]
+id = "X3-XVM-005"
+name = "EVM → SVM route"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 90
+tested = 80
+mainnet_ready = 78
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs full network-level external execution proof"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Six internal route invariant suite"]
+test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-006"
+name = "Expired transfer refund"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 88
+tested = 80
+mainnet_ready = 78
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs multi-validator timeout/recovery proof"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes test_expired_transfer_refunds_to_source"]
+test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-007"
+name = "External bridge circuit breaker"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 88
+tested = 70
+mainnet_ready = 78
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs live fault-trigger test"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Audit notes bridge gate can flip false on invariant break"]
+
+[[feature]]
+id = "X3-XVM-008"
+name = "Failed destination credit refund"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 88
+tested = 80
+mainnet_ready = 78
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs persistence/crash injection around refund path"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes failed_destination_credit_refunds_pending_supply"]
+test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-009"
+name = "SVM → EVM route"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 90
+tested = 80
+mainnet_ready = 78
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs full network-level external execution proof"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Six internal route invariant suite"]
+test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-010"
+name = "Cross-VM message replay rejection"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 90
+tested = 85
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs distributed replay injection test"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes duplicate_message_replay_rejected"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-011"
+name = "Cross-VM nonce replay rejection"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 90
+tested = 85
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs sustained adversarial replay testing across validators"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: required_tests includes duplicate nonce/message replay rejection"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-012"
+name = "EVM → X3 route"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 92
+tested = 82
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External boundary proof remains separate"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-013"
+name = "SVM → X3 route"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 92
+tested = 82
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External boundary proof remains separate"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-014"
+name = "X3 → EVM route"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 92
+tested = 82
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External boundary proof remains separate"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-015"
+name = "X3 → SVM route"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 92
+tested = 82
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External boundary proof remains separate"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Native internal routing and supply tests"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-016"
+name = "Cross-VM atomic router"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 92
+tested = 85
+mainnet_ready = 88
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External bridge path intentionally disabled at genesis"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: FEATURE_REGISTRY atomic_router = 88%; eight required tests listed"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+registry_feature = "atomic_router"
+
+[[feature]]
+id = "X3-XVM-017"
+name = "External bridge pause-at-genesis"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 95
+tested = 90
+mainnet_ready = 90
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Operational governance activation process still required"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: ExternalBridgesEnabled defaults false and is dispatch-gated"]
+test_evidence = ["note: audited test/CI evidence score=90; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-XVM-018"
+name = "Adaptor-signature settlement primitive"
+subsystem = "cross_vm_atomic"
+source = "master"
+paths = ["pallets/x3-settlement-engine/src/lib.rs"]
+implemented = 60
+tested = 35
+mainnet_ready = 35
+priority = "P1"
+confidence = "medium"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs cryptographic audit and production-path proof"]
+evidence = ["pallets/x3-settlement-engine/src/lib.rs", "note: Settlement code contains adaptor-signature secret extraction logic"]
