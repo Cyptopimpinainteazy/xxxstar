@@ -1,0 +1,375 @@
+# Cross-Chain feature matrix fragment.
+
+[[feature]]
+id = "X3-XCHAIN-001"
+name = "BTC Fortress gateway"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-gateway"]
+implemented = 50
+tested = 25
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["SIM_TESTNET only; signer quorum and withdrawal broadcast pending"]
+evidence = ["crates/x3-gateway", "note: FEATURE_REGISTRY btc_fortress_gateway = 25%"]
+registry_feature = "btc_fortress_gateway"
+
+[[feature]]
+id = "X3-XCHAIN-002"
+name = "Bitcoin HTLC script logic"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-bridge/src/bitcoin_htlc.rs"]
+implemented = 70
+tested = 40
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Mainnet proof verification and signer quorum not production-ready"]
+evidence = ["crates/x3-bridge/src/bitcoin_htlc.rs", "note: Audit says BTC script logic is real but proof verification was placeholder"]
+
+[[feature]]
+id = "X3-XCHAIN-003"
+name = "Relayer framework"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/relayer.rs"]
+implemented = 65
+tested = 40
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Multi-validator relayer quorum incomplete"]
+evidence = ["crates/x3-atomic-swap/src/relayer.rs", "note: Relayer module exists; status docs list quorum blocker"]
+
+[[feature]]
+id = "X3-XCHAIN-004"
+name = "Ethereum bridge adapter"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-bridge/src/ethereum_bridge.rs"]
+implemented = 65
+tested = 40
+mainnet_ready = 38
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs external-chain live proof and signer policy"]
+evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "note: Bridge module exists"]
+
+[[feature]]
+id = "X3-XCHAIN-005"
+name = "Finality proof model"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/finality.rs"]
+implemented = 68
+tested = 45
+mainnet_ready = 42
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Cross-chain finality certificate wiring incomplete"]
+evidence = ["crates/x3-atomic-swap/src/finality.rs", "note: Finality modules exist; older status flags GRANDPA cert gap"]
+
+[[feature]]
+id = "X3-XCHAIN-006"
+name = "Atomic swap intent model"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/intent.rs"]
+implemented = 82
+tested = 60
+mainnet_ready = 58
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External adapters and finality proof remain weaker than internal model"]
+evidence = ["crates/x3-atomic-swap/src/intent.rs", "note: AtomicIntent and lifecycle modules identified in cross-VM audit"]
+
+[[feature]]
+id = "X3-XCHAIN-007"
+name = "Atomic timeout engine"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/timeout.rs"]
+implemented = 78
+tested = 58
+mainnet_ready = 58
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs real chain timeout/reorg testing"]
+evidence = ["crates/x3-atomic-swap/src/timeout.rs", "note: Timeout engine identified in audit"]
+
+[[feature]]
+id = "X3-XCHAIN-008"
+name = "General external gateway"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-gateway"]
+implemented = 70
+tested = 55
+mainnet_ready = 65
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["External bridge activation remains governance-guarded"]
+evidence = ["crates/x3-gateway", "note: FEATURE_REGISTRY atomic_gateway = 65%"]
+registry_feature = "atomic_gateway"
+
+[[feature]]
+id = "X3-XCHAIN-009"
+name = "RPC quorum oracle"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
+implemented = 78
+tested = 55
+mainnet_ready = 65
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs Byzantine provider and partition tests"]
+evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Quorum types exported and used by security logic"]
+
+[[feature]]
+id = "X3-XCHAIN-010"
+name = "Cross-domain semantic idempotency"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
+implemented = 88
+tested = 82
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Strengthened exact-head production gate still pending"]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 persists operation journal; duplicate identical evidence becomes no-op"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-XCHAIN-011"
+name = "Gateway revoke / kill switch"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-gateway"]
+implemented = 78
+tested = 60
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs incident-response drill"]
+evidence = ["crates/x3-gateway", "note: Registry required test revoke_disables_gateway"]
+registry_feature = "atomic_gateway"
+
+[[feature]]
+id = "X3-XCHAIN-012"
+name = "RPC disagreement fail-closed behavior"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/rpc_quorum.rs"]
+implemented = 82
+tested = 62
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs live heterogeneous provider evidence"]
+evidence = ["crates/x3-atomic-swap/src/rpc_quorum.rs", "note: Secret-release design rejects rpc_quorum_agreed=false"]
+
+[[feature]]
+id = "X3-XCHAIN-013"
+name = "Secret-release firewall"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/x3-atomic-swap"]
+implemented = 85
+tested = 78
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Must land firewall and unforgeable permit together"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability"]
+open_prs = [162, 163]
+
+[[feature]]
+id = "X3-XCHAIN-014"
+name = "Coordinator restart recovery"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
+implemented = 88
+tested = 82
+mainnet_ready = 70
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs real process/network restart drill"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 adversarial restart test"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-XCHAIN-015"
+name = "Split-write crash recovery"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
+implemented = 88
+tested = 82
+mainnet_ready = 70
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs merge plus long-running persistence fault injection"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-XCHAIN-016"
+name = "Conflicting retry rejection"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
+implemented = 90
+tested = 85
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending production-gate proof"]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-XCHAIN-017"
+name = "Cross-session secret ownership"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
+implemented = 90
+tested = 85
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending production-gate proof"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+open_prs = [166]
+
+[[feature]]
+id = "X3-XCHAIN-018"
+name = "Secret-release domain binding"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/x3-atomic-swap"]
+implemented = 90
+tested = 82
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending merge/exact-head proof"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [162, 163]
+
+[[feature]]
+id = "X3-XCHAIN-019"
+name = "Secret-release proof reuse rejection"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/x3-atomic-swap"]
+implemented = 90
+tested = 82
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending merge/exact-head proof"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [162, 163]
+
+[[feature]]
+id = "X3-XCHAIN-020"
+name = "Secret-release refund rejection"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/x3-atomic-swap"]
+implemented = 90
+tested = 82
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending merge/exact-head proof"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [162, 163]
+
+[[feature]]
+id = "X3-XCHAIN-021"
+name = "Secret-release tx/block binding"
+subsystem = "cross_chain"
+source = "open_pr"
+paths = ["crates/x3-atomic-swap"]
+implemented = 90
+tested = 82
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Pending merge/exact-head proof"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block"]
+test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
+open_prs = [162, 163]
+
+[[feature]]
+id = "X3-XCHAIN-022"
+name = "Atomic swap proof ledger"
+subsystem = "cross_chain"
+source = "master"
+paths = ["crates/x3-atomic-swap/src/ledger.rs"]
+implemented = 72
+tested = 50
+mainnet_ready = 50
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs durable multi-validator proof retention and replay audit"]
+evidence = ["crates/x3-atomic-swap/src/ledger.rs", "note: Proof ledger module exists"]

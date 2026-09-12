@@ -1,0 +1,276 @@
+# GPU / Performance feature matrix fragment.
+
+[[feature]]
+id = "X3-GPU-001"
+name = "GPU finalized-TPS proof"
+subsystem = "gpu_performance"
+source = "research"
+paths = ["GPU_VALIDATOR_HONEST_AUDIT.md"]
+implemented = 10
+tested = 5
+mainnet_ready = 5
+priority = "P0"
+confidence = "high"
+launch_scope = "research"
+claim_risk = false
+blockers = ["No physical GPU benchmark showing finalized-TPS improvement"]
+evidence = ["GPU_VALIDATOR_HONEST_AUDIT.md", "note: Honest audit explicitly forbids GPU acceleration claim without real device"]
+
+[[feature]]
+id = "X3-GPU-002"
+name = "Production runtime weights"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["runtime/src/lib.rs"]
+implemented = 55
+tested = 40
+mainnet_ready = 40
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Older audits found WeightInfo=() in several places"]
+evidence = ["runtime/src/lib.rs", "note: Benchmark infrastructure exists but weight coverage is incomplete"]
+
+[[feature]]
+id = "X3-GPU-003"
+name = "FRAME benchmarking"
+subsystem = "gpu_performance"
+source = "master"
+paths = [".github/workflows/frame-benchmarking.yml"]
+implemented = 70
+tested = 60
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Generated production weights incomplete in older audits"]
+evidence = [".github/workflows/frame-benchmarking.yml", "note: Frame benchmarking workflow exists and runs on active PR heads"]
+
+[[feature]]
+id = "X3-GPU-004"
+name = "GPU/CPU parity checking"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 80
+tested = 70
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs real hardware equivalence evidence"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: ParityMismatch and CPU recomputation architecture exists"]
+
+[[feature]]
+id = "X3-GPU-005"
+name = "CPU consensus-truth backend"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 95
+tested = 85
+mainnet_ready = 80
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs continuous parity tests against future GPU kernels"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: CpuBackend is canonical implementation"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-GPU-006"
+name = "Fail-closed unavailable accelerator backend"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 95
+tested = 85
+mainnet_ready = 82
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Maintain strict mode coverage"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: BackendUnavailable/KernelUnavailable errors; no fake success"]
+test_evidence = ["note: audited test/CI evidence score=85; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-GPU-007"
+name = "GPU Keccak256 batching"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 20
+tested = 10
+mainnet_ready = 10
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No verified accelerator kernel in current backend"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+
+[[feature]]
+id = "X3-GPU-008"
+name = "GPU ed25519 verification"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 20
+tested = 10
+mainnet_ready = 10
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No verified accelerator kernel"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+
+[[feature]]
+id = "X3-GPU-009"
+name = "GPU secp256k1 verification"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 20
+tested = 10
+mainnet_ready = 10
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["WGPU backend reports KernelUnavailable; old GPU crate simulates CPU"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: Honest audit says no production GPU secp256k1 kernel"]
+
+[[feature]]
+id = "X3-GPU-010"
+name = "Single-authority finalized TPS baseline"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["GPU_VALIDATOR_HONEST_AUDIT.md"]
+implemented = 90
+tested = 90
+mainnet_ready = 35
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Single-authority result cannot stand in for production network"]
+evidence = ["GPU_VALIDATOR_HONEST_AUDIT.md", "note: Measured ~51–54 sustained finalized TPS with zero failures"]
+test_evidence = ["note: audited test/CI evidence score=90; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-GPU-011"
+name = "WGPU accelerator backend"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel-wgpu"]
+implemented = 70
+tested = 55
+mainnet_ready = 40
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs real physical GPU CI/run evidence"]
+evidence = ["crates/x3-accel-wgpu", "note: Honest audit confirms real WGSL/wgpu device code compiles"]
+
+[[feature]]
+id = "X3-GPU-012"
+name = "WGPU SHA-256 compute kernel"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel-wgpu"]
+implemented = 75
+tested = 55
+mainnet_ready = 42
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No production validator GPU benchmark yet"]
+evidence = ["crates/x3-accel-wgpu", "note: Real SHA-256 compute path called out by honest audit"]
+
+[[feature]]
+id = "X3-GPU-013"
+name = "GPU divergence quarantine / fallback"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-gpu-validator-swarm"]
+implemented = 75
+tested = 65
+mainnet_ready = 50
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs real GPU failure injection"]
+evidence = ["crates/x3-gpu-validator-swarm", "note: Honest audit describes divergence detection, replay, quarantine, CPU fallback"]
+
+[[feature]]
+id = "X3-GPU-014"
+name = "x3-accel backend abstraction"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 85
+tested = 75
+mainnet_ready = 60
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Real accelerator coverage is incomplete"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: AccelBackend trait with CPU truth and fail-closed unavailable backend"]
+
+[[feature]]
+id = "X3-GPU-015"
+name = "Benchmark regression CI gate"
+subsystem = "gpu_performance"
+source = "master"
+paths = [".github/workflows/benchmark-regression.yml"]
+implemented = 85
+tested = 75
+mainnet_ready = 72
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Need benchmark corpus tied to launch SLOs"]
+evidence = [".github/workflows/benchmark-regression.yml", "note: Exact-head benchmark regression workflow is active"]
+
+[[feature]]
+id = "X3-GPU-016"
+name = "GPU Blake2b batching"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 20
+tested = 10
+mainnet_ready = 10
+priority = "P2"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No verified accelerator kernel"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
+
+[[feature]]
+id = "X3-GPU-017"
+name = "GPU Merkle-root acceleration"
+subsystem = "gpu_performance"
+source = "master"
+paths = ["crates/x3-accel/src/lib.rs"]
+implemented = 20
+tested = 10
+mainnet_ready = 10
+priority = "P2"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No verified accelerator kernel"]
+evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable"]
