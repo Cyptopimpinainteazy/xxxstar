@@ -19,7 +19,7 @@ x3-evm-integration = { path = "../evm-integration", optional = true }
 x3-svm-integration = { path = "../svm-integration", optional = true }
 
 # Dynamic library loading for GPU FFI
-libloading = "0.8"
+libloading = "0.9"
 
 # Error handling
 thiserror = "1.0"
