@@ -22,12 +22,13 @@
 //! ```
 //! Add `--json` to emit a machine-readable submission or error object.
 //!
-//! For `claim` / `refund`, see the per-action branches below.
+//! For `claim` / `refund`, pass `--claimant-keypair` or
+//! `--refund-authority-keypair` when the authority is not the fee payer.
 
 use std::process::ExitCode;
 
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signature::Signer;
+use solana_sdk::signature::{read_keypair_file, Keypair, Signer};
 use x3_svm_client::{load_payer, SvmLiveConfig};
 
 fn parse_hex32(name: &str, hex: &str) -> Result<[u8; 32], String> {
@@ -258,23 +259,49 @@ fn lock(
 
 fn claim(
     cfg: &SvmLiveConfig,
-    payer: &solana_sdk::signature::Keypair,
+    payer: &Keypair,
     a: &[String],
 ) -> Result<x3_svm_client::LiveSubmission, String> {
     let swap_id = parse_hex32("--swap-id", &pick("--swap-id", a)?)?;
     let preimage_hex = pick("--preimage", a)?;
     let preimage_hex = preimage_hex.strip_prefix("0x").unwrap_or(&preimage_hex);
     let preimage = hex::decode(preimage_hex).map_err(|e| format!("--preimage: bad hex ({e})"))?;
-    let payer_pk = payer.pubkey();
-    x3_svm_client::broadcast_claim_htlc(cfg, payer, &payer_pk, &swap_id, &preimage)
+    let claimant_signer = optional_keypair("--claimant-keypair", a)?;
+    let claimant_pk = claimant_signer
+        .as_ref()
+        .map_or_else(|| payer.pubkey(), Signer::pubkey);
+    x3_svm_client::broadcast_claim_htlc(
+        cfg,
+        payer,
+        claimant_signer.as_ref(),
+        &claimant_pk,
+        &swap_id,
+        &preimage,
+    )
 }
 
 fn refund(
     cfg: &SvmLiveConfig,
-    payer: &solana_sdk::signature::Keypair,
+    payer: &Keypair,
     a: &[String],
 ) -> Result<x3_svm_client::LiveSubmission, String> {
     let swap_id = parse_hex32("--swap-id", &pick("--swap-id", a)?)?;
-    let payer_pk = payer.pubkey();
-    x3_svm_client::broadcast_refund_htlc(cfg, payer, &payer_pk, &swap_id)
+    let refund_signer = optional_keypair("--refund-authority-keypair", a)?;
+    let refund_pk = refund_signer
+        .as_ref()
+        .map_or_else(|| payer.pubkey(), Signer::pubkey);
+    x3_svm_client::broadcast_refund_htlc(cfg, payer, refund_signer.as_ref(), &refund_pk, &swap_id)
+}
+
+fn optional_keypair(flag: &str, args: &[String]) -> Result<Option<Keypair>, String> {
+    let Some(path) = args
+        .iter()
+        .position(|x| x == flag)
+        .and_then(|i| args.get(i + 1))
+    else {
+        return Ok(None);
+    };
+    read_keypair_file(path)
+        .map(Some)
+        .map_err(|e| format!("{flag}: failed to read keypair '{}': {}", path, e))
 }

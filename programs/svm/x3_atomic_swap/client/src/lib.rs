@@ -136,7 +136,7 @@ pub fn build_create_htlc_ix(
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
             AccountMeta::new(*payer, true),
-            AccountMeta::new_readonly(*initializer, true),
+            AccountMeta::new(*initializer, true),
             AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
         ],
         data,
@@ -159,7 +159,7 @@ pub fn build_claim_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*claimant, true),
+            AccountMeta::new(*claimant, true),
         ],
         data,
     }
@@ -175,7 +175,7 @@ pub fn build_refund_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*refund_authority, true),
+            AccountMeta::new(*refund_authority, true),
         ],
         data: vec![2u8],
     }
@@ -260,25 +260,56 @@ pub fn broadcast_create_htlc(
 pub fn broadcast_claim_htlc(
     cfg: &SvmLiveConfig,
     payer: &Keypair,
+    claimant_signer: Option<&Keypair>,
     claimant: &Pubkey,
     swap_id: &[u8; 32],
     preimage: &[u8],
 ) -> Result<LiveSubmission, String> {
     let (htlc_account, _bump) = derive_htlc_pda(&cfg.program_id, swap_id);
     let ix = build_claim_htlc_ix(&cfg.program_id, &htlc_account, claimant, preimage);
-    submit(cfg, &[payer], vec![ix], &htlc_account)
+    let signers = signer_set(payer, claimant_signer, claimant, "claimant")?;
+    submit(cfg, &signers, vec![ix], &htlc_account)
 }
 
 /// Broadcast `RefundHtlc` and await confirmation.
 pub fn broadcast_refund_htlc(
     cfg: &SvmLiveConfig,
     payer: &Keypair,
+    refund_signer: Option<&Keypair>,
     refund_authority: &Pubkey,
     swap_id: &[u8; 32],
 ) -> Result<LiveSubmission, String> {
     let (htlc_account, _bump) = derive_htlc_pda(&cfg.program_id, swap_id);
     let ix = build_refund_htlc_ix(&cfg.program_id, &htlc_account, refund_authority);
-    submit(cfg, &[payer], vec![ix], &htlc_account)
+    let signers = signer_set(payer, refund_signer, refund_authority, "refund authority")?;
+    submit(cfg, &signers, vec![ix], &htlc_account)
+}
+
+fn signer_set<'a>(
+    payer: &'a Keypair,
+    authority_signer: Option<&'a Keypair>,
+    authority: &Pubkey,
+    authority_name: &str,
+) -> Result<Vec<&'a Keypair>, String> {
+    let payer_pk = payer.pubkey();
+    if &payer_pk == authority {
+        return Ok(vec![payer]);
+    }
+
+    let Some(authority_signer) = authority_signer else {
+        return Err(format!(
+            "x3-svm-client: {authority_name} {} differs from fee payer {}; pass the authority keypair",
+            authority, payer_pk
+        ));
+    };
+    let signer_pk = authority_signer.pubkey();
+    if &signer_pk != authority {
+        return Err(format!(
+            "x3-svm-client: {authority_name} keypair pubkey {} does not match requested authority {}",
+            signer_pk, authority
+        ));
+    }
+    Ok(vec![payer, authority_signer])
 }
 
 /// Sign and submit a transaction, returning its genuine signature.
@@ -375,6 +406,7 @@ mod tests {
         assert_eq!(ix.accounts.len(), 4);
         // payer + initializer are signers
         assert!(ix.accounts.iter().filter(|m| m.is_signer).count() == 2);
+        assert!(ix.accounts[2].is_writable);
     }
 
     #[test]
@@ -387,6 +419,43 @@ mod tests {
         assert_eq!(ix.data[1] as usize, b"secret-preimage".len());
         assert_eq!(&ix.data[2..], b"secret-preimage");
         assert_eq!(ix.accounts.len(), 2);
+        assert!(ix.accounts[1].is_writable);
+    }
+
+    #[test]
+    fn refund_payout_account_is_writable() {
+        let pid = Pubkey::new_unique();
+        let htlc = Pubkey::new_unique();
+        let refund = Pubkey::new_unique();
+        let ix = build_refund_htlc_ix(&pid, &htlc, &refund);
+        assert_eq!(ix.accounts.len(), 2);
+        assert!(ix.accounts[1].is_writable);
+    }
+
+    #[test]
+    fn signer_set_accepts_distinct_authority_signer() {
+        let payer = Keypair::new();
+        let authority = Keypair::new();
+        let signers = signer_set(&payer, Some(&authority), &authority.pubkey(), "claimant")
+            .expect("distinct authority should be accepted");
+        assert_eq!(signers.len(), 2);
+        assert_eq!(signers[0].pubkey(), payer.pubkey());
+        assert_eq!(signers[1].pubkey(), authority.pubkey());
+    }
+
+    #[test]
+    fn signer_set_rejects_missing_distinct_authority_signer() {
+        let payer = Keypair::new();
+        let authority = Keypair::new();
+        assert!(signer_set(&payer, None, &authority.pubkey(), "claimant").is_err());
+    }
+
+    #[test]
+    fn signer_set_rejects_mismatched_authority_keypair() {
+        let payer = Keypair::new();
+        let authority = Keypair::new();
+        let wrong = Keypair::new();
+        assert!(signer_set(&payer, Some(&wrong), &authority.pubkey(), "claimant").is_err());
     }
 
     #[test]

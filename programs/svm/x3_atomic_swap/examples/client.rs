@@ -54,6 +54,7 @@ const HTLC_ACCOUNT_SEED: &[u8] = b"htlc";
 /// Assembles the instruction data manually using the on-chain format:
 /// tag(1) + swap_id(32) + claimant(32) + refund_authority(32) + hashlock(32)
 /// + token_mint(32) + amount(8) + timeout(8).
+#[allow(clippy::too_many_arguments)]
 fn build_create_htlc_ix(
     program_id: &Pubkey,
     htlc_account: &Pubkey,
@@ -82,7 +83,7 @@ fn build_create_htlc_ix(
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
             AccountMeta::new(*payer, true),
-            AccountMeta::new_readonly(*initializer, true),
+            AccountMeta::new(*initializer, true),
             AccountMeta::new_readonly(system_program::id(), false),
         ],
         data,
@@ -108,7 +109,7 @@ fn build_claim_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*claimant, true),
+            AccountMeta::new(*claimant, true),
         ],
         data,
     }
@@ -126,7 +127,7 @@ fn build_refund_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*refund_authority, true),
+            AccountMeta::new(*refund_authority, true),
         ],
         data: vec![2u8], // tag: RefundHtlc
     }

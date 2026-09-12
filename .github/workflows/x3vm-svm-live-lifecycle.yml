@@ -11,12 +11,12 @@ name: x3vm-svm-live-lifecycle
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "programs/svm/**"
       - ".github/workflows/x3vm-svm-live-lifecycle.yml"
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - "programs/svm/**"
       - ".github/workflows/x3vm-svm-live-lifecycle.yml"
