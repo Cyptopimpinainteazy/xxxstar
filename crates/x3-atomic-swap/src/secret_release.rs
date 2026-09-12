@@ -6,9 +6,9 @@
 
 use crate::adapter::{ChainId, FinalityProof, LockProof, VmType};
 use crate::error::SwapError;
-use crate::intent::{AtomicIntent, IntentId};
+use crate::intent::{AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, IntentId};
+use alloc::collections::BTreeSet;
 use alloc::string::String;
-use alloc::vec::Vec;
 use sha2::{Digest, Sha256};
 
 /// One domain that must be safely locked before the secret may be released.
@@ -19,23 +19,103 @@ pub struct SecretReleaseRequirement {
     pub min_confirmations: u64,
 }
 
-/// Evidence presented for one required domain.
-#[derive(Debug, Clone)]
-pub struct SecretReleaseEvidence {
-    pub lock: LockProof,
-    pub finality: FinalityProof,
-    /// Independent RPC/quorum layer agrees on the transaction/finality state.
-    pub rpc_quorum_agreed: bool,
-    /// A refund has been observed or finalized for this lock.
+/// Quorum attestation produced by the RPC/finality verifier.
+#[derive(Clone, PartialEq, Eq)]
+pub struct RpcQuorumAttestation {
+    pub tx_id: String,
+    pub block_hash: String,
+    pub provider_count: u32,
+    pub required_quorum: u32,
+    pub finalized: bool,
+}
+
+/// Refund observation produced by the chain observer.
+#[derive(Clone, PartialEq, Eq)]
+pub struct RefundObservation {
+    pub tx_id: String,
+    pub block_hash: String,
     pub refunded: bool,
 }
 
+/// Evidence presented for one required domain.
+#[derive(Clone)]
+pub struct SecretReleaseEvidence {
+    pub lock: LockProof,
+    pub finality: FinalityProof,
+    pub rpc_quorum: RpcQuorumAttestation,
+    pub refund: RefundObservation,
+}
+
 /// Capability returned only after all required domains pass the firewall.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SecretReleasePermit {
     pub intent_id: IntentId,
     pub evidence_domains: usize,
     pub preimage: [u8; 32],
+}
+
+impl core::fmt::Debug for SecretReleasePermit {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("SecretReleasePermit")
+            .field("intent_id", &self.intent_id)
+            .field("evidence_domains", &self.evidence_domains)
+            .field("preimage", &"[REDACTED]")
+            .finish()
+    }
+}
+
+fn chain_matches_kind(chain_id: &str, kind: ChainKind) -> bool {
+    let normalized = chain_id.to_ascii_lowercase();
+    let aliases = match kind {
+        ChainKind::Ethereum => &["eth", "ethereum"][..],
+        ChainKind::Solana => &["sol", "solana"][..],
+        ChainKind::Bitcoin => &["btc", "bitcoin"][..],
+        ChainKind::X3 => &["x3"][..],
+        ChainKind::Base => &["base"][..],
+        ChainKind::Arbitrum => &["arb", "arbitrum"][..],
+        ChainKind::Optimism => &["op", "optimism"][..],
+        ChainKind::Bsc => &["bsc"][..],
+        ChainKind::Polygon => &["poly", "polygon"][..],
+        ChainKind::Avalanche => &["avax", "avalanche"][..],
+        ChainKind::Cosmos => &["cosmos"][..],
+    };
+    aliases
+        .iter()
+        .any(|alias| normalized == *alias || normalized.starts_with(&format!("{alias}-")))
+}
+
+fn vm_matches_kind(vm_type: VmType, kind: ChainKind) -> bool {
+    matches!(
+        (vm_type, kind),
+        (VmType::Evm, ChainKind::Ethereum)
+            | (VmType::Evm, ChainKind::Base)
+            | (VmType::Evm, ChainKind::Arbitrum)
+            | (VmType::Evm, ChainKind::Optimism)
+            | (VmType::Evm, ChainKind::Bsc)
+            | (VmType::Evm, ChainKind::Polygon)
+            | (VmType::Evm, ChainKind::Avalanche)
+            | (VmType::Svm, ChainKind::Solana)
+            | (VmType::X3Vm, ChainKind::X3)
+            | (VmType::BitcoinScript, ChainKind::Bitcoin)
+            | (VmType::CosmWasm, ChainKind::Cosmos)
+    )
+}
+
+fn vm_type_for_chain(kind: ChainKind) -> VmType {
+    match kind {
+        ChainKind::Ethereum
+        | ChainKind::Base
+        | ChainKind::Arbitrum
+        | ChainKind::Optimism
+        | ChainKind::Bsc
+        | ChainKind::Polygon
+        | ChainKind::Avalanche => VmType::Evm,
+        ChainKind::Solana => VmType::Svm,
+        ChainKind::Bitcoin => VmType::BitcoinScript,
+        ChainKind::X3 => VmType::X3Vm,
+        ChainKind::Cosmos => VmType::CosmWasm,
+    }
 }
 
 /// Fail-closed secret release policy.
@@ -48,6 +128,25 @@ impl SecretReleaseFirewall {
         requirements: &[SecretReleaseRequirement],
         evidence: &[SecretReleaseEvidence],
     ) -> Result<SecretReleasePermit, SwapError> {
+        if !intent.verify_hash() {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "secret-release intent integrity",
+                reason: "intent hash does not match its fields".into(),
+            });
+        }
+        if !matches!(
+            intent.status,
+            AtomicSwapStatus::BothLocked
+                | AtomicSwapStatus::FinalityPending
+                | AtomicSwapStatus::Claimable
+                | AtomicSwapStatus::PreimageRevealed
+                | AtomicSwapStatus::ClaimSubmitted
+        ) {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "secret-release lifecycle",
+                reason: "intent is not in a releasable lifecycle state".into(),
+            });
+        }
         let computed = Sha256::digest(preimage);
         if computed.as_slice() != intent.hashlock {
             return Err(SwapError::HashlockMismatch);
@@ -59,10 +158,10 @@ impl SecretReleaseFirewall {
             });
         }
 
-        let mut seen_required_domains: Vec<(String, VmType)> = Vec::new();
+        let mut seen_required_domains: BTreeSet<(ChainId, String)> = BTreeSet::new();
         for required in requirements {
-            let domain = (required.chain_id.clone(), required.vm_type);
-            if seen_required_domains.contains(&domain) {
+            let domain = (required.chain_id.clone(), required.vm_type.name().into());
+            if !seen_required_domains.insert(domain) {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "secret-release requirements",
                     reason: alloc::format!(
@@ -72,11 +171,47 @@ impl SecretReleaseFirewall {
                     ),
                 });
             }
-            seen_required_domains.push(domain);
+            let Some(policy) = intent.finality_requirements.iter().find(|policy| {
+                chain_matches_kind(&required.chain_id, policy.chain)
+                    && vm_matches_kind(required.vm_type, policy.chain)
+            }) else {
+                return Err(SwapError::ProofVerificationFailed {
+                    proof_name: "secret-release canonical requirements",
+                    reason: "requirement is not declared by the intent".into(),
+                });
+            };
+            let expected_confirmations = match policy.level {
+                FinalityLevel::Confirmations(count) => count as u64,
+                FinalityLevel::Finalized | FinalityLevel::Confirmed | FinalityLevel::Bft => 0,
+            };
+            if required.min_confirmations != expected_confirmations {
+                return Err(SwapError::ProofVerificationFailed {
+                    proof_name: "secret-release canonical requirements",
+                    reason: "caller requirement does not match intent policy".into(),
+                });
+            }
         }
 
-        let mut consumed_evidence: Vec<usize> = Vec::new();
-        let mut seen_tx_ids: Vec<String> = Vec::new();
+        if seen_required_domains.len() != intent.finality_requirements.len()
+            || !intent.finality_requirements.iter().all(|policy| {
+                seen_required_domains.iter().any(|(chain_id, vm_name)| {
+                    chain_matches_kind(chain_id, policy.chain)
+                        && vm_name == vm_type_for_chain(policy.chain).name()
+                })
+            })
+            || !intent
+                .finality_requirements
+                .iter()
+                .any(|policy| policy.chain == intent.destination_chain)
+        {
+            return Err(SwapError::ProofVerificationFailed {
+                proof_name: "secret-release canonical requirements",
+                reason: "requirements do not cover the complete intent policy".into(),
+            });
+        }
+
+        let mut consumed_evidence = BTreeSet::new();
+        let mut seen_transactions: BTreeSet<(ChainId, String, String)> = BTreeSet::new();
 
         for required in requirements {
             let Some((index, item)) = evidence.iter().enumerate().find(|(index, item)| {
@@ -89,7 +224,7 @@ impl SecretReleaseFirewall {
                 });
             };
 
-            if item.refunded {
+            if item.refund.refunded {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "secret-release finality",
                     reason: alloc::format!(
@@ -100,11 +235,16 @@ impl SecretReleaseFirewall {
                 });
             }
 
-            if !item.rpc_quorum_agreed {
+            if item.rpc_quorum.provider_count < item.rpc_quorum.required_quorum
+                || item.rpc_quorum.required_quorum == 0
+                || !item.rpc_quorum.finalized
+                || item.rpc_quorum.tx_id != item.lock.tx_id
+                || item.rpc_quorum.block_hash != item.lock.block_hash
+            {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "secret-release RPC quorum",
                     reason: alloc::format!(
-                        "RPC providers disagree for {} / {}",
+                        "RPC quorum attestation is invalid for {} / {}",
                         required.chain_id,
                         required.vm_type.name()
                     ),
@@ -161,7 +301,7 @@ impl SecretReleaseFirewall {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "secret-release finality",
                     reason: alloc::format!(
-                        "{} / {} is not finalized and safe for reveal",
+                        "{} / {} is not finalized or safe for reveal",
                         required.chain_id,
                         required.vm_type.name()
                     ),
@@ -176,15 +316,28 @@ impl SecretReleaseFirewall {
                 });
             }
 
-            if seen_tx_ids.contains(&item.lock.tx_id) {
+            if item.refund.tx_id != item.lock.tx_id
+                || item.refund.block_hash != item.lock.block_hash
+            {
+                return Err(SwapError::ProofVerificationFailed {
+                    proof_name: "secret-release refund binding",
+                    reason: "refund observation does not bind to the lock".into(),
+                });
+            }
+
+            let transaction_key = (
+                required.chain_id.clone(),
+                required.vm_type.name().into(),
+                item.lock.tx_id.clone(),
+            );
+            if !seen_transactions.insert(transaction_key) {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "secret-release replay",
                     reason: "same lock transaction reused for multiple required domains".into(),
                 });
             }
 
-            seen_tx_ids.push(item.lock.tx_id.clone());
-            consumed_evidence.push(index);
+            consumed_evidence.insert(index);
         }
 
         Ok(SecretReleasePermit {
@@ -206,7 +359,7 @@ mod tests {
         let hashlock = Sha256::digest(preimage);
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&hashlock);
-        AtomicIntent {
+        let mut intent = AtomicIntent {
             intent_id: 7001,
             source_chain: ChainKind::X3,
             destination_chain: ChainKind::Ethereum,
@@ -232,7 +385,9 @@ mod tests {
             relayer_quorum_requirement: 2,
             status: AtomicSwapStatus::FinalityPending,
             intent_hash: [0u8; 32],
-        }
+        };
+        intent.intent_hash = intent.compute_hash();
+        intent
     }
 
     fn evidence(
@@ -265,14 +420,24 @@ mod tests {
                 vm_type: vm,
                 tx_id: tx.into(),
                 block_number: block,
-                block_hash,
+                block_hash: block_hash.clone(),
                 confirmations,
                 finalized: true,
                 finality_source: "test-finality".into(),
                 safe_to_reveal_secret: true,
             },
-            rpc_quorum_agreed: true,
-            refunded: false,
+            rpc_quorum: RpcQuorumAttestation {
+                tx_id: tx.into(),
+                block_hash: block_hash.clone(),
+                provider_count: 3,
+                required_quorum: 2,
+                finalized: true,
+            },
+            refund: RefundObservation {
+                tx_id: tx.into(),
+                block_hash,
+                refunded: false,
+            },
         }
     }
 
@@ -289,17 +454,12 @@ mod tests {
         let preimage = [0x11u8; 32];
         let intent = intent(preimage);
         let evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
-        let svm = evidence("solana-mainnet", VmType::Svm, "solsig", 20, intent.hashlock, 1);
-        let requirements = [
-            req("eth-mainnet", VmType::Evm, 12),
-            req("solana-mainnet", VmType::Svm, 1),
-        ];
+        let requirements = [req("eth-mainnet", VmType::Evm, 12)];
 
-        let permit =
-            SecretReleaseFirewall::authorize(&intent, preimage, &requirements, &[evm, svm])
-                .expect("all domains are safely finalized");
+        let permit = SecretReleaseFirewall::authorize(&intent, preimage, &requirements, &[evm])
+            .expect("all domains are safely finalized");
         assert_eq!(permit.intent_id, intent.intent_id);
-        assert_eq!(permit.evidence_domains, 2);
+        assert_eq!(permit.evidence_domains, 1);
         assert_eq!(permit.preimage, preimage);
     }
 
@@ -312,7 +472,9 @@ mod tests {
             req("eth-mainnet", VmType::Evm, 12),
             req("solana-mainnet", VmType::Svm, 1),
         ];
-        assert!(SecretReleaseFirewall::authorize(&intent, preimage, &requirements, &[evm]).is_err());
+        assert!(
+            SecretReleaseFirewall::authorize(&intent, preimage, &requirements, &[evm]).is_err()
+        );
     }
 
     #[test]
@@ -352,7 +514,7 @@ mod tests {
         let preimage = [0x15u8; 32];
         let intent = intent(preimage);
         let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
-        evm.rpc_quorum_agreed = false;
+        evm.rpc_quorum.provider_count = 1;
         assert!(SecretReleaseFirewall::authorize(
             &intent,
             preimage,
@@ -407,7 +569,7 @@ mod tests {
         let preimage = [0x18u8; 32];
         let intent = intent(preimage);
         let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
-        evm.refunded = true;
+        evm.refund.refunded = true;
         assert!(SecretReleaseFirewall::authorize(
             &intent,
             preimage,
@@ -437,8 +599,22 @@ mod tests {
     fn rejects_reused_proof_across_required_domains() {
         let preimage = [0x20u8; 32];
         let intent = intent(preimage);
-        let evm_a = evidence("eth-mainnet", VmType::Evm, "same-tx", 10, intent.hashlock, 12);
-        let mut evm_b = evidence("base-mainnet", VmType::Evm, "same-tx", 20, intent.hashlock, 12);
+        let evm_a = evidence(
+            "eth-mainnet",
+            VmType::Evm,
+            "same-tx",
+            10,
+            intent.hashlock,
+            12,
+        );
+        let mut evm_b = evidence(
+            "base-mainnet",
+            VmType::Evm,
+            "same-tx",
+            20,
+            intent.hashlock,
+            12,
+        );
         evm_b.finality.chain_id = "base-mainnet".into();
         let requirements = [
             req("eth-mainnet", VmType::Evm, 12),
@@ -449,6 +625,47 @@ mod tests {
             preimage,
             &requirements,
             &[evm_a, evm_b]
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_stale_intent_hash_and_terminal_status() {
+        let preimage = [0x21u8; 32];
+        let mut stale_intent = intent(preimage);
+        stale_intent.receiver = "tampered".into();
+        let evm = evidence(
+            "eth-mainnet",
+            VmType::Evm,
+            "0xevm",
+            10,
+            stale_intent.hashlock,
+            12,
+        );
+        assert!(SecretReleaseFirewall::authorize(
+            &stale_intent,
+            preimage,
+            &[req("eth-mainnet", VmType::Evm, 12)],
+            &[evm]
+        )
+        .is_err());
+
+        let mut terminal_intent = intent(preimage);
+        terminal_intent.status = AtomicSwapStatus::Claimed;
+        terminal_intent.intent_hash = terminal_intent.compute_hash();
+        let evm = evidence(
+            "eth-mainnet",
+            VmType::Evm,
+            "0xevm",
+            10,
+            terminal_intent.hashlock,
+            12,
+        );
+        assert!(SecretReleaseFirewall::authorize(
+            &terminal_intent,
+            preimage,
+            &[req("eth-mainnet", VmType::Evm, 12)],
+            &[evm]
         )
         .is_err());
     }
