@@ -8,7 +8,7 @@
 //! - Error handling for invalid scenarios
 
 #[cfg(test)]
-mod bridge_integration_tests {
+mod tests {
     use crate::types::{HtlcSecret, SwapSession};
     use std::collections::BTreeMap;
 
@@ -189,7 +189,7 @@ mod bridge_integration_tests {
         };
 
         // Expected: Lookup fails (domain not in registry)
-        let domain_exists = registry.get(&proof.source_domain).is_some();
+        let domain_exists = registry.contains_key(&proof.source_domain);
         assert!(!domain_exists, "Unknown domain should not be in registry");
     }
 
@@ -329,28 +329,26 @@ mod bridge_integration_tests {
     /// Test proof status transitions correctly
     #[test]
     fn test_proof_status_transitions_correctly() {
-        let mut status_log = Vec::new();
-
-        // Block N: Submit proof
-        status_log.push(ProofStatus {
-            status: "Verifying".to_string(),
-            confirmation_count: 0u32,
-            threshold: 1u32,
-        });
-
-        // Block N+1: Confirmation increases
-        status_log.push(ProofStatus {
-            status: "Confirmed".to_string(),
-            confirmation_count: 1u32,
-            threshold: 1u32,
-        });
-
-        // Block N+2: Status stable
-        status_log.push(ProofStatus {
-            status: "Confirmed".to_string(),
-            confirmation_count: 2u32,
-            threshold: 1u32,
-        });
+        let status_log = [
+            // Block N: Submit proof
+            ProofStatus {
+                status: "Verifying".to_string(),
+                confirmation_count: 0u32,
+                threshold: 1u32,
+            },
+            // Block N+1: Confirmation increases
+            ProofStatus {
+                status: "Confirmed".to_string(),
+                confirmation_count: 1u32,
+                threshold: 1u32,
+            },
+            // Block N+2: Status stable
+            ProofStatus {
+                status: "Confirmed".to_string(),
+                confirmation_count: 2u32,
+                threshold: 1u32,
+            },
+        ];
 
         // Expected: Transitions match sequence
         assert_eq!(status_log[0].status, "Verifying");

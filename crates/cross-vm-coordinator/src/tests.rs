@@ -634,7 +634,7 @@ fn test_htlc_wrong_secret_is_rejected() {
 }
 
 #[test]
-fn test_htlc_secret_replay_same_session_is_rejected() {
+fn test_htlc_secret_replay_same_session_is_idempotent() {
     let mut coordinator = SwapCoordinator::with_default_config();
     let now = 1700000000u64;
 
@@ -703,9 +703,24 @@ fn test_htlc_secret_replay_same_session_is_rejected() {
         .record_fast_claim(&session_id, secret.clone(), now)
         .expect("First claim with correct secret must succeed");
 
-    // Replay of the same secret must be rejected
+    // Same-session retry of the same secret is idempotent. Cross-session reuse
+    // remains rejected by the global ownership guard.
     let replay = coordinator.record_fast_claim(&session_id, secret, now);
-    assert!(replay.is_err(), "Replay of own secret must be rejected");
+    assert!(
+        replay.is_ok(),
+        "Retry of own secret must be an idempotent no-op"
+    );
+    let session = coordinator.get_session(&session_id).unwrap();
+    assert_eq!(session.phase, SwapPhase::ClaimingSlow);
+    assert_eq!(
+        session
+            .operation_journal
+            .iter()
+            .filter(|r| r.operation == CoordinatorOperation::FastClaim)
+            .count(),
+        1,
+        "idempotent retry must not duplicate the FastClaim receipt"
+    );
 }
 
 fn make_fast_htlc(hash_lock: HtlcHash, now: u64) -> HtlcRecord {
@@ -794,7 +809,10 @@ fn test_phase_guards_block_out_of_order_mutators() {
     let slow_after_lock_phase = coordinator.record_htlc_slow(&session_id, duplicate_slow_lock, now);
     assert!(matches!(
         slow_after_lock_phase,
-        Err(CoordinatorError::InvalidPhaseTransition { .. })
+        Err(CoordinatorError::IdempotencyConflict {
+            operation: CoordinatorOperation::SlowHtlcLock,
+            ..
+        })
     ));
 
     let fast_claim_too_early = coordinator.record_fast_claim(&session_id, secret.clone(), now);

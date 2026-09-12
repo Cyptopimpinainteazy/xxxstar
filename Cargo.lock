@@ -24523,6 +24523,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-cross-vm-coordinator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "blake2 0.10.6",
+ "blake3",
+ "ed25519-dalek 2.2.0",
+ "hex",
+ "rand 0.8.8",
+ "reqwest 0.11.27",
+ "sc-client-api",
+ "secp256k1 0.28.2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sp-core 39.0.0",
+ "subtle 2.6.1",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "x3-cross-vm-bridge",
+ "zeroize",
+]
+
+[[package]]
 name = "x3-crosschain-gateway"
 version = "0.1.0"
 dependencies = [
