@@ -1,60 +1,35 @@
-//! Integration tests for `x3_integration::compiler_bridge`.
+//! Compiler-to-runtime boundary tests.
 //!
-//! The bridge contract is pinned here: until the real compiler handoff
-//! is wired (gated on the workspace's `x3-compiler` crate building
-//! end to end, plus `x3-lang/compiler` being reachable from this
-//! workspace), `compile_source` MUST return a typed
-//! `X3IntegrationError::CompilationFailed` and MUST NOT return
-//! silently-fake bytes. This test exists so a future regression
-//! (e.g. someone re-introducing `Ok(vec![])` as a placeholder) is
-//! caught immediately.
-//!
-//! The test runs only when the `compile` bridge feature is enabled.
-//! When the upstream gate clears, the test is updated to assert the
-//! `Ok(bytecode)` path.
+//! These tests require the real workspace compiler. No fake or empty bytecode is
+//! accepted by the integration layer.
 
 #![cfg(all(feature = "std", feature = "compile"))]
 
+use x3_backend::BytecodeModule;
 use x3_x3_integration::compiler_bridge::compile_source;
-use x3_x3_integration::X3IntegrationError;
 
 #[test]
-fn compile_source_returns_typed_error_until_wired() {
-    // The bridge is gated on the workspace's x3-compiler pipeline
-    // building end-to-end (it currently has a pre-existing
-    // non-exhaustive match in its compiler pipeline) and on
-    // x3-lang/compiler being reachable from this workspace (it
-    // currently isn't, because of a different workspace.package
-    // block in x3-lang/Cargo.toml). The bridge returns a typed
-    // CompilationFailed error so production callers cannot mistake
-    // an unimplemented bridge for a successful compilation.
-    let result = compile_source("from ethereum.USDC amount 1");
-    let err = result.expect_err("bridge must return Err until the real call is wired");
-    match err {
-        X3IntegrationError::CompilationFailed(msg) => {
-            assert!(
-                msg.contains("not yet wired") || msg.contains("pre-existing"),
-                "error message must explain the gate, got {:?}",
-                msg
-            );
+fn compile_source_emits_runtime_loadable_bytecode() {
+    let source = r#"
+        fn main() -> i64 {
+            return 1;
         }
-        other => panic!("expected CompilationFailed, got {:?}", other),
-    }
+    "#;
+
+    let bytes = compile_source(source).expect("valid .x3 source must compile");
+    assert!(bytes.starts_with(b"X3BC"), "missing canonical X3 bytecode magic");
+
+    let module = BytecodeModule::from_bytes(&bytes)
+        .expect("compiler output must be accepted by the runtime bytecode loader");
+    assert!(!module.code.is_empty(), "compiled module must contain instructions");
 }
 
 #[test]
-fn compile_source_does_not_return_empty_bytes() {
-    // A regression guard: the bridge must never return an empty
-    // `Vec::new()` (which callers might mistake for valid
-    // "no-op" bytecode). If this test ever starts passing the
-    // bridge is *not* correctly failing closed.
-    let result = compile_source("anything");
-    if let Ok(bytes) = result {
-        assert!(
-            !bytes.is_empty(),
-            "bridge must not return empty bytes (would be indistinguishable from a no-op)"
-        );
-    }
-    // If `Err` is returned, the test trivially passes — the bridge
-    // is correctly failing closed.
+fn compile_source_rejects_invalid_source() {
+    let error = compile_source("this is not valid x3 source")
+        .expect_err("invalid source must fail closed");
+    assert!(
+        error.to_string().contains("compil"),
+        "error should identify the compilation boundary: {error}"
+    );
 }
