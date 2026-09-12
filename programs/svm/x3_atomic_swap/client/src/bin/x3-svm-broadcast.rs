@@ -290,13 +290,7 @@ fn refund(
     let refund_pk = refund_signer
         .as_ref()
         .map_or_else(|| payer.pubkey(), Signer::pubkey);
-    x3_svm_client::broadcast_refund_htlc(
-        cfg,
-        payer,
-        refund_signer.as_ref(),
-        &refund_pk,
-        &swap_id,
-    )
+    x3_svm_client::broadcast_refund_htlc(cfg, payer, refund_signer.as_ref(), &refund_pk, &swap_id)
 }
 
 fn optional_keypair(flag: &str, args: &[String]) -> Result<Option<Keypair>, String> {
@@ -307,11 +301,7 @@ fn optional_keypair(flag: &str, args: &[String]) -> Result<Option<Keypair>, Stri
     else {
         return Ok(None);
     };
-    read_keypair_file(path).map(Some).map_err(|e| {
-        format!(
-            "{flag}: failed to read keypair '{}': {}",
-            path,
-            e
-        )
-    })
+    read_keypair_file(path)
+        .map(Some)
+        .map_err(|e| format!("{flag}: failed to read keypair '{}': {}", path, e))
 }
