@@ -51,6 +51,19 @@ jobs:
           components: rustfmt, clippy, rust-src
           target: wasm32-unknown-unknown, wasm32v1-none
 
+      - name: Install Java 17 for K Framework
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Java 17 Runtime
+        run: |
+          echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+          sudo update-alternatives --install /usr/bin/java java "$JAVA_HOME/bin/java" 1710
+          sudo update-alternatives --set java "$JAVA_HOME/bin/java"
+          java -version
+
       - name: Cache Cargo Dependencies
         uses: actions/cache@v4
         with:
@@ -59,7 +72,6 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
