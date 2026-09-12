@@ -202,7 +202,7 @@ id = "X3-XCHAIN-013"
 name = "Secret-release firewall"
 subsystem = "cross_chain"
 source = "open_pr"
-paths = ["crates/x3-atomic-swap/src/secret_release.rs"]
+paths = ["crates/x3-atomic-swap"]
 implemented = 85
 tested = 78
 mainnet_ready = 68
@@ -211,7 +211,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Must land firewall and unforgeable permit together"]
-evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: PR #162 validates domain/finality/refund/replay; #163 hardens permit capability"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability"]
 open_prs = [162, 163]
 
 [[feature]]
@@ -291,7 +291,7 @@ id = "X3-XCHAIN-018"
 name = "Secret-release domain binding"
 subsystem = "cross_chain"
 source = "open_pr"
-paths = ["crates/x3-atomic-swap/src/secret_release.rs"]
+paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
 mainnet_ready = 72
@@ -300,7 +300,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: Checks chain-id and VM binding"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs checks chain-id and VM binding"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
 open_prs = [162, 163]
 
@@ -309,7 +309,7 @@ id = "X3-XCHAIN-019"
 name = "Secret-release proof reuse rejection"
 subsystem = "cross_chain"
 source = "open_pr"
-paths = ["crates/x3-atomic-swap/src/secret_release.rs"]
+paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
 mainnet_ready = 72
@@ -318,7 +318,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: Same tx proof cannot satisfy multiple required domains"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
 open_prs = [162, 163]
 
@@ -327,7 +327,7 @@ id = "X3-XCHAIN-020"
 name = "Secret-release refund rejection"
 subsystem = "cross_chain"
 source = "open_pr"
-paths = ["crates/x3-atomic-swap/src/secret_release.rs"]
+paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
 mainnet_ready = 72
@@ -336,7 +336,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: Firewall rejects refunded destination"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs rejects refunded destination evidence"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
 open_prs = [162, 163]
 
@@ -345,7 +345,7 @@ id = "X3-XCHAIN-021"
 name = "Secret-release tx/block binding"
 subsystem = "cross_chain"
 source = "open_pr"
-paths = ["crates/x3-atomic-swap/src/secret_release.rs"]
+paths = ["crates/x3-atomic-swap"]
 implemented = 90
 tested = 82
 mainnet_ready = 72
@@ -354,7 +354,7 @@ confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: Finality proof must bind exact lock tx and block"]
+evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs binds the finality proof to the exact lock tx and block"]
 test_evidence = ["note: audited test/CI evidence score=82; exact named tests should be added before score increase"]
 open_prs = [162, 163]
 
