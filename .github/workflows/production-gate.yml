@@ -5,7 +5,6 @@ on:
   push:
     branches: [ main, master, develop ]
 
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -37,6 +36,61 @@ jobs:
         run: make test-all-pallets
       - name: Build validated release node
         run: cargo build --release -p x3-chain-node --features mainnet-rc1
+      - name: Build reproducible runtime with srtool
+        run: ./scripts/run-srtool.sh build
+      - name: Verify srtool runtime evidence
+        run: |
+          ./scripts/run-srtool.sh test
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = Path('.srtool-reports/latest.json')
+          if not report.exists():
+              raise SystemExit('missing .srtool-reports/latest.json')
+
+          data = json.loads(report.read_text())
+          compact = data.get('runtimes', {}).get('compact', {})
+          blake2 = compact.get('blake2_256')
+          sha256 = compact.get('sha256')
+          wasm = compact.get('wasm')
+
+          if not blake2 or not sha256 or not wasm:
+              raise SystemExit('srtool report missing required blake2_256, sha256, or wasm metadata')
+
+          wasm_path = Path(wasm)
+          if not wasm_path.is_absolute():
+              wasm_path = Path.cwd() / wasm_path
+          if not wasm_path.exists() or wasm_path.stat().st_size == 0:
+              raise SystemExit(f'srtool WASM artifact missing or empty: {wasm_path}')
+
+          evidence = Path('.srtool-reports/runtime-hashes.txt')
+          evidence.write_text(
+              f'commit={"${{ github.sha }}"}\n'
+              f'blake2_256={blake2}\n'
+              f'sha256={sha256}\n'
+              f'wasm={wasm}\n'
+              f'wasm_bytes={wasm_path.stat().st_size}\n'
+          )
+
+          with open(Path('${{ github.step_summary }}'), 'a') as summary:
+              summary.write('## Reproducible runtime evidence\n\n')
+              summary.write(f'- Commit: `${{"${{ github.sha }}"}}`\n')
+              summary.write(f'- BLAKE2-256: `{blake2}`\n')
+              summary.write(f'- SHA-256: `{sha256}`\n')
+              summary.write(f'- WASM: `{wasm}`\n')
+              summary.write(f'- WASM bytes: `{wasm_path.stat().st_size}`\n')
+          PY
+      - name: Upload reproducible runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: srtool-runtime-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            .srtool-reports/latest.json
+            .srtool-reports/runtime-hashes.txt
+            target/release/wbuild/x3-chain-runtime/*.wasm
       - name: Audit (invariants + readiness + consistency)
         run: |
           python3 scripts/mainnet_release_gate.py
