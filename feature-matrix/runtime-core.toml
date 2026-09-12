@@ -1,0 +1,198 @@
+# Runtime / Core feature matrix fragment.
+
+[[feature]]
+id = "X3-RT-001"
+name = "Halt permits recovery/refund paths"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+implemented = 60
+tested = 20
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Required tests not yet proven in canonical registry"]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Registry blocker explicitly calls out refund/recovery tests"]
+registry_feature = "atomic_kernel"
+
+[[feature]]
+id = "X3-RT-002"
+name = "Atomic Kernel pallet"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+implemented = 75
+tested = 35
+mainnet_ready = 40
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Nine previously claimed invariant tests were removed as fictional; real invariant suite needed"]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: FEATURE_REGISTRY corrected readiness to 40%"]
+registry_feature = "atomic_kernel"
+
+[[feature]]
+id = "X3-RT-003"
+name = "mainnet-rc1 feature mode"
+subsystem = "runtime_core"
+source = "master"
+paths = ["runtime/src/lib.rs"]
+implemented = 75
+tested = 55
+mainnet_ready = 50
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Historical status documents show verification churn; exact-head proof still required"]
+evidence = ["runtime/src/lib.rs", "note: Feature wired through node/runtime and production gate"]
+registry_feature = "triforge_runtime"
+
+[[feature]]
+id = "X3-RT-004"
+name = "Canonical state ledger updates"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-kernel/src/lib.rs"]
+implemented = 78
+tested = 50
+mainnet_ready = 52
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Supply conservation across all failure paths needs stronger proof"]
+evidence = ["pallets/x3-kernel/src/lib.rs", "note: Kernel persists cross-VM state into canonical view"]
+
+[[feature]]
+id = "X3-RT-005"
+name = "Atomic bundle submission"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+implemented = 80
+tested = 55
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs multi-validator adversarial lifecycle proof"]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Real submit_atomic_bundle path with EconomicHalt guard"]
+
+[[feature]]
+id = "X3-RT-006"
+name = "Economic Halt safety valve"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+implemented = 82
+tested = 35
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Dedicated halt invariant tests incomplete"]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: Real fail-closed guard exists and is reused across economic modules"]
+registry_feature = "atomic_kernel"
+
+[[feature]]
+id = "X3-RT-007"
+name = "Halt blocks new atomic bundles"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-atomic-kernel/src/lib.rs"]
+implemented = 85
+tested = 30
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs explicit regression test"]
+evidence = ["pallets/x3-atomic-kernel/src/lib.rs", "note: ensure! EconomicHalt guard in bundle submission"]
+registry_feature = "atomic_kernel"
+
+[[feature]]
+id = "X3-RT-008"
+name = "X3 runtime"
+subsystem = "runtime_core"
+source = "master"
+paths = ["runtime/src/lib.rs"]
+implemented = 90
+tested = 75
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Full mainnet proof depends on weights, upgrades, and network testing"]
+evidence = ["runtime/src/lib.rs", "note: Large construct_runtime with mainnet-rc1 feature"]
+
+[[feature]]
+id = "X3-RT-009"
+name = "Forbidden experimental compile guards"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-cross-vm-router/src/lib.rs"]
+implemented = 85
+tested = 60
+mainnet_ready = 70
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Must keep mainnet and experimental feature graphs separated"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "note: Audit found compile_error! guards for mainnet-rc1/experimental features"]
+
+[[feature]]
+id = "X3-RT-010"
+name = "Runtime API surface"
+subsystem = "runtime_core"
+source = "master"
+paths = ["runtime/src/lib.rs"]
+implemented = 75
+tested = 55
+mainnet_ready = 55
+priority = "P1"
+confidence = "medium"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Historical compile issues require exact current proof"]
+evidence = ["runtime/src/lib.rs", "note: Node/runtime API integration exists"]
+
+[[feature]]
+id = "X3-RT-011"
+name = "Token class / fixed supply model"
+subsystem = "runtime_core"
+source = "master"
+paths = ["runtime/src/lib.rs"]
+implemented = 78
+tested = 50
+mainnet_ready = 55
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Supply invariants still incomplete"]
+evidence = ["runtime/src/lib.rs", "note: TokenClass::FixedSupply and supply configuration exist"]
+
+[[feature]]
+id = "X3-RT-012"
+name = "Agent-law runtime guard"
+subsystem = "runtime_core"
+source = "master"
+paths = ["pallets/x3-agent-law"]
+implemented = 72
+tested = 55
+mainnet_ready = 50
+priority = "P2"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs broader governance/adversarial coverage"]
+evidence = ["pallets/x3-agent-law", "note: Status document records privacy tightening and passing tests"]
