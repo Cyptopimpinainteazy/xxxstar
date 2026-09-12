@@ -12,6 +12,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+
 jobs:
   clippy:
     # Piloting this job on the x3 self-hosted runner (16c/32t, 77 GiB RAM,
