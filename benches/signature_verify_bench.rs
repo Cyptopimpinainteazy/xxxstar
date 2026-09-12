@@ -7,9 +7,17 @@
 //! - Batch ed25519 verification (1..128 signatures)
 //! - Batch sr25519 verification
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── ed25519 Verification (simulated — real impl requires dalek or ring) ────
 
@@ -114,9 +122,7 @@ fn bench_ed25519(c: &mut Criterion) {
     let message = b"X3 Chain block header signature payload v1.0";
     let sig = keypair.sign(message);
 
-    group.bench_function("sign", |b| {
-        b.iter(|| keypair.sign(black_box(message)))
-    });
+    group.bench_function("sign", |b| b.iter(|| keypair.sign(black_box(message))));
 
     group.bench_function("verify", |b| {
         b.iter(|| keypair.verify(black_box(message), black_box(&sig)))
@@ -137,17 +143,13 @@ fn bench_ed25519(c: &mut Criterion) {
         let msg: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
         let msg_sig = keypair.sign(&msg);
 
-        group.bench_with_input(
-            BenchmarkId::new("sign_size", size),
-            &size,
-            |b, _| b.iter(|| keypair.sign(black_box(&msg))),
-        );
+        group.bench_with_input(BenchmarkId::new("sign_size", size), &size, |b, _| {
+            b.iter(|| keypair.sign(black_box(&msg)))
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("verify_size", size),
-            &size,
-            |b, _| b.iter(|| keypair.verify(black_box(&msg), black_box(&msg_sig))),
-        );
+        group.bench_with_input(BenchmarkId::new("verify_size", size), &size, |b, _| {
+            b.iter(|| keypair.verify(black_box(&msg), black_box(&msg_sig)))
+        });
     }
 
     group.finish();
@@ -159,9 +161,7 @@ fn bench_sr25519(c: &mut Criterion) {
     let message = b"X3 Chain block header signature payload v1.0";
     let sig = keypair.sign(message);
 
-    group.bench_function("sign", |b| {
-        b.iter(|| keypair.sign(black_box(message)))
-    });
+    group.bench_function("sign", |b| b.iter(|| keypair.sign(black_box(message))));
 
     group.bench_function("verify", |b| {
         b.iter(|| keypair.verify(black_box(message), black_box(&sig)))
@@ -182,7 +182,7 @@ fn bench_batch_verify(c: &mut Criterion) {
             .map(|i| {
                 let mut m = vec![0u8; 128];
                 rng.fill_bytes(&mut m);
-                m[0..8].copy_from_slice(&i.to_le_bytes());
+                m[0..8].copy_from_slice(&(i as u64).to_le_bytes());
                 m
             })
             .collect();
@@ -197,7 +197,9 @@ fn bench_batch_verify(c: &mut Criterion) {
             &batch_size,
             |b, _| {
                 b.iter(|| {
-                    for ((kp, msg), sig) in keypairs.iter().zip(messages.iter()).zip(signatures.iter()) {
+                    for ((kp, msg), sig) in
+                        keypairs.iter().zip(messages.iter()).zip(signatures.iter())
+                    {
                         assert!(kp.verify(black_box(msg), black_box(sig)));
                     }
                 })
@@ -209,7 +211,6 @@ fn bench_batch_verify(c: &mut Criterion) {
 
 fn bench_address_derivation(c: &mut Criterion) {
     let mut group = c.benchmark_group("address_derivation");
-    let mut rng = rand::thread_rng();
 
     group.bench_function("ed25519_pub_to_address", |b| {
         let keypair = Ed25519Keypair::generate();
@@ -230,11 +231,13 @@ fn bench_address_derivation(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_ed25519,
-    bench_sr25519,
-    bench_batch_verify,
-    bench_address_derivation,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_ed25519,
+        bench_sr25519,
+        bench_batch_verify,
+        bench_address_derivation
+}
 criterion_main!(benches);

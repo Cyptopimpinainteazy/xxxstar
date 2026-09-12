@@ -8,8 +8,16 @@
 //! - Liquidity-lock verification
 //! - Anti-rug check (supply concentration, owner renounce, locked LP)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── AMM Constant Product Math ──────────────────────────────────────────────
 
@@ -48,7 +56,9 @@ impl Pool {
     }
 
     fn price_ratio(&self) -> f64 {
-        if self.reserve_b == 0 { return 0.0; }
+        if self.reserve_b == 0 {
+            return 0.0;
+        }
         self.reserve_a as f64 / self.reserve_b as f64
     }
 
@@ -82,7 +92,9 @@ struct Route {
 
 impl Route {
     fn score(&self) -> f64 {
-        if self.total_input == 0 { return 0.0; }
+        if self.total_input == 0 {
+            return 0.0;
+        }
         // Score = output/input ratio penalized by hop count
         let ratio = self.total_output as f64 / self.total_input as f64;
         let hop_penalty = 1.0 / (1.0 + (self.hop_count as f64 * 0.001));
@@ -90,7 +102,9 @@ impl Route {
     }
 
     fn effective_price_impact(&self, expected_output: u128) -> f64 {
-        if expected_output == 0 { return 1.0; }
+        if expected_output == 0 {
+            return 1.0;
+        }
         let diff = (expected_output as f64 - self.total_output as f64).abs();
         diff / expected_output as f64
     }
@@ -102,7 +116,12 @@ impl Route {
 
 // ─── Route Search (simulated graph walk) ────────────────────────────────────
 
-fn find_best_route(pools: &[Pool], _amount_in: u128, _token_a: usize, _token_b: usize) -> Option<Route> {
+fn find_best_route(
+    pools: &[Pool],
+    _amount_in: u128,
+    _token_a: usize,
+    _token_b: usize,
+) -> Option<Route> {
     // Simplified route search: score all pools directly connecting the pair
     let mut best: Option<Route> = None;
 
@@ -144,27 +163,41 @@ struct TokenInfo {
 
 impl TokenInfo {
     fn owner_concentration_pct(&self) -> f64 {
-        if self.total_supply == 0 { return 100.0; }
+        if self.total_supply == 0 {
+            return 100.0;
+        }
         (self.owner_balance as f64 / self.total_supply as f64) * 100.0
     }
 
     fn liquidity_lock_pct(&self) -> f64 {
-        if self.total_supply == 0 { return 0.0; }
+        if self.total_supply == 0 {
+            return 0.0;
+        }
         (self.locked_lp_tokens as f64 / self.total_supply as f64) * 100.0
     }
 
     fn anti_rug_score(&self) -> u8 {
         let mut score = 0u8;
         // Creator renounced ownership
-        if self.creator_renounced { score += 30; }
+        if self.creator_renounced {
+            score += 30;
+        }
         // No mint authority (can't inflate supply)
-        if !self.has_mint_authority { score += 25; }
+        if !self.has_mint_authority {
+            score += 25;
+        }
         // No freeze authority
-        if !self.has_freeze_authority { score += 15; }
+        if !self.has_freeze_authority {
+            score += 15;
+        }
         // Owner concentration < 5%
-        if self.owner_concentration_pct() < 5.0 { score += 15; }
+        if self.owner_concentration_pct() < 5.0 {
+            score += 15;
+        }
         // LP locked > 50%
-        if self.liquidity_lock_pct() > 50.0 { score += 15; }
+        if self.liquidity_lock_pct() > 50.0 {
+            score += 15;
+        }
         score
     }
 
@@ -184,11 +217,11 @@ fn bench_amm_quote(c: &mut Criterion) {
     };
 
     let amounts: [u128; 6] = [
-        1_000_000u128,         // 1 USDC worth
-        100_000_000u128,       // 100 USDC
-        1_000_000_000u128,     // 1,000 USDC
-        1_000_000_000_000u128, // 1M USDC
-        100_000_000_000_000u128, // 100M USDC
+        1_000_000u128,                 // 1 USDC worth
+        100_000_000u128,               // 100 USDC
+        1_000_000_000u128,             // 1,000 USDC
+        1_000_000_000_000u128,         // 1M USDC
+        100_000_000_000_000u128,       // 100M USDC
         1_000_000_000_000_000_000u128, // 1B USDC
     ];
 
@@ -225,9 +258,7 @@ fn bench_route_search(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("find_best_route", pool_count),
             &pool_count,
-            |b, _| {
-                b.iter(|| find_best_route(black_box(&pools), 1_000_000_000u128, 0, 1))
-            },
+            |b, _| b.iter(|| find_best_route(black_box(&pools), 1_000_000_000u128, 0, 1)),
         );
     }
     group.finish();
@@ -252,17 +283,11 @@ fn bench_route_scoring(c: &mut Criterion) {
         })
         .collect();
 
-    group.bench_function("score_1hop", |b| {
-        b.iter(|| routes[0].score())
-    });
+    group.bench_function("score_1hop", |b| b.iter(|| routes[0].score()));
 
-    group.bench_function("score_5hop", |b| {
-        b.iter(|| routes[4].score())
-    });
+    group.bench_function("score_5hop", |b| b.iter(|| routes[4].score()));
 
-    group.bench_function("score_10hop", |b| {
-        b.iter(|| routes[9].score())
-    });
+    group.bench_function("score_10hop", |b| b.iter(|| routes[9].score()));
 
     group.bench_function("price_impact", |b| {
         b.iter(|| routes[4].effective_price_impact(black_box(1_000_000_000u128)))
@@ -298,7 +323,7 @@ fn bench_anti_rug(c: &mut Criterion) {
 
     let safe_token = TokenInfo {
         total_supply: 1_000_000_000_000_000_000u128,
-        owner_balance: 10_000_000_000_000_000u128, // 1%
+        owner_balance: 10_000_000_000_000_000u128,     // 1%
         locked_lp_tokens: 700_000_000_000_000_000u128, // 70%
         creator_renounced: true,
         has_mint_authority: false,
@@ -341,12 +366,14 @@ fn bench_anti_rug(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_amm_quote,
-    bench_route_search,
-    bench_route_scoring,
-    bench_pool_update,
-    bench_anti_rug,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_amm_quote,
+        bench_route_search,
+        bench_route_scoring,
+        bench_pool_update,
+        bench_anti_rug
+}
 criterion_main!(benches);

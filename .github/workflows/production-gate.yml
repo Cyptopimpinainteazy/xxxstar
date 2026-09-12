@@ -33,7 +33,9 @@ jobs:
       - name: Build validated release node
         run: cargo build --release -p x3-chain-node --features mainnet-rc1
       - name: Audit (invariants + readiness + consistency)
-        run: make audit
+        run: |
+          python3 scripts/mainnet_release_gate.py
+          bash scripts/check-readiness-consistency.sh
       - name: Node Build Verification (mainnet-rc1)
         run: make test-node-build
       - name: Mainnet Check
