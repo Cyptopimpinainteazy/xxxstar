@@ -9,6 +9,14 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── RPC Response Types ──────────────────────────────────────────────────
 
@@ -263,11 +271,13 @@ fn bench_json_parse(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_rpc_serialization,
-    bench_hex_encoding,
-    bench_data_encoding,
-    bench_json_parse,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_rpc_serialization,
+        bench_hex_encoding,
+        bench_data_encoding,
+        bench_json_parse
+}
 criterion_main!(benches);

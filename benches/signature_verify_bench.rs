@@ -10,6 +10,14 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── ed25519 Verification (simulated — real impl requires dalek or ring) ────
 
@@ -223,11 +231,13 @@ fn bench_address_derivation(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_ed25519,
-    bench_sr25519,
-    bench_batch_verify,
-    bench_address_derivation,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_ed25519,
+        bench_sr25519,
+        bench_batch_verify,
+        bench_address_derivation
+}
 criterion_main!(benches);

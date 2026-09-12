@@ -8,10 +8,18 @@
 //! - Double-submit detection (dup nonce lookup)
 //! - Bridge finality attestation parsing
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── Proof Deserialization ──────────────────────────────────────────────────
 
@@ -29,7 +37,9 @@ struct BridgeProof {
 
 impl BridgeProof {
     fn deserialize(raw: &[u8]) -> Option<Self> {
-        if raw.len() < 72 { return None; } // minimum header size
+        if raw.len() < 72 {
+            return None;
+        } // minimum header size
 
         let chain_id = u32::from_be_bytes(raw[0..4].try_into().ok()?);
         let block_height = u64::from_be_bytes(raw[4..12].try_into().ok()?);
@@ -45,20 +55,26 @@ impl BridgeProof {
         let mut offset = 81;
         let mut merkle_proof = Vec::with_capacity(proof_len);
         for _ in 0..proof_len {
-            if offset + 32 > raw.len() { return None; }
+            if offset + 32 > raw.len() {
+                return None;
+            }
             let mut node = [0u8; 32];
             node.copy_from_slice(&raw[offset..offset + 32]);
             merkle_proof.push(node);
             offset += 32;
         }
 
-        if offset + leaf_len > raw.len() { return None; }
+        if offset + leaf_len > raw.len() {
+            return None;
+        }
         let leaf_data = raw[offset..offset + leaf_len].to_vec();
         offset += leaf_len;
 
         let mut signatures = Vec::with_capacity(sig_len);
         for _ in 0..sig_len {
-            if offset + 64 > raw.len() { return None; }
+            if offset + 64 > raw.len() {
+                return None;
+            }
             let mut sig = [0u8; 64];
             sig.copy_from_slice(&raw[offset..offset + 64]);
             signatures.push(sig);
@@ -137,7 +153,7 @@ fn bench_proof_deserialize(c: &mut Criterion) {
     let mut rng = rand::thread_rng();
 
     let scenarios = [
-        ("tiny", 2usize, 32usize, 1usize),   // 2 proof nodes, 32b leaf, 1 sig
+        ("tiny", 2usize, 32usize, 1usize), // 2 proof nodes, 32b leaf, 1 sig
         ("small", 4, 64, 3),
         ("medium", 8, 128, 7),
         ("large", 16, 256, 15),
@@ -147,31 +163,33 @@ fn bench_proof_deserialize(c: &mut Criterion) {
     for (name, proof_nodes, leaf_bytes, sig_count) in &scenarios {
         // Build serialized proof
         let mut raw = Vec::new();
-        raw.extend_from_slice(&1u32.to_be_bytes());        // chain_id
+        raw.extend_from_slice(&1u32.to_be_bytes()); // chain_id
         raw.extend_from_slice(&42_000_000u64.to_be_bytes()); // block_height
-        let mut block_hash = [0u8; 32]; rng.fill_bytes(&mut block_hash);
+        let mut block_hash = [0u8; 32];
+        rng.fill_bytes(&mut block_hash);
         raw.extend_from_slice(&block_hash);
-        let mut merkle_root = [0u8; 32]; rng.fill_bytes(&mut merkle_root);
+        let mut merkle_root = [0u8; 32];
+        rng.fill_bytes(&mut merkle_root);
         raw.extend_from_slice(&merkle_root);
         raw.extend_from_slice(&(*proof_nodes as u16).to_be_bytes());
         raw.extend_from_slice(&(*leaf_bytes as u16).to_be_bytes());
         raw.push(*sig_count as u8);
 
         for _ in 0..*proof_nodes {
-            let mut node = [0u8; 32]; rng.fill_bytes(&mut node);
+            let mut node = [0u8; 32];
+            rng.fill_bytes(&mut node);
             raw.extend_from_slice(&node);
         }
         raw.resize(raw.len() + *leaf_bytes, 0xAB);
         for _ in 0..*sig_count {
-            let mut sig = [0u8; 64]; rng.fill_bytes(&mut sig);
+            let mut sig = [0u8; 64];
+            rng.fill_bytes(&mut sig);
             raw.extend_from_slice(&sig);
         }
 
-        group.bench_with_input(
-            BenchmarkId::new("deserialize", name),
-            &raw.len(),
-            |b, _| b.iter(|| BridgeProof::deserialize(black_box(&raw))),
-        );
+        group.bench_with_input(BenchmarkId::new("deserialize", name), &raw.len(), |b, _| {
+            b.iter(|| BridgeProof::deserialize(black_box(&raw)))
+        });
     }
     group.finish();
 }
@@ -219,11 +237,9 @@ fn bench_merkle_verify(c: &mut Criterion) {
             signatures: vec![],
         };
 
-        group.bench_with_input(
-            BenchmarkId::new("verify", depth),
-            &depth,
-            |b, _| b.iter(|| bp.verify_merkle()),
-        );
+        group.bench_with_input(BenchmarkId::new("verify", depth), &depth, |b, _| {
+            b.iter(|| bp.verify_merkle())
+        });
     }
     group.finish();
 }
@@ -290,10 +306,12 @@ fn bench_replay_guard(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_proof_deserialize,
-    bench_merkle_verify,
-    bench_replay_guard,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_proof_deserialize,
+        bench_merkle_verify,
+        bench_replay_guard
+}
 criterion_main!(benches);

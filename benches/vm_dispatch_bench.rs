@@ -9,6 +9,14 @@
 //! - Cross-VM call dispatch (EVM→SVM, SVM→EVM)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── VM Opcodes ─────────────────────────────────────────────────────────────
 
@@ -402,11 +410,13 @@ fn bench_vm_execution_loop(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_opcode_decode,
-    bench_gas_metering,
-    bench_stack_ops,
-    bench_vm_execution_loop,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_opcode_decode,
+        bench_gas_metering,
+        bench_stack_ops,
+        bench_vm_execution_loop
+}
 criterion_main!(benches);

@@ -12,6 +12,14 @@ use blake2::Blake2b512;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
+use std::time::Duration;
+
+fn ci_criterion() -> Criterion {
+    Criterion::default()
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(20))
+        .measurement_time(Duration::from_millis(100))
+}
 
 // ─── HTLC Hashlock Benchmarks ───────────────────────────────────────────────
 
@@ -354,12 +362,14 @@ fn bench_intent_serialization(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_htlc_hashlock,
-    bench_timelock_ops,
-    bench_swap_state_transition,
-    bench_batch_hashlock_verify,
-    bench_intent_serialization,
-);
+criterion_group! {
+    name = benches;
+    config = ci_criterion();
+    targets =
+        bench_htlc_hashlock,
+        bench_timelock_ops,
+        bench_swap_state_transition,
+        bench_batch_hashlock_verify,
+        bench_intent_serialization
+}
 criterion_main!(benches);
