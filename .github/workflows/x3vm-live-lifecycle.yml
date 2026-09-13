@@ -1,0 +1,56 @@
+name: x3vm-live-lifecycle
+
+on:
+  pull_request:
+    paths:
+      - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "pallets/x3-settlement-engine/**"
+      - ".github/workflows/x3vm-live-lifecycle.yml"
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  live-x3vm-lifecycle:
+    name: real local-node X3VM lifecycles
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler clang cmake
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: x3vm-live-lifecycle
+
+      - name: Run live lock finalized claim lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_live_lifecycle \
+            real_local_node_lock_finalized_claim_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Run live timeout finalized refund lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_live_lifecycle \
+            real_local_node_timeout_reaches_finalized_refund_state \
+            -- --ignored --nocapture
+
+
+      - name: Run live early-refund fail-closed lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_live_lifecycle \
+            real_local_node_refund_before_timeout_fails_closed \
+            -- --ignored --nocapture

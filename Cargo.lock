@@ -24311,6 +24311,7 @@ dependencies = [
  "substrate-frame-rpc-system",
  "substrate-prometheus-endpoint",
  "tokio",
+ "x3-atomic-swap",
  "x3-atomic-trade",
  "x3-bridge-adapters",
  "x3-chain-runtime",

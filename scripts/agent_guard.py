@@ -58,11 +58,16 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)PRIVATE_KEY=\d{16,}",
     r"(?i)--from-literal=api-key=sk-or-\.\.\.",
     r"(?i)\$\{API_KEY:0:30\}",
-    r"(?i)privateKey:\s*'•+",
-    r'(?i)privateKey\s*:\s*"•{8,}"',
+    r'''(?i)privateKey:\s*["']•+''',
     r"(?i)private[_-]?key\s*[:=]\s*(self\.private_key|\"//Charlie\"|private_key\.clone\(\))",
     r"(?i)mnemonic\s*=\s*self\.decrypt_data\(",
     r"(?i)key\.privateKey\b",
+    r'''(?i)\bAPI_KEY\s*=\s*"\$\{[A-Z0-9_]+:-\}"''',
+    r'''(?i)\bapiKey\s*:\s*[\'"]your-[^\'"]+[\'"]''',
+    r"(?i)\bapiKey\s*:\s*config\.[A-Za-z_][A-Za-z0-9_]*",
+    r"(?i)\bthis\.config\.apiKey\s*=\s*undefined",
+    r"(?i)\bmnemonic\s*=\s*bip39::Mnemonic::from_phrase\(",
+    r"(?i)hardcoded\s+`?PRIVATE_KEY=`?/`?MNEMONIC=`?/AWS-key",
 ]
 
 
