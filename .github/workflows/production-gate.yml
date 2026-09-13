@@ -12,6 +12,10 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    env:
+      # Keep reproducible runtime builds pinned while using a Rust release
+      # compatible with the current dependency graph (Edition 2024 crates).
+      SRTOOL_IMAGE: paritytech/srtool:1.93.0-0.18.4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
