@@ -35,11 +35,18 @@ pub trait SessionPersistence: Send + Sync + 'static {
     ///
     /// This MUST be called after every secret insertion to prevent
     /// cross-session replay attacks surviving a node restart.
-    fn save_used_secrets(&self, secrets: &Vec<[u8; 32]>);
+    fn save_used_secrets(&self, secrets: &[[u8; 32]]);
 
     /// Load the persisted set of used HTLC secrets.
     /// Returns an empty set if nothing was previously persisted.
     fn load_used_secrets(&self) -> Vec<[u8; 32]>;
+
+    /// Persist secret-hash ownership so crash recovery can distinguish a
+    /// legitimate retry from cross-session replay.
+    fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]);
+
+    /// Load secret-hash ownership records.
+    fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)>;
 }
 
 // ─── InMemoryPersistence ──────────────────────────────────────────────────────
@@ -50,6 +57,7 @@ pub trait SessionPersistence: Send + Sync + 'static {
 pub struct InMemoryPersistence {
     inner: std::sync::RwLock<HashMap<String, SwapSession>>,
     used_secrets: std::sync::RwLock<Vec<[u8; 32]>>,
+    used_secret_claims: std::sync::RwLock<Vec<([u8; 32], String)>>,
 }
 
 impl Default for InMemoryPersistence {
@@ -63,6 +71,7 @@ impl InMemoryPersistence {
         Self {
             inner: std::sync::RwLock::new(HashMap::new()),
             used_secrets: std::sync::RwLock::new(Vec::new()),
+            used_secret_claims: std::sync::RwLock::new(Vec::new()),
         }
     }
 }
@@ -93,14 +102,23 @@ impl SessionPersistence for InMemoryPersistence {
         guard.len()
     }
 
-    fn save_used_secrets(&self, secrets: &Vec<[u8; 32]>) {
+    fn save_used_secrets(&self, secrets: &[[u8; 32]]) {
         let mut guard = self.used_secrets.write().unwrap();
-        *guard = secrets.clone();
+        *guard = secrets.to_vec();
     }
 
     fn load_used_secrets(&self) -> Vec<[u8; 32]> {
         let guard = self.used_secrets.read().unwrap();
         guard.clone()
+    }
+
+    fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]) {
+        let mut guard = self.used_secret_claims.write().unwrap();
+        *guard = claims.to_vec();
+    }
+
+    fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
+        self.used_secret_claims.read().unwrap().clone()
     }
 }
 
@@ -178,7 +196,7 @@ impl<O: OffchainStorageProvider> SessionPersistence for OffchainPersistence<O> {
         self.storage_provider.keys_with_prefix(Self::PREFIX).len()
     }
 
-    fn save_used_secrets(&self, secrets: &Vec<[u8; 32]>) {
+    fn save_used_secrets(&self, secrets: &[[u8; 32]]) {
         let key = b"x3secrets:used".to_vec();
         let value = serde_json::to_vec(secrets).expect("HashSet serializes");
         self.storage_provider.set(&key, &value);
@@ -186,6 +204,20 @@ impl<O: OffchainStorageProvider> SessionPersistence for OffchainPersistence<O> {
 
     fn load_used_secrets(&self) -> Vec<[u8; 32]> {
         let key = b"x3secrets:used".to_vec();
+        self.storage_provider
+            .get(&key)
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default()
+    }
+
+    fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]) {
+        let key = b"x3secrets:claims".to_vec();
+        let value = serde_json::to_vec(claims).expect("secret claims serialize");
+        self.storage_provider.set(&key, &value);
+    }
+
+    fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
+        let key = b"x3secrets:claims".to_vec();
         self.storage_provider
             .get(&key)
             .and_then(|b| serde_json::from_slice(&b).ok())
@@ -301,6 +333,7 @@ mod tests {
             timelock_slow: 2000,
             created_at: 123456,
             updated_at: 123456,
+            operation_journal: vec![],
             requires_merkle_verification: false,
         }
     }
@@ -350,6 +383,18 @@ mod tests {
         assert_eq!(loaded[0], [1u8; 32]);
         assert_eq!(loaded[1], [2u8; 32]);
         assert_eq!(loaded[2], [3u8; 32]);
+    }
+
+    #[test]
+    fn inmemory_secret_claim_ownership_roundtrip() {
+        let persistence = InMemoryPersistence::new();
+        let claims = vec![
+            ([9u8; 32], "swap-a".to_string()),
+            ([8u8; 32], "swap-b".to_string()),
+        ];
+
+        persistence.save_used_secret_claims(&claims);
+        assert_eq!(persistence.load_used_secret_claims(), claims);
     }
 
     #[test]
@@ -499,6 +544,18 @@ mod tests {
             assert_eq!(loaded.len(), 2);
             assert_eq!(loaded[0], [10u8; 32]);
             assert_eq!(loaded[1], [20u8; 32]);
+        }
+
+        #[test]
+        fn offchain_secret_claim_ownership_roundtrip() {
+            let p = make_persistence();
+            let claims = vec![
+                ([7u8; 32], "oc-a".to_string()),
+                ([6u8; 32], "oc-b".to_string()),
+            ];
+
+            p.save_used_secret_claims(&claims);
+            assert_eq!(p.load_used_secret_claims(), claims);
         }
 
         #[test]

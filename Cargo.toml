@@ -93,6 +93,7 @@ members = [
         # Note: crates/dylint-determinism is intentionally NOT listed here.
     # It is a standalone workspace (has its own [workspace
     "crates/cross-vm-bridge",
+    "crates/cross-vm-coordinator",
     "crates/evm-integration",
     "crates/flash-finality",
     "crates/parallel-proposer",
