@@ -49,7 +49,7 @@ use solana_program::{
 /// - `program_id` — The HTLC program ID.
 /// - `htlc_account` — The PDA address of the HTLC (seeds: ["htlc", swap_id]).
 /// - `payer` — Account funding the rent for the HTLC account.
-/// - `initializer` — The party locking funds (must be a signer).
+/// - `initializer` — The party locking funds (must be a writable signer).
 /// - `system_program` — System program ID.
 /// - `swap_id` — Unique 32-byte swap identifier.
 /// - `claimant` — Pubkey authorized to claim.
@@ -62,6 +62,7 @@ use solana_program::{
 /// ### Returns
 ///
 /// An [`Instruction`] ready for `invoke` or `invoke_signed`.
+#[allow(clippy::too_many_arguments)]
 pub fn create_htlc(
     program_id: &Pubkey,
     htlc_account: &Pubkey,
@@ -91,7 +92,7 @@ pub fn create_htlc(
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
             AccountMeta::new(*payer, true),
-            AccountMeta::new_readonly(*initializer, true),
+            AccountMeta::new(*initializer, true),
             AccountMeta::new_readonly(*system_program, false),
         ],
         data,
@@ -104,7 +105,7 @@ pub fn create_htlc(
 ///
 /// - `program_id` — The HTLC program ID.
 /// - `htlc_account` — The PDA address of the HTLC.
-/// - `claimant` — The authorized claimant (must be a signer).
+/// - `claimant` — The authorized claimant and payout account (must be a writable signer).
 /// - `preimage` — The preimage bytes (1–255 bytes).
 ///
 /// ### Returns
@@ -126,7 +127,7 @@ pub fn claim_htlc(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*claimant, true),
+            AccountMeta::new(*claimant, true),
         ],
         data,
     }
@@ -138,7 +139,7 @@ pub fn claim_htlc(
 ///
 /// - `program_id` — The HTLC program ID.
 /// - `htlc_account` — The PDA address of the HTLC.
-/// - `refund_authority` — The refund authority (must be a signer).
+/// - `refund_authority` — The refund authority and payout account (must be a writable signer).
 ///
 /// ### Returns
 ///
@@ -152,7 +153,7 @@ pub fn refund_htlc(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*refund_authority, true),
+            AccountMeta::new(*refund_authority, true),
         ],
         data: vec![2u8], // instruction tag: RefundHtlc
     }

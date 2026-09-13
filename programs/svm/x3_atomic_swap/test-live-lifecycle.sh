@@ -123,6 +123,13 @@ print(data[$offset])
 "
 }
 
+get_lamports() {
+  local pubkey="$1"
+  curl -s "$RPC_URL" -X POST -H 'Content-Type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getBalance\",\"params\":[\"$pubkey\",{\"commitment\":\"finalized\"}]}" \
+    | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['value'])"
+}
+
 check() {
   # check <description> <expected exit: 0=succeed nonzero=must fail>
   local desc="$1" expect_fail="$2"
@@ -142,6 +149,19 @@ check() {
   fi
 }
 
+check_reject() {
+  # check_reject <description> <expected stderr/stdout regex> <command...>
+  local desc="$1" expected="$2"
+  shift 2
+  if "$@" >"$WORKDIR/last.out" 2>&1; then
+    echo "FAIL: $desc (expected rejection, but succeeded)"; cat "$WORKDIR/last.out"; fail=$((fail + 1))
+  elif grep -Eq "$expected" "$WORKDIR/last.out"; then
+    echo "PASS: $desc (correctly rejected with expected error)"; pass=$((pass + 1))
+  else
+    echo "FAIL: $desc (rejected with unexpected error)"; cat "$WORKDIR/last.out"; fail=$((fail + 1))
+  fi
+}
+
 # --- Scenario 1: happy path lock -> wrong preimage rejected -> correct claim ---
 python3 -c "
 import os, hashlib
@@ -151,19 +171,33 @@ open('$WORKDIR/hashlock.hex','w').write(h.hex())
 open('$WORKDIR/swap_id.hex','w').write(s.hex())
 "
 CUR_SLOT="$(solana slot --url "$RPC_URL")"
+CLAIMANT_BEFORE_LOCK="$(get_lamports "$CLAIMANT_PK")"
 check "lock (happy path)" 0 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/payer.json" \
   lock --swap-id "$(cat "$WORKDIR/swap_id.hex")" --claimant "$CLAIMANT_PK" --refund-authority "$PAYER_PK" \
   --hashlock "$(cat "$WORKDIR/hashlock.hex")" --amount 500000 --timeout-slots $((CUR_SLOT + 1000))
 HTLC_PDA="$(grep -oP 'htlc=\K\S+' "$WORKDIR/last.out")"
+HTLC_LOCKED_LAMPORTS="$(get_lamports "$HTLC_PDA")"
+if [ "$HTLC_LOCKED_LAMPORTS" -ge 500000 ]; then
+  echo "PASS: HTLC PDA holds locked lamports after create"; pass=$((pass + 1))
+else
+  echo "FAIL: HTLC PDA holds $HTLC_LOCKED_LAMPORTS lamports (expected at least 500000)"; fail=$((fail + 1))
+fi
 
-check "claim with WRONG preimage" 1 \
+check_reject "claim with WRONG preimage" "custom program error: 0x0|WrongPreimage|hashlock mismatch" \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   claim --swap-id "$(cat "$WORKDIR/swap_id.hex")" --preimage "$(python3 -c 'import os; print(os.urandom(32).hex())')"
 
 check "claim with CORRECT preimage" 0 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   claim --swap-id "$(cat "$WORKDIR/swap_id.hex")" --preimage "$(cat "$WORKDIR/preimage.hex")"
+HTLC_AFTER_CLAIM="$(get_lamports "$HTLC_PDA")"
+CLAIMANT_AFTER_CLAIM="$(get_lamports "$CLAIMANT_PK")"
+if [ "$HTLC_AFTER_CLAIM" -eq "$((HTLC_LOCKED_LAMPORTS - 500000))" ] && [ "$CLAIMANT_AFTER_CLAIM" -gt "$CLAIMANT_BEFORE_LOCK" ]; then
+  echo "PASS: successful claim releases locked lamports to claimant"; pass=$((pass + 1))
+else
+  echo "FAIL: claim lamport movement htlc_before=$HTLC_LOCKED_LAMPORTS htlc_after=$HTLC_AFTER_CLAIM claimant_before=$CLAIMANT_BEFORE_LOCK claimant_after=$CLAIMANT_AFTER_CLAIM"; fail=$((fail + 1))
+fi
 
 claimed="$(decode_field "$HTLC_PDA" claimed)"
 if [ "$claimed" = "1" ]; then
@@ -172,7 +206,7 @@ else
   echo "FAIL: on-chain claimed=$claimed (expected 1)"; fail=$((fail + 1))
 fi
 
-check "double-claim" 1 \
+check_reject "double-claim" "custom program error: 0x6|HtlcAlreadyClaimed|already claimed" \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   claim --swap-id "$(cat "$WORKDIR/swap_id.hex")" --preimage "$(cat "$WORKDIR/preimage.hex")"
 
@@ -191,8 +225,10 @@ check "lock (short timeout, for refund test)" 0 \
   lock --swap-id "$(cat "$WORKDIR/swap_id2.hex")" --claimant "$CLAIMANT_PK" --refund-authority "$PAYER_PK" \
   --hashlock "$(cat "$WORKDIR/hashlock2.hex")" --amount 500000 --timeout-slots "$TARGET"
 HTLC_PDA2="$(grep -oP 'htlc=\K\S+' "$WORKDIR/last.out")"
+HTLC_REFUND_LOCKED_LAMPORTS="$(get_lamports "$HTLC_PDA2")"
+REFUND_BEFORE_REFUND="$(get_lamports "$PAYER_PK")"
 
-check "refund BEFORE timeout" 1 \
+check_reject "refund BEFORE timeout" "custom program error: 0x5|HtlcNotExpired|timeout has not yet expired" \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/payer.json" \
   refund --swap-id "$(cat "$WORKDIR/swap_id2.hex")"
 
@@ -202,6 +238,13 @@ while [ "$(solana slot --url "$RPC_URL" --commitment finalized)" -le "$((TARGET 
 check "refund AFTER timeout" 0 \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/payer.json" \
   refund --swap-id "$(cat "$WORKDIR/swap_id2.hex")"
+HTLC_AFTER_REFUND="$(get_lamports "$HTLC_PDA2")"
+REFUND_AFTER_REFUND="$(get_lamports "$PAYER_PK")"
+if [ "$HTLC_AFTER_REFUND" -eq "$((HTLC_REFUND_LOCKED_LAMPORTS - 500000))" ] && [ "$REFUND_AFTER_REFUND" -gt "$REFUND_BEFORE_REFUND" ]; then
+  echo "PASS: successful refund releases locked lamports to refund authority"; pass=$((pass + 1))
+else
+  echo "FAIL: refund lamport movement htlc_before=$HTLC_REFUND_LOCKED_LAMPORTS htlc_after=$HTLC_AFTER_REFUND refund_before=$REFUND_BEFORE_REFUND refund_after=$REFUND_AFTER_REFUND"; fail=$((fail + 1))
+fi
 
 refunded="$(decode_field "$HTLC_PDA2" refunded)"
 if [ "$refunded" = "1" ]; then
@@ -224,7 +267,7 @@ check "lock (for wrong-authority test)" 0 \
   lock --swap-id "$(cat "$WORKDIR/swap_id3.hex")" --claimant "$CLAIMANT_PK" --refund-authority "$PAYER_PK" \
   --hashlock "$(cat "$WORKDIR/hashlock3.hex")" --amount 500000 --timeout-slots $((CUR_SLOT + 1000))
 
-check "refund by wrong authority (claimant, not refund_authority)" 1 \
+check_reject "refund by wrong authority (claimant, not refund_authority)" "custom program error: 0x3|UnauthorizedRefund|not the refund authority" \
   "$BIN" --rpc "$RPC_URL" --program-id "$PROGRAM_ID" --payer-keypair "$WORKDIR/claimant.json" \
   refund --swap-id "$(cat "$WORKDIR/swap_id3.hex")"
 

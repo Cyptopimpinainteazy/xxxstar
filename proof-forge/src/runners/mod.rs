@@ -332,9 +332,21 @@ pub(crate) async fn run_cargo_test_and_parse(
     }
 
     if !output.status.success() && passed.is_empty() && failed.is_empty() {
+        let diagnostic = combined
+            .lines()
+            .rev()
+            .take(40)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
         failed.push(format!(
-            "cargo test process failed for package '{}' with filter '{}'",
-            package, filter
+            "cargo test process failed for package '{}' with filter '{}'; exit={:?}\n{}",
+            package,
+            filter,
+            output.status.code(),
+            diagnostic
         ));
     }
 

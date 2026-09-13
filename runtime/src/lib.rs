@@ -119,8 +119,6 @@ use scale_info::TypeInfo;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
-#[cfg(not(feature = "mainnet-rc1"))]
-use sp_runtime::DispatchResult;
 #[allow(deprecated)] // create_runtime_str! accepted: required by the runtime_version grammar.
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
@@ -134,8 +132,6 @@ use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
-#[cfg(not(feature = "mainnet-rc1"))]
-use x3_dex::amm_pools::TokenId as DexTokenId;
 
 #[cfg(feature = "frontier")]
 mod precompiles;
@@ -2638,12 +2634,10 @@ impl pallet_x3_sequencer::Config for Runtime {
 // `ProposerQuery` traits to the sequencer and consensus pallets respectively.
 
 use crate::fraud_proofs::types::ProposerQuery;
-#[cfg(not(feature = "mainnet-rc1"))]
-use crate::fraud_proofs::types::SchedulerCommitmentQuery;
 
 /// Reads the scheduler commitment from the sequencer pallet's per-block storage.
 #[cfg(not(feature = "mainnet-rc1"))]
-impl SchedulerCommitmentQuery for Runtime {
+impl crate::fraud_proofs::types::SchedulerCommitmentQuery for Runtime {
     fn get_scheduler_commitment(block_number: u32) -> Option<sp_core::H256> {
         pallet_x3_sequencer::SchedulerCommitment::<Runtime>::get(block_number)
     }
@@ -3013,11 +3007,11 @@ impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
         let fee_bps = 30u32;
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
-            DexTokenId {
+            x3_dex::TokenId {
                 chain_id: 0,
                 asset_id: token_a as u128,
             },
-            DexTokenId {
+            x3_dex::TokenId {
                 chain_id: 0,
                 asset_id: token_b as u128,
             },
@@ -3040,7 +3034,7 @@ impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLo
         pool_id: u64,
         lp_amount: u128,
         unlock_at_block: BlockNumber,
-    ) -> DispatchResult {
+    ) -> frame_support::dispatch::DispatchResult {
         pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
             frame_system::RawOrigin::Signed(owner.clone()).into(),
             pool_id,
@@ -3202,9 +3196,15 @@ impl GetSessionNumber for SessionHandler {
 #[cfg(feature = "runtime-benchmarks")]
 #[allow(unused_imports)] // define_benchmarks! consumes these pallet aliases as macro metadata.
 mod benches {
+    // These aliases are consumed by define_benchmarks! token expansion; rustc
+    // does not observe the generated use-site when linting this module.
+    #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
+    #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
+    #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
 
     frame_benchmarking::define_benchmarks!(
