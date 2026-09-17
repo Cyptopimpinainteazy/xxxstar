@@ -11,7 +11,12 @@ concurrency:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    # pull_request has no branch filter here, so this repo (public) accepts
+    # runs from any fork PR on this trigger. Keep pull_request on
+    # ubuntu-latest; only push (already-merged) and manual dispatch go to
+    # the x3 self-hosted runner. Do not remove this split without
+    # re-reviewing the self-hosted-runner-on-public-repo RCE risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     env:
       # Keep reproducible runtime builds pinned while using a Rust release
       # compatible with the current dependency graph (Edition 2024 crates).
@@ -33,6 +38,8 @@ jobs:
       - name: Verify srtool CLI
         run: srtool version
       - name: Install protoc
+        # x3star1 already has protoc via linuxbrew and no passwordless sudo.
+        if: runner.environment == 'github-hosted'
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Guard
         run: make guard

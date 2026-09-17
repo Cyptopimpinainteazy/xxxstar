@@ -15,7 +15,9 @@ env:
 jobs:
   rehearse:
     name: Rehearse Candidate Gates
-    runs-on: ubuntu-latest
+    # workflow_dispatch only, no pull_request trigger, so this is safe to
+    # run on the x3 self-hosted runner with no untrusted-code exposure.
+    runs-on: [self-hosted, Linux, X64, x3]
 
     steps:
       - name: Checkout candidate
