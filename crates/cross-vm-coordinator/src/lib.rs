@@ -45,6 +45,8 @@ pub mod relayer;
 pub mod rpc_client;
 pub mod state_machine;
 pub mod types;
+#[cfg(feature = "valkey")]
+pub mod valkey;
 
 #[cfg(test)]
 mod bridge_integration_tests; // Phase 13b: Bridge integration test suite
@@ -55,6 +57,8 @@ pub use concurrent::*;
 pub use persistence::*;
 pub use state_machine::*;
 pub use types::*;
+#[cfg(feature = "valkey")]
+pub use valkey::*;
 
 #[cfg(test)]
 mod tests;
