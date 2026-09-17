@@ -46,6 +46,7 @@ pub mod persistence;
 pub mod proof_binding;
 pub mod proof_vault;
 pub mod recovery;
+pub mod settlement_submission;
 pub mod relayer;
 pub mod rpc_client;
 pub mod state_machine;
@@ -65,6 +66,7 @@ pub use persistence::*;
 pub use proof_binding::*;
 pub use proof_vault::*;
 pub use recovery::*;
+pub use settlement_submission::*;
 pub use state_machine::*;
 pub use types::*;
 #[cfg(feature = "valkey")]

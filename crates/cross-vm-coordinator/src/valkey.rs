@@ -929,6 +929,50 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
     }
 
     #[cfg(feature = "canonical-proofs")]
+    pub fn claim_submission_envelope(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+    ) -> Result<crate::SettlementSubmissionEnvelope, CoordinatorError> {
+        let set = self.assemble_verified_claim_proof_set(
+            session_id,
+            intent,
+            runtime_intent_id,
+            required_domains,
+        )?;
+        crate::SettlementSubmissionEnvelope::for_claim(
+            intent,
+            runtime_intent_id,
+            set,
+            required_domains,
+        )
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn refund_submission_envelope(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+    ) -> Result<crate::SettlementSubmissionEnvelope, CoordinatorError> {
+        let set = self.assemble_verified_refund_proof_set(
+            session_id,
+            intent,
+            runtime_intent_id,
+            required_domains,
+        )?;
+        crate::SettlementSubmissionEnvelope::for_refund(
+            intent,
+            runtime_intent_id,
+            set,
+            required_domains,
+        )
+    }
+
+    #[cfg(feature = "canonical-proofs")]
     pub fn assemble_verified_claim_proof_set(
         &self,
         session_id: &str,
