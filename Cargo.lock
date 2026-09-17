@@ -11579,6 +11579,7 @@ dependencies = [
  "sp-runtime 45.0.0",
  "sp-std",
  "x3-asset-kernel-types",
+ "x3-atomic-swap",
  "x3-crosschain-intent",
 ]
 

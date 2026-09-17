@@ -121,6 +121,8 @@ pub mod pallet {
     use sp_core::{ed25519, ConstU32, H256};
     use sp_io::hashing::blake2_256;
     use sp_runtime::{SaturatedConversion, Saturating};
+    use scale_info::prelude::string::String;
+    use sp_std::prelude::*;
     use sp_std::vec::Vec;
     use x3_atomic_swap::{CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, VmType as ProofVmType};
 
@@ -2568,7 +2570,7 @@ pub mod pallet {
             Some((value, 5))
         }
 
-        fn proof_domain_descriptor(chain: ExternalChainId) -> (sp_std::string::String, ProofVmType) {
+        fn proof_domain_descriptor(chain: ExternalChainId) -> (String, ProofVmType) {
             match chain {
                 ExternalChainId::X3Native => ("x3-native".into(), ProofVmType::X3Vm),
                 ExternalChainId::Bitcoin => ("bitcoin-mainnet".into(), ProofVmType::BitcoinScript),
@@ -2582,7 +2584,12 @@ pub mod pallet {
                 ExternalChainId::Bnb => ("bnb-smart-chain".into(), ProofVmType::Evm),
                 ExternalChainId::Solana => ("solana-mainnet".into(), ProofVmType::Svm),
                 ExternalChainId::SolanaDevnet => ("solana-devnet".into(), ProofVmType::Svm),
-                ExternalChainId::EvmChain(id) => (sp_std::format!("evm:{id}"), ProofVmType::Evm),
+                ExternalChainId::EvmChain(id) => {
+                    use core::fmt::Write as _;
+                    let mut key = String::from("evm:");
+                    let _ = write!(key, "{id}");
+                    (key, ProofVmType::Evm)
+                },
             }
         }
 
