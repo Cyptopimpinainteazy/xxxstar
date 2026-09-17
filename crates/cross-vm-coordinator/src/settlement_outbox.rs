@@ -219,6 +219,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             )));
         }
 
+        let expected = latest.clone();
         let next = SettlementOutboxRecord {
             status: SettlementOutboxStatus::Signed,
             tx_id: Some(tx_id.to_string()),
@@ -229,7 +230,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             ..latest
         };
         self.store
-            .compare_and_append(next.submission_id, Some(&latest), &next)
+            .compare_and_append(next.submission_id, Some(&expected), &next)
             .or_else(|_| {
                 // Another process may have won the transition after our read.
                 // Re-read and accept only the exact same signed transaction.
@@ -314,13 +315,14 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             )));
         }
 
+        let expected = latest.clone();
         let next = SettlementOutboxRecord {
             status: SettlementOutboxStatus::Included,
             block_number: Some(block_number),
             updated_at: now,
             ..latest
         };
-        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
+        self.store.compare_and_append(next.submission_id, Some(&expected), &next)?;
         Ok(next)
     }
 
@@ -342,12 +344,13 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             )));
         }
 
+        let expected = latest.clone();
         let next = SettlementOutboxRecord {
             status: SettlementOutboxStatus::TerminalObserved,
             updated_at: now,
             ..latest
         };
-        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
+        self.store.compare_and_append(next.submission_id, Some(&expected), &next)?;
         Ok(next)
     }
 
@@ -368,13 +371,14 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             ));
         }
 
+        let expected = latest.clone();
         let next = SettlementOutboxRecord {
             status: SettlementOutboxStatus::Failed,
             error: Some(error.to_string()),
             updated_at: now,
             ..latest
         };
-        self.store.compare_and_append(next.submission_id, Some(&latest), &next)?;
+        self.store.compare_and_append(next.submission_id, Some(&expected), &next)?;
         Ok(next)
     }
 
