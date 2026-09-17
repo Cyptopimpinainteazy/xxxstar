@@ -7,10 +7,8 @@
 //! - Biometric registration
 //! - Error conditions
 
-#![cfg(test)]
-
 use crate::{mock::*, pallet::*};
-use frame_support::{assert_noop, assert_ok, BoundedVec};
+use frame_support::{assert_noop, assert_ok};
 
 // ============================================================================
 // Hardware Wallet Tests
@@ -72,17 +70,12 @@ fn create_multisig_wallet_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: BoundedVec<[u8; 32], 50> = BoundedVec::try_from(vec![
-            [1u8; 32],
-            [2u8; 32],
-            [3u8; 32],
-        ])
-        .unwrap();
+        let signers: Vec<[u8; 32]> = vec![[1u8; 32], [2u8; 32], [3u8; 32]];
 
         assert_ok!(X3Wallet::create_multisig_wallet(
             RuntimeOrigin::signed(ALICE),
             signers,
-            2, // 2-of-3 threshold
+            2,    // 2-of-3 threshold
             3600, // 1 hour timelock
         ));
 
@@ -98,11 +91,7 @@ fn create_multisig_wallet_fails_with_invalid_threshold() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
 
-        let signers: BoundedVec<[u8; 32], 50> = BoundedVec::try_from(vec![
-            [1u8; 32],
-            [2u8; 32],
-        ])
-        .unwrap();
+        let signers: Vec<[u8; 32]> = vec![[1u8; 32], [2u8; 32]];
 
         // Threshold 0 is invalid
         assert_noop!(
@@ -136,7 +125,7 @@ fn create_multisig_wallet_fails_with_invalid_threshold() {
 fn transfer_tokens_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         // First mint some tokens to ALICE
@@ -165,7 +154,7 @@ fn transfer_tokens_works() {
 fn transfer_tokens_fails_with_zero_amount() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         assert_noop!(
@@ -184,7 +173,7 @@ fn transfer_tokens_fails_with_zero_amount() {
 fn transfer_tokens_fails_with_insufficient_balance() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         // Mint 100 tokens to ALICE
@@ -229,7 +218,8 @@ fn register_biometric_works() {
         ));
 
         // Check profile was created
-        let profile = X3Wallet::get_biometric_profile(&ALICE).unwrap();
+        let profile =
+            X3Wallet::get_biometric_profile(&ALICE).expect("biometric profile should exist");
         assert_eq!(profile.biometric_type, biometric_type);
         assert_eq!(profile.template_hash, template_hash);
         assert!(profile.is_enabled);
@@ -260,6 +250,34 @@ fn initiate_recovery_fails_without_guardian() {
     });
 }
 
+#[test]
+fn initiate_recovery_works() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        // Pre-seed a guardian record for ALICE so recovery can succeed.
+        let guardian = x3_wallet::GuardianAccount {
+            id: [0u8; 32],
+            owner: [0u8; 32],
+            guardians: vec![[1u8; 32]],
+            required_guardians: 1,
+            recovery_delay_blocks: 100,
+            is_active: true,
+        };
+        crate::RecoveryAccounts::<Test>::insert(ALICE, guardian);
+
+        assert_ok!(X3Wallet::initiate_recovery(
+            RuntimeOrigin::signed(ALICE),
+            [9u8; 32], // new owner
+        ));
+
+        System::assert_has_event(RuntimeEvent::X3Wallet(Event::RecoveryInitiated {
+            account: ALICE,
+            new_owner: [9u8; 32],
+        }));
+    });
+}
+
 // ============================================================================
 // Token Minting Tests
 // ============================================================================
@@ -268,7 +286,7 @@ fn initiate_recovery_fails_without_guardian() {
 fn mint_tokens_works() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         assert_ok!(X3Wallet::mint_tokens(
@@ -292,7 +310,7 @@ fn mint_tokens_works() {
 fn mint_tokens_accumulates() {
     new_test_ext().execute_with(|| {
         System::set_block_number(1);
-        
+
         let token_id = [42u8; 32];
 
         assert_ok!(X3Wallet::mint_tokens(
@@ -310,6 +328,62 @@ fn mint_tokens_accumulates() {
         ));
 
         assert_eq!(X3Wallet::get_token_balance(&BOB, &token_id), 1500);
+    });
+}
+
+// ============================================================================
+// Minter Authorization Tests
+// ============================================================================
+
+#[test]
+fn mint_tokens_authorized_only() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        let token_id = [42u8; 32];
+
+        // BOB is not an authorized minter — mint should fail.
+        assert_noop!(
+            X3Wallet::mint_tokens(RuntimeOrigin::signed(BOB), token_id, BOB, 100,),
+            Error::<Test>::Unauthorized
+        );
+    });
+}
+
+#[test]
+fn add_remove_minter_root_only() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+
+        // Non-root (signed) call to add_minter must fail
+        assert_noop!(
+            X3Wallet::add_minter(RuntimeOrigin::signed(ALICE), BOB),
+            frame_support::error::BadOrigin
+        );
+
+        // Non-root (signed) call to remove_minter must fail
+        assert_noop!(
+            X3Wallet::remove_minter(RuntimeOrigin::signed(ALICE), ALICE),
+            frame_support::error::BadOrigin
+        );
+
+        // Root can add BOB as minter
+        assert_ok!(X3Wallet::add_minter(RuntimeOrigin::root(), BOB));
+
+        // BOB should now be an authorized minter
+        assert!(crate::Minters::<Test>::contains_key(BOB));
+
+        // Root can remove ALICE as minter
+        assert_ok!(X3Wallet::remove_minter(RuntimeOrigin::root(), ALICE));
+
+        // ALICE should no longer be authorized
+        assert!(!crate::Minters::<Test>::contains_key(ALICE));
+
+        // ALICE can no longer mint after removal
+        assert_noop!(
+            X3Wallet::mint_tokens(RuntimeOrigin::signed(ALICE), [42u8; 32], BOB, 100,),
+            Error::<Test>::Unauthorized
+        );
     });
 }
 

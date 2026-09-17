@@ -5,18 +5,31 @@ use crate::Pallet as X3AtomicKernel;
 use frame_benchmarking::{benchmarks, whitelisted_caller};
 use frame_support::traits::{Currency, Get};
 use frame_support::BoundedVec;
+use frame_support::PalletId;
 use frame_system::pallet_prelude::BlockNumberFor;
 use frame_system::RawOrigin;
+use parity_scale_codec::Encode;
 use sp_core::H256;
-use sp_runtime::traits::SaturatedConversion;
+use sp_io::hashing::blake2_256;
+use sp_runtime::traits::{AccountIdConversion, SaturatedConversion};
 use sp_std::vec;
+
+fn gateway_account<T: crate::Config>() -> T::AccountId {
+    PalletId(*b"x3langgw").into_account_truncating()
+}
+
+fn fund_gateway<T: crate::Config>() {
+    let gateway: T::AccountId = gateway_account::<T>();
+    let _ = T::Currency::make_free_balance_be(&gateway, (T::MinBond::get() * 100u128).saturated_into());
+}
 
 benchmarks! {
     // Benchmark submitting an atomic bundle with variable number of legs.
     // Cost scales with leg count due to encoding overhead.
     submit_atomic_bundle {
         let b in 1 .. T::MaxLegsPerBundle::get();
-        let caller: T::AccountId = whitelisted_caller();
+        fund_gateway::<T>();
+        let caller: T::AccountId = gateway_account::<T>();
 
         let mut legs = vec![];
         for _i in 0..b {
@@ -38,7 +51,7 @@ benchmarks! {
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(legs)
             .expect("legs within MaxLegsPerBundle");
 
-    }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into(), 0u32, 0u64)
+    }: _(RawOrigin::Signed(caller.clone()), legs, 1000u32.into(), 0u32, 1u64)
     verify {
         // Verify bundle was created and is in Pending status
         let bundle_id = Bundles::<T>::iter_keys().next().expect("bundle should exist");
@@ -50,8 +63,9 @@ benchmarks! {
     // Benchmark assigning an executor to a pending bundle.
     // Lightweight state transition: only updates executor field and status.
     assign_bundle_executor {
-        let caller: T::AccountId = whitelisted_caller();
-        let executor: T::AccountId = whitelisted_caller();
+        fund_gateway::<T>();
+        let caller: T::AccountId = gateway_account::<T>();
+        let executor: T::AccountId = gateway_account::<T>();
         let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
@@ -66,7 +80,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: _(RawOrigin::Signed(executor.clone()), bundle_id)
@@ -80,8 +94,9 @@ benchmarks! {
     // Requires bundle to be in Executing state.
     // Stores proof on-chain for external verifiers.
     finalize_atomic_bundle {
-        let caller: T::AccountId = whitelisted_caller();
-        let executor: T::AccountId = whitelisted_caller();
+        fund_gateway::<T>();
+        let caller: T::AccountId = gateway_account::<T>();
+        let executor: T::AccountId = gateway_account::<T>();
         let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
         let _ = T::Currency::make_free_balance_be(&executor, (T::MinBond::get() * 10u128).saturated_into());
 
@@ -97,14 +112,25 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(executor.clone()).into(), bundle_id).unwrap();
 
-        let receipt_root = H256::repeat_byte(0x11);
+        let record = Bundles::<T>::get(bundle_id).unwrap();
+        let executor_hash = H256::from(sp_io::hashing::blake2_256(&executor.encode()));
         let finality_cert = H256::repeat_byte(0x22);
         let block_number: BlockNumberFor<T> = 1u32.into();
+        FinalityCertAnchors::<T>::insert(block_number.saturated_into::<u64>(), finality_cert);
+        let commitment = ReceiptRootData {
+            bundle_id,
+            legs_hash: record.legs_hash,
+            leg_count: record.leg_count,
+            executor_hash,
+            finalized_block: block_number.saturated_into::<u64>(),
+            finality_cert,
+        };
+        let receipt_root = H256::from(sp_io::hashing::blake2_256(&commitment.encode()));
     }: _(RawOrigin::Signed(executor), bundle_id, receipt_root, finality_cert, block_number)
     verify {
         let bundle = Bundles::<T>::get(bundle_id).unwrap();
@@ -117,7 +143,8 @@ benchmarks! {
     // Benchmark rolling back a bundle with ExecutionFailed reason.
     // Slashes a portion of the submitter's bond.
     rollback_atomic_bundle {
-        let caller: T::AccountId = whitelisted_caller();
+        fund_gateway::<T>();
+        let caller: T::AccountId = gateway_account::<T>();
         let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
@@ -132,10 +159,10 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
-    }: _(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::ExecutionFailed)
+    }: _(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::SubmitterCancelled)
     verify {
         let bundle = Bundles::<T>::get(bundle_id).unwrap();
         assert_eq!(bundle.status, BundleStatus::RolledBack);
@@ -144,7 +171,8 @@ benchmarks! {
     // Benchmark rolling back a bundle with SubmitterCancelled reason.
     // No slashing - full bond returned to submitter.
     rollback_atomic_bundle_cancel {
-        let caller: T::AccountId = whitelisted_caller();
+        fund_gateway::<T>();
+        let caller: T::AccountId = gateway_account::<T>();
         let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
@@ -159,7 +187,7 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
     }: rollback_atomic_bundle(RawOrigin::Signed(caller), bundle_id, BundleRollbackReason::SubmitterCancelled)
@@ -171,7 +199,8 @@ benchmarks! {
     // Benchmark submitting finalization result via unsigned extrinsic (OCW path).
     // This is the on-chain finalization path called by the off-chain orchestrator.
     submit_finalization_result {
-        let caller: T::AccountId = whitelisted_caller();
+        fund_gateway::<T>();
+        let caller: T::AccountId = gateway_account::<T>();
         let _ = T::Currency::make_free_balance_be(&caller, (T::MinBond::get() * 10u128).saturated_into());
 
         let legs = BoundedVec::<proof::BundleLeg, T::MaxLegsPerBundle>::try_from(vec![proof::BundleLeg {
@@ -186,13 +215,25 @@ benchmarks! {
                 writes: Default::default(),
             },
         }]).expect("within MaxLegsPerBundle");
-        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 0u64).unwrap();
+        X3AtomicKernel::<T>::submit_atomic_bundle(RawOrigin::Signed(caller.clone()).into(), legs, 1000u32.into(), 0u32, 1u64).unwrap();
         let bundle_id = Bundles::<T>::iter_keys().next().unwrap();
 
         X3AtomicKernel::<T>::assign_bundle_executor(RawOrigin::Signed(caller.clone()).into(), bundle_id).unwrap();
 
-        let receipt_root = H256::repeat_byte(0x11);
-        let finality_cert = H256::zero(); // Zero cert when Flash Finality not running
+        let record = Bundles::<T>::get(bundle_id).unwrap();
+        let executor_hash = H256::from(sp_io::hashing::blake2_256(&caller.encode()));
+        let finality_cert = H256::repeat_byte(0x22);
+        let block_number: BlockNumberFor<T> = 1u32.into();
+        FinalityCertAnchors::<T>::insert(block_number.saturated_into::<u64>(), finality_cert);
+        let commitment = ReceiptRootData {
+            bundle_id,
+            legs_hash: record.legs_hash,
+            leg_count: record.leg_count,
+            executor_hash,
+            finalized_block: block_number.saturated_into::<u64>(),
+            finality_cert,
+        };
+        let receipt_root = H256::from(sp_io::hashing::blake2_256(&commitment.encode()));
         let committed_at_ns = 1000000000u64;
 
     }: _(RawOrigin::None, bundle_id, receipt_root, finality_cert, committed_at_ns)

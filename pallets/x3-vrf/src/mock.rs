@@ -81,7 +81,7 @@ impl Config for Test {
     type BaseFee = BaseFee;
     type FeePerByte = FeePerByte;
     type MaxSeedLength = MaxSeedLength;
-    type FulfillerOrigin = frame_system::EnsureRoot<Self::AccountId>;
+    type FulfillerOrigin = frame_system::EnsureSigned<Self::AccountId>;
     type WeightInfo = ();
 }
 

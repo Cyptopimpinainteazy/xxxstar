@@ -3,13 +3,39 @@
 //! This crate provides implementations of bridge adapters for external chains
 //! (Ethereum, Solana, Bitcoin) that integrate with the X3 cross-chain gateway.
 
+pub mod arbitrum;
 pub mod bitcoin;
+pub mod bsc;
+pub mod cairo;
+pub mod cosmwasm;
 pub mod ethereum;
+pub mod fuelvm;
+pub mod movevm;
+pub mod nearwasm;
+pub mod plutus;
+pub mod polkadotpvm;
+pub mod rpc_loader;
 pub mod solana;
+pub mod soroban;
+pub mod ton;
+pub mod zkvm;
 
+pub use arbitrum::ArbitrumBridgeAdapter;
 pub use bitcoin::BitcoinBridgeAdapter;
+pub use bsc::BscBridgeAdapter;
+pub use cairo::CairoBridgeAdapter;
+pub use cosmwasm::CosmWasmBridgeAdapter;
 pub use ethereum::EthereumBridgeAdapter;
+pub use fuelvm::FuelVmBridgeAdapter;
+pub use movevm::{MoveVmVariant, MoveVmBridgeAdapter};
+pub use nearwasm::NearWasmBridgeAdapter;
+pub use plutus::PlutusBridgeAdapter;
+pub use polkadotpvm::PolkadotPvmBridgeAdapter;
+pub use rpc_loader::{init_all_adapters, load_rpc_config, RpcEndpoint, RpcEndpointsConfig};
 pub use solana::SolanaBridgeAdapter;
+pub use soroban::SorobanBridgeAdapter;
+pub use ton::TonBridgeAdapter;
+pub use zkvm::ZkVmBridgeAdapter;
 
 /// Bridge adapter trait for external chain integration
 pub trait BridgeAdapter {

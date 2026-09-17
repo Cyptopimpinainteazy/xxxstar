@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bridged Testnet Scoreboard",
+  "type": "object",
+  "required": ["timestamp", "profile", "overall_status", "components", "scenarios", "summary"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the test run"
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["local-full", "local-minimal", "vps", "public"],
+      "description": "Testnet profile that was run"
+    },
+    "overall_status": {
+      "type": "string",
+      "enum": ["PASS", "FAIL", "PARTIAL", "RUNNING"],
+      "description": "Overall testnet status"
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "description": "Total test run duration in seconds"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "category", "status", "details"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["infrastructure", "core", "bridge", "monitoring", "tooling"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PASS", "FAIL", "SKIP", "NOT_TESTED"]
+          },
+          "details": { "type": "string" },
+          "latency_ms": { "type": "integer" },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "category", "status", "description", "expected", "actual"],
+        "properties": {
+          "name": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["happy_path", "failure_recovery", "security", "invariants", "stress"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PASS", "FAIL", "SKIP", "NOT_TESTED"]
+          },
+          "description": { "type": "string" },
+          "expected": { "type": "string" },
+          "actual": { "type": "string" },
+          "duration_ms": { "type": "integer" },
+          "error": { "type": "string" },
+          "proof_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_components", "passed_components", "failed_components", "total_scenarios", "passed_scenarios", "failed_scenarios", "readiness_percentage"],
+      "properties": {
+        "total_components": { "type": "integer" },
+        "passed_components": { "type": "integer" },
+        "failed_components": { "type": "integer" },
+        "total_scenarios": { "type": "integer" },
+        "passed_scenarios": { "type": "integer" },
+        "failed_scenarios": { "type": "integer" },
+        "readiness_percentage": { "type": "number" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "logs_dir": { "type": "string" },
+        "metrics_dump": { "type": "string" },
+        "proof_artifacts": { "type": "array", "items": { "type": "string" } },
+        "chain_specs": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

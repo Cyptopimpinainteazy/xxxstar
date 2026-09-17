@@ -24,7 +24,8 @@ const SEED: u32 = 0;
 fn setup_intent<T: Config>() -> (T::AccountId, T::AccountId, H256, AssetSpec, AssetSpec) {
     let maker: T::AccountId = frame_benchmarking::account("maker", 0, SEED);
     let taker: T::AccountId = frame_benchmarking::account("taker", 1, SEED);
-    let secret_hash: H256 = H256::from_low_u64_be(1);
+    let secret = H256::from_low_u64_be(0x42);
+    let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
     let asset_a = AssetSpec {
         chain: ExternalChainId::Ethereum,
         token: TokenId::Native,
@@ -81,6 +82,10 @@ benchmarks! {
     claim_settlement {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
 
+        // Fund maker for locking escrow
+        let bal = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::minimum_balance() * 10_000u32.into();
+        let _ = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::make_free_balance_be(&maker, bal);
+
         // Create intent
         let create_origin = RawOrigin::Signed(maker.clone()).into();
         Pallet::<T>::create_intent(
@@ -90,22 +95,32 @@ benchmarks! {
             asset_b.clone(),
             secret_hash,
             Some(86400u64),
-        ).ok();
+        ).expect("create_intent should succeed");
 
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
 
-        // Lock escrow
-        let escrow_origin = RawOrigin::Signed(maker.clone()).into();
+        // Lock escrow - both legs
+        let escrow_data = vec![1u8; 64];
+        let lock_origin = RawOrigin::Signed(maker.clone()).into();
         Pallet::<T>::lock_escrow(
-            escrow_origin,
+            lock_origin,
             intent_id,
             0u32,
             ExternalChainId::Ethereum,
             1_000_000u128,
-            vec![1u8; 64],
-        ).ok();
+            escrow_data.clone(),
+        ).expect("first lock_escrow should succeed");
+        let lock_origin2 = RawOrigin::Signed(maker.clone()).into();
+        Pallet::<T>::lock_escrow(
+            lock_origin2,
+            intent_id,
+            1u32,
+            ExternalChainId::Bitcoin,
+            1_000_000u128,
+            escrow_data,
+        ).expect("second lock_escrow should succeed");
 
-        let secret = H256::from_low_u64_be(1);
+        let secret = H256::from_low_u64_be(0x42);
         let origin = RawOrigin::Signed(maker.clone());
     }: _(origin, intent_id, secret)
     verify {
@@ -115,7 +130,7 @@ benchmarks! {
     refund_settlement {
         let (maker, taker, secret_hash, asset_a, asset_b) = setup_intent::<T>();
 
-        // Create intent with very short timeout
+        // Create intent with immediate timeout
         let create_origin = RawOrigin::Signed(maker.clone()).into();
         Pallet::<T>::create_intent(
             create_origin,
@@ -123,20 +138,30 @@ benchmarks! {
             asset_a.clone(),
             asset_b.clone(),
             secret_hash,
-            Some(1u64), // 1 second timeout
+            Some(0u64), // 0 second timeout → expires immediately
         ).ok();
 
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
 
-        // Lock escrow
-        let escrow_origin = RawOrigin::Signed(maker.clone()).into();
+        // Lock escrow - both legs
+        let escrow_data = vec![1u8; 64];
+        let lock_origin = RawOrigin::Signed(maker.clone()).into();
         Pallet::<T>::lock_escrow(
-            escrow_origin,
+            lock_origin,
             intent_id,
             0u32,
             ExternalChainId::Ethereum,
             1_000_000u128,
-            vec![1u8; 64],
+            escrow_data.clone(),
+        ).ok();
+        let lock_origin2 = RawOrigin::Signed(maker.clone()).into();
+        Pallet::<T>::lock_escrow(
+            lock_origin2,
+            intent_id,
+            1u32,
+            ExternalChainId::Bitcoin,
+            1_000_000u128,
+            escrow_data,
         ).ok();
 
         let origin = RawOrigin::Signed(maker.clone());
@@ -161,6 +186,28 @@ benchmarks! {
         ).ok();
 
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
+
+        // Lock escrow - both legs to reach FullyFunded
+        let escrow_data = vec![1u8; 64];
+        let lock_origin = RawOrigin::Signed(maker.clone()).into();
+        Pallet::<T>::lock_escrow(
+            lock_origin,
+            intent_id,
+            0u32,
+            ExternalChainId::Ethereum,
+            1_000_000u128,
+            escrow_data.clone(),
+        ).ok();
+        let lock_origin2 = RawOrigin::Signed(maker.clone()).into();
+        Pallet::<T>::lock_escrow(
+            lock_origin2,
+            intent_id,
+            1u32,
+            ExternalChainId::Bitcoin,
+            1_000_000u128,
+            escrow_data,
+        ).ok();
+
         let btc_txid = H256::from_low_u64_be(2);
         let merkle_proof: Vec<H256> = vec![H256::from_low_u64_be(0)];
         let block_header = BtcBlockHeader {
@@ -212,6 +259,28 @@ benchmarks! {
         ).ok();
 
         let intent_id = Pallet::<T>::generate_intent_id(&maker, &taker, 0);
+
+        // Lock escrow - both legs to reach FullyFunded
+        let escrow_data = vec![1u8; 64];
+        let lock_origin = RawOrigin::Signed(maker.clone()).into();
+        Pallet::<T>::lock_escrow(
+            lock_origin,
+            intent_id,
+            0u32,
+            ExternalChainId::Ethereum,
+            1_000_000u128,
+            escrow_data.clone(),
+        ).ok();
+        let lock_origin2 = RawOrigin::Signed(maker.clone()).into();
+        Pallet::<T>::lock_escrow(
+            lock_origin2,
+            intent_id,
+            1u32,
+            ExternalChainId::Bitcoin,
+            1_000_000u128,
+            escrow_data,
+        ).ok();
+
         let proof = SettlementProof {
             proof_type: ProofType::MerkleTrie,
             tx_hash: H256::from_low_u64_be(2),
@@ -230,6 +299,7 @@ benchmarks! {
     deposit_bond {
         let depositor: T::AccountId = frame_benchmarking::account("depositor", 0, SEED);
         let amount = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::minimum_balance() * 100u32.into();
+        let _ = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::make_free_balance_be(&depositor, amount * 10u32.into());
 
         let origin = RawOrigin::Signed(depositor.clone());
     }: _(origin, vec![1u8; 32], amount, 0u8)
@@ -241,8 +311,9 @@ benchmarks! {
     finalize_bond_withdraw {
         let depositor: T::AccountId = frame_benchmarking::account("depositor", 0, SEED);
         let amount = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::minimum_balance() * 100u32.into();
+        let _ = <<T as pallet::Config>::Currency as Currency<T::AccountId>>::make_free_balance_be(&depositor, amount * 10u32.into());
 
-        // Create bond first
+        // Create bond and track ID
         let create_origin = RawOrigin::Signed(depositor.clone()).into();
         Pallet::<T>::deposit_bond(
             create_origin,
@@ -250,8 +321,11 @@ benchmarks! {
             amount,
             0u8,
         ).ok();
+        let bond_id = Bonds::<T>::iter_keys().next().unwrap_or(H256::default());
 
-        let bond_id = H256::from_low_u64_be(0);
+        // Request withdrawal to set state=1
+        let req_origin = RawOrigin::Signed(depositor.clone()).into();
+        Pallet::<T>::request_bond_withdraw(req_origin, bond_id).ok();
 
         let origin = RawOrigin::Signed(depositor.clone());
     }: _(origin, bond_id)

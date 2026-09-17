@@ -327,7 +327,7 @@ parameter_types! {
     pub const ProtocolFeeBps: u32 = 0;
     pub const ProtocolTreasury: u64 = 999;
     pub const MaxSlippageBps: u32 = 500; // 5% default max slippage
-    pub const MinSlippageBps: u32 = 0;
+    pub const MinSlippageBps: u32 = 1; // MIN_SLIPPAGE_BPS = 1 (0.01%)
 }
 
 impl pallet_atomic_trade_engine::Config for Test {

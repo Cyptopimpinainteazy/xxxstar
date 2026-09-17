@@ -125,3 +125,6 @@ protoc_bin/
 
 # Repomix
 .repomix/
+
+# RALPH Runner task state
+.ralph/

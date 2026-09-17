@@ -129,6 +129,7 @@ native = ["x3-chain-runtime/native"]
 
 runtime-benchmarks = [
     "x3-chain-runtime/runtime-benchmarks",
+    "frame-benchmarking-cli",
     "frame-benchmarking-cli/runtime-benchmarks",
 ]
 

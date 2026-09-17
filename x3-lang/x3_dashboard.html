@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X3-lang | Cross-VM Intent Framework</title>
+    <style>
+        :root {
+            --bg-dark: #0f1115;
+            --bg-panel: #161b22;
+            --bg-input: #0d1117;
+            --border: #30363d;
+            --accent: #58a6ff;
+            --accent-dim: rgba(88, 166, 255, 0.15);
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --success: #238636;
+            --danger: #da3633;
+            --warning: #d29922;
+            --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        header {
+            height: 60px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            background: var(--bg-panel);
+            justify-content: space-between;
+        }
+
+        .brand {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand span { color: var(--text-main); }
+
+        .status-pill {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            font-family: var(--font-mono);
+        }
+
+        /* Main Layout */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 350px 1fr 300px;
+            overflow: hidden;
+        }
+
+        /* Panels */
+        .panel {
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-dark);
+        }
+
+        .panel:last-child {
+            border-right: none;
+            border-left: 1px solid var(--border);
+        }
+
+        .panel-header {
+            padding: 10px 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-panel);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        /* Editor */
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: var(--bg-input);
+        }
+
+        textarea#code-editor {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 20px;
+            resize: none;
+            outline: none;
+            white-space: pre;
+        }
+
+        /* Visualization Area */
+        .viz-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 1rem;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        /* Flow Diagram */
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .flow-node {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.8rem;
+            width: 100px;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .flow-node.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 10px var(--accent-dim);
+        }
+
+        .flow-line {
+            flex: 1;
+            height: 2px;
+            background: var(--border);
+            margin: 0 10px;
+            position: relative;
+        }
+
+        .flow-line::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .flow-line.active::after {
+            width: 100%;
+        }
+
+        /* Scoreboard Grid */
+        .scoreboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .score-item {
+            background: var(--bg-input);
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .score-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .score-value.good { color: var(--success); }
+        .score-value.warn { color: var(--warning); }
+        .score-value.bad { color: var(--danger); }
+
+        /* Logs */
+        .log-entry {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .log-time { color: var(--text-muted); }
+        .log-msg { color: var(--text-main); }
+        .log-type-info { color: var(--accent); }
+        .log-type-success { color: var(--success); }
+        .log-type-error { color: var(--danger); }
+
+        /* Buttons */
+        .btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { background: var(--border); cursor: not-allowed; }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-main); }
+        .btn-secondary:hover { border-color: var(--text-muted); }
+
+        /* Syntax Highlighting Sim */
+        .highlight-keyword { color: #ff7b72; }
+        .highlight-string { color: #a5d6ff; }
+        .highlight-asset { color: #79c0ff; }
+        .highlight-comment { color: #8b949e; font-style: italic; }
+
+        /* Toast */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .toast {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            padding: 15px 20px;
+            margin-top: 10px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+                overflow-y: auto;
+            }
+            .panel { height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+            .editor-container { height: 400px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        X3-lang <span>War B-52</span>
+    </div>
+    <div style="display: flex; gap: 15px; align-items: center;">
+        <div class="status-pill" id="system-status">SYSTEM READY</div>
+        <button class="btn btn-secondary" onclick="loadExample()">Load Example</button>
+        <button class="btn" id="compile-btn" onclick="runSimulation()">Compile & Execute</button>
+    </div>
+</header>
+
+<main>
+    <!-- Left Panel: Editor -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>Intent Editor (.x3)</span>
+            <span style="font-size: 0.7rem; opacity: 0.7;">AI-Assisted</span>
+        </div>
+        <div class="editor-container">
+            <textarea id="code-editor" spellcheck="false" placeholder="Define your cross-VM intent here..."></textarea>
+        </div>
+    </div>
+
+    <!-- Center Panel: Visualization -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>Execution Lifecycle</span>
+            <span id="intent-hash" style="font-family: var(--font-mono); font-size: 0.7rem;">Hash: N/A</span>
+        </div>
+        <div class="viz-container">
+            
+            <!-- State Machine Visualization -->
+            <div class="card">
+                <h3>Atomic State Machine</h3>
+                <div class="flow-diagram">
+                    <div class="flow-node" id="node-created">CREATED</div>
+                    <div class="flow-line" id="line-1"></div>
+                    <div class="flow-node" id="node-locked">LOCKED</div>
+                    <div class="flow-line" id="line-2"></div>
+                    <div class="flow-node" id="node-filled">FILLED</div>
+                    <div class="flow-line" id="line-3"></div>
+                    <div class="flow-node" id="node-claimed">CLAIMED</div>
+                </div>
+                <div style="text-align: center; margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);">
+                    Current State: <span id="current-state-text" style="color: var(--accent); font-weight: bold;">IDLE</span>
+                </div>
+            </div>
+
+            <!-- Proof Ledger & Route -->
+            <div class="card">
+                <h3>Route & Proof Ledger</h3>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9rem;">
+                    <div>
+                        <span style="color: var(--text-muted);">Source:</span> <span id="route-source">-</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--text-muted);">Dest:</span> <span id="route-dest">-</span>
+                    </div>
+                </div>
+                <div style="background: var(--bg-input); padding: 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.8rem; height: 100px; overflow-y: auto;" id="proof-ledger">
+                    <div style="color: var(--text-muted);">// Waiting for compilation...</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Right Panel: Scoreboard & Logs -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>System Scoreboard</span>
+        </div>
+        <div class="panel-content">
+            <div class="scoreboard-grid">
+                <div class="score-item">
+                    <span class="score-label">Route Safety</span>
+                    <span class="score-value good" id="score-safety">--</span>
+                </div>
+                <div class="score-item">
+                    <span class="score-label">RPC Quorum</span>
+                    <span class="score-value good" id="score-rpc">--</span>
+                </div>
+                <div class="score-item">
+                    <span class="score-label">Solver Rep</span>
+                    <span class="score-value good" id="score-solver">--</span>
+                </div>
+                <div class="score-item">
+                    <span class="score-label">Refund Safety</span>
+                    <span class="score-value good" id="score-refund">--</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h3 style="font-size: 0.9rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 10px;">Execution Logs</h3>
+                <div id="log-container">
+                    <!-- Logs go here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div id="toast-container"></div>
+
+<script>
+    // --- State Management ---
+    const state = {
+        isRunning: false,
+        currentStep: 0,
+        logs: [],
+        intentData: null
+    };
+
+    // --- DOM Elements ---
+    const editor = document.getElementById('code-editor');
+    const logContainer = document.getElementById('log-container');
+    const proofLedger = document.getElementById('proof-ledger');
+    const intentHashDisplay = document.getElementById('intent-hash');
+    const statusPill = document.getElementById('system-status');
+
+    // --- Example Code ---
+    const exampleCode = `intent cross_vm_swap {
+  // Define Assets
+  from arbitrum.USDC amount 500
+  to solana.SOL receiver user.wallet
+
+  // Route Configuration
+  route safest {
+    weight safety 50
+    weight price 25
+    weight speed 15
+    weight fee 10
+  }
+
+  // Safety Constraints
+  require slippage <= 0.5%
+  require route_score >= 90
+  require source_finality >= safe
+  require destination_finality >= confirmed
+  require refund_to == user.wallet
+
+  // Failure Handling
+  on timeout refund
+  on solver_fail refund_and_slash
+  on proof_conflict dispute
+
+  // Invariants
+  invariant no_double_claim
+  invariant no_double_refund
+}`;
+
+    // --- Initialization ---
+    function init() {
+        loadExample();
+        addLog("System initialized. X3 Compiler ready.", "info");
+    }
+
+    function loadExample() {
+        editor.value = exampleCode;
+        resetUI();
+        addLog("Example intent loaded.", "info");
+    }
+
+    function resetUI() {
+        state.isRunning = false;
+        state.currentStep = 0;
+        state.intentData = null;
+        
+        // Reset Flow
+        document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.flow-line').forEach(l => l.classList.remove('active'));
+        document.getElementById('current-state-text').innerText = "IDLE";
+        
+        // Reset Text
+        intentHashDisplay.innerText = "Hash: N/A";
+        document.getElementById('route-source').innerText = "-";
+        document.getElementById('route-dest').innerText = "-";
+        proofLedger.innerHTML = '<div style="color: var(--text-muted);">// Waiting for compilation...</div>';
+        
+        // Reset Scores
+        document.getElementById('score-safety').innerText = "--";
+        document.getElementById('score-rpc').innerText = "--";
+        document.getElementById('score-solver').innerText = "--";
+        document.getElementById('score-refund').innerText = "--";
+        
+        // Reset Logs
+        logContainer.innerHTML = '';
+        
+        statusPill.innerText = "SYSTEM READY";
+        statusPill.style.color = "var(--accent)";
+        statusPill.style.borderColor = "var(--accent)";
+        statusPill.style.background = "var(--accent-dim)";
+    }
+
+    // --- Core Logic ---
+
+    async function runSimulation() {
+        if (state.isRunning) return;
+        state.isRunning = true;
+        document.getElementById('compile-btn').disabled = true;
+        statusPill.innerText = "COMPILING...";
+        
+        try {
+            // 1. Parse & Compile
+            await wait(800);
+            const parsed = parseIntent(editor.value);
+            if (!parsed.valid) throw new Error("Compilation failed: Missing refund policy or invalid syntax.");
+            
+            addLog("Compilation successful. X3IR generated.", "success");
+            intentHashDisplay.innerText = `Hash: ${parsed.hash}`;
+            proofLedger.innerHTML = `<div style="color: var(--success);">> Intent Hash: ${parsed.hash}</div>`;
+            
+            // 2. Route Planning & Scoring
+            statusPill.innerText = "PLANNING ROUTE";
+            await wait(1000);
+            addLog("Route Engine: Analyzing 4 paths...", "info");
+            
+            const route = selectRoute(parsed);
+            updateScoreboard(route);
+            
+            document.getElementById('route-source').innerText = parsed.sourceChain;
+            document.getElementById('route-dest').innerText = parsed.destChain;
+            addLog(`Route selected: ${parsed.sourceChain} -> ${parsed.destChain} via ${route.bridge}`, "success");
+
+            // 3. Execution Flow
+            statusPill.innerText = "EXECUTING";
+            
+            // Step: Created
+            activateNode('node-created');
+            addLog("State transition: CREATED", "info");
+            await wait(1000);
+
+            // Step: Source Locked
+            activateNode('node-locked');
+            activateLine('line-1');
+            addLog(`Source Lock: 500 USDC locked on ${parsed.sourceChain}`, "info");
+            await wait(1500);
+            
+            // RPC Quorum Check
+            addLog("RPC Quorum: 3/5 nodes confirmed finality", "info");
+            await wait(500);
+
+            // Step: Dest Filled
+            activateNode('node-filled');
+            activateLine('line-2');
+            addLog(`Dest Fill: SOL acquired on ${parsed.destChain}`, "info");
+            addProof(`fill_proof: tx_sig_${Math.random().toString(36).substr(2, 9)}`);
+            await wait(1500);
+
+            // Step: Claimed
+            activateNode('node-claimed');
+            activateLine('line-3');
+            addLog("Claim: User funds released.", "success");
+            addProof(`claim_proof: verified`);
+            
+            statusPill.innerText = "COMPLETED";
+            statusPill.style.color = "var(--success)";
+            statusPill.style.borderColor = "var(--success)";
+            statusPill.style.background = "rgba(35, 134, 54, 0.15)";
+            
+            showToast("Intent Executed Successfully", "success");
+            addLog("Execution lifecycle complete.", "success");
+
+        } catch (error) {
+            statusPill.innerText = "FAILED";
+            statusPill.style.color = "var(--danger)";
+            statusPill.style.borderColor = "var(--danger)";
+            statusPill.style.background = "rgba(218, 54, 51, 0.15)";
+            addLog(error.message, "error");
+            showToast(error.message, "error");
+        } finally {
+            state.isRunning = false;
+            document.getElementById('compile-btn').disabled = false;
+        }
+    }
+
+    // --- Helpers ---
+
+    function parseIntent(code) {
+        // Mock parser logic
+        const hasRefund = code.includes('refund');
+        const hasSource = code.includes('from');
+        const hasDest = code.includes('to');
+        
+        if (!hasRefund || !hasSource || !hasDest) return { valid: false };
+
+        // Extract mock data
+        const sourceMatch = code.match(/from\s+(\w+)\.(\w+)/);
+        const destMatch = code.match(/to\s+(\w+)\.(\w+)/);
+
+        return {
+            valid: true,
+            hash: '0x' + Math.random().toString(16).substr(2, 40),
+            sourceChain: sourceMatch ? sourceMatch[1] : 'Unknown',
+            destChain: destMatch ? destMatch[1] : 'Unknown'
+        };
+    }
+
+    function selectRoute(parsed) {
+        // Mock route engine
+        return {
+            bridge: "Synapse + Wormhole",
+            safety: 98,
+            rpc: "5/5",
+            solver: "99.2",
+            refund: "100"
+        };
+    }
+
+    function updateScoreboard(route) {
+        document.getElementById('score-safety').innerText = route.safety;
+        document.getElementById('score-rpc').innerText = route.rpc;
+        document.getElementById('score-solver').innerText = route.solver + "%";
+        document.getElementById('score-refund').innerText = route.refund + "%";
+    }
+
+    function activateNode(id) {
+        document.querySelectorAll('.flow-node').forEach(n => n.classList.remove('active'));
+        const node = document.getElementById(id);
+        node.classList.add('active');
+        document.getElementById('current-state-text').innerText = id.replace('node-', '').toUpperCase();
+    }
+
+    function activateLine(id) {
+        document.getElementById(id).classList.add('active');
+    }
+
+    function addLog(msg, type = "info") {
+        const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        div.innerHTML = `
+            <span class="log-time">[${time}]</span>
+            <span class="log-msg log-type-${type}">${msg}</span>
+        `;
+        logContainer.appendChild(div);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function addProof(text) {
+        const div = document.createElement('div');
+        div.style.color = "var(--text-muted)";
+        div.style.marginTop = "5px";
+        div.innerText = `> ${text}`;
+        proofLedger.appendChild(div);
+        proofLedger.scrollTop = proofLedger.scrollHeight;
+    }
+
+    function showToast(message, type) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.borderLeftColor = type === 'success' ? 'var(--success)' : 'var(--danger)';
+        
+        let icon = type === 'success' 
+            ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+            : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+
+        toast.innerHTML = `${icon} <span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Run Init
+    init();
+
+</script>
+</body>
+</html>

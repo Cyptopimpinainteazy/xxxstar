@@ -64,6 +64,7 @@ pub mod substrate_htlc;
 pub mod svm_htlc;
 pub mod timeout;
 pub mod ton_htlc;
+pub mod wasm_l1_htlc;
 pub mod x3vm_htlc;
 pub mod zkvm_htlc;
 
@@ -75,7 +76,7 @@ pub use ethereum_tx::Transaction;
 
 pub use adapter::{
     AdapterReadinessScore, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof, LockProof,
-    RefundProof, VmType, X3VmAdapter,
+    RefundProof, VmFamily, VmType, X3VmAdapter,
 };
 pub use adapter_ledger::{
     claim_proof_to_entry, lock_proof_to_entry, refund_proof_to_entry, AdapterLedgerBridge,
@@ -142,5 +143,8 @@ pub use svm_htlc::{
 };
 pub use timeout::{TimeoutCheckResult, TimeoutEngine};
 pub use ton_htlc::{StatefulTonAdapter, TonContract, TonHtlcAdapter, TonLockData, TonNetwork};
+pub use wasm_l1_htlc::{
+    StatefulWasmL1Adapter, WasmL1Adapter, WasmL1Contract, WasmL1LockState, WasmL1Runtime,
+};
 pub use x3vm_htlc::{StatefulX3VmAdapter, X3VmAdapterImpl};
 pub use zkvm_htlc::{ZkProofRecord, ZkProofType, ZkVmAdapter, ZkVmTarget};

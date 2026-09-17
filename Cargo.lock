@@ -22511,6 +22511,8 @@ dependencies = [
  "once_cell",
  "rustls 0.23.40",
  "rustls-pki-types",
+ "serde",
+ "serde_json",
  "url 2.5.8",
  "webpki-roots 0.26.11",
 ]
@@ -24225,6 +24227,7 @@ dependencies = [
  "parity-scale-codec",
  "reqwest 0.12.28",
  "sc-client-api",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
  "sp-api",
@@ -24233,6 +24236,7 @@ dependencies = [
  "sp-io 44.0.0",
  "sp-runtime 45.0.0",
  "thiserror 1.0.69",
+ "toml 0.8.23",
  "x3-cross-vm-bridge",
  "x3-vm",
 ]
@@ -24243,6 +24247,23 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "x3-chain-health-daemon"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "env_logger 0.10.2",
+ "hex",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tokio",
+ "ureq",
+ "x3-atomic-swap",
 ]
 
 [[package]]

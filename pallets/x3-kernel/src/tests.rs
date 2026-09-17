@@ -2801,7 +2801,7 @@ fn test_add_authority_requires_governance() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.2b: Verify authority addition
 
-        let new_authority = CHARLIE;
+        let new_authority = 4; // Not in initial authority set
 
         // Root CAN add authority
         assert_ok!(AtlasKernel::add_authority(
@@ -2826,7 +2826,7 @@ fn test_authority_cannot_be_duplicated() {
     new_test_ext().execute_with(|| {
         // Phase 0.3.2c: Verify duplicate authority check
 
-        let new_authority = CHARLIE;
+        let new_authority = 5; // Not in initial authority set
 
         // Add authority first time
         assert_ok!(AtlasKernel::add_authority(

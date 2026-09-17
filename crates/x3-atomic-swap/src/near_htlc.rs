@@ -334,6 +334,7 @@ impl X3VmAdapter for NearHtlcAdapter {
             tests_implemented: true,
             proof_ledger_integration: false, // needs proof ledger integration
             ibc_support: false,
+            cross_adapter_atomicity_test: false,
         }
     }
 }
@@ -891,7 +892,7 @@ mod tests {
         assert!(missing.contains(&"rpc_indexer_support"));
         assert!(missing.contains(&"proof_ledger_integration"));
         assert!(missing.contains(&"ibc_support"));
-        assert_eq!(missing.len(), 4);
+        assert_eq!(missing.len(), 5);
     }
 
     // ── Stateful Adapter Tests ────────────────────────────────────────────

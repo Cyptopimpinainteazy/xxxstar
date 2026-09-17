@@ -460,6 +460,7 @@ impl X3VmAdapter for CosmWasmAdapter {
             tests_implemented: true,
             proof_ledger_integration: true,
             ibc_support: self.ibc_supported,
+            cross_adapter_atomicity_test: self.ibc_supported,
         }
     }
 }
@@ -1068,7 +1069,7 @@ mod tests {
         assert!(missing.contains(&"event_proof_extraction"));
         assert!(missing.contains(&"rpc_indexer_support"));
         assert!(missing.contains(&"ibc_support"));
-        assert_eq!(missing.len(), 3);
+        assert_eq!(missing.len(), 4);
     }
 
     // ── Stateful Adapter Tests ────────────────────────────────────────────
@@ -1555,7 +1556,8 @@ mod tests {
 
         let score = adapter.readiness_score();
         assert!(score.ibc_support);
-        assert_eq!(score.score(), 90);
+        // With IBC enabled, cross_adapter_atomicity_test is also true → 10 items × 10 = 100
+        assert_eq!(score.score(), 100);
     }
 
     #[test]
@@ -1563,6 +1565,7 @@ mod tests {
         let adapter = CosmWasmAdapter::new("cosmos-hub".into());
         let score = adapter.readiness_score();
         assert!(!score.ibc_support);
+        // Without IBC, cross_adapter_atomicity_test is also false → 8 items × 10 = 80
         assert_eq!(score.score(), 80);
     }
 }

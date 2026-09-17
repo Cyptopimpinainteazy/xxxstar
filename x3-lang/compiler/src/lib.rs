@@ -1,9 +1,12 @@
 pub mod emitter;
+pub mod formatter;
 pub mod intent_emit;
 pub mod ir;
+pub mod linter;
 pub mod lowering;
 pub mod parser;
 pub mod regalloc;
+pub mod risk;
 pub mod semantic;
 pub mod spec {
     pub mod opcodes {
@@ -14,12 +17,16 @@ pub mod spec {
 use emitter::emit_x3ir;
 use lowering::{lower_program, LowerCtx};
 use parser::parse_source;
-use semantic::{verify_atomic_swap_decls, verify_with_defaults as verify_semantics};
+use semantic::verify_atomic_swap_decls;
+use semantic::verify_with_config as verify_semantics;
 use x3_lang_ast::ast::Program;
-use x3_lang_common::{ErrorAccumulator, X3Error};
+use x3_lang_common::{ErrorAccumulator, Span, X3Error};
 
 // Re-export IR types
 pub use ir::{Condition, FailureAction, Operation, ProgramMetadata, RequireKind, X3IR};
+
+// Re-export semantic types
+pub use semantic::{CompilationMode, InvariantRule, RiskScore};
 
 /// Compile an X3 AST program to bytecode
 ///
@@ -51,7 +58,42 @@ pub fn check_source(source: &str) -> Result<(Program, crate::ir::X3IR, Vec<X3Err
     }
 
     let ir = compile_to_ir(&program)?;
-    match verify_semantics(&ir) {
+    match verify_semantics(&ir, 8, 4, None) {
+        Ok(()) => Ok((program, ir, Vec::new())),
+        Err(errs) => Ok((program, ir, errs)),
+    }
+}
+
+/// Compile with an explicit compilation mode for mode-gated safety checks.
+pub fn compile_with_mode(source: &str, mode: CompilationMode) -> Result<Vec<u8>, X3Error> {
+    let program = parse_source(source)?;
+    let ir = lower_program(&program, LowerCtx::new())?;
+    verify_semantics(&ir, 8, 4, Some(mode)).map_err(|errs| {
+        X3Error::SemanticError {
+            message: format!("compilation failed with {} semantic error(s)", errs.len()),
+            span: Span::DUMMY,
+        }
+    })?;
+    emit_x3ir(&ir)
+}
+
+/// Check source with an explicit compilation mode. Returns the program, IR,
+/// and list of semantic errors. When mode is Mainnet, mainnet-specific safety
+/// checks are also run.
+pub fn check_source_with_mode(
+    source: &str,
+    mode: CompilationMode,
+) -> Result<(Program, crate::ir::X3IR, Vec<X3Error>), X3Error> {
+    let program = parse_source(source)?;
+
+    let mut ast_errors = ErrorAccumulator::new();
+    verify_atomic_swap_decls(&program, &mut ast_errors);
+    if ast_errors.has_errors() {
+        return Ok((program, crate::ir::X3IR::new(), ast_errors.take_errors()));
+    }
+
+    let ir = compile_to_ir(&program)?;
+    match verify_semantics(&ir, 8, 4, Some(mode)) {
         Ok(()) => Ok((program, ir, Vec::new())),
         Err(errs) => Ok((program, ir, errs)),
     }
@@ -59,7 +101,7 @@ pub fn check_source(source: &str) -> Result<(Program, crate::ir::X3IR, Vec<X3Err
 
 /// Run the semantic verifier against an X3IR program.
 pub fn check_ir(ir: &crate::ir::X3IR) -> Result<(), Vec<X3Error>> {
-    verify_semantics(ir)
+    verify_semantics(ir, semantic::DEFAULT_MAX_ATOMIC_OPS, semantic::DEFAULT_MAX_ROUTE_HOPS, None)
 }
 
 /// Compile with explicit lowering context (for replay protection, chain_id, etc.)

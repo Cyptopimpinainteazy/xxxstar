@@ -2101,7 +2101,9 @@ fn wallet_daily_volume_limit_exceeded_rejected() {
     new_test_ext().execute_with(|| {
         let asset_id = bootstrap_x3_asset(10_000);
         let mut cfg = permissive_route();
-        // Set a low per-wallet daily limit.
+        // Set a low per-wallet daily limit and matching max_amount so the
+        // asset-registry guard `per_wallet_daily_limit >= max_amount` passes.
+        cfg.limits.max_amount = 120;
         cfg.limits.per_wallet_daily_limit = 120;
         assert_ok!(Registry::configure_route(
             RuntimeOrigin::root(),

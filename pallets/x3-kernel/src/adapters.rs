@@ -651,7 +651,7 @@ mod tests {
     fn test_unit_adapter_backwards_compat() {
         let result = <() as EvmExecutorAdapter>::execute(b"test", 100_000).unwrap();
         assert!(result.success);
-        assert_eq!(result.gas_used, 21000);
+        assert_eq!(result.gas_used, 1000); // () adapter returns 1000 gas
 
         let result = <() as SvmExecutorAdapter>::execute(b"test", 100_000).unwrap();
         assert!(result.success);

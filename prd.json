@@ -1,0 +1,1861 @@
+# Product Requirements Document
+
+# X3-lang: Cross-VM AI-Assisted Intent, Contract Linker, and Proof Execution Framework
+
+## 1. Product Name
+
+**X3-lang**
+
+## 2. Internal Codename
+
+**X3 War B-52**
+
+## 3. Product Summary
+
+X3-lang is a cross-VM developer tooling framework that lets developers define, validate, route, prove, and safely execute smart contract actions across multiple blockchain virtual machines using `.x3` intent files.
+
+X3-lang does **not** replace existing smart contract languages such as Solidity, Rust/Anchor, Move, CosmWasm, Cairo, or Substrate pallets. Instead, X3-lang connects to existing smart contracts, programs, modules, ABIs, IDLs, schemas, and metadata through a universal contract-linking and execution model.
+
+The system combines:
+
+```text
+.x3 language
+AI intent assistant
+universal contract linker
+cross-VM adapters
+intent routing
+solver marketplace
+relayer swarm
+RPC quorum
+finality oracle
+timeout/refund engine
+proof ledger
+scoreboard
+slashing/dispute engine
+mainnet release gate
+```
+
+The core promise:
+
+```text
+AI drafts.
+X3 verifies.
+User signs.
+VM adapters execute.
+Proof ledger records.
+Refund engine protects.
+Bad actors get slashed.
+```
+
+---
+
+## 4. Problem Statement
+
+Cross-chain and cross-VM development is fragmented, dangerous, and hard to audit.
+
+Developers currently need to understand many incompatible execution environments:
+
+```text
+EVM calldata
+Solana instructions
+Move transaction blocks
+CosmWasm execute messages
+Substrate extrinsics
+Cairo calldata
+Bitcoin scripts
+TON messages
+```
+
+Existing bridges, aggregators, and message protocols solve parts of the problem, but most do not provide one unified framework for:
+
+```text
+intent definition
+smart contract linking
+cross-VM route planning
+finality requirements
+RPC quorum verification
+refund-safe execution
+proof-ledger records
+solver/relayer accountability
+AI-assisted development
+```
+
+This creates high risk for users and builders:
+
+* Funds can get stuck.
+* Routes can be opaque.
+* RPCs can lie or lag.
+* Bridges can fail.
+* Solvers can misbehave.
+* Finality assumptions are often unclear.
+* AI agents may suggest unsafe actions.
+* Developers must manually glue together many chains and protocols.
+
+X3-lang solves this by making cross-VM execution **typed, scored, provable, refundable, and auditable**.
+
+---
+
+## 5. Product Vision
+
+X3-lang becomes the standard developer tooling layer for safe cross-VM intent execution.
+
+A developer should be able to write:
+
+```x3
+intent cross_vm_swap {
+  from arbitrum.USDC amount 500
+  to solana.SOL receiver user.wallet
+
+  route safest
+  require slippage <= 0.5%
+  require route_score >= 90
+  require source_finality >= safe
+  require destination_finality >= confirmed
+  require refund_to == user.wallet
+
+  on timeout refund
+  on solver_fail refund_and_slash
+}
+```
+
+Then X3 should:
+
+1. Parse the `.x3` file.
+2. Compile it into deterministic `X3IR`.
+3. Validate all safety rules.
+4. Link required contracts/programs/modules.
+5. Score possible routes.
+6. Select a valid route.
+7. Require proofs before state transitions.
+8. Execute through VM adapters.
+9. Record everything in the proof ledger.
+10. Refund safely if execution fails.
+11. Slash bad solvers or relayers if fraud occurs.
+12. Explain the full lifecycle through a public scoreboard.
+
+---
+
+## 6. Goals
+
+### 6.1 Primary Goals
+
+* Create a `.x3` language for cross-VM intent execution.
+* Connect existing smart contracts, programs, and modules through a universal contract linker.
+* Support AI-assisted intent creation, contract connector generation, route analysis, risk scoring, test generation, and proof auditing.
+* Build deterministic compiler checks that prevent unsafe execution.
+* Support cross-VM adapters for EVM and SVM first.
+* Add support for MoveVM, CosmWasm, Substrate/WASM, CairoVM, Bitcoin Script, and TVM later.
+* Require explicit proof, finality, refund, and failure rules for production execution.
+* Build a proof ledger that records every important state transition.
+* Build a scoreboard that reflects real system health, not documentation claims.
+* Create a mainnet release gate that blocks fake, mock, stub, or unsafe production code.
+
+### 6.2 Grant-Friendly Goals
+
+X3-lang qualifies as:
+
+```text
+developer tooling
+cross-chain infrastructure
+interoperability tooling
+AI-assisted blockchain tooling
+security tooling
+intent infrastructure
+smart contract orchestration middleware
+cross-VM abstraction layer
+```
+
+The strongest grant positioning:
+
+> X3-lang is a cross-VM developer tooling framework for composing, validating, routing, proving, and safely executing smart contract actions across heterogeneous blockchain virtual machines.
+
+---
+
+## 7. Non-Goals
+
+X3-lang v1 will **not** be a full smart contract language.
+
+It will not attempt to replace:
+
+```text
+Solidity
+Vyper
+Rust/Anchor
+Move
+CosmWasm Rust
+Cairo
+Substrate pallets
+ink!
+TON Tact/FunC
+```
+
+X3-lang v1 will not deploy arbitrary new smart contracts as its primary feature.
+
+Instead, v1 focuses on:
+
+```text
+connecting existing contracts
+orchestrating contract calls
+validating safety policies
+compiling cross-VM execution plans
+proving execution results
+protecting users with refunds and failure handling
+```
+
+Smart contract authoring may be considered in a later version, but it is not part of the first production milestone.
+
+---
+
+## 8. Target Users
+
+### 8.1 Blockchain Developers
+
+Developers who want to compose smart contract actions across chains without manually writing custom logic for every VM.
+
+### 8.2 Protocol Teams
+
+Teams that want safer cross-chain execution, stronger proof records, better route scoring, and refund-safe user flows.
+
+### 8.3 Solvers
+
+Actors who compete to fill user intents and earn fees.
+
+### 8.4 Relayers
+
+Actors who submit proofs, monitor events, and help advance intent states.
+
+### 8.5 Auditors
+
+Security reviewers who need a clear lifecycle of every cross-VM action.
+
+### 8.6 Grant Programs
+
+Ecosystems funding tooling, interoperability, AI, public goods, or security infrastructure.
+
+### 8.7 AI Agents
+
+AI systems that can draft, analyze, test, or explain `.x3` missions but cannot bypass deterministic safety checks.
+
+---
+
+## 9. Core Product Components
+
+## 9.1 `.x3` Language
+
+The `.x3` language is the main developer interface.
+
+It must support:
+
+```text
+intent declarations
+asset references
+chain references
+VM references
+contract/program/module declarations
+typed calls
+route policies
+risk policies
+proof requirements
+finality requirements
+refund policies
+timeout rules
+solver policies
+relayer quorum
+RPC quorum
+invariants
+error handling
+test declarations
+```
+
+Example:
+
+```x3
+intent deep_cross_vm_swap {
+  from arbitrum.USDC amount 500
+  to solana.SOL receiver user.wallet
+
+  route best_score {
+    weight safety 50
+    weight price 25
+    weight speed 15
+    weight fee 10
+  }
+
+  require slippage <= 0.5%
+  require route_score >= 90
+  require source_finality >= safe
+  require destination_finality >= confirmed
+  require refund_to == user.wallet
+
+  on timeout refund
+  on solver_fail refund_and_slash
+  on proof_conflict dispute
+
+  invariant no_double_claim
+  invariant no_double_refund
+  invariant no_claim_after_refund
+  invariant no_refund_after_claim
+}
+```
+
+---
+
+## 9.2 X3 Compiler
+
+The compiler converts `.x3` files into deterministic execution plans.
+
+Compiler pipeline:
+
+```text
+.x3 source
+  ↓
+lexer
+  ↓
+parser
+  ↓
+AST
+  ↓
+static analyzer
+  ↓
+X3IR
+  ↓
+route plan
+  ↓
+VM-specific execution plans
+```
+
+The compiler must produce:
+
+```text
+intent_hash
+route_hash
+X3IR
+VM call plans
+proof requirements
+refund rules
+risk score
+test plan
+mainnet safety report
+```
+
+Mainnet mode must reject:
+
+```text
+missing refund path
+missing proof requirements
+missing finality policy
+single RPC trust
+single relayer trust
+mock adapters
+stub execution
+unknown assets
+unsafe slippage
+unbounded deadline
+unverified contract calls
+unlimited token approvals
+manual-only recovery
+```
+
+---
+
+## 9.3 X3IR
+
+`X3IR` is the internal representation of every compiled `.x3` file.
+
+It must include:
+
+```text
+intent_hash
+route_hash
+source asset
+destination asset
+amount
+receiver
+chains
+VMs
+contracts/programs/modules
+typed calls
+constraints
+proof requirements
+finality requirements
+timeouts
+refund rules
+solver rules
+relayer rules
+RPC quorum rules
+risk policy
+state machine transitions
+invariants
+post-conditions
+```
+
+`X3IR` must be deterministic. The same `.x3` file must always produce the same canonical intent hash.
+
+---
+
+## 9.4 Universal Contract Linker
+
+The Contract Linker connects X3-lang to existing smart contracts, programs, modules, and schemas.
+
+Supported connector types:
+
+```text
+EVM ABI
+Solana IDL
+Move module ABI
+CosmWasm schema
+Substrate metadata
+Cairo ABI
+Bitcoin script template
+TON ABI
+```
+
+Example EVM contract declaration:
+
+```x3
+contract uniswap_v3 on arbitrum {
+  vm evm
+  address 0xE592427A0AEce92De3Edee1F18E0157C05861564
+  abi "@x3/abis/uniswap_v3_swap_router"
+}
+```
+
+Example Solana program declaration:
+
+```x3
+program jupiter on solana {
+  vm svm
+  id JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+  idl "@x3/idls/jupiter"
+}
+```
+
+Example Move module declaration:
+
+```x3
+module cetus_swap on sui {
+  vm move
+  package 0x...
+  module router
+  abi "@x3/move/cetus"
+}
+```
+
+The linker must validate:
+
+```text
+method exists
+argument names are valid
+argument types match
+asset chain matches contract chain
+approval is bounded
+target address/program/module is known
+risk profile exists
+receipt decoder exists
+failure path exists
+proof requirements exist
+```
+
+---
+
+## 9.5 Typed Call Blocks
+
+X3-lang must support typed calls into linked contracts.
+
+Example:
+
+```x3
+call uniswap_v3.exactInputSingle {
+  tokenIn arbitrum.USDC
+  tokenOut arbitrum.WETH
+  fee 500
+  recipient x3.executor
+  amountIn 500
+  amountOutMinimum auto
+}
+```
+
+Each call compiles to an internal object:
+
+```text
+X3ContractCall {
+  vm_type
+  chain_id
+  target
+  method
+  encoded_args
+  value
+  gas_budget
+  proof_required
+  rollback_policy
+}
+```
+
+VM adapters then convert `X3ContractCall` into native execution:
+
+```text
+EVM calldata
+SVM instruction set
+Move transaction block
+CosmWasm execute msg
+Substrate extrinsic
+Cairo calldata
+Bitcoin script
+TON message
+```
+
+---
+
+## 9.6 Post-Conditions
+
+Every production call must support post-condition checks.
+
+Example:
+
+```x3
+after call {
+  require balance(user, solana.SOL) >= quoted_min
+  require spent(arbitrum.USDC) <= 500
+  require no_unapproved_spender
+  prove receipt
+  prove event
+}
+```
+
+Post-conditions protect users from unexpected execution results.
+
+Required post-condition types:
+
+```text
+balance check
+spent amount check
+received amount check
+slippage check
+event check
+receipt check
+spender check
+approval check
+state transition check
+```
+
+---
+
+## 9.7 Approval Policy
+
+X3-lang must prevent unsafe token approval behavior.
+
+Example:
+
+```x3
+approval_policy strict {
+  approve_exact_amount true
+  revoke_after true
+  deny_unlimited_approval true
+  spender_must_equal contract.address
+}
+```
+
+Mainnet mode must reject unlimited approvals unless explicitly allowed by a dangerous override flag.
+
+---
+
+## 9.8 AI Copilot
+
+AI is integrated as a development and security assistant.
+
+AI may:
+
+```text
+convert plain English into .x3 drafts
+generate contract connector files from ABI/IDL/schema
+suggest route policies
+explain route risks
+generate tests
+generate fuzz cases
+audit proof ledger records
+explain scoreboard results
+summarize grant progress
+```
+
+AI must not:
+
+```text
+bypass wallet signatures
+bypass compiler safety checks
+bypass route constraints
+bypass proof requirements
+bypass refund rules
+bypass finality rules
+bypass mainnet release gates
+move funds without user authorization
+```
+
+AI execution rule:
+
+```text
+AI drafts.
+X3 verifies.
+User signs.
+Execution engine acts.
+Proof ledger records.
+```
+
+---
+
+## 9.9 AI Agents
+
+Required AI agents:
+
+| Agent            | Purpose                                                               |
+| ---------------- | --------------------------------------------------------------------- |
+| Intent Agent     | Converts user requests into `.x3` files                               |
+| Contract Agent   | Generates X3 connectors from ABIs, IDLs, schemas, and modules         |
+| Route Agent      | Compares possible execution routes                                    |
+| Risk Agent       | Detects risky chains, bridges, solvers, relayers, contracts, and RPCs |
+| Proof Agent      | Audits proof ledger records                                           |
+| Test Agent       | Generates unit, property, fuzz, and chaos tests                       |
+| Refund Agent     | Finds stuck intents and prepares refund flows                         |
+| Scoreboard Agent | Explains health scores and failures                                   |
+| Grant Agent      | Converts product progress into grant updates                          |
+| Security Agent   | Searches for stubs, mocks, fake code, and unsafe execution paths      |
+
+---
+
+## 9.10 Cross-VM Adapter System
+
+Each VM adapter must expose the same high-level behavior.
+
+Required adapter interface:
+
+```rust
+trait X3VmAdapter {
+    fn build_lock_tx();
+    fn verify_lock();
+    fn build_claim_tx();
+    fn verify_claim();
+    fn build_refund_tx();
+    fn verify_refund();
+    fn build_contract_call();
+    fn decode_receipt();
+    fn verify_finality();
+    fn estimate_fees();
+    fn estimate_risk();
+}
+```
+
+Priority VM support:
+
+| Priority | VM             | Chains                                                      |
+| -------: | -------------- | ----------------------------------------------------------- |
+|        1 | EVM            | Ethereum, Base, Arbitrum, Optimism, Polygon, BNB, Avalanche |
+|        2 | SVM            | Solana, Eclipse-style SVM chains                            |
+|        3 | MoveVM         | Sui, Aptos                                                  |
+|        4 | CosmWasm       | Cosmos appchains, Osmosis-style chains                      |
+|        5 | Substrate/WASM | Polkadot, Kusama, parachains                                |
+|        6 | CairoVM        | Starknet                                                    |
+|        7 | Bitcoin Script | BTC HTLC/native swap paths                                  |
+|        8 | TVM / TON      | TON ecosystem                                               |
+
+---
+
+## 9.11 Atomic State Machine
+
+Every intent must follow a deterministic state machine.
+
+Required states:
+
+```text
+CREATED
+COMPILED
+VALIDATED
+QUOTED
+ROUTE_SELECTED
+SOURCE_LOCKED
+SOURCE_FINALIZED
+DESTINATION_FILLED
+DESTINATION_FINALIZED
+SOURCE_CLAIMED
+COMPLETED
+REFUND_REQUESTED
+REFUNDED
+FAILED
+DISPUTED
+SLASHED
+```
+
+Required guarantees:
+
+```text
+No double claim.
+No double refund.
+No claim after refund.
+No refund after claim.
+No route mutation after source lock.
+No destination fill without source lock.
+No source claim without destination fill proof.
+No state transition without required proof.
+No lock without known refund path.
+```
+
+---
+
+## 9.12 HTLC Atomicity
+
+X3 must support HTLC-based atomic execution.
+
+Required HTLC features:
+
+```text
+hashlock generation
+preimage reveal
+source lock
+destination fill
+claim path
+refund path
+expiry validation
+replay protection
+double-claim prevention
+double-refund prevention
+secret reuse detection
+```
+
+Example:
+
+```x3
+atomic htlc {
+  hashlock sha256(preimage)
+  source_timeout 30m
+  destination_timeout 15m
+  refund_after source_timeout
+  reveal_preimage only_on_claim
+}
+```
+
+---
+
+## 9.13 Route Engine
+
+The route engine selects execution routes based on user constraints and risk policy.
+
+Required route modes:
+
+```text
+best_score
+cheapest
+fastest
+safest
+most_liquid
+private
+mev_protected
+manual
+split
+```
+
+Example:
+
+```x3
+route best_score {
+  weight safety 50
+  weight price 25
+  weight speed 15
+  weight fee 10
+}
+```
+
+The route engine must score:
+
+```text
+price
+fees
+speed
+liquidity
+bridge risk
+DEX risk
+VM risk
+chain health
+finality risk
+RPC health
+solver reputation
+relayer health
+refund safety
+MEV risk
+historical failure rate
+```
+
+---
+
+## 9.14 Solver Marketplace
+
+Solvers compete to fulfill user intents.
+
+Solver bid must include:
+
+```text
+solver ID
+route
+price
+fee
+deadline
+bond
+source asset
+destination asset
+expected output
+liquidity source
+finality estimate
+risk score
+signature
+```
+
+Required solver rules:
+
+```text
+solver registration
+solver bonding
+signed bids
+route commitment
+fill proof submission
+claim authorization
+solver reputation score
+slashing for failure
+slashing for fake fill
+slashing for route substitution
+```
+
+Example:
+
+```x3
+solver_market {
+  mode competitive
+  min_reputation 95
+  min_bond 10000 X3
+  max_fee 0.3%
+  require signed_bid
+  require route_commitment
+  slash_on failure
+  slash_on fake_fill
+}
+```
+
+---
+
+## 9.15 Relayer Swarm
+
+Relayers monitor chains and submit proofs.
+
+Required relayer features:
+
+```text
+relayer registration
+relayer bonding
+event watching
+proof submission
+multi-relayer quorum
+duplicate proof handling
+conflicting proof detection
+bad proof rejection
+relayer health scoring
+slashing for false proof
+backup relayers
+watchtower mode
+```
+
+Example:
+
+```x3
+relayers {
+  quorum 3_of_5
+  min_reputation 90
+  require independent_rpc true
+  slash_on false_proof
+  rotate every 100 intents
+}
+```
+
+---
+
+## 9.16 RPC Quorum
+
+X3 must never rely on a single RPC in production mode.
+
+Required checks:
+
+```text
+block hash agreement
+receipt agreement
+event agreement
+balance agreement
+slot/block height agreement
+finality agreement
+latency score
+error score
+fork detection
+auto-disable bad RPC
+```
+
+Example:
+
+```x3
+rpc_quorum {
+  source require 2_of_3
+  destination require 3_of_5
+  reject if receipt_disagree
+  reject if finality_disagree
+}
+```
+
+---
+
+## 9.17 Finality Oracle
+
+Every VM has different finality rules. X3 must make them explicit.
+
+Required finality support:
+
+```text
+EVM safe/finalized
+L2 challenge/finality model
+Solana processed/confirmed/finalized
+MoveVM checkpoint/certified finality
+Cosmos/Tendermint finality
+Substrate GRANDPA finality
+Bitcoin confirmation depth
+Cairo/Starknet finality
+TON finality model
+```
+
+Example:
+
+```x3
+finality_policy strict {
+  evm require finalized
+  svm require confirmed
+  bitcoin require confirmations >= 6
+  move require checkpoint_certified
+}
+```
+
+---
+
+## 9.18 Timeout and Refund Engine
+
+Refunds are a first-class feature.
+
+Required refund features:
+
+```text
+source timeout
+destination timeout
+solver timeout
+relayer timeout
+grace window
+auto-refund builder
+refund proof
+refund dashboard
+expiring-lock monitor
+third-party keeper refund
+refund gas policy
+partial refund
+full refund
+```
+
+Example:
+
+```x3
+refund_policy user_safe {
+  refund_to user.wallet
+  refund_after 30m
+  allow_third_party_refund true
+  refund_gas_payer solver
+}
+```
+
+Required guarantee:
+
+```text
+Every lock must have a known refund path before execution.
+```
+
+---
+
+## 9.19 Proof Ledger
+
+The proof ledger records every important event.
+
+Each proof ledger record must include:
+
+```text
+intent_hash
+route_hash
+state
+source chain
+destination chain
+source tx
+destination tx
+source lock proof
+destination fill proof
+finality proof
+claim proof
+refund proof
+solver signature
+relayer signatures
+RPC quorum evidence
+timestamp
+error code
+dispute/slashing record if applicable
+```
+
+Required proof types:
+
+```text
+lock_proof
+fill_proof
+claim_proof
+refund_proof
+finality_proof
+receipt_proof
+event_proof
+quorum_proof
+solver_signature
+relayer_signature
+route_commitment
+state_transition_proof
+```
+
+---
+
+## 9.20 Scoreboard
+
+The scoreboard must show real system status.
+
+Required scoreboard categories:
+
+| Category            | Score                             |
+| ------------------- | --------------------------------- |
+| VM adapter health   | pass/fail/partial                 |
+| Chain health        | live/degraded/halted              |
+| RPC quorum health   | strong/weak/broken                |
+| Solver reliability  | percentage                        |
+| Relayer reliability | percentage                        |
+| Route safety        | 0-100                             |
+| Refund safety       | 0-100                             |
+| Finality confidence | 0-100                             |
+| Test coverage       | percentage                        |
+| Stub/mock count     | must be zero for production paths |
+| Proof completeness  | percentage                        |
+| Mainnet readiness   | pass/fail                         |
+
+Every score must link to:
+
+```text
+tests
+proofs
+logs
+chain evidence
+adapter status
+CI results
+```
+
+No manual scoreboard inflation is allowed.
+
+---
+
+## 9.21 Slashing and Disputes
+
+X3 must hold solvers and relayers accountable.
+
+Slashable offenses:
+
+```text
+fake fill
+fake finality
+missed committed fill
+invalid proof
+withheld preimage
+late execution
+route substitution
+RPC manipulation
+double-submit fraud
+false relayer report
+```
+
+Required dispute flow:
+
+```text
+dispute opened
+evidence submitted
+proof ledger checked
+challenge window observed
+fault determined
+bond slashed or dispute rejected
+scoreboard updated
+```
+
+---
+
+## 9.22 Public Proof Explorer
+
+Users and auditors must be able to inspect any intent.
+
+The explorer must show:
+
+```text
+intent hash
+route hash
+current state
+source lock
+destination fill
+finality proof
+claim/refund status
+solver
+relayers
+RPC quorum
+risk score
+fees
+timeline
+error reason
+dispute/slashing record
+```
+
+Status labels must be explicit:
+
+```text
+CREATED
+IN_PROGRESS
+COMPLETED
+REFUNDED
+FAILED
+DISPUTED
+SLASHED
+```
+
+No indefinite vague “processing” status.
+
+---
+
+## 10. CLI Requirements
+
+The CLI is called `x3c`.
+
+Required commands:
+
+```bash
+x3c init
+x3c fmt
+x3c lint
+x3c build
+x3c plan
+x3c score
+x3c prove
+x3c test
+x3c fuzz
+x3c chaos
+x3c deploy
+x3c inspect
+x3c verify
+x3c refund
+x3c audit
+```
+
+Example commands:
+
+```bash
+x3c build swap.x3 --target evm,svm
+x3c plan swap.x3 --show-route
+x3c score swap.x3
+x3c prove --intent <hash>
+x3c refund --intent <hash>
+x3c audit swap.x3 --mainnet
+```
+
+---
+
+## 11. IDE Requirements
+
+X3-lang should support editor tooling.
+
+Required IDE features:
+
+```text
+.x3 syntax highlighting
+formatter
+linter
+compiler diagnostics
+route preview
+risk score preview
+proof requirement preview
+VM target preview
+autocomplete for chains/assets/contracts
+invariant warnings
+mainnet safety warnings
+```
+
+Example diagnostic:
+
+```text
+X3-MAINNET-004:
+Intent has no refund path for destination timeout.
+Mainnet compilation denied.
+```
+
+---
+
+## 12. Testing Requirements
+
+X3 must generate and run tests from `.x3` files.
+
+Required generated tests:
+
+```text
+happy path
+timeout path
+refund path
+bad solver path
+bad relayer path
+bad RPC path
+chain halt path
+reorg path
+slippage violation
+route mutation attempt
+double claim attempt
+double refund attempt
+stale proof attempt
+missing proof attempt
+```
+
+Required test commands:
+
+```bash
+x3c test intent.x3
+x3c fuzz intent.x3
+x3c invariants intent.x3
+x3c chaos intent.x3
+```
+
+Required test types:
+
+```text
+unit tests
+integration tests
+property tests
+fuzz tests
+chaos tests
+adapter tests
+local devnet tests
+testnet tests
+```
+
+---
+
+## 13. Mainnet Release Gate
+
+Nothing ships to mainnet unless the release gate passes.
+
+Required checks:
+
+```text
+unit tests pass
+integration tests pass
+property tests pass
+fuzz tests pass
+chaos tests pass
+adapter tests pass
+proof ledger tests pass
+refund drills pass
+no stubs in production paths
+no mocks in production paths
+no fake scoreboard updates
+no TODO critical paths
+no unsafe approvals
+no missing finality policy
+no missing refund path
+no missing proof requirement
+coverage threshold met
+security invariants pass
+external audit issues resolved
+```
+
+Release rule:
+
+```text
+Human claims do not count.
+Only machine-checkable evidence counts.
+```
+
+---
+
+## 14. MVP Scope
+
+## Phase 1: Core Language and Compiler
+
+Deliver:
+
+```text
+.x3 file extension
+lexer
+parser
+AST
+X3IR
+intent hash
+basic asset syntax
+basic chain syntax
+basic VM syntax
+intent declarations
+route constraints
+proof requirements
+refund rules
+finality rules
+invariants
+x3c CLI
+static analyzer
+mainnet mode restrictions
+```
+
+Acceptance criteria:
+
+```text
+A .x3 file compiles into deterministic X3IR.
+Unsafe .x3 files fail compilation.
+Intent hash is stable across repeated builds.
+Mainnet mode rejects missing proof/refund/finality requirements.
+```
+
+---
+
+## Phase 2: Contract Linker
+
+Deliver:
+
+```text
+EVM ABI connector
+SVM IDL connector
+contract block syntax
+program block syntax
+typed call blocks
+post-condition checks
+approval policy
+receipt decoder
+contract registry v1
+```
+
+Acceptance criteria:
+
+```text
+Developer can register an EVM contract by ABI.
+Developer can register a Solana program by IDL.
+Compiler validates method names and argument types.
+Compiler rejects unsupported or unsafe calls.
+```
+
+---
+
+## Phase 3: First Cross-VM Execution Pair
+
+Deliver:
+
+```text
+EVM adapter
+SVM adapter
+EVM local devnet
+Solana local validator
+HTLC lock/claim/refund v1
+proof ledger v1
+timeout/refund engine v1
+RPC quorum v1
+finality oracle v1
+scoreboard v1
+```
+
+Acceptance criteria:
+
+```text
+X3 can execute a testnet EVM ↔ SVM intent.
+Source lock is proven.
+Destination fill is proven.
+Claim is proven.
+Refund path works on timeout.
+Proof ledger reconstructs the full lifecycle.
+```
+
+---
+
+## Phase 4: AI Copilot
+
+Deliver:
+
+```text
+plain English to .x3 draft
+ABI/IDL to connector draft
+route explanation
+risk explanation
+test generation
+proof ledger explanation
+scoreboard explanation
+```
+
+Acceptance criteria:
+
+```text
+AI can draft .x3 files.
+Compiler catches AI mistakes.
+AI cannot bypass safety rules.
+AI-generated connectors require validation before use.
+```
+
+---
+
+## Phase 5: Solver and Relayer Infrastructure
+
+Deliver:
+
+```text
+solver registration
+solver bids
+solver bonds
+signed route commitments
+relayer registration
+relayer quorum
+relayer proof submission
+slashing v1
+dispute v1
+```
+
+Acceptance criteria:
+
+```text
+A solver can bid on an intent.
+A selected solver cannot change route after commitment.
+Relayers must meet quorum before proof is accepted.
+False proof can trigger dispute/slashing flow.
+```
+
+---
+
+## Phase 6: Public Testnet
+
+Deliver:
+
+```text
+public proof explorer
+public scoreboard
+incentivized solvers
+incentivized relayers
+refund drills
+chaos tests
+bug bounty
+grant reporting dashboard
+```
+
+Acceptance criteria:
+
+```text
+External users can submit testnet intents.
+External solvers can bid.
+External relayers can submit proofs.
+Failed routes refund safely.
+Proof explorer shows full lifecycle.
+```
+
+---
+
+## Phase 7: Mainnet Guarded Launch
+
+Deliver:
+
+```text
+limited chain support
+limited asset support
+strict liquidity caps
+audited EVM adapter
+audited SVM adapter
+audited refund engine
+audited proof ledger
+emergency pause
+public dashboard
+public risk scoring
+gradual cap increases
+```
+
+Acceptance criteria:
+
+```text
+Mainnet release gate passes.
+External audit issues are resolved.
+Initial caps are enforced.
+Emergency pause works.
+Refund path is proven.
+Proof explorer is live.
+```
+
+---
+
+## 15. P0, P1, P2 Feature Priorities
+
+## P0: Required Before Serious Testnet
+
+```text
+.x3 grammar
+parser
+AST
+X3IR
+intent hash
+asset syntax
+chain syntax
+VM syntax
+intent declarations
+contract/program declarations
+typed call blocks
+route constraints
+HTLC syntax
+timeout/refund syntax
+finality requirements
+proof requirements
+risk policy
+invariants
+EVM target
+SVM target
+x3c CLI
+static analyzer
+test generator
+proof ledger output
+mainnet mode restrictions
+```
+
+## P1: Required Before Public Incentivized Testnet
+
+```text
+solver marketplace syntax
+relayer swarm syntax
+RPC quorum syntax
+dispute syntax
+slashing syntax
+privacy/MEV protection syntax
+route scoring DSL
+package system
+standard library
+generated fuzz tests
+generated chaos tests
+proof explorer integration
+IDE/LSP support
+MoveVM target
+CosmWasm target
+AI copilot v1
+```
+
+## P2: Required Before Mainnet Expansion
+
+```text
+Substrate/WASM target
+CairoVM target
+Bitcoin Script target
+TVM target
+formal verification hooks
+zk proof hooks
+private solver auction support
+multi-intent batching
+portfolio rebalancing
+cross-VM contract calls
+governance policy language
+adapter versioning
+upgrade safety declarations
+```
+
+---
+
+## 16. Security Requirements
+
+The system must enforce these invariants:
+
+```text
+No double claim.
+No double refund.
+No claim after refund.
+No refund after claim.
+No route mutation after lock.
+No destination fill without source lock.
+No source claim without destination proof.
+No timeout bypass.
+No stale finality proof.
+No forged relayer quorum.
+No invalid VM adapter receipt.
+No solver claim without committed bid.
+No unsafe unlimited approval.
+No production execution through mock adapter.
+No production proof from simulation only.
+```
+
+---
+
+## 17. Privacy and MEV Protection
+
+X3 must support privacy features designed for user protection and MEV resistance.
+
+Allowed privacy features:
+
+```text
+private routing
+commit-reveal
+encrypted solver bids
+private mempool preference
+delayed route reveal
+minimal public metadata
+preimage secrecy until claim
+sandwich prevention
+```
+
+Disallowed use cases:
+
+```text
+hiding theft
+evading sanctions
+obfuscating stolen funds
+bypassing compliance controls
+laundering assets
+```
+
+Example:
+
+```x3
+privacy {
+  use_commit_reveal true
+  private_mempool preferred
+  encrypt_solver_bids true
+  prevent_sandwich true
+}
+```
+
+---
+
+## 18. Observability Requirements
+
+X3 must expose:
+
+```text
+metrics
+logs
+traces
+intent lifecycle dashboard
+chain health dashboard
+RPC health dashboard
+solver dashboard
+relayer dashboard
+refund risk dashboard
+adapter health dashboard
+proof ledger dashboard
+alerts
+incident reports
+```
+
+Required alerts:
+
+```text
+stuck intent
+expiring lock
+RPC quorum failure
+relayer quorum failure
+chain halt
+route score collapse
+adapter failure
+refund failure
+solver failure
+proof conflict
+```
+
+---
+
+## 19. Success Metrics
+
+Technical success metrics:
+
+```text
+100% deterministic intent hash generation
+0 production paths using mocks/stubs
+100% production intents with refund path
+100% production intents with proof requirements
+100% production intents with finality policy
+95%+ test coverage for critical state machine paths
+0 double-claim/double-refund invariant failures
+RPC quorum detects known bad RPC responses
+refund drills pass under failure simulation
+```
+
+Adoption metrics:
+
+```text
+number of .x3 files created
+number of registered contracts/programs/modules
+number of successful testnet intents
+number of external solvers
+number of external relayers
+number of proof explorer lookups
+number of grant applications submitted
+number of ecosystem integrations
+```
+
+Grant metrics:
+
+```text
+developer tooling milestone completed
+cross-VM adapter milestone completed
+AI copilot milestone completed
+proof ledger milestone completed
+public testnet milestone completed
+security audit milestone completed
+```
+
+---
+
+## 20. Major Risks
+
+### Risk 1: Scope Explosion
+
+Trying to build a full smart contract language too early would slow the project down.
+
+Mitigation:
+
+```text
+X3-lang v1 connects smart contracts.
+It does not replace smart contract languages.
+```
+
+### Risk 2: Cross-VM Complexity
+
+Every VM has different execution, finality, and receipt models.
+
+Mitigation:
+
+```text
+Start with EVM ↔ SVM only.
+Expand VM support after proof ledger and refund engine work.
+```
+
+### Risk 3: AI Unsafe Execution
+
+AI may generate dangerous or invalid actions.
+
+Mitigation:
+
+```text
+AI drafts only.
+Compiler verifies.
+User signs.
+Mainnet gate blocks unsafe execution.
+```
+
+### Risk 4: Fake Progress
+
+Agents may update docs or scoreboard numbers without implementing real code.
+
+Mitigation:
+
+```text
+Scoreboard must link to tests, proofs, logs, chain evidence, and CI results.
+Mainnet release gate must detect mocks, stubs, fake paths, and missing proof.
+```
+
+### Risk 5: Bridge/Protocol Dependency
+
+External protocols may fail or change.
+
+Mitigation:
+
+```text
+Treat bridges and aggregators as replaceable route modules.
+X3 owns proof, risk, refund, and route scoring.
+```
+
+---
+
+## 21. Competitive Differentiation
+
+Existing projects provide parts of this system:
+
+```text
+cross-chain messaging
+bridge aggregation
+AI agents with wallets
+intent-based swaps
+solver markets
+smart contract auditing
+```
+
+X3 differentiates by combining:
+
+```text
+AI-assisted .x3 intent language
+universal smart contract linker
+cross-VM adapter matrix
+proof-first atomic state machine
+refund-safe execution
+finality/RPC quorum
+solver/relayer accountability
+public proof ledger
+scoreboard
+mainnet release gate
+```
+
+Positioning statement:
+
+> X3-lang is not another bridge, DEX, or smart contract language. It is a proof-first cross-VM developer toolchain for commanding existing smart contracts safely across heterogeneous blockchain virtual machines.
+
+---
+
+## 22. Final Acceptance Definition
+
+X3-lang is considered successful when this complete flow works:
+
+```text
+User gives plain English request.
+AI drafts .x3 intent.
+Compiler validates .x3 file.
+X3IR is generated.
+Route engine scores routes.
+Solver bids.
+User signs.
+Source VM locks funds.
+Relayer swarm proves lock.
+Finality oracle confirms source.
+Destination VM fills.
+Relayer swarm proves fill.
+Finality oracle confirms destination.
+Source VM claim executes.
+Proof ledger records everything.
+Scoreboard updates automatically.
+If anything fails, refund executes.
+If anyone lies, slashing triggers.
+Explorer shows the full lifecycle.
+```
+
+The product is not considered complete when documentation claims features exist.
+
+The product is complete only when tests, proofs, logs, adapters, and chain evidence prove the features work.
+
+---
+
+## 23. One-Line Product Pitch
+
+**X3-lang is a cross-VM developer tooling framework that lets developers compose, validate, route, prove, and safely execute smart contract actions across multiple blockchain virtual machines using `.x3` intent files.**
+
+---
+
+## 24. Stronger Grant Pitch
+
+**X3 makes cross-chain smart contract execution programmable, verifiable, refundable, and safer through a unified `.x3` language, AI-assisted contract linker, VM adapter system, proof ledger, refund engine, solver/relayer accountability, and execution scoreboard.**
+
+---
+
+## 25. Build Rule
+
+Do not build X3-lang as a full smart contract language first.
+
+Build it as:
+
+```text
+the language that commands smart contracts
+the compiler that verifies intent safety
+the adapter system that reaches every VM
+the proof ledger that shows what happened
+the refund engine that protects users
+the scoreboard that keeps the system honest
+```
+
+That is the product.

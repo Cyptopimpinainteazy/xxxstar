@@ -13,6 +13,7 @@ benchmarks! {
     post_bond {
         let agent: T::AccountId = frame_benchmarking::account("agent", 0, SEED);
         let amount = T::MinBondAmount::get() * 10u32.into();
+        let _ = T::Currency::make_free_balance_be(&agent, amount * 10u32.into());
     }: _(RawOrigin::Signed(agent.clone()), amount, None)
     verify {
         let bonds = BondsByAgent::<T>::get(&agent);
@@ -22,6 +23,7 @@ benchmarks! {
     release_bond {
         let agent: T::AccountId = frame_benchmarking::account("agent", 0, SEED);
         let amount = T::MinBondAmount::get() * 10u32.into();
+        let _ = T::Currency::make_free_balance_be(&agent, amount * 10u32.into());
 
         // Post bond first
         Pallet::<T>::post_bond(
@@ -32,7 +34,7 @@ benchmarks! {
 
         let bonds = BondsByAgent::<T>::get(&agent);
         let bond_id = bonds[0];
-    }: _(RawOrigin::Signed(agent.clone()), bond_id)
+    }: _(RawOrigin::Root, bond_id)
     verify {
         let bond = Bonds::<T>::get(bond_id).unwrap();
         assert_eq!(bond.status, BondStatus::Released);
@@ -41,6 +43,7 @@ benchmarks! {
     slash_bond {
         let agent: T::AccountId = frame_benchmarking::account("agent", 0, SEED);
         let amount = T::MinBondAmount::get() * 10u32.into();
+        let _ = T::Currency::make_free_balance_be(&agent, amount * 10u32.into());
 
         // Post bond first
         Pallet::<T>::post_bond(
@@ -51,7 +54,7 @@ benchmarks! {
 
         let bonds = BondsByAgent::<T>::get(&agent);
         let bond_id = bonds[0];
-    }: _(RawOrigin::Signed(agent.clone()), bond_id, 2u8, vec![1u8; 64])
+    }: _(RawOrigin::Root, bond_id, 2u8, vec![1u8; 64])
     verify {
         let bond = Bonds::<T>::get(bond_id).unwrap();
         assert_eq!(bond.status, BondStatus::FullySlashed);
