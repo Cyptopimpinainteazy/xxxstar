@@ -14,7 +14,7 @@ use crate::persistence::{InMemoryPersistence, SessionPersistence};
 use crate::types::*;
 use blake2::{Blake2b512, Digest};
 use blake3;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -38,7 +38,7 @@ pub struct SwapCoordinator<P: SessionPersistence = InMemoryPersistence> {
     ///
     /// BTreeSet gives O(log n) membership checks vs O(n) for Vec, and eliminates
     /// any risk of duplicate entries accumulating over time.
-    used_secrets: BTreeSet<[u8; 32]>,
+    used_secrets: BTreeMap<[u8; 32], String>,
     /// Persistence backend for sessions.
     persistence: Arc<P>,
 }
@@ -73,8 +73,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         // Restore the used-secrets set so that HTLC secret replay protection
         // survives node restarts.  Without this, an adversary could restart the
         // node and reuse a previously-revealed secret to steal funds.
-        let used_secrets: BTreeSet<[u8; 32]> =
-            persistence.load_used_secrets().into_iter().collect();
+        let mut used_secrets: BTreeMap<[u8; 32], String> =
+            persistence.load_used_secret_claims().into_iter().collect();
+        if used_secrets.is_empty() {
+            // Backwards-compatible fail-closed import of legacy secret hashes.
+            // Unknown ownership means they remain globally blocked from reuse.
+            for secret_hash in persistence.load_used_secrets() {
+                used_secrets.insert(secret_hash, "__legacy_unknown__".to_string());
+            }
+        }
         let secrets_count = used_secrets.len();
 
         if session_count > 0 {
@@ -164,6 +171,63 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         purged
     }
 
+    fn fingerprint_serialized<T: serde::Serialize>(
+        value: &T,
+    ) -> Result<[u8; 32], CoordinatorError> {
+        let bytes = serde_json::to_vec(value).map_err(|e| {
+            CoordinatorError::Internal(format!("failed to serialize idempotency evidence: {e}"))
+        })?;
+        Ok(*blake3::hash(&bytes).as_bytes())
+    }
+
+    fn fingerprint_bytes(bytes: &[u8]) -> [u8; 32] {
+        *blake3::hash(bytes).as_bytes()
+    }
+
+    fn operation_already_applied(
+        &self,
+        session_id: &str,
+        operation: CoordinatorOperation,
+        fingerprint: [u8; 32],
+    ) -> Result<bool, CoordinatorError> {
+        let session =
+            self.sessions
+                .get(session_id)
+                .ok_or_else(|| CoordinatorError::SessionNotFound {
+                    session_id: session_id.to_string(),
+                })?;
+
+        if let Some(existing) = session
+            .operation_journal
+            .iter()
+            .find(|receipt| receipt.operation == operation)
+        {
+            if existing.evidence_fingerprint == fingerprint {
+                return Ok(true);
+            }
+            return Err(CoordinatorError::IdempotencyConflict {
+                operation,
+                existing: hex::encode(existing.evidence_fingerprint),
+                incoming: hex::encode(fingerprint),
+            });
+        }
+
+        Ok(false)
+    }
+
+    fn record_operation(
+        session: &mut SwapSession,
+        operation: CoordinatorOperation,
+        fingerprint: [u8; 32],
+        completed_at: u64,
+    ) {
+        session.operation_journal.push(CoordinatorOperationReceipt {
+            operation,
+            evidence_fingerprint: fingerprint,
+            completed_at,
+        });
+    }
+
     // ── Phase 1: Setup ────────────────────────────────────────────────────
 
     /// Initialize a new atomic swap session.
@@ -223,6 +287,7 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             timelock_slow: t_slow,
             created_at: now_unix,
             updated_at: now_unix,
+            operation_journal: Vec::new(),
             requires_merkle_verification: matches!(
                 (&fast_vm, &slow_vm),
                 (VmTarget::Evm { .. }, _)
@@ -312,6 +377,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         record: HtlcRecord,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_serialized(&record)?;
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::FastHtlcLock,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         let current_phase = self
             .sessions
             .get(session_id)
@@ -335,6 +409,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             session.htlc_fast = Some(record);
             session.phase = SwapPhase::LockingHtlcs;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::FastHtlcLock,
+                fingerprint,
+                now_unix,
+            );
         }
 
         self.persist_by_id(session_id);
@@ -348,6 +428,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         record: HtlcRecord,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_serialized(&record)?;
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::SlowHtlcLock,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -375,6 +464,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.htlc_slow = Some(record);
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::SlowHtlcLock,
+                fingerprint,
+                now_unix,
+            );
 
             // If both HTLCs are now recorded, advance phase
             if session.htlc_fast.is_some() && session.htlc_slow.is_some() {
@@ -645,9 +740,9 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             session.updated_at = now_unix;
         }
 
-        if abort_error.is_some() {
+        if let Some(err) = abort_error {
             self.persist_by_id(session_id);
-            return Err(abort_error.unwrap());
+            return Err(err);
         }
 
         let hash_lock = self.sessions.get(session_id).unwrap().hash_lock;
@@ -663,15 +758,23 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
     ///   accepting a wrong or forged preimage.
     ///
     /// # Replay Protection
-    /// The secret bytes are inserted into `used_secrets`. Any subsequent call
-    /// with the same secret — for this session or any other — will be rejected
-    /// with `CoordinatorError::SecretAlreadyUsed`.
+    /// The secret hash is persisted with its owning session. A retry from the
+    /// same session is idempotent; reuse by a different session is rejected.
     pub fn record_fast_claim(
         &mut self,
         session_id: &str,
         secret: HtlcSecret,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = *blake3::hash(secret.as_bytes()).as_bytes();
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::FastClaim,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -683,13 +786,19 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
         Self::validate_phase_transition(current_phase, SwapPhase::ClaimingFast)?;
 
-        // Global replay guard: O(log n) BTreeSet lookup, constant-time via subtle for
-        // resistance to timing side-channels even on the fast path.
+        // Global replay guard with persisted ownership.
+        //
+        // If the secret is already owned by this same session, we are
+        // recovering from the crash window where secret ownership was
+        // durably written before the session mutation. That retry is safe.
+        // A different owner remains a hard cross-session replay failure.
         let secret_hash = *blake3::hash(&secret.0).as_bytes();
-        if self.used_secrets.contains(&secret_hash) {
-            return Err(CoordinatorError::Internal(
-                format!("HTLC secret replay detected for session '{session_id}' — secret already used in a previous claim")
-            ));
+        if let Some(owner) = self.used_secrets.get(&secret_hash) {
+            if owner != session_id {
+                return Err(CoordinatorError::Internal(format!(
+                    "HTLC secret replay detected for session '{session_id}' — secret already owned by session '{owner}'"
+                )));
+            }
         }
         {
             let session = self.sessions.get_mut(session_id).ok_or_else(|| {
@@ -712,7 +821,8 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
             //  duplicate will be caught on retry, which is the safe outcome).
             // Register the secret hash globally (never store plaintext)
             let secret_hash = *blake3::hash(&secret.0).as_bytes();
-            self.used_secrets.insert(secret_hash);
+            self.used_secrets
+                .insert(secret_hash, session_id.to_string());
 
             if let Some(ref mut htlc) = session.htlc_fast {
                 htlc.status = HtlcStatus::Claimed;
@@ -720,12 +830,28 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.phase = SwapPhase::ClaimingSlow;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::FastClaim,
+                fingerprint,
+                now_unix,
+            );
         }
 
         // Persist the updated secret set BEFORE persisting the session, so
         // that on crash-recovery the replay guard is at least as restrictive
         // as the session state (safe direction).
-        let secrets_vec: Vec<[u8; 32]> = self.used_secrets.iter().copied().collect();
+        let secret_claims: Vec<([u8; 32], String)> = self
+            .used_secrets
+            .iter()
+            .map(|(hash, owner)| (*hash, owner.clone()))
+            .collect();
+        // Persist ownership first. If the process crashes before the session
+        // write, a retry can prove that this secret belongs to this session
+        // and safely finish the local mutation instead of misclassifying it as
+        // a cross-session replay.
+        self.persistence.save_used_secret_claims(&secret_claims);
+        let secrets_vec: Vec<[u8; 32]> = self.used_secrets.keys().copied().collect();
         self.persistence.save_used_secrets(&secrets_vec);
         self.persist_by_id(session_id);
         info!(session = %session_id, "Fast chain claimed — now claiming slow chain");
@@ -738,6 +864,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         session_id: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_bytes(format!("slow-claim:{session_id}").as_bytes());
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::SlowClaim,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -762,6 +897,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.phase = SwapPhase::Complete;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::SlowClaim,
+                fingerprint,
+                now_unix,
+            );
         }
 
         self.persist_by_id(session_id);
@@ -801,6 +942,15 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
         session_id: &str,
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
+        let fingerprint = Self::fingerprint_bytes(format!("refund-both:{session_id}").as_bytes());
+        if self.operation_already_applied(
+            session_id,
+            CoordinatorOperation::RefundBoth,
+            fingerprint,
+        )? {
+            return Ok(());
+        }
+
         // Read phase first, then validate, then mutate.
         let current_phase = self
             .sessions
@@ -828,6 +978,12 @@ impl<P: SessionPersistence> SwapCoordinator<P> {
 
             session.phase = SwapPhase::Refunded;
             session.updated_at = now_unix;
+            Self::record_operation(
+                session,
+                CoordinatorOperation::RefundBoth,
+                fingerprint,
+                now_unix,
+            );
         }
 
         self.persist_by_id(session_id);
@@ -888,8 +1044,228 @@ mod state_machine_regression_tests {
             timelock_slow: updated_at + 20,
             created_at: updated_at,
             updated_at,
+            operation_journal: Vec::new(),
             requires_merkle_verification: false,
         }
+    }
+
+    fn idempotency_test_session(
+        session_id: &str,
+        phase: SwapPhase,
+        hash_lock: HtlcHash,
+        now: u64,
+    ) -> SwapSession {
+        SwapSession {
+            session_id: session_id.to_string(),
+            hash_lock,
+            htlc_fast: None,
+            htlc_slow: None,
+            flash_legs: vec![],
+            leg_outcomes: vec![],
+            phase,
+            timelock_fast: now + 3_600,
+            timelock_slow: now + 7_200,
+            created_at: now,
+            updated_at: now,
+            operation_journal: Vec::new(),
+            requires_merkle_verification: false,
+        }
+    }
+
+    fn idempotency_htlc(id: u8, hash_lock: HtlcHash, now: u64) -> HtlcRecord {
+        HtlcRecord {
+            id: HtlcId(vec![id; 32]),
+            params: HtlcCreateParams {
+                vm: VmTarget::Svm,
+                recipient: vec![1; 32],
+                hash_lock,
+                timelock: now + 3_600,
+                asset: vec![2; 32],
+                amount: 1_000,
+            },
+            status: HtlcStatus::Funded,
+            created_at_block: 100,
+            confirmations_required: 1,
+            confirmations: 1,
+            params_hash: [id; 32],
+        }
+    }
+
+    #[test]
+    fn identical_fast_lock_replay_is_successful_noop_but_conflict_fails() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x41; 32]);
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let mut session =
+            idempotency_test_session("idem-lock", SwapPhase::Setup, secret.hash(), now);
+        persistence.save(&session);
+
+        let mut coordinator =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        let first = idempotency_htlc(1, secret.hash(), now);
+        coordinator
+            .record_htlc_fast("idem-lock", first.clone(), now)
+            .expect("first lock observation");
+        coordinator
+            .record_htlc_fast("idem-lock", first, now + 1)
+            .expect("identical retry is idempotent");
+
+        let session = coordinator.get_session("idem-lock").unwrap();
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::FastHtlcLock)
+                .count(),
+            1
+        );
+
+        let conflicting = idempotency_htlc(2, secret.hash(), now);
+        let err = coordinator
+            .record_htlc_fast("idem-lock", conflicting, now + 2)
+            .expect_err("different lock evidence must conflict");
+        assert!(matches!(
+            err,
+            CoordinatorError::IdempotencyConflict {
+                operation: CoordinatorOperation::FastHtlcLock,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn fast_claim_retry_survives_coordinator_restart() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x42; 32]);
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let mut session =
+            idempotency_test_session("idem-claim", SwapPhase::ClaimingFast, secret.hash(), now);
+        session.htlc_fast = Some(idempotency_htlc(3, secret.hash(), now));
+        persistence.save(&session);
+
+        {
+            let mut coordinator = SwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence.clone(),
+            );
+            coordinator
+                .record_fast_claim("idem-claim", secret.clone(), now)
+                .expect("first fast claim");
+            assert_eq!(
+                coordinator.get_session("idem-claim").unwrap().phase,
+                SwapPhase::ClaimingSlow
+            );
+        }
+
+        let mut recovered =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        recovered
+            .record_fast_claim("idem-claim", secret, now + 10)
+            .expect("same claim after restart must be successful no-op");
+        let session = recovered.get_session("idem-claim").unwrap();
+        assert_eq!(session.phase, SwapPhase::ClaimingSlow);
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::FastClaim)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn fast_claim_recovers_when_secret_ownership_persisted_before_session() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x44; 32]);
+        let secret_fingerprint = *blake3::hash(secret.as_bytes()).as_bytes();
+        let persistence = Arc::new(InMemoryPersistence::new());
+
+        let mut session = idempotency_test_session(
+            "idem-split-write",
+            SwapPhase::ClaimingFast,
+            secret.hash(),
+            now,
+        );
+        session.htlc_fast = Some(idempotency_htlc(7, secret.hash(), now));
+        persistence.save(&session);
+
+        // Simulate the exact crash window: the global ownership write made it
+        // to disk, but the mutated session/journal did not.
+        persistence
+            .save_used_secret_claims(&[(secret_fingerprint, "idem-split-write".to_string())]);
+        persistence.save_used_secrets(&[secret_fingerprint]);
+
+        let mut recovered =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        recovered
+            .record_fast_claim("idem-split-write", secret, now + 1)
+            .expect("same-session retry must finish the interrupted local mutation");
+
+        let session = recovered.get_session("idem-split-write").unwrap();
+        assert_eq!(session.phase, SwapPhase::ClaimingSlow);
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::FastClaim)
+                .count(),
+            1
+        );
+        assert_eq!(
+            session.htlc_fast.as_ref().unwrap().status,
+            HtlcStatus::Claimed
+        );
+    }
+
+    #[test]
+    fn duplicate_slow_claim_and_refund_completion_are_idempotent() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x43; 32]);
+
+        let persistence = Arc::new(InMemoryPersistence::new());
+        let mut claim_session =
+            idempotency_test_session("idem-slow", SwapPhase::ClaimingSlow, secret.hash(), now);
+        claim_session.htlc_slow = Some(idempotency_htlc(4, secret.hash(), now));
+        persistence.save(&claim_session);
+
+        let mut coordinator =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence.clone());
+        coordinator
+            .record_slow_claim("idem-slow", now)
+            .expect("first slow claim");
+        coordinator
+            .record_slow_claim("idem-slow", now + 1)
+            .expect("duplicate slow claim");
+        assert_eq!(
+            coordinator.get_session("idem-slow").unwrap().phase,
+            SwapPhase::Complete
+        );
+
+        let mut refund_session =
+            idempotency_test_session("idem-refund", SwapPhase::Aborting, secret.hash(), now);
+        refund_session.htlc_fast = Some(idempotency_htlc(5, secret.hash(), now));
+        refund_session.htlc_slow = Some(idempotency_htlc(6, secret.hash(), now));
+        persistence.save(&refund_session);
+
+        let mut recovered =
+            SwapCoordinator::with_persistence(CoordinatorConfig::default(), persistence);
+        recovered
+            .record_refunds("idem-refund", now)
+            .expect("first refund completion");
+        recovered
+            .record_refunds("idem-refund", now + 1)
+            .expect("duplicate refund completion");
+        let session = recovered.get_session("idem-refund").unwrap();
+        assert_eq!(session.phase, SwapPhase::Refunded);
+        assert_eq!(
+            session
+                .operation_journal
+                .iter()
+                .filter(|r| r.operation == CoordinatorOperation::RefundBoth)
+                .count(),
+            1
+        );
     }
 
     #[test]
