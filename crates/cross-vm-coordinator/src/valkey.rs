@@ -1329,6 +1329,50 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             .recovery(submission_id)
     }
 
+    #[cfg(feature = "canonical-proofs")]
+    pub fn settlement_submission_record(
+        &self,
+        submission_id: [u8; 32],
+    ) -> Result<Option<crate::SettlementOutboxRecord>, CoordinatorError> {
+        crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
+            .latest(submission_id)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub async fn reconcile_settlement_submission<O: crate::SettlementChainObserver>(
+        &self,
+        submission_id: [u8; 32],
+        observer: &O,
+        now_unix: u64,
+    ) -> Result<crate::SettlementReconcileDecision, CoordinatorError> {
+        let outbox =
+            crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone());
+        let current = outbox.latest(submission_id)?.ok_or_else(|| {
+            CoordinatorError::Internal(
+                "settlement outbox submission not found for reconciliation".into(),
+            )
+        })?;
+
+        let decision = crate::observe_and_decide(observer, &current).await?;
+        match &decision {
+            crate::SettlementReconcileDecision::MarkIncluded { block_number } => {
+                outbox.record_included(&current, *block_number, now_unix)?;
+            }
+            crate::SettlementReconcileDecision::MarkFailed { reason } => {
+                outbox.record_failed(&current, reason, now_unix)?;
+            }
+            crate::SettlementReconcileDecision::MarkTerminalObserved => {
+                outbox.record_terminal_observed(&current, now_unix)?;
+            }
+            _ => {
+                // Sign/rebroadcast/wait/observe/manual-halt decisions require
+                // an explicit external action or no durable transition.
+            }
+        }
+
+        Ok(decision)
+    }
+
     pub fn session(
         &self,
         session_id: &str,
