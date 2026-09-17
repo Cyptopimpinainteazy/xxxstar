@@ -7,7 +7,8 @@
 
 use crate::{
     CoordinatorConfig, CoordinatorError, CoordinatorOperation, HtlcRecord, HtlcSecret,
-    InMemoryPersistence, SessionPersistence, SwapCoordinator, SwapSession,
+    InMemoryPersistence, SessionLease, SessionLeaseManager, SessionPersistence, SwapCoordinator,
+    SwapSession,
 };
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -17,12 +18,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// is still resolved by the coordinator's persisted idempotency journal.
 pub struct ConcurrentSwapCoordinator<P: SessionPersistence = InMemoryPersistence> {
     inner: Arc<Mutex<SwapCoordinator<P>>>,
+    leases: SessionLeaseManager,
 }
 
 impl<P: SessionPersistence> Clone for ConcurrentSwapCoordinator<P> {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
+            leases: self.leases.clone(),
         }
     }
 }
@@ -31,11 +34,42 @@ impl<P: SessionPersistence> ConcurrentSwapCoordinator<P> {
     pub fn new(coordinator: SwapCoordinator<P>) -> Self {
         Self {
             inner: Arc::new(Mutex::new(coordinator)),
+            leases: SessionLeaseManager::default(),
         }
     }
 
     pub fn with_persistence(config: CoordinatorConfig, persistence: Arc<P>) -> Self {
         Self::new(SwapCoordinator::with_persistence(config, persistence))
+    }
+
+    pub fn lease_manager(&self) -> &SessionLeaseManager {
+        &self.leases
+    }
+
+    pub fn acquire_session_lease(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+        now_unix: u64,
+        ttl_secs: u64,
+    ) -> Result<SessionLease, CoordinatorError> {
+        self.leases
+            .acquire(session_id, owner_id, now_unix, ttl_secs)
+    }
+
+    fn validate_lease(
+        &self,
+        lease: &SessionLease,
+        session_id: &str,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        if lease.session_id != session_id {
+            return Err(CoordinatorError::Internal(format!(
+                "lease/session mismatch: lease for '{}' used on '{session_id}'",
+                lease.session_id
+            )));
+        }
+        self.leases.validate(lease, now_unix)
     }
 
     fn lock(&self) -> Result<MutexGuard<'_, SwapCoordinator<P>>, CoordinatorError> {
@@ -104,6 +138,54 @@ impl<P: SessionPersistence> ConcurrentSwapCoordinator<P> {
         now_unix: u64,
     ) -> Result<(), CoordinatorError> {
         self.execute(|coordinator| coordinator.record_refunds(session_id, now_unix))
+    }
+
+    pub fn record_htlc_fast_with_lease(
+        &self,
+        lease: &SessionLease,
+        record: HtlcRecord,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_lease(lease, &lease.session_id, now_unix)?;
+        self.record_htlc_fast(&lease.session_id, record, now_unix)
+    }
+
+    pub fn record_htlc_slow_with_lease(
+        &self,
+        lease: &SessionLease,
+        record: HtlcRecord,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_lease(lease, &lease.session_id, now_unix)?;
+        self.record_htlc_slow(&lease.session_id, record, now_unix)
+    }
+
+    pub fn record_fast_claim_with_lease(
+        &self,
+        lease: &SessionLease,
+        secret: HtlcSecret,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_lease(lease, &lease.session_id, now_unix)?;
+        self.record_fast_claim(&lease.session_id, secret, now_unix)
+    }
+
+    pub fn record_slow_claim_with_lease(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_lease(lease, &lease.session_id, now_unix)?;
+        self.record_slow_claim(&lease.session_id, now_unix)
+    }
+
+    pub fn record_refunds_with_lease(
+        &self,
+        lease: &SessionLease,
+        now_unix: u64,
+    ) -> Result<(), CoordinatorError> {
+        self.validate_lease(lease, &lease.session_id, now_unix)?;
+        self.record_refunds(&lease.session_id, now_unix)
     }
 
     /// Number of journal entries for one operation. Useful for telemetry and
@@ -278,6 +360,50 @@ mod tests {
                 .unwrap(),
             1
         );
+    }
+
+    #[test]
+    fn stale_fence_cannot_commit_after_takeover() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x54; 32]);
+        let (_persistence, coordinator) =
+            seeded("lease-race", SwapPhase::Setup, &secret, now);
+        let first = coordinator
+            .acquire_session_lease("lease-race", "relayer-a", now, 5)
+            .unwrap();
+        let second = coordinator
+            .acquire_session_lease("lease-race", "relayer-b", now + 5, 30)
+            .unwrap();
+
+        let lock = record(9, secret.hash(), now);
+        assert!(coordinator
+            .record_htlc_fast_with_lease(&first, lock.clone(), now + 6)
+            .is_err());
+        coordinator
+            .record_htlc_fast_with_lease(&second, lock, now + 6)
+            .expect("current fence may commit");
+        assert_eq!(
+            coordinator
+                .operation_count("lease-race", CoordinatorOperation::FastHtlcLock)
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn lease_for_one_session_cannot_mutate_another() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x55; 32]);
+        let (_persistence, coordinator) =
+            seeded("lease-a", SwapPhase::Setup, &secret, now);
+        let lease = coordinator
+            .acquire_session_lease("lease-a", "relayer-a", now, 30)
+            .unwrap();
+
+        assert_eq!(lease.session_id, "lease-a");
+        assert!(coordinator
+            .validate_lease(&lease, "lease-b", now + 1)
+            .is_err());
     }
 
     #[test]
