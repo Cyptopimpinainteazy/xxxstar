@@ -5,13 +5,17 @@
 //! the error and do **not** write to the ledger.
 //!
 //! The bridge is adapter-agnostic - any type implementing [`X3VmAdapter`] works.
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::adapter::{ClaimProof, LockProof, RefundProof, X3VmAdapter};
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, ChainKind, IntentId};
 use crate::ledger::{ProofEntry, ProofKind, ProofLedger};
-use alloc::boxed::Box;
-use alloc::vec::Vec;
 
 /// Next proof ID counter (simple incrementing within the bridge).
 fn next_proof_id(ledger: &ProofLedger) -> u64 {

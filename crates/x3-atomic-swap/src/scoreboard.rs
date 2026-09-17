@@ -21,10 +21,16 @@
 //! A completed refund path also earns full claim/refund points (10).
 //! The scoreboard cannot reach 100 if any proof step is missing its
 //! corresponding transaction hash.
+use alloc::collections::BTreeSet;
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::adapter::{VmType, X3VmAdapter};
 use crate::ledger::ProofRecord;
-use alloc::string::ToString;
 use serde::{Deserialize, Serialize};
 
 /// Score category weights.
@@ -357,7 +363,7 @@ impl SwapScoreboard {
     }
 
     fn progress_bar(score: u32) -> alloc::string::String {
-        let filled = ((score as f64) / 10.0).round() as usize;
+        let filled = ((score + 5) / 10) as usize;
         let filled = filled.min(10);
         let empty = 10 - filled;
         alloc::format!("{}{}", "█".repeat(filled), "░".repeat(empty))
@@ -650,7 +656,7 @@ impl AdapterScoreboard {
     }
 
     pub(crate) fn progress_bar(score: u32) -> alloc::string::String {
-        let filled = ((score as f64) / 10.0).round() as usize;
+        let filled = ((score + 5) / 10) as usize;
         let filled = filled.min(10);
         let empty = 10 - filled;
         use alloc::format;

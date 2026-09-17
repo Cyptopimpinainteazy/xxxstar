@@ -11,6 +11,7 @@
 //! Callers that only exercise simulation (unit tests, dry runs) never touch
 //! this module; callers that construct a [`LiveEvmExecutor`] get genuine tx
 //! hashes and receipt data — never a fabricated mock id.
+use alloc::vec;
 
 use crate::adapter::{ClaimProof, LockProof, RefundProof, TxId, VmType};
 use crate::error::SwapError;

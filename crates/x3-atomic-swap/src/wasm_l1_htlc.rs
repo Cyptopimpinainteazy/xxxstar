@@ -16,6 +16,8 @@
 //! In production, [`lock`] would deploy or call a WASM HTLC contract on the
 //! target chain, [`claim`] calls the claim method with preimage, and [`refund`]
 //! triggers the refund path after timeout.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

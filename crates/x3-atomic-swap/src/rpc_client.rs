@@ -3,6 +3,12 @@
 //! A minimal JSON-RPC client with real HTTP transport via `ureq` when the `std`
 //! feature is enabled. In `no_std` mode, all RPC methods return
 //! [`SwapError::RpcError`] indicating that the `std` feature is required.
+use alloc::format;
+use alloc::vec;
+use alloc::boxed::Box;
+use alloc::borrow::ToOwned;
+use alloc::string::ToString;
+use alloc::collections::BTreeSet;
 
 use crate::error::SwapError;
 use alloc::string::String;

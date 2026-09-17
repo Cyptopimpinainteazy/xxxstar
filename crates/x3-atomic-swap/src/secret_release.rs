@@ -3,6 +3,8 @@
 //! A preimage is value-moving authority. This module centralizes the policy
 //! that decides whether the coordinator is allowed to reveal it. Individual
 //! adapter finality flags are necessary but never sufficient on their own.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{ChainId, FinalityProof, LockProof, VmType};
 use crate::error::SwapError;

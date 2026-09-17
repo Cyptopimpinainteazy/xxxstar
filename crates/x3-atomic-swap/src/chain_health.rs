@@ -12,6 +12,7 @@
 //! - [`ChainHealthOracle`] — Trait for pluggable health backends.
 //! - [`SwapSafetyCheck`] — Aggregated safety verdict for a pending swap.
 //! - [`InMemoryChainHealth`] — Default in-memory implementation.
+use alloc::format;
 
 use crate::error::SwapError;
 use crate::intent::ChainKind;

@@ -14,6 +14,7 @@
 //! ## Offences
 //!
 //! See [`SlashReason`] for all supported reasons.
+use alloc::vec;
 
 use crate::error::SwapError;
 use alloc::collections::BTreeMap;

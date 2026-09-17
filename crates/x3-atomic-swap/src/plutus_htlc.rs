@@ -8,6 +8,8 @@
 //! that UTXO with a Claim redeemer providing the preimage, and [`refund`] would
 //! spend it with a Refund redeemer after timeout. Finality uses Cardano's
 //! Ouroboros consensus (minimum 2 confirmations for safe, standard 6).
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

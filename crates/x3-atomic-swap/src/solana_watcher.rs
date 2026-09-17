@@ -10,6 +10,8 @@
 //! 2. For each new signature, call `getTransaction` with `jsonParsed` encoding.
 //! 3. Parse the transaction instructions to extract Lock/Claim/Refund events.
 //! 4. Return decoded `HtlcEvent` records for the relayer to consume.
+use alloc::vec;
+use alloc::string::ToString;
 
 use crate::error::SwapError;
 use crate::event_watcher::HtlcEvent;

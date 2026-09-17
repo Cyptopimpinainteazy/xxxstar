@@ -11,6 +11,12 @@
 //! - **Claim instruction**: verifies preimage, transfers tokens
 //! - **Refund instruction**: returns tokens to refund authority after timeout
 //! - **Event/log output**: relayers watch via log data
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::SwapError;
 use crate::event_watcher::{EventWatcher, HtlcEvent, WatcherConfig};

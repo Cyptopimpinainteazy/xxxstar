@@ -7,6 +7,8 @@
 //! given hashlock, [`claim`] would provide the preimage to spend the predicate
 //! UTXO, and [`refund`] would spend via the refund path after timeout.
 //! Finality uses Fuel's UTXO model with ~1 block finality.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,
