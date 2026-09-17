@@ -12,7 +12,6 @@
 //!       --timelock <unix_ts> --amount <wei>
 //!   x3-evm-broadcast ... claim --id <hex32> --secret <hex32>
 //!   x3-evm-broadcast ... refund --id <hex32>
-use alloc::format;
 
 use std::process::ExitCode;
 use x3_atomic_swap::evm_live::LiveEvmExecutor;

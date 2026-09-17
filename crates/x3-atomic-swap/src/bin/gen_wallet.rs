@@ -1,6 +1,5 @@
 //! Generate a new Ethereum wallet for Sepolia testnet deployment.
 //! Run with: cargo run -p x3-atomic-swap --features std --bin gen_wallet
-use alloc::format;
 
 use k256::ecdsa::SigningKey;
 use rand::rngs::OsRng;
