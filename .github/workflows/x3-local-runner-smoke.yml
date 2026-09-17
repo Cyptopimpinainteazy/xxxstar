@@ -1,0 +1,47 @@
+name: X3 Local Runner Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  x3star1-smoke:
+    runs-on: [self-hosted, Linux, X64, x3]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Machine
+        run: |
+          echo "HOST: $(hostname)"
+          echo "CPUS: $(nproc)"
+          free -h
+          df -h /
+
+      - name: Rust
+        run: |
+          rustc --version
+          cargo --version
+          rustup target list --installed
+
+      - name: X3 Toolchain
+        run: |
+          node --version
+          npm --version
+          docker --version
+          forge --version
+          anvil --version
+          solana --version
+
+      - name: Repository
+        run: |
+          pwd
+          git rev-parse HEAD
+          git status --short
+
+      - name: X3 Runner Success
+        run: |
+          echo "================================"
+          echo " X3 LOCAL RUNNER ONLINE"
+          echo " Host: $(hostname)"
+          echo "================================"
