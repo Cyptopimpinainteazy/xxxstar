@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blockchain TPS Test — X3</title>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#0b1220;color:#e6eef8;padding:2rem}
+    .card{max-width:800px;margin:2rem auto;padding:2rem;border-radius:12px;background:rgba(255,255,255,.03)}
+    input,select{width:100%;padding:.8rem;margin:.4rem 0;border-radius:6px;border:1px solid rgba(255,255,255,.06);background:transparent;color:inherit}
+    button{padding:.8rem 1rem;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-weight:700}
+    pre{background:#01030a;padding:1rem;border-radius:8px;overflow:auto}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Blockchain TPS Test</h1>
+    <p>Enter their RPC endpoint and run a quick benchmark. Use GPU for faster results if available.</p>
+
+    <label>RPC Endpoint</label>
+    <input id="rpc" placeholder="https://your-rpc-endpoint"/>
+
+    <label>Target TPS (EVM)</label>
+    <input id="evm_tps" value="5000" />
+
+    <label>Duration (seconds)</label>
+    <input id="duration" value="10" />
+
+    <label><input type="checkbox" id="gpu"/> Use GPU</label>
+
+    <div style="display:flex;gap:.5rem;margin-top:1rem">
+      <button id="run">Run Benchmark</button>
+      <button id="stop">Stop</button>
+    </div>
+
+    <h3>Live Output</h3>
+    <pre id="output">No runs yet.</pre>
+
+    <h3>Jobs</h3>
+    <pre id="jobs">loading...</pre>
+  </div>
+
+  <script>
+    const out = (s) => { document.getElementById('output').textContent = s }
+    const refreshJobs = async () => { const r = await fetch('/api/jobs'); const j = await r.json(); document.getElementById('jobs').textContent = JSON.stringify(j, null, 2) }
+    refreshJobs(); setInterval(refreshJobs, 4000)
+
+    let currentJob = null;
+    document.getElementById('run').addEventListener('click', async () => {
+      out('Starting...')
+      const payload = { rpc: document.getElementById('rpc').value, evm_tps: Number(document.getElementById('evm_tps').value), duration: Number(document.getElementById('duration').value), gpu: document.getElementById('gpu').checked }
+      const r = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const data = await r.json(); currentJob = data.jobId; out('Job started: ' + currentJob)
+
+      // Poll status until finished
+      const poll = setInterval(async () => {
+        const s = await (await fetch('/api/status/' + currentJob)).json();
+        if (s.report) {
+          out(JSON.stringify(s.report, null, 2)); clearInterval(poll); currentJob = null; refreshJobs()
+        } else {
+          out('status: ' + s.status)
+        }
+      }, 1000)
+    })
+
+    document.getElementById('stop').addEventListener('click', async () => {
+      if (!currentJob) return alert('No active job');
+      await fetch('/api/stop/' + currentJob, { method: 'POST' }); document.getElementById('output').textContent = 'Stopped';
+      currentJob = null; refreshJobs()
+    })
+  </script>
+</body>
+</html>

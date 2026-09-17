@@ -229,6 +229,61 @@ blockers = [
 ]
 dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
 
+# ── Addendum 2026-09-11: two new entries added for real, previously-untracked
+# work verified this session (2026-09-08 commits a03a7a267, 4b6520c53,
+# 028aeac85, 66da1221d, 173fcec2b). Both were confirmed by actually running
+# the tests, not by trusting commit messages — see verification notes below.
+
+[x3_wrapped]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/x3-wrapped"
+tauri_app = "WalletVault"
+# Verified 2026-09-11: `cargo test -p pallet-x3-wrapped` = 26/26 passing.
+# Bridge/governance origin hardened from EnsureRootOrHalfCouncil to
+# EnsureRootOrTwoThirdsCouncil in runtime/src/lib.rs:2913-2914 (commit
+# 4b6520c53, 028aeac85) — confirmed present in current runtime/src/lib.rs.
+required_tests = [
+  "total_supply_invariant_holds_after_mixed_ops",
+  "mint_nonce_replay_rejected",
+  "mint_non_bridge_authority_rejected",
+  "register_asset_non_governance_rejected",
+  "mint_supply_cap_exceeded_rejected",
+  "burn_insufficient_balance_rejected"
+]
+proof_report = ""
+readiness_score = 65
+blockers = [
+  "External bridge deposits are disabled at genesis (ExternalBridgesEnabled=false per LAUNCH_SCOPE.md) — wrapped assets can only be minted via governance-gated RPC for testing, not from a real external-chain deposit",
+  "Two-of-two council quorum flow is verified by a manual script (scripts/testnet/verify-wrapped-council-flow.sh), not yet CI-enforced"
+]
+dangerous_paths = ["pallets/x3-wrapped", "runtime", "bridge authority", "council governance"]
+
+[x3_htlc]
+mode = "SIM_TESTNET"
+crate_or_service = "X3-contracts/svm/programs/x3_htlc"
+tauri_app = ""
+# Verified 2026-09-11: `cargo test -p x3_htlc` = 7/7 passing (commit
+# 66da1221d added this coverage; 173fcec2b made it CI-enforced via
+# .github/workflows/svm-htlc.yml). Confirmed NOT called from
+# crates/x3-atomic-swap or crates/cross-vm-coordinator — those files only
+# share the string "x3-htlc" as an unrelated hash-domain tag, not a real
+# caller relationship.
+required_tests = [
+  "funded_htlc_expires_after_timelock",
+  "preimage_hash_matches_recorded_hashlock",
+  "timelock_cannot_exceed_seven_days",
+  "timelock_must_be_more_than_one_hour_out",
+  "htlc_pda_is_deterministic_and_distinct",
+  "htlc_vault_pda_derives_from_escrow_account"
+]
+proof_report = ""
+readiness_score = 30
+blockers = [
+  "Unit-tested pure logic only (timelock/preimage/PDA math) — no localnet/devnet on-chain integration test exercising a deployed program",
+  "Not wired into any live cross-VM route — no caller in the atomic router or cross-vm-coordinator yet"
+]
+dangerous_paths = ["X3-contracts/svm/programs/x3_htlc", "SVM domain", "timelock logic"]
+
 # ── Score adjustments 2026-06-17 ──
 # atomic_kernel:  75→85  (6 tests verified passing, EconomicHalt gate wired)
 # atomic_router:  80→88  (VM control-flow ops + CI gate wired)

@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
  * generate-site-index.js
- * Reads scripts/app-manifest.json and regenerates site/index.html.
+ * Reads scripts/app-manifest.json and regenerates site/apps/index.html —
+ * the internal directory of every sub-app in the monorepo. The site root
+ * (site/index.html) is owned by the x3fronend investor/grant homepage;
+ * this page is linked from its "Ecosystem" section as the full directory.
  * Run: node scripts/generate-site-index.js
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -192,7 +195,8 @@ ${sections}
 </body>
 </html>`;
 
-const outPath = resolve(REPO, "site", "index.html");
+const outPath = resolve(REPO, "site", "apps", "index.html");
+mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, html, "utf8");
 console.log(`[generate-site-index] Written → ${outPath}`);
 console.log(`[generate-site-index] ${manifest.length} apps across ${CATEGORY_ORDER.filter(c => grouped[c]).length} categories`);

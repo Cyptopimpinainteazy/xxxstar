@@ -371,7 +371,7 @@ function HomePage({ nav }: { nav: (p: string) => void }) {
           <span className="l2">INFRASTRUCTURE</span>
           <span className="l3"><Typewriter texts={['FOR SECURE CROSS-CHAIN SETTLEMENT', 'THAT PROVES BEFORE IT MOVES', 'WITHOUT SILENT FAILURE']} /></span>
         </div>
-        <div className="home-s">X3 is not just another chain. It's a proof-driven, multi-VM, GPU-accelerated, agent-native blockchain infrastructure layer for secure cross-chain settlement, validator coordination, and AI-agent automation. 88% core readiness. Open-source. Verifiable. Real.</div>
+        <div className="home-s">X3 is not just another chain. It's a proof-driven, multi-VM blockchain infrastructure layer for secure cross-chain settlement and validator coordination — v0.4 Internal Testnet Candidate, 51% average readiness across 15 tracked features (live from FEATURE_REGISTRY.toml). Open-source. Verifiable. Honestly scored.</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', position: 'relative', zIndex: 2 }}>
           <button className="btnp" onClick={() => nav('/match')}>⚡ Find My Grant Lane</button>
           <button className="btnpu" onClick={() => nav('/grants')}>View All Grants</button>
@@ -955,7 +955,7 @@ function GrantAnglesPage({ nav }: { nav: (p: string) => void }) {
         <Badge text="GRANT ANGLES" bc="sb" />
         <div className="ptitle">{TOTAL_ANGLES} Grant & Funding<br /><span className="ac">Angles for X3</span></div>
         <div className="psub">
-          X3 Atomic Star is not just a chain. It's a proof-driven, multi-VM, GPU-accelerated, agent-native blockchain infrastructure project that can fund, build, test, and prove itself. Every angle below represents a genuine grant, sponsorship, or funding surface tied to real code.
+          X3 Atomic Star is not just a chain. It's a proof-driven, multi-VM blockchain infrastructure project that can fund, build, test, and prove itself. Every angle below represents a genuine grant, sponsorship, or funding surface tied to real code.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
           <button className="btnp" onClick={() => nav('/match')}>⚡ Find Your Angle</button>

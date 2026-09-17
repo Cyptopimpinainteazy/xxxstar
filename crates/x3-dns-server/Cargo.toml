@@ -37,7 +37,7 @@ sp-runtime = { workspace = true, default-features = false, features = ["std"] }
 axum = "0.7"
 tower = "0.4"
 hyper = "1.0"
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 
 # Cryptography for DNSSEC
 ring = "0.17.12"

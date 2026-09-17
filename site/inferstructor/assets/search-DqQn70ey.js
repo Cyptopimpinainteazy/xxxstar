@@ -1,0 +1,1 @@
+import{x as e}from"./index-CxwTNtCE.js";var a=[["path",{d:"M5 12h14",key:"1ays0h"}],["path",{d:"M12 5v14",key:"s699le"}]],o=e("plus",a);var r=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],s=e("search",r);export{o as n,s as t};

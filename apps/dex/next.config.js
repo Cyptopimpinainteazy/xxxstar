@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "export",
+  basePath: "/dex",
   reactStrictMode: true,
   // Ensure local monorepo packages are transpiled so their imports
   // (e.g., clsx, framer-motion) are resolved correctly by Next.js.
@@ -7,6 +9,7 @@ const nextConfig = {
 
   // Image optimization
   images: {
+    unoptimized: true,
     domains: ["assets.x3-chain.io"],
     formats: ["image/avif", "image/webp"],
   },
