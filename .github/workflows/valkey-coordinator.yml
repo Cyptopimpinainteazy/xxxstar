@@ -34,4 +34,4 @@ jobs:
           toolchain: 1.90.0
 
       - name: Test Valkey/Redis fencing backend
-        run: cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey --test valkey_live -- --nocapture
+        run: cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey,canonical-proofs --test valkey_live -- --nocapture

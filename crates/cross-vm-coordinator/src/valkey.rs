@@ -582,6 +582,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             .record_broadcast(started, tx_id, now_unix)
     }
 
+    #[cfg(not(feature = "canonical-proofs"))]
     pub fn record_attempt_finalized(
         &self,
         lease: &SessionLease,
@@ -598,6 +599,30 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
                 "attempt identity does not match active fencing lease".into(),
             ));
         }
+        crate::OperationAttemptLedger::new(self.attempts.clone())
+            .record_finalized(prior, proof_hash, now_unix)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    pub fn record_attempt_finalized_with_bundle(
+        &self,
+        lease: &SessionLease,
+        prior: &crate::OperationAttempt,
+        intent: &x3_atomic_swap::AtomicIntent,
+        bundle: &x3_atomic_swap::CrossDomainProofBundle,
+        now_unix: u64,
+    ) -> Result<crate::CanonicalOperationResult, CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        if prior.session_id != lease.session_id
+            || prior.owner_id != lease.owner_id
+            || prior.fence != lease.fence
+        {
+            return Err(CoordinatorError::Internal(
+                "attempt identity does not match active fencing lease".into(),
+            ));
+        }
+
+        let proof_hash = crate::verify_bundle_for_attempt(prior, intent, bundle)?;
         crate::OperationAttemptLedger::new(self.attempts.clone())
             .record_finalized(prior, proof_hash, now_unix)
     }

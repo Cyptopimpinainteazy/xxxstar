@@ -42,6 +42,7 @@ pub mod htlc;
 pub mod lease;
 pub mod merkle_settlement; // Gap #3: Merkle-backed settlement for atomic swaps
 pub mod persistence;
+pub mod proof_binding;
 pub mod recovery;
 pub mod relayer;
 pub mod rpc_client;
@@ -58,6 +59,7 @@ pub use config::*;
 pub use lease::*;
 pub use concurrent::*;
 pub use persistence::*;
+pub use proof_binding::*;
 pub use recovery::*;
 pub use state_machine::*;
 pub use types::*;
