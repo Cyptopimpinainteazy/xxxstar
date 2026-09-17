@@ -10,6 +10,7 @@
 //! - [`RelayerModel`] — A relayer that watches chains and submits proofs
 //! - [`SolverRegistry`] — Collection of solvers with selection helpers
 //! - [`RelayerRegistry`] — Collection of relayers with selection helpers
+use alloc::vec;
 
 use crate::intent::ChainKind;
 use alloc::string::String;

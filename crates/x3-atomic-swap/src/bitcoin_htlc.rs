@@ -6,6 +6,8 @@
 //! In production, [`lock`] would create a real P2SH HTLC transaction,
 //! [`claim`] would spend the HTLC output with the preimage,
 //! and [`refund`] would spend after timeout. Finality uses 6 confirmations.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

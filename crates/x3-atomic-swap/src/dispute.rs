@@ -9,6 +9,7 @@
 //! - **Solver dispute**: Did the solver fill with a stale quote?
 //! - **Proof dispute**: Is the finality or transfer proof valid?
 //! - **Watcher dispute**: Did a watcher censor or fabricate events?
+use alloc::vec;
 
 use crate::error::SwapError;
 use crate::slashing::{SlashReason, SlashableActor, SlashingEngine};

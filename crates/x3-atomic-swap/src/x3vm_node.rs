@@ -7,6 +7,7 @@
 //! `author_submitExtrinsic`, waits until the exact extrinsic is present in a
 //! GRANDPA-finalized block, and returns proof objects backed by finalized block
 //! evidence from the node.
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof, LockProof,

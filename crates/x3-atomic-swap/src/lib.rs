@@ -30,6 +30,8 @@
 //! - Scoreboard: cannot reach 100 with missing proof or tx hash
 //! - Timeout: expired swaps become REFUNDABLE/REFUNDED, never FAILED_SILENTLY
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 extern crate alloc;
 
 pub mod adapter;

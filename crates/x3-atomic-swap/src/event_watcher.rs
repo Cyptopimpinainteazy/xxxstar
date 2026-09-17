@@ -13,9 +13,15 @@
 //! - Locked:   `Locked(uint64,address,address,uint256,bytes32,uint256)`
 //! - Claimed:  `Claimed(uint64,address,bytes32)`
 //! - Refunded: `Refunded(uint64,address)`
+use alloc::format;
+use alloc::vec;
+use alloc::boxed::Box;
+use alloc::borrow::ToOwned;
+use alloc::collections::BTreeSet;
 
 use crate::error::SwapError;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 /// Event watcher configuration.

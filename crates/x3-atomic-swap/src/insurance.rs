@@ -5,6 +5,7 @@
 //!
 //! The fund is denominated in a canonical stablecoin (USDC) and replenished by
 //! slashing proceeds and protocol fees.
+use alloc::vec;
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;

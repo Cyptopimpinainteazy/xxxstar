@@ -12,6 +12,8 @@
 //! - Provides extra proof verification methods (`verify_route_proof`, etc.)
 //! - Reports 0 native fee (no on-chain costs for proof verification)
 //! - Reports `finalized=true` (proof verification is instantaneously final)
+use alloc::vec;
+use alloc::format;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

@@ -12,6 +12,12 @@
 //! | Bitcoin    | `ChainKind::Bitcoin` |
 //! | Substrate  | `ChainKind::X3` (X3 runtime is Substrate-based) |
 //! | Cosmos     | `ChainKind::Cosmos` |
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::SwapError;
 use crate::intent::ChainKind;

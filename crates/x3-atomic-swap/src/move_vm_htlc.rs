@@ -6,6 +6,8 @@
 //! In production, [`lock`] would deploy a Move HTLC module/object, [`claim`] would
 //! call the claim entry function, and [`refund`] would trigger the refund path
 //! after timeout. Finality uses checkpoint models (Sui) or BFT (Aptos).
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

@@ -9,6 +9,13 @@
 //! 5. **Submits** claim transaction to the opposite chain
 //! 6. **Writes** proof records to the proof ledger
 //! 7. **Refuses** to mark success without transaction hashes
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::collections::BTreeSet;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::SwapError;
 #[cfg(feature = "std")]
@@ -556,7 +563,7 @@ impl Relayer {
     ) -> Option<SwapScoreboard> {
         let record = self.ledger.get_latest_for_intent(intent_id)?;
         // Count unique relayers that have records for this intent
-        let relayers: std::collections::HashSet<&str> = self
+        let relayers: alloc::collections::BTreeSet<&str> = self
             .ledger
             .get_records_for_intent(intent_id)
             .iter()

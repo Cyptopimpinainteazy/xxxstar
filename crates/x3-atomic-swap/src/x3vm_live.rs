@@ -9,6 +9,7 @@
 //! transport results to the relayer. It intentionally keeps the
 //! [`X3VmAdapter::is_simulated`] safe default until repository-level live-node,
 //! key-separation, and failure-path gates explicitly promote it.
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

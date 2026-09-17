@@ -19,6 +19,12 @@
 //! - `max_slippage_bps` - maximum acceptable slippage in basis points
 //! - `relayer_quorum_requirement` - minimum relayer signatures needed
 //! - `status` - current lifecycle status
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::SwapError;
 use serde::{Deserialize, Serialize};

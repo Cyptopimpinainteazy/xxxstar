@@ -6,6 +6,12 @@
 //! Each supported VM (EVM, SVM, Substrate, Bitcoin Script, X3VM, MoveVM, ...)
 //! implements the [`X3VmAdapter`] trait so the relayer and swap pipeline can
 //! interact uniformly across execution environments.
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
