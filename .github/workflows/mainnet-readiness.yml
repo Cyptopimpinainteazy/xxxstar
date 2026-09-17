@@ -78,7 +78,11 @@ jobs:
           scripts/check-readiness-consistency.sh
 
   readiness:
-    runs-on: ubuntu-latest
+    # No pull_request trigger on this workflow (push to master/release + manual
+    # dispatch only), so routing the heavy job to the x3 self-hosted runner
+    # carries no untrusted-code exposure. The lightweight jobs above stay on
+    # ubuntu-latest so they don't queue behind this on the single x3 machine.
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: [secret-scan, cargo-audit, cargo-deny, readiness-consistency]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -86,6 +90,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install protoc
+        # x3star1 already provides protoc via linuxbrew and has no
+        # passwordless sudo, so this install step only runs on GitHub-hosted.
+        if: runner.environment == 'github-hosted'
         run: |
           curl -sSfL https://github.com/protocolbuffers/protobuf/releases/download/v25.3/protoc-25.3-linux-x86_64.zip -o /tmp/protoc.zip
           echo "f853e691868d0557425ea290bf7ba6384eef2fa9b04c323afab49a770ba9da80  /tmp/protoc.zip" | sha256sum -c -

@@ -34,7 +34,11 @@ concurrency:
 jobs:
   live-lifecycle:
     name: SVM HTLC live validator lifecycle
-    runs-on: ubuntu-latest
+    # This repo is public and pull_request can come from a fork, so keep PR
+    # runs on ubuntu-latest. Only push (master) and manual dispatch route to
+    # the x3 self-hosted runner. Do not remove this split without
+    # re-reviewing the self-hosted-runner-on-public-repo RCE risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
