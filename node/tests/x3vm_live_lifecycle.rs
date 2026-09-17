@@ -10,8 +10,8 @@ use x3_atomic_swap::intent::{
     RouteMode,
 };
 use x3_atomic_swap::{
-    LiveX3VmAdapter, NativeX3NodeTransport, ProofKind, RpcClient, VmType, X3NodeTransportConfig,
-    X3VmAdapter,
+    LiveX3VmAdapter, NativeX3NodeTransport, ProofKind, RpcClient, SecretReleaseEvidence,
+    SecretReleaseFirewall, SecretReleaseRequirement, VmType, X3NodeTransportConfig, X3VmAdapter,
 };
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
 use x3_chain_runtime::{AccountId, Signature};
@@ -315,19 +315,44 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     assert!(!submit(&leg1).is_empty());
     wait_finalized(&leg1, Duration::from_secs(180));
 
-    // A finalized extrinsic with a bad secret must never be promoted into a
-    // claim proof. The transport must bind finalized inclusion to
-    // System::ExtrinsicSuccess and fail closed on ExtrinsicFailed.
+    // Wrong secrets are now rejected before signing/broadcast: the live claim
+    // boundary accepts only a permit issued by the secret-release firewall.
+    let lock_finality = adapter
+        .finality_status(&lock.tx_id)
+        .expect("lock finality for release firewall");
+    let requirement = SecretReleaseRequirement {
+        chain_id: chain_id.clone(),
+        vm_type: VmType::X3Vm,
+        min_confirmations: 1,
+    };
+    let evidence = SecretReleaseEvidence {
+        lock: lock.clone(),
+        finality: lock_finality,
+        rpc_quorum_agreed: true,
+        refunded: false,
+    };
     let wrong_preimage = [0x99u8; 32];
-    let err = adapter
-        .claim(local_id, wrong_preimage)
-        .expect_err("wrong-secret claim must fail closed");
     assert!(
-        err.to_string().contains("ExtrinsicFailed"),
-        "unexpected wrong-secret claim error: {err}"
+        SecretReleaseFirewall::authorize(
+            &intent,
+            wrong_preimage,
+            core::slice::from_ref(&requirement),
+            core::slice::from_ref(&evidence),
+        )
+        .is_err(),
+        "wrong secret must be rejected before a live claim can be signed"
     );
 
-    let claim = adapter.claim(local_id, preimage).expect("live native claim");
+    let permit = SecretReleaseFirewall::authorize(
+        &intent,
+        preimage,
+        core::slice::from_ref(&requirement),
+        core::slice::from_ref(&evidence),
+    )
+    .expect("secret-release permit");
+    let claim = adapter
+        .claim_with_permit(&permit)
+        .expect("live native claim with permit");
     assert_eq!(claim.vm_type, VmType::X3Vm);
     assert_eq!(claim.intent_id, local_id);
     assert_eq!(claim.preimage, preimage);
@@ -474,6 +499,79 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
     assert!(
         claim_after_refund.to_string().contains("ExtrinsicFailed"),
         "unexpected claim-after-refund error: {claim_after_refund}"
+    );
+}
+
+
+#[test]
+#[ignore = "boots the real X3 dev node and proves early refund dispatch fails"]
+fn real_local_node_refund_before_timeout_fails_closed() {
+    let _node = spawn_dev_node();
+    wait_rpc(Duration::from_secs(180));
+
+    let chain_id = String::from("x3-local");
+    let local_id = 3u64;
+    let preimage = [0x36u8; 32];
+    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
+    let alice_uri = dev_uri("Alice");
+    let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+        .expect("early-refund signer");
+
+    let prepared = signer
+        .prepare_create_intent(
+            dev_account("Bob"),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            X3RuntimeSigner::x3_native_asset(1_000_000),
+            hashlock,
+            Some(300),
+        )
+        .expect("prepare early-refund intent");
+    assert!(!submit(&prepared.signed_extrinsic).is_empty());
+    let (_, finalized_head_hash) =
+        wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
+    let finalized_hash = H256::from_slice(
+        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
+            .expect("decode finalized head hex"),
+    );
+    let runtime_intent_id = signer
+        .resolve_intent_id(&prepared, finalized_hash)
+        .expect("resolve real on-chain intent id");
+    signer.bind_intent(local_id, runtime_intent_id).unwrap();
+
+    let transport = NativeX3NodeTransport::new(
+        X3NodeTransportConfig {
+            chain_id: chain_id.clone(),
+            rpc_url: RPC_URL.into(),
+            finality_poll_attempts: 480,
+            finality_poll_delay_ms: 500,
+            expected_block_time_ms: 6_000,
+        },
+        signer,
+    );
+    let adapter = LiveX3VmAdapter::new(
+        chain_id,
+        b"x3-native-early-refund-escrow".to_vec(),
+        transport,
+    );
+    let intent = atomic_intent(local_id, preimage);
+    let lock = adapter.lock(&intent).expect("live early-refund lock");
+    assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
+
+    let err = adapter
+        .refund(local_id)
+        .expect_err("refund before timeout must fail closed");
+    assert!(
+        err.to_string().contains("ExtrinsicFailed"),
+        "unexpected early-refund error: {err}"
+    );
+
+    let head = finalized_head();
+    assert!(
+        !matches!(
+            intent_state_at(runtime_intent_id, &head),
+            pallet_x3_settlement_engine::IntentState::Refunded
+        ),
+        "failed early refund must not mutate intent into Refunded"
     );
 }
 

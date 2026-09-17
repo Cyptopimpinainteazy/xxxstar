@@ -16,6 +16,7 @@ use crate::adapter::{
 };
 use crate::error::SwapError;
 use crate::intent::{AtomicIntent, IntentId};
+use crate::secret_release::SecretReleasePermit;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Debug;
@@ -38,8 +39,7 @@ pub trait X3VmLiveTransport: Send + Sync + Debug {
         &self,
         chain_id: &ChainId,
         escrow_address: &[u8],
-        intent_id: IntentId,
-        preimage: [u8; 32],
+        permit: &SecretReleasePermit,
     ) -> Result<ClaimProof, SwapError>;
 
     fn refund(
@@ -105,8 +105,37 @@ impl<T: X3VmLiveTransport> LiveX3VmAdapter<T> {
         &self.escrow_address
     }
 
-    pub fn transport(&self) -> &T {
+    pub(crate) fn transport(&self) -> &T {
         &self.transport
+    }
+
+    /// Claim a live X3 settlement only with a firewall-issued secret-release permit.
+    ///
+    /// The permit type has no public constructor and its fields are private, so
+    /// callers cannot manufacture authority by passing an arbitrary preimage.
+    pub fn claim_with_permit(
+        &self,
+        permit: &SecretReleasePermit,
+    ) -> Result<ClaimProof, SwapError> {
+        let intent_id = permit.intent_id();
+        let preimage = permit.preimage();
+        let proof = self
+            .transport
+            .claim(&self.chain_id, &self.escrow_address, permit)?;
+        self.validate_claim(&proof)?;
+        if proof.intent_id != intent_id {
+            return Err(Self::invalid_proof(
+                "claim",
+                "intent id does not match secret-release permit",
+            ));
+        }
+        if proof.preimage != preimage {
+            return Err(Self::invalid_proof(
+                "claim",
+                "preimage does not match secret-release permit",
+            ));
+        }
+        Ok(proof)
     }
 
     fn invalid_proof(kind: &str, reason: &str) -> SwapError {
@@ -263,27 +292,10 @@ impl<T: X3VmLiveTransport> X3VmAdapter for LiveX3VmAdapter<T> {
         Ok(proof)
     }
 
-    fn claim(&self, intent_id: IntentId, preimage: [u8; 32]) -> Result<ClaimProof, SwapError> {
-        let proof = self.transport.claim(
-            &self.chain_id,
-            &self.escrow_address,
-            intent_id,
-            preimage,
-        )?;
-        self.validate_claim(&proof)?;
-        if proof.intent_id != intent_id {
-            return Err(Self::invalid_proof(
-                "claim",
-                "intent id does not match request",
-            ));
-        }
-        if proof.preimage != preimage {
-            return Err(Self::invalid_proof(
-                "claim",
-                "preimage does not match request",
-            ));
-        }
-        Ok(proof)
+    fn claim(&self, _intent_id: IntentId, _preimage: [u8; 32]) -> Result<ClaimProof, SwapError> {
+        Err(SwapError::MissingProof {
+            proof_name: "secret-release permit required for live X3VM claim",
+        })
     }
 
     fn refund(&self, intent_id: IntentId) -> Result<RefundProof, SwapError> {
@@ -429,16 +441,15 @@ mod tests {
             &self,
             _chain_id: &ChainId,
             _escrow_address: &[u8],
-            intent_id: IntentId,
-            preimage: [u8; 32],
+            permit: &SecretReleasePermit,
         ) -> Result<ClaimProof, SwapError> {
             self.counts.claim.fetch_add(1, Ordering::SeqCst);
             Ok(ClaimProof {
                 tx_id: "0xlive-claim".into(),
-                intent_id,
+                intent_id: permit.intent_id(),
                 chain_id: self.proof_chain(),
                 vm_type: self.proof_vm(),
-                preimage,
+                preimage: permit.preimage(),
                 block_number: 11,
                 block_hash: "0xblock11".into(),
                 raw_proof: vec![4, 5, 6],
@@ -561,7 +572,13 @@ mod tests {
             amount_in: 1000,
             min_amount_out: 900,
             receiver: "receiver".into(),
-            hashlock: [9u8; 32],
+            hashlock: {
+                use sha2::{Digest, Sha256};
+                let digest = Sha256::digest([3u8; 32]);
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&digest);
+                hash
+            },
             source_timeout: 200,
             destination_timeout: 100,
             finality_requirements: vec![FinalityRequirement {
@@ -590,13 +607,41 @@ mod tests {
         let preimage = [3u8; 32];
 
         let lock = adapter.lock(&intent).expect("live lock");
-        let claim = adapter.claim(intent.intent_id, preimage).expect("live claim");
+        assert!(
+            adapter.claim(intent.intent_id, preimage).is_err(),
+            "bare live claim must fail closed without a secret-release permit"
+        );
+        assert_eq!(
+            counts.claim.load(Ordering::SeqCst),
+            0,
+            "firewall rejection must happen before transport sees the preimage"
+        );
+
+        let finality = adapter.finality_status(&lock.tx_id).expect("lock finality");
+        let permit = crate::SecretReleaseFirewall::authorize(
+            &intent,
+            preimage,
+            &[crate::SecretReleaseRequirement {
+                chain_id: "x3-local".into(),
+                vm_type: VmType::X3Vm,
+                min_confirmations: 1,
+            }],
+            &[crate::SecretReleaseEvidence {
+                lock: lock.clone(),
+                finality,
+                rpc_quorum_agreed: true,
+                refunded: false,
+            }],
+        )
+        .expect("firewall permit");
+        let claim = adapter
+            .claim_with_permit(&permit)
+            .expect("permitted live claim");
         let refund = adapter.refund(intent.intent_id).expect("live refund delegation");
         assert!(adapter.verify_lock(&lock).expect("verify lock"));
         assert!(adapter.verify_claim(&claim).expect("verify claim"));
         assert!(adapter.verify_refund(&refund).expect("verify refund"));
         let _ = adapter.estimate_fee(&intent).expect("fee");
-        let _ = adapter.finality_status(&lock.tx_id).expect("finality");
         let _ = adapter.chain_health().expect("health");
 
         assert_eq!(counts.lock.load(Ordering::SeqCst), 1);
@@ -640,7 +685,7 @@ mod tests {
                 proof.raw_proof.clear();
                 Ok(proof)
             }
-            fn claim(&self, c: &ChainId, e: &[u8], id: IntentId, p: [u8; 32]) -> Result<ClaimProof, SwapError> { self.0.claim(c, e, id, p) }
+            fn claim(&self, c: &ChainId, e: &[u8], permit: &SecretReleasePermit) -> Result<ClaimProof, SwapError> { self.0.claim(c, e, permit) }
             fn refund(&self, c: &ChainId, e: &[u8], id: IntentId) -> Result<RefundProof, SwapError> { self.0.refund(c, e, id) }
             fn verify_lock(&self, p: &LockProof) -> Result<bool, SwapError> { self.0.verify_lock(p) }
             fn verify_claim(&self, p: &ClaimProof) -> Result<bool, SwapError> { self.0.verify_claim(p) }
