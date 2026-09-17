@@ -17,6 +17,7 @@ jobs:
     # the x3 self-hosted runner. Do not remove this split without
     # re-reviewing the self-hosted-runner-on-public-repo RCE risk.
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    timeout-minutes: 90
     env:
       # Keep reproducible runtime builds pinned while using a Rust release
       # compatible with the current dependency graph (Edition 2024 crates).
