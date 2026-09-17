@@ -5,6 +5,7 @@ on:
     branches: [ "main", "master", "develop" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 
 concurrency:
@@ -13,7 +14,14 @@ concurrency:
 
 jobs:
   clippy:
-    runs-on: ubuntu-latest
+    # Piloting this job on the x3 self-hosted runner (16c/32t, 77 GiB RAM,
+    # warm Rust/WASM/Solana toolchain) for push/manual runs, where the code
+    # is already trusted (merged or dispatched by a collaborator). PRs stay
+    # on ubuntu-latest: this repo is public, and a self-hosted runner
+    # checking out an untrusted fork PR and running `cargo build`/`clippy`
+    # on it is a code-execution risk (arbitrary build.rs/proc-macros run on
+    # x3star1). Do not remove this split without re-reviewing that risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     permissions:
       contents: read
       issues: write
@@ -28,6 +36,9 @@ jobs:
           targets: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Install Protoc
+        # The x3 self-hosted runner already has protoc (via linuxbrew) and
+        # has no passwordless sudo, so apt-get would just fail here.
+        if: runner.environment == 'github-hosted'
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       # A workspace-wide `--all-features` unifies unrelated optional features
