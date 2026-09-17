@@ -11,6 +11,10 @@ repository = "https://github.com/x3-chain/x3-chain"
 default = ["cuda"]
 cuda = []
 sev-snp = []
+# Test-only: emits a deterministic, NON-cryptographic attestation report.
+# Never enable this in a production build — it exists so the simulation path
+# can still be exercised by unit tests.
+simulated-attestation = []
 
 [dependencies]
 # Async runtime

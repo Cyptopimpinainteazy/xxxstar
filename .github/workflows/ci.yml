@@ -271,9 +271,8 @@ jobs:
 
       - name: Scan for secrets
         run: |
-          trufflehog filesystem --no-verification . 2>&1 | tee trufflehog-output.txt || true
-          if grep -q "Secret" trufflehog-output.txt 2>/dev/null; then
-            echo "❌ SECRETS DETECTED"
+          if ! trufflehog filesystem --no-verification . > trufflehog-output.txt 2>&1; then
+            echo "❌ trufflehog reported findings or failed — treating as blocking"
             cat trufflehog-output.txt
             exit 1
           fi

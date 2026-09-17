@@ -37,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript type check
-        run: npm run typecheck || true  # non-blocking until strict types are fixed
+        run: npm run typecheck
 
       - name: Run unit tests
         run: npm run test
@@ -82,10 +82,10 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
 
       - name: Check Rust compilation
-        run: cargo check --release 2>&1 | head -100
+        run: cargo check --release
 
       - name: Clippy linting
-        run: cargo clippy -- -D warnings 2>&1 | head -100 || true
+        run: cargo clippy -- -D warnings
 
   # ── Build Installers ──
   build-installers:

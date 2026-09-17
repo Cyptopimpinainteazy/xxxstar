@@ -673,22 +673,21 @@ impl RelayerSafetyPipeline {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
 
-        let mut attestations = AttestationSet::new(proof_id);
-        let attestation = Attestation {
-            validator: ValidatorId("relayer-main".to_string()),
-            statement_hash: proof_id,
-            signature: vec![1],
-            weight: 100,
-        };
-        if let Err(err) = attestations.add_attestation(attestation) {
+        // Audit finding P0-5: this path previously fabricated a one-byte
+        // "signature" and self-attested with weight 100, which reached quorum
+        // without any cryptographic check. Attestation quorum now requires
+        // verified Ed25519 signatures, so an EVM proof that carries none is
+        // disputed instead of approving itself.
+        let attestations = AttestationSet::new(proof_id);
+        let quorum_met = attestations.has_quorum(67);
+        if !quorum_met {
             return self.raise_dispute(
                 proof_id,
                 proof.finalized_block,
-                format!("attestation_rejected: {err:?}"),
+                "attestation_quorum_not_met: EVM proof carries no verifiable validator signatures"
+                    .to_string(),
             );
         }
-
-        let quorum_met = attestations.has_quorum(67);
         if let Err(reason) = self.evaluate_risk(quorum_met, recent_failures) {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
@@ -728,12 +727,8 @@ impl RelayerSafetyPipeline {
             let attestation = Attestation {
                 validator: ValidatorId(format!("svm-validator-{idx}")),
                 statement_hash: proof_id,
-                signature: {
-                    let mut combined = Vec::with_capacity(96);
-                    combined.extend_from_slice(&signature.validator_pubkey);
-                    combined.extend_from_slice(&signature.signature);
-                    combined
-                },
+                public_key: signature.validator_pubkey,
+                signature: signature.signature.to_vec(),
                 weight: 1,
             };
             if let Err(err) = attestations.add_attestation(attestation) {

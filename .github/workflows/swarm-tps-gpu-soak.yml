@@ -64,7 +64,7 @@ jobs:
       - name: Upload TPS soak artifacts
         uses: actions/upload-artifact@v4
         if: always()
-        continue-on-error: true
         with:
           name: swarm-tps-gpu-soak
           path: target/swarm-tps-soak/
+          if-no-files-found: warn
