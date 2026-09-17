@@ -383,6 +383,102 @@ return 1
 }
 
 
+/// Immutable coordinator-session to canonical intent binding on Redis/Valkey.
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+#[derive(Clone)]
+pub struct ValkeyIntentBindingStore {
+    client: Client,
+    namespace: String,
+}
+
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+impl ValkeyIntentBindingStore {
+    pub fn new(redis_url: &str) -> Result<Self, CoordinatorError> {
+        Self::with_namespace(redis_url, "x3")
+    }
+
+    pub fn with_namespace(
+        redis_url: &str,
+        namespace: impl Into<String>,
+    ) -> Result<Self, CoordinatorError> {
+        Ok(Self {
+            client: Client::open(redis_url)
+                .map_err(|e| backend_error("client creation", e))?,
+            namespace: namespace.into(),
+        })
+    }
+
+    fn key(&self, session_id: &str) -> String {
+        format!("{}:intent-binding:{{{session_id}}}", self.namespace)
+    }
+
+    fn connection(&self) -> Result<redis::Connection, CoordinatorError> {
+        self.client
+            .get_connection()
+            .map_err(|e| backend_error("connection", e))
+    }
+}
+
+#[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
+impl crate::IntentBindingStore for ValkeyIntentBindingStore {
+    fn bind(
+        &self,
+        binding: &crate::SessionIntentBinding,
+    ) -> Result<(), CoordinatorError> {
+        let payload = serde_json::to_string(binding).map_err(|e| {
+            CoordinatorError::Internal(format!("intent binding serialize failed: {e}"))
+        })?;
+        let script = Script::new(
+            r#"
+local existing = redis.call('GET', KEYS[1])
+if not existing then
+  redis.call('SET', KEYS[1], ARGV[1])
+  return 1
+end
+if existing == ARGV[1] then
+  return 1
+end
+return 0
+"#,
+        );
+
+        let mut conn = self.connection()?;
+        let accepted: i64 = script
+            .key(self.key(&binding.session_id))
+            .arg(&payload)
+            .invoke(&mut conn)
+            .map_err(|e| backend_error("intent binding script", e))?;
+
+        if accepted == 1 {
+            Ok(())
+        } else {
+            Err(CoordinatorError::Internal(format!(
+                "session '{}' is already bound to a different canonical intent",
+                binding.session_id
+            )))
+        }
+    }
+
+    fn load(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<crate::SessionIntentBinding>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let raw: Option<String> = redis::cmd("GET")
+            .arg(self.key(session_id))
+            .query(&mut conn)
+            .map_err(|e| backend_error("intent binding lookup", e))?;
+
+        raw.map(|entry| {
+            serde_json::from_str(&entry).map_err(|e| {
+                CoordinatorError::Internal(format!("invalid intent binding in Valkey: {e}"))
+            })
+        })
+        .transpose()
+    }
+}
+
+
 /// Content-addressed canonical proof-bundle vault on Redis/Valkey.
 #[cfg(all(feature = "valkey", feature = "canonical-proofs"))]
 #[derive(Clone)]
@@ -489,6 +585,8 @@ pub struct ValkeyDistributedCoordinator<P: crate::SessionPersistence> {
     attempts: ValkeyAttemptStore,
     #[cfg(feature = "canonical-proofs")]
     proofs: ValkeyProofBundleStore,
+    #[cfg(feature = "canonical-proofs")]
+    bindings: ValkeyIntentBindingStore,
 }
 
 #[cfg(feature = "valkey")]
@@ -501,6 +599,8 @@ impl<P: crate::SessionPersistence> Clone for ValkeyDistributedCoordinator<P> {
             attempts: self.attempts.clone(),
             #[cfg(feature = "canonical-proofs")]
             proofs: self.proofs.clone(),
+            #[cfg(feature = "canonical-proofs")]
+            bindings: self.bindings.clone(),
         }
     }
 }
@@ -526,6 +626,8 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             attempts: ValkeyAttemptStore::with_namespace(redis_url, namespace)?,
             #[cfg(feature = "canonical-proofs")]
             proofs: ValkeyProofBundleStore::with_namespace(redis_url, namespace)?,
+            #[cfg(feature = "canonical-proofs")]
+            bindings: ValkeyIntentBindingStore::with_namespace(redis_url, namespace)?,
         })
     }
 
@@ -644,6 +746,56 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             .record_refunds(&lease.session_id, now_unix)
     }
 
+    #[cfg(feature = "canonical-proofs")]
+    pub fn bind_session_intent(
+        &self,
+        lease: &SessionLease,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+        now_unix: u64,
+    ) -> Result<crate::SessionIntentBinding, CoordinatorError> {
+        self.validate(lease, now_unix)?;
+        let session = self
+            .coordinator
+            .session(&lease.session_id)?
+            .ok_or_else(|| CoordinatorError::SessionNotFound {
+                session_id: lease.session_id.clone(),
+            })?;
+
+        if session.hash_lock.0 != intent.hashlock {
+            return Err(CoordinatorError::Internal(
+                "coordinator session hashlock does not match AtomicIntent hashlock".into(),
+            ));
+        }
+
+        let binding =
+            crate::binding_from_intent(&lease.session_id, runtime_intent_id, intent)?;
+        crate::IntentBindingStore::bind(&self.bindings, &binding)?;
+        Ok(binding)
+    }
+
+    #[cfg(feature = "canonical-proofs")]
+    fn assert_session_intent_binding(
+        &self,
+        session_id: &str,
+        intent: &x3_atomic_swap::AtomicIntent,
+        runtime_intent_id: [u8; 32],
+    ) -> Result<crate::SessionIntentBinding, CoordinatorError> {
+        let expected = crate::binding_from_intent(session_id, runtime_intent_id, intent)?;
+        let actual = crate::IntentBindingStore::load(&self.bindings, session_id)?
+            .ok_or_else(|| {
+                CoordinatorError::Internal(format!(
+                    "session '{session_id}' has no canonical runtime intent binding"
+                ))
+            })?;
+        if actual != expected {
+            return Err(CoordinatorError::Internal(format!(
+                "session '{session_id}' canonical intent binding mismatch"
+            )));
+        }
+        Ok(actual)
+    }
+
     pub fn record_attempt_started(
         &self,
         lease: &SessionLease,
@@ -725,6 +877,12 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             ));
         }
 
+        self.bind_session_intent(lease, intent, runtime_intent_id, now_unix)?;
+        self.assert_session_intent_binding(
+            &lease.session_id,
+            intent,
+            runtime_intent_id,
+        )?;
         let proof_hash =
             crate::verify_bundle_for_attempt(prior, intent, runtime_intent_id, bundle)?;
         crate::ProofBundleStore::put_bundle(&self.proofs, bundle)?;
@@ -739,6 +897,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         intent: &x3_atomic_swap::AtomicIntent,
         runtime_intent_id: [u8; 32],
     ) -> Result<x3_atomic_swap::CrossDomainProofSet, CoordinatorError> {
+        self.assert_session_intent_binding(session_id, intent, runtime_intent_id)?;
         let mut canonical_results = Vec::new();
         for operation in [
             crate::CoordinatorOperation::FastHtlcLock,
