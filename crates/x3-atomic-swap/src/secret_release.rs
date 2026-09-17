@@ -65,6 +65,26 @@ impl core::fmt::Debug for SecretReleasePermit {
     }
 }
 
+impl SecretReleasePermit {
+    /// Identifier of the intent this permit authorizes.
+    pub fn intent_id(&self) -> IntentId {
+        self.intent_id
+    }
+
+    /// Number of domains whose evidence unlocked this permit.
+    pub fn evidence_domains(&self) -> usize {
+        self.evidence_domains
+    }
+
+    /// The release preimage authorized by this permit.
+    ///
+    /// Callers must only reach this after the firewall issued the permit; the
+    /// value stays out of `Debug` output on purpose.
+    pub fn preimage(&self) -> [u8; 32] {
+        self.preimage
+    }
+}
+
 fn chain_matches_kind(chain_id: &str, kind: ChainKind) -> bool {
     let normalized = chain_id.to_ascii_lowercase();
     let aliases = match kind {
