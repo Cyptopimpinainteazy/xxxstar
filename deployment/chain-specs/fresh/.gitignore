@@ -1,9 +1,0 @@
-# TESTNET Key material — NEVER commit. These are throwaway local-validator SURIs,
-# but the pattern must not leak secrets into the git history of this audit repo.
-# This file lives in deployment/chain-specs/fresh/, so patterns are relative to fresh/.
-validator-keys/
-*.suri
-*.seed
-*.txt
-*secret*key*
-.node-key-*

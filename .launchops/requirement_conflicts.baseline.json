@@ -1,5 +1,0 @@
-{
-  "_comment": "Pinned fingerprints for .launchops/requirement_conflicts.json. Only SHIPPED-doc conflicts are gated; .kilo/worktrees/* entries are skipped as chat-transcript noise. Regenerate with UPDATE_BASELINE=1 and fill accepted_reason during review.",
-  "ignored_kilo_entries": 0,
-  "conflicts": []
-}

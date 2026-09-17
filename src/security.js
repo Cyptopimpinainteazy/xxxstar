@@ -1,1 +1,0 @@
-/* Authorization and user whitelist checks. */

@@ -1,5 +1,0 @@
-error: Invalid invariant ID format, expected e.g. CHAIN-CONSENSUS-001
- --> tests/ui/fail_invalid_format.rs:3:13
-  |
-3 | #[invariant("BADFORMAT")]
-  |             ^^^^^^^^^^^

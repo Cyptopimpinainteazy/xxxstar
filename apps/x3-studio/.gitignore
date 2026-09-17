@@ -1,6 +1,0 @@
-node_modules/
-dist/
-dist-electron/
-*.tsbuildinfo
-.x3studio/settings.json
-x3-proof/
