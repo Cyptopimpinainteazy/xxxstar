@@ -85,9 +85,16 @@ impl<O: crate::persistence::OffchainStorageProvider> DistributedLeaseStore
 ///
 /// This closes the cross-session race where two independent coordinator
 /// processes could otherwise update a last-write-wins used-secret vector.
-#[derive(Clone)]
 pub struct DurableSecretRegistry<S: DistributedLeaseStore> {
     store: Arc<S>,
+}
+
+impl<S: DistributedLeaseStore> Clone for DurableSecretRegistry<S> {
+    fn clone(&self) -> Self {
+        Self {
+            store: Arc::clone(&self.store),
+        }
+    }
 }
 
 impl<S: DistributedLeaseStore> DurableSecretRegistry<S> {
@@ -154,9 +161,16 @@ struct DurableLeaseState {
 ///
 /// Independent coordinator processes using the same store observe one
 /// authoritative lease/fencing epoch per session.
-#[derive(Clone)]
 pub struct DurableLeaseAuthority<S: DistributedLeaseStore> {
     store: Arc<S>,
+}
+
+impl<S: DistributedLeaseStore> Clone for DurableLeaseAuthority<S> {
+    fn clone(&self) -> Self {
+        Self {
+            store: Arc::clone(&self.store),
+        }
+    }
 }
 
 impl<S: DistributedLeaseStore> DurableLeaseAuthority<S> {
@@ -165,6 +179,12 @@ impl<S: DistributedLeaseStore> DurableLeaseAuthority<S> {
 
     pub fn new(store: Arc<S>) -> Self {
         Self { store }
+    }
+
+    /// Share the underlying CAS store with another durable authority, such as
+    /// the secret-ownership registry, so both observe one atomic backend.
+    pub fn shared_store(&self) -> Arc<S> {
+        Arc::clone(&self.store)
     }
 
     fn key(session_id: &str) -> Vec<u8> {
