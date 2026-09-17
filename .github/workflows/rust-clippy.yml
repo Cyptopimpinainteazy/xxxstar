@@ -22,6 +22,9 @@ jobs:
     # on it is a code-execution risk (arbitrary build.rs/proc-macros run on
     # x3star1). Do not remove this split without re-reviewing that risk.
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    # A hung self-hosted job blocks x3star1 indefinitely, unlike a disposable
+    # GitHub-hosted VM; give it a hard ceiling.
+    timeout-minutes: 90
     permissions:
       contents: read
       issues: write
