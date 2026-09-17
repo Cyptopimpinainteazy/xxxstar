@@ -1,8 +1,8 @@
 ---
-name: Ask yourself this before you ask me any questions
+name: ask-yourself-this-before-you-ask-me-any-questions
 description: Any time you want to ask me a question.. before any question you ask....
+disable-model-invocation: true
 ---
-
 <!-- Tip: Use /create-prompt in chat to generate content with agent assistance -->
 
 Before you ask me anything ask yourself as a blockchain god!   Ask what's best for the main net... what's best for production... is this the safest?  If you can answer any of those questions that is your clear answer.  Everytime!
