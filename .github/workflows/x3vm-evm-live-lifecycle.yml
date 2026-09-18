@@ -5,14 +5,9 @@ name: x3vm-evm-live-lifecycle
 # contract and execute real signed local-chain transactions; they are not mocks.
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "X3-contracts/evm/**"
-      - "crates/x3-atomic-swap/**"
-      - "node/**"
-      - "pallets/x3-settlement-engine/**"
-      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  # No standalone `push` trigger — `production-gate.yml` calls this as `evm-live`
+  # on every push and gates on it, so a push run here duplicated both jobs on the
+  # same runner. `workflow_dispatch` keeps it runnable on demand.
   pull_request:
     branches: [master, finish/x3vm-live-transport]
     paths:
@@ -28,14 +23,14 @@ env:
   CARGO_TERM_COLOR: always
 
 
-# NOTE: deliberately no `concurrency:` block. This workflow is invoked twice for
-# the same commit — standalone on push, and as a reusable workflow from
-# `production-gate.yml` (`evm-live`). A workflow-level concurrency group applies
-# to the called run too, and it collides with the standalone run of the same
-# workflow/commit: production-gate's `evm-live` job was never scheduled, so its
-# `gate` job (which `needs:` it) was always skipped and the release gate could
-# never pass. The single self-hosted runner already serialises everything, so
-# cancelling here bought nothing.
+# NOTE: deliberately no `concurrency:` block. This workflow is called as a
+# reusable workflow from `production-gate.yml` (`evm-live`), and a workflow-level
+# concurrency group applies to the called run too: when this also had a standalone
+# `push` trigger, the two runs shared a group, the called one was never scheduled,
+# and production-gate's `gate` job (which `needs:` it) was always skipped. The push
+# trigger is gone (production-gate covers pushes), but do not add a concurrency
+# block back without accounting for the call path. The single self-hosted runner
+# already serialises everything, so cancelling here buys nothing.
 
 jobs:
   live-lifecycle:
