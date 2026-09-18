@@ -1,6 +1,13 @@
 name: x3vm-live-lifecycle
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "pallets/x3-settlement-engine/**"
+      - ".github/workflows/x3vm-live-lifecycle.yml"
   pull_request:
     paths:
       - "crates/x3-atomic-swap/**"
@@ -13,15 +20,35 @@ on:
 jobs:
   live-x3vm-lifecycle:
     name: real local-node X3VM lifecycles
-    runs-on: ubuntu-latest
+    # This repo is public and pull_request can come from a fork, so keep PR runs
+    # on ubuntu-latest. Push (master), manual dispatch and workflow_call run on
+    # the x3 self-hosted runner, which is the only runner that can execute here
+    # (GitHub-hosted jobs are blocked by an account-level billing lock). Do not
+    # remove this split without re-reviewing the self-hosted-runner-on-public-repo
+    # RCE risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y protobuf-compiler clang cmake
+          # The self-hosted runner already has this toolchain and no usable sudo;
+          # install only what is actually missing and fail loudly otherwise.
+          missing=""
+          command -v protoc >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang  >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake  >/dev/null 2>&1 || missing="$missing cmake"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present: $(protoc --version | head -1)"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

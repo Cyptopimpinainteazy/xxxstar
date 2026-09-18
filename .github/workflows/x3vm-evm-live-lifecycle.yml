@@ -35,15 +35,33 @@ concurrency:
 jobs:
   live-lifecycle:
     name: EVM HTLC live anvil lifecycle
-    runs-on: ubuntu-latest
+    # Public repo + fork PRs => keep pull_request on ubuntu-latest. Push (master)
+    # and manual dispatch run on the x3 self-hosted runner, which is the only
+    # runner able to execute here (GitHub-hosted jobs are blocked by an
+    # account-level billing lock). Re-review the self-hosted-runner-on-public-repo
+    # RCE risk before removing this split.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y protobuf-compiler clang cmake openssl
+          missing=""
+          command -v protoc  >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang   >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake   >/dev/null 2>&1 || missing="$missing cmake"
+          command -v openssl >/dev/null 2>&1 || missing="$missing openssl"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -76,15 +94,29 @@ jobs:
 
   live-x3vm-evm:
     name: real X3VM to Anvil lock claim lifecycle
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y protobuf-compiler clang cmake jq openssl
+          missing=""
+          command -v protoc  >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang   >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake   >/dev/null 2>&1 || missing="$missing cmake"
+          command -v jq      >/dev/null 2>&1 || missing="$missing jq"
+          command -v openssl >/dev/null 2>&1 || missing="$missing openssl"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
