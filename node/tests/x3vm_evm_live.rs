@@ -9,8 +9,11 @@ use x3_atomic_swap::intent::{
     AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, FinalityRequirement, RefundPath,
     RouteMode,
 };
+use x3_atomic_swap::secret_release::{RefundObservation, RpcQuorumAttestation};
 use x3_atomic_swap::{
-    LiveEvmExecutor, LiveX3VmAdapter, NativeX3NodeTransport, RpcClient, VmType,
+    CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof,
+    LiveEvmExecutor, LiveX3VmAdapter, NativeX3NodeTransport, RpcClient, SecretReleaseEvidence,
+    SecretReleaseFirewall, SecretReleaseRequirement, VmType, X3ExtrinsicSigner,
     X3NodeTransportConfig, X3VmAdapter,
 };
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
@@ -108,6 +111,30 @@ fn x3_block_contains(rpc: &mut RpcClient, hash: &str, signed: &str) -> bool {
         .and_then(Value::as_array)
         .map(|xs| xs.iter().any(|x| x.as_str() == Some(signed)))
         .unwrap_or(false)
+}
+
+fn x3_extrinsic_index_in_block(rpc: &mut RpcClient, hash: &str, signed: &str) -> Option<u32> {
+    let block = rpc
+        .call("chain_getBlock", vec![Value::String(hash.to_string())])
+        .expect("finalized block")
+        .result;
+    block
+        .as_ref()
+        .and_then(|v| v.pointer("/block/extrinsics"))
+        .and_then(Value::as_array)
+        .and_then(|xs| xs.iter().position(|x| x.as_str() == Some(signed)))
+        .map(|position| position as u32)
+}
+
+/// Inclusion is not success: a rejected extrinsic still lands in a finalized
+/// block, so callers that need positive proof of execution must check this.
+fn assert_x3_dispatch_succeeded(signer: &X3RuntimeSigner, block_hash: &str, signed: &str) {
+    let mut rpc = RpcClient::new(X3_RPC.into(), 0);
+    let index = x3_extrinsic_index_in_block(&mut rpc, block_hash, signed)
+        .expect("signed extrinsic is present in the block that included it");
+    signer
+        .verify_finalized_dispatch(block_hash, index)
+        .expect("finalized extrinsic dispatched successfully");
 }
 
 /// Scans every finalized block number seen since the poll started (not just
@@ -235,7 +262,9 @@ fn intent_state_at(
     pallet_x3_settlement_engine::IntentState::decode(&mut &bytes[..]).expect("decode IntentState")
 }
 
-fn wait_for_finalized_refund(intent_id: H256, timeout: Duration) -> String {
+/// Poll for the terminal `Refunded` state. The runtime performs this transition
+/// from `on_initialize`, so a caller must not assume it has to drive it.
+fn wait_for_refund_state(intent_id: H256, timeout: Duration) -> Option<String> {
     let started = Instant::now();
     while started.elapsed() < timeout {
         let head = finalized_head();
@@ -243,15 +272,23 @@ fn wait_for_finalized_refund(intent_id: H256, timeout: Duration) -> String {
             intent_state_at(intent_id, &head),
             pallet_x3_settlement_engine::IntentState::Refunded
         ) {
-            return head;
+            return Some(head);
         }
         thread::sleep(Duration::from_millis(500));
     }
-    panic!("X3 intent did not reach Refunded in GRANDPA-finalized state");
+    None
 }
 
+fn wait_for_finalized_refund(intent_id: H256, timeout: Duration) -> String {
+    wait_for_refund_state(intent_id, timeout)
+        .expect("X3 intent did not reach Refunded in GRANDPA-finalized state")
+}
+
+/// Local mirror of the cross-domain intent. The secret-release firewall requires
+/// a releasable lifecycle state and a stored hash that matches the fields, so
+/// this fixture mirrors a trade whose X3 and EVM legs are both escrowed.
 fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
-    AtomicIntent {
+    let mut intent = AtomicIntent {
         intent_id: local_id,
         source_chain: ChainKind::X3,
         destination_chain: ChainKind::Ethereum,
@@ -281,9 +318,11 @@ fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
         route_mode: RouteMode::DirectHtlc,
         max_slippage_bps: 100,
         relayer_quorum_requirement: 1,
-        status: AtomicSwapStatus::Pending,
+        status: AtomicSwapStatus::BothLocked,
         intent_hash: [0u8; 32],
-    }
+    };
+    intent.intent_hash = intent.compute_hash();
+    intent
 }
 
 #[test]
@@ -388,8 +427,87 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
     assert!(!evm_claim.tx_id.is_empty());
 
     // The same preimage revealed on the EVM leg must settle the finalized X3 leg.
+    // A cross-domain claim is gated by the secret-release firewall — the bare
+    // claim path never reaches the chain — and the permit must carry evidence for
+    // every domain the intent declares, including the destination chain. Both
+    // evidence entries below are built from real on-chain transactions: the X3
+    // escrow and the EVM escrow that was just claimed.
+    let x3_lock_finality = x3_adapter
+        .finality_status(&x3_lock.tx_id)
+        .expect("X3 escrow finality");
+    // The adapter labels its chain `x3-local` and the intent's X3 policy is
+    // BFT finality, which maps to zero required confirmations.
+    let x3_requirement = SecretReleaseRequirement {
+        chain_id: String::from("x3-local"),
+        vm_type: VmType::X3Vm,
+        min_confirmations: 0,
+    };
+    // The EVM executor labels its chain `anvil`; the intent's Ethereum policy
+    // requires one confirmation. The firewall matches domains by chain family,
+    // so the EVM observation is presented under a canonical EVM label.
+    let mut evm_escrow = evm_lock.clone();
+    evm_escrow.chain_id = String::from("ethereum-anvil");
+    let evm_requirement = SecretReleaseRequirement {
+        chain_id: String::from("ethereum-anvil"),
+        vm_type: VmType::Evm,
+        min_confirmations: 1,
+    };
+    let evm_lock_finality = FinalityProof {
+        chain_id: String::from("ethereum-anvil"),
+        vm_type: VmType::Evm,
+        tx_id: evm_lock.tx_id.clone(),
+        block_number: evm_lock.block_number,
+        block_hash: evm_lock.block_hash.clone(),
+        confirmations: 1,
+        // Anvil mines and finalizes in the same block; there is no reorg window
+        // on this ephemeral chain.
+        finalized: true,
+        finality_source: String::from("anvil-instant-finality"),
+        safe_to_reveal_secret: true,
+    };
+    let evidence = [
+        SecretReleaseEvidence {
+            lock: x3_lock.clone(),
+            finality: x3_lock_finality,
+            rpc_quorum: RpcQuorumAttestation {
+                tx_id: x3_lock.tx_id.clone(),
+                block_hash: x3_lock.block_hash.clone(),
+                provider_count: 3,
+                required_quorum: 2,
+                finalized: true,
+            },
+            refund: RefundObservation {
+                tx_id: x3_lock.tx_id.clone(),
+                block_hash: x3_lock.block_hash.clone(),
+                refunded: false,
+            },
+        },
+        SecretReleaseEvidence {
+            lock: evm_escrow,
+            finality: evm_lock_finality,
+            rpc_quorum: RpcQuorumAttestation {
+                tx_id: evm_lock.tx_id.clone(),
+                block_hash: evm_lock.block_hash.clone(),
+                provider_count: 3,
+                required_quorum: 2,
+                finalized: true,
+            },
+            refund: RefundObservation {
+                tx_id: evm_lock.tx_id.clone(),
+                block_hash: evm_lock.block_hash.clone(),
+                refunded: false,
+            },
+        },
+    ];
+    let permit = SecretReleaseFirewall::authorize(
+        &intent,
+        evm_claim.preimage,
+        &[x3_requirement, evm_requirement],
+        &evidence,
+    )
+    .expect("secret-release permit for the cross-domain claim");
     let x3_claim = x3_adapter
-        .claim(local_id, evm_claim.preimage)
+        .claim_with_permit(&permit)
         .expect("X3 claim using EVM-revealed preimage");
     assert_eq!(x3_claim.preimage, preimage);
     assert!(x3_adapter.finality_status(&x3_claim.tx_id).unwrap().finalized);
@@ -434,6 +552,9 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
         .resolve_intent_id(&prepared, finalized_hash)
         .expect("resolve runtime intent id");
     signer.bind_intent(local_id, runtime_intent_id).unwrap();
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), X3_RPC.into(), &alice_uri)
+        .expect("X3 refund second-leg signer");
+    second_leg.bind_intent(local_id, runtime_intent_id).unwrap();
 
     let x3_transport = NativeX3NodeTransport::new(
         X3NodeTransportConfig {
@@ -453,6 +574,21 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
     let intent = atomic_intent(local_id, preimage);
     let x3_lock = x3_adapter.lock(&intent).expect("real X3 refund-path lock");
     assert!(x3_adapter.finality_status(&x3_lock.tx_id).unwrap().finalized);
+
+    // Both legs have to be escrowed before the runtime considers the refund proof
+    // set complete: `all_required_operation_proofs` walks every leg.
+    let leg1 = second_leg
+        .sign_lock_escrow_leg(
+            runtime_intent_id,
+            1,
+            pallet_x3_settlement_engine::ExternalChainId::X3Native,
+            1_000_000,
+            b"x3-native-crossvm-refund-leg1".to_vec(),
+        )
+        .expect("sign refund leg1");
+    assert!(!submit_x3(&leg1).is_empty());
+    let leg1_block = wait_x3_finalized(&leg1, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&second_leg, &leg1_block, &leg1);
 
     let mut evm_locker = LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key)
         .expect("live EVM locker");
@@ -481,7 +617,48 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
     assert!(!evm_refund.tx_id.is_empty());
     assert!(!evm_refund.block_hash.is_empty());
 
-    let refund_head = wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180));
+    // A terminal `Refunded` state is gated on a verified canonical Refund proof
+    // for every escrowed leg's domain. Every leg on the X3 side is X3-native, so
+    // a single canonical Refund bundle bound to the real X3 escrow covers them;
+    // the runtime then refunds from `on_initialize` once the wall-clock timeout
+    // has elapsed.
+    let mut refund_finality = x3_adapter
+        .finality_status(&x3_lock.tx_id)
+        .expect("refund observation finality");
+    refund_finality.chain_id = String::from("x3-native");
+    let mut proof_set = CrossDomainProofSet::new(&intent, runtime_intent_id.to_fixed_bytes());
+    let refund_bundle = CrossDomainProofBundle::new(
+        &intent,
+        runtime_intent_id.to_fixed_bytes(),
+        String::from("x3-native"),
+        VmType::X3Vm,
+        CrossDomainOperation::Refund,
+        x3_lock.tx_id.clone(),
+        x3_lock.block_number,
+        x3_lock.block_hash.clone(),
+        x3_lock.raw_proof.clone(),
+        refund_finality,
+    )
+    .expect("canonical refund bundle");
+    proof_set
+        .push_verified(&intent, refund_bundle)
+        .expect("verified canonical refund bundle");
+    let signed_proof_set = second_leg
+        .prepare_cross_domain_proof_set(runtime_intent_id, proof_set)
+        .expect("sign canonical refund proof set");
+    assert!(!submit_x3(&signed_proof_set).is_empty());
+    let proof_block = wait_x3_finalized(&signed_proof_set, Duration::from_secs(180));
+    assert_x3_dispatch_succeeded(&second_leg, &proof_block, &signed_proof_set);
+
+    let refund_head = match wait_for_refund_state(runtime_intent_id, Duration::from_secs(180)) {
+        Some(head) => head,
+        None => {
+            x3_adapter
+                .refund(local_id)
+                .expect("explicit timeout refund after the automatic path did not fire");
+            wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180))
+        },
+    };
     assert!(matches!(
         intent_state_at(runtime_intent_id, &refund_head),
         pallet_x3_settlement_engine::IntentState::Refunded
