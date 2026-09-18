@@ -65,9 +65,8 @@ test-x3-readiness:
 test-x3-lang-vm:
 	@cargo test --manifest-path x3-lang/Cargo.toml --tests
 test-runtime-upgrade:
-	@echo "=== Runtime upgrade rehearsal ==="
-	@cargo build -p x3-chain-node --features mainnet-rc1 --release
-	@echo "=== Runtime built, try-runtime requires live chain ==="
+	@echo "=== Runtime upgrade rehearsal (migration dry-run per variant) ==="
+	@bash scripts/check-runtime-variants.sh
 
 test-node-build:
 	@cargo check -p x3-chain-node --features mainnet-rc1
