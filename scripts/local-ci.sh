@@ -11,6 +11,7 @@
 #   scripts/local-ci.sh --cross         # + the X3-native and X3VM<->EVM/SVM cross-domain lifecycles
 #   scripts/local-ci.sh --release       # + the release gate (make mainnet-check)
 #   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
+#   scripts/local-ci.sh --deep          # + the whole workspace test suite (slow, ~5-15 min)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
@@ -44,6 +45,7 @@ RUN_LIVE=0
 RUN_CROSS=0
 RUN_RELEASE=0
 RUN_VARIANTS=0
+RUN_DEEP=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
@@ -62,7 +64,8 @@ while [ "$#" -gt 0 ]; do
     --cross) RUN_LIVE=1; RUN_CROSS=1 ;;
     --release) RUN_RELEASE=1 ;;
     --variants) RUN_VARIANTS=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1 ;;
+    --deep) RUN_DEEP=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1 ;;
     --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -151,6 +154,14 @@ GATES_RELEASE=(
   "release gate (mainnet-check):make mainnet-check"
 )
 
+# The broadest automated signal the repository has: every test target in every
+# workspace member. SLOW (thousands of tests), so it is opt-in rather than part
+# of the default set. No SKIP_WASM_BUILD: x3-chain-node's service tests boot a
+# real node whose chain spec is decoded by the embedded runtime.
+GATES_DEEP=(
+  "test workspace:env -u SKIP_WASM_BUILD cargo test --workspace"
+)
+
 GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
 )
@@ -174,6 +185,8 @@ EOF
   printf '  - %s\n' "${GATES_RELEASE[@]%%:*}"
   echo "runtime variants (--variants):"
   printf '  - %s\n' "${GATES_VARIANTS[@]%%:*}"
+  echo "deep gates (--deep, also implied by --all):"
+  printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
   echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
 }
 
@@ -233,6 +246,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_CROSS" = 1 ] && for spec in "${GATES_CROSS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_VARIANTS" = 1 ] && for spec in "${GATES_VARIANTS[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_RELEASE" = 1 ] && for spec in "${GATES_RELEASE[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_DEEP" = 1 ] && for spec in "${GATES_DEEP[@]}"; do SELECTED+=("$spec"); done
 
 if [ -n "$ONLY" ]; then
   IFS=',' read -r -a ONLY_LIST <<<"$ONLY"
@@ -297,7 +311,13 @@ echo "local-ci $STAMP — root=$ROOT"
 echo "local-ci: ${#SELECTED[@]} gate(s), jobs=$JOBS, cargo-jobs=$CARGO_JOBS, $BRANCH@$HEAD_SHA ($DIRTY)"
 for note in "${NOTES[@]:-}"; do [ -n "$note" ] && echo "local-ci: note: $note"; done
 echo "local-ci: prereqs: $(for tool in cargo python3 node docker srtool; do if command -v "$tool" >/dev/null 2>&1; then printf '%s=ok ' "$tool"; else printf '%s=MISSING ' "$tool"; fi; done)"
-command -v srtool >/dev/null 2>&1 || echo "local-ci: note: srtool missing -> the release gate fails on its reproducibility section"
+command -v srtool >/dev/null 2>&1 || cat <<'EOF'
+local-ci: note: srtool missing -> `--release` / `make mainnet-check` fails on its
+local-ci:       reproducibility section. This box has lost the binary more than
+local-ci:       once (something rewrites ~/.cargo/bin). Re-install it — the same
+local-ci:       pinned revision the self-hosted gate job uses — with:
+local-ci:         make srtool-install
+EOF
 echo "log: $LOG"
 
 if [ "$DRY_RUN" = 1 ]; then

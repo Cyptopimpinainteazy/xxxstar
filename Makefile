@@ -2,8 +2,9 @@
  test-node-build test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
  test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
  test-runtime-upgrade test-all-pallets fmt lint\
- local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-list\
+local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-list\
  local-ci-all local-ci-prepush local-ci-dry-run\
+ local-ci-deep srtool-install\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
 # Local CI — the gates that actually execute on this machine. Hosted CI for this
@@ -42,6 +43,19 @@ local-ci-prepush:
 # Show what would run without running it.
 local-ci-dry-run:
 	@bash scripts/local-ci.sh --dry-run
+
+# Everything in --all plus `cargo test --workspace`: every test target in every
+# workspace member (thousands of tests, ~5-15 min warm). This is the broadest
+# automated check the repository has; run it before a release candidate.
+local-ci-deep:
+	@bash scripts/local-ci.sh --all
+
+# The reproducibility prerequisite the `--release` gate needs. Same pinned
+# revision the self-hosted gate job installs; ~45s when the cargo cache is warm.
+srtool-install:
+	@cargo install --locked --git https://github.com/chevdor/srtool-cli \
+		--rev 0485b5507a0b63cf7699376f15d9cb5c849bbcd0 srtool-cli
+	@command -v srtool && srtool --version
 
 guard:
 	@python3 scripts/agent_guard.py
