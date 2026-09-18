@@ -1,5 +1,64 @@
 use std::{env, fs, path::PathBuf};
 
+/// The feature set that decides which `construct_runtime!` variant is compiled,
+/// and therefore which pallets exist in `RuntimeGenesisConfig`. A cached runtime
+/// blob built for a different set can never be embedded into this build: the
+/// node would boot a runtime whose genesis schema does not match the chain spec
+/// it was handed ("unknown field `depinMarketplace`, expected one of ...").
+///
+/// This mirrors what `substrate-wasm-builder` passes to the nested build: the
+/// outer feature list minus `std` (verified against the generated
+/// `target/<profile>/wbuild/x3-chain-runtime/Cargo.toml`). Deriving it from
+/// `CARGO_FEATURE_*` rather than a hardcoded list means a new variant feature is
+/// covered automatically.
+fn enabled_features_key() -> String {
+    let mut features: Vec<String> = env::vars()
+        .filter_map(|(key, _)| {
+            key.strip_prefix("CARGO_FEATURE_")
+                .map(|name| name.to_lowercase().replace('_', "-"))
+        })
+        // `std` is dropped because the WASM build never gets it; `default` is a
+        // cargo marker, not a feature of this crate.
+        .filter(|name| name != "std" && name != "default")
+        .collect();
+    features.sort();
+    features.dedup();
+    features.join(",")
+}
+
+/// Sidecar next to the built blob recording the feature set it was built with.
+fn sidecar_path(wasm: &PathBuf) -> PathBuf {
+    let mut name = wasm
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_else(|| "x3_chain_runtime.wasm".into());
+    name.push(".features");
+    wasm.with_file_name(name)
+}
+
+fn write_variant_sidecar(wasm: &PathBuf, key: &str) {
+    let _ = fs::write(sidecar_path(wasm), format!("{key}\n"));
+}
+
+fn cached_variant_matches(wasm: &PathBuf, key: &str) -> Result<(), String> {
+    let sidecar = sidecar_path(wasm);
+    let recorded = fs::read_to_string(&sidecar).map_err(|_| {
+        format!(
+            "cached runtime WASM at {} has no feature sidecar ({})",
+            wasm.display(),
+            sidecar.display()
+        )
+    })?;
+    let recorded = recorded.trim();
+    if recorded == key {
+        Ok(())
+    } else {
+        Err(format!(
+            "cached runtime WASM was built for features [{recorded}] but this build is [{key}]"
+        ))
+    }
+}
+
 fn write_wasm_binary_stub(reason: &str) {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR must be set by cargo");
     let wasm_binary_path = PathBuf::from(out_dir).join("wasm_binary.rs");
@@ -63,11 +122,29 @@ fn main() {
     if env::var_os("SKIP_WASM_BUILD").is_some() {
         // A build with `SKIP_WASM_BUILD` should not recompile WASM, but tests
         // and dev nodes still need a real embedded runtime when a previously
-        // built artifact is available. Prefer that artifact and only fall back
-        // to the None stub on a truly clean checkout.
+        // built artifact is available. That artifact is only usable when it was
+        // built for *this* variant: the runtime variant decides which pallets
+        // exist in `RuntimeGenesisConfig`, so embedding a blob from another
+        // feature set makes the node reject its own chain spec at boot
+        // ("unknown field `depinMarketplace`, expected one of ..."). Cache reuse
+        // is therefore gated on the recorded feature set; a mismatch falls back
+        // to the None stub, which fails loudly at the call site instead.
+        let features = enabled_features_key();
         if let Some(cached) = cached_runtime_wasm_path() {
-            write_cached_wasm_binary(&cached);
-            return;
+            match cached_variant_matches(&cached, &features) {
+                Ok(()) => {
+                    write_cached_wasm_binary(&cached);
+                    return;
+                }
+                Err(reason) => {
+                    write_wasm_binary_stub(&format!(
+                        "SKIP_WASM_BUILD is set and the cached runtime WASM is not usable: {reason}. \
+Rebuild the embedded runtime for this variant with `env -u SKIP_WASM_BUILD cargo build -p x3-chain-node` \
+(or `cargo build -p x3-chain-runtime`), then re-run."
+                    ));
+                    return;
+                }
+            }
         }
         write_wasm_binary_stub("SKIP_WASM_BUILD is set; skipping runtime WASM build");
         return;
@@ -89,4 +166,10 @@ fn main() {
         .export_heap_base()
         // Leave the output shim file name as the default (`wasm_binary.rs`).
         .build();
+
+    // Record the feature set for this blob so a later `SKIP_WASM_BUILD` build can
+    // prove the cache belongs to its own variant before embedding it.
+    if let Some(built) = cached_runtime_wasm_path() {
+        write_variant_sidecar(&built, &enabled_features_key());
+    }
 }
