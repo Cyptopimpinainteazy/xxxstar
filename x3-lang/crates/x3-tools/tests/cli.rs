@@ -69,6 +69,8 @@ fn trading_receipt_json(tamper: bool) -> String {
                 require_private_submission: false,
                 minimum_net_profit: None,
                 max_oracle_deviation_bps: None,
+                max_cumulative_loss: None,
+                max_cumulative_loss_asset: None,
             },
         },
         TradingOperation::OpenDebt {

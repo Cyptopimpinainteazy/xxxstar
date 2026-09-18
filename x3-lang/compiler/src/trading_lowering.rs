@@ -66,6 +66,13 @@ pub fn lower_atomic_trade(trade: &AtomicTradeDecl, symbols: &TradingSymbols) -> 
         Some(amount) => Some(literal_amount(amount, symbols, "policy min_profit")?),
         None => None,
     };
+    let (max_cumulative_loss, max_cumulative_loss_asset) = match &policy.max_cumulative_loss {
+        Some(amount) => (
+            Some(literal_amount(amount, symbols, "policy max_cumulative_loss")?),
+            Some(asset_key(&amount.asset, symbols)?),
+        ),
+        None => (None, None),
+    };
     let deadline_blocks = literal_u64(&policy.deadline, "policy deadline")?;
 
     let compiled_policy = CompiledTradingPolicy {
@@ -80,6 +87,8 @@ pub fn lower_atomic_trade(trade: &AtomicTradeDecl, symbols: &TradingSymbols) -> 
         require_private_submission: policy.require_private_submission,
         minimum_net_profit,
         max_oracle_deviation_bps: policy.max_oracle_deviation_bps,
+        max_cumulative_loss,
+        max_cumulative_loss_asset,
     };
 
     let mut operations = vec![Operation::Trading(TradingOperation::BeginAtomicTrade {
