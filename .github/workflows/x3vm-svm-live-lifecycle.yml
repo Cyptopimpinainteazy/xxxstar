@@ -160,6 +160,10 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Run real X3VM-SVM atomic lifecycle
+        # Persist the node/runtime build across runs. Scoped to this step on
+        # purpose: the SBF and client builds above keep their own target paths.
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
         run: |
           env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
             --test x3vm_svm_live \
@@ -167,6 +171,8 @@ jobs:
             -- --ignored --nocapture
 
       - name: Run real X3VM-SVM timeout/refund atomic lifecycle
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
         run: |
           env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
             --test x3vm_svm_live \
