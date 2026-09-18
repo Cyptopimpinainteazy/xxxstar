@@ -42,6 +42,10 @@
 //! - `enable_route` (governance): enable a route. Configures the
 //!   verification strategy, limits, dispute window.
 //! - `disable_route` (governance): disable a route.
+//! - `set_svm_validators` / `clear_svm_validators` (governance): install or
+//!   remove the authorized Solana validator set and the distinct-signer
+//!   threshold that `SolanaFinalizedProof` routes verify against. With no set
+//!   installed every Solana proof fails closed.
 //! - `submit_deposit_proof` (relayer, signed): verify a deposit proof
 //!   and create a `GatewayTransfer`.
 //! - `credit_x3_representation` (relayer, signed): after the dispute
@@ -244,6 +248,26 @@ pub mod pallet {
         Svm,
     }
 
+    /// Upper bound on the authorized SVM validator set per external chain.
+    pub type MaxSvmValidators = ConstU32<64>;
+
+    /// Authorized Solana validator set plus the distinct-signer threshold used by
+    /// the `SolanaFinalizedProof` verification level.
+    ///
+    /// Governance-managed (`set_svm_validators`). An absent entry means "no
+    /// authorized validators", which makes every Solana proof fail closed rather
+    /// than pass unchecked — see issue #266.
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
+    )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+    pub struct SvmValidatorSet {
+        /// Distinct authorized validators that must sign a finalized proof.
+        pub threshold: u32,
+        /// Ed25519 public keys authorized to attest Solana finality.
+        pub validators: BoundedVec<[u8; 32], MaxSvmValidators>,
+    }
+
     /// Gateway route configuration.
     #[derive(
         Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
@@ -374,6 +398,12 @@ pub mod pallet {
     }
 
     // ── Storage ──────────────────────────────────────────────────────────
+
+    /// Governance-controlled authorized SVM validators per external chain.
+    /// Missing entry => no validators => Solana proofs fail closed.
+    #[pallet::storage]
+    pub type SvmValidatorSets<T: Config> =
+        StorageMap<_, Blake2_128Concat, ExternalChainId, SvmValidatorSet, OptionQuery>;
 
     #[pallet::storage]
     pub type Assets<T: Config> = StorageDoubleMap<
@@ -647,6 +677,19 @@ pub mod pallet {
             token: BoundedVec<u8, ConstU32<128>>,
             x3_asset_id: X3AssetId,
         },
+        /// Governance set (or replaced) the authorized SVM validator set for a
+        /// chain. `count` is the number of authorized validators, `threshold`
+        /// the distinct signers a Solana proof now needs.
+        SvmValidatorsSet {
+            chain: ExternalChainId,
+            threshold: u32,
+            count: u32,
+        },
+        /// Governance removed the validator set: every Solana proof for the
+        /// chain fails closed until a new set is installed.
+        SvmValidatorsCleared {
+            chain: ExternalChainId,
+        },
         RouteEnabled {
             route_id: RouteId,
         },
@@ -725,6 +768,12 @@ pub mod pallet {
         PendingLimitExceeded,
         /// Dispute window has not yet closed.
         DisputeWindowOpen,
+        /// The SVM validator set must contain at least one key.
+        EmptySvmValidatorSet,
+        /// Threshold must be non-zero and no larger than the validator set.
+        InvalidSvmThreshold,
+        /// A validator key appears more than once in the submitted set.
+        DuplicateSvmValidator,
     }
 
     // ── Hooks ───────────────────────────────────────────────────────────
@@ -1148,6 +1197,64 @@ pub mod pallet {
             Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
             Ok(())
         }
+
+        /// Governance: install (or replace) the authorized SVM validator set for
+        /// an external chain, together with the distinct-signer threshold that a
+        /// `SolanaFinalizedProof` must reach.
+        ///
+        /// Until a set is installed the chain's Solana routes fail closed: the
+        /// verifier has nothing to check attestations against.
+        #[pallet::call_index(9)]
+        #[pallet::weight(frame_support::weights::Weight::from_parts(40_000, 0))]
+        pub fn set_svm_validators(
+            origin: OriginFor<T>,
+            chain: ExternalChainId,
+            validators: BoundedVec<[u8; 32], MaxSvmValidators>,
+            threshold: u32,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            ensure!(!validators.is_empty(), Error::<T>::EmptySvmValidatorSet);
+            ensure!(
+                threshold > 0 && threshold <= validators.len() as u32,
+                Error::<T>::InvalidSvmThreshold
+            );
+            // A repeated key would let one validator satisfy two threshold slots.
+            for (index, key) in validators.iter().enumerate() {
+                ensure!(
+                    !validators[index + 1..].contains(key),
+                    Error::<T>::DuplicateSvmValidator
+                );
+            }
+
+            let count = validators.len() as u32;
+            SvmValidatorSets::<T>::insert(
+                chain,
+                SvmValidatorSet {
+                    threshold,
+                    validators,
+                },
+            );
+            Self::deposit_event(Event::SvmValidatorsSet {
+                chain,
+                threshold,
+                count,
+            });
+            Ok(())
+        }
+
+        /// Governance: remove the authorized SVM validator set for a chain.
+        /// Every Solana proof for that chain fails closed afterwards.
+        #[pallet::call_index(10)]
+        #[pallet::weight(frame_support::weights::Weight::from_parts(25_000, 0))]
+        pub fn clear_svm_validators(
+            origin: OriginFor<T>,
+            chain: ExternalChainId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            SvmValidatorSets::<T>::remove(chain);
+            Self::deposit_event(Event::SvmValidatorsCleared { chain });
+            Ok(())
+        }
     }
 
     // ── Internal helpers ───────────────────────────────────────────────
@@ -1172,7 +1279,17 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
-                    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier);
+                    // The authorized validator set is governance-controlled
+                    // (`set_svm_validators`). With no set installed the verifier
+                    // is constructed empty and refuses every proof instead of
+                    // accepting it unchecked.
+                    let verifier = match SvmValidatorSets::<T>::get(route.external_chain_id) {
+                        Some(set) if !set.validators.is_empty() && set.threshold > 0 => {
+                            SolanaFinalizedVerifier::new(set.validators.into_inner(), set.threshold)
+                        }
+                        _ => SolanaFinalizedVerifier::empty(),
+                    };
+                    let v: Arc<dyn Verifier> = Arc::new(verifier);
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::BitcoinSpvProof => {

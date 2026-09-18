@@ -702,11 +702,7 @@ impl RelayerSafetyPipeline {
             return self.raise_dispute(proof_id, proof.slot, reason);
         }
 
-        let mut payload = proof.blockhash.to_vec();
-        for signature in &proof.validator_signatures {
-            payload.extend_from_slice(&signature.validator_pubkey);
-            payload.extend_from_slice(&signature.signature);
-        }
+        let payload = svm_proof_payload(proof);
         if let Err(reason) = self.evaluate_verification(
             VerificationStrategy::SolanaFinalizedProof,
             payload,
@@ -925,6 +921,33 @@ impl x3_verification_router::Verifier for AcceptAnyEvmVerifier {
             Err(x3_verification_router::VerificationError::UnsupportedChain)
         }
     }
+}
+
+/// Builds the `SolanaFinalizedProof` payload in the format the verifier parses
+/// (`SOLANA_FINALIZED_FORMAT_V1`):
+///
+/// ```text
+/// version u8 | slot u64 LE | blockhash [32] | count u32 LE | (pubkey[32] || sig[64])*
+/// ```
+///
+/// Each signature is over `BLAKE2b-256(slot_le || blockhash)` — see
+/// `Submitter::sign_proof_payload`. Without the version, slot and count the
+/// verifier cannot reconstruct the signed message, which is why the previous
+/// bare `blockhash || (pubkey || sig)*` layout could not be checked at all.
+pub(crate) fn svm_proof_payload(proof: &SvmProof) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(
+        x3_verification_router::SOLANA_PAYLOAD_HEADER_LEN
+            + proof.validator_signatures.len() * x3_verification_router::SOLANA_ATTESTATION_LEN,
+    );
+    payload.push(x3_verification_router::SOLANA_FINALIZED_FORMAT_V1);
+    payload.extend_from_slice(&proof.slot.to_le_bytes());
+    payload.extend_from_slice(&proof.blockhash);
+    payload.extend_from_slice(&(proof.validator_signatures.len() as u32).to_le_bytes());
+    for signature in &proof.validator_signatures {
+        payload.extend_from_slice(&signature.validator_pubkey);
+        payload.extend_from_slice(&signature.signature);
+    }
+    payload
 }
 
 #[cfg(test)]
@@ -1209,5 +1232,112 @@ mod tests {
             "expected a duplicate-signer rejection, got: {err}"
         );
         assert!(err.contains("dispute_status=Accepted"));
+    }
+
+    // ── Cross-side proof: what the relayer signs, the router verifies ───────
+
+    /// Sign with the same construction as `Submitter::sign_proof_payload` but
+    /// using a key the test controls.
+    fn signed_validator(
+        signing_key: &ed25519_dalek::SigningKey,
+        slot: u64,
+        blockhash: &[u8; 32],
+    ) -> ValidatorSignature {
+        use ed25519_dalek::Signer;
+
+        let mut preimage = Vec::with_capacity(40);
+        preimage.extend_from_slice(&slot.to_le_bytes());
+        preimage.extend_from_slice(blockhash);
+        let message = x3_verification_router::solana_attestation_message(slot, blockhash);
+        // The two BLAKE2b implementations must agree, or signatures the relayer
+        // produces can never verify.
+        assert_eq!(
+            message.as_slice(),
+            blake2b_simd::Params::new()
+                .hash_length(32)
+                .hash(&preimage)
+                .as_bytes(),
+            "relayer (blake2b_simd) and router (blake2) must hash identically"
+        );
+
+        ValidatorSignature {
+            validator_pubkey: signing_key.verifying_key().to_bytes(),
+            signature: signing_key.sign(&message).to_bytes(),
+        }
+    }
+
+    fn solana_pipeline_with(pubkeys: Vec<[u8; 32]>, threshold: u32) -> RelayerSafetyPipeline {
+        use std::sync::Arc;
+        use x3_verification_router::{SolanaFinalizedVerifier, VerificationRouter, Verifier};
+
+        let mut router = VerificationRouter::new();
+        let verifier: Arc<dyn Verifier> =
+            Arc::new(SolanaFinalizedVerifier::new(pubkeys, threshold));
+        router.register_verifier(verifier);
+        RelayerSafetyPipeline::for_test(&test_config(), router)
+    }
+
+    #[test]
+    fn relayer_svm_payload_verifies_through_the_real_verifier() {
+        let (a, b) = (
+            ed25519_dalek::SigningKey::from_bytes(&[1u8; 32]),
+            ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]),
+        );
+        let slot = 42u64;
+        let blockhash = [8u8; 32];
+        let mut proof = SvmProof {
+            source_domain: 200,
+            slot,
+            blockhash,
+            validator_signatures: vec![
+                signed_validator(&a, slot, &blockhash),
+                signed_validator(&b, slot, &blockhash),
+            ],
+            required_signatures: 2,
+        };
+
+        // Format and crypto agree end to end: relayer builds the payload, the
+        // router's real Solana verifier accepts it.
+        let payload = svm_proof_payload(&proof);
+        let envelope = x3_verification_router::ProofEnvelope {
+            proof_id: [0u8; 32],
+            strategy: x3_verification_router::VerificationStrategy::SolanaFinalizedProof,
+            source_chain: x3_verification_router::ChainKind::Solana,
+            destination_chain: x3_verification_router::ChainKind::X3,
+            payload,
+            expected_asset_id: [0u8; 32],
+            expected_amount: 0,
+            expected_sender: Vec::new(),
+            expected_recipient: Vec::new(),
+        };
+        let verifier = x3_verification_router::SolanaFinalizedVerifier::new(
+            vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],
+            2,
+        );
+        use x3_verification_router::Verifier as _;
+        let outcome = verifier
+            .verify(&envelope)
+            .expect("two authorized attestations must verify");
+        assert!(
+            outcome.accepted,
+            "relayer payload must verify in the router"
+        );
+
+        // One signature short of the threshold is rejected.
+        proof.validator_signatures.pop();
+        let pipeline = solana_pipeline_with(
+            vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],
+            2,
+        );
+        let one_signature = svm_proof_payload(&proof);
+        let one_envelope = x3_verification_router::ProofEnvelope {
+            payload: one_signature,
+            ..envelope
+        };
+        assert!(
+            verifier.verify(&one_envelope).is_err(),
+            "one signature must not satisfy a 2-validator quorum"
+        );
+        let _ = pipeline;
     }
 }

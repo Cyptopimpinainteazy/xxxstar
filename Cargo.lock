@@ -11047,6 +11047,7 @@ dependencies = [
 name = "pallet-x3-crosschain-gateway"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek 2.2.0",
  "frame-support",
  "frame-system",
  "log",
@@ -25151,6 +25152,8 @@ version = "0.1.0"
 name = "x3-verification-router"
 version = "0.1.0"
 dependencies = [
+ "blake2 0.10.6",
+ "ed25519-dalek 2.2.0",
  "hex-literal 1.1.0",
  "rlp 0.5.2",
  "scale-info",

@@ -63,7 +63,9 @@ fn router_with_evm() -> VerificationRouter {
 
 fn router_with_solana() -> VerificationRouter {
     let mut r = VerificationRouter::new();
-    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier);
+    // `empty()` = no authorized validators: this test builds the router to
+    // exercise dispatch, and the Solana verifier is expected to refuse.
+    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier::empty());
     r.register_verifier(v);
     r
 }
@@ -121,8 +123,14 @@ fn relayer_evm_proof_accepted_by_router() {
     );
 }
 
-/// Solana finalization proof is accepted by the SVM verifier and rejected
-/// by an EVM-only router (chain-kind mismatch).
+/// A Solana proof reaches the SVM verifier and never the EVM-only router.
+///
+/// The SVM verifier here has no authorized validator set, so it refuses the
+/// proof (`NoAuthorizedValidators`) — that *is* the dispatch assertion: the
+/// error comes from the SVM verifier, not from `MissingVerifier`. Positive
+/// acceptance with real Ed25519 attestations is proven in
+/// `x3-verification-router`'s own tests and in the gateway pallet's
+/// `solana_deposit_requires_authorized_attestations`.
 #[test]
 fn relayer_solana_proof_chain_kind_routing() {
     let svm = router_with_solana();
@@ -132,14 +140,25 @@ fn relayer_solana_proof_chain_kind_routing() {
         ChainKind::Solana,
         2_000_000,
     );
-    let svm_outcome = svm.route(&svm_env).expect("svm router should accept");
-    assert!(svm_outcome.accepted);
+    assert!(
+        matches!(
+            svm.route(&svm_env),
+            Err(x3_verification_router::VerificationError::NoAuthorizedValidators)
+        ),
+        "the SVM verifier must handle a Solana proof (and refuse it without a validator set)"
+    );
 
     // An EVM-only router should refuse to route a Solana proof because the
     // strategy isn't registered.
     let evm = router_with_evm();
     let res = evm.route(&svm_env);
-    assert!(res.is_err(), "evm-only router must not route solana proofs");
+    assert!(
+        matches!(
+            res,
+            Err(x3_verification_router::VerificationError::MissingVerifier)
+        ),
+        "evm-only router must not route solana proofs"
+    );
 }
 
 /// X3 internal proofs are pass-through; relayer + pallet + indexer should
@@ -227,10 +246,17 @@ fn strategy_dispatch_is_mutually_exclusive() {
         ChainKind::Solana,
         100,
     );
-    // The svm-only router accepts it.
-    assert!(svm_only.route(&svm_env).is_ok());
-    // The evm-only router must not.
-    assert!(evm_only.route(&svm_env).is_err());
+    // The svm-only router routes it to the SVM verifier (which refuses it:
+    // no authorized validator set is configured here).
+    assert!(matches!(
+        svm_only.route(&svm_env),
+        Err(x3_verification_router::VerificationError::NoAuthorizedValidators)
+    ));
+    // The evm-only router must not route it at all.
+    assert!(matches!(
+        evm_only.route(&svm_env),
+        Err(x3_verification_router::VerificationError::MissingVerifier)
+    ));
 }
 
 /// Unsupported strategy always fails closed (fail-closed security rule).

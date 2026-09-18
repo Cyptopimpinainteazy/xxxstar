@@ -39,6 +39,29 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+# Resolve the Rust toolchain defensively. This box has repeatedly lost
+# `~/.cargo/bin` (the rustup shims) *during* a session — once it took `srtool`
+# and the registry cache with it, and at 2026-09-18T07:36Z it briefly removed
+# `cargo` itself, which made twenty gates "fail" in 0s with
+# `cargo: command not found`. Prefer a full toolchain (one that ships rustfmt)
+# over the shim directory, and refuse to run rather than emit misleading reds.
+if ! command -v cargo >/dev/null 2>&1; then
+  for candidate in "$HOME"/.rustup/toolchains/*/bin "$HOME/.cargo/bin"; do
+    if [ -x "$candidate/cargo" ] && [ -x "$candidate/rustfmt" ]; then
+      PATH="$candidate:$PATH"
+      export PATH
+      echo "local-ci: note: cargo was not on PATH; using $candidate" >&2
+      break
+    fi
+  done
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "local-ci: cargo is not on PATH and no toolchain was found under" >&2
+  echo "local-ci: ~/.rustup/toolchains/*/bin or ~/.cargo/bin — nothing can be" >&2
+  echo "local-ci: verified. Restore the toolchain and re-run." >&2
+  exit 2
+fi
 export PATH="${HOME}/.cargo/bin:${PATH}"
 
 RUN_LIVE=0
@@ -137,7 +160,11 @@ GATES_FAST=(
   # exactly this reason: `cargo fetch --locked --manifest-path ...` once, then
   # this gate is deterministic and offline. If the cache is ever cold the gate
   # still fails loudly rather than passing quietly.
-  "test cross-vm-coordinator:cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+  # `--locked` keeps the versions pinned; the fetch is only there because this
+  # box keeps losing ~/.cargo (shims, srtool and the registry cache have all
+  # disappeared mid-session). Offline, the fetch fails and the test still runs
+  # against whatever cache exists - cold cache surfaces as BLOCKED, never green.
+  "test cross-vm-coordinator:cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml || echo 'local-ci: coordinator dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
   # Two configurations of the proof-verification router, because the `--deep`
   # workspace build unifies `test-verifier` through the gateway pallet's
   # dev-dependency and would therefore never exercise the fail-closed posture.
