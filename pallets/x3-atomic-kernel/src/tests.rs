@@ -14,12 +14,15 @@ use sp_core::H256;
 
 use crate::mock::{
     economy_open, new_test_ext, AtomicKernel, MaxLegsPerBundle, RuntimeOrigin, System, Test,
-    ALICE, MIN_BOND,
+    ALICE, BOB, CHARLIE, MIN_BOND,
 };
 use crate::{
     BundleRollbackReason, BundleStatus, Bundles, Error, NonceRegistry,
 };
+use crate::Event;
 use frame_support::{assert_noop, assert_ok, BoundedVec};
+
+use crate::mock::RuntimeEvent;
 
 /// Balances pallet specialised to the mock runtime, for bond assertions.
 type Balances = pallet_balances::Pallet<Test>;
@@ -149,6 +152,203 @@ fn economic_halt_does_not_trap_pending_bundle_funds() {
             ),
             Error::<Test>::EconomicHaltActive
         );
+    });
+}
+
+/// Submits one bundle and assigns an executor, returning its id.
+#[allow(dead_code)]
+fn submit_and_assign(deadline_blocks: u64, nonce: u64) -> H256 {
+    assert_ok!(AtomicKernel::submit_atomic_bundle(
+        RuntimeOrigin::signed(ALICE),
+        one_leg_bundle(),
+        deadline_blocks,
+        1,
+        nonce,
+    ));
+    let (bundle_id, _) = Bundles::<Test>::iter()
+        .next()
+        .expect("submitted bundle is stored");
+    assert_ok!(AtomicKernel::assign_bundle_executor(
+        RuntimeOrigin::signed(BOB),
+        bundle_id
+    ));
+    bundle_id
+}
+
+/// Asserts the bond was settled exactly once: nothing left reserved, the
+/// submitter down by exactly `penalty`, issuance unchanged (slashed funds move to
+/// the treasury rather than being burned), and a matching `BondSlashed` event.
+#[allow(dead_code)]
+fn assert_bond_settled_once(
+    bundle_id: H256,
+    free_before_submit: u128,
+    issuance_before: u128,
+    penalty: u128,
+    reason: BundleRollbackReason,
+) {
+    assert_eq!(
+        Bundles::<Test>::get(bundle_id).expect("record survives").status,
+        BundleStatus::RolledBack
+    );
+    assert_eq!(
+        Balances::reserved_balance(ALICE),
+        0,
+        "rollback must release the whole bond, not leave part of it reserved"
+    );
+    assert_eq!(
+        Balances::free_balance(ALICE),
+        free_before_submit - penalty,
+        "the submitter must lose exactly the {reason:?} penalty, no more"
+    );
+    assert_eq!(
+        Balances::total_issuance(),
+        issuance_before,
+        "slashed funds are moved to the treasury, not burned"
+    );
+    assert!(
+        System::events().iter().any(|record| matches!(
+            &record.event,
+            RuntimeEvent::AtomicKernel(Event::BondSlashed { amount, reason: event_reason, .. })
+                if *amount == penalty && *event_reason == reason
+        )),
+        "a BondSlashed event for {reason:?} with amount {penalty} must be emitted"
+    );
+}
+
+#[test]
+fn rollback_execution_failed_charges_only_the_ten_percent_penalty() {
+    let _open = economy_open();
+    new_test_ext().execute_with(|| {
+        let free_before = Balances::free_balance(ALICE);
+        let issuance_before = Balances::total_issuance();
+        let bundle_id = submit_and_assign(10, 1);
+
+        // Only the assigned executor may declare an execution failure.
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+            BundleRollbackReason::ExecutionFailed,
+        ));
+
+        assert_bond_settled_once(
+            bundle_id,
+            free_before,
+            issuance_before,
+            MIN_BOND / 10,
+            BundleRollbackReason::ExecutionFailed,
+        );
+    });
+}
+
+#[test]
+fn rollback_access_set_violation_charges_only_the_ten_percent_penalty() {
+    let _open = economy_open();
+    new_test_ext().execute_with(|| {
+        let free_before = Balances::free_balance(ALICE);
+        let issuance_before = Balances::total_issuance();
+        let bundle_id = submit_and_assign(10, 1);
+
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(BOB),
+            bundle_id,
+            BundleRollbackReason::AccessSetViolation,
+        ));
+
+        assert_bond_settled_once(
+            bundle_id,
+            free_before,
+            issuance_before,
+            MIN_BOND / 10,
+            BundleRollbackReason::AccessSetViolation,
+        );
+    });
+}
+
+#[test]
+fn rollback_deadline_exceeded_slashes_the_whole_bond_once() {
+    let _open = economy_open();
+    new_test_ext().execute_with(|| {
+        let free_before = Balances::free_balance(ALICE);
+        let issuance_before = Balances::total_issuance();
+        let bundle_id = submit_and_assign(10, 1);
+
+        // deadline_block = submitted_at (1) + 10; the guard requires now > deadline.
+        System::set_block_number(12);
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            bundle_id,
+            BundleRollbackReason::DeadlineExceeded,
+        ));
+
+        assert_bond_settled_once(
+            bundle_id,
+            free_before,
+            issuance_before,
+            MIN_BOND,
+            BundleRollbackReason::DeadlineExceeded,
+        );
+    });
+}
+
+#[test]
+fn rollback_rejects_callers_who_are_not_authorised_for_the_reason() {
+    let _open = economy_open();
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(10, 1); // submitter ALICE, executor BOB
+
+        // A third party can cancel nothing.
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(CHARLIE),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::NotBundleSubmitter
+        );
+
+        // The executor cannot cancel on the submitter's behalf...
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(BOB),
+                bundle_id,
+                BundleRollbackReason::SubmitterCancelled,
+            ),
+            Error::<Test>::NotBundleSubmitter
+        );
+
+        // ...and a non-executor cannot declare an execution failure.
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::ExecutionFailed,
+            ),
+            Error::<Test>::NotBundleSubmitter
+        );
+
+        // The rejected attempts left the bundle, and the bond, untouched.
+        let record = Bundles::<Test>::get(bundle_id).expect("record");
+        assert_eq!(record.status, BundleStatus::Executing);
+        assert!(Balances::reserved_balance(ALICE) >= MIN_BOND);
+    });
+}
+
+#[test]
+fn rollback_deadline_exceeded_before_the_deadline_is_rejected() {
+    let _open = economy_open();
+    new_test_ext().execute_with(|| {
+        let bundle_id = submit_and_assign(10, 1);
+
+        // Still inside the deadline window: a deadline rollback must not fire early.
+        assert_noop!(
+            AtomicKernel::rollback_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                bundle_id,
+                BundleRollbackReason::DeadlineExceeded,
+            ),
+            Error::<Test>::InvalidBundleState
+        );
+        assert!(Balances::reserved_balance(ALICE) >= MIN_BOND);
     });
 }
 
