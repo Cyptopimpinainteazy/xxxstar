@@ -88,8 +88,6 @@ npm_build "apps/dex"     "out"  "dex"
 
 # ── Static HTML pages ───────────────────────────────────────────────────────
 static_copy "infra-structure/services/blockchain-tps/public"  "tps"
-static_copy "web/mainnet-progress"                             "mainnet-progress"
-static_copy "apps/x3-extension"                                "extension"
 static_copy "swarm_infrastructure/autonomic"                   "swarm-autonomic"  "dashboard.html"
 
 # ── Jury Anchoring UI (TSX embed — copy build output if present) ────────────

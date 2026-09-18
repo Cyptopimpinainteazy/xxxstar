@@ -110,17 +110,6 @@
     "workdir": "infra-structure/services/blockchain-tps"
   },
   {
-    "id": "mainnet-progress",
-    "title": "Mainnet Progress",
-    "description": "Network mainnet launch progress tracker",
-    "devPort": null,
-    "siteSubdir": "mainnet-progress",
-    "category": "Site Pages",
-    "icon": "🏁",
-    "workdir": "web/mainnet-progress",
-    "staticOnly": true
-  },
-  {
     "id": "swarm-autonomic",
     "title": "Swarm Autonomic",
     "description": "Swarm infrastructure autonomic control plane dashboard",
@@ -130,17 +119,6 @@
     "icon": "🤖",
     "workdir": "swarm_infrastructure/autonomic",
     "staticEntry": "dashboard.html"
-  },
-  {
-    "id": "x3-extension",
-    "title": "X3 Browser Extension",
-    "description": "Chrome/browser extension for X3 Chain",
-    "devPort": null,
-    "siteSubdir": "extension",
-    "category": "Tools",
-    "icon": "🧩",
-    "workdir": "apps/x3-extension",
-    "staticOnly": true
   },
   {
     "id": "jury-anchoring",
