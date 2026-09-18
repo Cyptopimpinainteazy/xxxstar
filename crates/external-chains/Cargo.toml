@@ -31,7 +31,7 @@ hex-literal = "0.4"
 hex = "0.4"
 
 # HTTP client for JSON-RPC calls (std-only)
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 # Logging
 log = { workspace = true, default-features = false }
