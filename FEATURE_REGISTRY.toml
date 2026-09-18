@@ -250,6 +250,51 @@ blockers = [
 ]
 dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
 
+[trading_core_v1]
+mode = "GUARDED_TESTNET"
+crate_or_service = "x3-lang"
+tauri_app = "N/A"
+required_tests = [
+  "gas_ceiling_exceeded_rejects_even_though_profit_and_debts_are_fine",
+  "swap_across_declared_chains_is_rejected",
+  "solvent_invariant_catches_hidden_cost_in_an_asset_the_trade_never_touches",
+  "slippage_beyond_policy_ceiling_is_rejected",
+  "oracle_firewall_fails_closed_when_required_but_host_reports_no_sources",
+  "simulate_never_commits_even_when_every_guard_passes",
+  "cumulative_loss_ceiling_trips_only_once_prior_trades_are_summed_in",
+  "replay_ledger_rejects_the_identical_receipt_presented_twice",
+  "cli_receipt_verify_rejects_tampered_receipt",
+  "bridge_against_a_host_with_no_bridging_support_fails_closed"
+]
+proof_report = "reports/trading_core_v1_report.md"
+readiness_score = 70
+blockers = [
+  "x3c audit's RiskScorer does not recognize trading-core-v1's AST shape (Item::AtomicTrade/Item::TradeRiskPolicy) — its risk score output is meaningless for these programs today; treat as unscored, not as safe (flagged in PR #216, still open)",
+  "No multi-validator or live-network execution of a trading-core-v1 program has been performed — all 131 passing tests are single-process compiler/VM/CLI-level"
+]
+dangerous_paths = ["solvency invariant", "oracle firewall", "replay ledger", "gas ceiling enforcement", "receipt signing"]
+
+[atomic_trade_engine]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/atomic-trade-engine"
+tauri_app = "N/A"
+required_tests = [
+  "execute_triple_vm_batch_via_kernel_comit_v2_works",
+  "kernel_comit_failure_is_rolled_back_but_batch_is_marked_failed",
+  "execute_fails_with_slippage_exceeded",
+  "create_batch_fails_with_expired_deadline",
+  "create_batch_fails_with_invalid_nonce",
+  "concurrent_batches_per_account",
+  "sync_pool_price_writes_oracle_observation"
+]
+proof_report = "reports/trading_core_v1_report.md"
+readiness_score = 65
+blockers = [
+  "No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests",
+  "Pre-execution risk scoring for trades that originate as trading-core-v1 programs depends on x3c audit's RiskScorer, which is currently blind to that AST shape — see [trading_core_v1]"
+]
+dangerous_paths = ["kernel_comit settlement rollback", "AMM adapter registration", "cross-VM leg execution (EVM/SVM/X3)"]
+
 # ── Score adjustments 2026-06-17 ──
 # atomic_kernel:  75→85  (6 tests verified passing, EconomicHalt gate wired)
 # atomic_router:  80→88  (VM control-flow ops + CI gate wired)
