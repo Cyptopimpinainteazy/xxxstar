@@ -136,6 +136,7 @@ fn compiled_policy(id: &str) -> CompiledTradingPolicy {
         deadline_blocks: 10,
         require_private_submission: false,
         minimum_net_profit: None,
+        max_oracle_deviation_bps: None,
     }
 }
 

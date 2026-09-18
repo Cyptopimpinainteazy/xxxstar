@@ -374,6 +374,11 @@ pub struct CompiledTradingPolicy {
     pub deadline_blocks: u64,
     pub require_private_submission: bool,
     pub minimum_net_profit: Option<u128>,
+    /// Oracle-firewall ceiling: maximum allowed disagreement, in basis
+    /// points, between the venue's primary quote and any other independent
+    /// price source the host reports. `None` means no cross-source check
+    /// is required for this trade.
+    pub max_oracle_deviation_bps: Option<u16>,
 }
 
 /// Trading Core v1 IR operations. Field names are stable and explicit for

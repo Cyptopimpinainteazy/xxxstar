@@ -79,6 +79,7 @@ pub fn lower_atomic_trade(trade: &AtomicTradeDecl, symbols: &TradingSymbols) -> 
         deadline_blocks,
         require_private_submission: policy.require_private_submission,
         minimum_net_profit,
+        max_oracle_deviation_bps: policy.max_oracle_deviation_bps,
     };
 
     let mut operations = vec![Operation::Trading(TradingOperation::BeginAtomicTrade {
