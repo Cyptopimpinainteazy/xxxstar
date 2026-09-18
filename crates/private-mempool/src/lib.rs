@@ -41,7 +41,8 @@ pub struct EncryptedTransaction {
     pub id: [u8; 32],
     /// Encrypted payload (AES-256-GCM ciphertext).
     pub ciphertext: Vec<u8>,
-    /// Ephemeral public key for ECDH (X25519).
+    /// Ephemeral public key for ECDH: a compressed Ristretto point, not an
+    /// X25519 key — see [`crate::threshold`] for why.
     pub ephemeral_pk: [u8; 32],
     /// AES-GCM nonce (12 bytes).
     pub nonce: [u8; 12],

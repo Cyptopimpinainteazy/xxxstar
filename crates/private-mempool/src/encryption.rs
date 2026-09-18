@@ -108,8 +108,20 @@ pub fn combine_shares(
         )));
     }
 
+    let mut seen_indices = std::collections::HashSet::with_capacity(shares.len());
     let mut points = Vec::with_capacity(shares.len());
     for share in shares {
+        if share.validator_index == 0 {
+            return Err(MempoolError::EncryptionError(
+                "decryption share has index 0, which is reserved for the secret itself".to_string(),
+            ));
+        }
+        if !seen_indices.insert(share.validator_index) {
+            return Err(MempoolError::EncryptionError(format!(
+                "duplicate decryption share for validator index {}",
+                share.validator_index
+            )));
+        }
         points.push((share.validator_index, decompress_point_slice(&share.share)?));
     }
 
@@ -125,10 +137,25 @@ pub fn decrypt_transaction(
     aes_gcm_decrypt(&tx.ciphertext, &aes_key, &tx.nonce).map_err(MempoolError::EncryptionError)
 }
 
+/// Decompress a point that will be used as key material (a committee group
+/// key or an ephemeral public key), rejecting the group identity element.
+///
+/// The identity is a valid Ristretto encoding, but `scalar * identity ==
+/// identity` for every scalar — if it were accepted as a committee group
+/// key, every transaction's "shared secret" would collapse to that one
+/// constant, publicly-known value regardless of the ephemeral scalar,
+/// silently discarding confidentiality for the entire mempool with no
+/// error and no dependence on any validator's share.
 fn decompress_point(bytes: &[u8; 32]) -> Result<RistrettoPoint, MempoolError> {
-    CompressedRistretto(*bytes)
+    let point = CompressedRistretto(*bytes)
         .decompress()
-        .ok_or_else(|| MempoolError::EncryptionError("invalid Ristretto point".to_string()))
+        .ok_or_else(|| MempoolError::EncryptionError("invalid Ristretto point".to_string()))?;
+    if point == RistrettoPoint::identity() {
+        return Err(MempoolError::EncryptionError(
+            "point is the group identity element, which cannot be used as key material".to_string(),
+        ));
+    }
+    Ok(point)
 }
 
 fn decompress_point_slice(bytes: &[u8]) -> Result<RistrettoPoint, MempoolError> {
@@ -149,6 +176,7 @@ use aes_gcm::{
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::Identity;
 use hkdf::Hkdf;
 use rand::rngs::OsRng;
 use rand::RngCore;
@@ -267,6 +295,67 @@ mod tests {
     #[test]
     fn combine_shares_enforces_the_stated_threshold() {
         let result = combine_shares(&[], 3);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_the_identity_element_as_a_committee_group_key() {
+        let identity_key = RistrettoPoint::identity().compress().to_bytes();
+        let result = encrypt_for_committee(b"msg", &identity_key, &[0; 32], &[0; 32], 1);
+        assert!(
+            result.is_err(),
+            "encrypting to the identity element must be rejected, not silently \
+             produce a publicly-known shared secret"
+        );
+    }
+
+    #[test]
+    fn rejects_the_identity_element_as_an_ephemeral_key() {
+        let committee_secret = Scalar::random(&mut OsRng);
+        let share = split_secret(committee_secret, 1, 1).remove(0);
+        let identity_pk = RistrettoPoint::identity().compress().to_bytes();
+        let result = compute_decryption_share(&share, &identity_pk);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn combine_shares_rejects_a_zero_validator_index() {
+        let committee_secret = Scalar::random(&mut OsRng);
+        let committee_group_key = group_public_key(&committee_secret);
+        let shares = split_secret(committee_secret, 2, 2);
+        let tx =
+            encrypt_for_committee(b"msg", &committee_group_key, &[0; 32], &[0; 32], 1).unwrap();
+
+        let mut partials: Vec<DecryptionShare> = shares
+            .iter()
+            .map(|s| compute_decryption_share(s, &tx.ephemeral_pk).unwrap())
+            .collect();
+        partials[0].validator_index = 0;
+
+        let result = combine_shares(&partials, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn combine_shares_rejects_duplicate_validator_indices() {
+        let committee_secret = Scalar::random(&mut OsRng);
+        let committee_group_key = group_public_key(&committee_secret);
+        let shares = split_secret(committee_secret, 2, 3);
+        let tx =
+            encrypt_for_committee(b"msg", &committee_group_key, &[0; 32], &[0; 32], 1).unwrap();
+
+        // Two entries both claiming to be validator 1 — a second, possibly
+        // malicious, share silently overriding another validator's weight
+        // in the Lagrange combination instead of being rejected outright.
+        let mut partials: Vec<DecryptionShare> = vec![
+            compute_decryption_share(&shares[0], &tx.ephemeral_pk).unwrap(),
+            compute_decryption_share(&shares[1], &tx.ephemeral_pk).unwrap(),
+        ];
+        let mut impostor = compute_decryption_share(&shares[2], &tx.ephemeral_pk).unwrap();
+        impostor.validator_index = partials[0].validator_index;
+        partials.push(impostor);
+
+        let result = combine_shares(&partials, 2);
         assert!(result.is_err());
     }
 }
