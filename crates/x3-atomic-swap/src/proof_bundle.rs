@@ -21,7 +21,7 @@ pub enum CrossDomainOperation {
 }
 
 /// Canonical evidence package for one operation on one execution domain.
-#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
 pub struct CrossDomainProofBundle {
     pub version: u32,
     pub intent_id: IntentId,
@@ -192,7 +192,7 @@ impl CrossDomainProofBundle {
 }
 
 /// A set of domain proofs for one atomic intent.
-#[derive(Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
 pub struct CrossDomainProofSet {
     pub intent_id: IntentId,
     pub runtime_intent_id: [u8; 32],

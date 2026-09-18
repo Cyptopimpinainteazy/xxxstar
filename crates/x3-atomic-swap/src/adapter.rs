@@ -221,7 +221,7 @@ pub struct ChainHealth {
 }
 
 /// Finality proof - confirms a transaction is finalised on a particular chain.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
+#[derive(PartialEq, Eq, Debug, Clone, serde::Serialize, serde::Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
 pub struct FinalityProof {
     pub chain_id: ChainId,
     pub vm_type: VmType,
