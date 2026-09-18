@@ -1143,3 +1143,58 @@ fn test_revert_error_variants() {
     assert!(matches!(vm_err, RevertError::VmNotAvailable(VmType::Evm)));
     assert!(matches!(fail_err, RevertError::RevertFailed { .. }));
 }
+
+/// The halt guard gates *new* economic work. An in-flight bundle must stay
+/// workable while the economy is halted — a halt that froze execution or trapped
+/// the bond would be worse than the condition it answers.
+#[test]
+fn economic_halt_does_not_block_inflight_bundle_assignment() {
+    let halt = economy_open();
+    new_test_ext().execute_with(|| {
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            10,
+            1,
+            1,
+        ));
+        let (bundle_id, _) = Bundles::<Test>::iter()
+            .next()
+            .expect("submitted bundle is stored");
+
+        halt.halt();
+
+        // The next step of an in-flight bundle still works...
+        assert_ok!(AtomicKernel::assign_bundle_executor(
+            RuntimeOrigin::signed(BOB),
+            bundle_id
+        ));
+        let record = Bundles::<Test>::get(bundle_id).expect("record survives assignment");
+        assert_eq!(record.status, BundleStatus::Executing);
+        assert_eq!(record.executor, Some(BOB));
+
+        // ...while new economic work is still refused.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle(),
+                10,
+                1,
+                2,
+            ),
+            Error::<Test>::EconomicHaltActive
+        );
+
+        // ...and the in-flight bundle can still be rolled back, releasing its bond.
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+        assert_eq!(
+            Balances::reserved_balance(ALICE),
+            0,
+            "a halt must not trap the bond of an in-flight bundle"
+        );
+    });
+}
