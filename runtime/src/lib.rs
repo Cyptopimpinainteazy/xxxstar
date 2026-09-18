@@ -4946,16 +4946,25 @@ mod runtime_upgrade_rehearsal {
     use frame_support::weights::Weight;
 
     fn fresh_externalities() -> sp_io::TestExternalities {
-        // Empty storage is the base for this rehearsal: the hooks must cope with
-        // values that are absent, and it keeps the check independent of the
-        // genesis-builder API shape.
+        // Seed the variant's real genesis state, so the upgrade hooks run against
+        // populated pallet storage — the situation a real upgrade faces — rather
+        // than empty storage.
         //
-        // Fidelity note: a real upgrade runs against populated storage. Seeding
-        // this from the runtime's own genesis preset is the obvious next step and
-        // is recorded as a follow-up — three attempts at the genesis-builder API
-        // (generic arity, `get_preset` shape) did not compile, and the rehearsal is
-        // worth more working than blocked.
-        sp_io::TestExternalities::default()
+        // `sp_genesis_builder::GenesisBuilder` is declared inside
+        // `sp_api::decl_runtime_apis!`, so it is a *runtime API* (its impl carries
+        // the block type) and cannot be called directly from a test. These are the
+        // plain helper functions that API delegates to, generic over the generated
+        // `RuntimeGenesisConfig`.
+        use frame_support::genesis_builder_helper::{build_state, get_preset};
+        let json = get_preset::<crate::RuntimeGenesisConfig>(&None, |_| None)
+            .expect("runtime must expose a default genesis preset");
+        let mut ext = sp_io::TestExternalities::default();
+        ext.execute_with(|| {
+            build_state::<crate::RuntimeGenesisConfig>(json)
+                .expect("genesis state must build for this runtime variant");
+            frame_system::Pallet::<Runtime>::set_block_number(1);
+        });
+        ext
     }
 
     /// An upgrade must run its migrations without panicking and without needing
@@ -4965,9 +4974,6 @@ mod runtime_upgrade_rehearsal {
     fn runtime_upgrade_rehearsal() {
         let mut ext = fresh_externalities();
         let (pallets, migrations): (Weight, Weight) = ext.execute_with(|| {
-            // A realistic block height, so hooks that read the system block number
-            // see a value rather than the storage default.
-            frame_system::Pallet::<Runtime>::set_block_number(1);
             (
                 // Exactly what `Executive::on_runtime_upgrade` runs.
                 <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade(),
