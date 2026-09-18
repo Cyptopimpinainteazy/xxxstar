@@ -164,9 +164,14 @@ jobs:
             real_x3vm_evm_timeout_refund_atomic_lifecycle \
             -- --ignored --nocapture
 
-      - name: Run real X3VM-EVM refund recovery lifecycle
-        run: |
-          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node             --test x3vm_evm_live             real_x3vm_evm_refund_is_terminal_on_both_domains             -- --ignored --nocapture
+      # NOTE: there is deliberately no separate "refund is terminal on both
+      # domains" step here. A step used to invoke
+      # `real_x3vm_evm_refund_is_terminal_on_both_domains`, a test that does not
+      # exist anywhere in the repository — cargo exits 0 when a filter matches
+      # nothing, so that step was a false green. The property is asserted for
+      # real at the end of `real_x3vm_evm_timeout_refund_atomic_lifecycle`,
+      # which proves the EVM leg rejects a claim after refund and the X3 leg
+      # rejects a claim after its finalized refund.
 
       - name: Dump isolated Anvil log on failure
         if: failure()
