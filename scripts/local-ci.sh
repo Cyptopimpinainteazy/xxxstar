@@ -224,12 +224,27 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 if [ -n "$ONLY" ]; then
   IFS=',' read -r -a ONLY_LIST <<<"$ONLY"
   FILTERED=()
+  UNMATCHED=()
   for spec in "${SELECTED[@]}"; do
     name="${spec%%:*}"; slug="$(slugify "$name")"
     for want in "${ONLY_LIST[@]}"; do
-      [ "$slug" = "$want" ] && FILTERED+=("$spec")
+      [ "$slug" = "$want" ] && FILTERED+=("$spec") && break
     done
   done
+  # A name that matches nothing is a typo, not a no-op: saying nothing would let
+  # an operator believe a gate ran when it never did.
+  for want in "${ONLY_LIST[@]}"; do
+    matched=0
+    for spec in "${SELECTED[@]}"; do
+      [ "$(slugify "${spec%%:*}")" = "$want" ] && matched=1
+    done
+    [ "$matched" = 0 ] && UNMATCHED+=("$want")
+  done
+  if [ "${#UNMATCHED[@]}" -gt 0 ]; then
+    echo "local-ci: --only names gate(s) that are not in the selected set: ${UNMATCHED[*]}" >&2
+    echo "local-ci: see --list for the slugs" >&2
+    exit 2
+  fi
   if [ "${#FILTERED[@]}" -eq 0 ]; then
     echo "local-ci: --only matched no gate; see --list" >&2
     exit 2
