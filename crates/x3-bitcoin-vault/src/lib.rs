@@ -453,11 +453,22 @@ impl BtcVault {
         })
     }
 
+    /// Records a signer approval for a pending deposit.
+    ///
+    /// **The `signature` bytes are stored, not verified.** This method checks
+    /// only that `signer_pubkey` is one of `config.signers` and that it has not
+    /// already approved; it never verifies the signature against any message.
+    /// Callers must perform that verification themselves before calling —
+    /// a count of stored approvals is not evidence of signer consent.
+    ///
+    /// Tracked in issue #272 (the Bitcoin analogue of the Solana signed-message
+    /// format): until a canonical message and verification exist, treat every
+    /// entry in `deposit.signatures` as untrusted bytes.
     pub fn add_signer_approval(
         &mut self,
         deposit_index: usize,
         signer_pubkey: [u8; 32],
-        signature: Vec<u8>,
+        unverified_signature_bytes: Vec<u8>,
     ) -> Result<(), BtcVaultError> {
         let deposit = self
             .pending_deposits
@@ -479,7 +490,9 @@ impl BtcVault {
             return Err(BtcVaultError::DuplicateSignature);
         }
 
-        deposit.signatures.push((signer_pubkey, signature));
+        deposit
+            .signatures
+            .push((signer_pubkey, unverified_signature_bytes));
         let new_approvals = approvals + 1;
         if new_approvals >= threshold {
             deposit.status = BtcDepositStatus::Approved;
