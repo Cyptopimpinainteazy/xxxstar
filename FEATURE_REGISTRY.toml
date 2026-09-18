@@ -51,9 +51,9 @@ crate_or_service = "pallets/evolution-core"
 tauri_app = "LaunchGate"
 required_tests = ["runtime_upgrade_rehearsal"]
 proof_report = "reports/mainnet_readiness_report.md"
-readiness_score = 70
+readiness_score = 75
 blockers = [
-  "Migration dry-run is automated for all six runtime variants and passing: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block. Reaching that required repairing the dev variants' test target, which had never compiled (stale mock: pallet_balances::Config members, a half-finished Test->Runtime rename, missing assertion imports) — the dev suite now runs 80 and dev+frontier 84 tests, all passing. Remaining gap: the rehearsal base is empty storage, not a real state snapshot, so it proves the hooks are safe to run and fit in a block, but not that they migrate historical state correctly"
+  "Migration dry-run is automated for all six runtime variants and passing against real genesis state: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, seeding each variant's actual genesis through frame_support::genesis_builder_helper (the plain functions behind the sp_api GenesisBuilder runtime API), then executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block. Reaching that also required repairing the dev variants' test target, which had never compiled — the dev suite now runs 80 and dev+frontier 84 tests. Remaining gap: this rehearses an upgrade from *this* runtime's genesis, not from a previous runtime's state snapshot, so cross-version migration of historical state is still unverified, and storage-version alignment is not checked (the try-runtime CLI that would do both is absent from the pinned SDK)"
 ]
 dangerous_paths = ["runtime", "chain-specs", "validator keys"]
 
