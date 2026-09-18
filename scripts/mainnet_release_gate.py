@@ -167,18 +167,45 @@ def check_test_suites() -> None:
             ok(f"{pkg_name} tests passed")
 
 
+# ── 5. Runtime upgrade rehearsal ────────────────────────────────────────────
+
+def check_runtime_upgrade_rehearsal() -> None:
+    print("\n── 5. Runtime upgrade rehearsal (migration dry-run per variant) ──")
+    script = ROOT / "scripts" / "check-runtime-variants.sh"
+    if not script.exists():
+        fail(f"{script.relative_to(ROOT)} missing — no per-variant migration dry-run")
+        return
+    # Executes the same OnRuntimeUpgrade hooks an upgrade would, for every
+    # construct_runtime! variant. An upgrade that cannot fit in a block, or a
+    # variant whose hooks panic, must block a release.
+    result = run(["bash", str(script)])
+    if result.returncode == 0:
+        ok("migration dry-run passes for every construct_runtime! variant")
+    else:
+        fail("runtime upgrade rehearsal failed for at least one variant")
+        for line in result.stdout.splitlines()[-15:]:
+            print(f"    {line}")
+
+
 # ── 5. Reproducible-build prerequisites ──────────────────────────────────────
 
 def check_reproducible_build_prereqs() -> None:
-    print("\n── 5. Reproducible-build prerequisites ──")
+    print("\n── 6. Reproducible-build prerequisites ──")
     # Check srtool availability
     result = run(["which", "srtool"])
     if result.returncode == 0:
         ok("srtool installed (reproducible WASM builds possible)")
     else:
-        fail("srtool NOT found — install from https://github.com/paritytech/srtool")
-        print("    Without srtool, WASM builds are non-deterministic.")
-        print("    Mainnet genesis artifacts MUST be reproducible.")
+        # `cargo install` puts it in ~/.cargo/bin, which is not always on PATH for
+        # non-interactive runs (cron, detached CI steps). Look there before
+        # declaring a genuinely installed tool missing.
+        fallback = pathlib.Path.home() / ".cargo" / "bin" / "srtool"
+        if fallback.exists():
+            ok(f"srtool installed at {fallback} (reproducible WASM builds possible)")
+        else:
+            fail("srtool NOT found — install from https://github.com/paritytech/srtool")
+            print("    Without srtool, WASM builds are non-deterministic.")
+            print("    Mainnet genesis artifacts MUST be reproducible.")
 
     # Check docker (required by srtool)
     result = run(["docker", "--version"])
@@ -194,10 +221,10 @@ def check_reproducible_build_prereqs() -> None:
         ok("no SKIP_WASM_BUILD override detected")
 
 
-# ── 6. Forbidden secrets ─────────────────────────────────────────────────────
+# ── 7. Forbidden secrets ─────────────────────────────────────────────────────
 
 def has_forbidden_secrets() -> bool:
-    print("\n── 6. Forbidden secrets scan ──")
+    print("\n── 7. Forbidden secrets scan ──")
     assignment_re = re.compile(r"(?m)^\s*(?:export\s+)?(?:PRIVATE_KEY|MNEMONIC)\s*=\s*([^\s#]+)")
     aws_key_re = re.compile(r"AKIA[0-9A-Z]{16}")
     example_value_prefixes = ("replace_", "your_", "<", "$")
@@ -233,6 +260,7 @@ def main() -> int:
     check_build()
     check_chain_spec_artifacts()
     check_test_suites()
+    check_runtime_upgrade_rehearsal()
     check_reproducible_build_prereqs()
     has_forbidden_secrets()
 
