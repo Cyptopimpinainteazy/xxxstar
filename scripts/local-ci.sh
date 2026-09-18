@@ -29,6 +29,11 @@
 # local-ci-<timestamp>-<slug>.log per gate, and a machine-readable
 # local-ci-<timestamp>-summary.json. Exit status is non-zero if any gate failed,
 # 2 on a usage error, 3 when the whole run was skipped by X3_LOCAL_CI_SKIP_ALL=1.
+#
+# A gate that could not even start because the environment lacks something
+# (crates.io / github.com unreachable while cargo resolves dependencies) is
+# reported as BLOCKED, not FAIL — and BLOCKED still fails the run, because a
+# gate that did not execute has verified nothing.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -284,20 +289,27 @@ export CARGO_TERM_COLOR=never
 run_gate() {
   local name="$1" slug="$2" cmd="$3"
   local gate_log="$LOG_DIR/local-ci-$STAMP-$slug.log"
-  local start end rc
+  local start end rc status
   start=$(date +%s)
   env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "$cmd" >"$gate_log" 2>&1
   rc=$?
   end=$(date +%s)
-  if [ "$rc" -eq 0 ]; then
-    printf 'PASS' >"$LOG_DIR/local-ci-$STAMP-$slug.status"
-  else
-    printf 'FAIL' >"$LOG_DIR/local-ci-$STAMP-$slug.status"
+  status=PASS
+  if [ "$rc" -ne 0 ]; then
+    if grep -qE 'Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency' "$gate_log"; then
+      status=BLOCKED
+    else
+      status=FAIL
+    fi
   fi
+  printf '%s' "$status" >"$LOG_DIR/local-ci-$STAMP-$slug.status"
   printf '%s' "$((end - start))" >"$LOG_DIR/local-ci-$STAMP-$slug.secs"
   # One short line per gate: atomic appends, so parallel gates cannot interleave.
-  if [ "$rc" -eq 0 ]; then
+  if [ "$status" = "PASS" ]; then
     printf 'PASS %-34s %ss\n' "$name" "$((end - start))" | tee -a "$LOG"
+  elif [ "$status" = "BLOCKED" ]; then
+    printf 'BLOCKED %-31s %ss — environment could not fetch dependencies; nothing verified (%s)\n' \
+      "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
   else
     printf 'FAIL %-34s %ss — %s\n' "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
   fi
@@ -307,7 +319,7 @@ any_failed() {
   local file
   for file in "$LOG_DIR"/local-ci-"$STAMP"-*.status; do
     [ -e "$file" ] || continue
-    [ "$(cat "$file")" = "FAIL" ] && return 0
+    [ "$(cat "$file")" = "PASS" ] || return 0
   done
   return 1
 }
@@ -350,12 +362,24 @@ for spec in "${SELECTED[@]}"; do
   [ "$status" = "PASS" ] || FAILED=1
 done
 
+BLOCKED_COUNT=0
+for status in "${GATE_STATUS[@]}"; do
+  [ "$status" = "BLOCKED" ] && BLOCKED_COUNT=$((BLOCKED_COUNT + 1))
+done
+
 echo ""
 echo "──────── local-ci summary ($STAMP) ────────"
 printf '%-34s %-6s %s\n' "GATE" "RESULT" "SECONDS"
 for i in "${!GATE_NAMES[@]}"; do
   printf '%-34s %-6s %s\n' "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}"
 done
+if [ "$BLOCKED_COUNT" -gt 0 ]; then
+  echo ""
+  echo "$BLOCKED_COUNT gate(s) reported BLOCKED: the environment could not fetch"
+  echo "dependencies, so those gates did not execute and verified nothing. Re-run"
+  echo "with network access (or pre-fetch the dependency) before treating this as"
+  echo "coverage."
+fi
 
 {
   echo ""
