@@ -2,7 +2,7 @@
  test-node-build test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
  test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
  test-runtime-upgrade test-all-pallets fmt lint\
- local-ci local-ci-live local-ci-cross local-ci-list\
+ local-ci local-ci-live local-ci-cross local-ci-release local-ci-list\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
 # Local CI — the gates that actually execute on this machine. Hosted CI for this
@@ -17,6 +17,9 @@ local-ci-live:
 
 local-ci-cross:
 	@bash scripts/local-ci.sh --cross
+
+local-ci-release:
+	@bash scripts/local-ci.sh --release
 
 local-ci-list:
 	@bash scripts/local-ci.sh --list
