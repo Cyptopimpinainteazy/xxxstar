@@ -15,26 +15,27 @@ pub use pallet::*;
 
 #[frame_support::pallet]
 pub mod pallet {
+    use codec::{Decode, Encode};
     use frame_support::{
-        ensure, pallet_prelude::*, traits::Currency, transactional, dispatch::RawOrigin,
+        dispatch::RawOrigin, ensure, pallet_prelude::*, traits::Currency, transactional,
     };
     use frame_system::pallet_prelude::*;
+    use scale_info::TypeInfo;
     use sp_runtime::traits::{AtLeast32BitUnsigned, Zero};
     use sp_std::vec::Vec;
-    use codec::{Encode, Decode};
-    use scale_info::TypeInfo;
 
-    type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+    type BalanceOf<T> =
+        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
     /// Proposal status
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo)]
     pub enum ProposalStatus {
-        Pending,      // Awaiting voting threshold
-        Active,       // Voting in progress
-        Approved,     // Secured majority vote
-        Executed,     // Successfully executed on-chain
-        Rejected,     // Failed to reach approval threshold
-        Slashed,      // Proposer was slashed for bad faith
+        Pending,  // Awaiting voting threshold
+        Active,   // Voting in progress
+        Approved, // Secured majority vote
+        Executed, // Successfully executed on-chain
+        Rejected, // Failed to reach approval threshold
+        Slashed,  // Proposer was slashed for bad faith
     }
 
     /// Proposal information
@@ -87,29 +88,28 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        
         type Currency: Currency<Self::AccountId>;
-        
+
         /// Max voting options per proposal
         #[pallet::constant]
         type MaxVotingOptions: Get<u32>;
-        
+
         /// Max metadata length (256 bytes)
         #[pallet::constant]
         type MaxMetadataLength: Get<u32>;
-        
+
         /// Voting period (blocks)
         #[pallet::constant]
         type VotingPeriod: Get<BlockNumberFor<Self>>;
-        
+
         /// Minimum proposal deposit
         #[pallet::constant]
         type MinimumDeposit: Get<BalanceOf<Self>>;
-        
+
         /// Approval threshold (percentage 0-100)
         #[pallet::constant]
         type ApprovalThreshold: Get<u32>;
-        
+
         /// Max delegation expiry (blocks, 100 blocks = ~10 min)
         #[pallet::constant]
         type MaxDelegationExpiry: Get<BlockNumberFor<Self>>;
@@ -138,7 +138,7 @@ pub mod pallet {
         Blake2_128Concat,
         u32, // Proposal ID
         Blake2_128Concat,
-        T::AccountId, // Voter
+        T::AccountId,               // Voter
         (VoteChoice, BalanceOf<T>), // Vote and power
     >;
 
@@ -168,68 +168,85 @@ pub mod pallet {
 
     /// Council members (M-of-N governance)
     #[pallet::storage]
-    pub type CouncilMembers<T: Config> = StorageValue<_, BoundedVec<T::AccountId, ConstU32<50>>, ValueQuery>;
+    pub type CouncilMembers<T: Config> =
+        StorageValue<_, BoundedVec<T::AccountId, ConstU32<50>>, ValueQuery>;
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// Proposal created
-        ProposalCreated { proposal_id: u32, proposer: T::AccountId },
-        
+        ProposalCreated {
+            proposal_id: u32,
+            proposer: T::AccountId,
+        },
+
         /// Voting started on proposal
         VotingStarted { proposal_id: u32 },
-        
+
         /// User cast vote
-        VoteCast { proposal_id: u32, voter: T::AccountId, choice: VoteChoice },
-        
+        VoteCast {
+            proposal_id: u32,
+            voter: T::AccountId,
+            choice: VoteChoice,
+        },
+
         /// Vote delegated
-        VoteDelegated { delegator: T::AccountId, delegate: T::AccountId },
-        
+        VoteDelegated {
+            delegator: T::AccountId,
+            delegate: T::AccountId,
+        },
+
         /// Proposal approved
         ProposalApproved { proposal_id: u32 },
-        
+
         /// Proposal rejected
         ProposalRejected { proposal_id: u32 },
-        
+
         /// Proposal executed
         ProposalExecuted { proposal_id: u32 },
-        
+
         /// Treasury spend approved
-        TreasurySpendApproved { recipient: T::AccountId, amount: BalanceOf<T> },
-        
+        TreasurySpendApproved {
+            recipient: T::AccountId,
+            amount: BalanceOf<T>,
+        },
+
         /// Proposer slashed
-        ProposerSlashed { proposer: T::AccountId, amount: BalanceOf<T> },
+        ProposerSlashed {
+            proposer: T::AccountId,
+            amount: BalanceOf<T>,
+        },
     }
 
     #[pallet::error]
     pub enum Error<T> {
         /// Proposal not found
         ProposalNotFound,
-        
+
         /// Already voted
         AlreadyVoted,
-        
+
         /// Voting not active
         VotingNotActive,
-        
+
         /// Insufficient deposit
         InsufficientDeposit,
-        
+
         /// Invalid vote choice
         InvalidVoteChoice,
-        
+
         /// Cannot delegate to self
         CannotDelegateToSelf,
-        
+
         /// Delegation expired
         DelegationExpired,
-        
+
         /// Insufficient treasury balance
         InsufficientTreasuryBalance,
-        
+
         /// Councillor not found
         CouncillorNotFound,
-        
+
         /// Invalid metadata length
         InvalidMetadata,
     }
@@ -247,17 +264,19 @@ pub mod pallet {
             options: Vec<Vec<u8>>,
         ) -> DispatchResult {
             let proposer = ensure_signed(origin)?;
-            
+
             let title_bounded = BoundedVec::<u8, T::MaxMetadataLength>::try_from(title)
                 .map_err(|_| Error::<T>::InvalidMetadata)?;
             let desc_bounded = BoundedVec::<u8, T::MaxMetadataLength>::try_from(description)
                 .map_err(|_| Error::<T>::InvalidMetadata)?;
             let opts_bounded = BoundedVec::<_, T::MaxVotingOptions>::try_from(
-                options.into_iter()
+                options
+                    .into_iter()
                     .map(|o| BoundedVec::<u8, T::MaxMetadataLength>::try_from(o))
                     .collect::<Result<Vec<_>, _>>()
-                    .map_err(|_| Error::<T>::InvalidMetadata)?
-            ).map_err(|_| Error::<T>::InvalidMetadata)?;
+                    .map_err(|_| Error::<T>::InvalidMetadata)?,
+            )
+            .map_err(|_| Error::<T>::InvalidMetadata)?;
 
             let deposit = T::MinimumDeposit::get();
             T::Currency::reserve(&proposer, deposit)
@@ -284,26 +303,31 @@ pub mod pallet {
             Proposals::<T>::insert(proposal_id, proposal);
             ProposalCount::<T>::set(proposal_id + 1);
 
-            Self::deposit_event(Event::ProposalCreated { proposal_id, proposer });
+            Self::deposit_event(Event::ProposalCreated {
+                proposal_id,
+                proposer,
+            });
             Ok(())
         }
 
         /// Cast a vote on a proposal
         #[pallet::call_index(1)]
         #[pallet::weight(10_000 + T::DbWeight::get().reads_writes(3, 2))]
-        pub fn vote(
-            origin: OriginFor<T>,
-            proposal_id: u32,
-            choice: VoteChoice,
-        ) -> DispatchResult {
+        pub fn vote(origin: OriginFor<T>, proposal_id: u32, choice: VoteChoice) -> DispatchResult {
             let voter = ensure_signed(origin)?;
 
-            let mut proposal = Proposals::<T>::get(proposal_id)
-                .ok_or(Error::<T>::ProposalNotFound)?;
+            let mut proposal =
+                Proposals::<T>::get(proposal_id).ok_or(Error::<T>::ProposalNotFound)?;
 
             let now = <frame_system::Pallet<T>>::block_number();
-            ensure!(now >= proposal.voting_start && now < proposal.voting_end, Error::<T>::VotingNotActive);
-            ensure!(!Votes::<T>::contains_key(proposal_id, &voter), Error::<T>::AlreadyVoted);
+            ensure!(
+                now >= proposal.voting_start && now < proposal.voting_end,
+                Error::<T>::VotingNotActive
+            );
+            ensure!(
+                !Votes::<T>::contains_key(proposal_id, &voter),
+                Error::<T>::AlreadyVoted
+            );
 
             let voting_power = T::Currency::free_balance(&voter);
 
@@ -319,7 +343,11 @@ pub mod pallet {
             Votes::<T>::insert(proposal_id, &voter, (choice, voting_power));
             Proposals::<T>::insert(proposal_id, proposal);
 
-            Self::deposit_event(Event::VoteCast { proposal_id, voter, choice });
+            Self::deposit_event(Event::VoteCast {
+                proposal_id,
+                voter,
+                choice,
+            });
             Ok(())
         }
 
@@ -337,7 +365,7 @@ pub mod pallet {
             let voting_power = T::Currency::free_balance(&delegator);
             let now = <frame_system::Pallet<T>>::block_number();
             let max_expiry = now + T::MaxDelegationExpiry::get();
-            
+
             ensure!(expiry <= max_expiry, Error::<T>::InvalidMetadata);
 
             let delegation = VoteDelegation {
@@ -349,19 +377,24 @@ pub mod pallet {
 
             Delegations::<T>::insert(&delegator, &delegate, delegation);
 
-            Self::deposit_event(Event::VoteDelegated { delegator, delegate });
+            Self::deposit_event(Event::VoteDelegated {
+                delegator,
+                delegate,
+            });
             Ok(())
         }
 
         /// Deposit funds to treasury
         #[pallet::call_index(3)]
         #[pallet::weight(5_000 + T::DbWeight::get().reads_writes(1, 1))]
-        pub fn treasury_deposit(
-            origin: OriginFor<T>,
-            amount: BalanceOf<T>,
-        ) -> DispatchResult {
+        pub fn treasury_deposit(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
             let depositor = ensure_signed(origin)?;
-            T::Currency::transfer(&depositor, &Self::account_id(), amount, frame_support::traits::KeepAlive)?;
+            T::Currency::transfer(
+                &depositor,
+                &Self::account_id(),
+                amount,
+                frame_support::traits::KeepAlive,
+            )?;
 
             let current = TreasuryBalance::<T>::get();
             TreasuryBalance::<T>::set(current + amount);
@@ -384,7 +417,10 @@ pub mod pallet {
                 .map_err(|_| Error::<T>::InvalidMetadata)?;
 
             let current_balance = TreasuryBalance::<T>::get();
-            ensure!(current_balance >= amount, Error::<T>::InsufficientTreasuryBalance);
+            ensure!(
+                current_balance >= amount,
+                Error::<T>::InsufficientTreasuryBalance
+            );
 
             let spend_id = ProposalCount::<T>::get();
 
@@ -405,27 +441,24 @@ pub mod pallet {
         /// Approve treasury spend (council only, M-of-N vote)
         #[pallet::call_index(5)]
         #[pallet::weight(10_000 + T::DbWeight::get().reads_writes(2, 2))]
-        pub fn approve_treasury_spend(
-            origin: OriginFor<T>,
-            spend_id: u32,
-        ) -> DispatchResult {
+        pub fn approve_treasury_spend(origin: OriginFor<T>, spend_id: u32) -> DispatchResult {
             let approver = ensure_signed(origin)?;
-            
+
             let council = CouncilMembers::<T>::get();
             ensure!(council.contains(&approver), Error::<T>::CouncillorNotFound);
 
             if let Some(mut spend) = TreasurySpendsque::<T>::get(spend_id) {
                 spend.approvals += 1;
-                
+
                 // M-of-N threshold: need majority (>50% of council)
                 let required_approvals = (council.len() as u32 / 2) + 1;
-                
+
                 if spend.approvals >= required_approvals {
                     spend.status = ProposalStatus::Approved;
-                    
+
                     let treasury_balance = TreasuryBalance::<T>::get();
                     TreasuryBalance::<T>::set(treasury_balance.saturating_sub(spend.amount));
-                    
+
                     let _ = T::Currency::transfer(
                         &Self::account_id(),
                         &spend.beneficiary,
