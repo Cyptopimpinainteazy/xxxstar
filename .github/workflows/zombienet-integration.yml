@@ -11,30 +11,8 @@
 name: x3 zombienet integration
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - 'node/**'
-      - 'runtime/**'
-      - 'pallets/**'
-      - 'chain-specs/**'
-      - 'tests/zombienet/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-  push:
-    branches: [master, 'release/**']
-    paths:
-      - 'node/**'
-      - 'runtime/**'
-      - 'pallets/**'
-      - 'chain-specs/**'
-      - 'tests/zombienet/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-  schedule:
-    - cron: '30 6 * * *'
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
   workflow_dispatch:
-
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
@@ -51,7 +29,7 @@ concurrency:
 jobs:
   zombienet-smoke:
     name: 4-validator smoke (finality + block production)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

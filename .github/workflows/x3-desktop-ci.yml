@@ -1,17 +1,8 @@
 name: X3 Desktop CI
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'apps/x3-desktop/**'
-      - '.github/workflows/x3-desktop-ci.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/x3-desktop/**'
+  # Cross-platform hosted workflow retained as an explicit manual fallback; local CI is the gate of record.
   workflow_dispatch:
-
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1

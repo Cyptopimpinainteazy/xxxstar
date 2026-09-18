@@ -14,15 +14,8 @@
 name: x3 release-provenance
 
 on:
-  push:
-    tags:
-      - "v*"
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag (must already exist)"
-        required: true
-
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
@@ -38,7 +31,7 @@ jobs:
   # ── Deterministic Build ────────────────────────────────────────────────
   build:
     name: "Deterministic build + attestation"
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4

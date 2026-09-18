@@ -1,15 +1,11 @@
 name: security-audit
 
 on:
-  push:
-    branches: ['release/**']
-  schedule:
-    - cron: '0 4 * * *'
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

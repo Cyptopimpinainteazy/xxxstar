@@ -1,29 +1,8 @@
 name: docs-consistency
 
 on:
-  pull_request:
-    paths:
-      - '.ai/SESSION_UPDATE_SUMMARY_*.md'
-      - '.prompt.md'
-      - '.agent.md'
-      - '.instructions.md'
-      - '.github/prompts/**'
-      - 'tools/docs/**'
-      - '**/*.md'
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - '.ai/SESSION_UPDATE_SUMMARY_*.md'
-      - '.prompt.md'
-      - '.agent.md'
-      - '.instructions.md'
-      - '.github/prompts/**'
-      - 'tools/docs/**'
-      - '**/*.md'
-
-
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
+  workflow_dispatch:
 concurrency:
   # Never cancel an in-flight default-branch run: a cancelled release gate proves
   # nothing, and with one self-hosted runner every new commit used to cancel the
@@ -33,7 +12,7 @@ concurrency:
 
 jobs:
   validate-session-summary-format:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +23,7 @@ jobs:
           tools/docs/check-session-summary.sh
 
   readiness-consistency:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

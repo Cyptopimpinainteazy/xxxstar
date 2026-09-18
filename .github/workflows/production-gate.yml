@@ -1,31 +1,8 @@
 name: production-gate
 
 on:
-  # No `pull_request` trigger: the jobs below request ubuntu-latest for PR events,
-  # and this account's hosted minutes are locked (every PR run completed in ~2s
-  # with no steps and no runner). The gate is a push/dispatch gate; PR-time
-  # verification is the local CI on the author's machine
-  # (scripts/local-ci.sh --pre-push runs the same live gates).
-  push:
-    branches: [ main, master, develop ]
-    # The release gate fires on every commit, and each run costs ~5 heavy jobs on
-    # the shared runner. Documentation- and evidence-only changes cannot alter the
-    # build, chain spec, migrations or secrets it checks, so they do not need to
-    # queue a 90-minute gate behind the live-lifecycle jobs.
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - ".ai/**"
-      - "reports/**"
-      - "audit-artifacts/**"
-      - "memory/**"
-      - "stakeholder_comms/**"
-  # The release gate must be runnable on demand — e.g. to re-verify a commit
-  # after a billing/runner outage without pushing a no-op commit. It previously
-  # had no dispatch trigger, so `gh workflow run production-gate.yml` returned
-  # HTTP 422.
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 concurrency:
   # Never cancel an in-flight default-branch run: a cancelled release gate proves
   # nothing, and with one self-hosted runner every new commit used to cancel the
@@ -53,7 +30,7 @@ jobs:
       - native-x3vm-live
       - evm-live
       - svm-live
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 90
     env:
       # Keep reproducible runtime builds pinned while using a Rust release

@@ -1,25 +1,7 @@
 name: Formal Verification Gate
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - 'pallets/**'
-      - 'runtime/**'
-      - 'x3-vm/**'
-      - 'formal-proofs/**'
-      - 'proof-forge/src/runners/formal_proofs.rs'
-  push:
-    branches: [master, 'release/**']
-    paths:
-      - 'pallets/**'
-      - 'runtime/**'
-      - 'x3-vm/**'
-      - 'formal-proofs/**'
-      - 'proof-forge/src/runners/formal_proofs.rs'
-  schedule:
-    - cron: '30 5 * * *'
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
@@ -35,7 +17,7 @@ concurrency:
 jobs:
   formal-verification:
     name: Run Formal Verification Proofs
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 30
     permissions:
       contents: read
@@ -258,7 +240,7 @@ jobs:
   mainnet-gate-integration:
     name: Update Mainnet Gate with Formal Verification
     needs: formal-verification
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     
     steps:
       - name: Checkout Repository

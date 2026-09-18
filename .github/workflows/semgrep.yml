@@ -1,14 +1,8 @@
 name: Semgrep
 
 on:
-  push:
-    branches: [ "main", "master", "develop" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  schedule:
-    - cron: '0 8 * * 1'  # Weekly on Monday at 8 AM UTC
-
-
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
+  workflow_dispatch:
 concurrency:
   # Never cancel an in-flight default-branch run: a cancelled release gate proves
   # nothing, and with one self-hosted runner every new commit used to cancel the
@@ -19,7 +13,7 @@ concurrency:
 jobs:
   semgrep:
     name: Scan
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     container:
       image: returntocorp/semgrep:latest
     steps:

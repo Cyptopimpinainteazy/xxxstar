@@ -1,19 +1,8 @@
 name: X3 Fronend + GPU Swarm CI
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - 'sprint-*'
-  pull_request:
-    branches:
-      - main
-      - develop
-      - 'sprint-*'
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
   workflow_dispatch:
-
-
 concurrency:
   # Never cancel an in-flight default-branch run: a cancelled release gate proves
   # nothing, and with one self-hosted runner every new commit used to cancel the
@@ -24,7 +13,7 @@ concurrency:
 jobs:
   frontend-build:
     name: Build X3 Fronend
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - name: Checkout code
         uses: actions/checkout@v5

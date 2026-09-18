@@ -1,103 +1,31 @@
-# X3 Security Workflows
+# X3 CI / Actions Policy
 
-This repository uses multiple GitHub Actions workflows to maintain enterprise-grade security posture for the X3 blockchain mainnet.
+The gate of record for this repository is **local CI**, not GitHub-hosted Actions.
 
-## 🔒 Security Workflows Overview
+## Canonical verification
 
-### 1. CodeQL Analysis (`codeql-analysis.yml`)
-- **Purpose**: Built-in security scanning for vulnerabilities, secrets, and security issues
-- **Languages**: JavaScript, TypeScript, Rust, Python
-- **Triggers**: Push/PR + Weekly schedule
-- **Output**: Security alerts in GitHub Security tab
+- `scripts/local-ci.sh` runs the real gate suite with real exit codes.
+- `.githooks/pre-push` invokes `scripts/local-ci.sh --pre-push`.
+- Trusted Linux workflows use the self-hosted runner labels `[self-hosted, Linux, X64, x3]`.
+- Heavy, release, security, deployment, desktop, and cross-domain workflows are retained for **manual dispatch**.
+- Cross-domain reusable workflows may also retain `workflow_call` where another manual workflow composes them.
 
-### 2. OSV Scanner (`osv-scan.yml`)
-- **Purpose**: Dependency vulnerability scanning using OSV.dev database
-- **Scope**: All dependencies across all package managers
-- **Triggers**: Push/PR + Weekly schedule
-- **Output**: SARIF format security findings
+## Automatic GitHub Actions policy
 
-### 3. Rust Clippy (`rust-clippy.yml`)
-- **Purpose**: Code quality and security linting for Rust code
-- **Scope**: All Rust crates in workspace
-- **Triggers**: Push/PR
-- **Output**: Clippy warnings/errors
+Automatic `pull_request` / `push` hosted CI is intentionally disabled. GitHub-hosted jobs on this account terminate before executing any steps, so they produce red checks without verification and drown out real failures.
 
-### 4. Semgrep (`semgrep.yml`)
-- **Purpose**: Security-focused static analysis with community rules
-- **Scope**: All source code
-- **Triggers**: Push/PR + Weekly schedule
-- **Output**: SARIF security findings
+Do **not** move untrusted pull-request code onto a self-hosted runner. PR-time verification happens on the author's machine through the pre-push hook before the branch is pushed.
 
-### 5. Trivy (`trivy.yml`)
-- **Purpose**: Repository filesystem vulnerability, secret, and misconfiguration scanning
-- **Scope**: Checked-out source and dependency manifests; no container image is built
-- **Triggers**: Push/PR + Weekly schedule
-- **Output**: SARIF security findings
+## Local gate modes
 
-### 6. Snyk Security (`snyk.yml`)
-- **Purpose**: Comprehensive dependency and infrastructure scanning
-- **Scope**: NPM, Python, and infrastructure dependencies
-- **Triggers**: Push/PR + Weekly schedule
-- **Output**: Security vulnerabilities and fixes
-
-### 7. Security Dashboard (`security-dashboard.yml`)
-- **Purpose**: Weekly comprehensive security assessment
-- **Scope**: Rust (cargo-audit), NPM (audit), Python (safety)
-- **Triggers**: Manual + Weekly schedule
-- **Output**: Consolidated security report artifact
-
-## 🚀 Setup Instructions
-
-### Required Secrets
 ```bash
-# For Snyk workflow
-SNYK_TOKEN=your_snyk_token_here
+scripts/local-ci.sh
+scripts/local-ci.sh --live
+scripts/local-ci.sh --cross
+scripts/local-ci.sh --variants
+scripts/local-ci.sh --release
+scripts/local-ci.sh --deep
+scripts/local-ci.sh --all
 ```
 
-### Workflow Dependencies
-- All workflows use SARIF format for GitHub Security tab integration
-- Container-based workflows (Semgrep) use official images
-- Rust workflows require `protoc` for protobuf compilation
-
-## 📊 Security Coverage
-
-| Component | CodeQL | OSV | Clippy | Semgrep | Trivy | Snyk | Dashboard |
-|-----------|--------|-----|--------|---------|-------|------|-----------|
-| Rust Code | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| JavaScript/TypeScript | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Python | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Dependencies | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Repository secrets | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
-| Infrastructure | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
-
-## 🔧 Maintenance
-
-### Weekly Schedule
-- Monday 6 AM UTC: CodeQL Analysis
-- Monday 7 AM UTC: OSV Scanner
-- Monday 8 AM UTC: Semgrep
-- Monday 9 AM UTC: Trivy
-- Monday 10 AM UTC: Snyk
-- Monday 11 AM UTC: Security Dashboard
-
-### Alert Management
-- All findings appear in GitHub Security tab
-- Critical/high severity alerts trigger notifications
-- Weekly dashboard provides comprehensive security status
-
-### Updating Rules
-- CodeQL: Auto-updates with GitHub
-- Semgrep: Uses community rules, update via workflow
-- Clippy: Updates with Rust toolchain
-- Others: Update via workflow configuration
-
-## 🛡️ Security Posture
-
-These workflows provide:
-- **Multi-layered scanning**: Different tools catch different vulnerabilities
-- **Continuous monitoring**: Automated scanning on every change
-- **Comprehensive coverage**: Code, dependencies, repository secrets, infrastructure
-- **SARIF integration**: All results in GitHub Security tab
-- **Scheduled assessments**: Weekly deep dives
-
-**Result**: Enterprise-grade security monitoring for mainnet-ready blockchain.
+See `docs/local-ci.md` for the full gate list, evidence format, and runner policy.

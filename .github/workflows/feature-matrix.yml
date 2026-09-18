@@ -1,11 +1,8 @@
 name: feature-matrix
 
 on:
-  pull_request:
-  push:
-    branches: [master]
-  merge_group:
-
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
+  workflow_dispatch:
 permissions:
   contents: read
 
@@ -19,7 +16,7 @@ concurrency:
 jobs:
   validate:
     name: validate-feature-matrix
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4

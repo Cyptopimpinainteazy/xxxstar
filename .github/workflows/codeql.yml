@@ -12,14 +12,8 @@
 name: "CodeQL Advanced"
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  schedule:
-    - cron: '32 2 * * 2'
-
-
+  # Cross-platform hosted workflow retained as an explicit manual fallback; local CI is the gate of record.
+  workflow_dispatch:
 concurrency:
   # Never cancel an in-flight default-branch run: a cancelled release gate proves
   # nothing, and with one self-hosted runner every new commit used to cancel the

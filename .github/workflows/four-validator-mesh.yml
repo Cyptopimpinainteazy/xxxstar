@@ -1,10 +1,8 @@
 name: four-validator-mesh
 
 on:
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
   workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * 1" # weekly Monday maintenance run
-
 jobs:
   drill:
     name: four-validator finality and recovery drill
