@@ -30,6 +30,7 @@
 
 pub mod encryption;
 pub mod queue;
+pub mod threshold;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -57,7 +58,8 @@ pub struct EncryptedTransaction {
 /// Threshold public key for the confidential validator committee.
 #[derive(Debug, Clone)]
 pub struct ThresholdPublicKey {
-    /// The combined group public key (X25519).
+    /// The combined group public key: a compressed Ristretto point
+    /// (`secret * G`), not an X25519 key — see [`threshold`] for why.
     pub group_key: [u8; 32],
     /// DKG epoch number.
     pub epoch: u64,
