@@ -36,6 +36,8 @@ sp-core = { workspace = true, features = ["std"] }
 # test configuration and in the audit harness
 # (audit-artifacts/.../audit-harness/proof, which enables `production`).
 x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false, features = ["test-verifier", "std"] }
+# Ed25519 signing so the tests can produce real SVM attestations.
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
 default = ["std"]

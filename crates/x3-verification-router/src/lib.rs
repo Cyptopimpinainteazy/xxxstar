@@ -485,19 +485,12 @@ impl Verifier for SolanaFinalizedVerifier {
             return Err(VerificationError::MalformedProof);
         }
 
+        // Unconditional: with no authorized set there is nothing to verify, so
+        // the proof is refused in every feature configuration. `test-verifier`
+        // deliberately does not relax this — a test that wants a Solana proof to
+        // pass must supply real attestations from an authorized key.
         if self.validators.is_empty() || self.threshold == 0 {
-            #[cfg(all(feature = "test-verifier", not(feature = "production")))]
-            {
-                return Ok(VerificationOutcome {
-                    accepted: true,
-                    reason: "solana_finalized_structural_only_test_verifier",
-                    verified_at_height: None,
-                });
-            }
-            #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
-            {
-                return Err(VerificationError::NoAuthorizedValidators);
-            }
+            return Err(VerificationError::NoAuthorizedValidators);
         }
 
         let payload = &proof.payload;
@@ -883,18 +876,6 @@ mod tests {
         assert!(outcome.accepted);
     }
 
-    #[cfg(all(feature = "test-verifier", not(feature = "production")))]
-    #[test]
-    fn solana_verifier_works_under_test_verifier() {
-        let mut router = VerificationRouter::new();
-        router.register_verifier(Arc::new(SolanaFinalizedVerifier::empty()));
-
-        let mut proof = dummy_proof(VerificationStrategy::SolanaFinalizedProof);
-        proof.source_chain = ChainKind::Solana;
-        let outcome = router.route(&proof).expect("should verify");
-        assert!(outcome.accepted);
-    }
-
     /// What a production build does: every strategy without a real verifier
     /// refuses the proof. This is the posture the audit requires
     /// (`docs/reports/SECURITY_BLOCKERS.md`); the acceptance test that enforces
@@ -1128,6 +1109,22 @@ mod tests {
     }
 
     #[test]
+    fn solana_tampered_signature_rejected() {
+        let a = key(1);
+        let verifier = SolanaFinalizedVerifier::new(vec![a.verifying_key().to_bytes()], 1);
+
+        let mut payload = solana_payload(42, [9u8; 32], &[&a], None, SOLANA_FINALIZED_FORMAT_V1);
+        // Flip a bit in the last byte of the 64-byte signature.
+        let last = payload.len() - 1;
+        payload[last] ^= 0x01;
+
+        assert!(matches!(
+            verifier.verify(&solana_proof(payload)),
+            Err(VerificationError::InsufficientValidSignatures)
+        ));
+    }
+
+    #[test]
     fn solana_format_version_and_validator_set_are_enforced() {
         let a = key(1);
         let verifier = SolanaFinalizedVerifier::new(vec![a.verifying_key().to_bytes()], 1);
@@ -1141,7 +1138,6 @@ mod tests {
         let payload = solana_payload(42, [9u8; 32], &[&a], None, SOLANA_FINALIZED_FORMAT_V1);
         // Outside `test-verifier` an unconfigured verifier must refuse: there is
         // no validator set to check the attestations against.
-        #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
         assert!(matches!(
             SolanaFinalizedVerifier::empty().verify(&solana_proof(payload.clone())),
             Err(VerificationError::NoAuthorizedValidators)
