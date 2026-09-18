@@ -116,7 +116,13 @@ GATES_FAST=(
   "test atomic-kernel:cargo test -p pallet-x3-atomic-kernel"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
-  "test node:env SKIP_WASM_BUILD=1 cargo test -p x3-chain-node"
+  # No SKIP_WASM_BUILD here on purpose: the service tests boot a real node whose
+  # chain spec is decoded by the *embedded* runtime, so the runtime WASM must be
+  # built for this feature set. `SKIP_WASM_BUILD=1` used to embed whatever blob
+  # sat in target/<profile>/wbuild/ (once a mainnet-rc1 blob against a full-variant
+  # genesis), which the node then rejected at boot. runtime/build.rs now refuses a
+  # cache built for another feature set, so this gate has to build it.
+  "test node:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node"
   "test cross-vm-coordinator:cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml"
 )
 
