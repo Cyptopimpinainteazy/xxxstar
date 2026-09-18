@@ -113,6 +113,10 @@ GATES_FAST=(
   "clippy runtime rc1:cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings"
   "clippy node rc1:cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1 -- -D warnings"
   "test x3-lang:cargo test --manifest-path x3-lang/Cargo.toml"
+  # The Python half of `make test` (parser, typechecker, mocked e2e). Nothing else
+  # in this gate set runs pytest, so without this line the x3-lang Python suites
+  # were invisible to the CI of record.
+  "test x3-lang python:pytest -q x3-lang/tests/test_parser.py x3-lang/tests/test_typechecker.py x3-lang/tests/test_e2e_mocked.py"
   "test atomic-kernel:cargo test -p pallet-x3-atomic-kernel"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:cargo test -p pallet-x3-settlement-engine"
