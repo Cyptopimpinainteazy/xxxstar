@@ -4946,10 +4946,15 @@ mod runtime_upgrade_rehearsal {
     use frame_support::weights::Weight;
 
     fn fresh_externalities() -> sp_io::TestExternalities {
-        // Empty storage is the base for an upgrade rehearsal: a real upgrade runs
-        // against whatever the chain already holds, and the hooks must cope with
-        // values that are absent. Avoids depending on genesis-builder traits,
-        // whose shape differs across SDK pins.
+        // Empty storage is the base for this rehearsal: the hooks must cope with
+        // values that are absent, and it keeps the check independent of the
+        // genesis-builder API shape.
+        //
+        // Fidelity note: a real upgrade runs against populated storage. Seeding
+        // this from the runtime's own genesis preset is the obvious next step and
+        // is recorded as a follow-up — three attempts at the genesis-builder API
+        // (generic arity, `get_preset` shape) did not compile, and the rehearsal is
+        // worth more working than blocked.
         sp_io::TestExternalities::default()
     }
 
