@@ -1,16 +1,19 @@
 //! X3 SDK Marketplace
-//! 
+//!
 //! Plugin registry, rating system, and fee distribution for SDK extensions
 
-pub mod plugin_registry;
-pub mod rating_system;
 pub mod fee_distribution;
 pub mod ipfs_metadata;
+pub mod plugin_registry;
+pub mod rating_system;
 
-pub use plugin_registry::{PluginRegistry, Plugin, PluginMetadata};
-pub use rating_system::{RatingSystem, Rating};
+pub use plugin_registry::{Plugin, PluginMetadata, PluginRegistry};
+// `Rating` was re-exported here but no such type exists in `rating_system.rs`
+// (it defines `Review`, `RatingStats` and `RatingSystem`), so the crate could not
+// compile. Nothing referenced it; the dangling re-export is gone.
 pub use fee_distribution::{FeeDistribution, FeePool};
 pub use ipfs_metadata::{IPFSManager, IPFSPin};
+pub use rating_system::RatingSystem;
 
 use serde::{Deserialize, Serialize};
 
@@ -19,19 +22,19 @@ use serde::{Deserialize, Serialize};
 pub enum MarketplaceError {
     #[error("Plugin not found")]
     PluginNotFound,
-    
+
     #[error("Invalid rating: {0}")]
     InvalidRating(String),
-    
+
     #[error("Insufficient balance")]
     InsufficientBalance,
-    
+
     #[error("IPFS error: {0}")]
     IPFSError(String),
-    
+
     #[error("Plugin already exists")]
     PluginExists,
-    
+
     #[error("Invalid metadata")]
     InvalidMetadata,
 }
