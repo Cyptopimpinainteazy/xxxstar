@@ -19,6 +19,18 @@
 //! - `max_slippage_bps` - maximum acceptable slippage in basis points
 //! - `relayer_quorum_requirement` - minimum relayer signatures needed
 //! - `status` - current lifecycle status
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
+use alloc::format;
+use alloc::string::String;
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
+#[cfg(not(feature = "std"))]
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::error::SwapError;
 use serde::{Deserialize, Serialize};

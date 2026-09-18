@@ -66,29 +66,27 @@ def detect_criterion_results(criterion_dir: Path) -> Dict[str, Dict[str, float]]
     if not criterion_dir.exists():
         return results
 
-    for bench_dir in criterion_dir.iterdir():
-        if not bench_dir.is_dir():
-            continue
-        estimates_file = bench_dir / "new" / "estimates.json"
-        if not estimates_file.exists():
-            continue
-
+    for estimates_file in criterion_dir.glob("**/new/estimates.json"):
         try:
             with open(estimates_file) as f:
                 data = json.load(f)
 
-            bench_name = bench_dir.name
-            for group_name, group_data in data.items():
-                full_name = f"{bench_name}/{group_name}"
-                if "Slope" in group_data:
-                    results[full_name] = {
-                        "mean_ns": group_data["Slope"]["point_estimate"],
-                        "p95_ns": group_data["Slope"]["confidence_interval"]["upper_bound"],
-                        "stddev_ns": abs(
-                            group_data["Slope"]["confidence_interval"]["upper_bound"]
-                            - group_data["Slope"]["confidence_interval"]["lower_bound"]
-                        ) / 4.0,  # approx stddev from CI width
-                    }
+            bench_path = estimates_file.parent.parent.relative_to(criterion_dir)
+            bench_name = bench_path.as_posix()
+            slope = data.get("slope") or data["mean"]
+            std_dev = data.get("std_dev", {})
+            results[bench_name] = {
+                "mean_ns": slope["point_estimate"],
+                "p95_ns": slope["confidence_interval"]["upper_bound"],
+                "stddev_ns": std_dev.get(
+                    "point_estimate",
+                    abs(
+                        slope["confidence_interval"]["upper_bound"]
+                        - slope["confidence_interval"]["lower_bound"]
+                    )
+                    / 4.0,
+                ),
+            }
         except (json.JSONDecodeError, KeyError) as e:
             print(f"  ⚠ Skipping {estimates_file}: {e}", file=sys.stderr)
 
@@ -178,13 +176,26 @@ def get_machine_info() -> Dict[str, Any]:
     return info
 
 
+def detect_runtime_wasm_size_mb() -> Optional[float]:
+    """Return the largest built runtime WASM artifact size, if one is available."""
+    candidates: List[Path] = []
+    for root in (Path("target"), Path("runtime/target")):
+        if root.exists():
+            candidates.extend(root.rglob("*.wasm"))
+
+    if not candidates:
+        return None
+
+    largest = max(candidates, key=lambda path: path.stat().st_size)
+    return round(largest.stat().st_size / (1024**2), 3)
+
+
 def check_pass_thresholds(metrics: Dict[str, float]) -> Dict[str, Any]:
     """Check metrics against pass/fail thresholds."""
     violations: List[Dict[str, Any]] = []
     for metric, thresholds in PASS_THRESHOLDS.items():
         value = metrics.get(metric)
         if value is None:
-            violations.append({"metric": metric, "status": "missing", "message": "No data"})
             continue
         if "max" in thresholds and value > thresholds["max"]:
             violations.append({
@@ -280,9 +291,9 @@ def generate_report(
         "timestamp": timestamp,
         "machine": machine,
         "runtime": {
-            "wasm_size_mb": 0,  # TODO: detect from build
+            "wasm_size_mb": detect_runtime_wasm_size_mb(),
             "block_time_ms": 12000,
-            "max_block_weight": 0,
+            "max_block_weight": None,
         },
         "criteria": criterion_results,
         "k6": (

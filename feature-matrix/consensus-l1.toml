@@ -1,0 +1,195 @@
+# Consensus / L1 feature matrix fragment.
+
+[[feature]]
+id = "X3-L1-001"
+name = "Multi-validator authority network"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["scripts/testnet/run-7-validators-local.sh"]
+implemented = 55
+tested = 25
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["No sustained independent-validator production evidence"]
+evidence = ["scripts/testnet/run-7-validators-local.sh", "note: Scripts exist; repo status explicitly lists multi-validator testing as missing"]
+
+[[feature]]
+id = "X3-L1-002"
+name = "Validator key management"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["scripts"]
+implemented = 55
+tested = 30
+mainnet_ready = 30
+priority = "P0"
+confidence = "medium"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs hardened ceremony, rotation, recovery, and operator runbooks"]
+evidence = ["scripts", "note: Validator startup and chain tooling exist"]
+
+[[feature]]
+id = "X3-L1-003"
+name = "Runtime upgrade rehearsal"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["pallets/evolution-core"]
+implemented = 60
+tested = 45
+mainnet_ready = 40
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs automated full rehearsal with persisted state"]
+evidence = ["pallets/evolution-core", "note: Registry requires runtime_upgrade_rehearsal"]
+registry_feature = "triforge_runtime"
+
+[[feature]]
+id = "X3-L1-004"
+name = "Runtime upgrade / migration framework"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["pallets/evolution-core"]
+implemented = 65
+tested = 45
+mainnet_ready = 45
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["No complete migration dry-run across all runtime variants"]
+evidence = ["pallets/evolution-core", "note: FEATURE_REGISTRY triforge_runtime = 65%"]
+registry_feature = "triforge_runtime"
+
+[[feature]]
+id = "X3-L1-005"
+name = "Chain-spec production configuration"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["node/src/chain_spec.rs"]
+implemented = 75
+tested = 55
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Genesis ceremony not completed"]
+evidence = ["node/src/chain_spec.rs", "note: mainnet release gate checks production_config and tracked specs"]
+
+[[feature]]
+id = "X3-L1-006"
+name = "Raw + plain chain-spec artifacts"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["chain-specs/x3-local3-current-plain.json"]
+implemented = 80
+tested = 65
+mainnet_ready = 55
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Production artifacts require final ceremony and signed release lineage"]
+evidence = ["chain-specs/x3-local3-current-plain.json", "note: mainnet gate parses tracked raw/plain genesis specs"]
+
+[[feature]]
+id = "X3-L1-007"
+name = "GRANDPA finality"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["node/src/service.rs"]
+implemented = 88
+tested = 70
+mainnet_ready = 68
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Cross-chain finality certificate integration remains incomplete in older audit evidence"]
+evidence = ["node/src/service.rs", "note: Real finalized-chain testing exists; current consensus uses GRANDPA"]
+
+[[feature]]
+id = "X3-L1-008"
+name = "X3 chain node"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["node/src/service.rs"]
+implemented = 90
+tested = 75
+mainnet_ready = 70
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs multi-validator production proof and independent validator deployment"]
+evidence = ["node/src/service.rs", "note: Real node service wired to runtime and consensus"]
+
+[[feature]]
+id = "X3-L1-009"
+name = "Aura block authoring"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["node/src/service.rs"]
+implemented = 90
+tested = 75
+mainnet_ready = 72
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Production topology and slot tuning need external validation"]
+evidence = ["node/src/service.rs", "note: Production authoring path uses Aura"]
+
+[[feature]]
+id = "X3-L1-010"
+name = "Bootnode / peer discovery ops"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["docs/reports/FUNCTIONAL_ROADMAP.md"]
+implemented = 35
+tested = 15
+mainnet_ready = 20
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Roadmap still lists production peer discovery configuration work"]
+evidence = ["docs/reports/FUNCTIONAL_ROADMAP.md", "note: Networking roadmap identifies unfinished bootnode/peer reputation setup"]
+
+[[feature]]
+id = "X3-L1-011"
+name = "Validator set governance"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["runtime/src/lib.rs"]
+implemented = 70
+tested = 45
+mainnet_ready = 48
+priority = "P1"
+confidence = "medium"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Operational governance process and validator churn proof incomplete"]
+evidence = ["runtime/src/lib.rs", "note: Runtime governance and authority configuration exist"]
+
+[[feature]]
+id = "X3-L1-012"
+name = "Validator slashing"
+subsystem = "consensus_l1"
+source = "master"
+paths = ["pallets/x3-slash"]
+implemented = 70
+tested = 55
+mainnet_ready = 50
+priority = "P1"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs real validator-network fault and governance simulation"]
+evidence = ["pallets/x3-slash", "note: Slash pallet included in mainnet release test packages"]

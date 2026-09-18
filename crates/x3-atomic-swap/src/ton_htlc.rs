@@ -7,6 +7,8 @@
 //! [`claim`] would call the claim method with preimage, and [`refund`] would
 //! trigger the refund path after timeout. Finality uses TON masterchain
 //! confirmation (~5s finality).
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

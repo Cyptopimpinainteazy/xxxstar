@@ -3,6 +3,15 @@
 //! A minimal JSON-RPC client with real HTTP transport via `ureq` when the `std`
 //! feature is enabled. In `no_std` mode, all RPC methods return
 //! [`SwapError::RpcError`] indicating that the `std` feature is required.
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeSet;
+use alloc::format;
+use alloc::string::ToString;
+use alloc::vec;
 
 use crate::error::SwapError;
 use alloc::string::String;
@@ -248,10 +257,27 @@ impl RpcClient {
 
     /// Estimate gas for a transaction.
     pub fn estimate_gas(&mut self, from: &str, to: &str, data: &str) -> Result<u64, SwapError> {
+        self.estimate_gas_with_value(from, to, data, 0)
+    }
+
+    /// Estimate gas for a transaction that also sends native-token `value` wei.
+    ///
+    /// This must be included for calls (like `createHTLC` with the native
+    /// token) that revert when `msg.value` is zero but the callee requires
+    /// funds to be attached — without it, `eth_estimateGas` reverts even
+    /// though the real transaction (which does set `value`) would succeed.
+    pub fn estimate_gas_with_value(
+        &mut self,
+        from: &str,
+        to: &str,
+        data: &str,
+        value: u128,
+    ) -> Result<u64, SwapError> {
         let tx_obj = json!({
             "from": from,
             "to": to,
             "data": data,
+            "value": format!("0x{:x}", value),
         });
         let params = vec![tx_obj];
         let resp = self.call("eth_estimateGas", params)?;

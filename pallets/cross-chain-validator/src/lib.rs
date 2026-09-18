@@ -304,7 +304,10 @@ pub mod pallet {
                 (proof.len() as u32) <= MAX_PROOF_BYTES,
                 Error::<T>::PayloadTooLarge
             );
-            ensure!(proof.len().is_multiple_of(32), Error::<T>::ProofNotMultipleOf32);
+            ensure!(
+                proof.len().is_multiple_of(32),
+                Error::<T>::ProofNotMultipleOf32
+            );
 
             // Phase 2: far-future guard (rejects absurd heights that would poison the
             // high-water mark). Relative to the local chain's current height.
@@ -314,7 +317,10 @@ pub mod pallet {
             // proof leaves and require it to equal the claimed `merkle_root`.
             let leaves = Self::proof_to_leaves(&proof)?;
             let recomputed_root = Self::merkle_root_of(&leaves);
-            ensure!(recomputed_root == merkle_root, Error::<T>::MerkleRootMismatch);
+            ensure!(
+                recomputed_root == merkle_root,
+                Error::<T>::MerkleRootMismatch
+            );
 
             // Phase 4: parent / monotonicity.
             if let Some(last_header) = LastEvmHeader::<T>::get() {
@@ -328,8 +334,7 @@ pub mod pallet {
             // `validator_set_hash` is an internal identifier commitment of the proof
             // leaves. It is NOT presented as an independently-verified BFT quorum; the
             // trust anchor is the authorized submitter (see module docs).
-            let validator_set_hash =
-                H256::from(sp_io::hashing::blake2_256(&proof));
+            let validator_set_hash = H256::from(sp_io::hashing::blake2_256(&proof));
 
             let header_info = EvmHeaderInfo {
                 block_number,
@@ -521,7 +526,11 @@ pub mod pallet {
                 let mut i = 0;
                 while i < level.len() {
                     let left = level[i];
-                    let right = if i + 1 < level.len() { level[i + 1] } else { left };
+                    let right = if i + 1 < level.len() {
+                        level[i + 1]
+                    } else {
+                        left
+                    };
                     let mut concat = [0u8; 64];
                     concat[..32].copy_from_slice(left.as_bytes());
                     concat[32..].copy_from_slice(right.as_bytes());

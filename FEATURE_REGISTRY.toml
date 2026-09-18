@@ -10,23 +10,38 @@ mode = "LIVE_TESTNET"
 crate_or_service = "pallets/x3-atomic-kernel"
 tauri_app = "AtomicLock"
 # CRITICAL-TOK-1 (2026-09-06 independent audit,
-# audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/): all 9 names
+# audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/): the 9 names
 # previously listed here (canonical_supply_invariant_holds,
 # represented_total_equals_canonical_supply, pending_supply_returns_to_zero,
 # invariant_break_triggers_economic_halt, halt_blocks_new_mint,
 # halt_blocks_new_transfer, halt_blocks_new_swap, halt_allows_refund,
 # halt_allows_recovery) did not exist anywhere in this pallet, or under any
-# name, in the repository. The pallet's real EconomicHalt guard
-# (pallets/x3-atomic-kernel/src/lib.rs, `ensure!(!T::EconomicHalt::is_halted(), ...)`
-# inside `submit_atomic_bundle`) is real code but has zero dedicated test
-# coverage today. scripts/check-readiness-consistency.sh now verifies every
-# required_tests entry against real `fn` names so this cannot recur silently.
-required_tests = []
+# name, in the repository, and were removed.
+#
+# 2026-09-18: coverage now exists for the guard the pallet actually has
+# (`ensure!(!T::EconomicHalt::is_halted(), Error::EconomicHaltActive)` inside
+# `submit_atomic_bundle`). The mock's halt provider is switchable
+# (`SwitchableEconomicHalt` + `economy_open()`), so `halt_blocks_*` style names
+# are deliberately NOT claimed here — the pallet has exactly one halt guard and
+# the two names below are the tests that exercise it, including the
+# recovery-must-stay-open and no-funds-trapped properties.
+# scripts/check-readiness-consistency.sh verifies every required_tests entry
+# against real `fn` names so a fabricated list cannot recur silently.
+required_tests = [
+  "economic_halt_blocks_bundle_submission",
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+  "rollback_access_set_violation_charges_only_the_ten_percent_penalty",
+  "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+  "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+  "rollback_deadline_exceeded_before_the_deadline_is_rejected",
+  "economic_halt_does_not_block_inflight_bundle_assignment"
+]
 proof_report = "reports/six_route_invariants.md"
-readiness_score = 40
+readiness_score = 50
 blockers = [
-  "required_tests for the EconomicHalt invariant (mint/transfer/swap-blocking, refund/recovery-allowing) are not yet written — see CRITICAL-TOK-1; write real tests in pallets/x3-atomic-kernel/src/tests.rs before restoring a higher score",
-  "Economic halt path is tested but has never been triggered in a multi-validator network"
+  "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
+  "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
 
@@ -36,9 +51,9 @@ crate_or_service = "pallets/evolution-core"
 tauri_app = "LaunchGate"
 required_tests = ["runtime_upgrade_rehearsal"]
 proof_report = "reports/mainnet_readiness_report.md"
-readiness_score = 65
+readiness_score = 70
 blockers = [
-  "No automated migration-dry-run across all 6 construct_runtime! variants"
+  "Migration dry-run is automated for all six runtime variants and passing: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block. Reaching that required repairing the dev variants' test target, which had never compiled (stale mock: pallet_balances::Config members, a half-finished Test->Runtime rename, missing assertion imports) — the dev suite now runs 80 and dev+frontier 84 tests, all passing. Remaining gap: the rehearsal base is empty storage, not a real state snapshot, so it proves the hooks are safe to run and fit in a block, but not that they migrate historical state correctly"
 ]
 dangerous_paths = ["runtime", "chain-specs", "validator keys"]
 

@@ -1,0 +1,134 @@
+# MEV / Privacy feature matrix fragment.
+
+[[feature]]
+id = "X3-MEV-001"
+name = "Cross-domain MEV protection"
+subsystem = "mev_privacy"
+source = "master"
+paths = ["crates/cross-vm-coordinator"]
+implemented = 35
+tested = 18
+mainnet_ready = 20
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs threat model covering relayers, finality delays, and ordering"]
+evidence = ["crates/cross-vm-coordinator", "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV"]
+
+[[feature]]
+id = "X3-MEV-002"
+name = "Private transaction submission controls"
+subsystem = "mev_privacy"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 45
+tested = 20
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Trading Core hardening still requires private-submission enforcement"]
+evidence = ["x3-lang/compiler", "note: One of verified Trading Core v1 gaps"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-MEV-003"
+name = "Costs-before-profit evaluation"
+subsystem = "mev_privacy"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 50
+tested = 25
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Must prevent false-profit execution paths"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-MEV-004"
+name = "Transactional host rollback"
+subsystem = "mev_privacy"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 50
+tested = 25
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Rollback semantics not yet fully proven"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 hardening item"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-MEV-005"
+name = "Gas / economic execution limits"
+subsystem = "mev_privacy"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 55
+tested = 30
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Hardening branch must enforce gas and capability versions"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap list"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-MEV-006"
+name = "MEV-resistant architecture"
+subsystem = "mev_privacy"
+source = "open_pr"
+paths = ["pallets/private-execution"]
+implemented = 45
+tested = 25
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No complete formal MEV threat model; do not claim MEV-proof"]
+evidence = ["pallets/private-execution", "note: Private execution and trading controls exist, but fair-ordering/encrypted mempool proof is incomplete"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-MEV-007"
+name = "Encrypted mempool / threshold encryption"
+subsystem = "mev_privacy"
+source = "research"
+paths = []
+implemented = 5
+tested = 0
+mainnet_ready = 0
+priority = "P1"
+confidence = "high"
+launch_scope = "research"
+claim_risk = false
+blockers = ["Not implemented as a verified production feature"]
+evidence = ["note: No sufficient master evidence found"]
+
+[[feature]]
+id = "X3-MEV-008"
+name = "Fair transaction ordering"
+subsystem = "mev_privacy"
+source = "research"
+paths = []
+implemented = 15
+tested = 5
+mainnet_ready = 5
+priority = "P1"
+confidence = "high"
+launch_scope = "research"
+claim_risk = false
+blockers = ["No production fair-ordering protocol identified"]
+evidence = ["note: No strong master evidence for fair ordering"]

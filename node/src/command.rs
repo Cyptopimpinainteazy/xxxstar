@@ -9,9 +9,7 @@ use clap::Parser;
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use log::{error, info, warn};
 use sc_cli::{Error as CliError, Result as CliResult, SubstrateCli};
-#[cfg(feature = "try-runtime")]
-use sc_executor::{sp_wasm_interface::ExtendedHostFunctions, NativeExecutionDispatch};
-#[cfg(any(feature = "runtime-benchmarks", feature = "try-runtime"))]
+#[cfg(feature = "runtime-benchmarks")]
 use x3_chain_runtime::opaque::Block;
 
 use crate::logging;
@@ -166,6 +164,7 @@ pub fn run() -> CliResult<()> {
         }
         #[cfg(feature = "runtime-benchmarks")]
         Some(Commands::Benchmark(cmd)) => {
+            let cmd = cmd.as_ref();
             let runner = cli.create_runner(cmd).map_err(|e| {
                 error!("Failed to initialize runner for `benchmark`: {e}");
                 e

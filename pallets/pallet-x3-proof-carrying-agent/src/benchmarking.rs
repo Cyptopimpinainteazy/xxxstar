@@ -1,7 +1,5 @@
 //! Benchmarking setup for pallet-x3-proof-carrying-agent
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use crate::Pallet as ProofCarryingAgent;
 use frame_benchmarking::v2::*;

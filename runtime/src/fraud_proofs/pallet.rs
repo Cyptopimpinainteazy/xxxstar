@@ -335,7 +335,7 @@ pub mod mock {
     pub type Balance = u128;
 
     #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
-    impl frame_system::Config for Test {
+    impl frame_system::Config for Runtime {
         type BaseCallFilter = Everything;
         type BlockWeights = ();
         type BlockLength = ();
@@ -349,7 +349,7 @@ pub mod mock {
         type Lookup = IdentityLookup<Self::AccountId>;
         type Block = Block;
         type RuntimeEvent = RuntimeEvent;
-        type BlockHashCount = ConstU64<250>;
+        type BlockHashCount = ConstU32<250>;
         type Version = ();
         type PalletInfo = PalletInfo;
         type AccountData = pallet_balances::AccountData<Balance>;
@@ -366,7 +366,7 @@ pub mod mock {
         pub const MaxLocks: u32 = 50;
     }
 
-    impl pallet_balances::Config for Test {
+    impl pallet_balances::Config for Runtime {
         type MaxLocks = MaxLocks;
         type MaxReserves = ();
         type ReserveIdentifier = [u8; 8];
@@ -374,12 +374,15 @@ pub mod mock {
         type RuntimeEvent = RuntimeEvent;
         type DustRemoval = ();
         type ExistentialDeposit = ExistentialDeposit;
-        type AccountStore = frame_system::Pallet<Test>;
+        type AccountStore = frame_system::Pallet<Runtime>;
         type WeightInfo = ();
         type FreezeIdentifier = ();
         type MaxFreezes = ();
         type RuntimeHoldReason = ();
-        type MaxHolds = ();
+        // Members the current pallet_balances::Config requires; the mock predates
+        // them, which is part of why this module never compiled.
+        type RuntimeFreezeReason = ();
+        type DoneSlashHandler = ();
     }
 
     parameter_types! {
@@ -388,7 +391,7 @@ pub mod mock {
         pub const FraudProofReporterReward: Balance = 100;
     }
 
-    impl Config for Test {
+    impl Config for Runtime {
         type Currency = Balances;
         type MaxTxCount = FraudProofMaxTxCount;
         type DisputeWindowBlocks = FraudProofDisputeWindowBlocks;
@@ -396,7 +399,7 @@ pub mod mock {
         type GovernanceOrigin = frame_system::EnsureRoot<AccountId>;
     }
 
-    pub type Block = frame_system::mocking::MockBlockU32<Test>;
+    pub type Block = frame_system::mocking::MockBlockU32<Runtime>;
 
     construct_runtime!(
         pub enum Runtime {
@@ -408,19 +411,20 @@ pub mod mock {
 
     /// Build a test externalities with initial balances.
     pub fn new_test_ext() -> sp_io::TestExternalities {
-        let mut t = frame_system::GenesisConfig::<Test>::default()
+        let mut t = frame_system::GenesisConfig::<Runtime>::default()
             .build_storage()
             .unwrap();
 
-        pallet_balances::GenesisConfig::<Test> {
+        pallet_balances::GenesisConfig::<Runtime> {
             balances: vec![(1u64, 1_000_000), (2u64, 1_000_000), (99u64, 1_000_000)],
+            dev_accounts: None,
         }
         .assimilate_storage(&mut t)
         .unwrap();
 
         let mut ext = sp_io::TestExternalities::new(t);
         ext.execute_with(|| {
-            frame_system::Pallet::<Test>::set_block_number(50u32.into());
+            frame_system::Pallet::<Runtime>::set_block_number(50u32.into());
         });
         ext
     }
@@ -434,6 +438,9 @@ pub mod mock {
 mod tests {
     use super::mock::*;
     use super::pallet::*;
+    // These tests only compile under `feature = "dev"`, which is why the missing
+    // imports went unnoticed: the dev variant's test target did not build at all.
+    use frame_support::{assert_noop, assert_ok};
     use crate::fraud_proofs::{
         freeze::{FreezeReason, FreezeState},
         scheduler_v1::scheduler_commitment_from_bytes,
@@ -445,6 +452,19 @@ mod tests {
 
     fn zero_hash() -> H256 {
         H256::from([0u8; 32])
+    }
+
+    /// The commitment the witness bytes commit to — the "correct" value a fraud
+    /// proof attests, as opposed to the forged hash a block claims.
+    ///
+    /// Several tests used to write `make_valid_proof(.., disputed.scheduler_commitment)`,
+    /// reading the very binding the call was defining; the helper derives the
+    /// commitment from the witness, not from the hashes, so this returns the same
+    /// value without the self-reference.
+    fn correct_commitment() -> H256 {
+        make_valid_proof(1u64, zero_hash(), zero_hash())
+            .1
+            .scheduler_commitment
     }
 
     /// Build a minimal valid fraud proof with real commitment values.
@@ -535,7 +555,12 @@ mod tests {
         new_test_ext().execute_with(|| {
             // Forge a wrong commitment that the block claims
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            // The proof must attest the *correct* commitment while the stored meta
+            // carries the forged one. `scheduler_commitment` is derived from the
+            // witness bytes, not from the hashes, so take it from a reference
+            // proof rather than reading the binding being defined.
+            let expected_commitment = make_valid_proof(1u64, forged, forged).1.scheduler_commitment;
+            let (proof, disputed) = make_valid_proof(1u64, forged, expected_commitment);
 
             // The disputed block's meta must have the forged commitment
             let disputed_with_forged = DisputedBlockMeta {
@@ -560,7 +585,7 @@ mod tests {
     fn duplicate_proof_rejected() {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -580,7 +605,7 @@ mod tests {
                     proof,
                     disputed_with_forged,
                 ),
-                Error::<Test>::DuplicateProof
+                Error::<Runtime>::DuplicateProof
             );
         });
     }
@@ -592,13 +617,13 @@ mod tests {
         new_test_ext().execute_with(|| {
             let (proof, disputed) = make_valid_proof(
                 1u64,
-                disputed.scheduler_commitment, // observed == real (no fraud)
-                disputed.scheduler_commitment, // expected == real
+                correct_commitment(), // observed == real (no fraud)
+                correct_commitment(), // expected == real
             );
 
             assert_noop!(
                 FraudProofs::submit_fraud_proof(RuntimeOrigin::signed(1u64), proof, disputed,),
-                Error::<Test>::ProofNotFraudulent
+                Error::<Runtime>::ProofNotFraudulent
             );
 
             // Freeze should NOT be engaged
@@ -612,10 +637,10 @@ mod tests {
     fn dispute_window_expired_rejected() {
         new_test_ext().execute_with(|| {
             // Set current block far in the future
-            frame_system::Pallet::<Test>::set_block_number(1000u32.into());
+            frame_system::Pallet::<Runtime>::set_block_number(1000u32.into());
 
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -629,7 +654,7 @@ mod tests {
                     proof,
                     disputed_with_forged,
                 ),
-                Error::<Test>::DisputeWindowExpired
+                Error::<Runtime>::DisputeWindowExpired
             );
         });
     }
@@ -641,7 +666,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             // First, submit a valid proof to freeze
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -680,7 +705,7 @@ mod tests {
             let reporter_balance_before = Balances::free_balance(1u64);
 
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -708,7 +733,7 @@ mod tests {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
             let (mut proof, disputed) =
-                make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+                make_valid_proof(1u64, forged, correct_commitment());
             proof.proof_type = 0x02; // unknown type
 
             let disputed_with_forged = DisputedBlockMeta {
@@ -722,7 +747,7 @@ mod tests {
                     proof,
                     disputed_with_forged,
                 ),
-                Error::<Test>::UnsupportedProofType
+                Error::<Runtime>::UnsupportedProofType
             );
         });
     }
@@ -733,7 +758,7 @@ mod tests {
     fn commitment_mismatch_rejected() {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
 
             // Disputed meta has a DIFFERENT commitment than what proof.observed_hash says
             let disputed_wrong_commitment = DisputedBlockMeta {
@@ -747,7 +772,7 @@ mod tests {
                     proof,
                     disputed_wrong_commitment,
                 ),
-                Error::<Test>::CommitmentMismatch
+                Error::<Runtime>::CommitmentMismatch
             );
         });
     }
@@ -758,7 +783,7 @@ mod tests {
     fn events_emitted_correctly() {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -771,7 +796,7 @@ mod tests {
             ));
 
             // Check events
-            let events = frame_system::Pallet::<Test>::events();
+            let events = frame_system::Pallet::<Runtime>::events();
             let proof_id = compute_proof_id(&proof, disputed_with_forged.block_hash);
 
             let submitted = events.iter().any(|e| {
@@ -808,7 +833,7 @@ mod tests {
     fn disputed_meta_stored_after_acceptance() {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -832,7 +857,7 @@ mod tests {
     fn proofs_seen_prevents_replay() {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
-            let (proof, disputed) = make_valid_proof(1u64, forged, disputed.scheduler_commitment);
+            let (proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             let disputed_with_forged = DisputedBlockMeta {
                 scheduler_commitment: forged,
                 ..disputed
@@ -857,7 +882,7 @@ mod tests {
                     proof,
                     disputed_with_forged,
                 ),
-                Error::<Test>::DuplicateProof
+                Error::<Runtime>::DuplicateProof
             );
         });
     }

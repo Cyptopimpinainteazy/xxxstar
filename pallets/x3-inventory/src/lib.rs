@@ -11,8 +11,6 @@
 //! - TICKET-4.5-004: Inventory reserve and release — implemented
 //! - TICKET-4.5-006: Global and lane unsettled notional tracking — implemented
 
-#![cfg_attr(not(feature = "std"), no_std)]
-
 pub mod inventory;
 pub mod types;
 pub mod weights;

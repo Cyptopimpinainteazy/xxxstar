@@ -64,7 +64,6 @@
 
 pub mod bridge;
 pub mod contract_upgrade_pattern;
-pub mod universal_escrow;
 pub mod dap_debugging;
 pub mod error;
 pub mod execution_guards;
@@ -72,6 +71,7 @@ pub mod gas_metering_audit;
 pub mod gpu_hostcalls;
 pub mod hostcall;
 pub mod jit_compiler;
+pub mod universal_escrow;
 pub mod verifier;
 pub mod vm;
 

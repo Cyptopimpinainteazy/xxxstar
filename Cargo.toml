@@ -12,6 +12,8 @@ exclude = [
     # Solana BPF programs are standalone crates that conflict with the
     # workspace's solana-program dependency graph.
     "programs/svm/*",
+    # Cross-VM coordinator is intentionally a standalone crate.
+    "crates/cross-vm-coordinator",
 ]
 members = [
     "pallets/x3-kernel",
@@ -149,7 +151,8 @@ members = [
     "crates/x3-bridge",                # <- node/Cargo.toml
     "crates/x3-bridge-adapters",       # <- node/Cargo.toml
     "crates/x3-fees",                  # <- tests/e2e/Cargo.toml
-    "crates/x3-finality-oracle",       # <- node/Cargo.toml
+    "crates/x3-finality-oracle",
+    "crates/x3-flashloan",       # <- node/Cargo.toml
     "crates/x3-proof-dispute",         # <- node/Cargo.toml
     "crates/x3-security-events",       # <- pallets/atomic-trade-engine, pallets/x3-invariants, runtime
     "crates/x3-universal-contracts",   # <- tests/e2e/Cargo.toml
@@ -183,6 +186,7 @@ members = [
     "crates/x3-court",
     "crates/x3-agent",
     "crates/x3-intent",
+    "crates/x3-flashloan",
     # CI canonical crate paths: required workspace members
     "crates/atomic-swap-orchestrator",
     "crates/x3-relayer",
@@ -249,11 +253,11 @@ sha3 = "0.10"
 smallvec = "1.11"
 
 # Arkworks — pairing-friendly elliptic curves (used by EVM bn128 precompiles)
-ark-bn254 = { version = "0.5", default-features = false, features = ["curve"] }
-ark-ec = { version = "0.5", default-features = false }
-ark-ff = { version = "0.5", default-features = false }
-ark-serialize = { version = "0.5", default-features = false }
-ark-std = { version = "0.5", default-features = false }
+ark-bn254 = { version = "0.6", default-features = false, features = ["curve"] }
+ark-ec = { version = "0.6", default-features = false }
+ark-ff = { version = "0.6", default-features = false }
+ark-serialize = { version = "0.6", default-features = false }
+ark-std = { version = "0.6", default-features = false }
 
 # Common FRAME & Substrate workspace deps (referenced with `workspace = true` in members)
 frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false, features = ["experimental"] }
@@ -324,7 +328,7 @@ sc-transaction-pool-api = { git = "https://github.com/paritytech/polkadot-sdk", 
 
 # Utilities
 futures = "0.3.30"
-hex-literal = "0.4.1"
+hex-literal = "1.1.0"
 once_cell = "1.19.0"
 serde_json = "1.0.111"
 thiserror = "1.0.51"
@@ -421,8 +425,6 @@ wasm-instrument = { path = "patches/wasm-instrument" }
 # Note: wasmtime override removed due to patch conflicts - manual update needed
 # Fix environmental macro compatibility
 environmental = { path = "patches/environmental" }
-# Use the vendored blst crate so native Linux can build its no-assembly fallback.
-blst = { path = "vendor/blst" }
 # Fix substrate-prometheus-endpoint protobuf type mismatch (Vec -> RepeatedField)
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
 # Fix errno WASM compatibility by providing stub implementation for wasm32 targets

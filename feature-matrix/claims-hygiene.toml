@@ -1,0 +1,49 @@
+# Claims / Hygiene feature matrix fragment.
+
+[[feature]]
+id = "X3-CLAIM-001"
+name = "Million-TPS GPU claims"
+subsystem = "claims_hygiene"
+source = "claim_risk"
+paths = ["GPU_VALIDATOR_HONEST_AUDIT.md"]
+implemented = 10
+tested = 5
+mainnet_ready = 5
+priority = "P0"
+confidence = "high"
+launch_scope = "research"
+claim_risk = true
+blockers = ["Keep as target only; remove current-performance wording"]
+evidence = ["GPU_VALIDATOR_HONEST_AUDIT.md", "note: Honest GPU audit says no real GPU finalized-TPS benchmark"]
+
+[[feature]]
+id = "X3-CLAIM-002"
+name = "MEV-proof marketing claim"
+subsystem = "claims_hygiene"
+source = "claim_risk"
+paths = ["CURRENT_MAINNET_STATUS.md"]
+implemented = 20
+tested = 10
+mainnet_ready = 10
+priority = "P0"
+confidence = "high"
+launch_scope = "research"
+claim_risk = true
+blockers = ["Rename to MEV-resistant architecture under development"]
+evidence = ["CURRENT_MAINNET_STATUS.md", "note: No complete fair-ordering/encrypted mempool proof"]
+
+[[feature]]
+id = "X3-CLAIM-003"
+name = "Cross-chain complete claim"
+subsystem = "claims_hygiene"
+source = "claim_risk"
+paths = ["reports/atomic_crossvm_completion_audit.md"]
+implemented = 45
+tested = 30
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "research"
+claim_risk = true
+blockers = ["Distinguish internal cross-VM from external-chain settlement"]
+evidence = ["reports/atomic_crossvm_completion_audit.md", "note: Audit identifies simulated adapters/placeholder proof verification in older path"]

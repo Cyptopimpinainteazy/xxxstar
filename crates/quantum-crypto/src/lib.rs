@@ -30,9 +30,9 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+pub mod blake3ext;
 #[path = "dilithium.rs"]
 pub mod dilithium_research;
-pub mod blake3ext;
 pub mod error;
 pub mod hash;
 #[path = "kyber.rs"]
@@ -103,7 +103,10 @@ impl QuantumKeypair {
     }
 
     /// Sign a message using the simulated Dilithium-shaped research keypair
-    pub fn sign_dilithium_research(&self, message: &[u8]) -> dilithium_research::DilithiumSignature {
+    pub fn sign_dilithium_research(
+        &self,
+        message: &[u8],
+    ) -> dilithium_research::DilithiumSignature {
         self.dilithium_research.sign(message)
     }
 
@@ -111,7 +114,10 @@ impl QuantumKeypair {
     pub fn encapsulate(
         &self,
         recipient_pk: &kyber_research::KyberPublicKey,
-    ) -> (kyber_research::KyberCiphertext, kyber_research::SharedSecret) {
+    ) -> (
+        kyber_research::KyberCiphertext,
+        kyber_research::SharedSecret,
+    ) {
         kyber_research::encapsulate(recipient_pk)
     }
 

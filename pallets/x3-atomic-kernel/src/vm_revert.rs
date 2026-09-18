@@ -779,10 +779,7 @@ pub fn decode_overlay_state_diff(diff: &StateDiff) -> Result<Vec<OverlayLegChang
     Ok(changes)
 }
 
-fn decode_optional_h256(
-    bytes: &[u8],
-    offset: &mut usize,
-) -> Result<Option<H256>, RevertError> {
+fn decode_optional_h256(bytes: &[u8], offset: &mut usize) -> Result<Option<H256>, RevertError> {
     if *offset >= bytes.len() {
         return Err(RevertError::InvalidStateDiff);
     }
@@ -919,9 +916,7 @@ impl VmReverter for CompositeReverter {
         if state_diff.is_empty() {
             return Ok(RevertOutcome::NoSideEffects);
         }
-        if state_diff.as_bytes().len() >= 8
-            && state_diff.as_bytes()[..8] == OVERLAY_DIFF_MAGIC
-        {
+        if state_diff.as_bytes().len() >= 8 && state_diff.as_bytes()[..8] == OVERLAY_DIFF_MAGIC {
             return OverlayReverter::revert(state_diff);
         }
         match vm_type {
@@ -1276,7 +1271,10 @@ mod tests {
             OverlayReverter::revert(&diff).expect("revert succeeds");
 
             let key = overlay_ledger_storage_key(&change);
-            assert!(sp_io::storage::get(&key).is_none(), "deleted key stays deleted");
+            assert!(
+                sp_io::storage::get(&key).is_none(),
+                "deleted key stays deleted"
+            );
         });
     }
 
@@ -1307,22 +1305,17 @@ mod tests {
                 new_value: Some(H256([0xAA; 32])),
             };
             let mut receipt = LegReceipt::new(0, VmType::X3);
-            receipt
-                .mark_executed(encode_overlay_state_diff(core::slice::from_ref(&change)));
+            receipt.mark_executed(encode_overlay_state_diff(core::slice::from_ref(&change)));
 
             // Simulate the execution write and then roll it back through the
             // same CompositeReverter the kernel uses for bundle rollback.
             let key = overlay_ledger_storage_key(&change);
             sp_io::storage::set(
                 &key,
-                change
-                    .new_value
-                    .expect("new value present")
-                    .as_bytes(),
+                change.new_value.expect("new value present").as_bytes(),
             );
 
-            let outcome =
-                CompositeReverter::revert_leg(VmType::X3, &receipt.state_diff);
+            let outcome = CompositeReverter::revert_leg(VmType::X3, &receipt.state_diff);
             assert_eq!(outcome.unwrap(), RevertOutcome::Reverted);
 
             let restored = sp_io::storage::get(&key).expect("overlay ledger value restored");

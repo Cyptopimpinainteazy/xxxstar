@@ -13,6 +13,8 @@
 //!
 //! The per-provider attestation [`RpcQuorumProof`] defined in the ledger module
 //! is used directly — this module does **not** redefine it.
+#[cfg(not(feature = "std"))]
+use alloc::vec;
 
 use crate::error::SwapError;
 use crate::intent::ChainKind;

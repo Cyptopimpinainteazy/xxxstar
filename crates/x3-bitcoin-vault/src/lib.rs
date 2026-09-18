@@ -182,10 +182,16 @@ impl BtcDepositStatus {
     pub fn can_transition_to(&self, next: &Self) -> bool {
         matches!(
             (self, next),
-            (BtcDepositStatus::PendingConfirmations, BtcDepositStatus::PendingSpvVerification)
-                | (BtcDepositStatus::PendingSpvVerification, BtcDepositStatus::PendingSignerApproval { .. })
-                | (BtcDepositStatus::PendingSignerApproval { .. }, BtcDepositStatus::Approved)
-                | (BtcDepositStatus::Approved, BtcDepositStatus::Completed)
+            (
+                BtcDepositStatus::PendingConfirmations,
+                BtcDepositStatus::PendingSpvVerification
+            ) | (
+                BtcDepositStatus::PendingSpvVerification,
+                BtcDepositStatus::PendingSignerApproval { .. }
+            ) | (
+                BtcDepositStatus::PendingSignerApproval { .. },
+                BtcDepositStatus::Approved
+            ) | (BtcDepositStatus::Approved, BtcDepositStatus::Completed)
                 | (_, BtcDepositStatus::Rejected)
         )
     }
@@ -1046,10 +1052,7 @@ mod tests {
         vault
             .add_signer_approval(0, signer_ids[2], vec![0xCC; 64])
             .unwrap();
-        assert_eq!(
-            vault.pending_deposits[0].status,
-            BtcDepositStatus::Approved
-        );
+        assert_eq!(vault.pending_deposits[0].status, BtcDepositStatus::Approved);
 
         // 6. Final process_deposit moves Approved → Completed AND credits
         //    the UTXO set. This is the critical integration point — a
@@ -1088,7 +1091,14 @@ mod tests {
     fn test_threshold_quorum_is_exact_not_off_by_one() {
         let mut vault = default_vault();
         vault
-            .submit_deposit([0xCD; 32], 0, 1_000_000, vec![0x01], [0u8; 32], vec![1, 2, 3])
+            .submit_deposit(
+                [0xCD; 32],
+                0,
+                1_000_000,
+                vec![0x01],
+                [0u8; 32],
+                vec![1, 2, 3],
+            )
             .unwrap();
         // Drive to PendingSignerApproval. 6 calls → PendingSpvVerification
         // (call N), 1 more call → PendingSignerApproval {0, 3} (call N+1).
@@ -1112,9 +1122,7 @@ mod tests {
                 assert!(*approvals < *threshold,
                     "2/3 threshold must NOT approve (got approvals={approvals}, threshold={threshold})");
             }
-            other => panic!(
-                "expected PendingSignerApproval after 2 signers; got {other:?}"
-            ),
+            other => panic!("expected PendingSignerApproval after 2 signers; got {other:?}"),
         }
 
         // Third approval IS enough.

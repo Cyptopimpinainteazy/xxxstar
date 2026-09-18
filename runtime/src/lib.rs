@@ -71,10 +71,8 @@ use pallet_collective;
 use pallet_cross_chain_validator;
 #[cfg(feature = "frontier")]
 use pallet_ethereum;
-use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
-use pallet_meme_overlord;
 use pallet_offences;
 use pallet_preimage;
 use pallet_scheduler;
@@ -82,7 +80,6 @@ use pallet_session;
 #[cfg(feature = "dev")]
 use pallet_sudo;
 use pallet_svm_runtime;
-use pallet_swarm;
 use pallet_timestamp;
 #[allow(deprecated)]
 use pallet_transaction_payment::CurrencyAdapter;
@@ -92,12 +89,9 @@ use pallet_x3_agent_law;
 use pallet_x3_agent_registry;
 use pallet_x3_asset_registry;
 use pallet_x3_atomic_kernel;
-use pallet_x3_auction;
-use pallet_x3_compute_market;
 use pallet_x3_cross_vm_router;
 use pallet_x3_crosschain_gateway;
 use pallet_x3_custody;
-use pallet_x3_dapp_hub;
 use pallet_x3_invariants;
 use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
@@ -122,8 +116,6 @@ use x3_accounting_events::{AccountingEvent, AccountingSpine};
 use x3_security_events::{SecurityEvent, SecurityEventHook};
 
 use scale_info::TypeInfo;
-// IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
-use frame_support::dispatch::DispatchResult;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
@@ -140,7 +132,6 @@ use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
-use x3_dex::TokenId as DexTokenId;
 
 #[cfg(feature = "frontier")]
 mod precompiles;
@@ -2642,11 +2633,11 @@ impl pallet_x3_sequencer::Config for Runtime {
 // These wire the fraud-proof pallet's `SchedulerCommitmentQuery` and
 // `ProposerQuery` traits to the sequencer and consensus pallets respectively.
 
-use crate::fraud_proofs::types::{ProposerQuery, SchedulerCommitmentQuery};
+use crate::fraud_proofs::types::ProposerQuery;
 
 /// Reads the scheduler commitment from the sequencer pallet's per-block storage.
 #[cfg(not(feature = "mainnet-rc1"))]
-impl SchedulerCommitmentQuery for Runtime {
+impl crate::fraud_proofs::types::SchedulerCommitmentQuery for Runtime {
     fn get_scheduler_commitment(block_number: u32) -> Option<sp_core::H256> {
         pallet_x3_sequencer::SchedulerCommitment::<Runtime>::get(block_number)
     }
@@ -3016,11 +3007,11 @@ impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
         let fee_bps = 30u32;
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
-            DexTokenId {
+            x3_dex::TokenId {
                 chain_id: 0,
                 asset_id: token_a as u128,
             },
-            DexTokenId {
+            x3_dex::TokenId {
                 chain_id: 0,
                 asset_id: token_b as u128,
             },
@@ -3043,7 +3034,7 @@ impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLo
         pool_id: u64,
         lp_amount: u128,
         unlock_at_block: BlockNumber,
-    ) -> DispatchResult {
+    ) -> frame_support::dispatch::DispatchResult {
         pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
             frame_system::RawOrigin::Signed(owner.clone()).into(),
             pool_id,
@@ -3203,10 +3194,17 @@ impl GetSessionNumber for SessionHandler {
 // sp_session::SessionKeys trait implementation for session key generation/decoding
 
 #[cfg(feature = "runtime-benchmarks")]
+#[allow(unused_imports)] // define_benchmarks! consumes these pallet aliases as macro metadata.
 mod benches {
+    // These aliases are consumed by define_benchmarks! token expansion; rustc
+    // does not observe the generated use-site when linting this module.
+    #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
+    #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
+    #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
 
     frame_benchmarking::define_benchmarks!(
@@ -4927,5 +4925,58 @@ mod native_supply_contract_tests {
                 user_seed
             );
         });
+    }
+}
+
+// ── Runtime upgrade rehearsal ───────────────────────────────────────────────
+//
+// FEATURE_REGISTRY's `triforge_runtime` entry records that there is no automated
+// migration dry-run across the runtime's `construct_runtime!` variants, and the
+// standalone `try-runtime` CLI is not available in the pinned Polkadot SDK. This
+// module runs the dry-run in-process instead: it executes the same
+// `OnRuntimeUpgrade` hooks an upgrade would (the pallets' hooks plus the
+// `Migrations` tuple wired into `Executive`), for whichever variant the active
+// feature set selects, and asserts the work fits inside a block.
+//
+// `scripts/check-runtime-variants.sh` runs it once per variant.
+#[cfg(all(test, feature = "std"))]
+mod runtime_upgrade_rehearsal {
+    use super::{AllPalletsWithSystem, Migrations, Runtime};
+    use frame_support::traits::OnRuntimeUpgrade;
+    use frame_support::weights::Weight;
+
+    fn fresh_externalities() -> sp_io::TestExternalities {
+        // Empty storage is the base for an upgrade rehearsal: a real upgrade runs
+        // against whatever the chain already holds, and the hooks must cope with
+        // values that are absent. Avoids depending on genesis-builder traits,
+        // whose shape differs across SDK pins.
+        sp_io::TestExternalities::default()
+    }
+
+    /// An upgrade must run its migrations without panicking and without needing
+    /// more weight than a block provides — an upgrade that cannot fit would leave
+    /// the chain unable to produce the block that applies it.
+    #[test]
+    fn runtime_upgrade_rehearsal() {
+        let mut ext = fresh_externalities();
+        let (pallets, migrations): (Weight, Weight) = ext.execute_with(|| {
+            // A realistic block height, so hooks that read the system block number
+            // see a value rather than the storage default.
+            frame_system::Pallet::<Runtime>::set_block_number(1);
+            (
+                // Exactly what `Executive::on_runtime_upgrade` runs.
+                <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade(),
+                <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade(),
+            )
+        });
+        let weight = pallets.saturating_add(migrations);
+
+        let max_block = <Runtime as frame_system::Config>::BlockWeights::get().max_block;
+        assert!(
+            weight.ref_time() <= max_block.ref_time(),
+            "runtime upgrade needs {} ref_time but a block only allows {}",
+            weight.ref_time(),
+            max_block.ref_time()
+        );
     }
 }

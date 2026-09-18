@@ -17,6 +17,8 @@
 //! Bitcoin Core JSON-RPC requires HTTP Basic auth (usually a cookie or
 //! `rpcuser`/`rpcpassword`). Provide `user:pass` in `rpc_url_userpass` or an
 //! empty string when the endpoint is open (e.g. some regtest setups).
+use alloc::format;
+use alloc::vec;
 
 use crate::error::SwapError;
 use alloc::string::{String, ToString};

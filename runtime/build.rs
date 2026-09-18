@@ -39,7 +39,10 @@ pub const WASM_BINARY_BLOATY: Option<&[u8]> = None;
 "#;
 
     fs::write(&wasm_binary_path, source).expect("failed to write wasm_binary.rs");
-    println!("cargo:warning=runtime/build.rs embedded cached runtime WASM from {}", cached.display());
+    println!(
+        "cargo:warning=runtime/build.rs embedded cached runtime WASM from {}",
+        cached.display()
+    );
 }
 
 fn main() {

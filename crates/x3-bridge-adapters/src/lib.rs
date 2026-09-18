@@ -109,10 +109,10 @@ pub fn make_json_rpc_call(
 // These are the production wiring types used by node/src/service.rs.
 
 use codec::{Decode, Encode};
-use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use pallet_x3_atomic_kernel::vm_revert::{
     encode_overlay_state_diff, OverlayDomain, OverlayLegChange, StateDiff,
 };
+use pallet_x3_kernel::AtlasKernelRuntimeApi;
 use sha2::{Digest, Sha256};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;

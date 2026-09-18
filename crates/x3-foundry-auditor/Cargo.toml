@@ -2,6 +2,7 @@
 name = "x3-foundry-auditor"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Automated security auditor for X3 Foundry dApps"
 
 [dependencies]

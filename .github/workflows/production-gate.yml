@@ -4,22 +4,137 @@ on:
   pull_request:
   push:
     branches: [ main, master, develop ]
+  # The release gate must be runnable on demand — e.g. to re-verify a commit
+  # after a billing/runner outage without pushing a no-op commit. It previously
+  # had no dispatch trigger, so `gh workflow run production-gate.yml` returned
+  # HTTP 422.
+  workflow_dispatch:
+
+concurrency:
+  # Never cancel an in-flight default-branch run: a cancelled release gate proves
+  # nothing, and with one self-hosted runner every new commit used to cancel the
+  # previous gate before it finished. PR runs still cancel superseded pushes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  native-x3vm-live:
+    uses: ./.github/workflows/x3vm-live-lifecycle.yml
+
+  evm-live:
+    uses: ./.github/workflows/x3vm-evm-live-lifecycle.yml
+
+  svm-live:
+    uses: ./.github/workflows/x3vm-svm-live-lifecycle.yml
+
   gate:
-    runs-on: ubuntu-latest
+    # pull_request has no branch filter here, so this repo (public) accepts
+    # runs from any fork PR on this trigger. Keep pull_request on
+    # ubuntu-latest; only push (already-merged) and manual dispatch go to
+    # the x3 self-hosted runner. Do not remove this split without
+    # re-reviewing the self-hosted-runner-on-public-repo RCE risk.
+    needs:
+      - native-x3vm-live
+      - evm-live
+      - svm-live
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    timeout-minutes: 90
+    env:
+      # Keep reproducible runtime builds pinned while using a Rust release
+      # compatible with the current dependency graph (Edition 2024 crates).
+      SRTOOL_IMAGE: paritytech/srtool:1.93.0-0.18.4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
+          components: rustfmt, clippy, rust-src
+          targets: wasm32-unknown-unknown, wasm32v1-none
+      - name: Install srtool CLI
+        run: cargo install --locked --git https://github.com/chevdor/srtool-cli --rev 0485b5507a0b63cf7699376f15d9cb5c849bbcd0 srtool-cli
+      - name: Add Cargo binaries to PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Verify srtool CLI
+        run: srtool version
+      - name: Install protoc
+        # x3star1 already has protoc via linuxbrew and no passwordless sudo.
+        if: runner.environment == 'github-hosted'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Guard
         run: make guard
       - name: Test (core + pallets)
         run: make test-all-pallets
+      - name: Build validated release node
+        run: cargo build --release -p x3-chain-node --features mainnet-rc1
+      - name: Build reproducible runtime with srtool
+        run: ./scripts/run-srtool.sh build
+      - name: Verify srtool runtime evidence
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          ./scripts/run-srtool.sh test
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = Path('.srtool-reports/latest.json')
+          if not report.exists():
+              raise SystemExit('missing .srtool-reports/latest.json')
+
+          data = json.loads(report.read_text())
+          compact = data.get('runtimes', {}).get('compact', {})
+          blake2 = compact.get('blake2_256')
+          sha256 = compact.get('sha256')
+          wasm = compact.get('wasm')
+
+          if not blake2 or not sha256 or not wasm:
+              raise SystemExit('srtool report missing required blake2_256, sha256, or wasm metadata')
+
+          wasm_path = Path(wasm)
+          if not wasm_path.is_absolute():
+              wasm_path = Path.cwd() / wasm_path
+          if not wasm_path.exists() or wasm_path.stat().st_size == 0:
+              raise SystemExit(f'srtool WASM artifact missing or empty: {wasm_path}')
+
+          commit_sha = os.environ['COMMIT_SHA']
+          evidence = Path('.srtool-reports/runtime-hashes.txt')
+          evidence.write_text(
+              f'commit={commit_sha}\n'
+              f'blake2_256={blake2}\n'
+              f'sha256={sha256}\n'
+              f'wasm={wasm}\n'
+              f'wasm_bytes={wasm_path.stat().st_size}\n'
+          )
+
+          summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+          if not summary_path:
+              raise SystemExit('GITHUB_STEP_SUMMARY is not set')
+          with open(summary_path, 'a') as summary:
+              summary.write('## Reproducible runtime evidence\n\n')
+              summary.write(f'- Commit: `{commit_sha}`\n')
+              summary.write(f'- BLAKE2-256: `{blake2}`\n')
+              summary.write(f'- SHA-256: `{sha256}`\n')
+              summary.write(f'- WASM: `{wasm}`\n')
+              summary.write(f'- WASM bytes: `{wasm_path.stat().st_size}`\n')
+          PY
+      - name: Upload reproducible runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: srtool-runtime-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            .srtool-reports/latest.json
+            .srtool-reports/runtime-hashes.txt
+            target/release/wbuild/x3-chain-runtime/*.wasm
       - name: Audit (invariants + readiness + consistency)
-        run: make audit
+        run: |
+          python3 scripts/mainnet_release_gate.py
+          bash scripts/check-readiness-consistency.sh
       - name: Node Build Verification (mainnet-rc1)
         run: make test-node-build
       - name: Mainnet Check

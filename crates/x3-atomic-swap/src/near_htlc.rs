@@ -7,6 +7,8 @@
 //! [`claim`] would call the claim method with preimage, and [`refund`] would
 //! trigger the refund path after timeout. Finality uses NEAR's Doomslug
 //! finality (1 block optimistic, ~2s for final).
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

@@ -1,0 +1,258 @@
+name: x3vm-evm-live-lifecycle
+
+# Real anvil lifecycle gates for the EVM HTLC contract at
+# X3-contracts/evm/contracts/AtlasHTLC.sol. These jobs build/deploy the actual
+# contract and execute real signed local-chain transactions; they are not mocks.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "X3-contracts/evm/**"
+      - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "pallets/x3-settlement-engine/**"
+      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  pull_request:
+    branches: [master, finish/x3vm-live-transport]
+    paths:
+      - "X3-contracts/evm/**"
+      - "crates/x3-atomic-swap/**"
+      - "node/**"
+      - "pallets/x3-settlement-engine/**"
+      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+
+# NOTE: deliberately no `concurrency:` block. This workflow is invoked twice for
+# the same commit — standalone on push, and as a reusable workflow from
+# `production-gate.yml` (`evm-live`). A workflow-level concurrency group applies
+# to the called run too, and it collides with the standalone run of the same
+# workflow/commit: production-gate's `evm-live` job was never scheduled, so its
+# `gate` job (which `needs:` it) was always skipped and the release gate could
+# never pass. The single self-hosted runner already serialises everything, so
+# cancelling here bought nothing.
+
+jobs:
+  live-lifecycle:
+    name: EVM HTLC live anvil lifecycle
+    # Persistent cargo target dir (outside the checkout) so runs reuse compiled
+    # artefacts instead of rebuilding the workspace from scratch each time.
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+    # Public repo + fork PRs => keep pull_request on ubuntu-latest. Push (master)
+    # and manual dispatch run on the x3 self-hosted runner, which is the only
+    # runner able to execute here (GitHub-hosted jobs are blocked by an
+    # account-level billing lock). Re-review the self-hosted-runner-on-public-repo
+    # RCE risk before removing this split.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          missing=""
+          command -v protoc  >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang   >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake   >/dev/null 2>&1 || missing="$missing cmake"
+          command -v openssl >/dev/null 2>&1 || missing="$missing openssl"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+          shared-key: evm-live-lifecycle
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install forge dependencies (pinned via foundry.lock)
+        working-directory: X3-contracts/evm
+        run: |
+          set -euo pipefail
+          FORGE_STD_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/forge-std']['tag']['name'])")"
+          OZ_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/openzeppelin-contracts']['tag']['name'])")"
+          # `forge install` refuses to run when the target or .gitmodules already
+          # has changes. The self-hosted runner reuses one workspace across jobs,
+          # so the sibling job's install leaves lib/ and .gitmodules dirty and the
+          # second job dies with "cannot safely install dependency". Clone the
+          # exact pins from foundry.lock instead: idempotent, and it never touches
+          # .gitmodules.
+          ensure_pinned() {
+            local path="$1" url="$2" tag="$3"
+            if [ ! -d "$path/.git" ]; then
+              git clone --quiet --depth 1 --branch "$tag" "$url" "$path"
+            elif [ "$(git -C "$path" describe --tags --exact-match 2>/dev/null || echo none)" != "$tag" ]; then
+              git -C "$path" fetch --quiet --depth 1 origin "refs/tags/${tag}:refs/tags/${tag}"
+              git -C "$path" checkout --quiet "$tag"
+            else
+              echo "$path already pinned to $tag"
+            fi
+          }
+          ensure_pinned lib/forge-std https://github.com/foundry-rs/forge-std "$FORGE_STD_TAG"
+          ensure_pinned lib/openzeppelin-contracts https://github.com/OpenZeppelin/openzeppelin-contracts "$OZ_TAG"
+
+      - name: Build x3-evm-broadcast
+        run: cargo build --release -p x3-atomic-swap --features std --bin x3-evm-broadcast
+
+      - name: Run real anvil HTLC lifecycle gate
+        run: ./X3-contracts/evm/test-live-lifecycle.sh
+
+  live-x3vm-evm:
+    name: real X3VM to Anvil lock claim lifecycle
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          missing=""
+          command -v protoc  >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang   >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake   >/dev/null 2>&1 || missing="$missing cmake"
+          command -v jq      >/dev/null 2>&1 || missing="$missing jq"
+          command -v openssl >/dev/null 2>&1 || missing="$missing openssl"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install forge dependencies (pinned via foundry.lock)
+        working-directory: X3-contracts/evm
+        run: |
+          set -euo pipefail
+          FORGE_STD_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/forge-std']['tag']['name'])")"
+          OZ_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/openzeppelin-contracts']['tag']['name'])")"
+          # See the note in the sibling job: clone the pins instead of running
+          # `forge install`, which fails on the runner's reused (dirty) workspace.
+          ensure_pinned() {
+            local path="$1" url="$2" tag="$3"
+            if [ ! -d "$path/.git" ]; then
+              git clone --quiet --depth 1 --branch "$tag" "$url" "$path"
+            elif [ "$(git -C "$path" describe --tags --exact-match 2>/dev/null || echo none)" != "$tag" ]; then
+              git -C "$path" fetch --quiet --depth 1 origin "refs/tags/${tag}:refs/tags/${tag}"
+              git -C "$path" checkout --quiet "$tag"
+            else
+              echo "$path already pinned to $tag"
+            fi
+          }
+          ensure_pinned lib/forge-std https://github.com/foundry-rs/forge-std "$FORGE_STD_TAG"
+          ensure_pinned lib/openzeppelin-contracts https://github.com/OpenZeppelin/openzeppelin-contracts "$OZ_TAG"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: x3vm-evm-live-lifecycle
+
+      - name: Build AtlasHTLC
+        working-directory: X3-contracts/evm
+        run: forge build --contracts contracts/AtlasHTLC.sol
+
+      - name: Start isolated Anvil for X3VM-EVM atomic lifecycle
+        run: |
+          set -euo pipefail
+          anvil --port 18545 --chain-id 1337 --silent > /tmp/x3vm-evm-anvil.log 2>&1 &
+          echo $! > /tmp/x3vm-evm-anvil.pid
+          for _ in $(seq 1 30); do
+            if cast chain-id --rpc-url http://127.0.0.1:18545 >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/x3vm-evm-anvil.log
+          exit 1
+
+      - name: Generate ephemeral EVM actors and deploy AtlasHTLC
+        working-directory: X3-contracts/evm
+        run: |
+          set -euo pipefail
+          LOCKER_KEY="$(openssl rand -hex 32)"
+          CLAIMANT_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$LOCKER_KEY"
+          echo "::add-mask::$CLAIMANT_KEY"
+          LOCKER_ADDR="$(cast wallet address --private-key "$LOCKER_KEY")"
+          CLAIMANT_ADDR="$(cast wallet address --private-key "$CLAIMANT_KEY")"
+          cast rpc anvil_setBalance "$LOCKER_ADDR" 0x3635C9ADC5DEA00000 --rpc-url http://127.0.0.1:18545 >/dev/null
+          cast rpc anvil_setBalance "$CLAIMANT_ADDR" 0x3635C9ADC5DEA00000 --rpc-url http://127.0.0.1:18545 >/dev/null
+          DEPLOY_OUT="$(forge create contracts/AtlasHTLC.sol:AtlasHTLC \
+            --rpc-url http://127.0.0.1:18545 \
+            --private-key "$LOCKER_KEY" \
+            --broadcast 2>&1)"
+          CONTRACT="$(echo "$DEPLOY_OUT" | grep -oE 'Deployed to: 0x[0-9a-fA-F]{40}' | awk '{print $3}')"
+          test -n "$CONTRACT"
+          {
+            echo "X3_TEST_EVM_HTLC=$CONTRACT"
+            echo "X3_TEST_EVM_LOCKER_KEY=$LOCKER_KEY"
+            echo "X3_TEST_EVM_CLAIMANT_KEY=$CLAIMANT_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Run real X3VM-EVM atomic lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_evm_live \
+            real_x3vm_evm_lock_claim_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Run real X3VM-EVM timeout/refund atomic lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_evm_live \
+            real_x3vm_evm_timeout_refund_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      # NOTE: there is deliberately no separate "refund is terminal on both
+      # domains" step here. A step used to invoke
+      # `real_x3vm_evm_refund_is_terminal_on_both_domains`, a test that does not
+      # exist anywhere in the repository — cargo exits 0 when a filter matches
+      # nothing, so that step was a false green. The property is asserted for
+      # real at the end of `real_x3vm_evm_timeout_refund_atomic_lifecycle`,
+      # which proves the EVM leg rejects a claim after refund and the X3 leg
+      # rejects a claim after its finalized refund.
+
+      - name: Dump isolated Anvil log on failure
+        if: failure()
+        run: cat /tmp/x3vm-evm-anvil.log || true
+
+      - name: Stop isolated Anvil
+        if: always()
+        run: |
+          if [ -f /tmp/x3vm-evm-anvil.pid ]; then
+            kill "$(cat /tmp/x3vm-evm-anvil.pid)" 2>/dev/null || true
+          fi

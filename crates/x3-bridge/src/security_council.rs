@@ -127,7 +127,13 @@ impl BridgeSecurityCouncil {
     }
 
     /// Cast vote on proposal
-    pub fn vote(&mut self, proposal_id: u32, member_id: u32, vote_yes: bool, current_block: u32) -> Result<(), String> {
+    pub fn vote(
+        &mut self,
+        proposal_id: u32,
+        member_id: u32,
+        vote_yes: bool,
+        current_block: u32,
+    ) -> Result<(), String> {
         // Verify member exists and is active
         let member = self.members.get(&member_id).ok_or("Member not found")?;
 
@@ -142,7 +148,10 @@ impl BridgeSecurityCouncil {
             .ok_or("Proposal not found")?;
 
         // Check voting period (first 100 blocks)
-        let deadline = proposal.created_block.checked_add(100).ok_or("Overflow in deadline calculation")?;
+        let deadline = proposal
+            .created_block
+            .checked_add(100)
+            .ok_or("Overflow in deadline calculation")?;
         if current_block > deadline {
             return Err("Voting period expired".to_string());
         }

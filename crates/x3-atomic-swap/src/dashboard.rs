@@ -4,6 +4,13 @@
 //! into a single snapshot suitable for UI rendering or programmatic consumption.
 //!
 //! Also provides the Chaos Test Scoreboard for displaying test scenario status.
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeSet;
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::X3VmAdapter;
 use crate::intent::AtomicIntent;
@@ -354,7 +361,7 @@ impl AtomicCommandCenter {
                         .get_records_for_intent(intent.intent_id)
                         .iter()
                         .map(|r| r.relayer_id.as_str())
-                        .collect::<std::collections::HashSet<&str>>()
+                        .collect::<alloc::collections::BTreeSet<&str>>()
                         .len() as u32;
                     let has_rpc_quorum = ledger.has_rpc_quorum_for_intent(intent.intent_id);
                     let sb = SwapScoreboard::from_proof_record(

@@ -2,6 +2,7 @@
 name = "proof-forge"
 version = "1.0.0"
 edition = "2021"
+license.workspace = true
 publish = false
 
 [[bin]]
@@ -26,4 +27,3 @@ walkdir = "2.4"
 indicatif = "0.17"
 rayon = "1.8"
 parking_lot = "0.12"
-

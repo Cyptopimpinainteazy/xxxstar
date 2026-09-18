@@ -77,10 +77,7 @@ impl TaskExecutor {
             });
         }
 
-        let canonical_params: BTreeMap<_, _> = payload
-            .params
-            .iter()
-            .collect();
+        let canonical_params: BTreeMap<_, _> = payload.params.iter().collect();
         let canonical_input = serde_json::to_vec(&(payload.body.as_slice(), canonical_params))
             .map_err(|error| NorthernSwarmError::ExecutionFailed {
                 task_id: payload.task_id.clone(),
