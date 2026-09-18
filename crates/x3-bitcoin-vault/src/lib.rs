@@ -10,6 +10,63 @@ pub const MIN_BITCOIN_CONFIRMATIONS: u64 = 6;
 pub const DEFAULT_THRESHOLD: u32 = 3;
 pub const DEFAULT_TOTAL_SIGNERS: u32 = 5;
 
+// ── Signer-approval message (issue #272) ────────────────────────────────────
+
+/// Payload format version for a deposit signer-approval message, the
+/// Bitcoin analogue of `SOLANA_FINALIZED_FORMAT_V1`
+/// (crates/x3-verification-router). A signer approves a specific deposit —
+/// not a bare count of bytes — by signing `deposit_approval_message(..)`
+/// with the private key matching their entry in `config.signer_pubkeys`.
+pub const BTC_DEPOSIT_APPROVAL_FORMAT_V1: u8 = 1;
+
+/// Domain-separation tag, distinct from any other message format this
+/// workspace signs, so a signature produced for one purpose can never be
+/// replayed as an approval for another.
+const BTC_DEPOSIT_APPROVAL_DOMAIN: &[u8] = b"X3-BTC-DEPOSIT-APPROVAL-V1";
+
+/// The exact message a signer must sign (and this crate verifies) to
+/// approve `deposit`. Binds the approval to this deposit's UTXO (txid,
+/// vout), amount, and asset_id — a signature over a different deposit's
+/// fields will not verify here, even from an authorized signer.
+pub fn deposit_approval_message(
+    txid: &[u8; 32],
+    vout: u32,
+    amount: u64,
+    asset_id: &[u8; 32],
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update([BTC_DEPOSIT_APPROVAL_FORMAT_V1]);
+    hasher.update(BTC_DEPOSIT_APPROVAL_DOMAIN);
+    hasher.update(txid);
+    hasher.update(vout.to_le_bytes());
+    hasher.update(amount.to_le_bytes());
+    hasher.update(asset_id);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&hasher.finalize());
+    out
+}
+
+/// Verifies a compact (64-byte, r||s) secp256k1 ECDSA signature over an
+/// already-hashed 32-byte message. `pubkey_bytes` must be the SEC1
+/// (typically 33-byte compressed) encoding stored in
+/// `config.signer_pubkeys`.
+fn verify_signer_signature(
+    pubkey_bytes: &[u8; 33],
+    message: &[u8; 32],
+    signature_bytes: &[u8],
+) -> Result<(), BtcVaultError> {
+    use k256::ecdsa::signature::hazmat::PrehashVerifier;
+    use k256::ecdsa::{Signature, VerifyingKey};
+
+    let verifying_key = VerifyingKey::from_sec1_bytes(pubkey_bytes)
+        .map_err(|_| BtcVaultError::InvalidApprovalSignature)?;
+    let signature = Signature::from_slice(signature_bytes)
+        .map_err(|_| BtcVaultError::InvalidApprovalSignature)?;
+    verifying_key
+        .verify_prehash(message, &signature)
+        .map_err(|_| BtcVaultError::InvalidApprovalSignature)
+}
+
 // ── Address / script helpers ────────────────────────────────────────────────
 
 pub fn hash160(input: &[u8]) -> [u8; 20] {
@@ -203,6 +260,13 @@ pub struct BtcWithdrawalRequest {
     pub btc_recipient: Vec<u8>,
     pub amount: u64,
     pub x3_proof: Vec<u8>,
+    /// Unlike `BtcDepositRequest.signatures`, there is currently no method
+    /// that populates this field at all — `submit_withdrawal` always
+    /// initializes it empty, and nothing in this crate ever pushes to it.
+    /// Issue #272 named this field as sharing the deposit side's
+    /// unverified-signature problem; in fact the withdrawal signer-approval
+    /// flow doesn't exist yet, which is a larger, separate gap than this fix
+    /// (real verification for deposits) addresses.
     pub signatures: Vec<([u8; 32], Vec<u8>)>,
     pub status: BtcWithdrawalStatus,
 }
@@ -455,20 +519,17 @@ impl BtcVault {
 
     /// Records a signer approval for a pending deposit.
     ///
-    /// **The `signature` bytes are stored, not verified.** This method checks
-    /// only that `signer_pubkey` is one of `config.signers` and that it has not
-    /// already approved; it never verifies the signature against any message.
-    /// Callers must perform that verification themselves before calling —
-    /// a count of stored approvals is not evidence of signer consent.
-    ///
-    /// Tracked in issue #272 (the Bitcoin analogue of the Solana signed-message
-    /// format): until a canonical message and verification exist, treat every
-    /// entry in `deposit.signatures` as untrusted bytes.
+    /// `signature_bytes` is verified — a compact secp256k1 ECDSA signature,
+    /// from the private key matching this signer's entry in
+    /// `config.signer_pubkeys`, over `deposit_approval_message(..)` for
+    /// *this* deposit. A signature that doesn't verify (wrong key, tampered
+    /// bytes, or a signature over a different deposit) is rejected before
+    /// it can count toward the threshold. Closes issue #272.
     pub fn add_signer_approval(
         &mut self,
         deposit_index: usize,
         signer_pubkey: [u8; 32],
-        unverified_signature_bytes: Vec<u8>,
+        signature_bytes: Vec<u8>,
     ) -> Result<(), BtcVaultError> {
         let deposit = self
             .pending_deposits
@@ -483,16 +544,30 @@ impl BtcVault {
             _ => return Err(BtcVaultError::InvalidStateTransition),
         };
 
-        if !self.config.signers.contains(&signer_pubkey) {
-            return Err(BtcVaultError::InvalidSigner);
-        }
+        let signer_index = self
+            .config
+            .signers
+            .iter()
+            .position(|s| *s == signer_pubkey)
+            .ok_or(BtcVaultError::InvalidSigner)?;
         if deposit.signatures.iter().any(|(k, _)| *k == signer_pubkey) {
             return Err(BtcVaultError::DuplicateSignature);
         }
 
-        deposit
-            .signatures
-            .push((signer_pubkey, unverified_signature_bytes));
+        let verifying_pubkey = self
+            .config
+            .signer_pubkeys
+            .get(signer_index)
+            .ok_or(BtcVaultError::InvalidSigner)?;
+        let message = deposit_approval_message(
+            &deposit.txid,
+            deposit.vout,
+            deposit.amount,
+            &deposit.asset_id,
+        );
+        verify_signer_signature(verifying_pubkey, &message, &signature_bytes)?;
+
+        deposit.signatures.push((signer_pubkey, signature_bytes));
         let new_approvals = approvals + 1;
         if new_approvals >= threshold {
             deposit.status = BtcDepositStatus::Approved;
@@ -524,6 +599,7 @@ pub enum BtcVaultError {
     UtxoAlreadySpent,
     InvalidSigner,
     DuplicateSignature,
+    InvalidApprovalSignature,
 }
 
 impl Display for BtcVaultError {
@@ -545,6 +621,9 @@ impl Display for BtcVaultError {
             BtcVaultError::UtxoAlreadySpent => write!(f, "UTXO already spent"),
             BtcVaultError::InvalidSigner => write!(f, "invalid signer"),
             BtcVaultError::DuplicateSignature => write!(f, "duplicate signature"),
+            BtcVaultError::InvalidApprovalSignature => {
+                write!(f, "signature does not verify for this deposit and signer")
+            }
         }
     }
 }
@@ -686,6 +765,55 @@ mod tests {
             .collect();
         let config = BtcVaultConfig::default().with_signers(signers, 3);
         BtcVault::new(config)
+    }
+
+    /// A vault whose `config.signer_pubkeys` are real secp256k1 points (not
+    /// the placeholder byte patterns `default_vault` uses), plus the
+    /// matching signing keys, for tests that exercise real approval
+    /// signature verification. Keys are small, deterministic, valid
+    /// nonzero scalars — fine for a test fixture, never for production.
+    fn default_vault_with_keys() -> (BtcVault, Vec<k256::ecdsa::SigningKey>) {
+        use k256::ecdsa::SigningKey;
+
+        let keys: Vec<SigningKey> = (1..=5u8)
+            .map(|i| {
+                let mut scalar_bytes = [0u8; 32];
+                scalar_bytes[31] = i;
+                SigningKey::from_bytes(&scalar_bytes.into()).expect("small nonzero scalar is valid")
+            })
+            .collect();
+        let pubkeys: Vec<[u8; 33]> = keys
+            .iter()
+            .map(|k| {
+                let point = k.verifying_key().to_encoded_point(true);
+                let mut out = [0u8; 33];
+                out.copy_from_slice(point.as_bytes());
+                out
+            })
+            .collect();
+        let config = BtcVaultConfig::default().with_signers(pubkeys, 3);
+        (BtcVault::new(config), keys)
+    }
+
+    /// Signs `deposit_approval_message(..)` for `deposit` with `key`,
+    /// returning the compact 64-byte signature `add_signer_approval` expects.
+    fn sign_deposit_approval(
+        key: &k256::ecdsa::SigningKey,
+        deposit: &BtcDepositRequest,
+    ) -> Vec<u8> {
+        use k256::ecdsa::signature::hazmat::PrehashSigner;
+        use k256::ecdsa::Signature;
+
+        let message = deposit_approval_message(
+            &deposit.txid,
+            deposit.vout,
+            deposit.amount,
+            &deposit.asset_id,
+        );
+        let signature: Signature = key
+            .sign_prehash(&message)
+            .expect("sign over a 32-byte prehash cannot fail");
+        signature.to_bytes().to_vec()
     }
 
     #[test]
@@ -933,7 +1061,7 @@ mod tests {
 
     #[test]
     fn test_signer_approval() {
-        let mut vault = default_vault();
+        let (mut vault, keys) = default_vault_with_keys();
         vault
             .submit_deposit(
                 [1u8; 32],
@@ -957,14 +1085,15 @@ mod tests {
         );
 
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let deposit = vault.pending_deposits[0].clone();
         vault
-            .add_signer_approval(0, signer_ids[0], vec![0xAA; 64])
+            .add_signer_approval(0, signer_ids[0], sign_deposit_approval(&keys[0], &deposit))
             .unwrap();
         vault
-            .add_signer_approval(0, signer_ids[1], vec![0xBB; 64])
+            .add_signer_approval(0, signer_ids[1], sign_deposit_approval(&keys[1], &deposit))
             .unwrap();
         vault
-            .add_signer_approval(0, signer_ids[2], vec![0xCC; 64])
+            .add_signer_approval(0, signer_ids[2], sign_deposit_approval(&keys[2], &deposit))
             .unwrap();
 
         assert_eq!(vault.pending_deposits[0].status, BtcDepositStatus::Approved);
@@ -972,6 +1101,140 @@ mod tests {
         assert_eq!(
             vault.add_signer_approval(0, [0u8; 32], vec![]),
             Err(BtcVaultError::InvalidStateTransition)
+        );
+    }
+
+    /// A signature that verifies, but not for the deposit it's presented
+    /// against, must be rejected — proves the message binds txid/vout/
+    /// amount/asset_id, not just "any valid signature from this signer".
+    #[test]
+    fn test_signature_over_a_different_deposit_is_rejected() {
+        let (mut vault, keys) = default_vault_with_keys();
+        vault
+            .submit_deposit(
+                [1u8; 32],
+                0,
+                5_000_000,
+                vec![0x01],
+                [0u8; 32],
+                vec![1, 2, 3],
+            )
+            .unwrap();
+        for _ in 0..7 {
+            vault.process_deposit(0).unwrap();
+        }
+
+        let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let mut wrong_deposit = vault.pending_deposits[0].clone();
+        wrong_deposit.amount = 999_000_000; // same signer, different amount
+
+        let bogus_signature = sign_deposit_approval(&keys[0], &wrong_deposit);
+        assert_eq!(
+            vault.add_signer_approval(0, signer_ids[0], bogus_signature),
+            Err(BtcVaultError::InvalidApprovalSignature)
+        );
+    }
+
+    /// A well-formed but tampered signature (correct length, wrong bytes)
+    /// must be rejected, not silently accepted as an approval.
+    #[test]
+    fn test_tampered_signature_is_rejected() {
+        let (mut vault, keys) = default_vault_with_keys();
+        vault
+            .submit_deposit(
+                [1u8; 32],
+                0,
+                5_000_000,
+                vec![0x01],
+                [0u8; 32],
+                vec![1, 2, 3],
+            )
+            .unwrap();
+        for _ in 0..7 {
+            vault.process_deposit(0).unwrap();
+        }
+
+        let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let deposit = vault.pending_deposits[0].clone();
+        let mut tampered = sign_deposit_approval(&keys[0], &deposit);
+        tampered[0] ^= 0xFF;
+
+        assert_eq!(
+            vault.add_signer_approval(0, signer_ids[0], tampered),
+            Err(BtcVaultError::InvalidApprovalSignature)
+        );
+    }
+
+    /// The same signer cannot approve twice, even with a fresh valid
+    /// signature both times — one signer is one vote, not one vote per call.
+    #[test]
+    fn test_duplicate_signer_is_rejected() {
+        let (mut vault, keys) = default_vault_with_keys();
+        vault
+            .submit_deposit(
+                [1u8; 32],
+                0,
+                5_000_000,
+                vec![0x01],
+                [0u8; 32],
+                vec![1, 2, 3],
+            )
+            .unwrap();
+        for _ in 0..7 {
+            vault.process_deposit(0).unwrap();
+        }
+
+        let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let deposit = vault.pending_deposits[0].clone();
+        vault
+            .add_signer_approval(0, signer_ids[0], sign_deposit_approval(&keys[0], &deposit))
+            .unwrap();
+
+        assert_eq!(
+            vault.add_signer_approval(0, signer_ids[0], sign_deposit_approval(&keys[0], &deposit)),
+            Err(BtcVaultError::DuplicateSignature)
+        );
+    }
+
+    /// A valid signature from a real keypair that simply isn't in
+    /// `config.signers` must be rejected — a signer set of N does not
+    /// silently accept anyone who can produce a well-formed signature.
+    #[test]
+    fn test_unauthorized_signer_is_rejected() {
+        use k256::ecdsa::SigningKey;
+
+        let (mut vault, _keys) = default_vault_with_keys();
+        vault
+            .submit_deposit(
+                [1u8; 32],
+                0,
+                5_000_000,
+                vec![0x01],
+                [0u8; 32],
+                vec![1, 2, 3],
+            )
+            .unwrap();
+        for _ in 0..7 {
+            vault.process_deposit(0).unwrap();
+        }
+
+        let mut outsider_scalar = [0u8; 32];
+        outsider_scalar[31] = 99;
+        let outsider = SigningKey::from_bytes(&outsider_scalar.into()).unwrap();
+        let outsider_pubkey_id = {
+            let point = outsider.verifying_key().to_encoded_point(true);
+            let mut out = [0u8; 33];
+            out.copy_from_slice(point.as_bytes());
+            let mut id = [0u8; 32];
+            id.copy_from_slice(&Sha256::digest(out));
+            id
+        };
+
+        let deposit = vault.pending_deposits[0].clone();
+        let signature = sign_deposit_approval(&outsider, &deposit);
+        assert_eq!(
+            vault.add_signer_approval(0, outsider_pubkey_id, signature),
+            Err(BtcVaultError::InvalidSigner)
         );
     }
 
@@ -983,7 +1246,7 @@ mod tests {
     /// silently loses funds or mints UTXOs without quorum.
     #[test]
     fn test_end_to_end_deposit_with_threshold_quorum() {
-        let mut vault = default_vault();
+        let (mut vault, keys) = default_vault_with_keys();
         let deposit_amount = 5_000_000u64;
         let deposit_txid = [0xAB; 32];
         let deposit_vout = 0u32;
@@ -1038,8 +1301,9 @@ mod tests {
 
         // 4. Two of three signers approve — still not at threshold.
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
+        let deposit = vault.pending_deposits[0].clone();
         vault
-            .add_signer_approval(0, signer_ids[0], vec![0xAA; 64])
+            .add_signer_approval(0, signer_ids[0], sign_deposit_approval(&keys[0], &deposit))
             .unwrap();
         assert_eq!(
             vault.pending_deposits[0].status,
@@ -1050,7 +1314,7 @@ mod tests {
             "after 1 approval, must still be pending 2 more"
         );
         vault
-            .add_signer_approval(0, signer_ids[1], vec![0xBB; 64])
+            .add_signer_approval(0, signer_ids[1], sign_deposit_approval(&keys[1], &deposit))
             .unwrap();
         assert_eq!(
             vault.pending_deposits[0].status,
@@ -1063,7 +1327,7 @@ mod tests {
 
         // 5. Third signer pushes the deposit to Approved.
         vault
-            .add_signer_approval(0, signer_ids[2], vec![0xCC; 64])
+            .add_signer_approval(0, signer_ids[2], sign_deposit_approval(&keys[2], &deposit))
             .unwrap();
         assert_eq!(vault.pending_deposits[0].status, BtcDepositStatus::Approved);
 
@@ -1102,7 +1366,7 @@ mod tests {
     /// state would prematurely become Approved).
     #[test]
     fn test_threshold_quorum_is_exact_not_off_by_one() {
-        let mut vault = default_vault();
+        let (mut vault, keys) = default_vault_with_keys();
         vault
             .submit_deposit(
                 [0xCD; 32],
@@ -1125,8 +1389,13 @@ mod tests {
 
         // Two approvals must NOT be enough.
         let signer_ids: Vec<[u8; 32]> = vault.config.signers.clone();
-        vault.add_signer_approval(0, signer_ids[0], vec![]).unwrap();
-        vault.add_signer_approval(0, signer_ids[1], vec![]).unwrap();
+        let deposit = vault.pending_deposits[0].clone();
+        vault
+            .add_signer_approval(0, signer_ids[0], sign_deposit_approval(&keys[0], &deposit))
+            .unwrap();
+        vault
+            .add_signer_approval(0, signer_ids[1], sign_deposit_approval(&keys[1], &deposit))
+            .unwrap();
         match &vault.pending_deposits[0].status {
             BtcDepositStatus::PendingSignerApproval {
                 approvals,
@@ -1139,7 +1408,9 @@ mod tests {
         }
 
         // Third approval IS enough.
-        vault.add_signer_approval(0, signer_ids[2], vec![]).unwrap();
+        vault
+            .add_signer_approval(0, signer_ids[2], sign_deposit_approval(&keys[2], &deposit))
+            .unwrap();
         assert_eq!(vault.pending_deposits[0].status, BtcDepositStatus::Approved);
     }
 }
