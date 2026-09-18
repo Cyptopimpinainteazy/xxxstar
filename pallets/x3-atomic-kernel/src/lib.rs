@@ -710,9 +710,10 @@ pub mod pallet {
         ///
         /// # Bond Lifecycle
         /// - **Reserved** here at submission (submitter cannot spend bonded funds).
-        /// - **Unreserved** on `SubmitterCancelled` rollback (voluntary cancel, no slash).
-        /// - **Slashed** (via `Currency::slash` on reserved funds) on execution failure
-        ///   or deadline expiry.
+        /// - **Released and settled** on rollback: the whole bond is unreserved first,
+        ///   then the reason's penalty is slashed out of it and the remainder stays
+        ///   with the submitter. Penalties are 50% for `SubmitterCancelled`, 10% for
+        ///   `ExecutionFailed` / `AccessSetViolation`, and 100% for `DeadlineExceeded`.
         ///
         /// # Security
         /// - Max legs enforced by `MaxLegsPerBundle`.
@@ -1293,31 +1294,37 @@ pub mod pallet {
                 // Use the bond stored on the record (set at submission time).
                 let bond: BalanceOf<T> = record.bond;
 
-                // Determine slash amount (as BalanceOf<T>) and unreserve amount.
-                let (slash_amount, unreserve_amount): (BalanceOf<T>, BalanceOf<T>) = match reason {
+                // Determine the penalty for this rollback reason.
+                let slash_amount: BalanceOf<T> = match reason {
                     BundleRollbackReason::SubmitterCancelled => {
                         // 50% slash for submitter-cancelled
-                        let slashed = Perbill::from_percent(50) * bond;
-                        let unreserved = bond.saturating_sub(slashed);
-                        (slashed, unreserved)
-                    }
+                        Perbill::from_percent(50) * bond
+                    },
                     BundleRollbackReason::DeadlineExceeded => {
                         // 100% slash for deadline-exceeded
-                        (bond, Zero::zero())
-                    }
+                        bond
+                    },
                     BundleRollbackReason::ExecutionFailed
                     | BundleRollbackReason::AccessSetViolation => {
                         // 10% slash for execution failures / access violations
-                        let slashed = Perbill::from_percent(10) * bond;
-                        (slashed, bond.saturating_sub(slashed))
-                    }
+                        Perbill::from_percent(10) * bond
+                    },
                 };
 
-                // Slash (removes from submitter, returns imbalance)
+                // Release the entire bond from reserve *before* slashing.
+                //
+                // `Currency::slash` spends free balance before reserved balance, so
+                // slashing first charged the penalty twice whenever the submitter had
+                // free funds: once from free balance, and again by leaving
+                // `bond - unreserve_amount` of the bond stuck in reserve — a
+                // `RolledBack` bundle can never be finalized or rolled back again, so
+                // nothing could ever release it. Unreserving first makes the penalty
+                // come out of the bond itself, exactly once.
+                T::Currency::unreserve(&record.submitter, bond);
+
+                // Slash the penalty; the imbalance is deposited into the treasury.
                 if slash_amount > Zero::zero() {
                     let (imbalance, _actual) = T::Currency::slash(&record.submitter, slash_amount);
-                    // Transfer slashed funds to treasury by converting the
-                    // negative imbalance into a positive deposit.
                     let treasury = Self::treasury_account();
                     T::Currency::resolve_creating(&treasury, imbalance);
 
@@ -1326,11 +1333,6 @@ pub mod pallet {
                         amount: slash_amount,
                         reason,
                     });
-                }
-
-                // Unreserve any remaining bond not slashed.
-                if unreserve_amount > Zero::zero() {
-                    T::Currency::unreserve(&record.submitter, unreserve_amount);
                 }
 
                 // ── Status update ───────────────────────────────────────────

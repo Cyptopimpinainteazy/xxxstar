@@ -4,6 +4,154 @@ use super::proof::*;
 use super::vm_revert::*;
 use sp_core::H256;
 
+// ── Economic halt invariant (FRAME mock) ────────────────────────────────────
+//
+// FEATURE_REGISTRY's `atomic_kernel` entry records that the halt guard had no
+// dedicated coverage. These tests drive the guard that actually exists:
+// `ensure!(!T::EconomicHalt::is_halted(), Error::EconomicHaltActive)` in
+// `submit_atomic_bundle`, plus the recovery paths that must stay open while the
+// economy is halted.
+
+use crate::mock::{
+    economy_open, new_test_ext, AtomicKernel, MaxLegsPerBundle, RuntimeOrigin, System, Test,
+    ALICE, MIN_BOND,
+};
+use crate::{
+    BundleRollbackReason, BundleStatus, Bundles, Error, NonceRegistry,
+};
+use frame_support::{assert_noop, assert_ok, BoundedVec};
+
+/// Balances pallet specialised to the mock runtime, for bond assertions.
+type Balances = pallet_balances::Pallet<Test>;
+
+/// A minimal executable bundle: one X3 leg with declared access.
+#[allow(dead_code)]
+fn one_leg_bundle() -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
+    BoundedVec::try_from(vec![BundleLeg {
+        vm_type: VmType::X3,
+        token_in: H256::repeat_byte(0x11),
+        token_out: H256::repeat_byte(0x22),
+        amount_in: 1_000,
+        min_amount_out: 900,
+        deadline: 4_000_000_000,
+        access: DeclaredAccess {
+            reads: BoundedVec::try_from(vec![H256::repeat_byte(0x33)]).expect("reads fit"),
+            writes: BoundedVec::try_from(vec![H256::repeat_byte(0x44)]).expect("writes fit"),
+        },
+    }])
+    .expect("a single leg fits MaxLegsPerBundle")
+}
+
+#[test]
+fn economic_halt_blocks_bundle_submission() {
+    let halt = economy_open();
+    new_test_ext().execute_with(|| {
+        // While open, the same call succeeds and reserves the bond.
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            10,
+            1,
+            1,
+        ));
+        assert_eq!(Bundles::<Test>::iter().count(), 1);
+        let reserved_while_open = Balances::reserved_balance(ALICE);
+        assert!(reserved_while_open >= MIN_BOND);
+
+        halt.halt();
+
+        // A halted economy refuses new economic work. `assert_noop!` also proves
+        // the rejection left no trace: no bundle, no extra bond, no nonce burned.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle(),
+                10,
+                1,
+                2,
+            ),
+            Error::<Test>::EconomicHaltActive
+        );
+        assert_eq!(Bundles::<Test>::iter().count(), 1);
+        assert_eq!(Balances::reserved_balance(ALICE), reserved_while_open);
+        assert_eq!(NonceRegistry::<Test>::get(1, ALICE).used_nonces.len(), 1);
+
+        halt.resume();
+
+        // Lifting the halt restores economic work. `bundle_id` is derived from
+        // (submitter, block, legs_hash), so the block has to move for a fresh id.
+        System::set_block_number(2);
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            10,
+            1,
+            2,
+        ));
+        assert_eq!(Bundles::<Test>::iter().count(), 2);
+    });
+}
+
+#[test]
+fn economic_halt_does_not_trap_pending_bundle_funds() {
+    let halt = economy_open();
+    new_test_ext().execute_with(|| {
+        let free_before_submit = Balances::free_balance(ALICE);
+        let issuance_before = Balances::total_issuance();
+        assert_ok!(AtomicKernel::submit_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            one_leg_bundle(),
+            10,
+            1,
+            1,
+        ));
+        let (bundle_id, _) = Bundles::<Test>::iter()
+            .next()
+            .expect("submitted bundle is stored");
+        assert!(Balances::reserved_balance(ALICE) >= MIN_BOND);
+        let penalty = MIN_BOND / 2; // 50% for SubmitterCancelled
+
+        halt.halt();
+
+        // Recovery must stay possible while halted: a halt that locked pending
+        // funds would be worse than the condition it responds to.
+        assert_ok!(AtomicKernel::rollback_atomic_bundle(
+            RuntimeOrigin::signed(ALICE),
+            bundle_id,
+            BundleRollbackReason::SubmitterCancelled,
+        ));
+        let record = Bundles::<Test>::get(bundle_id).expect("record survives rollback");
+        assert_eq!(record.status, BundleStatus::RolledBack);
+        assert_eq!(
+            Balances::reserved_balance(ALICE),
+            0,
+            "rollback must release the whole bond, not leave part of it reserved"
+        );
+        assert_eq!(
+            Balances::free_balance(ALICE),
+            free_before_submit - penalty,
+            "a voluntary cancel must cost exactly the 50% penalty and return the rest"
+        );
+        assert_eq!(
+            Balances::total_issuance(),
+            issuance_before,
+            "slashed funds are moved to the treasury, not burned"
+        );
+
+        // The halt still blocks *new* work while recovery was permitted.
+        assert_noop!(
+            AtomicKernel::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg_bundle(),
+                10,
+                1,
+                2,
+            ),
+            Error::<Test>::EconomicHaltActive
+        );
+    });
+}
+
 // ── Simple unit tests (no FRAME mock needed) ────────────────────────────────
 
 #[test]
