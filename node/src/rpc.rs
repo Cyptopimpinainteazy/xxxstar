@@ -338,8 +338,6 @@ fn read_u32_storage(
         .map_err(|e| custom_error(format!("decode {pallet:?}/{item:?} storage failed: {e}")))
 }
 
-
-
 fn read_settlement_intent_state(
     client: &FullClient,
     at: H256,
@@ -355,9 +353,8 @@ fn read_settlement_intent_state(
         return Ok(None);
     }
 
-    let state_key = StorageKey(
-        pallet_x3_settlement_engine::IntentStates::<Runtime>::hashed_key_for(intent_id),
-    );
+    let state_key =
+        StorageKey(pallet_x3_settlement_engine::IntentStates::<Runtime>::hashed_key_for(intent_id));
     let state = match StorageProvider::storage(client, at, &state_key)
         .map_err(|e| custom_error(format!("read settlement intent state failed: {e}")))?
     {
@@ -704,11 +701,8 @@ where
             let (intent_hex,): (String,) = params.parse()?;
             let intent_id = H256(decode_hex_32(&intent_hex, "runtime intent id")?);
             let at = client_for_settlement_state.info().best_hash;
-            match read_settlement_intent_state(
-                client_for_settlement_state.as_ref(),
-                at,
-                intent_id,
-            )? {
+            match read_settlement_intent_state(client_for_settlement_state.as_ref(), at, intent_id)?
+            {
                 Some(state) => Ok(serde_json::json!({
                     "intent_id": intent_hex,
                     "state": format!("{state:?}"),
@@ -722,7 +716,6 @@ where
             }
         },
     )?;
-
 
     if let Some(atomic_gateway_tx) = atomic_gateway_tx {
         let rollback_tx = atomic_gateway_tx.clone();

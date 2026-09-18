@@ -13,14 +13,14 @@
 //! - Locked:   `Locked(uint64,address,address,uint256,bytes32,uint256)`
 //! - Claimed:  `Claimed(uint64,address,bytes32)`
 //! - Refunded: `Refunded(uint64,address)`
-use alloc::format;
-use alloc::vec;
-#[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 #[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
+use alloc::format;
+use alloc::vec;
 
 use crate::error::SwapError;
 use alloc::string::String;

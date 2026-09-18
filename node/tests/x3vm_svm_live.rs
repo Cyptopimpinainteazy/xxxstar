@@ -182,11 +182,7 @@ fn wait_svm_finalized(signature: &str, timeout: Duration) {
                 status.get("err").is_none_or(Value::is_null),
                 "Solana transaction failed: {status}"
             );
-            if status
-                .get("confirmationStatus")
-                .and_then(Value::as_str)
-                == Some("finalized")
-            {
+            if status.get("confirmationStatus").and_then(Value::as_str) == Some("finalized") {
                 return;
             }
         }
@@ -224,10 +220,7 @@ fn intent_state_storage_key(intent_id: H256) -> String {
     format!("0x{}", hex::encode(key))
 }
 
-fn intent_state_at(
-    intent_id: H256,
-    block_hash: &str,
-) -> pallet_x3_settlement_engine::IntentState {
+fn intent_state_at(intent_id: H256, block_hash: &str) -> pallet_x3_settlement_engine::IntentState {
     let mut rpc = RpcClient::new(X3_RPC.into(), 0);
     let value = rpc
         .call(
@@ -420,8 +413,7 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
     let claimant_keypair =
         std::env::var("X3_TEST_SVM_CLAIMANT_KEYPAIR").expect("X3_TEST_SVM_CLAIMANT_KEYPAIR");
     let payer_pubkey = std::env::var("X3_TEST_SVM_PAYER_PUBKEY").expect("payer pubkey");
-    let claimant_pubkey =
-        std::env::var("X3_TEST_SVM_CLAIMANT_PUBKEY").expect("claimant pubkey");
+    let claimant_pubkey = std::env::var("X3_TEST_SVM_CLAIMANT_PUBKEY").expect("claimant pubkey");
 
     let _x3 = spawn_x3_node();
     wait_x3_rpc(Duration::from_secs(360));
@@ -466,16 +458,17 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         },
         primary,
     );
-    let x3_adapter = LiveX3VmAdapter::new(
-        chain_id,
-        b"x3-native-svm-escrow".to_vec(),
-        x3_transport,
-    );
+    let x3_adapter = LiveX3VmAdapter::new(chain_id, b"x3-native-svm-escrow".to_vec(), x3_transport);
     let intent = atomic_intent(local_id, preimage);
 
     let x3_lock = x3_adapter.lock(&intent).expect("real X3 lock");
     assert_eq!(x3_lock.vm_type, VmType::X3Vm);
-    assert!(x3_adapter.finality_status(&x3_lock.tx_id).unwrap().finalized);
+    assert!(
+        x3_adapter
+            .finality_status(&x3_lock.tx_id)
+            .unwrap()
+            .finalized
+    );
 
     let leg1 = second_leg
         .sign_lock_escrow_leg(
@@ -507,7 +500,10 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         timeout_slot.to_string(),
     ];
     let svm_lock = run_svm_broadcast(&lock_args, &payer_keypair);
-    assert_eq!(svm_lock.get("status").and_then(Value::as_str), Some("submitted"));
+    assert_eq!(
+        svm_lock.get("status").and_then(Value::as_str),
+        Some("submitted")
+    );
     let lock_signature = svm_lock
         .get("signature")
         .and_then(Value::as_str)
@@ -628,9 +624,13 @@ fn real_x3vm_svm_lock_claim_atomic_lifecycle() {
         .claim_with_permit(&permit)
         .expect("X3 claim using SVM-finalized preimage");
     assert_eq!(x3_claim.preimage, preimage);
-    assert!(x3_adapter.finality_status(&x3_claim.tx_id).unwrap().finalized);
+    assert!(
+        x3_adapter
+            .finality_status(&x3_claim.tx_id)
+            .unwrap()
+            .finalized
+    );
 }
-
 
 #[test]
 #[ignore = "requires solana-test-validator + real SBF program/client and boots a real X3 dev node"]
@@ -640,8 +640,7 @@ fn real_x3vm_svm_timeout_refund_atomic_lifecycle() {
     let claimant_keypair =
         std::env::var("X3_TEST_SVM_CLAIMANT_KEYPAIR").expect("X3_TEST_SVM_CLAIMANT_KEYPAIR");
     let payer_pubkey = std::env::var("X3_TEST_SVM_PAYER_PUBKEY").expect("payer pubkey");
-    let claimant_pubkey =
-        std::env::var("X3_TEST_SVM_CLAIMANT_PUBKEY").expect("claimant pubkey");
+    let claimant_pubkey = std::env::var("X3_TEST_SVM_CLAIMANT_PUBKEY").expect("claimant pubkey");
 
     let _x3 = spawn_x3_node();
     wait_x3_rpc(Duration::from_secs(360));
@@ -667,8 +666,7 @@ fn real_x3vm_svm_timeout_refund_atomic_lifecycle() {
     let finalized_head_hash =
         wait_x3_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
     let finalized_hash = H256::from_slice(
-        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
-            .expect("decode finalized head"),
+        &hex::decode(finalized_head_hash.trim_start_matches("0x")).expect("decode finalized head"),
     );
     let runtime_intent_id = signer
         .resolve_intent_id(&prepared, finalized_hash)
@@ -695,7 +693,12 @@ fn real_x3vm_svm_timeout_refund_atomic_lifecycle() {
     );
     let intent = atomic_intent(local_id, preimage);
     let x3_lock = x3_adapter.lock(&intent).expect("real X3 refund-path lock");
-    assert!(x3_adapter.finality_status(&x3_lock.tx_id).unwrap().finalized);
+    assert!(
+        x3_adapter
+            .finality_status(&x3_lock.tx_id)
+            .unwrap()
+            .finalized
+    );
 
     // Both legs have to be escrowed before the runtime considers the refund proof
     // set complete: `all_required_operation_proofs` walks every leg.
@@ -797,7 +800,7 @@ fn real_x3vm_svm_timeout_refund_atomic_lifecycle() {
                 .refund(local_id)
                 .expect("explicit timeout refund after the automatic path did not fire");
             wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180))
-        },
+        }
     };
     assert!(matches!(
         intent_state_at(runtime_intent_id, &refund_head),

@@ -118,13 +118,15 @@ pub mod pallet {
     };
     use frame_system::offchain::SubmitTransaction;
     use frame_system::pallet_prelude::*;
+    use scale_info::prelude::string::String;
     use sp_core::{ed25519, ConstU32, H256};
     use sp_io::hashing::blake2_256;
     use sp_runtime::{SaturatedConversion, Saturating};
-    use scale_info::prelude::string::String;
     use sp_std::prelude::*;
     use sp_std::vec::Vec;
-    use x3_atomic_swap::{CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, VmType as ProofVmType};
+    use x3_atomic_swap::{
+        CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, VmType as ProofVmType,
+    };
 
     /// Current storage version
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -419,15 +421,8 @@ pub mod pallet {
     /// and are not retained in consensus storage.
     #[pallet::storage]
     #[pallet::getter(fn verified_cross_domain_proof)]
-    pub type VerifiedCrossDomainProofs<T: Config> = StorageDoubleMap<
-        _,
-        Blake2_128Concat,
-        H256,
-        Blake2_128Concat,
-        H256,
-        H256,
-        OptionQuery,
-    >;
+    pub type VerifiedCrossDomainProofs<T: Config> =
+        StorageDoubleMap<_, Blake2_128Concat, H256, Blake2_128Concat, H256, H256, OptionQuery>;
 
     /// Adaptor signatures: Maps intent_id → (maker, btc_adaptor_signature, message_digest)
     ///
@@ -1558,11 +1553,8 @@ pub mod pallet {
                     Self::bundle_matches_intent_domain(intent_id, bundle),
                     Error::<T>::CrossDomainProofDomainMismatch
                 );
-                let key = Self::proof_domain_key(
-                    &bundle.chain_id,
-                    bundle.vm_type,
-                    bundle.operation,
-                );
+                let key =
+                    Self::proof_domain_key(&bundle.chain_id, bundle.vm_type, bundle.operation);
                 let proof_hash = H256::from(bundle.proof_hash);
                 VerifiedCrossDomainProofs::<T>::insert(intent_id, key, proof_hash);
                 Self::deposit_event(Event::CrossDomainProofAccepted {
@@ -1576,7 +1568,10 @@ pub mod pallet {
             // proof set may now unlock finalization.
             let state = IntentStates::<T>::get(intent_id);
             if intent.legs_claimed >= intent.legs_total
-                && matches!(state, IntentState::Claiming | IntentState::ExecutingExternal)
+                && matches!(
+                    state,
+                    IntentState::Claiming | IntentState::ExecutingExternal
+                )
                 && Self::all_required_operation_proofs(
                     intent_id,
                     &intent,
@@ -2574,7 +2569,9 @@ pub mod pallet {
             match chain {
                 ExternalChainId::X3Native => ("x3-native".into(), ProofVmType::X3Vm),
                 ExternalChainId::Bitcoin => ("bitcoin-mainnet".into(), ProofVmType::BitcoinScript),
-                ExternalChainId::BitcoinTestnet => ("bitcoin-testnet".into(), ProofVmType::BitcoinScript),
+                ExternalChainId::BitcoinTestnet => {
+                    ("bitcoin-testnet".into(), ProofVmType::BitcoinScript)
+                }
                 ExternalChainId::Ethereum => ("ethereum-mainnet".into(), ProofVmType::Evm),
                 ExternalChainId::Arbitrum => ("arbitrum-one".into(), ProofVmType::Evm),
                 ExternalChainId::Base => ("base-mainnet".into(), ProofVmType::Evm),
@@ -2589,7 +2586,7 @@ pub mod pallet {
                     let mut key = String::from("evm:");
                     let _ = write!(key, "{id}");
                     (key, ProofVmType::Evm)
-                },
+                }
             }
         }
 
@@ -2604,10 +2601,7 @@ pub mod pallet {
             H256::from(blake2_256(&bytes))
         }
 
-        fn bundle_matches_intent_domain(
-            intent_id: H256,
-            bundle: &CrossDomainProofBundle,
-        ) -> bool {
+        fn bundle_matches_intent_domain(intent_id: H256, bundle: &CrossDomainProofBundle) -> bool {
             let Some(intent) = SettlementIntents::<T>::get(intent_id) else {
                 return false;
             };

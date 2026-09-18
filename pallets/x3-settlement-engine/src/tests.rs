@@ -295,7 +295,7 @@ fn atomic_lock_released_on_finalize() {
         }
 
         // Claim settlement: taker claims (marks leg 0 as claimed)
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -622,7 +622,7 @@ fn settlement_lifecycle_evm_to_evm() {
         ));
 
         // 4. Claim settlement: both parties reveal secret and claim
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -714,7 +714,7 @@ fn settlement_lifecycle_evm_to_solana() {
         ));
 
         // 4. Claim settlement
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1080,7 +1080,7 @@ fn settlement_state_transitions() {
         assert!(matches!(state4, IntentState::ExecutingExternal));
 
         // Claim first leg
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1533,7 +1533,7 @@ fn settlement_with_maximum_boundary_amounts() {
             proof,
         ));
 
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1615,7 +1615,7 @@ fn settlement_with_minimum_boundary_amounts() {
             proof,
         ));
 
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1708,7 +1708,7 @@ fn all_intent_state_transitions_valid() {
         assert!(matches!(state, IntentState::ExecutingExternal));
 
         // Transition: ExecutingExternal -> Claiming
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1795,7 +1795,7 @@ fn atomic_lock_all_phase_transitions() {
         ));
 
         // Claim settlements
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1990,7 +1990,7 @@ fn settlement_between_three_different_chains_complex() {
         ));
 
         // Claim settlements in reverse order (test order independence)
-            submit_canonical_claim_proof_set(intent_id);
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(maker),
             intent_id,
@@ -2823,7 +2823,6 @@ fn adaptor_swap_real_full_lifecycle() {
         assert!(replay.is_err(), "replay of final sig must be rejected");
     });
 }
-
 
 #[test]
 fn local_claims_do_not_finalize_without_cross_domain_proof_set() {

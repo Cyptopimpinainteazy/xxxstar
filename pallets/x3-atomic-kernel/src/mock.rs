@@ -56,7 +56,9 @@ impl EconomicHaltInspect for SwitchableEconomicHalt {
 /// and the flag is cleared on drop even if the test panics.
 #[allow(dead_code)]
 pub fn economy_open() -> EconomicHaltGuard {
-    let lock = HALT_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let lock = HALT_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     ECONOMIC_HALTED.store(false, Ordering::SeqCst);
     EconomicHaltGuard { _lock: lock }
 }

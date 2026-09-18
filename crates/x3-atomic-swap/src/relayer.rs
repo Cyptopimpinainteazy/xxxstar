@@ -14,9 +14,9 @@ use alloc::borrow::ToOwned;
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
-use alloc::format;
-#[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
+#[cfg(not(feature = "std"))]
+use alloc::format;
 use alloc::string::{String, ToString};
 #[cfg(not(feature = "std"))]
 use alloc::vec;

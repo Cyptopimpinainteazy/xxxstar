@@ -65,7 +65,8 @@ impl<S: X3ExtrinsicSigner> NativeX3NodeTransport<S> {
         let mut restored = BTreeMap::new();
         for record in &ledger.records {
             for entry in &record.entries {
-                if entry.proof_kind != crate::ledger::ProofKind::FinalityVerified || !entry.verified {
+                if entry.proof_kind != crate::ledger::ProofKind::FinalityVerified || !entry.verified
+                {
                     continue;
                 }
                 let tx_id = entry.tx_hash.as_ref().ok_or_else(|| {
@@ -157,7 +158,12 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
         intent: &AtomicIntent,
     ) -> Result<LockProof, SwapError> {
         let proof = self.inner.lock(chain_id, escrow_address, intent)?;
-        self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
+        self.remember_finality(
+            chain_id,
+            &proof.tx_id,
+            proof.block_number,
+            &proof.block_hash,
+        )?;
         if let Some(ledger) = &self.proof_ledger {
             ledger.record_lock(intent.intent_id, &proof)?;
         }
@@ -170,10 +176,13 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
         escrow_address: &[u8],
         permit: &SecretReleasePermit,
     ) -> Result<ClaimProof, SwapError> {
-        let proof = self
-            .inner
-            .claim(chain_id, escrow_address, permit)?;
-        self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
+        let proof = self.inner.claim(chain_id, escrow_address, permit)?;
+        self.remember_finality(
+            chain_id,
+            &proof.tx_id,
+            proof.block_number,
+            &proof.block_hash,
+        )?;
         if let Some(ledger) = &self.proof_ledger {
             ledger.record_claim(permit.intent_id(), &proof)?;
         }
@@ -187,7 +196,12 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for NativeX3NodeTransport<S> {
         intent_id: IntentId,
     ) -> Result<RefundProof, SwapError> {
         let proof = self.inner.refund(chain_id, escrow_address, intent_id)?;
-        self.remember_finality(chain_id, &proof.tx_id, proof.block_number, &proof.block_hash)?;
+        self.remember_finality(
+            chain_id,
+            &proof.tx_id,
+            proof.block_number,
+            &proof.block_hash,
+        )?;
         if let Some(ledger) = &self.proof_ledger {
             ledger.record_refund(intent_id, &proof)?;
         }
@@ -405,5 +419,4 @@ mod tests {
 
         let _ = std::fs::remove_file(path);
     }
-
 }

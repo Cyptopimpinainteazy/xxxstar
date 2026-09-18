@@ -5,9 +5,9 @@
 //! An explicit [`X3VmAdapterImpl::simulation`] constructor is provided only
 //! for offline dry-runs and tests; it must never be used as a production
 //! proof source.
+use alloc::format;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use alloc::format;
 use alloc::vec;
 
 use crate::adapter::{

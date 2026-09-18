@@ -1299,16 +1299,16 @@ pub mod pallet {
                     BundleRollbackReason::SubmitterCancelled => {
                         // 50% slash for submitter-cancelled
                         Perbill::from_percent(50) * bond
-                    },
+                    }
                     BundleRollbackReason::DeadlineExceeded => {
                         // 100% slash for deadline-exceeded
                         bond
-                    },
+                    }
                     BundleRollbackReason::ExecutionFailed
                     | BundleRollbackReason::AccessSetViolation => {
                         // 10% slash for execution failures / access violations
                         Perbill::from_percent(10) * bond
-                    },
+                    }
                 };
 
                 // Release the entire bond from reserve *before* slashing.
