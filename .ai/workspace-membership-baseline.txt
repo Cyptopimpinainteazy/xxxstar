@@ -20,11 +20,6 @@ pallet-x3-control
 pallet-x3-governance
 swarm-media
 voice-to-x3
-x3-appzone-factory
-x3-atomic-client
-x3-bench
-x3-bot
-x3-canonical-truth
 x3-chain-onboarding
 x3-dns-server
 x3-evolution-core

@@ -54,19 +54,10 @@ pub enum VmType {
 }
 
 /// Declared access set for parallel scheduling.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Encode, Decode, DecodeWithMemTracking)]
 pub struct DeclaredAccess {
     pub reads: Vec<H256>,
     pub writes: Vec<H256>,
-}
-
-impl Default for DeclaredAccess {
-    fn default() -> Self {
-        Self {
-            reads: Vec::new(),
-            writes: Vec::new(),
-        }
-    }
 }
 
 /// A single leg in an atomic bundle.
@@ -178,6 +169,9 @@ impl AtomicBundleBuilder {
     }
 
     /// Add a leg with explicit access declarations (required for parallel execution).
+    // The nine parameters mirror the on-chain `BundleLeg` shape; grouping them
+    // into a struct here would be an API change for every caller.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_leg_with_access(
         mut self,
         vm_type: VmType,
