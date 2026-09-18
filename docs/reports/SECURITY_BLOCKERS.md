@@ -50,3 +50,62 @@
 3. **P0:** Replace `panic!()` in `on_initialize` with graceful error handling
 4. **P1:** Audit top 100 `unwrap()` calls in node boot and block production paths
 5. **P1:** Replace `unwrap()` with proper error propagation in runtime initialization
+
+---
+
+## Status update — 2026-09-18
+
+Findings 1 and 5 above (stub verifiers, missing feature gates) were the same root
+cause and are resolved in behaviour, not documentation:
+
+| finding | status | evidence |
+| --- | --- | --- |
+| 1 — stub verifiers accept any proof (CRITICAL) | **resolved** | see below |
+| 5 — verification router not feature-gated | **superseded** | fail-closed default; permissive path requires a feature that cannot coexist with `production` (compile-time guard) |
+| 2 — `MockChainAdapter` not feature-gated (CRITICAL) | **unchanged** | still compiles in all builds |
+| 3 / 4 — `unwrap()` / `panic!()` counts (HIGH) | **unchanged** | 3,078 / 104 at last count |
+
+**Finding 1, per strategy:**
+
+- `EvmReceiptVerifier`, `ValidatorQuorumVerifier`, `SolanaFinalizedVerifier` — the
+  permissive behaviour is gone (#265). They return
+  `VerificationError::NotImplemented` unless the `test-verifier` feature is
+  enabled, and `test-verifier + production` is a `compile_error!`. The real EVM
+  verifier (`evm_receipt::ProductionEvmReceiptVerifier`) was already implemented.
+- `SolanaFinalizedVerifier` — now performs real verification (#268): Ed25519
+  attestations over `BLAKE2b-256(slot_le || blockhash)`, restricted to a
+  governance-controlled validator set with a per-chain threshold (#271). With no
+  set installed it refuses every proof, in every feature configuration.
+- `BitcoinSpvVerifier` — was never a stub: it checks header-chain linkage
+  (`sha256d`), the merkle proof against the last header's root, and the
+  confirmation count. What it did *not* do was enforce the vault-signer policy it
+  documented; those fields are removed (see below).
+- `X3InternalVerifier` — an internal-only pass-through by design (the kernel is
+  the proof for X3-internal transfers); it is registered only for
+  `VerificationStrategy::X3Internal`.
+
+The repository's own acceptance test for this finding,
+`audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/audit-harness/proof`
+(which builds the router with `features = ["production"]`), **failed 3/3 before
+these changes and passes 3/3 now**.
+
+**Finding 5 is superseded rather than implemented as written.** The strategies
+are not gated behind a new `external-gateway` feature; instead the stubs fail
+closed by default, so a governance call that enables `ExternalBridgesEnabled` no
+longer exposes an accept-anything path. `test-verifier` exists for plumbing tests
+and cannot be combined with `production`.
+
+**#267 — `BitcoinSpvVerifier`'s `vault_threshold` / `vault_total_signers`**
+claimed that SPV-verified deposits must be backed by that many vault signers and
+were never read. They have been removed. Counting approvals would not have made
+the claim true: `BtcVault::add_signer_approval` stores signature bytes **without
+verifying them**.
+
+**New finding (#272, HIGH)** — `BtcVault::add_signer_approval` accepts
+`(signer_pubkey, signature)` for any signer in `config.signers` and increments the
+approval count without verifying the signature; at `threshold` approvals the
+deposit becomes `Approved`. Today `BtcVault` has no consumers outside its own
+crate, and the verification router no longer claims a vault-signer policy, but
+the API invites treating stored approvals as consent. The method signature now
+names the parameter `unverified_signature_bytes` and the docs state the
+requirement; a real scheme (canonical message + verification) is tracked in #272.

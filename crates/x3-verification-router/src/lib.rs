@@ -679,45 +679,44 @@ fn verify_btc_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]
 // `x3-bitcoin-vault` crate to a real compiled consumer of the production
 // Bitcoin SPV path used by `pallet_x3_crosschain_gateway`.
 
+/// Verifies Bitcoin SPV proofs: header-chain linkage (`sha256d`), the merkle
+/// proof against the last header's merkle root, and the confirmation count.
+///
+/// **Vault signer approvals are not verified.** An earlier version carried
+/// `vault_threshold` / `vault_total_signers` and documented that SPV-verified
+/// deposits must be backed by that many vault signers — but `verify` never read
+/// those fields, so the policy only looked enforced. They were **removed**
+/// rather than "enforced" by counting approvals, because
+/// `BtcVault::add_signer_approval` stores signer signature bytes *without
+/// verifying them* (issue #272), so counting them would prove nothing.
+///
+/// Deposits are therefore credited on the SPV proof plus confirmations. If
+/// vault-signer authorization is wanted, it needs a signed message format and a
+/// payload extension — exactly what the Solana path got in
+/// `SOLANA_FINALIZED_FORMAT_V1`.
 pub struct BitcoinSpvVerifier {
     pub min_confirmations: u64,
-    /// Signer threshold required for vault withdrawals. SPV-verified deposits
-    /// must be backed by at least this many vault signers (enforced via
-    /// `BtcVaultConfig::signers`). `0` disables the check (e.g. SPV-only
-    /// flows that don't go through the vault).
-    pub vault_threshold: u32,
-    /// Total signers authorized on the vault. Used together with
-    /// `vault_threshold` to derive the minimum signer-acknowledgement
-    /// count a SPV-verified deposit must carry.
-    pub vault_total_signers: u32,
 }
 
 impl BitcoinSpvVerifier {
-    /// Default constructor: uses `x3-bitcoin-vault` constants for confirmations
-    /// and the default (threshold, total) signer set. Prefer this over
-    /// `BitcoinSpvVerifier::new(6)` so confirmation policy stays centralized.
+    /// Default constructor: takes the confirmation policy from
+    /// `x3-bitcoin-vault`. Prefer this over `BitcoinSpvVerifier::new(6)` so the
+    /// confirmation policy stays centralized.
     pub fn from_vault_defaults() -> Self {
         Self {
             min_confirmations: x3_bitcoin_vault::MIN_BITCOIN_CONFIRMATIONS,
-            vault_threshold: x3_bitcoin_vault::DEFAULT_THRESHOLD,
-            vault_total_signers: x3_bitcoin_vault::DEFAULT_TOTAL_SIGNERS,
         }
     }
 
     pub fn new(min_confirmations: u64) -> Self {
-        Self {
-            min_confirmations,
-            vault_threshold: 0,
-            vault_total_signers: 0,
-        }
+        Self { min_confirmations }
     }
 
-    /// Configure from an explicit vault config (recommended for production
-    /// gateways — keeps the verifier in lock-step with the vault signer set).
+    /// Adopt the vault's confirmation policy. The vault's signer set is *not*
+    /// adopted, because this verifier cannot check signer approvals (see the
+    /// type docs and issue #272).
     pub fn with_vault_config(mut self, config: &x3_bitcoin_vault::BtcVaultConfig) -> Self {
         self.min_confirmations = config.min_confirmations;
-        self.vault_threshold = config.threshold;
-        self.vault_total_signers = config.signers.len() as u32;
         self
     }
 }
@@ -965,6 +964,34 @@ mod tests {
         proof.payload = payload;
         let outcome = router.route(&proof).expect("should verify");
         assert!(outcome.accepted);
+    }
+
+    #[test]
+    fn bitcoin_spv_below_confirmation_threshold_rejected() {
+        // Same proof as `bitcoin_spv_works` (chain tip 200, tx at index 100 →
+        // 101 confirmations) but a verifier that demands more than the chain has.
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(BitcoinSpvVerifier::new(102)));
+
+        let mut proof = dummy_proof(VerificationStrategy::BitcoinSpvProof);
+        proof.source_chain = ChainKind::Bitcoin;
+
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&200u64.to_le_bytes());
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        let mut header = [0u8; 80];
+        header[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
+        header[76..80].copy_from_slice(&2561u32.to_le_bytes());
+        payload.extend_from_slice(&header);
+        payload.extend_from_slice(&100u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&[0u8; 32]);
+        proof.payload = payload;
+
+        assert!(matches!(
+            router.route(&proof),
+            Err(VerificationError::MalformedProof)
+        ));
     }
 
     #[test]

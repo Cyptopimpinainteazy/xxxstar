@@ -11047,6 +11047,7 @@ dependencies = [
 name = "pallet-x3-crosschain-gateway"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek 2.2.0",
  "frame-support",
  "frame-system",
  "log",
