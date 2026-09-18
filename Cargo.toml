@@ -215,6 +215,12 @@ members = [
     "crates/x3-constitution",
     "crates/private-mempool",
     "crates/x3-cli",
+    # Burn-down batch 2 (issue #274).
+    "crates/x3-appzone-factory",
+    "crates/x3-atomic-client",
+    "crates/x3-bench",
+    "crates/x3-bot",
+    "crates/x3-canonical-truth",
 ]
 default-members = ["node"]
 resolver = "2"

@@ -3,7 +3,7 @@
 //! Coverage:
 //!   - SCALE encode/decode round-trips for each major type (tests 1–9).
 //!   - Serde JSON serialize/deserialize round-trips for representative types
-//!     that contain no `u128` fields, avoiding serde_json's arbitrary-precision
+//!     that contain no `u128` fields, avoiding `serde_json`'s arbitrary-precision
 //!     requirement (tests 10–12).
 //!   - Semantic correctness checks: identity hash stability, supply arithmetic,
 //!     and treasury snapshot field summation (tests 13–15).
@@ -13,6 +13,9 @@ use codec::{Decode, Encode};
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
+// Test helper: taking the value by value keeps the call sites readable, and the
+// types it is used with are cheap to move.
+#[allow(clippy::needless_pass_by_value)]
 fn scale_roundtrip<T>(value: T)
 where
     T: Encode + Decode + PartialEq + core::fmt::Debug,

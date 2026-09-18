@@ -1,0 +1,8 @@
+[[pallets]]
+name = "system"
+path = "pallets/system"
+
+[[pallets]]
+name = "balances"
+path = "pallets/balances"
+

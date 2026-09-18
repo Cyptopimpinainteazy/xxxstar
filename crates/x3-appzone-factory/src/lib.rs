@@ -59,6 +59,13 @@ pub struct AppZoneFactory {
     templates_dir: String,
 }
 
+impl Default for AppZoneFactory {
+    /// The built-in `templates/` directory, identical to [`AppZoneFactory::new`].
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AppZoneFactory {
     /// Create new factory instance
     pub fn new() -> Self {
@@ -92,7 +99,7 @@ impl AppZoneFactory {
         }
 
         // Copy template files
-        self.copy_template_files(&template_path, &app_dir)?;
+        Self::copy_template_files(&template_path, &app_dir)?;
 
         // Initialize the app zone
         self.initialize_app_zone(&app_dir, name)?;
@@ -223,11 +230,8 @@ impl AppZoneFactory {
     }
 
     // Private helper methods
-    fn copy_template_files(
-        &self,
-        template_path: &Path,
-        target_path: &Path,
-    ) -> Result<(), AppZoneError> {
+    /// Associated (not method) so the recursion does not carry an unused `&self`.
+    fn copy_template_files(template_path: &Path, target_path: &Path) -> Result<(), AppZoneError> {
         // Recursively copy template directory
         fs::create_dir_all(target_path)?;
 
@@ -243,7 +247,7 @@ impl AppZoneFactory {
             let target_file = target_path.join(file_name);
 
             if entry_path.is_dir() {
-                self.copy_template_files(&entry_path, &target_file)?;
+                Self::copy_template_files(&entry_path, &target_file)?;
             } else {
                 fs::copy(&entry_path, &target_file)?;
             }
@@ -261,18 +265,18 @@ impl AppZoneFactory {
 
         // Initialize git repository
         Command::new("git")
-            .args(&["init"])
+            .args(["init"])
             .current_dir(app_dir)
             .output()?;
 
         // Create initial commit
         Command::new("git")
-            .args(&["add", "."])
+            .args(["add", "."])
             .current_dir(app_dir)
             .output()?;
 
         Command::new("git")
-            .args(&["commit", "-m", "Initial app zone creation"])
+            .args(["commit", "-m", "Initial app zone creation"])
             .current_dir(app_dir)
             .output()?;
 
@@ -283,7 +287,7 @@ impl AppZoneFactory {
         println!("Building app zone...");
 
         let output = Command::new("cargo")
-            .args(&["build", "--release"])
+            .args(["build", "--release"])
             .current_dir(app_dir)
             .output()?;
 
@@ -357,9 +361,11 @@ impl AppZoneFactory {
         let cargo_content = fs::read_to_string(&cargo_path)?;
 
         // Update framework dependencies to latest versions
-        let updated = cargo_content
-            .replace("x3-framework = \"0.1.0\"", "x3-framework = \"0.4.0\"")
-            .replace("substrate = \"4.0\"", "substrate = \"4.0\"");
+        let updated = cargo_content.replace("x3-framework = \"0.1.0\"", "x3-framework = \"0.4.0\"");
+        // A second `.replace("substrate = \"4.0\"", "substrate = \"4.0\"")` used to
+        // sit here: it rewrote the string with itself, so it never did anything.
+        // Bumping that dependency needs the version the release actually targets;
+        // inventing one here would silently change generated zones.
 
         fs::write(&cargo_path, updated)?;
         Ok(())
@@ -373,7 +379,7 @@ impl AppZoneFactory {
 
     fn run_tests(&self, app_dir: &Path) -> Result<(), AppZoneError> {
         let output = Command::new("cargo")
-            .args(&["test"])
+            .args(["test"])
             .current_dir(app_dir)
             .output()?;
 
@@ -505,6 +511,38 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    /// Writes the `src/lib.rs` a fixture app zone needs, creating `src/` first.
+    /// The fixtures used to assume the directory already existed, so these tests
+    /// failed the first time they were ever run (issue #274).
+    fn write_src_lib(root: &std::path::Path) {
+        fs::create_dir_all(root.join("src")).expect("create src dir");
+        fs::write(root.join("src/lib.rs"), "// test").expect("write src/lib.rs");
+    }
+
+    /// Minimal app zone that satisfies `validate_app_zone`: the four required
+    /// files, with `app-config.toml` / `pallets.toml` written to match the
+    /// `AppConfig` / `PalletsConfig` structs. The older fixtures used `[app]`
+    /// and `[pallets]` tables, which those structs do not parse, so the
+    /// validation test failed the first time it ran (issue #274).
+    fn write_app_zone_fixture(root: &std::path::Path, name: &str) {
+        fs::write(
+            root.join("Cargo.toml"),
+            format!("[package]\nname = \"{name}\""),
+        )
+        .expect("write Cargo.toml");
+        write_src_lib(root);
+        fs::write(
+            root.join("app-config.toml"),
+            format!("name = \"{name}\"\npallets = [\"system\"]\n"),
+        )
+        .expect("write app-config.toml");
+        fs::write(
+            root.join("pallets.toml"),
+            "[[pallets]]\nname = \"system\"\npath = \"pallets/system\"\n",
+        )
+        .expect("write pallets.toml");
+    }
+
     #[test]
     fn test_factory_creation() {
         let factory = AppZoneFactory::new();
@@ -577,18 +615,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create valid app zone structure
-        fs::write(
-            temp_dir.path().join("Cargo.toml"),
-            "[package]\nname = \"test\"",
-        )
-        .unwrap();
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
-        fs::write(
-            temp_dir.path().join("app-config.toml"),
-            "[app]\nname = \"test\"",
-        )
-        .unwrap();
-        fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
+        write_app_zone_fixture(temp_dir.path(), "test");
 
         let result = factory.validate_app_zone(temp_dir.path());
         assert!(result.is_ok());
@@ -599,7 +626,7 @@ mod tests {
         let factory = AppZoneFactory::new();
         let temp_dir = TempDir::new().unwrap();
 
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+        write_src_lib(temp_dir.path());
         fs::write(
             temp_dir.path().join("app-config.toml"),
             "[app]\nname = \"test\"",
@@ -618,7 +645,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         fs::write(temp_dir.path().join("Cargo.toml"), "invalid toml").unwrap();
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+        write_src_lib(temp_dir.path());
         fs::write(
             temp_dir.path().join("app-config.toml"),
             "[app]\nname = \"test\"",
@@ -644,7 +671,7 @@ mod tests {
             "[package]\nname = \"test\"",
         )
         .unwrap();
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+        write_src_lib(temp_dir.path());
         fs::write(temp_dir.path().join("app-config.toml"), "invalid toml").unwrap();
         fs::write(temp_dir.path().join("pallets.toml"), "[pallets]").unwrap();
 
@@ -673,6 +700,8 @@ mod tests {
     fn test_deploy_config_creation() {
         let factory = AppZoneFactory::new();
         let temp_dir = TempDir::new().unwrap();
+        // `generate_deploy_config` reads the zone's `app-config.toml`.
+        write_app_zone_fixture(temp_dir.path(), "test");
 
         let config = factory
             .generate_deploy_config(temp_dir.path(), "testnet")
@@ -708,7 +737,7 @@ mod tests {
             "[package]\nname = \"test\"",
         )
         .unwrap();
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+        write_src_lib(temp_dir.path());
         fs::write(
             temp_dir.path().join("app-config.toml"),
             "[app]\nname = \"test\"",
@@ -740,7 +769,7 @@ mod tests {
             "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"",
         )
         .unwrap();
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+        write_src_lib(temp_dir.path());
 
         // This test might fail if cargo is not available, so we'll mock it
         let result = factory.run_tests(temp_dir.path());
@@ -760,7 +789,7 @@ mod tests {
             "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"",
         )
         .unwrap();
-        fs::write(temp_dir.path().join("src/lib.rs"), "// test").unwrap();
+        write_src_lib(temp_dir.path());
 
         let result = factory.build_app_zone(temp_dir.path());
         // This will fail in test environment without full cargo setup
