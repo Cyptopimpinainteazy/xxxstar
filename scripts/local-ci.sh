@@ -127,7 +127,14 @@ GATES_FAST=(
   # genesis), which the node then rejected at boot. runtime/build.rs now refuses a
   # cache built for another feature set, so this gate has to build it.
   "test node:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node"
-  "test cross-vm-coordinator:cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+  # This crate is deliberately outside the workspace (its own lockfile, its own
+  # dependency graph), so without `--offline --locked` cargo re-resolves against
+  # crates.io/github every run and the gate reports BLOCKED whenever the network
+  # is unavailable. `crates/cross-vm-coordinator/Cargo.lock` is committed for
+  # exactly this reason: `cargo fetch --locked --manifest-path ...` once, then
+  # this gate is deterministic and offline. If the cache is ever cold the gate
+  # still fails loudly rather than passing quietly.
+  "test cross-vm-coordinator:cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
 )
 
 # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).

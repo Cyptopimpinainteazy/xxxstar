@@ -34,4 +34,7 @@ jobs:
           toolchain: 1.90.0
 
       - name: Test coordinator + Valkey + canonical proofs
-        run: cargo test --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey,canonical-proofs -- --nocapture
+        # `--locked` uses the crate's committed Cargo.lock: this crate sits
+        # outside the workspace, so without it cargo re-resolves its own graph
+        # on every run and a dependency bump can change the build silently.
+        run: cargo test --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml --features valkey,canonical-proofs -- --nocapture
