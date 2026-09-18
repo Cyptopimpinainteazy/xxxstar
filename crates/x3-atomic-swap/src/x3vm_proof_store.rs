@@ -23,8 +23,9 @@ impl PersistentX3ProofLedger {
     pub fn open(path: impl Into<PathBuf>) -> Result<Self, SwapError> {
         let path = path.into();
         let ledger = if path.exists() {
-            let bytes = fs::read(&path)
-                .map_err(|e| SwapError::Internal(format!("read X3 proof ledger {}: {e}", path.display())))?;
+            let bytes = fs::read(&path).map_err(|e| {
+                SwapError::Internal(format!("read X3 proof ledger {}: {e}", path.display()))
+            })?;
             if bytes.is_empty() {
                 ProofLedger::new()
             } else {
@@ -104,9 +105,11 @@ impl PersistentX3ProofLedger {
         }
         let record_id = match ledger.get_latest_for_intent(intent_id) {
             Some(record) => record.record_id,
-            None => ledger
-                .create_record(intent_id, "x3-native".into(), timestamp)
-                .record_id,
+            None => {
+                ledger
+                    .create_record(intent_id, "x3-native".into(), timestamp)
+                    .record_id
+            }
         };
 
         let proof_id = ledger
@@ -114,23 +117,18 @@ impl PersistentX3ProofLedger {
             .iter()
             .map(|record| record.entries.len() as u64)
             .sum::<u64>();
-        let entry = ProofEntry::new(
-            proof_id,
-            intent_id,
-            kind,
-            ChainKind::X3,
-            timestamp,
-            0,
-        )
-        .with_tx_hash(tx_id.to_string())
-        .with_block(block_number)
-        .mark_verified();
+        let entry = ProofEntry::new(proof_id, intent_id, kind, ChainKind::X3, timestamp, 0)
+            .with_tx_hash(tx_id.to_string())
+            .with_block(block_number)
+            .mark_verified();
 
         let record = ledger
             .get_record_mut(record_id)
             .ok_or_else(|| SwapError::Internal("X3 proof ledger record disappeared".into()))?;
         match kind {
-            ProofKind::SourceLock => record.record_source_lock(tx_id.to_string(), block_number, timestamp),
+            ProofKind::SourceLock => {
+                record.record_source_lock(tx_id.to_string(), block_number, timestamp)
+            }
             ProofKind::Claim => record.record_claim(tx_id.to_string(), block_number, timestamp),
             ProofKind::Refund => record.record_refund(tx_id.to_string(), block_number, timestamp),
             _ => {}
@@ -166,7 +164,10 @@ impl PersistentX3ProofLedger {
     fn persist_atomic(path: &Path, ledger: &ProofLedger) -> Result<(), SwapError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
-                SwapError::Internal(format!("create X3 proof ledger dir {}: {e}", parent.display()))
+                SwapError::Internal(format!(
+                    "create X3 proof ledger dir {}: {e}",
+                    parent.display()
+                ))
             })?;
         }
         let tmp = path.with_extension("tmp");
@@ -174,7 +175,10 @@ impl PersistentX3ProofLedger {
             .map_err(|e| SwapError::Internal(format!("encode X3 proof ledger: {e}")))?;
         {
             let mut file = File::create(&tmp).map_err(|e| {
-                SwapError::Internal(format!("create X3 proof ledger temp {}: {e}", tmp.display()))
+                SwapError::Internal(format!(
+                    "create X3 proof ledger temp {}: {e}",
+                    tmp.display()
+                ))
             })?;
             file.write_all(&bytes).map_err(|e| {
                 SwapError::Internal(format!("write X3 proof ledger temp {}: {e}", tmp.display()))
@@ -199,7 +203,10 @@ mod tests {
         let path = std::env::temp_dir().join(format!(
             "x3-proof-ledger-{}-{}.json",
             std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let store = PersistentX3ProofLedger::open(&path).unwrap();
         let proof = LockProof {

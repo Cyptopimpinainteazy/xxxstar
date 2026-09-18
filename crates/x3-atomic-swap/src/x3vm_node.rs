@@ -153,7 +153,9 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         let tx_id = resp
             .result
             .and_then(|v| v.as_str().map(ToString::to_string))
-            .ok_or_else(|| SwapError::RpcError("author_submitExtrinsic returned no tx hash".into()))?;
+            .ok_or_else(|| {
+                SwapError::RpcError("author_submitExtrinsic returned no tx hash".into())
+            })?;
         if tx_id.is_empty() {
             return Err(SwapError::RpcError(
                 "author_submitExtrinsic returned empty tx hash".into(),
@@ -194,9 +196,8 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
             .as_str()
             .ok_or_else(|| SwapError::RpcError(alloc::format!("{} is not a hex string", field)))?;
         let stripped = raw.strip_prefix("0x").unwrap_or(raw);
-        u64::from_str_radix(stripped, 16).map_err(|e| {
-            SwapError::RpcError(alloc::format!("invalid {} '{}': {}", field, raw, e))
-        })
+        u64::from_str_radix(stripped, 16)
+            .map_err(|e| SwapError::RpcError(alloc::format!("invalid {} '{}': {}", field, raw, e)))
     }
 
     fn finalized_head_number(&self) -> Result<u64, SwapError> {
@@ -216,11 +217,10 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
 
     fn block_hash_at(&self, number: u64) -> Result<Option<String>, SwapError> {
         let mut rpc = self.rpc_lock()?;
-        let resp = rpc.call(
-            "chain_getBlockHash",
-            vec![Value::Number(number.into())],
-        )?;
-        Ok(resp.result.and_then(|v| v.as_str().map(ToString::to_string)))
+        let resp = rpc.call("chain_getBlockHash", vec![Value::Number(number.into())])?;
+        Ok(resp
+            .result
+            .and_then(|v| v.as_str().map(ToString::to_string)))
     }
 
     fn inclusion_at_block(
@@ -285,9 +285,7 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
                             number
                         ))
                     })?;
-                    if let Some(proof) =
-                        self.inclusion_at_block(tx_id, signed_extrinsic, &hash)?
-                    {
+                    if let Some(proof) = self.inclusion_at_block(tx_id, signed_extrinsic, &hash)? {
                         return Ok(proof);
                     }
                 }
@@ -314,7 +312,12 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
             .map_err(|e| SwapError::RpcError(alloc::format!("decode X3 inclusion proof: {}", e)))
     }
 
-    fn verify_inclusion(&self, tx_id: &str, block_hash: &str, raw: &[u8]) -> Result<bool, SwapError> {
+    fn verify_inclusion(
+        &self,
+        tx_id: &str,
+        block_hash: &str,
+        raw: &[u8],
+    ) -> Result<bool, SwapError> {
         let proof = Self::decode_inclusion(raw)?;
         if proof.tx_id != tx_id || proof.block_hash != block_hash {
             return Ok(false);
@@ -354,7 +357,6 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         Ok(proof.block_number <= finalized_number)
     }
 
-
     pub(crate) fn revalidate_finalized_inclusion(
         &self,
         proof: &X3FinalizedInclusionProof,
@@ -382,7 +384,9 @@ impl<S: X3ExtrinsicSigner> X3NodeTransport<S> {
         let latest_header = rpc
             .call("chain_getHeader", Vec::new())?
             .result
-            .ok_or_else(|| SwapError::RpcError("latest chain_getHeader returned no header".into()))?;
+            .ok_or_else(|| {
+                SwapError::RpcError("latest chain_getHeader returned no header".into())
+            })?;
         let latest = Self::parse_hex_u64(
             latest_header
                 .get("number")
@@ -514,7 +518,11 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
             .and_then(Value::as_str)
             .ok_or_else(|| SwapError::RpcError("payment_queryInfo missing partialFee".into()))?;
         let native_fee = partial_fee.parse::<u128>().map_err(|e| {
-            SwapError::RpcError(alloc::format!("invalid partialFee '{}': {}", partial_fee, e))
+            SwapError::RpcError(alloc::format!(
+                "invalid partialFee '{}': {}",
+                partial_fee,
+                e
+            ))
         })?;
         let weight = info
             .pointer("/weight/refTime")
@@ -562,15 +570,15 @@ impl<S: X3ExtrinsicSigner> X3VmLiveTransport for X3NodeTransport<S> {
         self.require_chain(chain_id)?;
         let (latest, finalized) = self.latest_header_numbers()?;
         let mut rpc = self.rpc_lock()?;
-        let health = rpc.call("system_health", Vec::new())?.result.unwrap_or_else(|| json!({}));
+        let health = rpc
+            .call("system_health", Vec::new())?
+            .result
+            .unwrap_or_else(|| json!({}));
         let syncing = health
             .get("isSyncing")
             .and_then(Value::as_bool)
             .unwrap_or(true);
-        let peers = health
-            .get("peers")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
+        let peers = health.get("peers").and_then(Value::as_u64).unwrap_or(0);
         let lag = latest.saturating_sub(finalized);
         let degraded = syncing || lag > 8;
         Ok(ChainHealth {

@@ -61,11 +61,8 @@ pub trait X3VmLiveTransport: Send + Sync + Debug {
         intent: &AtomicIntent,
     ) -> Result<FeeEstimate, SwapError>;
 
-    fn finality_status(
-        &self,
-        chain_id: &ChainId,
-        tx_id: &TxId,
-    ) -> Result<FinalityProof, SwapError>;
+    fn finality_status(&self, chain_id: &ChainId, tx_id: &TxId)
+        -> Result<FinalityProof, SwapError>;
 
     fn chain_health(&self, chain_id: &ChainId) -> Result<ChainHealth, SwapError>;
 
@@ -110,10 +107,7 @@ impl<T: X3VmLiveTransport> LiveX3VmAdapter<T> {
     ///
     /// The permit type has no public constructor and its fields are private, so
     /// callers cannot manufacture authority by passing an arbitrary preimage.
-    pub fn claim_with_permit(
-        &self,
-        permit: &SecretReleasePermit,
-    ) -> Result<ClaimProof, SwapError> {
+    pub fn claim_with_permit(&self, permit: &SecretReleasePermit) -> Result<ClaimProof, SwapError> {
         let intent_id = permit.intent_id();
         let preimage = permit.preimage();
         let proof = self
@@ -653,7 +647,9 @@ mod tests {
         let claim = adapter
             .claim_with_permit(&permit)
             .expect("permitted live claim");
-        let refund = adapter.refund(intent.intent_id).expect("live refund delegation");
+        let refund = adapter
+            .refund(intent.intent_id)
+            .expect("live refund delegation");
         assert!(adapter.verify_lock(&lock).expect("verify lock"));
         assert!(adapter.verify_claim(&claim).expect("verify claim"));
         assert!(adapter.verify_refund(&refund).expect("verify refund"));
@@ -667,7 +663,10 @@ mod tests {
         assert_eq!(counts.fee.load(Ordering::SeqCst), 1);
         assert_eq!(counts.finality.load(Ordering::SeqCst), 1);
         assert_eq!(counts.health.load(Ordering::SeqCst), 1);
-        assert!(adapter.is_simulated(), "production gate stays fail-closed in Task 1");
+        assert!(
+            adapter.is_simulated(),
+            "production gate stays fail-closed in Task 1"
+        );
     }
 
     #[test]
@@ -696,20 +695,58 @@ mod tests {
         struct EmptyProofTransport(RecordingTransport);
 
         impl X3VmLiveTransport for EmptyProofTransport {
-            fn lock(&self, c: &ChainId, e: &[u8], i: &AtomicIntent) -> Result<LockProof, SwapError> {
+            fn lock(
+                &self,
+                c: &ChainId,
+                e: &[u8],
+                i: &AtomicIntent,
+            ) -> Result<LockProof, SwapError> {
                 let mut proof = self.0.lock(c, e, i)?;
                 proof.raw_proof.clear();
                 Ok(proof)
             }
-            fn claim(&self, c: &ChainId, e: &[u8], permit: &SecretReleasePermit) -> Result<ClaimProof, SwapError> { self.0.claim(c, e, permit) }
-            fn refund(&self, c: &ChainId, e: &[u8], id: IntentId) -> Result<RefundProof, SwapError> { self.0.refund(c, e, id) }
-            fn verify_lock(&self, p: &LockProof) -> Result<bool, SwapError> { self.0.verify_lock(p) }
-            fn verify_claim(&self, p: &ClaimProof) -> Result<bool, SwapError> { self.0.verify_claim(p) }
-            fn verify_refund(&self, p: &RefundProof) -> Result<bool, SwapError> { self.0.verify_refund(p) }
-            fn estimate_fee(&self, c: &ChainId, e: &[u8], i: &AtomicIntent) -> Result<FeeEstimate, SwapError> { self.0.estimate_fee(c, e, i) }
-            fn finality_status(&self, c: &ChainId, tx: &TxId) -> Result<FinalityProof, SwapError> { self.0.finality_status(c, tx) }
-            fn chain_health(&self, c: &ChainId) -> Result<ChainHealth, SwapError> { self.0.chain_health(c) }
-            fn readiness_score(&self) -> AdapterReadinessScore { self.0.readiness_score() }
+            fn claim(
+                &self,
+                c: &ChainId,
+                e: &[u8],
+                permit: &SecretReleasePermit,
+            ) -> Result<ClaimProof, SwapError> {
+                self.0.claim(c, e, permit)
+            }
+            fn refund(
+                &self,
+                c: &ChainId,
+                e: &[u8],
+                id: IntentId,
+            ) -> Result<RefundProof, SwapError> {
+                self.0.refund(c, e, id)
+            }
+            fn verify_lock(&self, p: &LockProof) -> Result<bool, SwapError> {
+                self.0.verify_lock(p)
+            }
+            fn verify_claim(&self, p: &ClaimProof) -> Result<bool, SwapError> {
+                self.0.verify_claim(p)
+            }
+            fn verify_refund(&self, p: &RefundProof) -> Result<bool, SwapError> {
+                self.0.verify_refund(p)
+            }
+            fn estimate_fee(
+                &self,
+                c: &ChainId,
+                e: &[u8],
+                i: &AtomicIntent,
+            ) -> Result<FeeEstimate, SwapError> {
+                self.0.estimate_fee(c, e, i)
+            }
+            fn finality_status(&self, c: &ChainId, tx: &TxId) -> Result<FinalityProof, SwapError> {
+                self.0.finality_status(c, tx)
+            }
+            fn chain_health(&self, c: &ChainId) -> Result<ChainHealth, SwapError> {
+                self.0.chain_health(c)
+            }
+            fn readiness_score(&self) -> AdapterReadinessScore {
+                self.0.readiness_score()
+            }
         }
 
         let transport = EmptyProofTransport(RecordingTransport::good("x3-local"));

@@ -94,13 +94,10 @@ fn header_number(rpc: &mut RpcClient, hash: &str) -> u64 {
 }
 
 fn block_hash_at(rpc: &mut RpcClient, number: u64) -> Option<String> {
-    rpc.call(
-        "chain_getBlockHash",
-        vec![Value::Number(number.into())],
-    )
-    .expect("block hash")
-    .result
-    .and_then(|v| v.as_str().map(ToOwned::to_owned))
+    rpc.call("chain_getBlockHash", vec![Value::Number(number.into())])
+        .expect("block hash")
+        .result
+        .and_then(|v| v.as_str().map(ToOwned::to_owned))
 }
 
 fn block_contains(rpc: &mut RpcClient, hash: &str, signed: &str) -> bool {
@@ -185,7 +182,8 @@ fn finalized_head() -> String {
 }
 
 fn intent_state_storage_key(intent_id: H256) -> String {
-    let mut key = frame_support::storage::storage_prefix(b"X3SettlementEngine", b"IntentStates").to_vec();
+    let mut key =
+        frame_support::storage::storage_prefix(b"X3SettlementEngine", b"IntentStates").to_vec();
     let encoded = intent_id.encode();
     key.extend_from_slice(&sp_core::hashing::blake2_128(&encoded));
     key.extend_from_slice(&encoded);
@@ -277,7 +275,10 @@ fn proof_ledger_path(label: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!(
         "x3-live-{label}-{}-{}.json",
         std::process::id(),
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
     ))
 }
 
@@ -317,9 +318,7 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         .expect("resolve real on-chain intent id");
 
     primary.bind_intent(local_id, runtime_intent_id).unwrap();
-    second_leg
-        .bind_intent(local_id, runtime_intent_id)
-        .unwrap();
+    second_leg.bind_intent(local_id, runtime_intent_id).unwrap();
 
     let ledger_path = proof_ledger_path("claim");
     let transport = NativeX3NodeTransport::new_with_proof_ledger(
@@ -334,11 +333,7 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         ledger_path.clone(),
     )
     .expect("persistent native transport");
-    let adapter = LiveX3VmAdapter::new(
-        chain_id.clone(),
-        b"x3-native-escrow".to_vec(),
-        transport,
-    );
+    let adapter = LiveX3VmAdapter::new(chain_id.clone(), b"x3-native-escrow".to_vec(), transport);
     let intent = atomic_intent(local_id, preimage);
 
     let lock = adapter.lock(&intent).expect("live native lock");
@@ -457,9 +452,8 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     // recover durable evidence, then re-read the exact finalized block and
     // dispatch result before it can return safe finality again.
     drop(adapter);
-    let restarted_signer =
-        X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
-            .expect("restart signer");
+    let restarted_signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+        .expect("restart signer");
     let restarted_transport = NativeX3NodeTransport::new_with_proof_ledger(
         X3NodeTransportConfig {
             chain_id: chain_id.clone(),
@@ -472,11 +466,8 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         ledger_path.clone(),
     )
     .expect("reopen native transport after process-style restart");
-    let restarted_adapter = LiveX3VmAdapter::new(
-        chain_id,
-        b"x3-native-escrow".to_vec(),
-        restarted_transport,
-    );
+    let restarted_adapter =
+        LiveX3VmAdapter::new(chain_id, b"x3-native-escrow".to_vec(), restarted_transport);
 
     let restored_lock = restarted_adapter
         .finality_status(&lock.tx_id)
@@ -540,11 +531,7 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
         },
         signer,
     );
-    let adapter = LiveX3VmAdapter::new(
-        chain_id,
-        b"x3-native-timeout-escrow".to_vec(),
-        transport,
-    );
+    let adapter = LiveX3VmAdapter::new(chain_id, b"x3-native-timeout-escrow".to_vec(), transport);
     let intent = atomic_intent(local_id, preimage);
     let lock = adapter.lock(&intent).expect("live timeout lock");
     assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
@@ -596,7 +583,7 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
 
     let signed_proof_set = second_leg
         .prepare_cross_domain_proof_set(runtime_intent_id, proof_set)
-    .expect("sign canonical refund proof set");
+        .expect("sign canonical refund proof set");
     assert!(!submit(&signed_proof_set).is_empty());
     let (_, proof_block) = wait_finalized(&signed_proof_set, Duration::from_secs(180));
     assert_dispatch_succeeded(&second_leg, &proof_block, &signed_proof_set);
@@ -613,7 +600,7 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
                 .refund(local_id)
                 .expect("explicit timeout refund after the automatic path did not fire");
             wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180))
-        },
+        }
     };
     assert!(matches!(
         intent_state_at(runtime_intent_id, &refund_head),
@@ -637,7 +624,6 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
         "unexpected claim-after-refund error: {claim_after_refund}"
     );
 }
-
 
 #[test]
 #[ignore = "boots the real X3 dev node and proves early refund dispatch fails"]

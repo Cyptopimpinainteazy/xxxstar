@@ -14,7 +14,19 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Value-moving operation proven by this bundle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    codec::Encode,
+    codec::Decode,
+    codec::DecodeWithMemTracking,
+    scale_info::TypeInfo,
+)]
 pub enum CrossDomainOperation {
     Lock,
     Claim,
@@ -22,7 +34,18 @@ pub enum CrossDomainOperation {
 }
 
 /// Canonical evidence package for one operation on one execution domain.
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    codec::Encode,
+    codec::Decode,
+    codec::DecodeWithMemTracking,
+    scale_info::TypeInfo,
+)]
 pub struct CrossDomainProofBundle {
     pub version: u32,
     pub intent_id: IntentId,
@@ -83,12 +106,11 @@ impl CrossDomainProofBundle {
     pub fn compute_hash(&self) -> Result<[u8; 32], SwapError> {
         let mut canonical = self.clone();
         canonical.proof_hash = [0u8; 32];
-        let bytes = serde_json::to_vec(&canonical).map_err(|e| {
-            SwapError::ProofVerificationFailed {
+        let bytes =
+            serde_json::to_vec(&canonical).map_err(|e| SwapError::ProofVerificationFailed {
                 proof_name: "cross-domain proof bundle",
                 reason: alloc::format!("canonical serialization failed: {e}"),
-            }
-        })?;
+            })?;
         let digest = Sha256::digest(bytes);
         let mut out = [0u8; 32];
         out.copy_from_slice(&digest);
@@ -124,10 +146,7 @@ impl CrossDomainProofBundle {
 
     /// Runtime-facing verification that does not depend on the coordinator's
     /// local u64 intent id. The consensus layer binds to the canonical H256 id.
-    pub fn verify_runtime_binding(
-        &self,
-        runtime_intent_id: [u8; 32],
-    ) -> Result<(), SwapError> {
+    pub fn verify_runtime_binding(&self, runtime_intent_id: [u8; 32]) -> Result<(), SwapError> {
         if self.version != Self::VERSION {
             return Err(SwapError::ProofVerificationFailed {
                 proof_name: "cross-domain proof bundle",
@@ -152,7 +171,8 @@ impl CrossDomainProofBundle {
     }
 
     fn validate_bindings(&self) -> Result<(), SwapError> {
-        if self.tx_id.is_empty() || self.block_hash.is_empty() || self.execution_evidence.is_empty() {
+        if self.tx_id.is_empty() || self.block_hash.is_empty() || self.execution_evidence.is_empty()
+        {
             return Err(SwapError::MissingProof {
                 proof_name: "cross-domain transaction/block/execution evidence",
             });
@@ -193,7 +213,18 @@ impl CrossDomainProofBundle {
 }
 
 /// A set of domain proofs for one atomic intent.
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, codec::Encode, codec::Decode, codec::DecodeWithMemTracking, scale_info::TypeInfo)]
+#[derive(
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    codec::Encode,
+    codec::Decode,
+    codec::DecodeWithMemTracking,
+    scale_info::TypeInfo,
+)]
 pub struct CrossDomainProofSet {
     pub intent_id: IntentId,
     pub runtime_intent_id: [u8; 32],
@@ -219,7 +250,8 @@ impl CrossDomainProofSet {
         bundle.verify(intent)?;
         if self.intent_id != intent.intent_id
             || self.runtime_intent_id != bundle.runtime_intent_id
-            || self.intent_hash != intent.intent_hash {
+            || self.intent_hash != intent.intent_hash
+        {
             return Err(SwapError::ProofVerificationFailed {
                 proof_name: "cross-domain proof set",
                 reason: "proof set belongs to a different intent".into(),
@@ -240,10 +272,7 @@ impl CrossDomainProofSet {
     }
 
     /// Runtime-facing verification of every bundle against the canonical H256 id.
-    pub fn verify_runtime_binding(
-        &self,
-        runtime_intent_id: [u8; 32],
-    ) -> Result<(), SwapError> {
+    pub fn verify_runtime_binding(&self, runtime_intent_id: [u8; 32]) -> Result<(), SwapError> {
         if self.runtime_intent_id != runtime_intent_id {
             return Err(SwapError::ProofVerificationFailed {
                 proof_name: "cross-domain proof set runtime binding",
@@ -254,11 +283,7 @@ impl CrossDomainProofSet {
         let mut seen: Vec<(String, VmType, CrossDomainOperation)> = Vec::new();
         for bundle in &self.bundles {
             bundle.verify_runtime_binding(runtime_intent_id)?;
-            let key = (
-                bundle.chain_id.clone(),
-                bundle.vm_type,
-                bundle.operation,
-            );
+            let key = (bundle.chain_id.clone(), bundle.vm_type, bundle.operation);
             if seen.contains(&key) {
                 return Err(SwapError::ProofVerificationFailed {
                     proof_name: "cross-domain proof replay",
@@ -301,8 +326,7 @@ impl CrossDomainProofSet {
         }
 
         for (chain_id, vm_type) in required_domains {
-            let bundle =
-                self.require_operation(chain_id, *vm_type, CrossDomainOperation::Claim)?;
+            let bundle = self.require_operation(chain_id, *vm_type, CrossDomainOperation::Claim)?;
             bundle.verify(intent)?;
         }
         Ok(())
@@ -564,14 +588,7 @@ mod tests {
         ] {
             set.push_verified(
                 &intent,
-                bundle(
-                    &intent,
-                    chain,
-                    vm,
-                    CrossDomainOperation::Refund,
-                    tx,
-                    block,
-                ),
+                bundle(&intent, chain, vm, CrossDomainOperation::Refund, tx, block),
             )
             .unwrap();
         }

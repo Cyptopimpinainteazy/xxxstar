@@ -160,9 +160,7 @@ pub use plutus_htlc::{
     StatefulPlutusAdapter,
 };
 pub use polkadot_ink_htlc::{InkHtlcAdapter, InkHtlcContract, InkNetwork, StatefulInkAdapter};
-pub use proof_bundle::{
-    CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet,
-};
+pub use proof_bundle::{CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet};
 pub use registry::{RelayerModel, RelayerRegistry, SolverModel, SolverRegistry};
 pub use relayer::{scan_for_alerts, Relayer, RelayerObservation, RelayerState, WatcherAlert};
 pub use rpc_client::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, RpcClient, RpcClientConfig};

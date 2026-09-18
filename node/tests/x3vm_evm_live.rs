@@ -178,12 +178,7 @@ fn parse_address(value: &str) -> [u8; 20] {
     out
 }
 
-fn htlc_id(
-    sender: [u8; 20],
-    recipient: [u8; 20],
-    hashlock: [u8; 32],
-    count: u64,
-) -> [u8; 32] {
+fn htlc_id(sender: [u8; 20], recipient: [u8; 20], hashlock: [u8; 32], count: u64) -> [u8; 32] {
     let mut encoded = Vec::with_capacity(20 + 20 + 32 + 32);
     encoded.extend_from_slice(&sender);
     encoded.extend_from_slice(&recipient);
@@ -241,10 +236,7 @@ fn intent_state_storage_key(intent_id: H256) -> String {
     format!("0x{}", hex::encode(key))
 }
 
-fn intent_state_at(
-    intent_id: H256,
-    block_hash: &str,
-) -> pallet_x3_settlement_engine::IntentState {
+fn intent_state_at(intent_id: H256, block_hash: &str) -> pallet_x3_settlement_engine::IntentState {
     let mut rpc = RpcClient::new(X3_RPC.into(), 0);
     let value = rpc
         .call(
@@ -375,15 +367,17 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         },
         primary,
     );
-    let x3_adapter = LiveX3VmAdapter::new(
-        chain_id,
-        b"x3-native-crossvm-escrow".to_vec(),
-        x3_transport,
-    );
+    let x3_adapter =
+        LiveX3VmAdapter::new(chain_id, b"x3-native-crossvm-escrow".to_vec(), x3_transport);
     let intent = atomic_intent(local_id, preimage);
     let x3_lock = x3_adapter.lock(&intent).expect("real X3 lock");
     assert_eq!(x3_lock.vm_type, VmType::X3Vm);
-    assert!(x3_adapter.finality_status(&x3_lock.tx_id).unwrap().finalized);
+    assert!(
+        x3_adapter
+            .finality_status(&x3_lock.tx_id)
+            .unwrap()
+            .finalized
+    );
 
     // Runtime settlement currently requires two escrow legs before claim.
     let leg1 = second_leg
@@ -398,10 +392,10 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
     assert!(!submit_x3(&leg1).is_empty());
     wait_x3_finalized(&leg1, Duration::from_secs(180));
 
-    let mut evm_locker = LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key)
-        .expect("live EVM locker");
-    let mut evm_claimant = LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key)
-        .expect("live EVM claimant");
+    let mut evm_locker =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key).expect("live EVM locker");
+    let mut evm_claimant =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key).expect("live EVM claimant");
     let sender = parse_address(&evm_locker.signer_address().expect("EVM locker address"));
     let recipient = parse_address(&evm_claimant.signer_address().expect("EVM claimant address"));
     let timelock = SystemTime::now()
@@ -510,9 +504,13 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         .claim_with_permit(&permit)
         .expect("X3 claim using EVM-revealed preimage");
     assert_eq!(x3_claim.preimage, preimage);
-    assert!(x3_adapter.finality_status(&x3_claim.tx_id).unwrap().finalized);
+    assert!(
+        x3_adapter
+            .finality_status(&x3_claim.tx_id)
+            .unwrap()
+            .finalized
+    );
 }
-
 
 #[test]
 #[ignore = "requires Anvil with AtlasHTLC deployed plus a real local X3 node"]
@@ -545,8 +543,7 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
     let finalized_head_hash =
         wait_x3_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
     let finalized_hash = H256::from_slice(
-        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
-            .expect("decode finalized head"),
+        &hex::decode(finalized_head_hash.trim_start_matches("0x")).expect("decode finalized head"),
     );
     let runtime_intent_id = signer
         .resolve_intent_id(&prepared, finalized_hash)
@@ -573,7 +570,12 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
     );
     let intent = atomic_intent(local_id, preimage);
     let x3_lock = x3_adapter.lock(&intent).expect("real X3 refund-path lock");
-    assert!(x3_adapter.finality_status(&x3_lock.tx_id).unwrap().finalized);
+    assert!(
+        x3_adapter
+            .finality_status(&x3_lock.tx_id)
+            .unwrap()
+            .finalized
+    );
 
     // Both legs have to be escrowed before the runtime considers the refund proof
     // set complete: `all_required_operation_proofs` walks every leg.
@@ -590,10 +592,10 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
     let leg1_block = wait_x3_finalized(&leg1, Duration::from_secs(180));
     assert_x3_dispatch_succeeded(&second_leg, &leg1_block, &leg1);
 
-    let mut evm_locker = LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key)
-        .expect("live EVM locker");
-    let mut evm_claimant = LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key)
-        .expect("live EVM claimant");
+    let mut evm_locker =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &locker_key).expect("live EVM locker");
+    let mut evm_claimant =
+        LiveEvmExecutor::new(EVM_RPC, 1337, contract, &claimant_key).expect("live EVM claimant");
     let sender = parse_address(&evm_locker.signer_address().expect("EVM locker address"));
     let recipient = parse_address(&evm_claimant.signer_address().expect("EVM claimant address"));
     let expected_count = evm_htlc_count(contract).saturating_add(1);
@@ -657,7 +659,7 @@ fn real_x3vm_evm_timeout_refund_atomic_lifecycle() {
                 .refund(local_id)
                 .expect("explicit timeout refund after the automatic path did not fire");
             wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180))
-        },
+        }
     };
     assert!(matches!(
         intent_state_at(runtime_intent_id, &refund_head),

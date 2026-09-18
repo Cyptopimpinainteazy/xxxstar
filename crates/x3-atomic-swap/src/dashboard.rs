@@ -4,13 +4,13 @@
 //! into a single snapshot suitable for UI rendering or programmatic consumption.
 //!
 //! Also provides the Chaos Test Scoreboard for displaying test scenario status.
-use alloc::format;
-use alloc::vec;
-use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::X3VmAdapter;
 use crate::intent::AtomicIntent;

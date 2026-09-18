@@ -67,11 +67,7 @@ impl fmt::Debug for X3RuntimeSigner {
 
 impl X3RuntimeSigner {
     /// Load an sr25519 signer URI and attach it to a live X3 RPC endpoint.
-    pub fn from_uri(
-        chain_id: ChainId,
-        rpc_url: String,
-        uri: &str,
-    ) -> Result<Self, SwapError> {
+    pub fn from_uri(chain_id: ChainId, rpc_url: String, uri: &str) -> Result<Self, SwapError> {
         let pair = sp_core::sr25519::Pair::from_string(uri, None).map_err(|e| {
             SwapError::Internal(format!("failed to load X3 sr25519 signer {uri}: {e:?}"))
         })?;
@@ -198,8 +194,9 @@ impl X3RuntimeSigner {
         let genesis_hash = self.genesis_hash()?;
         let nonce = self.account_nonce()?;
         let account = self.account();
-        let agent_law_check = pallet_x3_agent_law::AgentLawCheck::<Runtime>::decode(&mut &[][..])
-            .map_err(|e| SwapError::Internal(format!("decode agent-law extension: {e}")))?;
+        let agent_law_check =
+            pallet_x3_agent_law::AgentLawCheck::<Runtime>::decode(&mut &[][..])
+                .map_err(|e| SwapError::Internal(format!("decode agent-law extension: {e}")))?;
 
         // This tuple and additional-signed payload intentionally mirror
         // node/src/atomic_gateway.rs. The order is consensus-critical.
@@ -232,12 +229,7 @@ impl X3RuntimeSigner {
             ),
         );
         let signature = payload.using_encoded(|bytes| Signature::from(self.pair.sign(bytes)));
-        let xt = UncheckedExtrinsic::new_signed(
-            call,
-            Address::Id(account),
-            signature,
-            extra,
-        );
+        let xt = UncheckedExtrinsic::new_signed(call, Address::Id(account), signature, extra);
         Ok(format!("0x{}", hex::encode(xt.encode())))
     }
 
@@ -255,9 +247,9 @@ impl X3RuntimeSigner {
                 Value::String(format!("0x{}", hex::encode(block_hash.as_bytes()))),
             ],
         )?;
-        let raw = result.as_str().ok_or_else(|| {
-            SwapError::RpcError("Timestamp::Now storage was not hex".into())
-        })?;
+        let raw = result
+            .as_str()
+            .ok_or_else(|| SwapError::RpcError("Timestamp::Now storage was not hex".into()))?;
         let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
             .map_err(|e| SwapError::RpcError(format!("decode Timestamp::Now storage: {e}")))?;
         // pallet_timestamp stores the moment in milliseconds; the settlement
@@ -444,10 +436,8 @@ impl X3ExtrinsicSigner for X3RuntimeSigner {
             .ok_or_else(|| SwapError::RpcError("System::Events storage was not hex".into()))?;
         let bytes = hex::decode(raw.strip_prefix("0x").unwrap_or(raw))
             .map_err(|e| SwapError::RpcError(format!("decode System::Events storage: {e}")))?;
-        let records =
-            Vec::<frame_system::EventRecord<RuntimeEvent, H256>>::decode(&mut &bytes[..]).map_err(
-                |e| SwapError::RpcError(format!("SCALE decode System::Events: {e}")),
-            )?;
+        let records = Vec::<frame_system::EventRecord<RuntimeEvent, H256>>::decode(&mut &bytes[..])
+            .map_err(|e| SwapError::RpcError(format!("SCALE decode System::Events: {e}")))?;
 
         let mut saw_failed_dispatch = false;
         let mut reported_error: Option<String> = None;
@@ -460,12 +450,15 @@ impl X3ExtrinsicSigner for X3RuntimeSigner {
             }
             match record.event {
                 RuntimeEvent::System(frame_system::Event::ExtrinsicSuccess { .. }) => return Ok(()),
-                RuntimeEvent::System(frame_system::Event::ExtrinsicFailed { dispatch_error, .. }) => {
+                RuntimeEvent::System(frame_system::Event::ExtrinsicFailed {
+                    dispatch_error,
+                    ..
+                }) => {
                     saw_failed_dispatch = true;
                     // Surface the pallet error: "ExtrinsicFailed" alone cannot
                     // distinguish a fail-closed guard from a real defect.
                     reported_error = Some(format!("{dispatch_error:?}"));
-                },
+                }
                 _ => {}
             }
         }
@@ -489,24 +482,18 @@ mod tests {
 
     #[test]
     fn rejects_unbound_local_intent() {
-        let signer = X3RuntimeSigner::from_uri(
-            "x3-local".into(),
-            "http://127.0.0.1:1".into(),
-            "//Alice",
-        )
-        .expect("dev key loads without RPC");
+        let signer =
+            X3RuntimeSigner::from_uri("x3-local".into(), "http://127.0.0.1:1".into(), "//Alice")
+                .expect("dev key loads without RPC");
         let err = signer.runtime_intent_id(7).unwrap_err();
         assert!(err.to_string().contains("not bound"));
     }
 
     #[test]
     fn binding_is_stable_and_cannot_be_repointed() {
-        let signer = X3RuntimeSigner::from_uri(
-            "x3-local".into(),
-            "http://127.0.0.1:1".into(),
-            "//Alice",
-        )
-        .expect("dev key loads without RPC");
+        let signer =
+            X3RuntimeSigner::from_uri("x3-local".into(), "http://127.0.0.1:1".into(), "//Alice")
+                .expect("dev key loads without RPC");
         let a = H256([1u8; 32]);
         let b = H256([2u8; 32]);
         signer.bind_intent(7, a).unwrap();

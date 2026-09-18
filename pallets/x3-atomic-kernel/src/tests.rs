@@ -13,13 +13,11 @@ use sp_core::H256;
 // economy is halted.
 
 use crate::mock::{
-    economy_open, new_test_ext, AtomicKernel, MaxLegsPerBundle, RuntimeOrigin, System, Test,
-    ALICE, BOB, CHARLIE, MIN_BOND,
-};
-use crate::{
-    BundleRollbackReason, BundleStatus, Bundles, Error, NonceRegistry,
+    economy_open, new_test_ext, AtomicKernel, MaxLegsPerBundle, RuntimeOrigin, System, Test, ALICE,
+    BOB, CHARLIE, MIN_BOND,
 };
 use crate::Event;
+use crate::{BundleRollbackReason, BundleStatus, Bundles, Error, NonceRegistry};
 use frame_support::{assert_noop, assert_ok, BoundedVec};
 
 use crate::mock::RuntimeEvent;
@@ -187,7 +185,9 @@ fn assert_bond_settled_once(
     reason: BundleRollbackReason,
 ) {
     assert_eq!(
-        Bundles::<Test>::get(bundle_id).expect("record survives").status,
+        Bundles::<Test>::get(bundle_id)
+            .expect("record survives")
+            .status,
         BundleStatus::RolledBack
     );
     assert_eq!(
