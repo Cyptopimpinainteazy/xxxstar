@@ -29,13 +29,18 @@ tauri_app = "AtomicLock"
 # against real `fn` names so a fabricated list cannot recur silently.
 required_tests = [
   "economic_halt_blocks_bundle_submission",
-  "economic_halt_does_not_trap_pending_bundle_funds"
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+  "rollback_access_set_violation_charges_only_the_ten_percent_penalty",
+  "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+  "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+  "rollback_deadline_exceeded_before_the_deadline_is_rejected"
 ]
 proof_report = "reports/six_route_invariants.md"
-readiness_score = 45
+readiness_score = 50
 blockers = [
   "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
-  "Bond accounting on rollback was fixed on 2026-09-18: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and left part of the bond permanently reserved. The penalty is now taken from the released bond exactly once. This needs an independent audit and an invariant test over all rollback reasons before the score can rise further"
+  "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
 
