@@ -102,6 +102,26 @@ X3_LOCAL_CI_PREPUSH_MODE="--live --variants" git push   # any local-ci flags
 
 Install the hooks in a fresh clone with `bash scripts/install_hooks.sh`.
 
+## Known-red gates right now
+
+Two gates in the fast set are red on `master` for reasons unrelated to whatever
+change is being pushed. Both are tracked, and both are real:
+
+| gate | why it is red | ticket |
+| --- | --- | --- |
+| `test node` | `x3-chain-node`'s own dev chain spec fails to boot: the genesis blob carries the full variant's pallet set while the runtime that rejects it knows the smaller set | #232 |
+| `test cross-vm-coordinator` | `crates/cross-vm-coordinator` sits outside the workspace, so cargo has to hit the network to resolve its dependencies (reported as `BLOCKED`) | #233 |
+
+Until those are fixed, the recorded way to push is an explicit, visible skip:
+
+```bash
+X3_LOCAL_CI_SKIP=test-node,test-cross-vm-coordinator git push
+```
+
+`--skip`/`X3_LOCAL_CI_SKIP` is deliberately not quiet: the gate is dropped from
+the run and the summary prints `SKIPPED BY REQUEST: <slug>`. Do not reach for
+`X3_LOCAL_CI_SKIP_ALL=1` instead - that runs nothing at all and says so.
+
 ## Workflow wiring reality
 
 `scripts/check_ci_workflow_refs.py` is a gate, not a report: it fails when a
