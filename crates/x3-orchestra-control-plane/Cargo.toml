@@ -10,7 +10,7 @@ anyhow = { workspace = true, default-features = true }
 async-trait = "0.1"
 axum = "0.7"
 clap = { version = "4.5", features = ["derive"] }
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true }
 sled = "0.34"
