@@ -29,6 +29,10 @@ jobs:
     # A hung self-hosted job blocks x3star1 indefinitely, unlike a disposable
     # GitHub-hosted VM; give it a hard ceiling.
     timeout-minutes: 90
+    env:
+      # Two self-hosted runners share this 32-core machine, and cargo defaults to
+      # one job per core; cap it so the lint gate and a live gate can run at once.
+      CARGO_BUILD_JOBS: "12"
     permissions:
       contents: read
       issues: write

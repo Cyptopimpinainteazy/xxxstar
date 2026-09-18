@@ -44,6 +44,7 @@ jobs:
     # artefacts instead of rebuilding the workspace from scratch each time.
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+      CARGO_BUILD_JOBS: "12"
     # Public repo + fork PRs => keep pull_request on ubuntu-latest. Push (master)
     # and manual dispatch run on the x3 self-hosted runner, which is the only
     # runner able to execute here (GitHub-hosted jobs are blocked by an
@@ -122,6 +123,7 @@ jobs:
     name: real X3VM to Anvil lock claim lifecycle
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+      CARGO_BUILD_JOBS: "12"
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
     timeout-minutes: 90
     steps:

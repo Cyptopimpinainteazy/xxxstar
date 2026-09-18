@@ -43,6 +43,10 @@ jobs:
       # Keep reproducible runtime builds pinned while using a Rust release
       # compatible with the current dependency graph (Edition 2024 crates).
       SRTOOL_IMAGE: paritytech/srtool:1.93.0-0.18.4
+      # Two self-hosted runners share this 32-core machine; cargo defaults to one
+      # job per core, and the measured load (54-67) showed heavy thrashing. Cap it
+      # so this 90-minute gate and its siblings make progress concurrently.
+      CARGO_BUILD_JOBS: "12"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

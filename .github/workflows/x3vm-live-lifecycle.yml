@@ -26,6 +26,10 @@ jobs:
     # test code had changed.
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+      # Two self-hosted runners share this 32-core machine, and cargo defaults to
+      # one job per core — measured load hit 54-67, i.e. heavy thrashing. Capping
+      # per-job parallelism lets both runners make progress instead of contending.
+      CARGO_BUILD_JOBS: "12"
     # This repo is public and pull_request can come from a fork, so keep PR runs
     # on ubuntu-latest. Push (master), manual dispatch and workflow_call run on
     # the x3 self-hosted runner, which is the only runner that can execute here
