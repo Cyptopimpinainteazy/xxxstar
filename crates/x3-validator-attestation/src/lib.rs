@@ -15,6 +15,10 @@ pub struct Attestation {
 pub enum AttestationError {
     EmptySignature,
     DuplicateValidator,
+    /// The attestation is for a different statement than this set aggregates.
+    /// Without this check a caller can mix attestations from unrelated
+    /// statements and still reach `has_quorum`.
+    StatementMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +40,10 @@ impl AttestationSet {
     pub fn add_attestation(&mut self, attestation: Attestation) -> Result<(), AttestationError> {
         if attestation.signature.is_empty() {
             return Err(AttestationError::EmptySignature);
+        }
+
+        if attestation.statement_hash != self.statement_hash {
+            return Err(AttestationError::StatementMismatch);
         }
 
         if self.attestations.contains_key(&attestation.validator) {
@@ -99,5 +107,45 @@ mod tests {
         assert_eq!(set.total_weight(), 75);
         assert!(set.has_quorum(67));
         assert!(!set.has_quorum(80));
+    }
+
+    #[test]
+    fn rejects_empty_signature() {
+        let mut set = AttestationSet::new([7; 32]);
+        let mut attestation = mk_attestation("alice", 30);
+        attestation.signature.clear();
+
+        assert!(matches!(
+            set.add_attestation(attestation),
+            Err(AttestationError::EmptySignature)
+        ));
+        assert_eq!(set.total_weight(), 0);
+    }
+
+    /// An attestation for another statement must not contribute to this set's
+    /// quorum. Before this check, a mixed set reported quorum for its own
+    /// `statement_hash` while counting signatures over something else.
+    #[test]
+    fn rejects_attestation_for_a_different_statement() {
+        let mut set = AttestationSet::new([7; 32]);
+        let mut foreign = mk_attestation("mallory", 100);
+        foreign.statement_hash = [9; 32];
+
+        assert!(matches!(
+            set.add_attestation(foreign),
+            Err(AttestationError::StatementMismatch)
+        ));
+        assert_eq!(set.total_weight(), 0);
+        assert!(!set.has_quorum(1));
+    }
+
+    #[test]
+    fn duplicate_validator_does_not_double_count_weight() {
+        let mut set = AttestationSet::new([7; 32]);
+        set.add_attestation(mk_attestation("alice", 30)).unwrap();
+        assert!(set.add_attestation(mk_attestation("alice", 30)).is_err());
+
+        assert_eq!(set.total_weight(), 30);
+        assert_eq!(set.unique_validators(), 1);
     }
 }

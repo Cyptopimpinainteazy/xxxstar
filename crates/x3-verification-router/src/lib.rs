@@ -107,6 +107,9 @@ pub enum VerificationError {
     InvalidStrategy,
     UnsupportedChain,
     ReplayDetected,
+    /// The strategy reached a verifier that has no real verification logic.
+    /// Security code fails closed rather than accepting an unchecked proof.
+    NotImplemented,
 }
 
 impl Display for VerificationError {
@@ -119,6 +122,12 @@ impl Display for VerificationError {
             VerificationError::InvalidStrategy => write!(f, "invalid verification strategy"),
             VerificationError::UnsupportedChain => write!(f, "unsupported source chain"),
             VerificationError::ReplayDetected => write!(f, "replay detected: proof already used"),
+            VerificationError::NotImplemented => {
+                write!(
+                    f,
+                    "no verifier implemented for this strategy: failing closed"
+                )
+            }
         }
     }
 }
@@ -278,29 +287,38 @@ impl Verifier for EvmReceiptVerifier {
         VerificationStrategy::EvmReceiptProof
     }
 
+    /// **Fails closed.** This is the legacy structural check: it only looked at
+    /// payload length and chain kind, so 64 arbitrary bytes were "verified". The
+    /// real EVM verification lives in `evm_receipt::ProductionEvmReceiptVerifier`
+    /// (RLP decode + merkle-patricia proof + confirmations) and is what
+    /// production code must register.
+    ///
+    /// `test-verifier` (without `production`) opts back into the old permissive
+    /// behaviour for plumbing tests; `production` always wins.
     fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
         if proof.payload.is_empty() || proof.payload.len() < 64 {
             return Err(VerificationError::MalformedProof);
         }
 
-        // Validate EVM chain
-        match proof.source_chain {
-            ChainKind::Evm { chain_id: _ } => {} // accepted
-            _ => return Err(VerificationError::UnsupportedChain),
+        #[cfg(all(feature = "test-verifier", not(feature = "production")))]
+        {
+            match proof.source_chain {
+                ChainKind::Evm { chain_id: _ } => {}
+                _ => return Err(VerificationError::UnsupportedChain),
+            }
+            let _ = self.min_confirmations;
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "evm_receipt_proof_structural_only_test_verifier",
+                verified_at_height: None,
+            })
         }
 
-        // In production, this would:
-        // 1. Decode the RLP-encoded receipt
-        // 2. Verify the receipt merkle proof against a stored block header
-        // 3. Verify the block header is part of the canonical chain with sufficient confirmations
-        // 4. Parse the event logs and match against event signatures
-        // 5. Verify asset_id, amount, sender, recipient match the event data
-
-        Ok(VerificationOutcome {
-            accepted: true,
-            reason: "evm_receipt_proof_verified",
-            verified_at_height: None,
-        })
+        #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
+        {
+            let _ = (self.min_confirmations, proof);
+            Err(VerificationError::NotImplemented)
+        }
     }
 }
 
@@ -328,23 +346,29 @@ impl Verifier for ValidatorQuorumVerifier {
         }
     }
 
+    /// **Fails closed.** Counting attestations without verifying their signatures
+    /// accepts any non-empty payload, which is not a quorum check at all. See
+    /// `docs/reports/SECURITY_BLOCKERS.md` (stub verifiers, CRITICAL).
     fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
         if proof.payload.is_empty() {
             return Err(VerificationError::MalformedProof);
         }
 
-        // In production, this would:
-        // 1. Decode the attestation payload (signatures + signer indices)
-        // 2. Verify each signature against the known validator set
-        // 3. Count unique valid signatures
-        // 4. Check count >= threshold
-        // 5. Verify the attestation message hash matches the proof params
+        #[cfg(all(feature = "test-verifier", not(feature = "production")))]
+        {
+            let _ = (self.threshold, self.total_validators, proof);
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "validator_quorum_structural_only_test_verifier",
+                verified_at_height: None,
+            })
+        }
 
-        Ok(VerificationOutcome {
-            accepted: true,
-            reason: "validator_quorum_verified",
-            verified_at_height: None,
-        })
+        #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
+        {
+            let _ = (self.threshold, self.total_validators, proof);
+            Err(VerificationError::NotImplemented)
+        }
     }
 }
 
@@ -357,26 +381,33 @@ impl Verifier for SolanaFinalizedVerifier {
         VerificationStrategy::SolanaFinalizedProof
     }
 
+    /// **Fails closed.** It accepted any non-empty payload on any Solana source
+    /// chain: no blockhash check, no validator set, no signature verification.
+    /// A real implementation must verify the relayer's Ed25519 attestations
+    /// against the configured validator set (see `docs/reports/CROSS_VM_AUDIT.md`).
     fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
         if proof.payload.is_empty() {
             return Err(VerificationError::MalformedProof);
         }
 
-        match proof.source_chain {
-            ChainKind::Solana => {} // accepted
-            _ => return Err(VerificationError::UnsupportedChain),
+        #[cfg(all(feature = "test-verifier", not(feature = "production")))]
+        {
+            match proof.source_chain {
+                ChainKind::Solana => {}
+                _ => return Err(VerificationError::UnsupportedChain),
+            }
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "solana_finalized_structural_only_test_verifier",
+                verified_at_height: None,
+            })
         }
 
-        // In production, this would:
-        // 1. Verify Solana finalized block hash against known validators
-        // 2. Verify transaction inclusion proof
-        // 3. Parse instruction data and match against expected params
-
-        Ok(VerificationOutcome {
-            accepted: true,
-            reason: "solana_finalized_proof_verified",
-            verified_at_height: None,
-        })
+        #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
+        {
+            let _ = proof;
+            Err(VerificationError::NotImplemented)
+        }
     }
 }
 
@@ -389,12 +420,14 @@ impl Verifier for X3InternalVerifier {
         VerificationStrategy::X3Internal
     }
 
+    /// Internal-only strategy: an X3-internal transfer is proven by the kernel
+    /// itself, so there is nothing external to verify. The router only routes
+    /// `VerificationStrategy::X3Internal` proofs here, and this verifier must
+    /// never be registered under an external-chain strategy.
     fn verify(&self, _proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
-        // X3 internal transfers don't need external proofs — the kernel itself
-        // is the proof. This verifier is a pass-through.
         Ok(VerificationOutcome {
             accepted: true,
-            reason: "x3_internal_trusted",
+            reason: "x3_internal_kernel_is_the_proof",
             verified_at_height: None,
         })
     }
@@ -668,8 +701,12 @@ mod tests {
         assert!(matches!(result, Err(VerificationError::MissingVerifier)));
     }
 
+    /// The permissive path is opt-in (`test-verifier`, and never together with
+    /// `production`). These three tests document that the opt-in exists; the
+    /// fail-closed tests below cover what production builds do.
+    #[cfg(all(feature = "test-verifier", not(feature = "production")))]
     #[test]
-    fn evm_receipt_verifier_works() {
+    fn evm_receipt_verifier_works_under_test_verifier() {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(EvmReceiptVerifier::new(12)));
 
@@ -678,8 +715,9 @@ mod tests {
         assert!(outcome.accepted);
     }
 
+    #[cfg(all(feature = "test-verifier", not(feature = "production")))]
     #[test]
-    fn validator_quorum_works() {
+    fn validator_quorum_works_under_test_verifier() {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(ValidatorQuorumVerifier::new(3, 5)));
 
@@ -691,8 +729,9 @@ mod tests {
         assert!(outcome.accepted);
     }
 
+    #[cfg(all(feature = "test-verifier", not(feature = "production")))]
     #[test]
-    fn solana_verifier_works() {
+    fn solana_verifier_works_under_test_verifier() {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(SolanaFinalizedVerifier));
 
@@ -700,6 +739,57 @@ mod tests {
         proof.source_chain = ChainKind::Solana;
         let outcome = router.route(&proof).expect("should verify");
         assert!(outcome.accepted);
+    }
+
+    /// What a production build does: every strategy without a real verifier
+    /// refuses the proof. This is the posture the audit requires
+    /// (`docs/reports/SECURITY_BLOCKERS.md`); the acceptance test that enforces
+    /// it from outside the crate is
+    /// `audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/audit-harness/proof`.
+    #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
+    #[test]
+    fn unimplemented_strategies_fail_closed() {
+        let well_formed = vec![1u8; 96];
+
+        let mut evm_router = VerificationRouter::new();
+        evm_router.register_verifier(Arc::new(EvmReceiptVerifier::new(12)));
+        let mut evm_proof = dummy_proof(VerificationStrategy::EvmReceiptProof);
+        evm_proof.payload = vec![1u8; 64];
+        assert!(
+            matches!(
+                evm_router.route(&evm_proof),
+                Err(VerificationError::NotImplemented)
+            ),
+            "the legacy structural EVM verifier must not accept unverified bytes"
+        );
+
+        let mut quorum_router = VerificationRouter::new();
+        quorum_router.register_verifier(Arc::new(ValidatorQuorumVerifier::new(3, 5)));
+        let mut quorum_proof = dummy_proof(VerificationStrategy::ValidatorQuorum {
+            threshold: 3,
+            total: 5,
+        });
+        quorum_proof.payload = well_formed.clone();
+        assert!(
+            matches!(
+                quorum_router.route(&quorum_proof),
+                Err(VerificationError::NotImplemented)
+            ),
+            "an unsigned one-byte quorum proof must not pass"
+        );
+
+        let mut solana_router = VerificationRouter::new();
+        solana_router.register_verifier(Arc::new(SolanaFinalizedVerifier));
+        let mut solana_proof = dummy_proof(VerificationStrategy::SolanaFinalizedProof);
+        solana_proof.source_chain = ChainKind::Solana;
+        solana_proof.payload = vec![1u8];
+        assert!(
+            matches!(
+                solana_router.route(&solana_proof),
+                Err(VerificationError::NotImplemented)
+            ),
+            "an unsigned one-byte Solana proof must not pass"
+        );
     }
 
     #[test]
