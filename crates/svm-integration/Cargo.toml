@@ -30,7 +30,7 @@ solana_rbpf = { workspace = true, optional = true }
 
 [dev-dependencies]
 sp-io = { workspace = true }
-solana-program = "=3.0.0"
+solana-program = "=5.0.0"
 solana-program-test = "=3.0.0"
 # Add explicit dev-deps required by integration tests after Solana v3 upgrade
 solana-sdk = "=3.0.0"
