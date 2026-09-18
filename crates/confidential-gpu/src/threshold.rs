@@ -45,6 +45,8 @@ pub struct DkgManager {
     secret_coefficients: Vec<Scalar>,
     /// Received shares from other validators.
     received_shares: Vec<DkgShare>,
+    /// Public commitments keyed by zero-based validator ID.
+    peer_commitments: std::collections::HashMap<u32, DkgCommitment>,
     /// Our aggregated secret share.
     aggregated_secret: Option<[u8; 32]>,
     /// The group public key.
@@ -60,6 +62,7 @@ impl DkgManager {
             committee_size,
             secret_coefficients: Vec::new(),
             received_shares: Vec::new(),
+            peer_commitments: std::collections::HashMap::new(),
             aggregated_secret: None,
             group_key: None,
             complete: false,
@@ -129,10 +132,49 @@ impl DkgManager {
             return Err(ConfidentialGpuError::DkgFailed("group key is identity".into()));
         }
         self.group_key = Some(group.compress().to_bytes());
-        // Compatibility path is not enough to declare the DKG complete: a
-        // production ceremony must verify and aggregate private incoming shares.
+        self.peer_commitments = peer_commitments.iter().map(|c| (c.validator_index, c.clone())).collect();
         self.complete = false;
         self.share_for(self.validator_index)
+    }
+
+    /// Verify a private share against the sender's Feldman commitments and
+    /// aggregate it only if it is addressed to this validator.
+    pub fn accept_share(&mut self, share: DkgShare) -> Result<(), ConfidentialGpuError> {
+        use curve25519_dalek::{ristretto::{CompressedRistretto, RistrettoPoint}, traits::Identity};
+        if share.to != self.validator_index || share.from >= self.committee_size {
+            return Err(ConfidentialGpuError::DkgFailed("share has invalid sender or recipient".into()));
+        }
+        if self.received_shares.iter().any(|s| s.from == share.from) {
+            return Err(ConfidentialGpuError::DkgFailed("duplicate DKG share".into()));
+        }
+        let commitment = self.peer_commitments.get(&share.from)
+            .ok_or_else(|| ConfidentialGpuError::DkgFailed("share sender has no registered commitment".into()))?;
+        let scalar = Option::<Scalar>::from(Scalar::from_canonical_bytes(share.share))
+            .ok_or_else(|| ConfidentialGpuError::DkgFailed("non-canonical DKG scalar".into()))?;
+        let x = Scalar::from((self.validator_index + 1) as u64);
+        let mut expected = RistrettoPoint::identity();
+        let mut power = Scalar::ONE;
+        for bytes in &commitment.commitments {
+            let point = CompressedRistretto(*bytes).decompress()
+                .ok_or_else(|| ConfidentialGpuError::DkgFailed("invalid Ristretto commitment".into()))?;
+            expected += power * point;
+            power *= x;
+        }
+        if scalar * RISTRETTO_BASEPOINT_POINT != expected {
+            return Err(ConfidentialGpuError::DkgFailed("share failed Feldman verification".into()));
+        }
+        self.received_shares.push(share);
+        if self.received_shares.len() == self.committee_size as usize {
+            let mut aggregate = Scalar::ZERO;
+            for accepted in &self.received_shares {
+                let scalar = Option::<Scalar>::from(Scalar::from_canonical_bytes(accepted.share))
+                    .ok_or_else(|| ConfidentialGpuError::DkgFailed("non-canonical DKG scalar".into()))?;
+                aggregate += scalar;
+            }
+            self.aggregated_secret = Some(aggregate.to_bytes());
+            self.complete = true;
+        }
+        Ok(())
     }
 
     /// Combine decryption shares to reconstruct the shared secret.
@@ -179,20 +221,21 @@ mod tests {
             let _share = v.participate(&commitments).unwrap();
         }
 
-        // Commitment processing derives one identical group key, but does not
-        // falsely claim completion before incoming private shares are verified.
         let group_key = validators[0].group_key();
-        for v in &validators {
-            assert!(!v.is_complete());
-            assert_eq!(v.group_key(), group_key);
-        }
+        for v in &validators { assert_eq!(v.group_key(), group_key); }
 
-        // Shares are recipient-specific rather than broadcast constants.
         let a = validators[0].share_for(1).unwrap();
         let b = validators[0].share_for(2).unwrap();
         assert_ne!(a.share, b.share);
-        assert_eq!(a.to, 1);
-        assert_eq!(b.to, 2);
+
+        // Deliver and verify every sender's private share to every recipient.
+        for recipient in 0..5usize {
+            let incoming: Vec<_> = (0..5usize)
+                .map(|sender| validators[sender].share_for(recipient as u32).unwrap())
+                .collect();
+            for share in incoming { validators[recipient].accept_share(share).unwrap(); }
+        }
+        assert!(validators.iter().all(DkgManager::is_complete));
     }
 
     /// # Invariant: PRIV-EXEC-003
