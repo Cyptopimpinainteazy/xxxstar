@@ -73,7 +73,10 @@ ARTIFACT="$SCRIPT_DIR/out/AtlasHTLC.sol/AtlasHTLC.json"
 
 echo "=== Building broadcaster client ==="
 (cd "$REPO_ROOT" && cargo build --release -p x3-atomic-swap --features std --bin x3-evm-broadcast 2>&1 | tail -10)
-BIN="$REPO_ROOT/target/release/x3-evm-broadcast"
+# Honour CARGO_TARGET_DIR: CI (and the local runner) point it outside the
+# checkout so builds are reused, and asserting the default path then fails with
+# "not built" even though cargo just built the binary there.
+BIN="${CARGO_TARGET_DIR:-$REPO_ROOT/target}/release/x3-evm-broadcast"
 [ -x "$BIN" ] || { echo "Error: $BIN not built"; exit 1; }
 
 echo "=== Starting anvil ==="
