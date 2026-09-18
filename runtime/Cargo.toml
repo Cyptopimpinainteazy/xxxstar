@@ -158,6 +158,7 @@ serde = { workspace = true, default-features = false, features = ["alloc", "deri
 substrate-wasm-builder = { workspace = true }
 
 [dev-dependencies]
+sp-io = { workspace = true, features = ["std"] }
 
 [features]
 default = ["std", "tuples-96"]

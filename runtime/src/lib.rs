@@ -4927,3 +4927,56 @@ mod native_supply_contract_tests {
         });
     }
 }
+
+// ── Runtime upgrade rehearsal ───────────────────────────────────────────────
+//
+// FEATURE_REGISTRY's `triforge_runtime` entry records that there is no automated
+// migration dry-run across the runtime's `construct_runtime!` variants, and the
+// standalone `try-runtime` CLI is not available in the pinned Polkadot SDK. This
+// module runs the dry-run in-process instead: it executes the same
+// `OnRuntimeUpgrade` hooks an upgrade would (the pallets' hooks plus the
+// `Migrations` tuple wired into `Executive`), for whichever variant the active
+// feature set selects, and asserts the work fits inside a block.
+//
+// `scripts/check-runtime-variants.sh` runs it once per variant.
+#[cfg(all(test, feature = "std"))]
+mod runtime_upgrade_rehearsal {
+    use super::{AllPalletsWithSystem, Migrations, Runtime};
+    use frame_support::traits::OnRuntimeUpgrade;
+    use frame_support::weights::Weight;
+
+    fn fresh_externalities() -> sp_io::TestExternalities {
+        // Empty storage is the base for an upgrade rehearsal: a real upgrade runs
+        // against whatever the chain already holds, and the hooks must cope with
+        // values that are absent. Avoids depending on genesis-builder traits,
+        // whose shape differs across SDK pins.
+        sp_io::TestExternalities::default()
+    }
+
+    /// An upgrade must run its migrations without panicking and without needing
+    /// more weight than a block provides — an upgrade that cannot fit would leave
+    /// the chain unable to produce the block that applies it.
+    #[test]
+    fn runtime_upgrade_rehearsal() {
+        let mut ext = fresh_externalities();
+        let (pallets, migrations): (Weight, Weight) = ext.execute_with(|| {
+            // A realistic block height, so hooks that read the system block number
+            // see a value rather than the storage default.
+            frame_system::Pallet::<Runtime>::set_block_number(1);
+            (
+                // Exactly what `Executive::on_runtime_upgrade` runs.
+                <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade(),
+                <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade(),
+            )
+        });
+        let weight = pallets.saturating_add(migrations);
+
+        let max_block = <Runtime as frame_system::Config>::BlockWeights::get().max_block;
+        assert!(
+            weight.ref_time() <= max_block.ref_time(),
+            "runtime upgrade needs {} ref_time but a block only allows {}",
+            weight.ref_time(),
+            max_block.ref_time()
+        );
+    }
+}

@@ -434,6 +434,9 @@ pub mod mock {
 mod tests {
     use super::mock::*;
     use super::pallet::*;
+    // These tests only compile under `feature = "dev"`, which is why the missing
+    // imports went unnoticed: the dev variant's test target did not build at all.
+    use frame_support::{assert_noop, assert_ok};
     use crate::fraud_proofs::{
         freeze::{FreezeReason, FreezeState},
         scheduler_v1::scheduler_commitment_from_bytes,
