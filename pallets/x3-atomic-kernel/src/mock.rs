@@ -15,7 +15,9 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
-use x3_asset_kernel_types::traits::NoEconomicHalt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, MutexGuard};
+use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
 pub type AccountId = u64;
 pub type BlockNumber = u64;
@@ -29,6 +31,59 @@ pub const CHARLIE: AccountId = 3;
 #[allow(dead_code)]
 pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 pub const MIN_BOND: Balance = 10_000_000;
+
+// ── Switchable economic halt ───────────────────────────────────────────────
+//
+// `NoEconomicHalt` can never halt, which left the halt guard inside
+// `submit_atomic_bundle` with no way to observe it. This provider lets a test
+// flip the flag; the guard serialises halt tests and always clears the flag on
+// drop so tests running in parallel cannot observe it.
+
+pub struct SwitchableEconomicHalt;
+
+static ECONOMIC_HALTED: AtomicBool = AtomicBool::new(false);
+static HALT_LOCK: Mutex<()> = Mutex::new(());
+
+impl EconomicHaltInspect for SwitchableEconomicHalt {
+    fn is_halted() -> bool {
+        ECONOMIC_HALTED.load(Ordering::SeqCst)
+    }
+}
+
+/// Holds the halt lock with the economy open; flip it with [`EconomicHaltGuard::halt`].
+///
+/// Holding the lock for the whole test keeps halt tests from racing each other,
+/// and the flag is cleared on drop even if the test panics.
+#[allow(dead_code)]
+pub fn economy_open() -> EconomicHaltGuard {
+    let lock = HALT_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+    EconomicHaltGuard { _lock: lock }
+}
+
+#[allow(dead_code)]
+pub struct EconomicHaltGuard {
+    _lock: MutexGuard<'static, ()>,
+}
+
+#[allow(dead_code)]
+impl EconomicHaltGuard {
+    /// Halt new economic operations, as governance would.
+    pub fn halt(&self) {
+        ECONOMIC_HALTED.store(true, Ordering::SeqCst);
+    }
+
+    /// Lift the halt.
+    pub fn resume(&self) {
+        ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+    }
+}
+
+impl Drop for EconomicHaltGuard {
+    fn drop(&mut self) {
+        ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+    }
+}
 
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 250;
@@ -169,7 +224,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MinBond = MinBond;
     type MaxLegsPerBundle = MaxLegsPerBundle;
     type BundleDeadlineBlocks = BundleDeadlineBlocks;
-    type EconomicHalt = NoEconomicHalt;
+    type EconomicHalt = SwitchableEconomicHalt;
     type X3LangOrigin = RootOrSignedAccount;
     type SettlementOrigin = SettlementOnlyOrigin;
     type VmReverter = crate::vm_revert::NoopVmReverter;
