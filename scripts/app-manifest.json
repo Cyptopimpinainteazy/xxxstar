@@ -1,5 +1,25 @@
 [
   {
+    "id": "funding",
+    "title": "Funding Strategy",
+    "description": "Grant, sponsorship, and funding-angle target list tied to real code — not a solicitation",
+    "devPort": 1440,
+    "siteSubdir": "funding",
+    "category": "Site Pages",
+    "icon": "🎯",
+    "workdir": "apps/x3-funding"
+  },
+  {
+    "id": "transparency",
+    "title": "Transparency Ledger",
+    "description": "Evidence-only treasury and completion record — no payments accepted, no promises inferred",
+    "devPort": 1450,
+    "siteSubdir": "transparency",
+    "category": "Site Pages",
+    "icon": "🔍",
+    "workdir": "apps/x3-transparency"
+  },
+  {
     "id": "inferstructor",
     "title": "Inferstructor Dashboard",
     "description": "GPU validator admin dashboard with TPS leaderboard and orchestra controls",
@@ -51,9 +71,9 @@
   },
   {
     "id": "x3fronend",
-    "title": "X3 Landing & Pages",
-    "description": "Marketing landing page and 40+ specialized blockchain dashboard pages",
-    "devPort": 4173,
+    "title": "X3 Atomic Star — Home",
+    "description": "Investor/grant homepage — status and evidence generated live from LAUNCH_SCOPE.md and FEATURE_REGISTRY.toml",
+    "devPort": 4174,
     "siteSubdir": ".",
     "category": "Site Pages",
     "icon": "🚀",

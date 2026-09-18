@@ -1,9 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "export",
+  basePath: "/wallet",
   reactStrictMode: true,
   transpilePackages: ['@x3-chain/shared', '@x3-chain/ts-sdk'],
 
   images: {
+    unoptimized: true,
     domains: ["assets.x3-chain.io"],
     formats: ["image/avif", "image/webp"],
   },
