@@ -1,3 +1,8 @@
+---
+name: update-docs
+description: update-docs
+disable-model-invocation: true
+---
 # /update-docs
 
 Run the workspace post-task documentation synchronization flow.
