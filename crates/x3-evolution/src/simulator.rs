@@ -642,18 +642,39 @@ mod tests {
         }
     }
 
+    /// The strategy interpreter is a **fail-closed stub**: `execute_strategy`
+    /// holds for an empty strategy and returns an explicit
+    /// `SimulationFailed("… X3 VM integration pending")` for any real bytecode.
+    ///
+    /// This test pins that contract rather than the aspiration: the simulator
+    /// must never fabricate a result for a strategy it cannot execute. It needs
+    /// updating — in the direction of accepting the simulation — when the X3 VM
+    /// interpreter lands.
     #[test]
     fn test_simulation() {
         let config = SimulationConfig::default();
         let simulator = Simulator::new(config);
 
-        let bytecode = vec![0x20, 128, 128, 0x00];
-        let chromosome = Chromosome::from_bytecode(bytecode).unwrap();
-
         let data = generate_synthetic_data("ETH", 100, 2000.0, 0.02);
 
-        let result = simulator.simulate(&chromosome, &data).unwrap();
+        // An empty strategy simulates end to end and holds.
+        let empty = Chromosome::from_bytecode(Vec::new()).expect("empty chromosome");
+        let result = simulator
+            .simulate(&empty, &data)
+            .expect("an empty strategy must simulate");
         assert!(result.ticks_processed > 0);
+        assert!(result.portfolio.trades.is_empty());
+
+        // Any real strategy is refused, not silently treated as a hold.
+        let bytecode = vec![0x20, 128, 128, 0x00];
+        let chromosome = Chromosome::from_bytecode(bytecode).expect("chromosome");
+        let err = simulator
+            .simulate(&chromosome, &data)
+            .expect_err("the interpreter is unimplemented; it must fail closed");
+        assert!(
+            matches!(&err, EvolutionError::SimulationFailed(msg) if msg.contains("not yet implemented")),
+            "expected the documented fail-closed error, got {err:?}"
+        );
     }
 
     #[test]
