@@ -9,13 +9,15 @@
 //! No single validator can reconstruct the decryption key.
 
 use crate::ConfidentialGpuError;
+use curve25519_dalek::{constants::RISTRETTO_BASEPOINT_POINT, scalar::Scalar};
+use rand::rngs::OsRng;
 
 /// A DKG commitment broadcast by a validator.
 #[derive(Debug, Clone)]
 pub struct DkgCommitment {
     /// Validator index.
     pub validator_index: u32,
-    /// Polynomial commitments (Pedersen).
+    /// Feldman coefficient commitments (compressed Ristretto points).
     pub commitments: Vec<[u8; 32]>,
 }
 
@@ -40,7 +42,7 @@ pub struct DkgManager {
     threshold: u32,
     committee_size: u32,
     /// Our secret polynomial coefficients.
-    secret_coefficients: Vec<[u8; 32]>,
+    secret_coefficients: Vec<Scalar>,
     /// Received shares from other validators.
     received_shares: Vec<DkgShare>,
     /// Our aggregated secret share.
@@ -64,98 +66,73 @@ impl DkgManager {
         }
     }
 
-    /// Generate our polynomial commitments for phase 1 of DKG.
+    /// Generate a fresh random polynomial and real Feldman commitments.
     pub fn generate_commitments(&mut self) -> DkgCommitment {
-        // Generate random polynomial of degree t-1
-        let mut coefficients = Vec::with_capacity(self.threshold as usize);
-        for i in 0..self.threshold {
-            let mut coeff = [0u8; 32];
-            // Deterministic for testing; use CSPRNG in production
-            coeff[0] = (self.validator_index * 10 + i + 1) as u8;
-            coeff[1] = 0x42;
-            coefficients.push(coeff);
+        if self.threshold == 0 || self.threshold > self.committee_size || self.validator_index >= self.committee_size {
+            self.secret_coefficients.clear();
+            return DkgCommitment { validator_index: self.validator_index, commitments: Vec::new() };
         }
-
-        // Compute commitments (g^coefficient for each)
-        let commitments: Vec<[u8; 32]> = coefficients
-            .iter()
-            .map(|c| {
-                let mut commitment = [0u8; 32];
-                for i in 0..32 {
-                    commitment[i] = c[i].wrapping_mul(7);
-                }
-                commitment
-            })
+        let mut rng = OsRng;
+        self.secret_coefficients = (0..self.threshold).map(|_| Scalar::random(&mut rng)).collect();
+        let commitments = self.secret_coefficients.iter()
+            .map(|c| (c * RISTRETTO_BASEPOINT_POINT).compress().to_bytes())
             .collect();
-
-        self.secret_coefficients = coefficients;
-
-        DkgCommitment {
-            validator_index: self.validator_index,
-            commitments,
-        }
+        DkgCommitment { validator_index: self.validator_index, commitments }
     }
 
-    /// Process peer commitments and generate shares for phase 2.
-    pub fn participate(
-        &mut self,
-        peer_commitments: &[DkgCommitment],
-    ) -> Result<DkgShare, ConfidentialGpuError> {
-        if self.secret_coefficients.is_empty() {
-            // Auto-generate if not done yet
-            let _ = self.generate_commitments();
+    /// Generate a recipient-specific Shamir share. External validator IDs are
+    /// zero-based; field evaluation points are ID+1 so x=0 remains the secret.
+    pub fn share_for(&self, recipient: u32) -> Result<DkgShare, ConfidentialGpuError> {
+        if recipient >= self.committee_size || self.secret_coefficients.len() != self.threshold as usize {
+            return Err(ConfidentialGpuError::DkgFailed("invalid recipient or DKG polynomial not generated".into()));
         }
-
-        // Evaluate our polynomial at each peer's index to generate shares
-        // For now, generate a share for the first peer
-        let share_value = self.evaluate_polynomial(1);
-
+        let scalar = private_mempool::threshold::evaluate_polynomial(&self.secret_coefficients, recipient + 1);
+        let share = scalar.to_bytes();
         let mut proof_hasher = Sha256::new();
+        proof_hasher.update(b"x3/confidential-gpu/feldman-share/v1");
         proof_hasher.update(self.validator_index.to_le_bytes());
-        for c in &self.secret_coefficients {
-            proof_hasher.update(c);
+        proof_hasher.update(recipient.to_le_bytes());
+        proof_hasher.update(share);
+        Ok(DkgShare { from: self.validator_index, to: recipient, share, proof: proof_hasher.finalize().to_vec() })
+    }
+
+    /// Process a complete commitment set and return this validator's own share.
+    /// The group key is the sum of constant-term Feldman commitments.
+    pub fn participate(&mut self, peer_commitments: &[DkgCommitment]) -> Result<DkgShare, ConfidentialGpuError> {
+        use curve25519_dalek::{ristretto::{CompressedRistretto, RistrettoPoint}, traits::Identity};
+        use std::collections::HashSet;
+
+        if self.secret_coefficients.is_empty() {
+            let generated = self.generate_commitments();
+            if generated.commitments.is_empty() {
+                return Err(ConfidentialGpuError::DkgFailed("invalid DKG configuration".into()));
+            }
         }
-        proof_hasher.update(share_value);
-        proof_hasher.update(b"dleq-bind");
+        if peer_commitments.len() != self.committee_size as usize {
+            return Err(ConfidentialGpuError::DkgFailed(format!("expected {} commitment sets but got {}", self.committee_size, peer_commitments.len())));
+        }
 
-        let share = DkgShare {
-            from: self.validator_index,
-            to: 0, // Broadcast to all
-            share: share_value,
-            proof: proof_hasher.finalize().to_vec(),
-        };
-
-        // Process received commitments to derive group key
-        // Simplified: XOR all constant-term commitments
-        let mut group_key = [0u8; 32];
+        let mut seen = HashSet::new();
+        let mut group = RistrettoPoint::identity();
         for commitment in peer_commitments {
-            if let Some(c0) = commitment.commitments.first() {
-                for i in 0..32 {
-                    group_key[i] ^= c0[i];
-                }
+            if commitment.validator_index >= self.committee_size || !seen.insert(commitment.validator_index) {
+                return Err(ConfidentialGpuError::DkgFailed("duplicate or out-of-range commitment validator".into()));
             }
-        }
-
-        // Include our own
-        if let Some(c0) = self.secret_coefficients.first() {
-            let mut our_commitment = [0u8; 32];
-            for i in 0..32 {
-                our_commitment[i] = c0[i].wrapping_mul(7);
+            if commitment.commitments.len() != self.threshold as usize {
+                return Err(ConfidentialGpuError::DkgFailed("commitment polynomial has wrong degree".into()));
             }
-            for i in 0..32 {
-                group_key[i] ^= our_commitment[i];
-            }
+            let c0 = CompressedRistretto(commitment.commitments[0]).decompress()
+                .ok_or_else(|| ConfidentialGpuError::DkgFailed("invalid Ristretto commitment".into()))?;
+            group += c0;
         }
-
-        self.group_key = Some(group_key);
-        self.aggregated_secret = Some(share_value);
-
-        // Mark complete if we have enough shares
-        if peer_commitments.len() as u32 + 1 >= self.threshold {
-            self.complete = true;
+        if group == RistrettoPoint::identity() {
+            return Err(ConfidentialGpuError::DkgFailed("group key is identity".into()));
         }
-
-        Ok(share)
+        self.group_key = Some(group.compress().to_bytes());
+        // Compatibility path is not enough to declare the DKG complete: a
+        // production ceremony must verify and aggregate private incoming shares.
+        self.complete = false;
+        self.share_for(self.validator_index)
     }
 
     /// Combine decryption shares to reconstruct the shared secret.
@@ -165,24 +142,8 @@ impl DkgManager {
         &self,
         shares: &[private_mempool::DecryptionShare],
     ) -> Result<[u8; 32], ConfidentialGpuError> {
-        if (shares.len() as u32) < self.threshold {
-            return Err(ConfidentialGpuError::DkgFailed(format!(
-                "Need {} shares but got {}",
-                self.threshold,
-                shares.len()
-            )));
-        }
-
-        // Lagrange interpolation over decryption shares
-        // Simplified: XOR combination with Lagrange-like weighting
-        let mut result = [0u8; 32];
-        for share in shares {
-            for i in 0..32.min(share.share.len()) {
-                result[i] ^= share.share[i];
-            }
-        }
-
-        Ok(result)
+        private_mempool::encryption::combine_shares(shares, self.threshold)
+            .map_err(|e| ConfidentialGpuError::DkgFailed(e.to_string()))
     }
 
     /// Get the group public key.
@@ -195,19 +156,7 @@ impl DkgManager {
         self.complete
     }
 
-    /// Evaluate our polynomial at a given point.
-    fn evaluate_polynomial(&self, x: u32) -> [u8; 32] {
-        let mut result = [0u8; 32];
 
-        for (power, coeff) in self.secret_coefficients.iter().enumerate() {
-            let x_pow = x.pow(power as u32);
-            for i in 0..32 {
-                result[i] = result[i].wrapping_add(coeff[i].wrapping_mul(x_pow as u8));
-            }
-        }
-
-        result
-    }
 }
 
 #[cfg(test)]
@@ -230,11 +179,20 @@ mod tests {
             let _share = v.participate(&commitments).unwrap();
         }
 
-        // All should be complete
+        // Commitment processing derives one identical group key, but does not
+        // falsely claim completion before incoming private shares are verified.
+        let group_key = validators[0].group_key();
         for v in &validators {
-            assert!(v.is_complete());
-            assert!(v.group_key().is_some());
+            assert!(!v.is_complete());
+            assert_eq!(v.group_key(), group_key);
         }
+
+        // Shares are recipient-specific rather than broadcast constants.
+        let a = validators[0].share_for(1).unwrap();
+        let b = validators[0].share_for(2).unwrap();
+        assert_ne!(a.share, b.share);
+        assert_eq!(a.to, 1);
+        assert_eq!(b.to, 2);
     }
 
     /// # Invariant: PRIV-EXEC-003
