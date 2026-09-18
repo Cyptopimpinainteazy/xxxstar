@@ -9,6 +9,7 @@
 #   scripts/local-ci.sh                 # fast: format, guards, check, lint, unit tests
 #   scripts/local-ci.sh --live          # + the two self-contained contract gates (anvil/SVM)
 #   scripts/local-ci.sh --cross         # + the X3-native and X3VM<->EVM/SVM cross-domain lifecycles
+#   scripts/local-ci.sh --release       # + the release gate (make mainnet-check)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
@@ -21,12 +22,14 @@ cd "$ROOT"
 
 RUN_LIVE=0
 RUN_CROSS=0
+RUN_RELEASE=0
 LIST_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --live) RUN_LIVE=1 ;;
     --cross) RUN_LIVE=1; RUN_CROSS=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1 ;;
+    --release) RUN_RELEASE=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1 ;;
     --list) LIST_ONLY=1 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
@@ -100,6 +103,10 @@ describe_all() {
   - X3VM<->SVM cross-domain lifecycles (needs solana-test-validator + SBF program)
 EOF
   fi
+  if [ "$RUN_RELEASE" = 1 ]; then
+    echo "release gate:"
+    echo "  - make mainnet-check  (docs, release build + runtime WASM, chain specs, critical suites, srtool, secret scan)"
+  fi
 }
 
 if [ "$LIST_ONLY" = 1 ]; then
@@ -140,6 +147,15 @@ if [ "$RUN_CROSS" = 1 ]; then
   echo "NOTE: the X3VM<->EVM and X3VM<->SVM cross-domain gates need anvil /"
   echo "      solana-test-validator wired up first; run them with"
   echo "      the recipes recorded in .ai/memory/agent-memory.md."
+fi
+
+# The release gate: docs, release build + runtime WASM, chain specs, the critical
+# pallet/runtime suites, srtool/docker reproducibility prerequisites and the
+# forbidden-secret scan. Needs `srtool` on PATH (see the memory notes for the
+# pinned install command) or it fails loudly on section 5.
+if [ "$RUN_RELEASE" = 1 ]; then
+  run_gate "release gate (mainnet-check)" "release-gate" \
+    env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "make mainnet-check"
 fi
 
 echo ""
