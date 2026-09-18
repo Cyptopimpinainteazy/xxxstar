@@ -2,6 +2,14 @@
 //!
 //! Post-quantum cryptographic primitives for X3 validator and account security.
 //! Provides quantum-resistant algorithms for key generation, signing, and verification.
+//!
+//! **Status: research simulation.** Key generation, signing and verification are
+//! placeholder implementations (zeroed keys, `blake2_256(message)` padded to the
+//! nominal signature size). Verification therefore **fails closed**: it returns
+//! [`PQError::VerificationUnavailable`] rather than reporting a "valid" signature,
+//! because the check it used to perform ignored the public key entirely — any
+//! caller could forge `blake2_256(message) || padding` and be accepted. Do not
+//! treat this crate as a cryptographic root of trust; see issue #285.
 
 pub mod types;
 
@@ -121,11 +129,12 @@ impl PQManager {
         signature: &PQSignature,
         public_key: &PQPublicKey,
     ) -> Result<bool, PQError> {
-        // Dilithium verification
-        // In practice: use pqclean_dilithium::verify
-        // For now, simulate verification
-        let message_hash = sp_io::hashing::blake2_256(message);
-        Ok(signature.0.len() == 3293 && signature.0[0..32] == message_hash)
+        // The placeholder that used to live here compared
+        // `blake2_256(message)` with the first 32 bytes of the signature and never
+        // touched `public_key`, so any caller could "sign" without a private key.
+        // Refusing is the only honest answer until a real Dilithium verifier lands.
+        let _ = (message, signature, public_key);
+        Err(PQError::VerificationUnavailable)
     }
 
     // Falcon implementation
@@ -155,9 +164,10 @@ impl PQManager {
         signature: &PQSignature,
         public_key: &PQPublicKey,
     ) -> Result<bool, PQError> {
-        // Falcon verification
-        let message_hash = sp_io::hashing::blake2_256(message);
-        Ok(signature.0.len() == 666 && signature.0[0..32] == message_hash)
+        // Same placeholder shape as Dilithium: signature bytes compared against a
+        // message hash, public key ignored. Fails closed (issue #285).
+        let _ = (message, signature, public_key);
+        Err(PQError::VerificationUnavailable)
     }
 
     // Sphincs+ implementation
@@ -187,9 +197,10 @@ impl PQManager {
         signature: &PQSignature,
         public_key: &PQPublicKey,
     ) -> Result<bool, PQError> {
-        // Sphincs+ verification
-        let message_hash = sp_io::hashing::blake2_256(message);
-        Ok(signature.0.len() == 29792 && signature.0[0..32] == message_hash)
+        // Same placeholder shape as Dilithium: signature bytes compared against a
+        // message hash, public key ignored. Fails closed (issue #285).
+        let _ = (message, signature, public_key);
+        Err(PQError::VerificationUnavailable)
     }
 }
 
@@ -415,6 +426,10 @@ pub enum PQError {
     SigningFailed,
     #[error("Verification failed")]
     VerificationFailed,
+    /// No real post-quantum verifier exists in this crate yet, so every
+    /// verification request is refused rather than answered by a placeholder.
+    #[error("post-quantum verification is not implemented; refusing to verify")]
+    VerificationUnavailable,
     #[error("Invalid key")]
     InvalidKey,
     #[error("Rotation failed")]
