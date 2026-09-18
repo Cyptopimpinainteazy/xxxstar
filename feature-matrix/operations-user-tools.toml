@@ -1,0 +1,163 @@
+# Operations / User Tools feature matrix fragment.
+
+[[feature]]
+id = "X3-OPS-001"
+name = "Genesis ceremony tooling"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["scripts/mainnet/genesis_ceremony.sh"]
+implemented = 75
+tested = 45
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Real tagged genesis ceremony has not been completed"]
+evidence = ["scripts/mainnet/genesis_ceremony.sh", "note: Script requires tagged commit and srtool; status lists ceremony not run"]
+
+[[feature]]
+id = "X3-OPS-002"
+name = "Snapshot / restore tooling"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["scripts/snapshot-restore.sh"]
+implemented = 55
+tested = 25
+mainnet_ready = 35
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs live restore drills and integrity verification"]
+evidence = ["scripts/snapshot-restore.sh", "note: Independent audit previously scored snapshot/restore partial"]
+
+[[feature]]
+id = "X3-OPS-003"
+name = "Public testnet gate"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["scripts/mainnet/public_testnet_gate.sh"]
+implemented = 65
+tested = 45
+mainnet_ready = 45
+priority = "P0"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Fresh external testnet availability must be verified"]
+evidence = ["scripts/mainnet/public_testnet_gate.sh", "note: RPC-based public testnet gate exists"]
+
+[[feature]]
+id = "X3-OPS-004"
+name = "Telemetry integration"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["docs/reports/FUNCTIONAL_ROADMAP.md"]
+implemented = 40
+tested = 20
+mainnet_ready = 30
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Roadmap still lists telemetry integration as unfinished"]
+evidence = ["docs/reports/FUNCTIONAL_ROADMAP.md", "note: Functional roadmap identifies telemetry as outstanding"]
+
+[[feature]]
+id = "X3-OPS-005"
+name = "Load-generation TPS harness"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["scripts/testnet/load-remarks-tps.js"]
+implemented = 85
+tested = 80
+mainnet_ready = 55
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs multi-validator load profiles"]
+evidence = ["scripts/testnet/load-remarks-tps.js", "note: Used for real finalized-TPS baseline"]
+test_evidence = ["note: audited test/CI evidence score=80; exact named tests should be added before score increase"]
+
+[[feature]]
+id = "X3-OPS-006"
+name = "Wallet pallet"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["pallets/x3-wallet-pallet"]
+implemented = 75
+tested = 62
+mainnet_ready = 55
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Security review of biometric/recovery pending"]
+evidence = ["pallets/x3-wallet-pallet", "note: FEATURE_REGISTRY x3_wallet_pallet=55"]
+registry_feature = "x3_wallet_pallet"
+
+[[feature]]
+id = "X3-OPS-007"
+name = "Gateway /readyz health check"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["crates/x3-gateway"]
+implemented = 80
+tested = 65
+mainnet_ready = 65
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Needs deployed monitoring/SLO proof"]
+evidence = ["crates/x3-gateway", "note: Registry corrected health surfaces to /health,/readyz,/livez"]
+
+[[feature]]
+id = "X3-OPS-008"
+name = "RPC middleware"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["node/src/rpc_middleware.rs"]
+implemented = 78
+tested = 65
+mainnet_ready = 65
+priority = "P1"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["Production rate limits/abuse policies need external testing"]
+evidence = ["node/src/rpc_middleware.rs", "note: Readiness snapshots cite rpc middleware evidence"]
+
+[[feature]]
+id = "X3-OPS-009"
+name = "Block explorer"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["docs/X3_NEXT_TASKS.md"]
+implemented = 30
+tested = 15
+mainnet_ready = 20
+priority = "P2"
+confidence = "high"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No finished production explorer proven"]
+evidence = ["docs/X3_NEXT_TASKS.md", "note: Roadmap says integrate Blockscout/similar; older checklist scores indexer/explorer low"]
+
+[[feature]]
+id = "X3-OPS-010"
+name = "Prometheus/Grafana-style ops monitoring"
+subsystem = "operations_user_tools"
+source = "master"
+paths = ["docs"]
+implemented = 35
+tested = 15
+mainnet_ready = 25
+priority = "P2"
+confidence = "medium"
+launch_scope = "guarded"
+claim_risk = false
+blockers = ["No complete canonical deployed monitoring stack proven"]
+evidence = ["docs", "note: Monitoring concepts present but operational proof incomplete"]

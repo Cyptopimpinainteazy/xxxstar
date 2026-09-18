@@ -1,0 +1,24 @@
+# Canonical granular engineering readiness manifest for X3.
+# FEATURE_REGISTRY.toml remains the coarse product-readiness authority.
+
+includes = [
+  "feature-matrix/cross-chain.toml",
+  "feature-matrix/cross-vm-atomic.toml",
+  "feature-matrix/gpu-performance.toml",
+  "feature-matrix/economic-defi.toml",
+  "feature-matrix/security-proofgate.toml",
+  "feature-matrix/consensus-l1.toml",
+  "feature-matrix/runtime-core.toml",
+  "feature-matrix/operations-user-tools.toml",
+  "feature-matrix/language-trading.toml",
+  "feature-matrix/mev-privacy.toml",
+  "feature-matrix/agents-experimental.toml",
+  "feature-matrix/claims-hygiene.toml",
+]
+
+[meta]
+version = 1
+audit_date = "2026-09-12"
+repository = "Cyptopimpinainteazy/xxxstar"
+feature_count_expected = 145
+scoring = "implemented*0.35 + tested*0.25 + mainnet_ready*0.40"

@@ -1,0 +1,57 @@
+name: feature-matrix
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate-feature-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+
+      - name: Validator unit and repository integration tests
+        run: python -m pytest -q tests/test_feature_matrix.py
+
+      - name: Hard-fail feature matrix evidence check
+        run: python3 scripts/feature_matrix.py check
+
+      - name: Generate deterministic reports
+        run: python3 scripts/feature_matrix.py generate
+
+      - name: Verify generated reports are deterministic
+        run: python3 scripts/feature_matrix.py generate --check-clean
+
+      - name: Print readiness summary
+        run: python3 scripts/feature_matrix.py summary
+
+      - name: Upload feature matrix reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-feature-matrix-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            reports/feature-matrix/X3_FEATURE_MATRIX.json
+            reports/feature-matrix/X3_FEATURE_MATRIX.csv
+            reports/feature-matrix/X3_FEATURE_MATRIX.md
+            reports/feature-matrix/X3_FEATURE_SUMMARY.md

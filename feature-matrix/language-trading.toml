@@ -1,0 +1,172 @@
+# Language / Trading feature matrix fragment.
+
+[[feature]]
+id = "X3-LANG-001"
+name = "Compile→encode→decode→execute→receipt E2E"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 30
+tested = 10
+mainnet_ready = 15
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Genuine E2E test still required"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #10"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-LANG-002"
+name = "Economic replay validation in receipts"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 35
+tested = 15
+mainnet_ready = 20
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Receipts need replay-economic validation"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-LANG-003"
+name = "Signed / attested trading receipts"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 35
+tested = 15
+mainnet_ready = 20
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Receipt signatures/attestations incomplete"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #9"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-LANG-004"
+name = "Bytecode routing to atomic kernel"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["crates/x3-integration"]
+implemented = 40
+tested = 20
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["End-to-end compiler→runtime route incomplete"]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement"]
+open_prs = [129]
+registry_feature = "atomic_kernel"
+
+[[feature]]
+id = "X3-LANG-005"
+name = "Chain/capability version enforcement"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 40
+tested = 20
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Version gates incomplete"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #7"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-LANG-006"
+name = "Decoded bytecode → TradingVm execution"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 40
+tested = 20
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Decoder/executor connection incomplete"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #4"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-LANG-007"
+name = "Stateful trading IR verifier"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["x3-lang/compiler"]
+implemented = 40
+tested = 20
+mainnet_ready = 25
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs real stateful verifier"]
+evidence = ["x3-lang/compiler", "note: Trading Core v1 gap #3"]
+open_prs = [135]
+
+[[feature]]
+id = "X3-LANG-008"
+name = ".x3 compile_source integration"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["crates/x3-integration"]
+implemented = 45
+tested = 25
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["PR recovery/rebase and exact E2E proof needed"]
+evidence = ["crates/x3-integration", "note: Known grant-track gap"]
+open_prs = [129]
+
+[[feature]]
+id = "X3-LANG-009"
+name = "Authenticated bytecode decoder"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["crates/x3-integration"]
+implemented = 45
+tested = 25
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs tamper/replay tests"]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement"]
+open_prs = [129]
+
+[[feature]]
+id = "X3-LANG-010"
+name = "Versioned runtime bytecode envelope"
+subsystem = "language_trading"
+source = "open_pr"
+paths = ["crates/x3-integration"]
+implemented = 45
+tested = 25
+mainnet_ready = 30
+priority = "P0"
+confidence = "high"
+launch_scope = "core"
+claim_risk = false
+blockers = ["Needs signed domain-separated production envelope proof"]
+evidence = ["crates/x3-integration", "note: Known .x3 integration requirement"]
+open_prs = [129]
