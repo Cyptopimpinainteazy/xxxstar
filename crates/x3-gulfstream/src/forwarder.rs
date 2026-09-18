@@ -1,7 +1,7 @@
 //! Forwarder Module - Transaction forwarding to leaders
 
 use crate::config::GulfstreamConfig;
-use crate::error::GulfstreamResult;
+use crate::error::{GulfstreamError, GulfstreamResult};
 use crate::metrics::GulfstreamMetrics;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,28 +29,37 @@ impl Forwarder {
         }
     }
 
+    /// The configuration this forwarder was built with. Exposed so callers can
+    /// inspect it (the forwarding path itself does not consult it yet).
+    pub fn config(&self) -> &GulfstreamConfig {
+        &self.config
+    }
+
     /// Start the forwarder
     pub async fn start(&self) -> GulfstreamResult<()> {
         info!("Starting transaction forwarder");
-        
+
         let (tx, _rx) = mpsc::channel(100);
         *self.shutdown_tx.write() = Some(tx);
-        
+
         self.running.store(true, Ordering::SeqCst);
-        
+
         Ok(())
     }
 
     /// Stop the forwarder
     pub async fn stop(&self) -> GulfstreamResult<()> {
         info!("Stopping transaction forwarder");
-        
-        if let Some(tx) = self.shutdown_tx.write().take() {
+
+        // Take the sender and drop the guard *before* awaiting: holding a std
+        // `RwLock` guard across an await point can deadlock and is not `Send`.
+        let shutdown_tx = self.shutdown_tx.write().take();
+        if let Some(tx) = shutdown_tx {
             let _ = tx.send(()).await;
         }
-        
+
         self.running.store(false, Ordering::SeqCst);
-        
+
         Ok(())
     }
 
@@ -61,31 +70,39 @@ impl Forwarder {
         }
 
         let start = Instant::now();
-        
+
         debug!("Forwarding transaction {} to leader {}", tx_hash, leader_id);
-        
+
         // In real implementation, would send to actual network
         // Simulate network delay
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         let elapsed = start.elapsed().as_millis() as u64;
         self.metrics.record_forward_time(elapsed);
-        
+
         Ok(())
     }
 
     /// Forward multiple transactions in batch
-    pub async fn forward_batch(&self, leader_id: &str, tx_hashes: &[String]) -> GulfstreamResult<()> {
+    pub async fn forward_batch(
+        &self,
+        leader_id: &str,
+        tx_hashes: &[String],
+    ) -> GulfstreamResult<()> {
         if !self.running.load(Ordering::SeqCst) {
             return Err(GulfstreamError::NotStarted("Forwarder not running".into()));
         }
 
-        debug!("Forwarding batch of {} transactions to leader {}", tx_hashes.len(), leader_id);
-        
+        debug!(
+            "Forwarding batch of {} transactions to leader {}",
+            tx_hashes.len(),
+            leader_id
+        );
+
         for tx_hash in tx_hashes {
             self.forward_to(leader_id, tx_hash).await?;
         }
-        
+
         Ok(())
     }
 

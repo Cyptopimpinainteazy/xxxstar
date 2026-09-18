@@ -1,7 +1,7 @@
 //! Transaction Module
 
 use crate::error::{GulfstreamError, GulfstreamResult};
-use bincode::{serialize, deserialize};
+use bincode::{deserialize, serialize};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -77,7 +77,7 @@ impl Transaction {
         fee_payer: [u8; 32],
     ) -> Self {
         let hash = Self::compute_hash(&data, &signature);
-        
+
         Self {
             data,
             hash,
@@ -133,17 +133,19 @@ impl Transaction {
         if self.data.is_empty() {
             return Err(GulfstreamError::InvalidTransaction("Empty data".into()));
         }
-        
+
         if self.signature.is_empty() {
-            return Err(GulfstreamError::InvalidTransaction("Empty signature".into()));
+            return Err(GulfstreamError::InvalidTransaction(
+                "Empty signature".into(),
+            ));
         }
-        
+
         // Verify hash
         let computed_hash = Self::compute_hash(&self.data, &self.signature);
         if computed_hash != self.hash {
             return Err(GulfstreamError::InvalidTransaction("Hash mismatch".into()));
         }
-        
+
         Ok(())
     }
 
@@ -161,7 +163,7 @@ impl Transaction {
 /// Simple hex encoding helper
 mod hex {
     const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
-    
+
     pub fn encode(data: &[u8]) -> String {
         let mut result = String::with_capacity(data.len() * 2);
         for byte in data {

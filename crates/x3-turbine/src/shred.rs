@@ -306,7 +306,7 @@ impl ErasureCode {
             let row = &self.encoding_matrix[self.data_shreds + i];
             let mut coding_chunk = vec![0u8; chunk_size];
 
-            for byte_idx in 0..chunk_size {
+            for (byte_idx, slot) in coding_chunk.iter_mut().enumerate() {
                 let mut value: u8 = 0;
                 for j in 0..self.data_shreds {
                     if byte_idx < data_chunks[j].len() {
@@ -314,7 +314,7 @@ impl ErasureCode {
                             Self::gf_mul(data_chunks[j][byte_idx].into(), row[j] as u32, 285) as u8;
                     }
                 }
-                coding_chunk[byte_idx] = value;
+                *slot = value;
             }
 
             coding_chunks.push(coding_chunk);

@@ -7,34 +7,34 @@ use serde::{Deserialize, Serialize};
 pub struct GulfstreamConfig {
     /// Maximum mempool size
     pub max_mempool_size: usize,
-    
+
     /// Maximum transaction age in slots
     pub max_transaction_age_slots: u64,
-    
+
     /// Batch size for forwarding transactions
     pub forward_batch_size: usize,
-    
+
     /// Forward timeout in milliseconds
     pub forward_timeout_ms: u64,
-    
+
     /// Enable transaction prioritization
     pub enable_prioritization: bool,
-    
+
     /// Number of priority levels
     pub priority_levels: usize,
-    
+
     /// Stale transaction check interval in ms
     pub stale_check_interval_ms: u64,
-    
+
     /// Deduplication cache size
     pub dedup_cache_size: usize,
-    
+
     /// Network bind address
     pub bind_address: String,
-    
+
     /// Maximum connections
     pub max_connections: usize,
-    
+
     /// Enable metrics
     pub enable_metrics: bool,
 }
