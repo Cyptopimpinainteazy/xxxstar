@@ -10,6 +10,7 @@
 #   scripts/local-ci.sh --live          # + the two self-contained contract gates (anvil/SVM)
 #   scripts/local-ci.sh --cross         # + the X3-native and X3VM<->EVM/SVM cross-domain lifecycles
 #   scripts/local-ci.sh --release       # + the release gate (make mainnet-check)
+#   scripts/local-ci.sh --variants      # + the runtime migration dry-run for all six variants
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
@@ -23,13 +24,15 @@ cd "$ROOT"
 RUN_LIVE=0
 RUN_CROSS=0
 RUN_RELEASE=0
+RUN_VARIANTS=0
 LIST_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --live) RUN_LIVE=1 ;;
     --cross) RUN_LIVE=1; RUN_CROSS=1 ;;
     --release) RUN_RELEASE=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1 ;;
+    --variants) RUN_VARIANTS=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1 ;;
     --list) LIST_ONLY=1 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
@@ -107,6 +110,10 @@ EOF
     echo "release gate:"
     echo "  - make mainnet-check  (docs, release build + runtime WASM, chain specs, critical suites, srtool, secret scan)"
   fi
+  if [ "$RUN_VARIANTS" = 1 ]; then
+    echo "runtime variants:"
+    echo "  - scripts/check-runtime-variants.sh  (migration dry-run per construct_runtime! variant)"
+  fi
 }
 
 if [ "$LIST_ONLY" = 1 ]; then
@@ -156,6 +163,13 @@ fi
 if [ "$RUN_RELEASE" = 1 ]; then
   run_gate "release gate (mainnet-check)" "release-gate" \
     env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "make mainnet-check"
+fi
+
+# The migration dry-run covers every construct_runtime! variant; each variant is a
+# separate feature set, so this compiles the runtime six times.
+if [ "$RUN_VARIANTS" = 1 ]; then
+  run_gate "runtime variant dry-runs" "runtime-variants" \
+    env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash scripts/check-runtime-variants.sh
 fi
 
 echo ""
