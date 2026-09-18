@@ -34,12 +34,10 @@ env:
   SOLANA_INSTALL_URL: https://release.anza.xyz/stable/install
 
 
-concurrency:
-  # Never cancel an in-flight default-branch run: a cancelled release gate proves
-  # nothing, and with one self-hosted runner every new commit used to cancel the
-  # previous gate before it finished. PR runs still cancel superseded pushes.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# NOTE: deliberately no `concurrency:` block — see the same note in
+# `x3vm-evm-live-lifecycle.yml`. This workflow is called by `production-gate.yml`
+# as `svm-live`, and a concurrency group colliding with the standalone push run
+# prevented that call from ever being scheduled.
 
 jobs:
   live-lifecycle:

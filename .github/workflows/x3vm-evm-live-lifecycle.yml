@@ -28,12 +28,14 @@ env:
   CARGO_TERM_COLOR: always
 
 
-concurrency:
-  # Never cancel an in-flight default-branch run: a cancelled release gate proves
-  # nothing, and with one self-hosted runner every new commit used to cancel the
-  # previous gate before it finished. PR runs still cancel superseded pushes.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# NOTE: deliberately no `concurrency:` block. This workflow is invoked twice for
+# the same commit — standalone on push, and as a reusable workflow from
+# `production-gate.yml` (`evm-live`). A workflow-level concurrency group applies
+# to the called run too, and it collides with the standalone run of the same
+# workflow/commit: production-gate's `evm-live` job was never scheduled, so its
+# `gate` job (which `needs:` it) was always skipped and the release gate could
+# never pass. The single self-hosted runner already serialises everything, so
+# cancelling here bought nothing.
 
 jobs:
   live-lifecycle:
