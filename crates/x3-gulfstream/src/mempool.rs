@@ -1,9 +1,9 @@
 //! Mempool Module - Transaction memory pool
 
 use crate::config::GulfstreamConfig;
-use crate::error::GulfstreamResult;
+use crate::error::{GulfstreamError, GulfstreamResult};
 use crate::metrics::GulfstreamMetrics;
-use crate::transaction::{Transaction, TransactionMeta, TransactionStatus};
+use crate::transaction::{Transaction, TransactionStatus};
 use lru::LruCache;
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
@@ -38,7 +38,11 @@ pub struct TransactionMempool {
 impl TransactionMempool {
     /// Create new mempool
     pub fn new(config: GulfstreamConfig) -> Self {
-        let dedup_cache = LruCache::new(config.dedup_cache_size);
+        // `lru` wants a NonZero size; a configured 0 means "dedup disabled", which
+        // the smallest cache expresses without panicking.
+        let dedup_cache_size = core::num::NonZeroUsize::new(config.dedup_cache_size)
+            .unwrap_or(core::num::NonZeroUsize::MIN);
+        let dedup_cache = LruCache::new(dedup_cache_size);
         let priority_queues = (0..config.priority_levels)
             .map(|_| VecDeque::new())
             .collect();
@@ -60,11 +64,10 @@ impl TransactionMempool {
         *self.cleanup_handle.write() = Some(tx);
 
         let config = self.config.clone();
-        
+
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                Duration::from_millis(config.stale_check_interval_ms)
-            );
+            let mut interval =
+                tokio::time::interval(Duration::from_millis(config.stale_check_interval_ms));
 
             loop {
                 tokio::select! {
@@ -88,7 +91,9 @@ impl TransactionMempool {
         {
             let mut dedup = self.dedup_cache.write();
             if dedup.contains(&tx_hash) {
-                return Err(GulfstreamError::MempoolError("Duplicate transaction".into()));
+                return Err(GulfstreamError::MempoolError(
+                    "Duplicate transaction".into(),
+                ));
             }
             dedup.put(tx_hash.clone(), ());
         }
@@ -113,10 +118,11 @@ impl TransactionMempool {
             added_at: Instant::now(),
         };
 
+        // Read the priority before the entry is moved into the map.
+        let priority = entry.transaction.meta().priority as usize;
         self.transactions.write().insert(tx_hash.clone(), entry);
 
         // Add to priority queue
-        let priority = entry.transaction.meta().priority as usize;
         if priority < self.config.priority_levels {
             self.priority_queues.write()[priority].push_back(tx_hash.clone());
         }
@@ -127,14 +133,13 @@ impl TransactionMempool {
 
     /// Get transaction status
     pub fn get_status(&self, tx_hash: &str) -> Option<TransactionStatus> {
-        self.transactions.read()
-            .get(tx_hash)
-            .map(|e| e.status)
+        self.transactions.read().get(tx_hash).map(|e| e.status)
     }
 
     /// Get transaction
     pub fn get_transaction(&self, tx_hash: &str) -> Option<Transaction> {
-        self.transactions.read()
+        self.transactions
+            .read()
             .get(tx_hash)
             .map(|e| e.transaction.clone())
     }
@@ -142,9 +147,10 @@ impl TransactionMempool {
     /// Remove oldest transaction
     fn remove_oldest(&self) -> GulfstreamResult<()> {
         let mut transactions = self.transactions.write();
-        
+
         // Find oldest
-        let oldest = transactions.iter()
+        let oldest = transactions
+            .iter()
             .min_by_key(|(_, e)| e.added_at)
             .map(|(k, _)| k.clone());
 
@@ -162,7 +168,7 @@ impl TransactionMempool {
         let max_age = self.config.max_transaction_age_slots;
 
         let mut transactions = self.transactions.write();
-        
+
         transactions.retain(|hash, entry| {
             let age = current_slot.saturating_sub(entry.transaction.meta().created_slot);
             if age > max_age {
@@ -190,7 +196,7 @@ impl TransactionMempool {
                     if entry.status == TransactionStatus::Pending {
                         entry.status = TransactionStatus::Forwarded;
                         result.push(entry.transaction.clone());
-                        
+
                         if result.len() >= count {
                             return result;
                         }
@@ -205,7 +211,7 @@ impl TransactionMempool {
     /// Update current slot
     pub fn set_current_slot(&self, slot: u64) {
         *self.current_slot.write() = slot;
-        
+
         // Remove expired transactions
         self.remove_expired(slot);
     }

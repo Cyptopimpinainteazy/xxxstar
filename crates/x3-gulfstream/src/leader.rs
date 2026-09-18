@@ -31,7 +31,7 @@ impl LeaderSchedule {
     /// Set current slot
     pub fn set_current_slot(&mut self, slot: u64) {
         self.current_slot = slot;
-        
+
         // Remove old entries
         while let Some(entry) = self.schedule.front() {
             if entry.slot <= slot {

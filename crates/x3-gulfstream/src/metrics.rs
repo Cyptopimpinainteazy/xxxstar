@@ -2,7 +2,6 @@
 
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 
 /// Gulfstream metrics collector
 pub struct GulfstreamMetrics {

@@ -323,10 +323,9 @@ mod tests {
         // 13 nodes mapped to a k-ary tree means 1 root and 12 edges
         assert_eq!(total_edges, 12, "Tree should have N-1 edges");
 
-        // Verify different shred indices yield different trees
-        let children_shred5 = manager.get_broadcast_children(100, 5, "peer-0", 3);
-        let children_shred6 = manager.get_broadcast_children(100, 6, "peer-0", 3);
-
+        // Verify different shred indices yield different trees. The loop below
+        // recomputes both for every peer, so the two one-off calls that used to
+        // sit here were dead work (their results were never read).
         // While theoretically they could be identical randomly, the probability is 1/13!
         // so we can safely assert they differ for at least one node in practice.
         let mut diff_found = false;

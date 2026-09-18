@@ -22,10 +22,7 @@ swarm-media
 voice-to-x3
 x3-chain-onboarding
 x3-dns-server
-x3-evolution-core
-x3-gulfstream
 x3-indexer
-x3-launch-validator
 x3-lsp
 x3-marketplace
 x3-mobile-sdk
@@ -37,5 +34,4 @@ x3-swarm-api
 x3-swarm-core
 x3-swarm-worker-standalone
 x3-treasury
-x3-turbine
 x3-wallet-cli
