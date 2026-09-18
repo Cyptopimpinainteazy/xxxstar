@@ -141,6 +141,45 @@ enum Cmd {
     },
     /// Run static analysis linter.
     Lint { input: PathBuf },
+    /// Build the opportunity graph from a program's `venue` declarations and
+    /// search it for routes between two assets.
+    Graph {
+        input: PathBuf,
+        /// Asset to start from, as `chain.ASSET`.
+        #[arg(long)]
+        from: String,
+        /// Asset to reach, as `chain.ASSET`.
+        #[arg(long)]
+        to: String,
+        /// Maximum hops.
+        #[arg(long, default_value_t = 4)]
+        max_hops: usize,
+        /// Reject venues that declare more slippage than this, in bps.
+        #[arg(long)]
+        max_slippage_bps: Option<u32>,
+        /// Reject venues whose declared liquidity is below this.
+        #[arg(long)]
+        min_liquidity: Option<u128>,
+    },
+    /// Choose one route from the opportunity graph, deterministically.
+    Optimize {
+        input: PathBuf,
+        /// Asset to start from, as `chain.ASSET`.
+        #[arg(long)]
+        from: String,
+        /// Asset to reach, as `chain.ASSET`.
+        #[arg(long)]
+        to: String,
+        /// What to optimize for.
+        #[arg(long, default_value = "minimize_fees")]
+        objective: String,
+        /// Maximum hops.
+        #[arg(long, default_value_t = 4)]
+        max_hops: usize,
+        /// Reject venues that declare more slippage than this, in bps.
+        #[arg(long)]
+        max_slippage_bps: Option<u32>,
+    },
     /// Compute route/risk score for an intent.
     Score { input: PathBuf },
     /// Generate and run tests for an intent.
@@ -285,6 +324,22 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
         // B-52 commands
         Cmd::Fmt { input, check } => cmd_fmt(&input, check),
         Cmd::Lint { input } => cmd_lint(&input, mode),
+        Cmd::Graph {
+            input,
+            from,
+            to,
+            max_hops,
+            max_slippage_bps,
+            min_liquidity,
+        } => cmd_graph(&input, &from, &to, max_hops, max_slippage_bps, min_liquidity),
+        Cmd::Optimize {
+            input,
+            from,
+            to,
+            objective,
+            max_hops,
+            max_slippage_bps,
+        } => cmd_optimize(&input, &from, &to, &objective, max_hops, max_slippage_bps),
         Cmd::Score { input } => cmd_score(&input, mode),
         Cmd::Test {
             input,
@@ -402,6 +457,187 @@ fn cmd_check(input: &PathBuf, out: Option<&PathBuf>, mode_str: &str, deny_warnin
         }
         Ok(ExitCode::from(1))
     }
+}
+
+/// `x3c optimize` — choose one route, and show enough to review the choice.
+fn cmd_optimize(
+    input: &PathBuf,
+    from: &str,
+    to: &str,
+    objective_name: &str,
+    max_hops: usize,
+    max_slippage_bps: Option<u32>,
+) -> Result<ExitCode, String> {
+    use x3_lang_compiler::optimizer::{optimize, NoRoute, Objective};
+
+    let Some(objective) = Objective::parse(objective_name) else {
+        let allowed: Vec<&str> = Objective::ALL.iter().map(|objective| objective.as_str()).collect();
+        return Err(format!(
+            "unknown objective '{objective_name}'; the optimizer can only rank what it can \
+             evaluate, so the set is closed: {}",
+            allowed.join(", ")
+        ));
+    };
+
+    let source = read_source(input)?;
+    let program = x3_lang_compiler::parser::parse_source(&source).map_err(|e| format!("parse error: {e}"))?;
+    let mut acc = x3_lang_common::ErrorAccumulator::new();
+    x3_lang_compiler::semantic::verify_venue_decls(&program, &mut acc);
+    if acc.has_errors() {
+        for error in acc.errors() {
+            print_error(&format!("{error}"));
+        }
+        return Ok(ExitCode::from(1));
+    }
+
+    let graph = x3_lang_compiler::opportunity::OpportunityGraph::from_program(&program);
+    let constraints = x3_lang_compiler::opportunity::OpportunityConstraints {
+        max_hops,
+        max_slippage_bps,
+        ..Default::default()
+    };
+    let report = optimize(&graph, from, to, objective, &constraints);
+
+    match (&report.chosen, &report.no_route) {
+        (Some(chosen), _) => {
+            println!(
+                "x3c optimize: {} — {}  ({} bps fee, {} bps slippage, risk {}, {}ms, {} block(s) \
+                 finality)",
+                objective.as_str(),
+                chosen.venues.join(" -> "),
+                chosen.fee_bps,
+                chosen.slippage_bps,
+                chosen.max_risk,
+                chosen.latency_ms,
+                chosen.finality_blocks
+            );
+            println!(
+                "  considered {} route(s); {}",
+                report.considered,
+                if report.decided_by_objective() {
+                    "the objective decided".to_string()
+                } else {
+                    // Saying this out loud is the point: a caller that believes
+                    // the objective decided when a tie-break did has been
+                    // misled about the quality of the choice.
+                    format!(
+                        "{} route(s) tied on {}, broken canonically by venue order: {}",
+                        report.tied.len(),
+                        objective.as_str(),
+                        report
+                            .tied
+                            .iter()
+                            .map(|opportunity| opportunity.venues.join(" -> "))
+                            .collect::<Vec<_>>()
+                            .join("; ")
+                    )
+                }
+            );
+            Ok(ExitCode::SUCCESS)
+        }
+        (None, Some(NoRoute::BudgetExhausted { examined, budget })) => {
+            print_error(&format!(
+                "optimizer exhausted its expansion budget ({examined} of {budget}); the graph is too \
+                 large to optimize — reduce --max-hops or narrow the constraints"
+            ));
+            Ok(ExitCode::from(1))
+        }
+        (None, Some(NoRoute::AllRefused { refused })) => {
+            print_error("no route satisfies the constraints:");
+            for (venue, reason) in refused {
+                println!("  refused {venue}: {reason:?}");
+            }
+            Ok(ExitCode::from(1))
+        }
+        (None, _) => {
+            print_error(&format!("no route from {from} to {to} within {max_hops} hop(s)"));
+            Ok(ExitCode::from(1))
+        }
+    }
+}
+
+/// `x3c graph` — build the opportunity graph and search it.
+///
+/// This is the reachability the graph needs to be a feature rather than a
+/// module: without a command that builds a graph from a real program and prints
+/// what the planner found, nothing outside the tests would ever exercise it.
+fn cmd_graph(
+    input: &PathBuf,
+    from: &str,
+    to: &str,
+    max_hops: usize,
+    max_slippage_bps: Option<u32>,
+    min_liquidity: Option<u128>,
+) -> Result<ExitCode, String> {
+    let source = read_source(input)?;
+    let program = x3_lang_compiler::parser::parse_source(&source).map_err(|e| format!("parse error: {e}"))?;
+
+    // The declarations are checked before they are searched: a graph built from
+    // an inconsistent venue would answer confidently about a node that cannot
+    // exist.
+    let mut acc = x3_lang_common::ErrorAccumulator::new();
+    x3_lang_compiler::semantic::verify_venue_decls(&program, &mut acc);
+    if acc.has_errors() {
+        for error in acc.errors() {
+            print_error(&format!("{error}"));
+        }
+        return Ok(ExitCode::from(1));
+    }
+
+    let graph = x3_lang_compiler::opportunity::OpportunityGraph::from_program(&program);
+    let constraints = x3_lang_compiler::opportunity::OpportunityConstraints {
+        max_hops,
+        max_slippage_bps,
+        min_liquidity,
+        ..Default::default()
+    };
+    let outcome = x3_lang_compiler::opportunity::search(&graph, from, to, &constraints);
+    let opportunities = match &outcome {
+        x3_lang_compiler::opportunity::SearchOutcome::Found(found) => found.clone(),
+        x3_lang_compiler::opportunity::SearchOutcome::BudgetExhausted { examined, budget } => {
+            // "I stopped looking" is not "there is nothing there". Reporting an
+            // unreachable route for a search that never finished is the worst
+            // answer this command can give.
+            print_error(&format!(
+                "search exhausted its expansion budget ({examined} of {budget}); narrow the \
+                 constraints or reduce --max-hops"
+            ));
+            return Ok(ExitCode::from(1));
+        }
+    };
+
+    println!(
+        "x3c graph: {} venue(s), {} edge(s); {from} -> {to} within {} hop(s): {} opportunit{}",
+        graph.edges.len(),
+        graph.edges.len(),
+        constraints.max_hops,
+        opportunities.len(),
+        if opportunities.len() == 1 { "y" } else { "ies" }
+    );
+    for (rank, opportunity) in opportunities.iter().enumerate() {
+        println!(
+            "  {}. {}  fee {} bps, slippage {} bps, risk {}, latency {}ms, finality {} block(s), \
+             min liquidity {}",
+            rank + 1,
+            opportunity.venues.join(" -> "),
+            opportunity.fee_bps,
+            opportunity.slippage_bps,
+            opportunity.max_risk,
+            opportunity.latency_ms,
+            opportunity.finality_blocks,
+            opportunity.min_liquidity
+        );
+    }
+    if opportunities.is_empty() {
+        // An empty result is the interesting case, so say which venues were
+        // refused and why rather than printing nothing.
+        for edge in &graph.edges {
+            if let Some(reason) = x3_lang_compiler::opportunity::reject_reason(edge, &constraints) {
+                println!("  refused {} -> {}: {reason:?}", edge.from, edge.venue);
+            }
+        }
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn cmd_lower(input: &PathBuf, out: &PathBuf) -> Result<ExitCode, String> {
