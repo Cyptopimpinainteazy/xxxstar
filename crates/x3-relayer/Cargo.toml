@@ -21,7 +21,7 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand = "0.8"
 sha2 = "0.10"
 env_logger = "0.11"
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 hex = { version = "0.4", default-features = false }
 sha3 = "0.10"
 codec = { workspace = true, default-features = false }
