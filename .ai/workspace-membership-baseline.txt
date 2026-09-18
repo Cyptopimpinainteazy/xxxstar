@@ -29,11 +29,7 @@ x3-launch-validator
 x3-lsp
 x3-marketplace
 x3-mobile-sdk
-x3-parallel-executor
 x3-pq
-x3-readiness-report
-x3-rpc-policy
-x3-runtime-params
 x3-sidecar
 x3-solvency-sidecar
 x3-swap-router
