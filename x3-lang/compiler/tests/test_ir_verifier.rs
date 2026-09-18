@@ -152,6 +152,9 @@ fn compiled_policy(id: &str) -> CompiledTradingPolicy {
         ]),
         allow_mint: false,
         allow_burn: false,
+        max_oracle_deviation_bps: None,
+        max_cumulative_loss: None,
+        max_cumulative_loss_asset: None,
     }
 }
 

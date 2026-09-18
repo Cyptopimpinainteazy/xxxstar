@@ -86,6 +86,9 @@ fn trading_receipt_json(tamper: bool) -> String {
                 ]),
                 allow_mint: false,
                 allow_burn: false,
+                max_oracle_deviation_bps: None,
+                max_cumulative_loss: None,
+                max_cumulative_loss_asset: None,
             },
         },
         TradingOperation::OpenDebt {
@@ -139,6 +142,127 @@ fn trading_receipt_json(tamper: bool) -> String {
     }
     serde_json::to_string_pretty(&receipt).expect("receipt json")
 }
+
+const TRADING_SOURCE: &str = r#"
+asset USDC = evm.ethereum.0xA0b8 { decimals: 6 }
+asset WETH = evm.ethereum.0xC02a { decimals: 18 }
+asset ETH = evm.ethereum.0x0000000000000000000000000000000000000000 { decimals: 18 }
+
+risk policy MainnetArb {
+    max_slippage: 30 bps
+    max_gas: 0.02 ETH
+    max_flash_fee: 10 bps
+    deadline: 2 blocks
+    require_private_submission: true
+}
+
+atomic trade CrossDexArb using MainnetArb {
+    borrow 1_000_000 USDC from aave_v3 as debt
+
+    let weth = swap debt.amount USDC -> WETH
+        via uniswap_v3
+        min_out 410 WETH
+
+    let returned = swap weth WETH -> USDC
+        via sushiswap
+        min_out 1_002_000 USDC
+
+    repay debt
+
+    require net_profit >= 1_000 USDC
+    require all_debts_repaid
+    emit receipt
+}
+"#;
+
+/// A B-52 program that declares every optional recommendation `x3c audit`
+/// checks for (vm, solver_market, two rpc_quorum blocks, risk_policy,
+/// privacy, invariant, proofs required, finality_policy, target) plus a
+/// nonce guard, refund path, and timeout — chosen so a clean run produces
+/// zero [FAIL] and zero [WARN] entries at all.
+const FULLY_CONFIGURED_SOURCE: &str = r#"
+vm {
+    chain arbitrum
+    adapter evm
+    finality safe
+}
+
+solver_market {
+    mode competitive
+    min_reputation 95
+}
+
+relayers {
+    quorum_numerator 3
+    quorum_denominator 5
+    relayers [relayer_a, relayer_b, relayer_c, relayer_d, relayer_e]
+}
+
+rpc_quorum {
+    source arbitrum
+    require_numerator 2
+    require_denominator 3
+    reject_on [receipt_disagree, finality_disagree]
+}
+
+rpc_quorum {
+    source solana
+    require_numerator 2
+    require_denominator 3
+    reject_on [receipt_disagree, finality_disagree]
+}
+
+risk_policy {
+    max_slippage 5
+    max_position 500000
+}
+
+privacy {
+    hide_route_until_commit true
+    reveal_on claim
+    encrypted true
+}
+
+invariant no_double_claim
+
+proofs required {
+    source_lock_proof
+    source_finality_proof
+    destination_fill_proof
+}
+
+finality_policy strict {
+    chain ethereum
+    requirement finalized
+}
+
+error SlippageExceeded
+
+target evm {
+    adapter evm_adapter
+    contract 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18
+}
+
+intent safe_cross_vm_swap {
+    from arbitrum.USDC amount 500
+    to solana.SOL receiver wallet
+
+    route {
+        bridge X3 arbitrum.USDC -> solana.SOL receiver wallet
+    }
+
+    require nonce unused safe_swap_001
+    require slippage <= 5
+    require route_score >= 90
+    require finality.arbitrum >= 32
+    require finality.solana >= 32
+    require relayer_quorum >= 3
+    require solver_bond >= 10000
+
+    timeout 3600s
+    on_fail refund arbitrum.USDC to sender
+}
+"#;
 
 const GOOD_SOURCE: &str = r#"intent arb_solana_eth {
     from Ethereum.USDC amount 100 receiver 0x1111111111111111111111111111111111111111
@@ -339,5 +463,183 @@ fn cli_check_rejects_unsafe_program() {
     assert!(
         !status.success(),
         "unknown chain must be rejected by `x3c check`, got: {status:?}"
+    );
+}
+
+#[test]
+fn cli_receipt_execute_compiles_runs_and_emits_a_verifiable_receipt() {
+    // Proves the previously-unwired pipeline actually connects: a real
+    // .x3 source file, compiled and executed through the CLI (not
+    // library test code), produces a receipt that independently passes
+    // `x3c receipt verify`.
+    let src = write_fixture("cli_receipt_execute.x3", TRADING_SOURCE);
+    let receipt_path = std::env::temp_dir().join("cli_receipt_execute_out.json");
+
+    let output = x3c()
+        .arg("receipt")
+        .arg("execute")
+        .arg(&src)
+        .arg("--out")
+        .arg(&receipt_path)
+        .output()
+        .expect("x3c receipt execute");
+    assert!(
+        output.status.success(),
+        "receipt execute must succeed for a well-formed trade: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("CrossDexArb"));
+
+    let body = std::fs::read_to_string(&receipt_path).expect("receipt file must be written");
+    assert!(body.contains("\"trade_id\": \"CrossDexArb\""));
+    assert!(body.contains("\"attestation\""));
+
+    let verify_status = x3c()
+        .arg("receipt")
+        .arg("verify")
+        .arg(&receipt_path)
+        .status()
+        .expect("x3c receipt verify");
+    assert!(
+        verify_status.success(),
+        "a receipt produced by `receipt execute` must itself pass `receipt verify`"
+    );
+}
+
+#[test]
+fn cli_receipt_execute_is_deterministic_given_the_same_signing_key() {
+    let src = write_fixture("cli_receipt_execute_deterministic.x3", TRADING_SOURCE);
+    let key = "1111111111111111111111111111111111111111111111111111111111111111";
+    let key = &key[..64];
+
+    let first = x3c()
+        .arg("receipt")
+        .arg("execute")
+        .arg(&src)
+        .arg("--key-hex")
+        .arg(key)
+        .output()
+        .expect("x3c receipt execute");
+    let second = x3c()
+        .arg("receipt")
+        .arg("execute")
+        .arg(&src)
+        .arg("--key-hex")
+        .arg(key)
+        .output()
+        .expect("x3c receipt execute");
+
+    assert!(first.status.success() && second.status.success());
+    assert_eq!(
+        first.stdout, second.stdout,
+        "the same source and signing key must produce byte-identical receipts"
+    );
+}
+
+#[test]
+fn cli_receipt_execute_rejects_a_trade_past_its_deadline() {
+    let src = write_fixture("cli_receipt_execute_expired.x3", TRADING_SOURCE);
+
+    let status = x3c()
+        .arg("receipt")
+        .arg("execute")
+        .arg(&src)
+        .arg("--block")
+        .arg("999")
+        .status()
+        .expect("x3c receipt execute");
+
+    assert!(
+        !status.success(),
+        "a trade executed past its compiled deadline must be rejected, not silently succeed"
+    );
+}
+
+#[test]
+fn cli_receipt_execute_rejects_a_malformed_signing_key() {
+    let src = write_fixture("cli_receipt_execute_badkey.x3", TRADING_SOURCE);
+
+    let status = x3c()
+        .arg("receipt")
+        .arg("execute")
+        .arg(&src)
+        .arg("--key-hex")
+        .arg("deadbeef")
+        .status()
+        .expect("x3c receipt execute");
+
+    assert!(
+        !status.success(),
+        "a 4-byte key-hex must be rejected, not silently truncated/padded"
+    );
+}
+
+#[test]
+fn cli_audit_passes_a_program_with_zero_fail_and_zero_warn_issues() {
+    let src = write_fixture("cli_audit_fully_configured.x3", FULLY_CONFIGURED_SOURCE);
+    let output = x3c().arg("audit").arg(&src).output().expect("x3c audit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        !stdout.contains("[FAIL]"),
+        "fixture must have zero real failures: {stdout}"
+    );
+    assert!(
+        !stdout.contains("[WARN]"),
+        "fixture must have zero warnings, to isolate this from the WARN/FAIL conflation being tested: {stdout}"
+    );
+    assert!(
+        stdout.contains("Status: PASS"),
+        "zero FAIL and zero WARN must audit clean: {stdout}"
+    );
+    assert!(
+        output.status.success(),
+        "a program with no real issues must exit 0: {stdout}"
+    );
+}
+
+#[test]
+fn cli_audit_status_reflects_fail_severity_not_warn_count() {
+    // Regression test for a real bug: `has_failures` used to be computed
+    // from `!issues.is_empty()`, where `issues` held both [FAIL] and
+    // [WARN]-prefixed strings in one vector — so a single missed "consider
+    // adding X for production" WARN flipped the entire audit to FAIL, with
+    // no way to ever report a clean pass short of declaring every optional
+    // B-52 item. Every example .x3 file in this repo failed `x3c audit`
+    // for exactly this reason, including ones explicitly named as the
+    // canonical safe example (examples/mainnet_safe_swap.x3) and the
+    // flagship feature-complete one (examples/flagship_b52.x3). Dropping
+    // exactly one optional declaration (here: the `privacy` block) from an
+    // otherwise fully-configured, zero-FAIL program must produce exactly
+    // one [WARN] and still report Status: PASS.
+    let without_privacy = FULLY_CONFIGURED_SOURCE.replacen(
+        "privacy {\n    hide_route_until_commit true\n    reveal_on claim\n    encrypted true\n}\n\n",
+        "",
+        1,
+    );
+    assert_ne!(
+        without_privacy, FULLY_CONFIGURED_SOURCE,
+        "the privacy block must actually have been removed from the fixture"
+    );
+    let src = write_fixture("cli_audit_one_warning.x3", &without_privacy);
+
+    let output = x3c().arg("audit").arg(&src).output().expect("x3c audit");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        !stdout.contains("[FAIL]"),
+        "dropping an optional block must not introduce a real failure: {stdout}"
+    );
+    assert!(
+        stdout.contains("[WARN] no privacy block found"),
+        "dropping the privacy block must be flagged as a warning: {stdout}"
+    );
+    assert!(
+        stdout.contains("Status: PASS"),
+        "a program with only WARN-level issues and zero FAIL-level issues must still report PASS: {stdout}"
+    );
+    assert!(
+        output.status.success(),
+        "a program with only warnings must exit 0, not 1: {stdout}"
     );
 }

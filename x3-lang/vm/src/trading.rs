@@ -78,9 +78,25 @@ pub struct QuoteRequest {
     pub input: u128,
 }
 
+/// An independent price reading, reported alongside the primary quote for
+/// oracle-firewall cross-checking. What "independent" means is a host
+/// concern (a second venue's pool, a TWAP, a signed off-chain feed) — the
+/// VM only ever compares numbers, it never trusts a source because of its
+/// name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PriceSource {
+    pub name: String,
+    pub expected_output: u128,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuoteResult {
     pub expected_output: u128,
+    /// Independent readings for the same route/input, for policies that
+    /// declare `max_oracle_deviation`. Empty means the host has no
+    /// cross-check data — which is only a problem if the policy actually
+    /// requires the check; see `enforce_oracle_firewall`.
+    pub sources: Vec<PriceSource>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -213,6 +229,16 @@ pub enum TradingExecError {
         ceiling_bps: u16,
         actual_bps: u128,
     },
+    /// Policy requires an oracle-firewall check (`max_oracle_deviation` is
+    /// set) but the host reported zero independent price sources. Declaring
+    /// the requirement and then not being able to satisfy it fails closed,
+    /// the same way an unclaimed PrivateSubmissionRequired does.
+    OracleFirewallUnsatisfied,
+    OracleDeviationExceeded {
+        source: String,
+        ceiling_bps: u16,
+        actual_bps: u128,
+    },
     OpenDebtAtCommit(String),
     NetProfitBelowFloor {
         minimum: u128,
@@ -229,6 +255,15 @@ pub enum TradingExecError {
         asset: AssetKey,
         ceiling: u128,
         actual: u128,
+    },
+    /// Committing this trade would push the VM instance's running realized
+    /// total for `asset` — summed across every trade it has already
+    /// committed under a policy declaring `max_cumulative_loss` — below
+    /// `-ceiling`. A cross-trade circuit breaker, not a per-trade guard.
+    CumulativeLossCeilingExceeded {
+        asset: AssetKey,
+        ceiling: u128,
+        projected_loss: u128,
     },
 }
 
@@ -279,6 +314,18 @@ impl fmt::Display for TradingExecError {
                     "realized slippage {actual_bps} bps exceeds compiled ceiling {ceiling_bps} bps"
                 )
             }
+            Self::OracleFirewallUnsatisfied => write!(
+                f,
+                "compiled policy requires oracle-deviation cross-checking but the host reported no independent price sources"
+            ),
+            Self::OracleDeviationExceeded {
+                source,
+                ceiling_bps,
+                actual_bps,
+            } => write!(
+                f,
+                "price source '{source}' deviates {actual_bps} bps from the primary quote, exceeding the compiled ceiling {ceiling_bps} bps"
+            ),
             Self::OpenDebtAtCommit(debt) => write!(f, "debt '{debt}' is still open at commit"),
             Self::NetProfitBelowFloor { minimum, actual } => {
                 write!(f, "realized net profit {actual} is below floor {minimum}")
@@ -295,6 +342,15 @@ impl fmt::Display for TradingExecError {
             Self::GasCeilingExceeded { asset, ceiling, actual } => write!(
                 f,
                 "accrued {} cost {actual} exceeds compiled max_gas ceiling {ceiling}",
+                asset.symbol
+            ),
+            Self::CumulativeLossCeilingExceeded {
+                asset,
+                ceiling,
+                projected_loss,
+            } => write!(
+                f,
+                "committing this trade would bring cumulative {} losses to {projected_loss}, exceeding the compiled max_cumulative_loss ceiling {ceiling}",
                 asset.symbol
             ),
         }
@@ -330,6 +386,13 @@ pub struct TradingVm {
     pub trading_state: TradingState,
     expected_commitment: Option<[u8; 32]>,
     compiled_policy: Option<CompiledTradingPolicy>,
+    /// Realized net proceeds, per asset, summed across every trade this VM
+    /// instance has actually committed (never a simulated or failed one).
+    /// Lives for the lifetime of the `TradingVm`, not any single trade —
+    /// this is the state a cross-trade circuit breaker like
+    /// `max_cumulative_loss` reads and updates. A fresh `TradingVm::new()`
+    /// starts a fresh strategy session with an empty ledger.
+    cumulative_realized: BTreeMap<AssetKey, i128>,
 }
 
 /// Result of a successful atomic trading execution.
@@ -343,12 +406,51 @@ impl TradingVm {
         Self::default()
     }
 
-    /// Execute a lowered trading operation sequence atomically.
+    /// Execute a lowered trading operation sequence atomically. On success,
+    /// the host-side transaction is committed for real.
     pub fn execute_atomic(
         &mut self,
         operations: &[TradingOperation],
         host: &mut dyn TradingHost,
         context: TradeExecutionContext,
+    ) -> Result<TradeExecution, TradingExecError> {
+        self.run_atomic(operations, host, context, true)
+    }
+
+    /// Run a trade through the exact same policy validation, host calls,
+    /// and guard checks as `execute_atomic` — but never let it land.
+    /// `host.commit_transaction()` is never called, `host.rollback_transaction()`
+    /// is always called, and `self.trading_state` is always restored to its
+    /// pre-call snapshot, whether the guards passed or failed.
+    ///
+    /// This is a real dry run against the real host, not a synthetic
+    /// re-implementation: it exercises the same `TradingHost` staging
+    /// contract (`begin_transaction`/`rollback_transaction`) that
+    /// production adapters already have to support for rollback-on-
+    /// rejection, so the projected `TradeExecution` returned on success
+    /// reflects exactly what would have committed. Useful for previewing a
+    /// trade — or screening many candidate routes — without paying for a
+    /// real settlement or risking a host-side transaction actually
+    /// landing.
+    ///
+    /// `committed_state.committed` on the returned execution reflects that
+    /// the trade's own `CommitAtomicTrade` guard passed, not that any host
+    /// funds moved: nothing a simulation returns is final.
+    pub fn simulate_atomic(
+        &mut self,
+        operations: &[TradingOperation],
+        host: &mut dyn TradingHost,
+        context: TradeExecutionContext,
+    ) -> Result<TradeExecution, TradingExecError> {
+        self.run_atomic(operations, host, context, false)
+    }
+
+    fn run_atomic(
+        &mut self,
+        operations: &[TradingOperation],
+        host: &mut dyn TradingHost,
+        context: TradeExecutionContext,
+        commit: bool,
     ) -> Result<TradeExecution, TradingExecError> {
         let manifest = host.capabilities();
         if context.mode == ExecutionMode::Production && manifest.mode != CapabilityMode::Production {
@@ -379,23 +481,39 @@ impl TradingVm {
 
         host.begin_transaction().map_err(TradingExecError::HostRejected)?;
 
-        match self.execute_inner(operations, host, context) {
-            Ok(execution) => {
-                if let Err(error) = host.commit_transaction() {
-                    let _ = host.rollback_transaction();
+        let outcome = self.execute_inner(operations, host, context);
+        if commit {
+            match outcome {
+                Ok(execution) => {
+                    if let Err(error) = host.commit_transaction() {
+                        let _ = host.rollback_transaction();
+                        self.trading_state = snapshot;
+                        return Err(TradingExecError::HostRejected(error));
+                    }
+                    self.record_cumulative_realized(&execution.committed_state);
+                    Ok(execution)
+                }
+                Err(error) => {
+                    let rollback = host.rollback_transaction();
                     self.trading_state = snapshot;
-                    return Err(TradingExecError::HostRejected(error));
+                    if let Err(rollback_error) = rollback {
+                        return Err(TradingExecError::HostRejected(rollback_error));
+                    }
+                    Err(error)
                 }
-                Ok(execution)
             }
-            Err(error) => {
-                let rollback = host.rollback_transaction();
-                self.trading_state = snapshot;
-                if let Err(rollback_error) = rollback {
-                    return Err(TradingExecError::HostRejected(rollback_error));
-                }
-                Err(error)
+        } else {
+            // Simulation: always roll back and restore state, regardless
+            // of outcome — nothing is allowed to land. If the rollback
+            // itself fails, we can't vouch the host is actually clean, so
+            // that failure takes priority over handing back a projected
+            // "this would have succeeded" result.
+            let rollback = host.rollback_transaction();
+            self.trading_state = snapshot;
+            if let Err(rollback_error) = rollback {
+                return Err(TradingExecError::HostRejected(rollback_error));
             }
+            outcome
         }
     }
 
@@ -511,6 +629,9 @@ impl TradingVm {
                         result.output,
                         self.compiled_policy().max_slippage_bps,
                     )?;
+                    if let Some(ceiling_bps) = self.compiled_policy().max_oracle_deviation_bps {
+                        self.enforce_oracle_firewall(quote.expected_output, &quote.sources, ceiling_bps)?;
+                    }
                     self.debit(from, result.input)?;
                     self.credit(to, result.output)?;
                     self.accrue_cost(&result.fee_asset, result.fee)?;
@@ -651,9 +772,52 @@ impl TradingVm {
                 return Err(TradingExecError::NetProfitBelowFloor { minimum, actual: best });
             }
         }
+        if let (Some(ceiling), Some(asset)) = (
+            self.compiled_policy().max_cumulative_loss,
+            self.compiled_policy().max_cumulative_loss_asset.clone(),
+        ) {
+            let prior = self.cumulative_realized.get(&asset).copied().unwrap_or(0);
+            let this_trade = self.trading_state.net_deltas.get(&asset).copied().unwrap_or(0);
+            let projected = prior
+                .checked_add(this_trade)
+                .ok_or(TradingExecError::AccountingOverflow)?;
+            let ceiling_i128 = i128::try_from(ceiling).map_err(|_| TradingExecError::AccountingOverflow)?;
+            if projected < -ceiling_i128 {
+                let projected_loss = u128::try_from(-projected).map_err(|_| TradingExecError::AccountingOverflow)?;
+                return Err(TradingExecError::CumulativeLossCeilingExceeded {
+                    asset,
+                    ceiling,
+                    projected_loss,
+                });
+            }
+        }
         Ok(TradeExecution {
             committed_state: self.trading_state.clone(),
         })
+    }
+
+    /// Merge a just-committed trade's realized deltas into the VM's
+    /// cross-trade ledger. Only called from the real-commit path in
+    /// `run_atomic` — never for a simulated or failed trade — so
+    /// `max_cumulative_loss` only ever reflects trades that actually
+    /// landed. Uses `saturating_add`: by the time this runs, the host has
+    /// already committed for real, so a ledger update can no longer fail
+    /// the trade; the guard check above already used `checked_add` on the
+    /// one asset a policy actually cares about; a general ledger entry at
+    /// the practical limits of `i128` is not a case worth failing an
+    /// already-landed trade over.
+    fn record_cumulative_realized(&mut self, state: &TradingState) {
+        for (asset, delta) in &state.net_deltas {
+            let entry = self.cumulative_realized.entry(asset.clone()).or_insert(0);
+            *entry = entry.saturating_add(*delta);
+        }
+    }
+
+    /// Realized net proceeds for `asset`, summed across every trade this
+    /// VM instance has committed so far (0 if the asset has never been
+    /// touched by a committed trade). Never affected by `simulate_atomic`.
+    pub fn cumulative_realized(&self, asset: &AssetKey) -> i128 {
+        self.cumulative_realized.get(asset).copied().unwrap_or(0)
     }
 
     fn validate_compiled_policy(
@@ -774,6 +938,38 @@ impl TradingVm {
         Ok(())
     }
 
+    /// Cross-check the primary quote against every independent source the
+    /// host reported. Deviation is measured both directions — a source
+    /// quoting *higher* than the primary is just as much a disagreement
+    /// (and just as suspicious a manipulation signal) as one quoting lower.
+    /// A policy that opts into this check and gets zero sources back fails
+    /// closed rather than silently skipping the check it asked for.
+    fn enforce_oracle_firewall(
+        &self,
+        primary_expected: u128,
+        sources: &[PriceSource],
+        ceiling_bps: u16,
+    ) -> Result<(), TradingExecError> {
+        if sources.is_empty() {
+            return Err(TradingExecError::OracleFirewallUnsatisfied);
+        }
+        for source in sources {
+            let diff = primary_expected.abs_diff(source.expected_output);
+            let actual_bps = diff
+                .checked_mul(10_000)
+                .and_then(|value| value.checked_div(primary_expected.max(1)))
+                .ok_or(TradingExecError::AccountingOverflow)?;
+            if actual_bps > ceiling_bps as u128 {
+                return Err(TradingExecError::OracleDeviationExceeded {
+                    source: source.name.clone(),
+                    ceiling_bps,
+                    actual_bps,
+                });
+            }
+        }
+        Ok(())
+    }
+
     fn credit(&mut self, asset: &AssetKey, amount: u128) -> Result<(), TradingExecError> {
         let entry = self.trading_state.balances.entry(asset.clone()).or_insert(0);
         *entry = entry.checked_add(amount).ok_or(TradingExecError::AccountingOverflow)?;
@@ -884,7 +1080,10 @@ pub struct ReceiptAttestation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReceiptError {
     Encoding(String),
-    HashMismatch { expected: [u8; 32], actual: [u8; 32] },
+    HashMismatch {
+        expected: [u8; 32],
+        actual: [u8; 32],
+    },
     OpenDebtInSuccessfulReceipt(String),
     ProfitInFailedReceipt,
     EmptyOperationList,
@@ -892,6 +1091,13 @@ pub enum ReceiptError {
     MissingAttestation,
     UntrustedAttestor(String),
     InvalidAttestation,
+    /// This exact receipt (by `receipt_hash`) has already been accepted by
+    /// this `ReceiptReplayLedger` once before. Distinct from
+    /// `EconomicReplayMismatch`, which is about re-deriving a receipt's
+    /// reported numbers from its own operations — this is about the same
+    /// valid, correctly signed receipt being presented for settlement a
+    /// second time.
+    ReceiptAlreadySettled([u8; 32]),
 }
 
 impl fmt::Display for ReceiptError {
@@ -910,6 +1116,9 @@ impl fmt::Display for ReceiptError {
             Self::MissingAttestation => write!(f, "receipt is missing a trusted attestation"),
             Self::UntrustedAttestor(key_id) => write!(f, "receipt attestor '{key_id}' is not trusted"),
             Self::InvalidAttestation => write!(f, "receipt attestation signature is invalid"),
+            Self::ReceiptAlreadySettled(hash) => {
+                write!(f, "receipt {hash:?} has already been settled once")
+            }
         }
     }
 }
@@ -1182,6 +1391,56 @@ pub fn verify_receipt_trusted(
     verify_receipt(receipt)?;
     verify_receipt_economics(receipt)?;
     verify_receipt_attestation(receipt, trusted_keys)
+}
+
+/// Replay protection for receipt settlement.
+///
+/// `verify_receipt_trusted` alone checks that a receipt is well-formed,
+/// economically consistent, and signed by a trusted key — but it is a pure
+/// function with no memory: the identical valid, correctly signed receipt
+/// verifies successfully every single time it's presented. A settlement
+/// service that used `verify_receipt_trusted` as its sole admission check
+/// would accept (and presumably act on) the same trade's receipt twice.
+///
+/// This ledger closes that gap: it wraps `verify_receipt_trusted` with a
+/// record of every `receipt_hash` already accepted, so the second
+/// presentation of an identical receipt is rejected even though every
+/// other check about it still passes. It is deliberately not persisted or
+/// distributed by this crate — a real settlement service is expected to
+/// back this (or an equivalent check) with whatever durable, possibly
+/// shared storage its deployment actually needs; this type documents and
+/// enforces the invariant in-process.
+#[derive(Debug, Clone, Default)]
+pub struct ReceiptReplayLedger {
+    seen: BTreeSet<[u8; 32]>,
+}
+
+impl ReceiptReplayLedger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Verify `receipt` exactly as `verify_receipt_trusted` does, and
+    /// additionally reject it if this ledger has already accepted the same
+    /// `receipt_hash`. On success, the hash is recorded, so a later replay
+    /// of the identical receipt is rejected even though it would otherwise
+    /// still pass every other check.
+    pub fn verify_and_record(
+        &mut self,
+        receipt: &TradeReceipt,
+        trusted_keys: &BTreeMap<String, [u8; 32]>,
+    ) -> Result<(), ReceiptError> {
+        verify_receipt_trusted(receipt, trusted_keys)?;
+        if !self.seen.insert(receipt.receipt_hash) {
+            return Err(ReceiptError::ReceiptAlreadySettled(receipt.receipt_hash));
+        }
+        Ok(())
+    }
+
+    /// Whether `receipt_hash` has already been accepted by this ledger.
+    pub fn has_settled(&self, receipt_hash: &[u8; 32]) -> bool {
+        self.seen.contains(receipt_hash)
+    }
 }
 
 /// Build and finalize a canonical receipt from an execution result.
