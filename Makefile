@@ -2,7 +2,24 @@
  test-node-build test-atomic-kernel test-atomic-router test-axe test-x3-forge test-x3-sentinel\
  test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
  test-runtime-upgrade test-all-pallets fmt lint\
+ local-ci local-ci-live local-ci-cross local-ci-list\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
+
+# Local CI — the gates that actually execute on this machine. Hosted CI for this
+# repository is blocked by an account billing lock, so this (and the self-hosted
+# runner) is where the gate suite runs. See scripts/local-ci.sh for what each
+# target runs, and .ai/runlogs/ for per-gate logs.
+local-ci:
+	@bash scripts/local-ci.sh
+
+local-ci-live:
+	@bash scripts/local-ci.sh --live
+
+local-ci-cross:
+	@bash scripts/local-ci.sh --cross
+
+local-ci-list:
+	@bash scripts/local-ci.sh --list
 
 guard:
 	@python3 scripts/agent_guard.py
