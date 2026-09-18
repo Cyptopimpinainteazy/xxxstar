@@ -20,6 +20,12 @@ on:
 jobs:
   live-x3vm-lifecycle:
     name: real local-node X3VM lifecycles
+    # Keep the cargo target dir outside the checkout so it survives
+    # `actions/checkout`'s clean and is reused across runs and commits. Without
+    # this every run rebuilt the whole runtime (20-30 minutes) even when only
+    # test code had changed.
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
     # This repo is public and pull_request can come from a fork, so keep PR runs
     # on ubuntu-latest. Push (master), manual dispatch and workflow_call run on
     # the x3 self-hosted runner, which is the only runner that can execute here
