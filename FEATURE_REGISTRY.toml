@@ -34,7 +34,8 @@ required_tests = [
   "rollback_access_set_violation_charges_only_the_ten_percent_penalty",
   "rollback_deadline_exceeded_slashes_the_whole_bond_once",
   "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
-  "rollback_deadline_exceeded_before_the_deadline_is_rejected"
+  "rollback_deadline_exceeded_before_the_deadline_is_rejected",
+  "economic_halt_does_not_block_inflight_bundle_assignment"
 ]
 proof_report = "reports/six_route_invariants.md"
 readiness_score = 50
