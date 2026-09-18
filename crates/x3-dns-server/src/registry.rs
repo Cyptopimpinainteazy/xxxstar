@@ -171,7 +171,9 @@ impl DomainRegistry {
         }
 
         // If blockchain is not enabled, ownership cannot be verified
-        Err(DnsError::blockchain("blockchain integration not available for ownership verification"))
+        Err(DnsError::blockchain(
+            "blockchain integration not available for ownership verification",
+        ))
     }
 
     /// Get domains by owner address

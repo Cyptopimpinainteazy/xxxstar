@@ -231,6 +231,9 @@ members = [
     "crates/x3-turbine",
     "crates/x3-gulfstream",
     "crates/x3-evolution-core",
+    # Burn-down batch 5 (issue #274).
+    "crates/x3-dns-server",
+    "crates/x3-marketplace",
 ]
 default-members = ["node"]
 resolver = "2"

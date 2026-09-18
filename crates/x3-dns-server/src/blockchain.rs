@@ -237,7 +237,9 @@ impl BlockchainClient {
             ))
         } else {
             warn!("⚠️  Blockchain integration is disabled, ownership verification cannot proceed");
-            Err(DnsError::blockchain("blockchain integration not available for ownership verification"))
+            Err(DnsError::blockchain(
+                "blockchain integration not available for ownership verification",
+            ))
         }
     }
 
