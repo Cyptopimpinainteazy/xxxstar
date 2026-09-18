@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 
@@ -70,7 +71,7 @@ def main() -> int:
     if len(names) > 1000:
         print("PR Supervisor: refusing >1000 changed files; split the change into smaller PRs", file=sys.stderr)
         return 1
-    if any(name.endswith("Cargo.toml") for name in names):
+    if any(name.endswith("Cargo.toml") for name in names) and shutil.which("cargo"):
         try:
             run("cargo", "metadata", "--no-deps", "--format-version", "1")
         except RuntimeError as exc:
