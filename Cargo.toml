@@ -221,6 +221,11 @@ members = [
     "crates/x3-bench",
     "crates/x3-bot",
     "crates/x3-canonical-truth",
+    # Burn-down batch 3 (issue #274).
+    "crates/x3-runtime-params",
+    "crates/x3-parallel-executor",
+    "crates/x3-rpc-policy",
+    "crates/x3-readiness-report",
 ]
 default-members = ["node"]
 resolver = "2"

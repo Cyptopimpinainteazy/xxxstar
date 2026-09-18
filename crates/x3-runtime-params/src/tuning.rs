@@ -47,14 +47,14 @@ impl RuntimeTuner {
     /// Set tuning profile
     pub fn set_profile(&self, profile: TuningProfile) {
         self.profile.store(profile as u64, Ordering::SeqCst);
-        
+
         let params = match profile {
             TuningProfile::Default => RuntimeParameters::default(),
             TuningProfile::HighThroughput => RuntimeParameters::high_throughput(),
             TuningProfile::LowLatency => RuntimeParameters::low_latency(),
             TuningProfile::Archival => RuntimeParameters::archival(),
         };
-        
+
         self.apply_tuning(&params);
     }
 

@@ -26874,6 +26874,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-parallel-executor"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-io 44.0.0",
+ "sp-std",
+]
+
+[[package]]
 name = "x3-parser"
 version = "0.1.0"
 dependencies = [
@@ -26946,6 +26956,17 @@ dependencies = [
  "serde",
  "serde_json",
  "toml 0.8.23",
+ "ureq",
+]
+
+[[package]]
+name = "x3-readiness-report"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
  "ureq",
 ]
 
@@ -27023,6 +27044,30 @@ dependencies = [
  "x3-chain-runtime",
  "x3-metrics-tracker",
  "x3-staking-analytics",
+]
+
+[[package]]
+name = "x3-rpc-policy"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "scale-info",
+ "sp-std",
+]
+
+[[package]]
+name = "x3-runtime-params"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]

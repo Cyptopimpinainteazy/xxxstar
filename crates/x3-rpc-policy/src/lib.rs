@@ -23,9 +23,9 @@ use scale_info::TypeInfo;
 
 /// Operational tier that determines selection priority for a provider.
 ///
-/// Lower discriminant values are preferred: Tier 0 (X3Owned) is always tried
-/// before Tier 1 (ManagedProvider), which is always tried before Tier 2
-/// (PublicFallback).
+/// Lower discriminant values are preferred: Tier 0 (`X3Owned`) is always tried
+/// before Tier 1 (`ManagedProvider`), which is always tried before Tier 2
+/// (`PublicFallback`).
 ///
 /// See §3 of `docs/RPC_OPERATIONAL_POLICY.md` for the full tier definitions.
 #[derive(
@@ -36,7 +36,7 @@ pub enum ProviderTier {
     /// method support; must maintain sync within 2 blocks of network tip.
     X3Owned = 0,
     /// Tier 1: Third-party managed providers (Alchemy, dRPC/Nodecore, Ankr,
-    /// QuickNode). Operate under a commercial SLA with X3-managed API keys.
+    /// `QuickNode`). Operate under a commercial SLA with X3-managed API keys.
     ManagedProvider = 1,
     /// Tier 2: Unauthenticated or lightly-authenticated public fallback
     /// endpoints. Read-only, severely capacity-constrained. Used only when all

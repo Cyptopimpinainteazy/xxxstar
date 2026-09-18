@@ -47,9 +47,9 @@ pub struct GasLimits {
 impl Default for GasLimits {
     fn default() -> Self {
         Self {
-            max_gas_per_tx: 21_000_000, // 21M gas (similar to EIP-1559)
+            max_gas_per_tx: 21_000_000,       // 21M gas (similar to EIP-1559)
             max_gas_per_block: 1_000_000_000, // 1B gas per block
-            min_gas_price: 1, // 1 lamport
+            min_gas_price: 1,                 // 1 lamport
             priority_gas_bump_percent: 10,
             compute: ComputeBudget::default(),
         }
@@ -82,15 +82,15 @@ impl GasLimits {
         if self.max_gas_per_tx == 0 {
             return Err("max_gas_per_tx must be > 0".into());
         }
-        
+
         if self.max_gas_per_block < self.max_gas_per_tx {
             return Err("max_gas_per_block must be >= max_gas_per_tx".into());
         }
-        
+
         if self.compute.max_compute_units > self.compute.max_block_compute_units {
             return Err("max_compute_units must be <= max_block_compute_units".into());
         }
-        
+
         Ok(())
     }
 }

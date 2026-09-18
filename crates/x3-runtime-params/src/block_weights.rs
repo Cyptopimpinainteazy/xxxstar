@@ -34,7 +34,7 @@ pub struct TransactionWeight {
 impl TransactionWeight {
     /// Calculate total weight for a transaction
     pub fn calculate(&self, data_size: usize, compute_units: u64) -> u64 {
-        self.base_weight 
+        self.base_weight
             + (data_size as u64 * self.data_weight)
             + (compute_units * self.compute_weight)
     }
@@ -56,35 +56,47 @@ pub struct BlockWeights {
 impl Default for BlockWeights {
     fn default() -> Self {
         let mut weights = HashMap::new();
-        
-        weights.insert(OperationType::Transfer, TransactionWeight {
-            operation: OperationType::Transfer,
-            base_weight: 100,
-            data_weight: 1,
-            compute_weight: 0,
-        });
-        
-        weights.insert(OperationType::TokenTransfer, TransactionWeight {
-            operation: OperationType::TokenTransfer,
-            base_weight: 200,
-            data_weight: 1,
-            compute_weight: 1,
-        });
-        
-        weights.insert(OperationType::ContractCall, TransactionWeight {
-            operation: OperationType::ContractCall,
-            base_weight: 500,
-            data_weight: 2,
-            compute_weight: 10,
-        });
-        
-        weights.insert(OperationType::ContractCreate, TransactionWeight {
-            operation: OperationType::ContractCreate,
-            base_weight: 1000,
-            data_weight: 5,
-            compute_weight: 20,
-        });
-        
+
+        weights.insert(
+            OperationType::Transfer,
+            TransactionWeight {
+                operation: OperationType::Transfer,
+                base_weight: 100,
+                data_weight: 1,
+                compute_weight: 0,
+            },
+        );
+
+        weights.insert(
+            OperationType::TokenTransfer,
+            TransactionWeight {
+                operation: OperationType::TokenTransfer,
+                base_weight: 200,
+                data_weight: 1,
+                compute_weight: 1,
+            },
+        );
+
+        weights.insert(
+            OperationType::ContractCall,
+            TransactionWeight {
+                operation: OperationType::ContractCall,
+                base_weight: 500,
+                data_weight: 2,
+                compute_weight: 10,
+            },
+        );
+
+        weights.insert(
+            OperationType::ContractCreate,
+            TransactionWeight {
+                operation: OperationType::ContractCreate,
+                base_weight: 1000,
+                data_weight: 5,
+                compute_weight: 20,
+            },
+        );
+
         Self {
             max_block_weight: 60_000_000, // ~60M weight units
             max_transactions: 1200,
@@ -97,10 +109,11 @@ impl Default for BlockWeights {
 impl BlockWeights {
     /// High throughput configuration
     pub fn high_throughput() -> Self {
-        let mut weights = Self::default();
-        weights.max_block_weight = 120_000_000; // 2x default
-        weights.max_transactions = 2400;
-        weights
+        Self {
+            max_block_weight: 120_000_000, // 2x default
+            max_transactions: 2400,
+            ..Default::default()
+        }
     }
 
     /// Validate weights
@@ -108,22 +121,24 @@ impl BlockWeights {
         if self.max_block_weight == 0 {
             return Err("max_block_weight must be > 0".into());
         }
-        
+
         if self.max_transactions == 0 {
             return Err("max_transactions must be > 0".into());
         }
-        
+
         for (op, weight) in &self.weights {
             if weight.base_weight == 0 {
                 return Err(format!("base_weight for {:?} must be > 0", op));
             }
         }
-        
+
         Ok(())
     }
 
     /// Get weight for operation
     pub fn get_weight(&self, op: OperationType) -> &TransactionWeight {
-        self.weights.get(&op).unwrap_or(&self.weights[&OperationType::Transfer])
+        self.weights
+            .get(&op)
+            .unwrap_or(&self.weights[&OperationType::Transfer])
     }
 }

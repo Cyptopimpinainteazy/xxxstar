@@ -90,7 +90,7 @@ fn status_score_zero_is_offline() {
 // ---------------------------------------------------------------------------
 
 /// A score below the failover threshold triggers failover even when
-/// block_drift and error_rate are both zero.
+/// `block_drift` and `error_rate` are both zero.
 #[test]
 fn failover_triggered_by_low_score() {
     let h = score_only(FAILOVER_THRESHOLD - 1); // score = 59
@@ -150,9 +150,9 @@ fn failover_triggered_by_high_error_rate() {
 /// acceptability must NOT trigger failover.
 ///
 /// Boundary values used:
-/// - score = FAILOVER_THRESHOLD (60) — exactly healthy
-/// - block_drift = MAX_BLOCK_DRIFT (10) — at the limit, not beyond
-/// - error_rate_bps = MAX_ERROR_RATE_BPS (500) — at the limit, not beyond
+/// - score = `FAILOVER_THRESHOLD` (60) — exactly healthy
+/// - `block_drift` = `MAX_BLOCK_DRIFT` (10) — at the limit, not beyond
+/// - `error_rate_bps` = `MAX_ERROR_RATE_BPS` (500) — at the limit, not beyond
 #[test]
 fn no_failover_when_all_signals_at_or_within_bounds() {
     let h = ProviderHealthScore {

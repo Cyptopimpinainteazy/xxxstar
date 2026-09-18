@@ -27,7 +27,7 @@ impl Default for ConsensusParams {
     fn default() -> Self {
         Self {
             slot_duration_ms: 400, // 400ms slots
-            finality_depth: 32,   // ~12.8s finality
+            finality_depth: 32,    // ~12.8s finality
             poh_ticks_per_slot: 6400,
             max_rollback_depth: 2,
             leader_rotation_slots: 4,
@@ -54,15 +54,15 @@ impl ConsensusParams {
         if self.slot_duration_ms == 0 {
             return Err("slot_duration_ms must be > 0".into());
         }
-        
+
         if self.finality_depth == 0 {
             return Err("finality_depth must be > 0".into());
         }
-        
+
         if self.vote_threshold <= 0.5 || self.vote_threshold > 1.0 {
             return Err("vote_threshold must be > 0.5 and <= 1.0".into());
         }
-        
+
         Ok(())
     }
 }

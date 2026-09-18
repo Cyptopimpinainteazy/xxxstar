@@ -77,7 +77,12 @@ pub struct BenchmarkResults {
 
 impl BenchmarkResults {
     /// Create success result
-    pub fn success(scenario: &str, load: LoadScenario, duration: u64, metrics: PerformanceMetrics) -> Self {
+    pub fn success(
+        scenario: &str,
+        load: LoadScenario,
+        duration: u64,
+        metrics: PerformanceMetrics,
+    ) -> Self {
         Self {
             scenario: scenario.to_string(),
             load,

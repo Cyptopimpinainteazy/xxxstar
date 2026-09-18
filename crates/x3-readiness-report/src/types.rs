@@ -187,6 +187,14 @@ mod tests {
         r.halt_functional = ReadinessCheck::pass("ok");
         r.permissions_enforced = ReadinessCheck::pass("ok");
         r.balance_reconciliation = ReadinessCheck::pass("ok");
+        // The report grew five RC-1 gates after this test was written; readiness
+        // requires all nine, so the test has to set all nine. It used to pass only
+        // the original four and still expect `is_ready` (issue #274).
+        r.ixl_bundle_gate = ReadinessCheck::pass("ok");
+        r.packet_lifecycle_gate = ReadinessCheck::pass("ok");
+        r.liquidity_core_gate = ReadinessCheck::pass("ok");
+        r.external_bridges_disabled = ReadinessCheck::pass("ok");
+        r.kernel_invariant_gate = ReadinessCheck::pass("ok");
         r.recompute_overall();
         assert!(r.is_ready());
         assert_eq!(r.readiness_percentage(), 100);

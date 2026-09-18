@@ -213,6 +213,7 @@ impl ParallelExecutor {
 }
 
 /// Conflict detection for parallel execution
+#[derive(Default)]
 pub struct ConflictDetector {
     /// Read-write conflict tracking
     #[allow(dead_code)]
@@ -274,6 +275,7 @@ impl ConflictDetector {
 }
 
 /// Access list builder for transactions
+#[derive(Default)]
 pub struct AccessListBuilder;
 
 impl AccessListBuilder {
@@ -373,7 +375,7 @@ pub struct TransactionResult {
     pub events: Vec<Event>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ExecutionResult {
     pub results: Vec<TransactionResult>,
     pub state_hash: [u8; 32],
@@ -523,9 +525,22 @@ mod tests {
         };
 
         let access_list = builder.build_access_list(&tx);
-        // Access list should be empty for now (simplified implementation)
-        assert_eq!(access_list.reads.len(), 0);
-        assert_eq!(access_list.writes.len(), 0);
+        // Opcode 0x01 is a read, 0x02 a write (0x03 both), keyed by the
+        // instruction's state key. This used to assert an empty list while the
+        // builder still returned zeros — the assertion pinned the placeholder,
+        // not the behaviour (issue #274).
+        assert_eq!(
+            access_list.reads,
+            vec![ParallelExecutor::state_key_for_instruction(
+                &tx.instructions[0]
+            )]
+        );
+        assert_eq!(
+            access_list.writes,
+            vec![ParallelExecutor::state_key_for_instruction(
+                &tx.instructions[1]
+            )]
+        );
     }
 
     #[test]
@@ -588,7 +603,35 @@ mod tests {
         assert_eq!(result.results.len(), 1);
 
         result.commit_batch().unwrap();
-        assert_eq!(result.final_state_hash(), [0; 32]);
+        // `commit_batch` recalculates the hash from the committed results
+        // (tx ids, success flags, state changes), so it is never the all-zero
+        // placeholder this test used to assert.
+        let hash = result.final_state_hash();
+        assert_ne!(
+            hash, [0u8; 32],
+            "committing results must produce a real state hash"
+        );
+        assert_eq!(
+            hash,
+            result.final_state_hash(),
+            "the hash must be stable between calls"
+        );
+
+        // Determinism: an identical result set hashes identically.
+        let mut twin = ExecutionResult::new();
+        twin.merge(TransactionResult {
+            tx_id: 1,
+            success: true,
+            state_changes: vec![],
+            events: vec![],
+        })
+        .unwrap();
+        twin.commit_batch().unwrap();
+        assert_eq!(
+            twin.final_state_hash(),
+            hash,
+            "identical results must hash identically"
+        );
     }
 
     #[test]
@@ -702,7 +745,25 @@ mod tests {
         };
 
         let conflicts = detector.detect_conflicts(&[list1, list2, list3]).unwrap();
-        assert_eq!(conflicts.len(), 3); // Conflicts between 1-2, 2-3, and 1-2 for key 2
+        // `check_conflict` reports one entry per conflicting *pair*, carrying a
+        // representative key: (0,1) conflict on key 1 or 2, (1,2) conflict on key
+        // 3, and (0,2) does not conflict at all. The old expectation of 3 counted
+        // the second key of the same pair as a separate conflict.
+        assert_eq!(conflicts.len(), 2);
+        assert!(
+            conflicts.iter().any(|c| (c.tx1, c.tx2) == (0, 1)),
+            "transactions 0 and 1 conflict on their shared keys"
+        );
+        assert!(
+            conflicts.iter().any(|c| (c.tx1, c.tx2) == (1, 2)),
+            "transactions 1 and 2 conflict on key 3"
+        );
+        assert!(
+            conflicts
+                .iter()
+                .all(|c| c.key == [1; 32] || c.key == [2; 32] || c.key == [3; 32]),
+            "every reported key must be one of the conflicting keys"
+        );
     }
 
     #[test]

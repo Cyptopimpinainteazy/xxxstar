@@ -10,43 +10,31 @@
 //! - **NetworkParams**: Network throughput and connection parameters
 //! - **ConsensusParams**: Finality and PoH parameters
 
+pub mod benchmarks;
 pub mod block_weights;
+pub mod consensus_params;
 pub mod gas_limits;
 pub mod network_params;
-pub mod consensus_params;
 pub mod tuning;
-pub mod benchmarks;
 
-pub use block_weights::{BlockWeights, TransactionWeight, OperationType};
-pub use gas_limits::{GasLimits, ComputeBudget};
-pub use network_params::NetworkParams;
-pub use consensus_params::ConsensusParams;
-pub use tuning::{RuntimeTuner, TuningProfile};
 pub use benchmarks::{BenchmarkResults, LoadScenario, PerformanceMetrics};
+pub use block_weights::{BlockWeights, OperationType, TransactionWeight};
+pub use consensus_params::ConsensusParams;
+pub use gas_limits::{ComputeBudget, GasLimits};
+pub use network_params::NetworkParams;
+pub use tuning::{RuntimeTuner, TuningProfile};
 
 use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info, warn};
 
 /// Main runtime parameters container
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RuntimeParameters {
     pub block_weights: BlockWeights,
     pub gas_limits: GasLimits,
     pub network: NetworkParams,
     pub consensus: ConsensusParams,
-}
-
-impl Default for RuntimeParameters {
-    fn default() -> Self {
-        Self {
-            block_weights: BlockWeights::default(),
-            gas_limits: GasLimits::default(),
-            network: NetworkParams::default(),
-            consensus: ConsensusParams::default(),
-        }
-    }
 }
 
 impl RuntimeParameters {
@@ -100,7 +88,7 @@ impl RuntimeParameterManager {
     /// Create new parameter manager
     pub fn new(params: RuntimeParameters) -> Self {
         let tuning = Arc::new(RuntimeTuner::new(params.clone()));
-        
+
         Self {
             params: Arc::new(RwLock::new(params)),
             tuning,
@@ -118,7 +106,7 @@ impl RuntimeParameterManager {
             warn!("Invalid parameters: {}", e);
             return;
         }
-        
+
         *self.params.write() = params.clone();
         self.tuning.apply_tuning(&params);
         info!("Runtime parameters updated");
@@ -150,7 +138,7 @@ mod tests {
     fn test_parameter_manager() {
         let params = RuntimeParameters::default();
         let manager = RuntimeParameterManager::new(params);
-        
+
         let current = manager.get_params();
         assert!(current.validate().is_ok());
     }
