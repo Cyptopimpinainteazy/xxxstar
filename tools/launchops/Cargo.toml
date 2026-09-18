@@ -12,5 +12,5 @@ walkdir = "2"
 globset = "0.4"
 regex = "1"
 anyhow = "1"
-thiserror = "1"
+thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }

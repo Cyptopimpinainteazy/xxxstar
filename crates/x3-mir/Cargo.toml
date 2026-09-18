@@ -9,7 +9,7 @@ publish = false
 x3-ast = { path = "../x3-ast" }
 x3-hir = { path = "../x3-hir" }
 x3-common = { path = "../x3-common" }
-thiserror = "1.0"
+thiserror = "2.0"
 
 [dev-dependencies]
 x3-parser = { path = "../x3-parser" }

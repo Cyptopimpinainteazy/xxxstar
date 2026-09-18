@@ -10,7 +10,7 @@ publish = false
 x3-ast = { path = "../x3-ast" }
 x3-common = { path = "../x3-common" }
 x3-typeck = { path = "../x3-typeck" }
-thiserror = "1.0"
+thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]

@@ -22,7 +22,7 @@ x3-svm-integration = { path = "../svm-integration", optional = true }
 libloading = "0.9"
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Logging
 log = "0.4"

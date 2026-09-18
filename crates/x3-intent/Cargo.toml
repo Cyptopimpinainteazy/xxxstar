@@ -11,7 +11,7 @@ x3-slash = { path = "../x3-slash" }
 x3-fees = { path = "../x3-fees" }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
-thiserror = "1.0"
+thiserror = "2.0"
 
 [dev-dependencies]
 serde_json = "1.0"

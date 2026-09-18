@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-thiserror = "1"
+thiserror = "2"
 
 # The Substrate crates that used to be listed here (`sp-core = "21"`,
 # `sp-runtime = "27"`, `frame-support`/`frame-system`/`pallet-balances = "27"`,

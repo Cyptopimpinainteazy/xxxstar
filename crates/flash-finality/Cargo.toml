@@ -20,7 +20,7 @@ hex = "0.4"
 tracing = "0.1"
 # Error handling
 anyhow = "1"
-thiserror = "1"
+thiserror = "2"
 sp-core = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
 

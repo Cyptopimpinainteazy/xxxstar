@@ -27,7 +27,7 @@ x3-opt = { path = "../x3-opt" }
 x3-verifier = { path = "../x3-verifier" }
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Serialization (for ABI generation)
 serde = { workspace = true, features = ["derive"] }
