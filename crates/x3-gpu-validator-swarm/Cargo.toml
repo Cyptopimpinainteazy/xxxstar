@@ -79,7 +79,7 @@ humantime-serde = "1.1"
 once_cell = "1.18"
 
 # For CPU verification
-keccak-hash = "0.1"
+keccak-hash = "0.11"
 
 # GPU and VM
 x3-accel = { path = "../x3-accel" }
