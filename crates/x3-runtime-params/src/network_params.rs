@@ -98,11 +98,11 @@ impl NetworkParams {
         if self.max_peers == 0 {
             return Err("max_peers must be > 0".into());
         }
-        
+
         if self.max_pending_transactions == 0 {
             return Err("max_pending_transactions must be > 0".into());
         }
-        
+
         Ok(())
     }
 }
