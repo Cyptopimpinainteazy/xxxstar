@@ -20,7 +20,7 @@ pallet-evm = { workspace = true, default-features = false, optional = true }
 fp-evm = { workspace = true, default-features = false, optional = true }
 
 # EVM numeric types
-primitive-types = { version = "0.12.2", default-features = false }
+primitive-types = { version = "0.13.1", default-features = false }
 
 # Serialization
 parity-scale-codec = { workspace = true, default-features = false }
