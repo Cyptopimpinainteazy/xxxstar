@@ -63,7 +63,9 @@ fn router_with_evm() -> VerificationRouter {
 
 fn router_with_solana() -> VerificationRouter {
     let mut r = VerificationRouter::new();
-    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier);
+    // `empty()` = no authorized validators: this test builds the router to
+    // exercise dispatch, and the Solana verifier is expected to refuse.
+    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier::empty());
     r.register_verifier(v);
     r
 }
