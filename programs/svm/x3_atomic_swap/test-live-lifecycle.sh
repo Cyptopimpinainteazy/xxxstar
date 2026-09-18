@@ -43,12 +43,16 @@ command -v solana-test-validator >/dev/null 2>&1 || { echo "Error: solana-test-v
 command -v cargo-build-sbf >/dev/null 2>&1 || { echo "Error: cargo-build-sbf not installed"; exit 1; }
 
 echo "=== Building SBF program ==="
-(cd "$SCRIPT_DIR" && cargo build-sbf 2>&1 | tail -5)
+# These are sub-workspace builds with their own target directories, and the paths
+# asserted below are the defaults. Unset CARGO_TARGET_DIR so an ambient CI value
+# (used by the live workflows to share a warm root target dir) cannot relocate the
+# artefacts this script then looks for — the same trap that broke the EVM gate.
+(cd "$SCRIPT_DIR" && env -u CARGO_TARGET_DIR cargo build-sbf 2>&1 | tail -5)
 PROGRAM_SO="$SCRIPT_DIR/target/deploy/x3_atomic_swap.so"
 [ -f "$PROGRAM_SO" ] || { echo "Error: $PROGRAM_SO not built"; exit 1; }
 
 echo "=== Building broadcaster client ==="
-(cd "$SCRIPT_DIR/client" && cargo build --release --bin x3-svm-broadcast 2>&1 | tail -5)
+(cd "$SCRIPT_DIR/client" && env -u CARGO_TARGET_DIR cargo build --release --bin x3-svm-broadcast 2>&1 | tail -5)
 BIN="$SCRIPT_DIR/client/target/release/x3-svm-broadcast"
 [ -x "$BIN" ] || { echo "Error: broadcaster binary not built"; exit 1; }
 
