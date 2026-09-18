@@ -563,11 +563,16 @@ mod tests {
         }
     }
 
+    /// Local mirror of the intent the live adapter settles. The secret-release
+    /// firewall requires a releasable lifecycle state, requirements that cover
+    /// the intent's own policy including the destination chain, and a stored
+    /// hash that matches the fields — so this fixture is X3-native to X3-native
+    /// with the X3 BFT policy the test then presents.
     fn intent() -> AtomicIntent {
-        AtomicIntent {
+        let mut intent = AtomicIntent {
             intent_id: 77,
             source_chain: ChainKind::X3,
-            destination_chain: ChainKind::Ethereum,
+            destination_chain: ChainKind::X3,
             source_asset: "X3".into(),
             destination_asset: "USDC".into(),
             amount_in: 1000,
@@ -594,9 +599,11 @@ mod tests {
             route_mode: RouteMode::DirectHtlc,
             max_slippage_bps: 100,
             relayer_quorum_requirement: 1,
-            status: AtomicSwapStatus::Pending,
+            status: AtomicSwapStatus::BothLocked,
             intent_hash: [0u8; 32],
-        }
+        };
+        intent.intent_hash = intent.compute_hash();
+        intent
     }
 
     #[test]
@@ -625,13 +632,25 @@ mod tests {
             &[crate::SecretReleaseRequirement {
                 chain_id: "x3-local".into(),
                 vm_type: VmType::X3Vm,
-                min_confirmations: 1,
+                // X3 is declared `FinalityLevel::Bft`, which maps to zero
+                // required confirmations in the firewall.
+                min_confirmations: 0,
             }],
             &[crate::SecretReleaseEvidence {
                 lock: lock.clone(),
                 finality,
-                rpc_quorum_agreed: true,
-                refunded: false,
+                rpc_quorum: crate::secret_release::RpcQuorumAttestation {
+                    tx_id: lock.tx_id.clone(),
+                    block_hash: lock.block_hash.clone(),
+                    provider_count: 3,
+                    required_quorum: 2,
+                    finalized: true,
+                },
+                refund: crate::secret_release::RefundObservation {
+                    tx_id: lock.tx_id.clone(),
+                    block_hash: lock.block_hash.clone(),
+                    refunded: false,
+                },
             }],
         )
         .expect("firewall permit");

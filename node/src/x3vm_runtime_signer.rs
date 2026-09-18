@@ -19,7 +19,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Mutex;
 use x3_atomic_swap::intent::IntentId;
-use x3_atomic_swap::{AtomicIntent, ChainId, RpcClient, SwapError, X3ExtrinsicSigner};
+use x3_atomic_swap::{
+    AtomicIntent, ChainId, CrossDomainProofSet, RpcClient, SwapError, X3ExtrinsicSigner,
+};
 use x3_chain_runtime::{
     AccountId, Address, Runtime, RuntimeCall, RuntimeEvent, Signature, SignedExtra, SignedPayload,
     UncheckedExtrinsic, VERSION,
@@ -335,6 +337,26 @@ impl X3RuntimeSigner {
         self.signed_extrinsic(call)
     }
 
+    /// Sign a canonical cross-domain proof set for `runtime_intent_id`.
+    ///
+    /// The settlement engine refuses a terminal `Refunded` state until every
+    /// escrowed leg has a verified canonical `Refund` proof, so a live lifecycle
+    /// harness has to submit one through this real extrinsic rather than
+    /// assuming the timeout alone is enough.
+    pub fn prepare_cross_domain_proof_set(
+        &self,
+        runtime_intent_id: H256,
+        proof_set: CrossDomainProofSet,
+    ) -> Result<String, SwapError> {
+        let call = RuntimeCall::X3SettlementEngine(
+            pallet_x3_settlement_engine::Call::<Runtime>::submit_cross_domain_proof_set {
+                intent_id: runtime_intent_id,
+                proof_set,
+            },
+        );
+        self.signed_extrinsic(call)
+    }
+
     /// Convenience native-asset spec for local X3 lifecycle tests/tools.
     pub fn x3_native_asset(amount: u128) -> AssetSpec {
         AssetSpec {
@@ -428,6 +450,7 @@ impl X3ExtrinsicSigner for X3RuntimeSigner {
             )?;
 
         let mut saw_failed_dispatch = false;
+        let mut reported_error: Option<String> = None;
         for record in records {
             let frame_system::Phase::ApplyExtrinsic(index) = record.phase else {
                 continue;
@@ -437,16 +460,20 @@ impl X3ExtrinsicSigner for X3RuntimeSigner {
             }
             match record.event {
                 RuntimeEvent::System(frame_system::Event::ExtrinsicSuccess { .. }) => return Ok(()),
-                RuntimeEvent::System(frame_system::Event::ExtrinsicFailed { .. }) => {
+                RuntimeEvent::System(frame_system::Event::ExtrinsicFailed { dispatch_error, .. }) => {
                     saw_failed_dispatch = true;
-                }
+                    // Surface the pallet error: "ExtrinsicFailed" alone cannot
+                    // distinguish a fail-closed guard from a real defect.
+                    reported_error = Some(format!("{dispatch_error:?}"));
+                },
                 _ => {}
             }
         }
 
         if saw_failed_dispatch {
             Err(SwapError::RpcError(format!(
-                "X3 extrinsic at finalized index {extrinsic_index} dispatched with ExtrinsicFailed"
+                "X3 extrinsic at finalized index {extrinsic_index} dispatched with ExtrinsicFailed: {}",
+                reported_error.unwrap_or_else(|| "unknown dispatch error".into())
             )))
         } else {
             Err(SwapError::RpcError(format!(

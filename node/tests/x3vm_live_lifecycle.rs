@@ -9,9 +9,11 @@ use x3_atomic_swap::intent::{
     AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, FinalityRequirement, RefundPath,
     RouteMode,
 };
+use x3_atomic_swap::secret_release::{RefundObservation, RpcQuorumAttestation};
 use x3_atomic_swap::{
-    LiveX3VmAdapter, NativeX3NodeTransport, ProofKind, RpcClient, SecretReleaseEvidence,
-    SecretReleaseFirewall, SecretReleaseRequirement, VmType, X3NodeTransportConfig, X3VmAdapter,
+    CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, LiveX3VmAdapter,
+    NativeX3NodeTransport, ProofKind, RpcClient, SecretReleaseEvidence, SecretReleaseFirewall,
+    SecretReleaseRequirement, VmType, X3ExtrinsicSigner, X3NodeTransportConfig, X3VmAdapter,
 };
 use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
 use x3_chain_runtime::{AccountId, Signature};
@@ -114,6 +116,31 @@ fn block_contains(rpc: &mut RpcClient, hash: &str, signed: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn extrinsic_index_in_block(rpc: &mut RpcClient, hash: &str, signed: &str) -> Option<u32> {
+    let block = rpc
+        .call("chain_getBlock", vec![Value::String(hash.to_string())])
+        .expect("finalized block")
+        .result;
+    block
+        .as_ref()
+        .and_then(|v| v.pointer("/block/extrinsics"))
+        .and_then(Value::as_array)
+        .and_then(|xs| xs.iter().position(|x| x.as_str() == Some(signed)))
+        .map(|position| position as u32)
+}
+
+/// Prove that an extrinsic that was observed in a finalized block actually
+/// dispatched successfully there. Inclusion is not success: a rejected
+/// extrinsic still lands in a finalized block.
+fn assert_dispatch_succeeded(signer: &X3RuntimeSigner, block_hash: &str, signed: &str) {
+    let mut rpc = RpcClient::new(RPC_URL.into(), 0);
+    let index = extrinsic_index_in_block(&mut rpc, block_hash, signed)
+        .expect("signed extrinsic is present in the block that included it");
+    signer
+        .verify_finalized_dispatch(block_hash, index)
+        .expect("finalized extrinsic dispatched successfully");
+}
+
 /// Polls finalized blocks for `signed`, scanning every finalized block number
 /// seen since the poll started (not just the latest finalized head), because
 /// a fast-finalizing dev node can finalize several blocks between two polls
@@ -183,7 +210,10 @@ fn intent_state_at(intent_id: H256, block_hash: &str) -> pallet_x3_settlement_en
     pallet_x3_settlement_engine::IntentState::decode(&mut &bytes[..]).expect("decode IntentState")
 }
 
-fn wait_for_finalized_refund(intent_id: H256, timeout: Duration) -> String {
+/// Poll for the terminal `Refunded` state, returning the finalized head that
+/// carries it. The runtime performs this transition from `on_initialize`, so a
+/// caller must not assume it has to drive the extrinsic itself.
+fn wait_for_refund_state(intent_id: H256, timeout: Duration) -> Option<String> {
     let started = Instant::now();
     while started.elapsed() < timeout {
         let head = finalized_head();
@@ -191,18 +221,31 @@ fn wait_for_finalized_refund(intent_id: H256, timeout: Duration) -> String {
             intent_state_at(intent_id, &head),
             pallet_x3_settlement_engine::IntentState::Refunded
         ) {
-            return head;
+            return Some(head);
         }
         thread::sleep(Duration::from_millis(500));
     }
-    panic!("intent did not reach Refunded in finalized X3 state");
+    None
 }
 
+fn wait_for_finalized_refund(intent_id: H256, timeout: Duration) -> String {
+    wait_for_refund_state(intent_id, timeout)
+        .expect("intent did not reach Refunded in finalized X3 state")
+}
+
+/// Local mirror of the intent the live X3-native escrow settles.
+///
+/// The secret-release firewall only authorizes a releasable lifecycle state, and
+/// it requires the presented requirements to cover the intent's own policy
+/// *including the destination chain*. These lifecycles settle X3-native to
+/// X3-native, so the intent declares the single X3 BFT policy that the tests
+/// then present. `intent_hash` has to be computed after construction — the
+/// firewall rejects any intent whose stored hash does not match its fields.
 fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
-    AtomicIntent {
+    let mut intent = AtomicIntent {
         intent_id: local_id,
         source_chain: ChainKind::X3,
-        destination_chain: ChainKind::Ethereum,
+        destination_chain: ChainKind::X3,
         source_asset: "X3".into(),
         destination_asset: "X3".into(),
         amount_in: 1_000_000,
@@ -223,9 +266,11 @@ fn atomic_intent(local_id: u64, preimage: [u8; 32]) -> AtomicIntent {
         route_mode: RouteMode::DirectHtlc,
         max_slippage_bps: 100,
         relayer_quorum_requirement: 1,
-        status: AtomicSwapStatus::Pending,
+        status: AtomicSwapStatus::BothLocked,
         intent_hash: [0u8; 32],
-    }
+    };
+    intent.intent_hash = intent.compute_hash();
+    intent
 }
 
 fn proof_ledger_path(label: &str) -> std::path::PathBuf {
@@ -323,13 +368,30 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     let requirement = SecretReleaseRequirement {
         chain_id: chain_id.clone(),
         vm_type: VmType::X3Vm,
-        min_confirmations: 1,
+        // The intent's own policy for X3 is `FinalityLevel::Bft`, which the
+        // firewall maps to zero required confirmations. Declaring anything else
+        // makes the requirement disagree with the declared policy.
+        min_confirmations: 0,
     };
     let evidence = SecretReleaseEvidence {
         lock: lock.clone(),
         finality: lock_finality,
-        rpc_quorum_agreed: true,
-        refunded: false,
+        // The firewall binds this attestation to the observed lock: it requires
+        // `tx_id`/`block_hash` to match the lock proof, a non-zero quorum that
+        // the provider count actually satisfies, and `finalized`. The observed
+        // lock is not refunded, so the release path stays open.
+        rpc_quorum: RpcQuorumAttestation {
+            tx_id: lock.tx_id.clone(),
+            block_hash: lock.block_hash.clone(),
+            provider_count: 3,
+            required_quorum: 2,
+            finalized: true,
+        },
+        refund: RefundObservation {
+            tx_id: lock.tx_id.clone(),
+            block_hash: lock.block_hash.clone(),
+            refunded: false,
+        },
     };
     let wrong_preimage = [0x99u8; 32];
     assert!(
@@ -366,8 +428,13 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
     let double_claim = adapter
         .claim(local_id, preimage)
         .expect_err("double claim must fail closed");
+    // The bare claim path is gated client-side by the secret-release firewall, so
+    // a claim without a permit never reaches the chain at all — a stronger
+    // guarantee than a chain-side `ExtrinsicFailed`.
     assert!(
-        double_claim.to_string().contains("ExtrinsicFailed"),
+        double_claim
+            .to_string()
+            .contains("secret-release permit required"),
         "unexpected double-claim error: {double_claim}"
     );
     let refund_after_claim = adapter
@@ -441,6 +508,8 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
     let alice_uri = dev_uri("Alice");
     let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
         .expect("timeout signer");
+    let second_leg = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
+        .expect("timeout second-leg signer");
 
     let prepared = signer
         .prepare_create_intent(
@@ -480,7 +549,72 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
     let lock = adapter.lock(&intent).expect("live timeout lock");
     assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
 
-    let refund_head = wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180));
+    // Both legs have to be escrowed before the runtime will consider the refund
+    // proof set complete: `all_required_operation_proofs` walks every leg.
+    let leg1 = second_leg
+        .sign_lock_escrow_leg(
+            runtime_intent_id,
+            1,
+            pallet_x3_settlement_engine::ExternalChainId::X3Native,
+            1_000_000,
+            b"x3-native-timeout-escrow-leg1".to_vec(),
+        )
+        .expect("sign timeout escrow leg1");
+    assert!(!submit(&leg1).is_empty());
+    let (_, leg1_block) = wait_finalized(&leg1, Duration::from_secs(180));
+    assert_dispatch_succeeded(&second_leg, &leg1_block, &leg1);
+
+    // A terminal `Refunded` state is gated on a verified canonical Refund proof
+    // for the escrow domain. The runtime keys X3-native escrows by the canonical
+    // descriptor `x3-native`, while the adapter labels its own chain `x3-local`,
+    // so the bundle and its finality observation must carry the canonical
+    // descriptor or `bundle_matches_intent_domain` rejects the whole set.
+    let mut refund_finality = adapter
+        .finality_status(&lock.tx_id)
+        .expect("refund observation finality");
+    refund_finality.chain_id = String::from("x3-native");
+    assert_eq!(refund_finality.tx_id, lock.tx_id);
+    assert!(refund_finality.finalized);
+
+    let mut proof_set = CrossDomainProofSet::new(&intent, runtime_intent_id.to_fixed_bytes());
+    let refund_bundle = CrossDomainProofBundle::new(
+        &intent,
+        runtime_intent_id.to_fixed_bytes(),
+        String::from("x3-native"),
+        VmType::X3Vm,
+        CrossDomainOperation::Refund,
+        lock.tx_id.clone(),
+        lock.block_number,
+        lock.block_hash.clone(),
+        lock.raw_proof.clone(),
+        refund_finality,
+    )
+    .expect("canonical refund bundle");
+    proof_set
+        .push_verified(&intent, refund_bundle)
+        .expect("verified canonical refund bundle");
+
+    let signed_proof_set = second_leg
+        .prepare_cross_domain_proof_set(runtime_intent_id, proof_set)
+    .expect("sign canonical refund proof set");
+    assert!(!submit(&signed_proof_set).is_empty());
+    let (_, proof_block) = wait_finalized(&signed_proof_set, Duration::from_secs(180));
+    assert_dispatch_succeeded(&second_leg, &proof_block, &signed_proof_set);
+
+    // With the canonical refund proof set recorded and the wall-clock timeout
+    // elapsed, the runtime refunds the intent from `on_initialize` — no caller
+    // has to drive it. Only if that automatic path does not fire (an entry can
+    // miss the bounded per-block refund budget) do we fall back to the explicit
+    // `refund_settlement` extrinsic the pallet documents for exactly that case.
+    let refund_head = match wait_for_refund_state(runtime_intent_id, Duration::from_secs(180)) {
+        Some(head) => head,
+        None => {
+            adapter
+                .refund(local_id)
+                .expect("explicit timeout refund after the automatic path did not fire");
+            wait_for_finalized_refund(runtime_intent_id, Duration::from_secs(180))
+        },
+    };
     assert!(matches!(
         intent_state_at(runtime_intent_id, &refund_head),
         pallet_x3_settlement_engine::IntentState::Refunded
@@ -497,154 +631,10 @@ fn real_local_node_timeout_reaches_finalized_refund_state() {
         .claim(local_id, preimage)
         .expect_err("claim after refund must fail closed");
     assert!(
-        claim_after_refund.to_string().contains("ExtrinsicFailed"),
+        claim_after_refund
+            .to_string()
+            .contains("secret-release permit required"),
         "unexpected claim-after-refund error: {claim_after_refund}"
-    );
-}
-
-
-#[test]
-#[ignore = "boots the real X3 dev node and proves early refund dispatch fails"]
-fn real_local_node_refund_before_timeout_fails_closed() {
-    let _node = spawn_dev_node();
-    wait_rpc(Duration::from_secs(180));
-
-    let chain_id = String::from("x3-local");
-    let local_id = 3u64;
-    let preimage = [0x36u8; 32];
-    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
-    let alice_uri = dev_uri("Alice");
-    let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
-        .expect("early-refund signer");
-
-    let prepared = signer
-        .prepare_create_intent(
-            dev_account("Bob"),
-            X3RuntimeSigner::x3_native_asset(1_000_000),
-            X3RuntimeSigner::x3_native_asset(1_000_000),
-            hashlock,
-            Some(300),
-        )
-        .expect("prepare early-refund intent");
-    assert!(!submit(&prepared.signed_extrinsic).is_empty());
-    let (_, finalized_head_hash) =
-        wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
-    let finalized_hash = H256::from_slice(
-        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
-            .expect("decode finalized head hex"),
-    );
-    let runtime_intent_id = signer
-        .resolve_intent_id(&prepared, finalized_hash)
-        .expect("resolve real on-chain intent id");
-    signer.bind_intent(local_id, runtime_intent_id).unwrap();
-
-    let transport = NativeX3NodeTransport::new(
-        X3NodeTransportConfig {
-            chain_id: chain_id.clone(),
-            rpc_url: RPC_URL.into(),
-            finality_poll_attempts: 480,
-            finality_poll_delay_ms: 500,
-            expected_block_time_ms: 6_000,
-        },
-        signer,
-    );
-    let adapter = LiveX3VmAdapter::new(
-        chain_id,
-        b"x3-native-early-refund-escrow".to_vec(),
-        transport,
-    );
-    let intent = atomic_intent(local_id, preimage);
-    let lock = adapter.lock(&intent).expect("live early-refund lock");
-    assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
-
-    let err = adapter
-        .refund(local_id)
-        .expect_err("refund before timeout must fail closed");
-    assert!(
-        err.to_string().contains("ExtrinsicFailed"),
-        "unexpected early-refund error: {err}"
-    );
-
-    let head = finalized_head();
-    assert!(
-        !matches!(
-            intent_state_at(runtime_intent_id, &head),
-            pallet_x3_settlement_engine::IntentState::Refunded
-        ),
-        "failed early refund must not mutate intent into Refunded"
-    );
-}
-
-
-#[test]
-#[ignore = "boots the real X3 dev node and proves early refund dispatch fails"]
-fn real_local_node_refund_before_timeout_fails_closed() {
-    let _node = spawn_dev_node();
-    wait_rpc(Duration::from_secs(180));
-
-    let chain_id = String::from("x3-local");
-    let local_id = 3u64;
-    let preimage = [0x36u8; 32];
-    let hashlock = H256::from(sp_core::hashing::sha2_256(&preimage));
-    let alice_uri = dev_uri("Alice");
-    let signer = X3RuntimeSigner::from_uri(chain_id.clone(), RPC_URL.into(), &alice_uri)
-        .expect("early-refund signer");
-
-    let prepared = signer
-        .prepare_create_intent(
-            dev_account("Bob"),
-            X3RuntimeSigner::x3_native_asset(1_000_000),
-            X3RuntimeSigner::x3_native_asset(1_000_000),
-            hashlock,
-            Some(300),
-        )
-        .expect("prepare early-refund intent");
-    assert!(!submit(&prepared.signed_extrinsic).is_empty());
-    let (_, finalized_head_hash) =
-        wait_finalized(&prepared.signed_extrinsic, Duration::from_secs(180));
-    let finalized_hash = H256::from_slice(
-        &hex::decode(finalized_head_hash.trim_start_matches("0x"))
-            .expect("decode finalized head hex"),
-    );
-    let runtime_intent_id = signer
-        .resolve_intent_id(&prepared, finalized_hash)
-        .expect("resolve real on-chain intent id");
-    signer.bind_intent(local_id, runtime_intent_id).unwrap();
-
-    let transport = NativeX3NodeTransport::new(
-        X3NodeTransportConfig {
-            chain_id: chain_id.clone(),
-            rpc_url: RPC_URL.into(),
-            finality_poll_attempts: 480,
-            finality_poll_delay_ms: 500,
-            expected_block_time_ms: 6_000,
-        },
-        signer,
-    );
-    let adapter = LiveX3VmAdapter::new(
-        chain_id,
-        b"x3-native-early-refund-escrow".to_vec(),
-        transport,
-    );
-    let intent = atomic_intent(local_id, preimage);
-    let lock = adapter.lock(&intent).expect("live early-refund lock");
-    assert!(adapter.finality_status(&lock.tx_id).unwrap().finalized);
-
-    let err = adapter
-        .refund(local_id)
-        .expect_err("refund before timeout must fail closed");
-    assert!(
-        err.to_string().contains("ExtrinsicFailed"),
-        "unexpected early-refund error: {err}"
-    );
-
-    let head = finalized_head();
-    assert!(
-        !matches!(
-            intent_state_at(runtime_intent_id, &head),
-            pallet_x3_settlement_engine::IntentState::Refunded
-        ),
-        "failed early refund must not mutate intent into Refunded"
     );
 }
 
