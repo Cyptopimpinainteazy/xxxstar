@@ -69,6 +69,9 @@
 pub use pallet::*;
 
 #[cfg(test)]
+mod mock;
+
+#[cfg(test)]
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -726,6 +729,13 @@ pub mod pallet {
         ) -> DispatchResult {
             let submitter = T::X3LangOrigin::ensure_origin(origin)?;
 
+            // Economic halt is enforced BEFORE any state mutation so that a
+            // rejected submission does not consume the caller's nonce.
+            ensure!(
+                !T::EconomicHalt::is_halted(),
+                Error::<T>::EconomicHaltActive
+            );
+
             // Nonce validation
             let mut nonce_state = NonceRegistry::<T>::get(chain_id, &submitter);
             ensure!(
@@ -740,11 +750,6 @@ pub mod pallet {
                 .try_push(nonce)
                 .map_err(|_| Error::<T>::TooManyLegs)?;
             NonceRegistry::<T>::insert(chain_id, &submitter, nonce_state);
-
-            ensure!(
-                !T::EconomicHalt::is_halted(),
-                Error::<T>::EconomicHaltActive
-            );
 
             ensure!(!legs.is_empty(), Error::<T>::TooManyLegs);
             ensure!(

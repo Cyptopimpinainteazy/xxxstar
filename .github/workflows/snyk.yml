@@ -11,6 +11,8 @@ on:
 jobs:
   security:
     runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,9 +26,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Verify Snyk token is configured
+        run: |
+          if [ -z "${SNYK_TOKEN:-}" ]; then
+            echo "::error::SNYK_TOKEN secret is not configured; dependency scanning cannot be skipped silently"
+            exit 1
+          fi
+
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/node@master
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:

@@ -795,3 +795,86 @@ fn test_revert_error_variants() {
     assert!(matches!(vm_err, RevertError::VmNotAvailable(VmType::Evm)));
     assert!(matches!(fail_err, RevertError::RevertFailed { .. }));
 }
+
+// ── EconomicHalt gate (audit finding CRITICAL-TOK-1) ──────────────────────
+//
+// `mock.rs` was previously unreferenced, so this pallet had no compiled FRAME
+// test harness and its EconomicHalt guard had zero coverage. These tests wire
+// the mock in and exercise the real guard on the real extrinsic.
+
+mod economic_halt {
+    use crate::mock::*;
+    use crate::proof::{BundleLeg, VmType};
+    use crate::{Error, NonceRegistry, Pallet};
+    use frame_support::{assert_noop, assert_ok, BoundedVec};
+
+    fn one_leg() -> BoundedVec<BundleLeg, MaxLegsPerBundle> {
+        BoundedVec::try_from(vec![test_leg(VmType::Evm)]).expect("one leg fits")
+    }
+
+    #[test]
+    fn halted_chain_rejects_new_bundle_submission() {
+        new_test_ext().execute_with(|| {
+            TestEconomicHalt::set_halted(true);
+            let result = Pallet::<Test>::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg(),
+                10,
+                1,
+                1,
+            );
+            TestEconomicHalt::set_halted(false);
+
+            assert_noop!(result, Error::<Test>::EconomicHaltActive);
+        });
+    }
+
+    #[test]
+    fn halt_rejection_does_not_consume_the_nonce() {
+        new_test_ext().execute_with(|| {
+            TestEconomicHalt::set_halted(true);
+            let _ = Pallet::<Test>::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg(),
+                10,
+                7,
+                1,
+            );
+            TestEconomicHalt::set_halted(false);
+
+            assert!(
+                !NonceRegistry::<Test>::contains_key(7, ALICE),
+                "a rejected submission must not burn the caller's nonce"
+            );
+        });
+    }
+
+    #[test]
+    fn open_gate_allows_bundle_submission() {
+        new_test_ext().execute_with(|| {
+            TestEconomicHalt::set_halted(false);
+            assert_ok!(Pallet::<Test>::submit_atomic_bundle(
+                RuntimeOrigin::signed(ALICE),
+                one_leg(),
+                10,
+                1,
+                1,
+            ));
+        });
+    }
+
+    #[test]
+    fn unauthorised_origin_is_rejected_before_the_gate() {
+        new_test_ext().execute_with(|| {
+            TestEconomicHalt::set_halted(false);
+            assert!(Pallet::<Test>::submit_atomic_bundle(
+                RuntimeOrigin::none(),
+                one_leg(),
+                10,
+                1,
+                1,
+            )
+            .is_err());
+        });
+    }
+}

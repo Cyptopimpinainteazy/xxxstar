@@ -21,11 +21,22 @@ tauri_app = "AtomicLock"
 # inside `submit_atomic_bundle`) is real code but has zero dedicated test
 # coverage today. scripts/check-readiness-consistency.sh now verifies every
 # required_tests entry against real `fn` names so this cannot recur silently.
-required_tests = []
+#
+# 2026-09-10 baseline audit remediation: `src/mock.rs` was not referenced by
+# any `mod` declaration, so this pallet had no compiled FRAME harness at all.
+# The mock is now wired in (and was repaired — it had never compiled), the
+# EconomicHalt guard was moved ahead of nonce mutation so a rejected bundle no
+# longer burns the caller's nonce, and the names below are real, passing tests.
+required_tests = [
+  "halted_chain_rejects_new_bundle_submission",
+  "halt_rejection_does_not_consume_the_nonce",
+  "open_gate_allows_bundle_submission",
+  "unauthorised_origin_is_rejected_before_the_gate",
+]
 proof_report = "reports/six_route_invariants.md"
-readiness_score = 40
+readiness_score = 50
 blockers = [
-  "required_tests for the EconomicHalt invariant (mint/transfer/swap-blocking, refund/recovery-allowing) are not yet written — see CRITICAL-TOK-1; write real tests in pallets/x3-atomic-kernel/src/tests.rs before restoring a higher score",
+  "EconomicHalt is now covered at the kernel entrypoint, but the downstream mint/transfer/swap blocking and refund/recovery allowance paths in x3-dex, x3-token-factory, x3-cross-vm-router and x3-settlement-engine are still untested under a halted gate",
   "Economic halt path is tested but has never been triggered in a multi-validator network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]

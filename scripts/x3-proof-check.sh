@@ -27,10 +27,10 @@ run_check() {
 # Rust checks
 if [ -f "$REPO_ROOT/Cargo.toml" ]; then
     echo "=== Rust detected ===" | tee -a "$LOG"
-    run_check "cargo-fmt-check" cargo fmt --check --manifest-path "$REPO_ROOT/Cargo.toml" 2>&1 || true
-    run_check "cargo-clippy" cargo clippy --workspace --all-targets --all-features -- -D warnings 2>&1 || true
+    run_check "cargo-fmt-check" cargo fmt --check --manifest-path "$REPO_ROOT/Cargo.toml"
+    run_check "cargo-clippy" cargo clippy --workspace --all-targets --all-features -- -D warnings
     if cargo test --workspace --all-features --no-run 2>/dev/null; then
-        run_check "cargo-test" cargo test --workspace --all-features 2>&1 || true
+        run_check "cargo-test" cargo test --workspace --all-features
     else
         echo "[SKIP] cargo-test — no test binaries built" | tee -a "$LOG"
     fi
@@ -40,19 +40,19 @@ fi
 if [ -f "$REPO_ROOT/package.json" ]; then
     echo "=== Node/TypeScript detected ===" | tee -a "$LOG"
     if [ -f "$REPO_ROOT/package-lock.json" ] && [ ! -d "$REPO_ROOT/node_modules" ]; then
-        run_check "npm-install" npm ci 2>&1 || true
+        run_check "npm-install" npm ci
     fi
     if npm run lint --if-present 2>/dev/null; then
-        run_check "npm-lint" npm run lint 2>&1 || true
+        run_check "npm-lint" npm run lint
     fi
     if npm run typecheck --if-present 2>/dev/null; then
-        run_check "npm-typecheck" npm run typecheck 2>&1 || true
+        run_check "npm-typecheck" npm run typecheck
     fi
     if npm test --if-present 2>/dev/null; then
-        run_check "npm-test" npm test 2>&1 || true
+        run_check "npm-test" npm test
     fi
     if npm run build --if-present 2>/dev/null; then
-        run_check "npm-build" npm run build 2>&1 || true
+        run_check "npm-build" npm run build
     fi
 fi
 
@@ -60,14 +60,14 @@ fi
 PYTHON_FILES=$(find "$REPO_ROOT" -name '*.py' -not -path '*/.venv/*' -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | head -1)
 if [ -n "$PYTHON_FILES" ]; then
     echo "=== Python detected ===" | tee -a "$LOG"
-    run_check "python-compileall" python3 -m compileall -q "$REPO_ROOT" -x '\.venv|node_modules|target' 2>&1 || true
+    run_check "python-compileall" python3 -m compileall -q "$REPO_ROOT" -x '\.venv|node_modules|target'
 fi
 
 # Solidity checks
 if [ -f "$REPO_ROOT/hardhat.config.ts" ] || [ -f "$REPO_ROOT/hardhat.config.js" ]; then
     echo "=== Solidity/Hardhat detected ===" | tee -a "$LOG"
     if npx hardhat test 2>/dev/null; then
-        run_check "hardhat-test" npx hardhat test 2>&1 || true
+        run_check "hardhat-test" npx hardhat test
     else
         echo "[SKIP] hardhat-test — command failed or no tests" | tee -a "$LOG"
     fi
@@ -77,7 +77,7 @@ if [ -f "$REPO_ROOT/foundry.toml" ] || [ -d "$REPO_ROOT/X3-contracts" ]; then
     echo "=== Foundry detected ===" | tee -a "$LOG"
     if command -v forge &>/dev/null; then
         if [ -f "$REPO_ROOT/foundry.toml" ]; then
-            run_check "forge-test" forge test 2>&1 || true
+            run_check "forge-test" forge test
         fi
         if [ -d "$REPO_ROOT/X3-contracts" ]; then
             (cd "$REPO_ROOT/X3-contracts" && forge test 2>&1) >> "$LOG" 2>&1 || echo "[FAIL] forge-test in X3-contracts" | tee -a "$LOG"
@@ -89,11 +89,11 @@ fi
 
 # Generic stub detection
 echo "=== Stub Detection ===" | tee -a "$LOG"
-"$SCRIPT_DIR/x3-detect-stubs.sh" >> "$LOG" 2>&1 || true
+run_check "stub-detection" "$SCRIPT_DIR/x3-detect-stubs.sh"
 
 # Generic test-cheat detection
 echo "=== Test-Cheat Detection ===" | tee -a "$LOG"
-"$SCRIPT_DIR/x3-detect-test-cheats.sh" >> "$LOG" 2>&1 || true
+run_check "test-cheat-detection" "$SCRIPT_DIR/x3-detect-test-cheats.sh"
 
 # Summary
 echo "" | tee -a "$LOG"

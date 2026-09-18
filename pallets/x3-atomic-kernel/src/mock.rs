@@ -8,7 +8,7 @@
 use crate as pallet_x3_atomic_kernel;
 use frame_support::{
     construct_runtime, derive_impl, parameter_types,
-    traits::{ConstU32, ConstU64, EnsureOrigin},
+    traits::{ConstU32, ConstU64, EnsureOrigin, Hooks},
 };
 use frame_system as system;
 use sp_core::H256;
@@ -18,7 +18,9 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
     BuildStorage, MultiSignature, Perbill,
 };
-use x3_asset_kernel_types::traits::NoEconomicHalt;
+use std::cell::Cell;
+
+use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
 pub type AccountId = u64;
 pub type BlockNumber = u64;
@@ -169,10 +171,38 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MinBond = MinBond;
     type MaxLegsPerBundle = MaxLegsPerBundle;
     type BundleDeadlineBlocks = BundleDeadlineBlocks;
-    type EconomicHalt = NoEconomicHalt;
+    type EconomicHalt = TestEconomicHalt;
     type X3LangOrigin = RootOrSignedAccount;
     type SettlementOrigin = SettlementOnlyOrigin;
     type VmReverter = crate::vm_revert::NoopVmReverter;
+}
+
+// ── Toggleable economic halt gate (test-only) ─────────────────────────────
+
+/// Test-only stand-in for the runtime's `EconomicHaltInspect` provider.
+///
+/// Audit finding CRITICAL-TOK-1: this pallet previously had no FRAME test
+/// harness wired in, so the `EconomicHalt` guard was never exercised. This
+/// switch lets tests prove the gate blocks new work while leaving recovery
+/// paths untouched.
+pub struct TestEconomicHalt;
+
+// Per-thread so concurrently running tests cannot flip each other's gate.
+thread_local! {
+    static ECONOMIC_HALTED: Cell<bool> = const { Cell::new(false) };
+}
+
+impl TestEconomicHalt {
+    /// Flip the halt gate for the current test process.
+    pub fn set_halted(halted: bool) {
+        ECONOMIC_HALTED.with(|flag| flag.set(halted));
+    }
+}
+
+impl EconomicHaltInspect for TestEconomicHalt {
+    fn is_halted() -> bool {
+        ECONOMIC_HALTED.with(|flag| flag.get())
+    }
 }
 
 // ── Test Externalities Builder ────────────────────────────────────────────
@@ -189,7 +219,6 @@ impl Default for ExtBuilder {
                 (BOB, INITIAL_BALANCE),
                 (CHARLIE, INITIAL_BALANCE),
             ],
-        dev_accounts: None,
         }
     }
 }
@@ -207,6 +236,7 @@ impl ExtBuilder {
 
         pallet_balances::GenesisConfig::<Test> {
             balances: self.balances,
+            dev_accounts: None,
         }
         .assimilate_storage(&mut storage)
         .expect("Failed to assimilate balances storage");

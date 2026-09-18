@@ -12,6 +12,12 @@ exclude = [
     # Solana BPF programs are standalone crates that conflict with the
     # workspace's solana-program dependency graph.
     "programs/svm/*",
+    # ORPHANED (audit P0-4): confidential-gpu declares no workspace membership
+    # and is not a dependency of any member, so it was never compiled or tested
+    # by any workspace command. Listing it here makes that status explicit and
+    # keeps the workspace graph unchanged. Its TEE attestation path now fails
+    # closed (see crates/confidential-gpu/src/attestation.rs).
+    "crates/confidential-gpu",
 ]
 members = [
     "pallets/x3-kernel",
