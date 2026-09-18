@@ -132,6 +132,7 @@ GATES_FAST=(
   "make gate exit codes:make check-make-gates"
   "script syntax:bash scripts/check-script-syntax.sh"
   "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
+  "workspace membership:python3 scripts/check-workspace-membership.py"
   "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
   "workspace check:env SKIP_WASM_BUILD=1 cargo check --workspace"

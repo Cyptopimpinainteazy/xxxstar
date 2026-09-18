@@ -1,6 +1,10 @@
 use crate::audit::AuditLog;
 use crate::error::{CustodyError, Result};
-use crate::hsm::{HSMBackend, HSMSigner, MockHSM};
+#[cfg(any(test, feature = "dev"))]
+use crate::hsm::MockHSM;
+#[cfg(not(any(test, feature = "dev")))]
+use crate::hsm::NoHsmBackend;
+use crate::hsm::{HSMBackend, HSMSigner};
 /// Main Custody Service implementation
 /// Orchestrates vault operations, authorization, policy enforcement, and settlement linkage
 use crate::types::*;
@@ -53,10 +57,37 @@ pub struct CustodyServiceImpl {
 }
 
 impl CustodyServiceImpl {
+    /// Build a service with the backend the build is configured for.
+    ///
+    /// With `dev` (or under test) that is `MockHSM`, which fabricates keys and
+    /// deterministic digests instead of signatures. In every other build it is
+    /// `NoHsmBackend`, which refuses to sign or generate anything with
+    /// `HsmNotAvailable` — production vault signing needs a real PKCS#11
+    /// provider via [`CustodyServiceImpl::new_with_backend`].
     pub async fn new() -> Result<Self> {
-        let hsm = Box::new(MockHSM::new());
-        let _ = hsm.generate_key("vault-key-1", "ECDSA-P256").await?;
-        let signer = HSMSigner::new(hsm, "vault-key-1".to_string());
+        #[cfg(any(test, feature = "dev"))]
+        let hsm: Box<dyn HSMBackend> = {
+            let hsm = Box::new(MockHSM::new());
+            let _ = hsm.generate_key("vault-key-1", "ECDSA-P256").await?;
+            hsm
+        };
+        #[cfg(not(any(test, feature = "dev")))]
+        let hsm: Box<dyn HSMBackend> = Box::new(NoHsmBackend);
+
+        Self::from_backend(hsm, "vault-key-1".to_string()).await
+    }
+
+    /// Build a service around an explicit HSM backend — the injection point for
+    /// a real PKCS#11 provider. The key must already exist in that backend.
+    pub async fn new_with_backend(
+        hsm: Box<dyn HSMBackend>,
+        key_id: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_backend(hsm, key_id.into()).await
+    }
+
+    async fn from_backend(hsm: Box<dyn HSMBackend>, key_id: String) -> Result<Self> {
+        let signer = HSMSigner::new(hsm, key_id);
 
         Ok(Self {
             vaults: RwLock::new(HashMap::new()),
@@ -450,7 +481,7 @@ mod tests {
             requestor: "user-1".to_string(),
             reason: "test transfer".to_string(),
             created_at_ms: Utc::now().timestamp_millis() as u64,
-            expires_at_ms: Utc::now().timestamp_millis() as u64 + 3600_000,
+            expires_at_ms: Utc::now().timestamp_millis() as u64 + 3_600_000,
         };
 
         let decision = service.authorize_operation(request).await.unwrap();
