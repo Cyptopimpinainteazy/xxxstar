@@ -166,7 +166,7 @@ display_status() {
     echo "  1. Monitor pods:         kubectl get pods -n $NAMESPACE -w"
     echo "  2. Check logs:           kubectl logs -n $NAMESPACE -f <pod-name>"
     echo "  3. Verify consensus:     kubectl exec -n $NAMESPACE x3-validator-0 -- curl localhost:9933 2>/dev/null | jq"
-    echo "  4. Check indexer:        curl -X POST http://\${INDEXER_IP}:4000/graphql -H 'Content-Type: application/json' -d '{\"query\":\"{__typename}\"}'
+    echo "  4. Check indexer:        curl -X POST http://\${INDEXER_IP}:4000/graphql -H 'Content-Type: application/json' -d '{\"query\":\"{__typename}\"}'"
     echo ""
 }
 

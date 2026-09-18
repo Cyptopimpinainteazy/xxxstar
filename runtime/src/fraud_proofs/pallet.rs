@@ -440,7 +440,6 @@ mod tests {
     use super::pallet::*;
     // These tests only compile under `feature = "dev"`, which is why the missing
     // imports went unnoticed: the dev variant's test target did not build at all.
-    use frame_support::{assert_noop, assert_ok};
     use crate::fraud_proofs::{
         freeze::{FreezeReason, FreezeState},
         scheduler_v1::scheduler_commitment_from_bytes,
@@ -448,6 +447,7 @@ mod tests {
         verifier::compute_proof_id,
     };
     use codec::Encode;
+    use frame_support::{assert_noop, assert_ok};
     use sp_core::H256;
 
     fn zero_hash() -> H256 {
@@ -559,7 +559,9 @@ mod tests {
             // carries the forged one. `scheduler_commitment` is derived from the
             // witness bytes, not from the hashes, so take it from a reference
             // proof rather than reading the binding being defined.
-            let expected_commitment = make_valid_proof(1u64, forged, forged).1.scheduler_commitment;
+            let expected_commitment = make_valid_proof(1u64, forged, forged)
+                .1
+                .scheduler_commitment;
             let (proof, disputed) = make_valid_proof(1u64, forged, expected_commitment);
 
             // The disputed block's meta must have the forged commitment
@@ -732,8 +734,7 @@ mod tests {
     fn invalid_proof_type_rejected() {
         new_test_ext().execute_with(|| {
             let forged = H256([0xFF; 32]);
-            let (mut proof, disputed) =
-                make_valid_proof(1u64, forged, correct_commitment());
+            let (mut proof, disputed) = make_valid_proof(1u64, forged, correct_commitment());
             proof.proof_type = 0x02; // unknown type
 
             let disputed_with_forged = DisputedBlockMeta {
