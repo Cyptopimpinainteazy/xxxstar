@@ -14,64 +14,94 @@
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
-# Results are written to .ai/runlogs/local-ci-<timestamp>.log and a summary table
-# is printed at the end. Exit status is non-zero if any gate failed.
+# Scheduling and scoping (added for the pre-push hook and for triage):
+#   --jobs N          run N gates at once (default 3, or X3_LOCAL_CI_JOBS)
+#   --cargo-jobs N    CARGO_BUILD_JOBS for every gate (default 10, or the env var)
+#   --only a,b        run exactly these gate slugs (see --list)
+#   --skip a,b        drop these gate slugs; the summary records the skip loudly
+#   --dry-run         print the gate list that would run, then exit
+#   --fail-fast       stop scheduling new gates once one has failed
+#   --changed-from R  add gates implied by the files changed in R...HEAD
+#   --pre-push        the push-time set: fast gates + diff-scoped gates, plus the
+#                     release/variant gates when pushing the default branch
+#
+# Results are written to .ai/runlogs/local-ci-<timestamp>.log (aggregate), one
+# local-ci-<timestamp>-<slug>.log per gate, and a machine-readable
+# local-ci-<timestamp>-summary.json. Exit status is non-zero if any gate failed,
+# 2 on a usage error, 3 when the whole run was skipped by X3_LOCAL_CI_SKIP_ALL=1.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+export PATH="${HOME}/.cargo/bin:${PATH}"
 
 RUN_LIVE=0
 RUN_CROSS=0
 RUN_RELEASE=0
 RUN_VARIANTS=0
+RUN_PREPUSH=0
 LIST_ONLY=0
-for arg in "$@"; do
-  case "$arg" in
+DRY_RUN=0
+FAIL_FAST=0
+JOBS="${X3_LOCAL_CI_JOBS:-3}"
+CARGO_JOBS="${CARGO_BUILD_JOBS:-10}"
+ONLY=""
+SKIP="${X3_LOCAL_CI_SKIP:-}"
+CHANGED_FROM=""
+
+usage() { sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --live) RUN_LIVE=1 ;;
     --cross) RUN_LIVE=1; RUN_CROSS=1 ;;
     --release) RUN_RELEASE=1 ;;
     --variants) RUN_VARIANTS=1 ;;
     --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1 ;;
+    --pre-push) RUN_PREPUSH=1 ;;
     --list) LIST_ONLY=1 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
-    *) echo "unknown option: $arg" >&2; exit 2 ;;
+    --dry-run) DRY_RUN=1 ;;
+    --fail-fast) FAIL_FAST=1 ;;
+    --jobs) JOBS="${2:-}"; shift ;;
+    --cargo-jobs) CARGO_JOBS="${2:-}"; shift ;;
+    --only) ONLY="${2:-}"; shift ;;
+    --skip) SKIP="${SKIP:+$SKIP,}${2:-}"; shift ;;
+    --changed-from) CHANGED_FROM="${2:-}"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
+  shift
 done
+
+case "$JOBS" in ''|*[!0-9]*) echo "local-ci: --jobs must be a positive integer" >&2; exit 2 ;; esac
+case "$CARGO_JOBS" in ''|*[!0-9]*) echo "local-ci: --cargo-jobs must be a positive integer" >&2; exit 2 ;; esac
+
+if [ "${X3_LOCAL_CI_SKIP_ALL:-0}" = "1" ]; then
+  echo "local-ci: SKIPPED — X3_LOCAL_CI_SKIP_ALL=1 was set for this invocation."
+  echo "local-ci: nothing was verified. Re-run without it before trusting the result."
+  exit 3
+fi
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 LOG_DIR="$ROOT/.ai/runlogs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/local-ci-$STAMP.log"
+PROGRESS="$LOG_DIR/local-ci-$STAMP-progress.log"
+: >"$PROGRESS"
 
 declare -a GATE_NAMES=() GATE_STATUS=() GATE_SECS=() GATE_LOGS=()
 FAILED=0
 
-# run_gate <name> <log-suffix> <command...>
-run_gate() {
-  local name="$1"; shift
-  local slug="$1"; shift
-  local gate_log="$LOG_DIR/local-ci-$STAMP-$slug.log"
-  GATE_NAMES+=("$name"); GATE_LOGS+=("$gate_log")
-  echo ""
-  echo "=== $name ==="
-  local start=$SECONDS
-  if "$@" > "$gate_log" 2>&1; then
-    GATE_STATUS+=("PASS")
-    echo "PASS ($((SECONDS - start))s) — $gate_log"
-  else
-    GATE_STATUS+=("FAIL")
-    FAILED=1
-    echo "FAIL ($((SECONDS - start))s) — $gate_log"
-    tail -15 "$gate_log"
-  fi
-  GATE_SECS+=("$((SECONDS - start))")
-}
+declare -A SEEN_SLUG=()
 
-# The repository's own gates.
+# ── the repository's own gates ─────────────────────────────────────────────
 GATES_FAST=(
   "format check:cargo fmt --all -- --check"
   "agent guards:make guard"
+  "make gate exit codes:make check-make-gates"
+  "script syntax:bash scripts/check-script-syntax.sh"
+  "workflow wiring:python3 scripts/check_ci_workflow_refs.py --parity"
+  "test integrity diff:python3 scripts/test_cheat_guard.py --base ${X3_LOCAL_CI_BASE:-origin/master}"
   "readiness consistency:bash scripts/check-readiness-consistency.sh"
   "workspace check:env SKIP_WASM_BUILD=1 cargo check --workspace"
   "clippy workspace:cargo clippy --workspace --all-targets -- -D warnings"
@@ -91,29 +121,36 @@ GATES_LIVE=(
   "SVM contract lifecycle:programs/svm/x3_atomic_swap/test-live-lifecycle.sh"
 )
 
+GATES_VARIANTS=(
+  "runtime variant dry-runs:bash scripts/check-runtime-variants.sh"
+)
+
+GATES_RELEASE=(
+  "release gate (mainnet-check):make mainnet-check"
+)
+
+GATES_CROSS=(
+  "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
+)
+
+slugify() { printf '%s' "$1" | tr ' ' '-'; }
+
 describe_all() {
-  echo "fast gates:"
-  printf '  - %s\n' "${GATES_FAST[@]%%:*}" | grep -v '^  - $'
-  if [ "$RUN_LIVE" = 1 ]; then
-    echo "live gates:"
-    printf '  - %s\n' "${GATES_LIVE[@]%%:*}"
-  fi
-  if [ "$RUN_CROSS" = 1 ]; then
-    echo "cross-domain gates:"
-    cat <<'EOF'
-  - X3-native local-node lifecycles (cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored)
+  echo "fast gates (default):"
+  printf '  - %s\n' "${GATES_FAST[@]%%:*}"
+  echo "live gates (--live):"
+  printf '  - %s\n' "${GATES_LIVE[@]%%:*}"
+  echo "cross-domain gates (--cross):"
+  printf '  - %s\n' "${GATES_CROSS[@]%%:*}"
+  cat <<'EOF'
   - X3VM<->EVM cross-domain lifecycles (needs anvil + deployed AtlasHTLC; see .ai/runlogs for the runner recipe)
   - X3VM<->SVM cross-domain lifecycles (needs solana-test-validator + SBF program)
 EOF
-  fi
-  if [ "$RUN_RELEASE" = 1 ]; then
-    echo "release gate:"
-    echo "  - make mainnet-check  (docs, release build + runtime WASM, chain specs, critical suites, srtool, secret scan)"
-  fi
-  if [ "$RUN_VARIANTS" = 1 ]; then
-    echo "runtime variants:"
-    echo "  - scripts/check-runtime-variants.sh  (migration dry-run per construct_runtime! variant)"
-  fi
+  echo "release gate (--release):"
+  printf '  - %s\n' "${GATES_RELEASE[@]%%:*}"
+  echo "runtime variants (--variants):"
+  printf '  - %s\n' "${GATES_VARIANTS[@]%%:*}"
+  echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast"
 }
 
 if [ "$LIST_ONLY" = 1 ]; then
@@ -121,56 +158,197 @@ if [ "$LIST_ONLY" = 1 ]; then
   exit 0
 fi
 
+# ── what the outgoing diff implies ─────────────────────────────────────────
+BASE_REF="${X3_LOCAL_CI_BASE:-origin/master}"
+git rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null || BASE_REF="HEAD"
+
+NOTES=()
+TOUCHED=()
+
+collect_touched() {
+  local base="$1"
+  {
+    git diff --name-only "$base...HEAD" 2>/dev/null
+    git diff --name-only HEAD 2>/dev/null
+  } | sort -u
+}
+
+if [ "$RUN_PREPUSH" = 1 ] || [ -n "$CHANGED_FROM" ]; then
+  DIFF_BASE="${CHANGED_FROM:-$BASE_REF}"
+  if git rev-parse --verify --quiet "${DIFF_BASE}^{commit}" >/dev/null; then
+    mapfile -t TOUCHED < <(collect_touched "$DIFF_BASE")
+    for path in "${TOUCHED[@]}"; do
+      case "$path" in
+        X3-contracts/evm/*|X3-contracts/svm/*)
+          RUN_LIVE=1
+          NOTES+=("$path changed -> live contract gates added (--live)")
+          ;;
+        runtime/*)
+          RUN_VARIANTS=1
+          NOTES+=("$path changed -> runtime variant dry-runs added (--variants)")
+          ;;
+      esac
+    done
+    NOTES+=("diff vs $DIFF_BASE touched ${#TOUCHED[@]} file(s)")
+  else
+    NOTES+=("changed-from ref $DIFF_BASE does not resolve; diff scoping skipped")
+  fi
+fi
+
+PUSH_REF="${X3_LOCAL_CI_PUSH_REF:-}"
+if [ "$RUN_PREPUSH" = 1 ] && { [ "$PUSH_REF" = "refs/heads/master" ] || [ "$PUSH_REF" = "refs/heads/main" ]; }; then
+  RUN_RELEASE=1
+  RUN_VARIANTS=1
+  NOTES+=("push to $PUSH_REF -> release + variant gates added")
+fi
+
+# ── select gates ───────────────────────────────────────────────────────────
+SELECTED=()
+for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_LIVE" = 1 ] && for spec in "${GATES_LIVE[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_CROSS" = 1 ] && for spec in "${GATES_CROSS[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_VARIANTS" = 1 ] && for spec in "${GATES_VARIANTS[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_RELEASE" = 1 ] && for spec in "${GATES_RELEASE[@]}"; do SELECTED+=("$spec"); done
+
+if [ -n "$ONLY" ]; then
+  IFS=',' read -r -a ONLY_LIST <<<"$ONLY"
+  FILTERED=()
+  for spec in "${SELECTED[@]}"; do
+    name="${spec%%:*}"; slug="$(slugify "$name")"
+    for want in "${ONLY_LIST[@]}"; do
+      [ "$slug" = "$want" ] && FILTERED+=("$spec")
+    done
+  done
+  if [ "${#FILTERED[@]}" -eq 0 ]; then
+    echo "local-ci: --only matched no gate; see --list" >&2
+    exit 2
+  fi
+  SELECTED=("${FILTERED[@]}")
+fi
+
+if [ -n "$SKIP" ]; then
+  IFS=',' read -r -a SKIP_LIST <<<"$SKIP"
+  KEPT=()
+  for spec in "${SELECTED[@]}"; do
+    name="${spec%%:*}"; slug="$(slugify "$name")"
+    drop=0
+    for skipper in "${SKIP_LIST[@]}"; do
+      [ "$slug" = "$skipper" ] && drop=1
+    done
+    if [ "$drop" = 1 ]; then
+      NOTES+=("SKIPPED BY REQUEST: $slug")
+    else
+      KEPT+=("$spec")
+    fi
+  done
+  SELECTED=("${KEPT[@]}")
+fi
+
+if [ "${#SELECTED[@]}" -eq 0 ]; then
+  echo "local-ci: no gates selected" >&2
+  exit 2
+fi
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+DIRTY="clean"
+[ -n "$(git status --porcelain 2>/dev/null | head -n 1)" ] && DIRTY="dirty"
+
 echo "local-ci $STAMP — root=$ROOT"
+echo "local-ci: ${#SELECTED[@]} gate(s), jobs=$JOBS, cargo-jobs=$CARGO_JOBS, $BRANCH@$HEAD_SHA ($DIRTY)"
+for note in "${NOTES[@]:-}"; do [ -n "$note" ] && echo "local-ci: note: $note"; done
+echo "local-ci: prereqs: $(for tool in cargo python3 node docker srtool; do if command -v "$tool" >/dev/null 2>&1; then printf '%s=ok ' "$tool"; else printf '%s=MISSING ' "$tool"; fi; done)"
+command -v srtool >/dev/null 2>&1 || echo "local-ci: note: srtool missing -> the release gate fails on its reproducibility section"
 echo "log: $LOG"
+
+if [ "$DRY_RUN" = 1 ]; then
+  printf 'would run %-34s %s\n' GATE COMMAND
+  for spec in "${SELECTED[@]}"; do
+    printf 'would run %-34s %s\n' "${spec%%:*}" "${spec#*:}"
+  done
+  exit 0
+fi
+
+export CARGO_BUILD_JOBS="$CARGO_JOBS"
+export CARGO_TERM_COLOR=never
+
 {
   echo "local-ci $STAMP"
   echo "root=$ROOT"
-  echo "live=$RUN_LIVE cross=$RUN_CROSS"
-} > "$LOG"
+  echo "branch=$BRANCH head=$HEAD_SHA tree=$DIRTY"
+  echo "live=$RUN_LIVE cross=$RUN_CROSS release=$RUN_RELEASE variants=$RUN_VARIANTS jobs=$JOBS cargo_jobs=$CARGO_JOBS"
+} >"$LOG"
 
-for spec in "${GATES_FAST[@]}"; do
-  name="${spec%%:*}"; cmd="${spec#*:}"
-  slug="$(echo "$name" | tr ' ' '-')"
-  # shellcheck disable=SC2086
-  run_gate "$name" "$slug" env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "$cmd"
-done
+# run_gate <name> <slug> <command> — one process per gate so the parent keeps the
+# real exit code, the timing, and a per-gate log even when gates run in parallel.
+run_gate() {
+  local name="$1" slug="$2" cmd="$3"
+  local gate_log="$LOG_DIR/local-ci-$STAMP-$slug.log"
+  local start end rc
+  start=$(date +%s)
+  env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "$cmd" >"$gate_log" 2>&1
+  rc=$?
+  end=$(date +%s)
+  if [ "$rc" -eq 0 ]; then
+    printf 'PASS' >"$LOG_DIR/local-ci-$STAMP-$slug.status"
+  else
+    printf 'FAIL' >"$LOG_DIR/local-ci-$STAMP-$slug.status"
+  fi
+  printf '%s' "$((end - start))" >"$LOG_DIR/local-ci-$STAMP-$slug.secs"
+  # One short line per gate: atomic appends, so parallel gates cannot interleave.
+  if [ "$rc" -eq 0 ]; then
+    printf 'PASS %-34s %ss\n' "$name" "$((end - start))" | tee -a "$LOG"
+  else
+    printf 'FAIL %-34s %ss — %s\n' "$name" "$((end - start))" "${gate_log#"$ROOT"/}" | tee -a "$LOG"
+  fi
+}
 
-# Live gates need a few tools and a free port; fail loudly rather than skip silently.
-if [ "$RUN_LIVE" = 1 ]; then
-  for spec in "${GATES_LIVE[@]}"; do
-    name="${spec%%:*}"; cmd="${spec#*:}"
-    slug="$(echo "$name" | tr ' ' '-')"
-    # shellcheck disable=SC2086
-    run_gate "$name" "$slug" env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "$cmd"
+any_failed() {
+  local file
+  for file in "$LOG_DIR"/local-ci-"$STAMP"-*.status; do
+    [ -e "$file" ] || continue
+    [ "$(cat "$file")" = "FAIL" ] && return 0
   done
-fi
+  return 1
+}
 
-if [ "$RUN_CROSS" = 1 ]; then
-  run_gate "X3-native lifecycles" "x3-native-lifecycles" \
-    env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" \
-    bash -lc "env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
-  echo ""
-  echo "NOTE: the X3VM<->EVM and X3VM<->SVM cross-domain gates need anvil /"
-  echo "      solana-test-validator wired up first; run them with"
-  echo "      the recipes recorded in .ai/memory/agent-memory.md."
-fi
+kill_running() {
+  local pid
+  for pid in $(jobs -p); do
+    pkill -P "$pid" 2>/dev/null
+    kill "$pid" 2>/dev/null
+  done
+  wait 2>/dev/null
+}
 
-# The release gate: docs, release build + runtime WASM, chain specs, the critical
-# pallet/runtime suites, srtool/docker reproducibility prerequisites and the
-# forbidden-secret scan. Needs `srtool` on PATH (see the memory notes for the
-# pinned install command) or it fails loudly on section 5.
-if [ "$RUN_RELEASE" = 1 ]; then
-  run_gate "release gate (mainnet-check)" "release-gate" \
-    env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "make mainnet-check"
-fi
+for spec in "${SELECTED[@]}"; do
+  name="${spec%%:*}"; cmd="${spec#*:}"; slug="$(slugify "$name")"
+  if [ -n "${SEEN_SLUG[$slug]:-}" ]; then
+    echo "local-ci: duplicate gate slug '$slug' — refusing to overwrite its log" >&2
+    exit 2
+  fi
+  SEEN_SLUG[$slug]=1
+  while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do
+    wait -n
+    if [ "$FAIL_FAST" = 1 ] && any_failed; then
+      echo "local-ci: --fail-fast triggered — stopping remaining gates"
+      kill_running
+      break 2
+    fi
+  done
+  run_gate "$name" "$slug" "$cmd" &
+done
+wait
 
-# The migration dry-run covers every construct_runtime! variant; each variant is a
-# separate feature set, so this compiles the runtime six times.
-if [ "$RUN_VARIANTS" = 1 ]; then
-  run_gate "runtime variant dry-runs" "runtime-variants" \
-    env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash scripts/check-runtime-variants.sh
-fi
+# ── summary ────────────────────────────────────────────────────────────────
+for spec in "${SELECTED[@]}"; do
+  name="${spec%%:*}"; slug="$(slugify "$name")"
+  status="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.status" 2>/dev/null || echo FAIL)"
+  secs="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.secs" 2>/dev/null || echo 0)"
+  GATE_NAMES+=("$name"); GATE_STATUS+=("$status"); GATE_SECS+=("$secs")
+  GATE_LOGS+=("$LOG_DIR/local-ci-$STAMP-$slug.log")
+  [ "$status" = "PASS" ] || FAILED=1
+done
 
 echo ""
 echo "──────── local-ci summary ($STAMP) ────────"
@@ -178,6 +356,7 @@ printf '%-34s %-6s %s\n' "GATE" "RESULT" "SECONDS"
 for i in "${!GATE_NAMES[@]}"; do
   printf '%-34s %-6s %s\n' "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}"
 done
+
 {
   echo ""
   echo "──────── summary ────────"
@@ -185,7 +364,34 @@ done
   for i in "${!GATE_NAMES[@]}"; do
     printf '%-34s %-6s %s\n' "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}"
   done
+  if [ "${#NOTES[@]}" -gt 0 ]; then
+    echo ""
+    for note in "${NOTES[@]}"; do echo "note: $note"; done
+  fi
 } >> "$LOG"
+
+{
+  printf '{\n'
+  printf '  "stamp": "%s",\n' "$STAMP"
+  printf '  "branch": "%s",\n' "$BRANCH"
+  printf '  "head": "%s",\n' "$HEAD_SHA"
+  printf '  "working_tree": "%s",\n' "$DIRTY"
+  printf '  "jobs": %s,\n' "$JOBS"
+  printf '  "cargo_jobs": %s,\n' "$CARGO_JOBS"
+  printf '  "result": "%s",\n' "$([ "$FAILED" -eq 1 ] && echo FAIL || echo PASS)"
+  printf '  "touched_files": %s,\n' "${#TOUCHED[@]}"
+  printf '  "gates": [\n'
+  for i in "${!GATE_NAMES[@]}"; do
+    comma=","
+    [ "$i" -eq "$((${#GATE_NAMES[@]} - 1))" ] && comma=""
+    printf '    {"name": "%s", "result": "%s", "seconds": %s, "log": "%s"}%s\n' \
+      "${GATE_NAMES[$i]}" "${GATE_STATUS[$i]}" "${GATE_SECS[$i]}" \
+      "$(basename "${GATE_LOGS[$i]}")" "$comma"
+  done
+  printf '  ]\n}\n'
+} >"$LOG_DIR/local-ci-$STAMP-summary.json"
+
+echo "local-ci: summary json -> .ai/runlogs/local-ci-$STAMP-summary.json"
 
 if [ "$FAILED" = 1 ]; then
   echo ""
