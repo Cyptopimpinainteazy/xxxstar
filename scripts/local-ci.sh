@@ -144,7 +144,9 @@ GATES_CROSS=(
   "X3-native lifecycles:env -u SKIP_WASM_BUILD cargo test -p x3-chain-node --test x3vm_live_lifecycle -- --ignored --nocapture --test-threads=1"
 )
 
-slugify() { printf '%s' "$1" | tr ' ' '-'; }
+# Slugs are the `--only`/`--skip` keys, so keep them lowercase: gate names carry
+# acronyms ("EVM contract lifecycle") that nobody types in caps.
+slugify() { printf '%s' "$1" | tr '[:upper:] ' '[:lower:]-'; }
 
 describe_all() {
   echo "fast gates (default):"
