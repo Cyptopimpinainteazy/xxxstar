@@ -12,7 +12,10 @@
 ///   enabling production vault signing.
 use crate::error::{CustodyError, Result};
 use crate::types::{HSMKeyReference, VaultOperationCommand};
+// Only the `MockHSM` backend (dev/test) timestamps anything.
+#[cfg(any(test, feature = "dev"))]
 use chrono::Utc;
+use sha2::Digest;
 
 /// HSM backend abstraction
 #[async_trait::async_trait]
@@ -192,7 +195,7 @@ impl HSMSigner {
         pending_out: u128,
         pending_in: u128,
     ) -> String {
-        let mut hasher = Sha256::new();
+        let mut hasher = sha2::Sha256::new();
         hasher.update(vault_id.as_bytes());
         hasher.update(available.to_le_bytes());
         hasher.update(reserved.to_le_bytes());

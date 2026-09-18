@@ -109,3 +109,33 @@ crate, and the verification router no longer claims a vault-signer policy, but
 the API invites treating stored approvals as consent. The method signature now
 names the parameter `unverified_signature_bytes` and the docs state the
 requirement; a real scheme (canonical message + verification) is tracked in #272.
+
+---
+
+## Status update — 2026-09-18 (later)
+
+**Finding 2 — `MockChainAdapter` compiled in all builds (CRITICAL) — resolved.**
+
+The type now lives behind `#[cfg(any(test, feature = "mock-adapters"))]` in
+`crates/external-chains/src/adapter.rs` and the crate declares a non-default
+`mock-adapters` feature. Proven by a downstream probe: a crate depending on
+`x3-external-chains` with default features fails with
+`error[E0432]: unresolved import x3_external_chains::adapter::MockChainAdapter`
+("no `MockChainAdapter` in `adapter`"), and compiles once the feature is enabled.
+In-crate tests still use the double, since `cfg(test)` enables it.
+
+Reaching that proof required fixing why the crate could not be built at all: it
+was in neither `members` nor `exclude`, so nothing compiled it. It is a workspace
+member now, its 62 tests run in `cargo test --workspace`, and the same repair
+brought `cross-chain-position-manager` (51 tests) and `custody-service`
+(14 tests) in — the latter had two hard compile errors, an ungated `MockHSM`
+import in `service.rs` and a missing `Sha256` path in `hsm.rs`.
+
+**New finding (#274, HIGH)** — 59 crates sit in that same members/exclude gap, so
+their code and tests are compiled nowhere. `scripts/check-workspace-membership.py`
+is now a local-CI gate with a checked-in baseline
+(`.ai/workspace-membership-baseline.txt`) that fails when a crate appears in
+neither list or when a repaired one stays in the baseline.
+
+Findings 3 and 4 (`unwrap()` / `panic!()` counts) remain open and are unchanged
+by either update.

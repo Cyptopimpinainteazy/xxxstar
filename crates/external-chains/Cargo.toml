@@ -41,6 +41,11 @@ tokio = { version = "1.0", features = ["full", "test-util", "macros", "rt-multi-
 
 [features]
 default = ["std"]
+# Test double for the chain adapters (`MockChainAdapter`). Not in `default`:
+# it accepts every proof (`verify_message_proof` -> `Ok(true)`), so it must not
+# be reachable from a production build. See docs/reports/SECURITY_BLOCKERS.md
+# finding 2.
+mock-adapters = []
 std = [
     "parity-scale-codec/std",
     "scale-info/std",
