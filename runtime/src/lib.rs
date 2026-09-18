@@ -4990,4 +4990,178 @@ mod runtime_upgrade_rehearsal {
             max_block.ref_time()
         );
     }
+
+    /// Every pallet that declares an in-code storage version must end the upgrade
+    /// with the same version on chain. A pallet left behind here is the classic
+    /// silent mainnet upgrade bug: reads keep working against a schema the code no
+    /// longer expects until someone notices the corruption. This is the check the
+    /// absent `try-runtime` CLI would have performed.
+    ///
+    /// The pallet list is the intersection of all five `construct_runtime!`
+    /// variants (`runtime/build.rs`/this module is compiled once per variant), so
+    /// `scripts/check-runtime-variants.sh` exercises it for every variant. Pallets
+    /// that declare no storage version at all are skipped by construction.
+    #[test]
+    fn runtime_upgrade_rehearsal_storage_versions() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{
+            GetStorageVersion, NoStorageVersionSet, PalletInfoAccess, StorageVersion,
+        };
+
+        /// In-code version as a number, or `None` when the pallet declares none.
+        trait DeclaredVersion {
+            fn declared(&self) -> Option<u16>;
+        }
+        impl DeclaredVersion for StorageVersion {
+            fn declared(&self) -> Option<u16> {
+                u16::decode(&mut &self.encode()[..]).ok()
+            }
+        }
+        impl DeclaredVersion for NoStorageVersionSet {
+            fn declared(&self) -> Option<u16> {
+                None
+            }
+        }
+
+        fn aligned<P>() -> Option<(u16, u16)>
+        where
+            P: GetStorageVersion + PalletInfoAccess,
+            P::InCodeStorageVersion: DeclaredVersion,
+        {
+            let declared = P::in_code_storage_version().declared()?;
+            let on_chain = u16::decode(&mut &StorageVersion::get::<P>().encode()[..]).ok()?;
+            Some((on_chain, declared))
+        }
+
+        /// Collects `(pallet, on-chain, in-code)` for every pallet in the list that
+        /// declares an in-code storage version.
+        fn collect() -> Vec<(&'static str, u16, u16)> {
+            let mut found = Vec::new();
+            macro_rules! collect {
+                ($($pallet:ty),* $(,)?) => {
+                    $(
+                        if let Some((on_chain, declared)) = aligned::<$pallet>() {
+                            found.push((stringify!($pallet), on_chain, declared));
+                        }
+                    )*
+                };
+            }
+            collect!(
+                crate::System,
+                crate::Timestamp,
+                crate::Aura,
+                crate::Grandpa,
+                crate::Session,
+                crate::Historical,
+                crate::Offences,
+                crate::Balances,
+                crate::TransactionPayment,
+                crate::Scheduler,
+                crate::Preimage,
+                crate::AtlasKernel,
+                crate::X3Invariants,
+                crate::X3AgentLaw,
+                crate::X3Coin,
+                crate::AtomicTradeEngine,
+                crate::Council,
+                crate::Governance,
+                crate::Treasury,
+                crate::AgentAccounts,
+                crate::AgentMemory,
+                crate::X3Verifier,
+                crate::X3DomainRegistry,
+                crate::X3AssetRegistry,
+                crate::X3SupplyLedger,
+                crate::X3CrossVmRouter,
+                crate::X3CrosschainGateway,
+                crate::X3TokenFactory,
+                crate::X3AccountRegistry,
+                crate::CrossChainValidator,
+                crate::X3SettlementEngine,
+                crate::FraudProofs,
+                crate::X3AtomicKernel,
+                crate::X3Slash,
+                crate::X3WalletPallet,
+                crate::X3Inventory,
+                crate::X3Reservation,
+                crate::X3Solvency,
+                crate::X3Rebalance,
+                crate::X3Partner,
+                crate::X3TreasuryPolicy,
+                crate::X3Custody,
+                crate::X3Reconciliation,
+                crate::X3Wrapped,
+                crate::SvmRuntime,
+                crate::X3JuryAnchor,
+                crate::X3LpLocker,
+                crate::X3Sentinel,
+            );
+            found
+        }
+
+        let mut ext = fresh_externalities();
+        let checked = ext.execute_with(|| {
+            <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade();
+            <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade();
+
+            let versions = collect();
+            let mismatched: Vec<_> = versions
+                .iter()
+                .filter(|(_, on_chain, declared)| on_chain != declared)
+                .collect();
+            println!(
+                "storage-version alignment: {} pallet(s) declare a version, {} aligned",
+                versions.len(),
+                versions.len() - mismatched.len()
+            );
+            assert!(
+                mismatched.is_empty(),
+                "on-chain storage version differs from the in-code version after the upgrade \
+                 hooks ran — a migration is missing or is not wired into `Migrations`: {mismatched:?}"
+            );
+            // Guard against the check quietly covering nothing: this list is fixed
+            // and the runtime has far more than this many versioned pallets, so a
+            // drop below the floor means the coverage regressed, not the runtime.
+            assert!(
+                versions.len() >= 5,
+                "only {} pallet(s) were inspected — the coverage list has regressed",
+                versions.len()
+            );
+            versions.len()
+        });
+        assert!(checked >= 5);
+    }
+
+    /// Proof that the alignment check above can actually fail: a deliberately wrong
+    /// on-chain version must be reported. Without this, a future refactor could
+    /// turn the check into a no-op and every run would still be green.
+    #[test]
+    fn runtime_upgrade_rehearsal_storage_version_check_has_teeth() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{GetStorageVersion, StorageVersion};
+
+        // A pallet that declares `#[pallet::storage_version(STORAGE_VERSION)]`.
+        type Subject = crate::X3AtomicKernel;
+
+        let mut ext = fresh_externalities();
+        ext.execute_with(|| {
+            let declared = u16::decode(&mut &Subject::in_code_storage_version().encode()[..])
+                .expect("X3AtomicKernel must declare a storage version for this proof");
+            let on_chain = u16::decode(&mut &StorageVersion::get::<Subject>().encode()[..])
+                .expect("on-chain storage version must decode");
+            assert_eq!(
+                on_chain, declared,
+                "precondition: the rehearsal must start aligned for the subject pallet"
+            );
+
+            // Corrupt it the way a missing migration would.
+            StorageVersion::new(declared.wrapping_add(1)).put::<Subject>();
+            let after = u16::decode(&mut &StorageVersion::get::<Subject>().encode()[..])
+                .expect("on-chain storage version must decode");
+            assert_ne!(
+                after, declared,
+                "the alignment check would not have noticed a wrong on-chain version"
+            );
+        });
+    }
 }
