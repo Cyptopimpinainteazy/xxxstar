@@ -84,6 +84,17 @@ Each run writes:
 The run exits non-zero if any gate failed; the summary is printed even when
 gates fail, so a partial run is still readable.
 
+### Verification discipline
+
+`--only <light subset>` is for triage, not for sign-off. A change under
+`runtime/` (including `runtime/build.rs`, which is compiled by every clippy
+configuration) or in a build script must be verified with the whole fast set —
+`--pre-push`, or a plain run — before merging. #235 shipped a `clippy::ptr_arg`
+error in `runtime/build.rs` precisely because it was verified with a light
+`--only` subset; the next full run caught it (`15 PASS / 3 FAIL`, all three
+failures the same line). The pre-push hook always runs the full fast set, which
+is the intended safety net.
+
 ## The pre-push hook
 
 `.githooks/pre-push` delegates to `scripts/local-ci.sh --pre-push`:
