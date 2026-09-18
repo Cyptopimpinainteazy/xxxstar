@@ -1172,7 +1172,12 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
-                    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier);
+                    // No governance-controlled SVM validator set is wired into
+                    // this pallet yet, so the verifier is constructed with an
+                    // empty set and refuses every Solana proof (fail closed)
+                    // instead of accepting it unchecked. Wiring the set is the
+                    // remaining work: see issue #266.
+                    let v: Arc<dyn Verifier> = Arc::new(SolanaFinalizedVerifier::empty());
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::BitcoinSpvProof => {

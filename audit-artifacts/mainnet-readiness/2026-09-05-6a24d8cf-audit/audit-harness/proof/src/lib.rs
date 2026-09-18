@@ -12,7 +12,11 @@ mod audit_tests {
  #[test]
  fn reject_unsigned_one_byte_solana_proof_in_production() {
   let proof=envelope(ChainKind::Solana, VerificationStrategy::SolanaFinalizedProof);
-  assert!(SolanaFinalizedVerifier.verify(&proof).is_err(), "one-byte unsigned proof accepted by production Solana verifier");
+  // 2026-09-18: `SolanaFinalizedVerifier` now carries the authorized validator
+  // set (it verifies Ed25519 attestations over BLAKE2b-256(slot || blockhash)).
+  // `empty()` is the unconfigured verifier, whose job is still to refuse this
+  // structural one-byte proof. The assertion itself is unchanged.
+  assert!(SolanaFinalizedVerifier::empty().verify(&proof).is_err(), "one-byte unsigned proof accepted by production Solana verifier");
  }
  #[test]
  fn reject_legacy_structural_evm_proof_in_production() {
