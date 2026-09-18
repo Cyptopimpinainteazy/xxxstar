@@ -5132,6 +5132,86 @@ mod runtime_upgrade_rehearsal {
         assert!(checked >= 5);
     }
 
+    /// The alignment check above only proves the *end* state is consistent. This
+    /// proves the migrations actually run: every pallet whose migration struct is
+    /// wired into `Migrations` is first rolled back to an older on-chain version
+    /// (0), then the upgrade hooks run, and the pallet must end at the version the
+    /// code declares. A migration that silently stops matching its pallet (or is
+    /// dropped from the tuple) fails here — which is the failure mode `try-runtime`
+    /// would have reported on a real upgrade.
+    ///
+    /// The four pallets are exactly the structs registered in `Migrations`, so this
+    /// covers every migration this runtime ships.
+    #[test]
+    fn runtime_upgrade_rehearsal_migrations_advance_behind_versions() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{GetStorageVersion, StorageVersion};
+
+        macro_rules! rehearse {
+            ($($pallet:ty),* $(,)?) => {{
+                // Simulate an older on-chain state: every migrated pallet is behind.
+                $(
+                    StorageVersion::new(0).put::<$pallet>();
+                )*
+                // Prove the rollback took effect, so the assertions below cannot
+                // pass just because the pallet was already at the right version.
+                $(
+                    assert_eq!(
+                        u16::decode(&mut &StorageVersion::get::<$pallet>().encode()[..])
+                            .expect("on-chain storage version must decode"),
+                        0,
+                        concat!(stringify!($pallet), ": rollback to storage version 0 did not take effect")
+                    );
+                )*
+                <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade();
+                <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade();
+                let mut report: Vec<(&'static str, u16, u16)> = Vec::new();
+                $(
+                    let declared = u16::decode(
+                        &mut &<$pallet as GetStorageVersion>::in_code_storage_version()
+                            .encode()[..],
+                    )
+                    .expect("declared storage version must decode");
+                    let after =
+                        u16::decode(&mut &StorageVersion::get::<$pallet>().encode()[..])
+                            .expect("on-chain storage version must decode");
+                    report.push((stringify!($pallet), after, declared));
+                )*
+                report
+            }};
+        }
+
+        let mut ext = fresh_externalities();
+        let report = ext.execute_with(|| {
+            rehearse!(
+                crate::AtlasKernel,
+                crate::Treasury,
+                crate::AgentMemory,
+                crate::AgentAccounts
+            )
+        });
+
+        assert_eq!(
+            report.len(),
+            4,
+            "the migration rehearsal must cover every migration wired into `Migrations`"
+        );
+        for (pallet, after, declared) in &report {
+            assert!(
+                *declared >= 1,
+                "{pallet} declares storage version {declared}; a migrated pallet must declare at \
+                 least 1 for this rehearsal to mean anything"
+            );
+            assert_eq!(
+                after, declared,
+                "{pallet} was rolled back to storage version 0 and the upgrade hooks left it at \
+                 {after} instead of {declared} — its migration did not run, or no longer matches \
+                 the pallet's declared version"
+            );
+        }
+        println!("migration rehearsal: {report:?} (rolled back to 0, upgraded back)");
+    }
+
     /// Proof that the alignment check above can actually fail: a deliberately wrong
     /// on-chain version must be reported. Without this, a future refactor could
     /// turn the check into a no-op and every run would still be green.
