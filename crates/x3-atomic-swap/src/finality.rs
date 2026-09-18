@@ -12,11 +12,16 @@
 //! | Bitcoin    | `ChainKind::Bitcoin` |
 //! | Substrate  | `ChainKind::X3` (X3 runtime is Substrate-based) |
 //! | Cosmos     | `ChainKind::Cosmos` |
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
 use alloc::format;
 use alloc::string::{String, ToString};
+#[cfg(not(feature = "std"))]
 use alloc::vec;
+#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 use crate::error::SwapError;

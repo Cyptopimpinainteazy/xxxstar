@@ -5,9 +5,12 @@
 //! the error and do **not** write to the ledger.
 //!
 //! The bridge is adapter-agnostic - any type implementing [`X3VmAdapter`] works.
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
 use alloc::format;
+#[cfg(not(feature = "std"))]
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;

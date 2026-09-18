@@ -5,6 +5,7 @@
 //! to transactions this process actually observed in GRANDPA-finalized blocks,
 //! so an unrelated finalized head can never be reported as proof for a queried
 //! transaction.
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 
 use crate::adapter::{

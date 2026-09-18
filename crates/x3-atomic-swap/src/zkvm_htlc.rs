@@ -13,6 +13,7 @@
 //! - Reports 0 native fee (no on-chain costs for proof verification)
 //! - Reports `finalized=true` (proof verification is instantaneously final)
 use alloc::vec;
+#[cfg(not(feature = "std"))]
 use alloc::format;
 
 use crate::adapter::{

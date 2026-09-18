@@ -2,6 +2,7 @@
 //!
 //! Settlement and recovery should consume one domain-bound artifact rather than
 //! unrelated tx hashes, block fields, receipt bytes, and finality flags.
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 
 use crate::adapter::{ChainId, FinalityProof, VmType};

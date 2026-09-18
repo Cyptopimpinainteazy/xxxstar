@@ -7,7 +7,9 @@
 use alloc::format;
 use alloc::vec;
 use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
 
 use crate::adapter::X3VmAdapter;
