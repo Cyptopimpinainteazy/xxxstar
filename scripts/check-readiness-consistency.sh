@@ -103,40 +103,67 @@ echo ""
 # not just that one.
 echo "--- Checking required_tests exist as real test functions ---"
 TESTS_MISSING=0
+
+# Check every name cited by one `required_tests` array body.
+flush_required_tests() { # <feature-key> <crate_or_service> <array-body>
+  local key="$1" path="$2" body="$3"
+  [ -z "$key" ] || [ -z "$body" ] || [ -z "$path" ] && return 0
+  local abs_path="$REPO_ROOT/$path"
+  [ -d "$abs_path" ] || return 0
+  local rs_file_count
+  rs_file_count=$(find "$abs_path" -name "*.rs" 2>/dev/null | wc -l)
+  [ "$rs_file_count" -gt 0 ] || return 0
+  local test_name
+  while IFS= read -r test_name; do
+    [ -z "$test_name" ] && continue
+    if ! grep -rqE "fn[[:space:]]+${test_name}[[:space:]]*\(" "$abs_path" --include="*.rs" 2>/dev/null; then
+      echo "  VIOLATION: feature '$key' required_tests cites '$test_name' but no 'fn $test_name' exists under $path"
+      TESTS_MISSING=$((TESTS_MISSING + 1))
+    fi
+  done < <(printf '%s' "$body" | grep -oE '"[a-zA-Z0-9_]+"' | tr -d '"')
+}
+
 current_key=""
 current_path=""
+array_body=""
 in_tests_array=0
 while IFS= read -r line; do
   if [[ "$line" =~ ^\[([a-z0-9_]+)\]$ ]]; then
+    if [[ "$in_tests_array" -eq 1 ]]; then
+      flush_required_tests "$current_key" "$current_path" "$array_body"
+    fi
     current_key="${BASH_REMATCH[1]}"
     current_path=""
+    array_body=""
     in_tests_array=0
   elif [[ "$line" =~ ^crate_or_service[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]] && [[ -n "$current_key" ]]; then
     current_path="${BASH_REMATCH[1]}"
-  elif [[ "$line" =~ ^required_tests[[:space:]]*=[[:space:]]*\[ ]]; then
-    in_tests_array=1
-    if [[ "$line" =~ \][[:space:]]*$ ]]; then
-      in_tests_array=0
+  elif [[ "$in_tests_array" -eq 0 && "$line" =~ ^required_tests[[:space:]]*=[[:space:]]*\[(.*)$ ]]; then
+    # Single-line arrays ("required_tests = [\"a\", \"b\"]") are the common form
+    # in this registry. The previous version set the in-array flag and then
+    # cleared it on the very same line, so every name in those arrays was skipped
+    # — 12 of the 15 entries were never verified at all.
+    array_body="${BASH_REMATCH[1]}"
+    if [[ "$array_body" == *"]"* ]]; then
+      array_body="${array_body%%]*}"
+      flush_required_tests "$current_key" "$current_path" "$array_body"
+      array_body=""
+    else
+      in_tests_array=1
     fi
   elif [[ "$in_tests_array" -eq 1 ]]; then
-    if [[ "$line" =~ \"([a-zA-Z0-9_]+)\" ]]; then
-      test_name="${BASH_REMATCH[1]}"
-      abs_path="$REPO_ROOT/$current_path"
-      if [[ -n "$current_path" ]] && [[ -d "$abs_path" ]]; then
-        rs_file_count=$(find "$abs_path" -name "*.rs" 2>/dev/null | wc -l)
-        if [[ "$rs_file_count" -gt 0 ]]; then
-          if ! grep -rqE "fn[[:space:]]+${test_name}[[:space:]]*\(" "$abs_path" --include="*.rs" 2>/dev/null; then
-            echo "  VIOLATION: feature '$current_key' required_tests cites '$test_name' but no 'fn $test_name' exists under $current_path"
-            TESTS_MISSING=$((TESTS_MISSING + 1))
-          fi
-        fi
-      fi
-    fi
-    if [[ "$line" =~ \][[:space:]]*$ ]]; then
+    array_body+=" $line"
+    if [[ "$line" == *"]"* ]]; then
+      array_body="${array_body%%]*}"
+      flush_required_tests "$current_key" "$current_path" "$array_body"
+      array_body=""
       in_tests_array=0
     fi
   fi
 done < "$REGISTRY"
+if [[ "$in_tests_array" -eq 1 ]]; then
+  flush_required_tests "$current_key" "$current_path" "$array_body"
+fi
 VIOLATIONS=$((VIOLATIONS + TESTS_MISSING))
 if [[ "$TESTS_MISSING" -gt 0 ]]; then
   echo "  → $TESTS_MISSING fictional required_tests citation(s). Write the missing test(s) or correct the citation."
