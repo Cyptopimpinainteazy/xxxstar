@@ -122,10 +122,12 @@ mod cli_flags_tests {
     /// Test that feature flag names follow naming convention
     #[test]
     fn feature_flag_names_are_consistent() {
-        let flags = ["enable_parallel_proposer",
+        let flags = [
+            "enable_parallel_proposer",
             "enable_flash_finality",
             "enable_poh",
-            "gpu_required"];
+            "gpu_required",
+        ];
 
         // All enable_* flags should be toggles
         for flag in flags.iter().take(3) {
@@ -325,9 +327,11 @@ mod telemetry_tests {
 
         if flash_finality_enabled {
             // These metrics should be available
-            let metrics = ["x3_flash_finality_rounds_completed",
+            let metrics = [
+                "x3_flash_finality_rounds_completed",
                 "x3_flash_finality_shadow_agreements",
-                "x3_flash_finality_certificates_issued"];
+                "x3_flash_finality_certificates_issued",
+            ];
             assert_eq!(metrics.len(), 3, "Should have 3 Flash Finality metrics");
         }
     }
@@ -405,10 +409,12 @@ mod graceful_shutdown_tests {
         // - Pending votes count
         // - Cleanup status
 
-        let logs_expected = ["Shutdown initiated",
+        let logs_expected = [
+            "Shutdown initiated",
             "Final block",
             "pending votes",
-            "database flush"];
+            "database flush",
+        ];
         assert_eq!(logs_expected.len(), 4);
     }
 

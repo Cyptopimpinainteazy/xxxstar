@@ -73,3 +73,7 @@ sha2 = "0.10"
 once_cell = "1.19"
 
 [dev-dependencies]
+# Same reason as `pallets/x3-crosschain-gateway`: these tests drive the gateway
+# with structural proofs, so they opt into the test verifiers. Production builds
+# never see this feature.
+x3-verification-router = { path = "../../crates/x3-verification-router", features = ["test-verifier"] }

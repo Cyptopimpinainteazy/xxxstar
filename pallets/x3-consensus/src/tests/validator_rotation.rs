@@ -46,11 +46,7 @@ fn authority_change_requires_root() {
         // A signed (non-root) origin must be rejected
         let set: Vec<u64> = vec![1, 2];
         assert_noop!(
-            crate::Pallet::<Test>::set_validators(
-                RawOrigin::Signed(42).into(),
-                set,
-                0
-            ),
+            crate::Pallet::<Test>::set_validators(RawOrigin::Signed(42).into(), set, 0),
             sp_runtime::DispatchError::BadOrigin
         );
 
@@ -65,11 +61,7 @@ fn authority_change_rejects_oversized_set() {
         // Build a set larger than MaxValidators
         let oversized: Vec<u64> = (0..200).collect();
         assert_noop!(
-            crate::Pallet::<Test>::set_validators(
-                RawOrigin::Root.into(),
-                oversized,
-                0
-            ),
+            crate::Pallet::<Test>::set_validators(RawOrigin::Root.into(), oversized, 0),
             crate::Error::<Test>::TooManyValidators
         );
     });

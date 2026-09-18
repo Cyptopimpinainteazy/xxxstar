@@ -13,15 +13,39 @@ name: x3 frame-benchmarking
 
 on:
   pull_request:
+    branches: [master]
     paths:
       - "pallets/**"
       - "runtime/**"
+      - "node/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "patches/**"
+  push:
+    branches: [master, 'release/**']
+    paths:
+      - "pallets/**"
+      - "runtime/**"
+      - "node/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "patches/**"
+  schedule:
+    - cron: '30 4 * * *'
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: "-D warnings"
+
+
+concurrency:
+  # Never cancel an in-flight default-branch run: a cancelled release gate proves
+  # nothing, and with one self-hosted runner every new commit used to cancel the
+  # previous gate before it finished. PR runs still cancel superseded pushes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   benchmark:
@@ -39,6 +63,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.90.0
           targets: wasm32v1-none, wasm32-unknown-unknown
 
       - name: Cache cargo

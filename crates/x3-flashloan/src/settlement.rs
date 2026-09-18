@@ -189,7 +189,7 @@ mod tests {
 
     fn sample_receipt() -> BorrowReceipt {
         BorrowReceipt {
-            id: FlashloanId::from_str("test-settle-001"),
+            id: FlashloanId::from_literal("test-settle-001"),
             chain: ChainKind::Evm(1),
             asset: AssetId::new("USDC"),
             principal: 1_000_000,
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn test_record_revert() {
         let mut engine = SettlementEngine::new();
-        let id = FlashloanId::from_str("revert-001");
+        let id = FlashloanId::from_literal("revert-001");
 
         let record = engine.record_revert(&id);
         assert_eq!(record.status, SettlementStatus::Reverted);
@@ -262,8 +262,8 @@ mod tests {
         let mut engine = SettlementEngine::new();
         let proof_engine = test_proof_engine();
 
-        engine.record_revert(&FlashloanId::from_str("r1"));
-        engine.record_revert(&FlashloanId::from_str("r2"));
+        engine.record_revert(&FlashloanId::from_literal("r1"));
+        engine.record_revert(&FlashloanId::from_literal("r2"));
         engine.record_default(&sample_receipt(), &proof_engine);
 
         assert_eq!(

@@ -102,10 +102,7 @@ impl AtomicGatewayKey {
         tx_nonce: u32,
     ) -> Result<UncheckedExtrinsic, String> {
         let call = RuntimeCall::X3AtomicKernel(
-            pallet_x3_atomic_kernel::Call::<Runtime>::rollback_atomic_bundle {
-                bundle_id,
-                reason,
-            },
+            pallet_x3_atomic_kernel::Call::<Runtime>::rollback_atomic_bundle { bundle_id, reason },
         );
         self.signed_extrinsic(call, genesis_hash, tx_nonce)
     }
@@ -117,10 +114,8 @@ impl AtomicGatewayKey {
         nonce: u32,
     ) -> Result<UncheckedExtrinsic, String> {
         let account = self.account();
-        let agent_law_check = pallet_x3_agent_law::AgentLawCheck::<Runtime>::decode(
-            &mut &[][..],
-        )
-        .map_err(|e| format!("failed to decode agent-law extension: {e}"))?;
+        let agent_law_check = pallet_x3_agent_law::AgentLawCheck::<Runtime>::decode(&mut &[][..])
+            .map_err(|e| format!("failed to decode agent-law extension: {e}"))?;
 
         let extra: SignedExtra = (
             frame_system::CheckNonZeroSender::<Runtime>::new(),
@@ -150,9 +145,7 @@ impl AtomicGatewayKey {
                 (),
             ),
         );
-        let signature = payload.using_encoded(|payload| {
-            Signature::from(self.pair.sign(payload))
-        });
+        let signature = payload.using_encoded(|payload| Signature::from(self.pair.sign(payload)));
         Ok(UncheckedExtrinsic::new_signed(
             call,
             Address::Id(account),
@@ -178,10 +171,9 @@ mod tests {
     #[test]
     fn gateway_account_matches_runtime_constant() {
         let expected = AccountId::new([
-            0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2,
-            0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52, 0x32, 0x87,
-            0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e,
-            0x4f, 0xb8, 0xd8, 0x23, 0xdd, 0xe6, 0x29, 0x35,
+            0x4c, 0x81, 0xd4, 0x16, 0xba, 0xa8, 0xc0, 0xe2, 0xb2, 0xe9, 0x99, 0x77, 0xe4, 0x52,
+            0x32, 0x87, 0xe1, 0x1c, 0xd6, 0xf6, 0x2c, 0xd3, 0x32, 0x8e, 0x4f, 0xb8, 0xd8, 0x23,
+            0xdd, 0xe6, 0x29, 0x35,
         ]);
         assert_eq!(gateway().account(), expected);
     }

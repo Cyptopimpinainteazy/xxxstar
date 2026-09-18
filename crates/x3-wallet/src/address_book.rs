@@ -357,8 +357,11 @@ mod tests {
             AddressBookManager::add_contact(&mut book, vec![65], [2u8; 32], vec![], [1u8; 32], 100)
                 .unwrap();
 
-        let found =
-            AddressBookManager::get_contact_by_address(&book, [2u8; 32], std::slice::from_ref(&contact));
+        let found = AddressBookManager::get_contact_by_address(
+            &book,
+            [2u8; 32],
+            std::slice::from_ref(&contact),
+        );
         assert!(found.is_some());
         assert_eq!(found.unwrap().address, [2u8; 32]);
     }

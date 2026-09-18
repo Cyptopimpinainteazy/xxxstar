@@ -2,26 +2,40 @@ name: Test Integrity Enforcement
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
   push:
-    branches: [main]
+    branches: [master]
+  workflow_dispatch:
+
+
+concurrency:
+  # Never cancel an in-flight default-branch run: a cancelled release gate proves
+  # nothing, and with one self-hosted runner every new commit used to cancel the
+  # previous gate before it finished. PR runs still cancel superseded pushes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   integrity-check:
     name: Test Integrity Enforcement
-    runs-on: ubuntu-latest
+    # Self-hosted only: this account's hosted minutes are locked, so an
+    # ubuntu-latest run here finishes with no steps and no verdict. The runners
+    # on this box are the CI of record for this repository.
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run X3 Test Integrity Enforcement
+      - name: Reject skipped or weakened tests in this change set
         run: |
-          echo "🔍 CI: running X3 test integrity enforcement"
-          python3 scripts_infrastructure/enforce_x3_rules.py --base origin/main
+          echo "CI: test integrity enforcement over the change set"
+          python3 scripts/test_cheat_guard.py --base "origin/${{ github.base_ref || 'master' }}"
 
-      - name: Run core test suite
+      - name: Reject credential material and unverifiable diffs
         run: |
-          echo "🧪 Running core test suite"
-          cargo test --workspace --all-targets --all-features -- --quiet
+          python3 scripts_infrastructure/pr_supervisor.py --base "origin/${{ github.base_ref || 'master' }}"
+
+      - name: Prove make recipes still propagate their exit codes
+        run: make check-make-gates

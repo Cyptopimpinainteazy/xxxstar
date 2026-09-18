@@ -2666,7 +2666,8 @@ fn test_e2e_multi_vm_atomic_swap_lifecycle() {
     let _evm_bridge = AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::simulation("eth".into())));
     let _svm_bridge =
         AdapterLedgerBridge::new(Box::new(SubstrateHtlcAdapter::new("solana".into())));
-    let _x3_bridge = AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::simulation("x3-mainnet".into())));
+    let _x3_bridge =
+        AdapterLedgerBridge::new(Box::new(X3VmAdapterImpl::simulation("x3-mainnet".into())));
     let _move_bridge = AdapterLedgerBridge::new(Box::new(MoveVmAdapter::new("sui-mainnet".into())));
     let _cw_bridge =
         AdapterLedgerBridge::new(Box::new(CosmWasmAdapter::new("cosmwasm-mainnet".into())));

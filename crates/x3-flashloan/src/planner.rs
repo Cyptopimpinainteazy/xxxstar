@@ -152,7 +152,7 @@ mod tests {
         FlashloanPlan {
             intent_id: "test-001".to_string(),
             borrows: vec![BorrowRequest {
-                id: FlashloanId::from_str("borrow-1"),
+                id: FlashloanId::from_literal("borrow-1"),
                 chain: ChainKind::Evm(1),
                 asset: AssetId::new("USDC"),
                 amount: 100_000,

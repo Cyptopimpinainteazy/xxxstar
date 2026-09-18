@@ -776,21 +776,27 @@ impl X3VMBridge {
             move |args| {
                 let chain_id = match args.first() {
                     Some(Value::I64(v)) => (*v).max(0) as u64,
-                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
-                        "bridge_x3vm_to_external: arg[0] (chain_id) must be I64".into(),
-                    ))),
+                    _ => {
+                        return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                            "bridge_x3vm_to_external: arg[0] (chain_id) must be I64".into(),
+                        )))
+                    }
                 };
                 let x3_sender = match args.get(1) {
                     Some(Value::Bytes(b)) => b.clone(),
-                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
-                        "bridge_x3vm_to_external: arg[1] (x3_sender) must be Bytes".into(),
-                    ))),
+                    _ => {
+                        return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                            "bridge_x3vm_to_external: arg[1] (x3_sender) must be Bytes".into(),
+                        )))
+                    }
                 };
                 let amount = match args.get(2) {
                     Some(Value::I64(v)) => (*v).max(0) as u128,
-                    _ => return Err(VMError::without_ip(VMErrorKind::HostcallError(
-                        "bridge_x3vm_to_external: arg[2] (amount) must be I64".into(),
-                    ))),
+                    _ => {
+                        return Err(VMError::without_ip(VMErrorKind::HostcallError(
+                            "bridge_x3vm_to_external: arg[2] (amount) must be I64".into(),
+                        )))
+                    }
                 };
                 let nonce = bridge_nonce_arg(args.get(3), "bridge_x3vm_to_external")?;
                 reserve_bridge_nonce(&nonces, nonce)?;
@@ -802,7 +808,8 @@ impl X3VMBridge {
                 })?;
                 let ext_provider = registry.get(chain_id).ok_or_else(|| {
                     VMError::without_ip(VMErrorKind::HostcallError(format!(
-                        "bridge_x3vm_to_external: no escrow provider for chain_id {}", chain_id
+                        "bridge_x3vm_to_external: no escrow provider for chain_id {}",
+                        chain_id
                     )))
                 })?;
                 let x3_provider = esc.as_ref().ok_or_else(|| {
@@ -814,20 +821,24 @@ impl X3VMBridge {
                 let result = (|| {
                     let ticket = x3_provider.lock_svm(&x3_sender, amount).map_err(|e| {
                         VMError::without_ip(VMErrorKind::HostcallError(format!(
-                            "bridge_x3vm_to_external lock_x3vm: {}", e
+                            "bridge_x3vm_to_external lock_x3vm: {}",
+                            e
                         )))
                     })?;
-                    ext_provider.release(&x3_sender, &ticket, amount).map_err(|e| {
-                        let unwind = x3_provider.unwind_svm_lock(&ticket, &x3_sender, amount);
-                        VMError::without_ip(VMErrorKind::HostcallError(format!(
-                            "bridge_x3vm_to_external release_external(cid={}): {}. unwind: {}",
-                            chain_id, e,
-                            match unwind {
-                                Ok(()) => "unwound successfully".to_string(),
-                                Err(ue) => format!("UNWIND FAILED: {}. Ticket ORPHANED.", ue),
-                            }
-                        )))
-                    })?;
+                    ext_provider
+                        .release(&x3_sender, &ticket, amount)
+                        .map_err(|e| {
+                            let unwind = x3_provider.unwind_svm_lock(&ticket, &x3_sender, amount);
+                            VMError::without_ip(VMErrorKind::HostcallError(format!(
+                                "bridge_x3vm_to_external release_external(cid={}): {}. unwind: {}",
+                                chain_id,
+                                e,
+                                match unwind {
+                                    Ok(()) => "unwound successfully".to_string(),
+                                    Err(ue) => format!("UNWIND FAILED: {}. Ticket ORPHANED.", ue),
+                                }
+                            )))
+                        })?;
                     Ok(ticket)
                 })();
                 match result {

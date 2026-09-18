@@ -6,6 +6,7 @@ on:
 jobs:
   x3star1-smoke:
     runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 10
 
     steps:
       - name: Checkout

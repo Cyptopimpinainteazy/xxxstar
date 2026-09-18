@@ -28,6 +28,16 @@ log = { workspace = true, default-features = false }
 [dev-dependencies]
 sp-io = { workspace = true, features = ["std"] }
 sp-core = { workspace = true, features = ["std"] }
+# The pallet's own tests exercise the verification plumbing with structural
+# proofs (see `deposit_proof_validator_quorum_works` and friends). The stub
+# verifiers fail closed unless `test-verifier` is on, and production builds must
+# never enable it, so it is requested here - dev-dependencies only. The
+# fail-closed posture itself is asserted in `x3-verification-router`'s default
+# test configuration and in the audit harness
+# (audit-artifacts/.../audit-harness/proof, which enables `production`).
+x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false, features = ["test-verifier", "std"] }
+# Ed25519 signing so the tests can produce real SVM attestations.
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
 default = ["std"]

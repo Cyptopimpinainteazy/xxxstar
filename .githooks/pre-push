@@ -1,7 +1,50 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# pre-push — the only gate a push passes through on this machine.
+#
+# GitHub-hosted Actions cannot execute for this account (every run finishes
+# step-less), so a push that skips this hook is genuinely unverified. The hook
+# delegates to scripts/local-ci.sh --pre-push, which runs:
+#   * the fast gate set (format, guards, wiring, check, clippy matrix, unit tests)
+#   * every gate the outgoing diff implies (contract gates, runtime variants)
+#   * the release gate + variant dry-runs when the default branch is the target
+#
+# Escape hatches, both loud:
+#   X3_LOCAL_CI_SKIP_ALL=1   run nothing (the push is unverified)
+#   X3_LOCAL_CI_PREPUSH_MODE=--live   widen the run (any local-ci flag works)
+set -uo pipefail
 
-make guard
-make test
-make audit
-make mainnet-check
+if [ "${X3_LOCAL_CI_SKIP_ALL:-0}" = "1" ]; then
+  echo "[pre-push] X3_LOCAL_CI_SKIP_ALL=1 — running NO gates; this push is unverified." >&2
+  exit 0
+fi
+
+if [ ! -f scripts/local-ci.sh ]; then
+  echo "[pre-push] scripts/local-ci.sh is missing — refusing to push unverified." >&2
+  exit 1
+fi
+
+# Read the whole ref list first: the gate run must not consume the hook's stdin.
+refs="$(cat)"
+push_ref=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${remote_ref:-}" ] && continue
+  # Skip deletions: there is nothing to verify.
+  case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  push_ref="$remote_ref"
+  case "$remote_ref" in
+    refs/heads/master|refs/heads/main) push_ref="$remote_ref"; break ;;
+  esac
+done <<<"$refs"
+
+if [ -z "$push_ref" ]; then
+  echo "[pre-push] no refs to verify (delete-only push)"
+  exit 0
+fi
+
+echo "[pre-push] verifying push to $push_ref via scripts/local-ci.sh --pre-push"
+if [ -n "${X3_LOCAL_CI_PREPUSH_MODE:-}" ]; then
+  # shellcheck disable=SC2086
+  X3_LOCAL_CI_PUSH_REF="$push_ref" bash scripts/local-ci.sh $X3_LOCAL_CI_PREPUSH_MODE
+else
+  X3_LOCAL_CI_PUSH_REF="$push_ref" bash scripts/local-ci.sh --pre-push
+fi

@@ -7,6 +7,8 @@
 //! atomic-swap or HTLC pallet), [`claim`] would submit a claim transaction,
 //! and [`refund`] would trigger the refund path after timeout. Finality uses
 //! GRANDPA (1 block finality) model.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

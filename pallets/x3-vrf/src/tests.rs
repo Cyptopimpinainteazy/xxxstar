@@ -100,10 +100,7 @@ fn fulfill_randomness_works() {
         let request_id = Vrf::account_requests(1)[0];
 
         // Fulfill it
-        assert_ok!(Vrf::fulfill_randomness(
-            RuntimeOrigin::root(),
-            request_id
-        ));
+        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::root(), request_id));
 
         // Check that it's fulfilled
         let result = Vrf::fulfilled_requests(request_id).unwrap();
@@ -138,10 +135,7 @@ fn fulfill_randomness_already_fulfilled() {
             1000
         ));
         let request_id = Vrf::account_requests(1)[0];
-        assert_ok!(Vrf::fulfill_randomness(
-            RuntimeOrigin::root(),
-            request_id
-        ));
+        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::root(), request_id));
 
         // Try to fulfill again
         assert_noop!(
@@ -206,10 +200,7 @@ fn cancel_randomness_already_fulfilled() {
             1000
         ));
         let request_id = Vrf::account_requests(1)[0];
-        assert_ok!(Vrf::fulfill_randomness(
-            RuntimeOrigin::root(),
-            request_id
-        ));
+        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::root(), request_id));
 
         // Try to cancel
         assert_noop!(
@@ -233,10 +224,7 @@ fn get_randomness_public_function() {
             1000
         ));
         let request_id = Vrf::account_requests(1)[0];
-        assert_ok!(Vrf::fulfill_randomness(
-            RuntimeOrigin::root(),
-            request_id
-        ));
+        assert_ok!(Vrf::fulfill_randomness(RuntimeOrigin::root(), request_id));
 
         // Now should be available
         assert!(Vrf::get_randomness(request_id).is_some());

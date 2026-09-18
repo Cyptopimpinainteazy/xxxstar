@@ -182,10 +182,16 @@ impl BtcDepositStatus {
     pub fn can_transition_to(&self, next: &Self) -> bool {
         matches!(
             (self, next),
-            (BtcDepositStatus::PendingConfirmations, BtcDepositStatus::PendingSpvVerification)
-                | (BtcDepositStatus::PendingSpvVerification, BtcDepositStatus::PendingSignerApproval { .. })
-                | (BtcDepositStatus::PendingSignerApproval { .. }, BtcDepositStatus::Approved)
-                | (BtcDepositStatus::Approved, BtcDepositStatus::Completed)
+            (
+                BtcDepositStatus::PendingConfirmations,
+                BtcDepositStatus::PendingSpvVerification
+            ) | (
+                BtcDepositStatus::PendingSpvVerification,
+                BtcDepositStatus::PendingSignerApproval { .. }
+            ) | (
+                BtcDepositStatus::PendingSignerApproval { .. },
+                BtcDepositStatus::Approved
+            ) | (BtcDepositStatus::Approved, BtcDepositStatus::Completed)
                 | (_, BtcDepositStatus::Rejected)
         )
     }
@@ -447,11 +453,22 @@ impl BtcVault {
         })
     }
 
+    /// Records a signer approval for a pending deposit.
+    ///
+    /// **The `signature` bytes are stored, not verified.** This method checks
+    /// only that `signer_pubkey` is one of `config.signers` and that it has not
+    /// already approved; it never verifies the signature against any message.
+    /// Callers must perform that verification themselves before calling —
+    /// a count of stored approvals is not evidence of signer consent.
+    ///
+    /// Tracked in issue #272 (the Bitcoin analogue of the Solana signed-message
+    /// format): until a canonical message and verification exist, treat every
+    /// entry in `deposit.signatures` as untrusted bytes.
     pub fn add_signer_approval(
         &mut self,
         deposit_index: usize,
         signer_pubkey: [u8; 32],
-        signature: Vec<u8>,
+        unverified_signature_bytes: Vec<u8>,
     ) -> Result<(), BtcVaultError> {
         let deposit = self
             .pending_deposits
@@ -473,7 +490,9 @@ impl BtcVault {
             return Err(BtcVaultError::DuplicateSignature);
         }
 
-        deposit.signatures.push((signer_pubkey, signature));
+        deposit
+            .signatures
+            .push((signer_pubkey, unverified_signature_bytes));
         let new_approvals = approvals + 1;
         if new_approvals >= threshold {
             deposit.status = BtcDepositStatus::Approved;
@@ -1046,10 +1065,7 @@ mod tests {
         vault
             .add_signer_approval(0, signer_ids[2], vec![0xCC; 64])
             .unwrap();
-        assert_eq!(
-            vault.pending_deposits[0].status,
-            BtcDepositStatus::Approved
-        );
+        assert_eq!(vault.pending_deposits[0].status, BtcDepositStatus::Approved);
 
         // 6. Final process_deposit moves Approved → Completed AND credits
         //    the UTXO set. This is the critical integration point — a
@@ -1088,7 +1104,14 @@ mod tests {
     fn test_threshold_quorum_is_exact_not_off_by_one() {
         let mut vault = default_vault();
         vault
-            .submit_deposit([0xCD; 32], 0, 1_000_000, vec![0x01], [0u8; 32], vec![1, 2, 3])
+            .submit_deposit(
+                [0xCD; 32],
+                0,
+                1_000_000,
+                vec![0x01],
+                [0u8; 32],
+                vec![1, 2, 3],
+            )
             .unwrap();
         // Drive to PendingSignerApproval. 6 calls → PendingSpvVerification
         // (call N), 1 more call → PendingSignerApproval {0, 3} (call N+1).
@@ -1112,9 +1135,7 @@ mod tests {
                 assert!(*approvals < *threshold,
                     "2/3 threshold must NOT approve (got approvals={approvals}, threshold={threshold})");
             }
-            other => panic!(
-                "expected PendingSignerApproval after 2 signers; got {other:?}"
-            ),
+            other => panic!("expected PendingSignerApproval after 2 signers; got {other:?}"),
         }
 
         // Third approval IS enough.

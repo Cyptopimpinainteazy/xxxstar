@@ -450,15 +450,10 @@ pub mod pallet {
         /// authority op. Maps the guard's denial to a pallet error so callers
         /// get a precise, auditable reason. Uses fail-closed semantics through
         /// the `SentinelGuard` trait.
-        fn check_sentinel(
-            asset_id: &AssetId,
-            who: &T::AccountId,
-        ) -> DispatchResult {
+        fn check_sentinel(asset_id: &AssetId, who: &T::AccountId) -> DispatchResult {
             match T::Sentinel::can_authorize(asset_id, who) {
                 Ok(()) => Ok(()),
-                Err(SentinelDenial::AssetFrozen) => {
-                    Err(Error::<T>::AssetFrozenBySentinel.into())
-                }
+                Err(SentinelDenial::AssetFrozen) => Err(Error::<T>::AssetFrozenBySentinel.into()),
                 Err(SentinelDenial::AuthorityFrozen) => {
                     Err(Error::<T>::AuthorityFrozenBySentinel.into())
                 }

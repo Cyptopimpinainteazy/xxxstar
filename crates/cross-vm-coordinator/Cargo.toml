@@ -28,9 +28,13 @@ blake2 = "0.10"
 blake3 = "1.5"
 subtle = "2.5"
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
+x3-atomic-swap = { path = "../x3-atomic-swap", default-features = false, optional = true }
+codec = { package = "parity-scale-codec", version = "3.6", default-features = false, optional = true }
 # Optional: for production persistence with substrate offchain storage
 sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", optional = true }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", optional = true }
+# Optional: low-latency shared fencing authority for Redis/Valkey.
+redis = { version = "1.7", default-features = false, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
@@ -38,6 +42,8 @@ tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
 [features]
 default = ["real-signing"]
 offchain = ["sc-client-api", "sp-core"]
+valkey = ["redis"]
+canonical-proofs = ["x3-atomic-swap", "codec"]
 # Enable signed on-chain transaction submission for all three VM adapters.
 # Without this flag the adapters use simulation/dry-run paths only.
 real-signing = []

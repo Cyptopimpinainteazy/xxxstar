@@ -79,10 +79,9 @@ async fn main() -> Result<()> {
     // 5. Bind and serve with graceful shutdown on Ctrl-C / SIGTERM.
     let listener = tokio::net::TcpListener::bind(cfg.listen)
         .await
-        .map_err(|e| x3_gateway::error::GatewayError::Internal(format!(
-            "failed to bind {}: {e}",
-            cfg.listen
-        )))?;
+        .map_err(|e| {
+            x3_gateway::error::GatewayError::Internal(format!("failed to bind {}: {e}", cfg.listen))
+        })?;
     let local = listener.local_addr()?;
     tracing::info!(addr = %local, "x3-gateway listening");
 

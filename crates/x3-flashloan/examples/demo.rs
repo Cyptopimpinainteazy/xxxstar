@@ -66,10 +66,14 @@ fn main() {
     );
 
     // 3) Create a tampered replay chain (mutate first proof post_state_hash)
-    let block = chain.proofs().get(0).map(|p| p.block_height).unwrap_or(100);
+    let block = chain
+        .proofs()
+        .first()
+        .map(|p| p.block_height)
+        .unwrap_or(100);
     let program = chain
         .proofs()
-        .get(0)
+        .first()
         .map(|p| p.program_hash)
         .unwrap_or([0u8; 32]);
     let mut tampered = ProofChain::new(block, program);

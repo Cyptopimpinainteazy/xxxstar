@@ -34,23 +34,47 @@
 //!    committed on-chain in both HTLCs. `S` is only revealed when ALL legs succeed.
 
 pub mod abi;
+pub mod attempt_ledger;
 pub mod config;
+pub mod intent_binding;
+pub mod concurrent;
 pub mod flashloan_adapter;
 pub mod htlc;
+pub mod lease;
 pub mod merkle_settlement; // Gap #3: Merkle-backed settlement for atomic swaps
 pub mod persistence;
+pub mod proof_binding;
+pub mod proof_vault;
+pub mod recovery;
+pub mod settlement_submission;
+pub mod settlement_outbox;
+pub mod settlement_reconcile;
 pub mod relayer;
 pub mod rpc_client;
 pub mod state_machine;
 pub mod types;
+#[cfg(feature = "valkey")]
+pub mod valkey;
 
 #[cfg(test)]
 mod bridge_integration_tests; // Phase 13b: Bridge integration test suite
 
+pub use attempt_ledger::*;
 pub use config::*;
+pub use intent_binding::*;
+pub use lease::*;
+pub use concurrent::*;
 pub use persistence::*;
+pub use proof_binding::*;
+pub use proof_vault::*;
+pub use recovery::*;
+pub use settlement_submission::*;
+pub use settlement_outbox::*;
+pub use settlement_reconcile::*;
 pub use state_machine::*;
 pub use types::*;
+#[cfg(feature = "valkey")]
+pub use valkey::*;
 
 #[cfg(test)]
 mod tests;

@@ -44,10 +44,7 @@ mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use frame_support::{
-        pallet_prelude::*,
-        traits::EnsureOrigin,
-    };
+    use frame_support::{pallet_prelude::*, traits::EnsureOrigin};
     use frame_system::pallet_prelude::*;
     use x3_asset_kernel_types::{traits::SentinelGuard, AssetId};
 
@@ -75,8 +72,15 @@ pub mod pallet {
     /// A frozen authority cannot exercise supply-changing ops on that asset
     /// even if it is still the recorded `mint_authority`.
     #[pallet::storage]
-    pub type FrozenAccounts<T: Config> =
-        StorageDoubleMap<_, Blake2_128Concat, AssetId, Blake2_128Concat, T::AccountId, (), ValueQuery>;
+    pub type FrozenAccounts<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        AssetId,
+        Blake2_128Concat,
+        T::AccountId,
+        (),
+        ValueQuery,
+    >;
 
     /// Assets frozen in whole (all supply-changing ops blocked until unfrozen).
     #[pallet::storage]
@@ -173,7 +177,10 @@ pub mod pallet {
     /// A `SentinelGuard` implementation for runtimes that wire the real pallet.
     /// Enforces fail-closed over the pallet's own storage.
     impl<T: Config> SentinelGuard<T::AccountId> for Pallet<T> {
-        fn can_authorize(asset: &AssetId, who: &T::AccountId) -> Result<(), x3_asset_kernel_types::traits::SentinelDenial> {
+        fn can_authorize(
+            asset: &AssetId,
+            who: &T::AccountId,
+        ) -> Result<(), x3_asset_kernel_types::traits::SentinelDenial> {
             Self::enforce(asset, who)
         }
     }
@@ -305,10 +312,7 @@ pub mod pallet {
         /// `enforce` already requires a non-zero counter.
         #[pallet::call_index(6)]
         #[pallet::weight(Weight::from_parts(15_000, 0))]
-        pub fn grant_guardian_approval(
-            origin: OriginFor<T>,
-            asset: AssetId,
-        ) -> DispatchResult {
+        pub fn grant_guardian_approval(origin: OriginFor<T>, asset: AssetId) -> DispatchResult {
             T::FreezeOrigin::ensure_origin(origin)?;
             if !ReviewEnrolled::<T>::contains_key(asset) {
                 return Err(Error::<T>::NotEnrolled.into());

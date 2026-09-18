@@ -738,8 +738,7 @@ fn inventory_snapshot_id(
 }
 
 fn u256_bytes(value: &U256) -> [u8; 32] {
-    let bytes = value.to_big_endian();
-    bytes
+    value.to_big_endian()
 }
 
 #[cfg(test)]

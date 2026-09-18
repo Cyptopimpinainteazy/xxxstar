@@ -38,9 +38,8 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::Keypair,
     signer::Signer,
-    system_program,
-    transaction::Transaction,
 };
+use solana_system_interface::program as system_program;
 
 /// Program ID of the deployed X3 Atomic Swap HTLC BPF program.
 ///
@@ -55,6 +54,7 @@ const HTLC_ACCOUNT_SEED: &[u8] = b"htlc";
 /// Assembles the instruction data manually using the on-chain format:
 /// tag(1) + swap_id(32) + claimant(32) + refund_authority(32) + hashlock(32)
 /// + token_mint(32) + amount(8) + timeout(8).
+#[allow(clippy::too_many_arguments)]
 fn build_create_htlc_ix(
     program_id: &Pubkey,
     htlc_account: &Pubkey,
@@ -83,7 +83,7 @@ fn build_create_htlc_ix(
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
             AccountMeta::new(*payer, true),
-            AccountMeta::new_readonly(*initializer, true),
+            AccountMeta::new(*initializer, true),
             AccountMeta::new_readonly(system_program::id(), false),
         ],
         data,
@@ -109,7 +109,7 @@ fn build_claim_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*claimant, true),
+            AccountMeta::new(*claimant, true),
         ],
         data,
     }
@@ -127,7 +127,7 @@ fn build_refund_htlc_ix(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*refund_authority, true),
+            AccountMeta::new(*refund_authority, true),
         ],
         data: vec![2u8], // tag: RefundHtlc
     }
@@ -199,12 +199,7 @@ fn main() {
     println!("Data len:   {} bytes", create_ix.data.len());
 
     // --- Step 2: Build ClaimHtlc instruction ---
-    let claim_ix = build_claim_htlc_ix(
-        &program_id,
-        &htlc_pda,
-        &claimant.pubkey(),
-        preimage,
-    );
+    let claim_ix = build_claim_htlc_ix(&program_id, &htlc_pda, &claimant.pubkey(), preimage);
 
     println!("\n--- ClaimHtlc Instruction ---");
     println!("Program ID: {}", claim_ix.program_id);
@@ -212,11 +207,7 @@ fn main() {
     println!("Data len:   {} bytes", claim_ix.data.len());
 
     // --- Step 3: Build RefundHtlc instruction (alternative to claim) ---
-    let refund_ix = build_refund_htlc_ix(
-        &program_id,
-        &htlc_pda,
-        &refund_authority.pubkey(),
-    );
+    let refund_ix = build_refund_htlc_ix(&program_id, &htlc_pda, &refund_authority.pubkey());
 
     println!("\n--- RefundHtlc Instruction ---");
     println!("Program ID: {}", refund_ix.program_id);

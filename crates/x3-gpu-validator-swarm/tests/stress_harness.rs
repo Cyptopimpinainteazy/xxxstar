@@ -96,7 +96,16 @@ mod tests {
             barrier.wait().await;
 
             let tasks_per_second = self.config.target_tps / self.config.num_submitters as u64;
-            let task_interval = Duration::from_micros(1_000_000 / tasks_per_second.max(1));
+            // Rate limit on the *batch*: one `batch_size` submission per interval.
+            // The previous version slept for a single task's interval
+            // (`1 / tasks_per_second`) after every batch of 256, so a 10k TPS
+            // configuration actually spawned ~2.5M tasks/second, exhausted the
+            // runtime queue and memory, and wedged the test run (it passed or
+            // hung depending on machine load). `batch_size / tasks_per_second`
+            // makes the submitter hit the configured target instead.
+            let batch_interval = Duration::from_secs_f64(
+                self.config.batch_size as f64 / tasks_per_second.max(1) as f64,
+            );
 
             while !self.stop_signal.load(Ordering::Acquire) {
                 let interval_start = Instant::now();
@@ -124,8 +133,7 @@ mod tests {
                         latencies.lock().await.push(latency_ms);
 
                         #[allow(clippy::manual_is_multiple_of)]
-                        let injected_failure = inject_gpu_failures
-                            && (task_seq % 10 == 0);
+                        let injected_failure = inject_gpu_failures && (task_seq % 10 == 0);
                         if gpu_healthy.load(Ordering::Acquire) && !injected_failure {
                             tasks_completed.fetch_add(1, Ordering::Relaxed);
                         } else {
@@ -136,8 +144,8 @@ mod tests {
 
                 // Rate limiting: sleep to maintain target TPS
                 let elapsed = interval_start.elapsed();
-                if elapsed < task_interval {
-                    tokio::time::sleep(task_interval - elapsed).await;
+                if elapsed < batch_interval {
+                    tokio::time::sleep(batch_interval - elapsed).await;
                 }
             }
         }
@@ -189,9 +197,22 @@ mod tests {
             // Signal stop
             self.stop_signal.store(true, Ordering::Release);
 
-            // Wait for submitters to finish
+            // Wait for submitters to finish. Bounded: a submitter that never
+            // observes the stop signal must fail the test rather than hang the
+            // whole `cargo test --workspace` run (the local-CI `--deep` gate
+            // wedged here for >10 minutes before this bound existed).
+            let stop_budget = Duration::from_secs(self.config.duration_secs.saturating_add(30));
             for handle in handles {
-                let _ = handle.await;
+                match tokio::time::timeout(stop_budget, handle).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(join_error)) => {
+                        panic!("submitter task panicked: {join_error}")
+                    }
+                    Err(_) => panic!(
+                        "submitter task did not stop within {stop_budget:?} after the stop signal; \
+                         refusing to hang the test run"
+                    ),
+                }
             }
 
             // Allow in-flight tasks to complete
@@ -321,6 +342,22 @@ mod tests {
         if let Some(bottleneck) = &result.bottleneck {
             println!("Bottleneck: {}", bottleneck);
         }
+
+        // This test previously asserted nothing at all, so a harness that
+        // silently stopped submitting (or that drowned the runtime) still
+        // "passed". The floors are deliberately far below the 10k target so a
+        // loaded machine cannot make them flaky, while still catching a
+        // regression in the rate limiter.
+        assert!(
+            result.tasks_submitted >= 10_000,
+            "5s at 10k TPS must submit at least 10k tasks, got {}",
+            result.tasks_submitted
+        );
+        assert!(result.tasks_completed > 0, "Must complete at least 1 task");
+        assert!(
+            result.tasks_failed == 0,
+            "Should have no failures in normal test"
+        );
     }
 
     #[tokio::test]

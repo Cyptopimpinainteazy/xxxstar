@@ -7,6 +7,8 @@
 //! [`claim`] would reveal the preimage to claim funds, and [`refund`] would
 //! trigger the refund path after timeout. Finality uses Stellar SCP consensus
 //! (ledger close ~5s, pre-verified tx).
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

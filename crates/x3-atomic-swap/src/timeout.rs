@@ -11,6 +11,8 @@
 //!
 //! 3. **Expiration handling**: expired swaps transition to REFUNDABLE or REFUNDED,
 //!    never FAILED_SILENTLY. Funds are never lost - they either get claimed or refunded.
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
 
 use crate::error::SwapError;
 use crate::intent::AtomicIntent;

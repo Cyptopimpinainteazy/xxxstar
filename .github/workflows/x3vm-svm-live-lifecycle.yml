@@ -1,0 +1,184 @@
+name: x3vm-svm-live-lifecycle
+
+# Real solana-test-validator lifecycle gate for the SVM HTLC program at
+# programs/svm/x3_atomic_swap. This is NOT a mock/simulation job: it installs
+# the Solana CLI + cargo-build-sbf, builds the actual SBF binary, deploys it
+# to a genuine local solana-test-validator, and drives the full HTLC
+# lifecycle (lock/claim/refund) plus adversarial rejections through the real
+# on-chain program, independently verifying resulting account state via raw
+# RPC getAccountInfo byte decoding. See
+# programs/svm/x3_atomic_swap/test-live-lifecycle.sh for the test itself.
+
+on:
+  # No standalone `push` trigger — `production-gate.yml` calls this as `svm-live`
+  # on every push and gates on it; a push run here duplicated the 17-step job.
+  # No `pull_request` trigger: PR events requested ubuntu-latest, and this
+  # account's hosted minutes are locked (step-less ~2s failures). PR-time SVM
+  # lifecycle coverage comes from `scripts/local-ci.sh --live` on the author's
+  # machine, which runs the same programs/svm/x3_atomic_swap/test-live-lifecycle.sh.
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+  SOLANA_INSTALL_URL: https://release.anza.xyz/stable/install
+
+
+# NOTE: deliberately no `concurrency:` block — see the same note in
+# `x3vm-evm-live-lifecycle.yml`. This workflow is called by `production-gate.yml`
+# as `svm-live`, and a concurrency group colliding with the standalone push run
+# prevented that call from ever being scheduled.
+
+jobs:
+  live-lifecycle:
+    name: SVM HTLC live validator lifecycle
+    # This repo is public and pull_request can come from a fork, so keep PR
+    # runs on ubuntu-latest. Only push (master) and manual dispatch route to
+    # the x3 self-hosted runner. Do not remove this split without
+    # re-reviewing the self-hosted-runner-on-public-repo RCE risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          # This job runs on the x3 self-hosted runner for push/dispatch, where
+          # the toolchain is already provisioned and sudo is unavailable
+          # ("a terminal is required to read the password"). Install only what is
+          # actually missing, and fail loudly if something is missing and cannot
+          # be installed — never silently continue without a required tool.
+          missing=""
+          command -v protoc >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang  >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake  >/dev/null 2>&1 || missing="$missing cmake"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present: $(protoc --version | head -1)"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            programs/svm/x3_atomic_swap
+            programs/svm/x3_atomic_swap/client
+          shared-key: svm-live-lifecycle
+
+      - name: Install Solana CLI (agave) + cargo-build-sbf
+        run: |
+          set -euo pipefail
+          curl -sSfL "$SOLANA_INSTALL_URL" -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Solana toolchain
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo-build-sbf --version
+          solana-test-validator --version
+
+      - name: Run real solana-test-validator HTLC lifecycle gate
+        run: |
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          ./programs/svm/x3_atomic_swap/test-live-lifecycle.sh
+
+      - name: Run SVM program + client unit tests
+        run: |
+          cargo test --release --manifest-path programs/svm/x3_atomic_swap/Cargo.toml
+          cargo test --release --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml
+
+      - name: Build SBF program and broadcaster for cross-domain lifecycle
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          (cd programs/svm/x3_atomic_swap && cargo build-sbf)
+          (cd programs/svm/x3_atomic_swap/client && cargo build --release --bin x3-svm-broadcast)
+
+      - name: Start isolated Solana validator for X3VM-SVM atomic lifecycle
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          WORKDIR="$(mktemp -d /tmp/x3vm-svm-cross.XXXXXX)"
+          echo "X3_SVM_WORKDIR=$WORKDIR" >> "$GITHUB_ENV"
+          solana-keygen new --no-bip39-passphrase -s -o "$WORKDIR/program-keypair.json" >/dev/null
+          solana-keygen new --no-bip39-passphrase -s -o "$WORKDIR/payer.json" >/dev/null
+          solana-keygen new --no-bip39-passphrase -s -o "$WORKDIR/claimant.json" >/dev/null
+          PROGRAM_ID="$(solana-keygen pubkey "$WORKDIR/program-keypair.json")"
+          PAYER_PK="$(solana-keygen pubkey "$WORKDIR/payer.json")"
+          CLAIMANT_PK="$(solana-keygen pubkey "$WORKDIR/claimant.json")"
+          PROGRAM_SO="$GITHUB_WORKSPACE/programs/svm/x3_atomic_swap/target/deploy/x3_atomic_swap.so"
+          test -f "$PROGRAM_SO"
+          solana-test-validator --reset --quiet \
+            --ledger "$WORKDIR/ledger" \
+            --rpc-port 18999 \
+            --faucet-port 18900 \
+            --dynamic-port-range 19000-19100 \
+            --bpf-program "$PROGRAM_ID" "$PROGRAM_SO" \
+            > "$WORKDIR/validator.log" 2>&1 &
+          echo $! > "$WORKDIR/validator.pid"
+          RPC_URL="http://127.0.0.1:18999"
+          for i in $(seq 1 45); do
+            if solana cluster-version --url "$RPC_URL" >/dev/null 2>&1; then break; fi
+            sleep 1
+            if [ "$i" -eq 45 ]; then cat "$WORKDIR/validator.log"; exit 1; fi
+          done
+          solana airdrop 5 "$PAYER_PK" --url "$RPC_URL" --commitment finalized >/dev/null
+          solana airdrop 2 "$CLAIMANT_PK" --url "$RPC_URL" --commitment finalized >/dev/null
+          {
+            echo "X3_TEST_SVM_RPC=$RPC_URL"
+            echo "X3_TEST_SVM_PROGRAM_ID=$PROGRAM_ID"
+            echo "X3_TEST_SVM_PAYER_KEYPAIR=$WORKDIR/payer.json"
+            echo "X3_TEST_SVM_CLAIMANT_KEYPAIR=$WORKDIR/claimant.json"
+            echo "X3_TEST_SVM_PAYER_PUBKEY=$PAYER_PK"
+            echo "X3_TEST_SVM_CLAIMANT_PUBKEY=$CLAIMANT_PK"
+            echo "X3_SVM_BROADCAST_BIN=$GITHUB_WORKSPACE/programs/svm/x3_atomic_swap/client/target/release/x3-svm-broadcast"
+          } >> "$GITHUB_ENV"
+
+      - name: Run real X3VM-SVM atomic lifecycle
+        # Persist the node/runtime build across runs. Scoped to this step on
+        # purpose: the SBF and client builds above keep their own target paths.
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+          CARGO_BUILD_JOBS: "12"
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_svm_live \
+            real_x3vm_svm_lock_claim_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Run real X3VM-SVM timeout/refund atomic lifecycle
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+          CARGO_BUILD_JOBS: "12"
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_svm_live \
+            real_x3vm_svm_timeout_refund_atomic_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Dump isolated Solana validator log on failure
+        if: failure()
+        run: |
+          if [ -n "$X3_SVM_WORKDIR" ] && [ -f "$X3_SVM_WORKDIR/validator.log" ]; then
+            cat "$X3_SVM_WORKDIR/validator.log"
+          fi
+
+      - name: Stop isolated Solana validator
+        if: always()
+        run: |
+          if [ -n "$X3_SVM_WORKDIR" ] && [ -f "$X3_SVM_WORKDIR/validator.pid" ]; then
+            kill "$(cat "$X3_SVM_WORKDIR/validator.pid")" 2>/dev/null || true
+          fi

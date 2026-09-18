@@ -1,7 +1,5 @@
 //! Benchmarking for the Treasury pallet.
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use crate::types::RiskLevel;
 use frame_benchmarking::v2::*;

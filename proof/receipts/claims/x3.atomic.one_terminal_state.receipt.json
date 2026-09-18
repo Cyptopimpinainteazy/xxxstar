@@ -1,14 +1,14 @@
 {
-  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.atomic.one_terminal_state",
-  "artifact_hash": "47bbfef21ef16ee1a373c4c1fcc44521337623c1b1e13e479326064d4d076363",
+  "artifact_hash": "d4ace0f516465d3b0b96c92f2e7669a50f01e25275de424bc1d0e4f8170d66b8",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
     "pallets/x3-atomic-kernel/src/lib.rs",
     "pallets/x3-atomic-kernel/src/tests.rs",
     "pallets/x3-cross-vm-router/src/lib.rs"
   ],
-  "timestamp": "2026-05-06T12:38:50.668034793Z",
+  "timestamp": "2026-09-11T18:17:57.686803725Z",
   "result": {
     "claim_id": "x3.atomic.one_terminal_state",
     "claim": "Every cross-VM atomic operation ends in exactly one terminal state",
@@ -30,7 +30,7 @@
     "passed_checks": [
       "x3-atomic-kernel/src/lib.rs exists",
       "x3-atomic-kernel/src/tests.rs exists",
-      "29 rollback/commit references found in atomic kernel",
+      "50 rollback/commit references found in atomic kernel",
       "cargo test passed (1 tests)",
       "loom rollback visibility test passed",
       "8 atomic enforcement references in cross-vm-router"
@@ -40,14 +40,14 @@
     "blockers": [],
     "score": 1.0,
     "evidence": {
-      "rollback_references": "29",
+      "loom_rollback_visibility": "pass",
+      "rollback_references": "50",
       "tests_passed": "1",
-      "router_atomic_references": "8",
-      "loom_rollback_visibility": "pass"
+      "router_atomic_references": "8"
     },
-    "timestamp": "2026-05-06T12:38:50.661667526Z",
-    "duration_ms": 3399
+    "timestamp": "2026-09-11T18:17:57.652557Z",
+    "duration_ms": 116979
   },
   "limitations": [],
-  "binding_hash": "9bc59179ecb88a0b0fb94c4da1c19da752063df205403b4ba89d19812d7e0258"
+  "binding_hash": "0ce3ad68cdfead2e4d30b2677d1954aa0466c4de3717ab5444ac943511a56ba8"
 }

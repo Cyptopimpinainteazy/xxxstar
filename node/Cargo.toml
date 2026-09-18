@@ -25,6 +25,7 @@ poh-generator = { package = "x3-poh-generator", path = "../crates/poh-generator"
 x3-bridge-adapters = { path = "../crates/x3-bridge-adapters" }
 x3-rpc = { path = "../crates/x3-rpc" }
 x3-atomic-trade = { path = "../crates/x3-atomic-trade" }
+x3-atomic-swap = { path = "../crates/x3-atomic-swap", features = ["std"] }
 atomic-swap-orchestrator = { path = "../crates/atomic-swap-orchestrator" }
 x3-cross-vm-bridge = { path = "../crates/cross-vm-bridge" }
 x3-vm = { path = "../crates/x3-vm" }
@@ -64,7 +65,6 @@ pallet-x3-agent-law = { path = "../pallets/x3-agent-law", default-features = fal
 pallet-x3-invariants = { path = "../pallets/x3-invariants", default-features = false, features = ["std"] }
 pallet-x3-atomic-kernel = { path = "../pallets/x3-atomic-kernel", default-features = false, features = ["std"] }
 frame-support = { workspace = true, default-features = false, features = ["std"] }
-
 
 sc-basic-authorship = { workspace = true }
 sc-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512", default-features = false }
@@ -108,27 +108,16 @@ frame-benchmarking-cli = { workspace = true, optional = true, default-features =
 default = ["cli"]
 cli = []
 
-# Testnet feature: enables NoOpCrossChainValidator, ExternalBridgesEnabled=true,
-# and other testnet-only config in the runtime. Passes through to x3-chain-runtime.
 testnet = ["x3-chain-runtime/testnet"]
-
-# Mainnet RC1 feature: production mainnet release candidate.
-# Passes through to x3-chain-runtime. Builds identically to the default
-# production build; pallet narrowing deferred to post-RC1.
 mainnet-rc1 = ["x3-chain-runtime/mainnet-rc1"]
 
-# GPU validator orchestrator feature (requires x3-gpu-validator-swarm crate).
-# Enable to spawn the GPU validator swarm orchestrator during node startup.
 gpu-validator = [
     "x3-gpu-validator-swarm",
     "cross-chain-gpu-validator",
     "x3-chain-runtime/gpu-validator",
 ]
 
-# Optional flags to enable Frontier JSON-RPC and EVM runtime features.
-# Enabling `frontier` will opt-in to Frontier crates and runtime adapters.
 frontier = ["x3-chain-runtime/frontier", "x3-chain-runtime/native-real-vm-adapters"]
-
 native = ["x3-chain-runtime/native"]
 
 runtime-benchmarks = [
@@ -136,14 +125,9 @@ runtime-benchmarks = [
     "frame-benchmarking-cli/runtime-benchmarks",
 ]
 
-# try-runtime feature enables runtime-level testing support
-# Note: try-runtime-cli tool has been removed in polkadot-stable2512
-# Use runtime benchmarks or tests for try-runtime functionality
 try-runtime = [
     "x3-chain-runtime/try-runtime",
 ]
-
-# Optional Frontier (EVM) JSON-RPC wiring
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }

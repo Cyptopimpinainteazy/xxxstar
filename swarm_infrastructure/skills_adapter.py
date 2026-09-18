@@ -5,58 +5,9 @@ from typing import Dict, Optional
 try:
     import requests
 except Exception:  # pragma: no cover - requests may be installed separately
-        try:
-            import shutil, subprocess
-
-            if shutil.which("ollama") is None:
-                raise RuntimeError("No Ollama HTTP endpoint and `ollama` CLI not found on PATH")
-
-            # Ollama CLI usage: `ollama run MODEL PROMPT --format json`
-            cmd = ["ollama", "run", model, prompt, "--format", "json", "--think=false", "--hidethinking"]
-            proc = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=120)
-            out = proc.stdout.strip()
-
-            # Parse potentially streaming/concatenated JSON objects
-            parsed = _parse_streaming_json(out)
-            parts = []
-            if parsed:
-                for obj in parsed:
-                    if isinstance(obj, dict):
-                        # common keys observed: 'response', 'text', or single-key maps
-                        if 'response' in obj:
-                            parts.append(obj.get('response') or '')
-                        elif 'text' in obj:
-                            parts.append(obj.get('text') or '')
-                        elif len(obj) == 1:
-                            parts.append(str(list(obj.values())[0] or ''))
-                        else:
-                            parts.append(json.dumps(obj))
-                    else:
-                        parts.append(str(obj))
-
-                # Join parts into a single string; preserve order
-                joined = ''.join(str(p) for p in parts).strip()
-                if joined:
-                    return joined
-
-            # Fallback: if we couldn't parse JSON pieces, try a raw JSON load
-            try:
-                j = json.loads(out)
-                if isinstance(j, dict) and len(j) == 1:
-                    return str(list(j.values())[0])
-                return json.dumps(j)
-            except Exception:
-                return out
-        except Exception as e:
-            raise RuntimeError(f"Failed to generate with Ollama: {e}")
-        try:
-            obj = json.loads(candidate)
-            objs.append(obj)
-        except Exception:
-            # ignore parse errors for this candidate and continue
-            pass
-
-    return objs
+    # `ollama_generate` probes `requests is not None` before using the HTTP API,
+    # so the name has to exist even when the module is unavailable.
+    requests = None
 
 
 DEFAULT_SKILLS_DIR = os.path.join(os.path.dirname(__file__), "..", "third_party", "agent-skills", "skills")

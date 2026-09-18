@@ -2,6 +2,7 @@
 name = "pallet-x3-dex"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 authors = ["X3 Chain Team"]
 description = "DEX pallet providing access to AMM pools, limit orders, and trading features"
 

@@ -13,6 +13,14 @@ on:
       - 'sprint-*'
   workflow_dispatch:
 
+
+concurrency:
+  # Never cancel an in-flight default-branch run: a cancelled release gate proves
+  # nothing, and with one self-hosted runner every new commit used to cancel the
+  # previous gate before it finished. PR runs still cancel superseded pushes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   frontend-build:
     name: Build X3 Fronend

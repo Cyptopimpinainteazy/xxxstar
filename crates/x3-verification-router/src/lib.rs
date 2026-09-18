@@ -34,6 +34,7 @@ pub use gateway_types::{
 use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
 use sha2::{Digest, Sha256};
 
@@ -107,6 +108,15 @@ pub enum VerificationError {
     InvalidStrategy,
     UnsupportedChain,
     ReplayDetected,
+    /// The strategy reached a verifier that has no real verification logic.
+    /// Security code fails closed rather than accepting an unchecked proof.
+    NotImplemented,
+    /// The payload's format version is not the one this verifier implements.
+    UnsupportedProofFormat,
+    /// The verifier has no authorized validator set, so nothing can be verified.
+    NoAuthorizedValidators,
+    /// Fewer distinct authorized validators signed than the threshold requires.
+    InsufficientValidSignatures,
 }
 
 impl Display for VerificationError {
@@ -119,6 +129,21 @@ impl Display for VerificationError {
             VerificationError::InvalidStrategy => write!(f, "invalid verification strategy"),
             VerificationError::UnsupportedChain => write!(f, "unsupported source chain"),
             VerificationError::ReplayDetected => write!(f, "replay detected: proof already used"),
+            VerificationError::NotImplemented => {
+                write!(
+                    f,
+                    "no verifier implemented for this strategy: failing closed"
+                )
+            }
+            VerificationError::UnsupportedProofFormat => {
+                write!(f, "unsupported proof payload format")
+            }
+            VerificationError::NoAuthorizedValidators => {
+                write!(f, "no authorized validators configured: failing closed")
+            }
+            VerificationError::InsufficientValidSignatures => {
+                write!(f, "insufficient valid validator attestations")
+            }
         }
     }
 }
@@ -278,29 +303,38 @@ impl Verifier for EvmReceiptVerifier {
         VerificationStrategy::EvmReceiptProof
     }
 
+    /// **Fails closed.** This is the legacy structural check: it only looked at
+    /// payload length and chain kind, so 64 arbitrary bytes were "verified". The
+    /// real EVM verification lives in `evm_receipt::ProductionEvmReceiptVerifier`
+    /// (RLP decode + merkle-patricia proof + confirmations) and is what
+    /// production code must register.
+    ///
+    /// `test-verifier` (without `production`) opts back into the old permissive
+    /// behaviour for plumbing tests; `production` always wins.
     fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
         if proof.payload.is_empty() || proof.payload.len() < 64 {
             return Err(VerificationError::MalformedProof);
         }
 
-        // Validate EVM chain
-        match proof.source_chain {
-            ChainKind::Evm { chain_id: _ } => {} // accepted
-            _ => return Err(VerificationError::UnsupportedChain),
+        #[cfg(all(feature = "test-verifier", not(feature = "production")))]
+        {
+            match proof.source_chain {
+                ChainKind::Evm { chain_id: _ } => {}
+                _ => return Err(VerificationError::UnsupportedChain),
+            }
+            let _ = self.min_confirmations;
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "evm_receipt_proof_structural_only_test_verifier",
+                verified_at_height: None,
+            })
         }
 
-        // In production, this would:
-        // 1. Decode the RLP-encoded receipt
-        // 2. Verify the receipt merkle proof against a stored block header
-        // 3. Verify the block header is part of the canonical chain with sufficient confirmations
-        // 4. Parse the event logs and match against event signatures
-        // 5. Verify asset_id, amount, sender, recipient match the event data
-
-        Ok(VerificationOutcome {
-            accepted: true,
-            reason: "evm_receipt_proof_verified",
-            verified_at_height: None,
-        })
+        #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
+        {
+            let _ = (self.min_confirmations, proof);
+            Err(VerificationError::NotImplemented)
+        }
     }
 }
 
@@ -328,54 +362,198 @@ impl Verifier for ValidatorQuorumVerifier {
         }
     }
 
+    /// **Fails closed.** Counting attestations without verifying their signatures
+    /// accepts any non-empty payload, which is not a quorum check at all. See
+    /// `docs/reports/SECURITY_BLOCKERS.md` (stub verifiers, CRITICAL).
     fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
         if proof.payload.is_empty() {
             return Err(VerificationError::MalformedProof);
         }
 
-        // In production, this would:
-        // 1. Decode the attestation payload (signatures + signer indices)
-        // 2. Verify each signature against the known validator set
-        // 3. Count unique valid signatures
-        // 4. Check count >= threshold
-        // 5. Verify the attestation message hash matches the proof params
+        #[cfg(all(feature = "test-verifier", not(feature = "production")))]
+        {
+            let _ = (self.threshold, self.total_validators, proof);
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "validator_quorum_structural_only_test_verifier",
+                verified_at_height: None,
+            })
+        }
 
-        Ok(VerificationOutcome {
-            accepted: true,
-            reason: "validator_quorum_verified",
-            verified_at_height: None,
-        })
+        #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
+        {
+            let _ = (self.threshold, self.total_validators, proof);
+            Err(VerificationError::NotImplemented)
+        }
     }
 }
 
 // ── Solana Finalized Proof Verifier ─────────────────────────────────────────
 
-pub struct SolanaFinalizedVerifier;
+/// Payload format version for `VerificationStrategy::SolanaFinalizedProof`.
+///
+/// ```text
+/// offset 0  : u8    version (= SOLANA_FINALIZED_FORMAT_V1)
+/// offset 1  : u64   slot                 (little endian)
+/// offset 9  : [32]  blockhash
+/// offset 41 : u32   attestation count    (little endian)
+/// offset 45 : count * ( [32] ed25519 pubkey || [64] ed25519 signature )
+/// ```
+///
+/// Each attestation signs `BLAKE2b-256(slot_le || blockhash)` — the message the
+/// relayer produces in `Submitter::sign_proof_payload`. Signers are matched
+/// against the verifier's authorized set, counted once each regardless of how
+/// often they appear, and the count must reach the threshold.
+pub const SOLANA_FINALIZED_FORMAT_V1: u8 = 1;
+
+pub const SOLANA_ATTESTATION_LEN: usize = 96;
+pub const SOLANA_PAYLOAD_HEADER_LEN: usize = 45;
+
+/// Verification of Solana finalized-commitment attestations.
+///
+/// Construct with the authorized validator set and the required threshold. There
+/// is deliberately no default constructor that trusts the payload's own key
+/// list: an empty set verifies nothing, so a caller that has not been wired to a
+/// governance-controlled set fails closed.
+pub struct SolanaFinalizedVerifier {
+    validators: Vec<[u8; 32]>,
+    threshold: u32,
+}
+
+impl SolanaFinalizedVerifier {
+    pub fn new(validators: Vec<[u8; 32]>, threshold: u32) -> Self {
+        Self {
+            validators,
+            threshold,
+        }
+    }
+
+    /// No authorized validators. Every proof fails closed; use this until a
+    /// governance-controlled validator set is wired in.
+    pub fn empty() -> Self {
+        Self {
+            validators: Vec::new(),
+            threshold: 1,
+        }
+    }
+
+    pub fn threshold(&self) -> u32 {
+        self.threshold
+    }
+
+    pub fn is_authorized(&self, pubkey: &[u8; 32]) -> bool {
+        self.validators.iter().any(|known| known == pubkey)
+    }
+}
+
+/// `BLAKE2b-256(slot_le || blockhash)` — the message SVM validators attest to.
+pub fn solana_attestation_message(slot: u64, blockhash: &[u8; 32]) -> [u8; 32] {
+    use blake2::digest::consts::U32;
+    use blake2::{Blake2b, Digest};
+
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(slot.to_le_bytes());
+    hasher.update(blockhash);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&hasher.finalize());
+    out
+}
 
 impl Verifier for SolanaFinalizedVerifier {
     fn strategy(&self) -> VerificationStrategy {
         VerificationStrategy::SolanaFinalizedProof
     }
 
+    /// Verifies the attestations in `SOLANA_FINALIZED_FORMAT_V1`.
+    ///
+    /// Fails closed: unknown signers, repeated signers (counted once), malformed
+    /// payloads and a threshold that cannot be met all produce an error rather
+    /// than an accepted outcome.
+    ///
+    /// `test-verifier` only relaxes the *unconfigured* case (no validator set
+    /// wired yet): there it accepts a structural proof so plumbing tests can run.
+    /// A configured verifier always performs the real signature check, in every
+    /// feature configuration — otherwise the test hook could hide a broken
+    /// verification path.
     fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+        match proof.source_chain {
+            ChainKind::Solana => {}
+            _ => return Err(VerificationError::UnsupportedChain),
+        }
+
         if proof.payload.is_empty() {
             return Err(VerificationError::MalformedProof);
         }
 
-        match proof.source_chain {
-            ChainKind::Solana => {} // accepted
-            _ => return Err(VerificationError::UnsupportedChain),
+        // Unconditional: with no authorized set there is nothing to verify, so
+        // the proof is refused in every feature configuration. `test-verifier`
+        // deliberately does not relax this — a test that wants a Solana proof to
+        // pass must supply real attestations from an authorized key.
+        if self.validators.is_empty() || self.threshold == 0 {
+            return Err(VerificationError::NoAuthorizedValidators);
         }
 
-        // In production, this would:
-        // 1. Verify Solana finalized block hash against known validators
-        // 2. Verify transaction inclusion proof
-        // 3. Parse instruction data and match against expected params
+        let payload = &proof.payload;
+        if payload.len() < SOLANA_PAYLOAD_HEADER_LEN {
+            return Err(VerificationError::MalformedProof);
+        }
+        if payload[0] != SOLANA_FINALIZED_FORMAT_V1 {
+            return Err(VerificationError::UnsupportedProofFormat);
+        }
+
+        let mut slot_bytes = [0u8; 8];
+        slot_bytes.copy_from_slice(&payload[1..9]);
+        let slot = u64::from_le_bytes(slot_bytes);
+
+        let mut blockhash = [0u8; 32];
+        blockhash.copy_from_slice(&payload[9..41]);
+
+        let mut count_bytes = [0u8; 4];
+        count_bytes.copy_from_slice(&payload[41..45]);
+        let count = u32::from_le_bytes(count_bytes) as usize;
+
+        let expected_len = SOLANA_PAYLOAD_HEADER_LEN + count * SOLANA_ATTESTATION_LEN;
+        if payload.len() != expected_len {
+            return Err(VerificationError::MalformedProof);
+        }
+
+        let message = solana_attestation_message(slot, &blockhash);
+        let mut counted: alloc::collections::btree_set::BTreeSet<[u8; 32]> =
+            alloc::collections::btree_set::BTreeSet::new();
+
+        for i in 0..count {
+            let start = SOLANA_PAYLOAD_HEADER_LEN + i * SOLANA_ATTESTATION_LEN;
+            let mut pubkey = [0u8; 32];
+            pubkey.copy_from_slice(&payload[start..start + 32]);
+
+            if !self.is_authorized(&pubkey) || counted.contains(&pubkey) {
+                continue;
+            }
+
+            let mut signature = [0u8; 64];
+            signature.copy_from_slice(&payload[start + 32..start + SOLANA_ATTESTATION_LEN]);
+
+            if ed25519_dalek::VerifyingKey::from_bytes(&pubkey)
+                .ok()
+                .and_then(|key| {
+                    ed25519_dalek::Signature::from_slice(&signature)
+                        .ok()
+                        .map(|sig| key.verify_strict(&message, &sig).is_ok())
+                })
+                .unwrap_or(false)
+            {
+                counted.insert(pubkey);
+            }
+        }
+
+        if (counted.len() as u32) < self.threshold {
+            return Err(VerificationError::InsufficientValidSignatures);
+        }
 
         Ok(VerificationOutcome {
             accepted: true,
-            reason: "solana_finalized_proof_verified",
-            verified_at_height: None,
+            reason: "solana_finalized_attestations_verified",
+            verified_at_height: Some(slot),
         })
     }
 }
@@ -389,12 +567,14 @@ impl Verifier for X3InternalVerifier {
         VerificationStrategy::X3Internal
     }
 
+    /// Internal-only strategy: an X3-internal transfer is proven by the kernel
+    /// itself, so there is nothing external to verify. The router only routes
+    /// `VerificationStrategy::X3Internal` proofs here, and this verifier must
+    /// never be registered under an external-chain strategy.
     fn verify(&self, _proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
-        // X3 internal transfers don't need external proofs — the kernel itself
-        // is the proof. This verifier is a pass-through.
         Ok(VerificationOutcome {
             accepted: true,
-            reason: "x3_internal_trusted",
+            reason: "x3_internal_kernel_is_the_proof",
             verified_at_height: None,
         })
     }
@@ -499,45 +679,44 @@ fn verify_btc_merkle_proof(txid: &[u8; 32], merkle_root: &[u8; 32], proof: &[u8]
 // `x3-bitcoin-vault` crate to a real compiled consumer of the production
 // Bitcoin SPV path used by `pallet_x3_crosschain_gateway`.
 
+/// Verifies Bitcoin SPV proofs: header-chain linkage (`sha256d`), the merkle
+/// proof against the last header's merkle root, and the confirmation count.
+///
+/// **Vault signer approvals are not verified.** An earlier version carried
+/// `vault_threshold` / `vault_total_signers` and documented that SPV-verified
+/// deposits must be backed by that many vault signers — but `verify` never read
+/// those fields, so the policy only looked enforced. They were **removed**
+/// rather than "enforced" by counting approvals, because
+/// `BtcVault::add_signer_approval` stores signer signature bytes *without
+/// verifying them* (issue #272), so counting them would prove nothing.
+///
+/// Deposits are therefore credited on the SPV proof plus confirmations. If
+/// vault-signer authorization is wanted, it needs a signed message format and a
+/// payload extension — exactly what the Solana path got in
+/// `SOLANA_FINALIZED_FORMAT_V1`.
 pub struct BitcoinSpvVerifier {
     pub min_confirmations: u64,
-    /// Signer threshold required for vault withdrawals. SPV-verified deposits
-    /// must be backed by at least this many vault signers (enforced via
-    /// `BtcVaultConfig::signers`). `0` disables the check (e.g. SPV-only
-    /// flows that don't go through the vault).
-    pub vault_threshold: u32,
-    /// Total signers authorized on the vault. Used together with
-    /// `vault_threshold` to derive the minimum signer-acknowledgement
-    /// count a SPV-verified deposit must carry.
-    pub vault_total_signers: u32,
 }
 
 impl BitcoinSpvVerifier {
-    /// Default constructor: uses `x3-bitcoin-vault` constants for confirmations
-    /// and the default (threshold, total) signer set. Prefer this over
-    /// `BitcoinSpvVerifier::new(6)` so confirmation policy stays centralized.
+    /// Default constructor: takes the confirmation policy from
+    /// `x3-bitcoin-vault`. Prefer this over `BitcoinSpvVerifier::new(6)` so the
+    /// confirmation policy stays centralized.
     pub fn from_vault_defaults() -> Self {
         Self {
             min_confirmations: x3_bitcoin_vault::MIN_BITCOIN_CONFIRMATIONS,
-            vault_threshold: x3_bitcoin_vault::DEFAULT_THRESHOLD,
-            vault_total_signers: x3_bitcoin_vault::DEFAULT_TOTAL_SIGNERS,
         }
     }
 
     pub fn new(min_confirmations: u64) -> Self {
-        Self {
-            min_confirmations,
-            vault_threshold: 0,
-            vault_total_signers: 0,
-        }
+        Self { min_confirmations }
     }
 
-    /// Configure from an explicit vault config (recommended for production
-    /// gateways — keeps the verifier in lock-step with the vault signer set).
+    /// Adopt the vault's confirmation policy. The vault's signer set is *not*
+    /// adopted, because this verifier cannot check signer approvals (see the
+    /// type docs and issue #272).
     pub fn with_vault_config(mut self, config: &x3_bitcoin_vault::BtcVaultConfig) -> Self {
         self.min_confirmations = config.min_confirmations;
-        self.vault_threshold = config.threshold;
-        self.vault_total_signers = config.signers.len() as u32;
         self
     }
 }
@@ -668,8 +847,12 @@ mod tests {
         assert!(matches!(result, Err(VerificationError::MissingVerifier)));
     }
 
+    /// The permissive path is opt-in (`test-verifier`, and never together with
+    /// `production`). These three tests document that the opt-in exists; the
+    /// fail-closed tests below cover what production builds do.
+    #[cfg(all(feature = "test-verifier", not(feature = "production")))]
     #[test]
-    fn evm_receipt_verifier_works() {
+    fn evm_receipt_verifier_works_under_test_verifier() {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(EvmReceiptVerifier::new(12)));
 
@@ -678,8 +861,9 @@ mod tests {
         assert!(outcome.accepted);
     }
 
+    #[cfg(all(feature = "test-verifier", not(feature = "production")))]
     #[test]
-    fn validator_quorum_works() {
+    fn validator_quorum_works_under_test_verifier() {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(ValidatorQuorumVerifier::new(3, 5)));
 
@@ -691,15 +875,61 @@ mod tests {
         assert!(outcome.accepted);
     }
 
+    /// What a production build does: every strategy without a real verifier
+    /// refuses the proof. This is the posture the audit requires
+    /// (`docs/reports/SECURITY_BLOCKERS.md`); the acceptance test that enforces
+    /// it from outside the crate is
+    /// `audit-artifacts/mainnet-readiness/2026-09-05-6a24d8cf-audit/audit-harness/proof`.
+    #[cfg(not(all(feature = "test-verifier", not(feature = "production"))))]
     #[test]
-    fn solana_verifier_works() {
-        let mut router = VerificationRouter::new();
-        router.register_verifier(Arc::new(SolanaFinalizedVerifier));
+    fn unimplemented_strategies_fail_closed() {
+        let well_formed = vec![1u8; 96];
 
-        let mut proof = dummy_proof(VerificationStrategy::SolanaFinalizedProof);
-        proof.source_chain = ChainKind::Solana;
-        let outcome = router.route(&proof).expect("should verify");
-        assert!(outcome.accepted);
+        let mut evm_router = VerificationRouter::new();
+        evm_router.register_verifier(Arc::new(EvmReceiptVerifier::new(12)));
+        let mut evm_proof = dummy_proof(VerificationStrategy::EvmReceiptProof);
+        evm_proof.payload = vec![1u8; 64];
+        assert!(
+            matches!(
+                evm_router.route(&evm_proof),
+                Err(VerificationError::NotImplemented)
+            ),
+            "the legacy structural EVM verifier must not accept unverified bytes"
+        );
+
+        let mut quorum_router = VerificationRouter::new();
+        quorum_router.register_verifier(Arc::new(ValidatorQuorumVerifier::new(3, 5)));
+        let mut quorum_proof = dummy_proof(VerificationStrategy::ValidatorQuorum {
+            threshold: 3,
+            total: 5,
+        });
+        quorum_proof.payload = well_formed.clone();
+        assert!(
+            matches!(
+                quorum_router.route(&quorum_proof),
+                Err(VerificationError::NotImplemented)
+            ),
+            "an unsigned one-byte quorum proof must not pass"
+        );
+
+        let mut solana_router = VerificationRouter::new();
+        // No governance-controlled validator set is wired to this verifier yet,
+        // so it must refuse every proof rather than accept it unchecked.
+        solana_router.register_verifier(Arc::new(SolanaFinalizedVerifier::empty()));
+        let mut solana_proof = dummy_proof(VerificationStrategy::SolanaFinalizedProof);
+        solana_proof.source_chain = ChainKind::Solana;
+        let mut well_formed = vec![SOLANA_FINALIZED_FORMAT_V1];
+        well_formed.extend_from_slice(&1u64.to_le_bytes());
+        well_formed.extend_from_slice(&[0u8; 32]);
+        well_formed.extend_from_slice(&0u32.to_le_bytes());
+        solana_proof.payload = well_formed;
+        assert!(
+            matches!(
+                solana_router.route(&solana_proof),
+                Err(VerificationError::NoAuthorizedValidators)
+            ),
+            "an unconfigured Solana verifier must fail closed"
+        );
     }
 
     #[test]
@@ -737,6 +967,34 @@ mod tests {
     }
 
     #[test]
+    fn bitcoin_spv_below_confirmation_threshold_rejected() {
+        // Same proof as `bitcoin_spv_works` (chain tip 200, tx at index 100 →
+        // 101 confirmations) but a verifier that demands more than the chain has.
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(BitcoinSpvVerifier::new(102)));
+
+        let mut proof = dummy_proof(VerificationStrategy::BitcoinSpvProof);
+        proof.source_chain = ChainKind::Bitcoin;
+
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&200u64.to_le_bytes());
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        let mut header = [0u8; 80];
+        header[72..76].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0x1E]);
+        header[76..80].copy_from_slice(&2561u32.to_le_bytes());
+        payload.extend_from_slice(&header);
+        payload.extend_from_slice(&100u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&[0u8; 32]);
+        proof.payload = payload;
+
+        assert!(matches!(
+            router.route(&proof),
+            Err(VerificationError::MalformedProof)
+        ));
+    }
+
+    #[test]
     fn x3_internal_works() {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(X3InternalVerifier));
@@ -757,5 +1015,179 @@ mod tests {
         // Since no verifier is registered, it should return MissingVerifier
         let result = router.route(&proof);
         assert!(matches!(result, Err(VerificationError::MissingVerifier)));
+    }
+
+    // ── Solana finalized-proof verifier (real Ed25519 attestations) ─────────
+
+    /// Builds a `SOLANA_FINALIZED_FORMAT_V1` payload signed by the given keys.
+    /// Mirrors what the relayer's `sign_proof_payload` produces: each signature
+    /// is over `BLAKE2b-256(slot_le || blockhash)`.
+    fn solana_payload(
+        slot: u64,
+        blockhash: [u8; 32],
+        signers: &[&ed25519_dalek::SigningKey],
+        signed_blockhash: Option<[u8; 32]>,
+        format_version: u8,
+    ) -> Vec<u8> {
+        use ed25519_dalek::Signer;
+
+        let message = solana_attestation_message(slot, &signed_blockhash.unwrap_or(blockhash));
+        let mut payload = Vec::new();
+        payload.push(format_version);
+        payload.extend_from_slice(&slot.to_le_bytes());
+        payload.extend_from_slice(&blockhash);
+        payload.extend_from_slice(&(signers.len() as u32).to_le_bytes());
+        for key in signers {
+            payload.extend_from_slice(&key.verifying_key().to_bytes());
+            payload.extend_from_slice(&key.sign(&message).to_bytes());
+        }
+        payload
+    }
+
+    fn solana_proof(payload: Vec<u8>) -> ProofEnvelope {
+        let mut proof = dummy_proof(VerificationStrategy::SolanaFinalizedProof);
+        proof.source_chain = ChainKind::Solana;
+        proof.payload = payload;
+        proof
+    }
+
+    fn key(seed: u8) -> ed25519_dalek::SigningKey {
+        ed25519_dalek::SigningKey::from_bytes(&[seed; 32])
+    }
+
+    #[test]
+    fn solana_attestations_at_threshold_are_accepted() {
+        let (a, b) = (key(1), key(2));
+        let authorized = vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()];
+        let verifier = SolanaFinalizedVerifier::new(authorized, 2);
+
+        let payload = solana_payload(42, [9u8; 32], &[&a, &b], None, SOLANA_FINALIZED_FORMAT_V1);
+        let outcome = verifier
+            .verify(&solana_proof(payload))
+            .expect("two authorized attestations must verify");
+
+        assert!(outcome.accepted);
+        assert_eq!(outcome.verified_at_height, Some(42));
+    }
+
+    #[test]
+    fn solana_insufficient_signatures_rejected() {
+        let (a, b) = (key(1), key(2));
+        let verifier = SolanaFinalizedVerifier::new(
+            vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],
+            2,
+        );
+
+        let payload = solana_payload(42, [9u8; 32], &[&a], None, SOLANA_FINALIZED_FORMAT_V1);
+        assert!(matches!(
+            verifier.verify(&solana_proof(payload)),
+            Err(VerificationError::InsufficientValidSignatures)
+        ));
+    }
+
+    #[test]
+    fn solana_duplicate_signer_counts_once() {
+        let (a, b) = (key(1), key(2));
+        let verifier = SolanaFinalizedVerifier::new(
+            vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],
+            2,
+        );
+
+        // The same authorized validator twice is still one validator.
+        let payload = solana_payload(42, [9u8; 32], &[&a, &a], None, SOLANA_FINALIZED_FORMAT_V1);
+        assert!(matches!(
+            verifier.verify(&solana_proof(payload)),
+            Err(VerificationError::InsufficientValidSignatures)
+        ));
+    }
+
+    #[test]
+    fn solana_unknown_signer_is_not_counted() {
+        let (known, rogue) = (key(1), key(7));
+        let verifier = SolanaFinalizedVerifier::new(vec![known.verifying_key().to_bytes()], 1);
+
+        let payload = solana_payload(42, [9u8; 32], &[&rogue], None, SOLANA_FINALIZED_FORMAT_V1);
+        assert!(
+            matches!(
+                verifier.verify(&solana_proof(payload)),
+                Err(VerificationError::InsufficientValidSignatures)
+            ),
+            "an unauthorized key must never satisfy the threshold"
+        );
+    }
+
+    #[test]
+    fn solana_signature_over_other_blockhash_rejected() {
+        let a = key(1);
+        let verifier = SolanaFinalizedVerifier::new(vec![a.verifying_key().to_bytes()], 1);
+
+        // Signatures are over a different blockhash than the payload claims.
+        let payload = solana_payload(
+            42,
+            [9u8; 32],
+            &[&a],
+            Some([8u8; 32]),
+            SOLANA_FINALIZED_FORMAT_V1,
+        );
+        assert!(matches!(
+            verifier.verify(&solana_proof(payload)),
+            Err(VerificationError::InsufficientValidSignatures)
+        ));
+    }
+
+    #[test]
+    fn solana_tampered_signature_rejected() {
+        let a = key(1);
+        let verifier = SolanaFinalizedVerifier::new(vec![a.verifying_key().to_bytes()], 1);
+
+        let mut payload = solana_payload(42, [9u8; 32], &[&a], None, SOLANA_FINALIZED_FORMAT_V1);
+        // Flip a bit in the last byte of the 64-byte signature.
+        let last = payload.len() - 1;
+        payload[last] ^= 0x01;
+
+        assert!(matches!(
+            verifier.verify(&solana_proof(payload)),
+            Err(VerificationError::InsufficientValidSignatures)
+        ));
+    }
+
+    #[test]
+    fn solana_format_version_and_validator_set_are_enforced() {
+        let a = key(1);
+        let verifier = SolanaFinalizedVerifier::new(vec![a.verifying_key().to_bytes()], 1);
+
+        let wrong_version = solana_payload(42, [9u8; 32], &[&a], None, 0x02);
+        assert!(matches!(
+            verifier.verify(&solana_proof(wrong_version)),
+            Err(VerificationError::UnsupportedProofFormat)
+        ));
+
+        let payload = solana_payload(42, [9u8; 32], &[&a], None, SOLANA_FINALIZED_FORMAT_V1);
+        // Outside `test-verifier` an unconfigured verifier must refuse: there is
+        // no validator set to check the attestations against.
+        assert!(matches!(
+            SolanaFinalizedVerifier::empty().verify(&solana_proof(payload.clone())),
+            Err(VerificationError::NoAuthorizedValidators)
+        ));
+
+        let mut wrong_chain = solana_proof(payload);
+        wrong_chain.source_chain = ChainKind::Bitcoin;
+        assert!(matches!(
+            verifier.verify(&wrong_chain),
+            Err(VerificationError::UnsupportedChain)
+        ));
+    }
+
+    #[test]
+    fn solana_truncated_payload_rejected() {
+        let a = key(1);
+        let verifier = SolanaFinalizedVerifier::new(vec![a.verifying_key().to_bytes()], 1);
+        let mut payload = solana_payload(42, [9u8; 32], &[&a], None, SOLANA_FINALIZED_FORMAT_V1);
+        payload.truncate(payload.len() - 1);
+
+        assert!(matches!(
+            verifier.verify(&solana_proof(payload)),
+            Err(VerificationError::MalformedProof)
+        ));
     }
 }

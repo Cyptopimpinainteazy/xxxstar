@@ -8,6 +8,14 @@
 //! provider. In this implementation, the adapter simulates on-chain behavior
 //! with full verification logic so the relayer and scoreboard can be tested
 //! end-to-end without a live chain.
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,
@@ -17,7 +25,6 @@ use crate::error::SwapError;
 use crate::event_watcher::{EventWatcher, HtlcEvent, WatcherConfig};
 use crate::intent::{AtomicIntent, IntentId};
 use crate::rpc_client::RpcClient;
-use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

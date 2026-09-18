@@ -115,7 +115,12 @@ fn sentinel_checks_freeze_authority() {
         assert!(Sentinel::freeze_authority(signed(7), a, 7, reason("nope")).is_err());
 
         // Root freezes authority 7 on asset a.
-        assert_ok!(Sentinel::freeze_authority(root(), a, 7, reason("rogue minter")));
+        assert_ok!(Sentinel::freeze_authority(
+            root(),
+            a,
+            7,
+            reason("rogue minter")
+        ));
         assert!(FrozenAccounts::<Test>::contains_key(a, 7));
 
         // Root-level enforce now rejects 7 on a (fail-closed), but not account 8.

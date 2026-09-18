@@ -3,25 +3,122 @@ name: Rust Clippy
 on:
   push:
     branches: [ "main", "master", "develop" ]
-  pull_request:
-    branches: [ "main", "master" ]
+  # No `pull_request` trigger. PR runs were routed to ubuntu-latest (see the job
+  # comment below), and this account's hosted minutes are locked: every PR run
+  # finished in ~2s with `"steps": []` and `runner_name: ""`, i.e. a guaranteed
+  # red check that proved nothing. The split is *not* being reversed - untrusted
+  # PR code still never executes on the self-hosted runner. PR-time lint is
+  # covered on the author's machine by scripts/local-ci.sh (pre-push hook).
+  workflow_dispatch:
+
+
+concurrency:
+  # Never cancel an in-flight default-branch run: a cancelled release gate proves
+  # nothing, and with one self-hosted runner every new commit used to cancel the
+  # previous gate before it finished. PR runs still cancel superseded pushes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 
 jobs:
   clippy:
-    runs-on: ubuntu-latest
+    # Piloting this job on the x3 self-hosted runner (16c/32t, 77 GiB RAM,
+    # warm Rust/WASM/Solana toolchain) for push/manual runs, where the code
+    # is already trusted (merged or dispatched by a collaborator). PRs stay
+    # on ubuntu-latest: this repo is public, and a self-hosted runner
+    # checking out an untrusted fork PR and running `cargo build`/`clippy`
+    # on it is a code-execution risk (arbitrary build.rs/proc-macros run on
+    # x3star1). Do not remove this split without re-reviewing that risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    # A hung self-hosted job blocks x3star1 indefinitely, unlike a disposable
+    # GitHub-hosted VM; give it a hard ceiling.
+    timeout-minutes: 90
+    env:
+      # Two self-hosted runners share this 32-core machine, and cargo defaults to
+      # one job per core; cap it so the lint gate and a live gate can run at once.
+      CARGO_BUILD_JOBS: "12"
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          toolchain: 1.90.0
+          components: clippy, rust-src
+          targets: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Install Protoc
+        # The x3 self-hosted runner already has protoc (via linuxbrew) and
+        # has no passwordless sudo, so apt-get would just fail here.
+        if: runner.environment == 'github-hosted'
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      # A workspace-wide `--all-features` unifies unrelated optional features
+      # through shared FRAME dependencies. That enables benchmark-only trait
+      # requirements in crates whose own `runtime-benchmarks` feature is off,
+      # producing configurations Cargo cannot build. Lint the complete default
+      # workspace, then check each supported feature mode independently below.
+      - name: Run Clippy (workspace defaults)
+        run: |
+          set -o pipefail
+          cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee clippy-workspace-defaults.txt
 
-      - name: Run Clippy (tests)
-        run: cargo clippy --workspace --all-targets --all-features --tests -- -D warnings
+      - name: Report Clippy failure on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('clippy-workspace-defaults.txt')) return;
+            const output = fs.readFileSync('clippy-workspace-defaults.txt', 'utf8');
+            const tail = output.slice(-12000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Rust Clippy workspace-default failure\n\n\`\`\`text\n${tail}\n\`\`\``
+            });
+
+      - name: Run Clippy (runtime RC-1)
+        run: cargo clippy -p x3-chain-runtime --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (node RC-1)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (node runtime benchmarks)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,runtime-benchmarks -- -D warnings
+
+      - name: Run Clippy (node try-runtime)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,try-runtime -- -D warnings
+
+      - name: Run Clippy (node GPU validator)
+        run: cargo clippy -p x3-chain-node --all-targets --features mainnet-rc1,gpu-validator -- -D warnings
+
+      # `production` and `test-verifier` are intentionally incompatible:
+      # production must never compile a test verifier. Check both valid
+      # configurations independently rather than disabling that fail-closed
+      # compile-time guard with a workspace-wide --all-features invocation.
+      - name: Run Clippy (verification router production)
+        run: cargo clippy -p x3-verification-router --all-targets --features production -- -D warnings
+
+      - name: Run Clippy (verification router test verifier)
+        run: cargo clippy -p x3-verification-router --all-targets --features test-verifier -- -D warnings
+
+      - name: Run Clippy (finality oracle production)
+        run: cargo clippy -p x3-finality-oracle --all-targets --features production -- -D warnings
+
+      - name: Run Clippy (finality oracle test verifier)
+        run: cargo clippy -p x3-finality-oracle --all-targets --features test-verifier -- -D warnings
+
+      # RC-1 and post-RC-1 router features are intentionally incompatible.
+      - name: Run Clippy (cross-VM router RC-1)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1 -- -D warnings
+
+      - name: Run Clippy (cross-VM router runtime benchmarks)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1,runtime-benchmarks -- -D warnings
+
+      - name: Run Clippy (cross-VM router try-runtime)
+        run: cargo clippy -p pallet-x3-cross-vm-router --all-targets --no-default-features --features std,mainnet-rc1,try-runtime -- -D warnings

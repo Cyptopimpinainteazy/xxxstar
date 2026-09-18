@@ -16,6 +16,8 @@
 //! In production, [`lock`] would deploy or call a WASM HTLC contract on the
 //! target chain, [`claim`] calls the claim method with preimage, and [`refund`]
 //! triggers the refund path after timeout.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,
@@ -135,7 +137,12 @@ impl X3VmAdapter for WasmL1Adapter {
     fn supported_assets(&self) -> Vec<AssetId> {
         match self.runtime {
             WasmL1Runtime::InternetComputer => {
-                vec!["ICP".into(), "ckBTC".into(), "ckETH".into(), "ckUSDC".into()]
+                vec![
+                    "ICP".into(),
+                    "ckBTC".into(),
+                    "ckETH".into(),
+                    "ckUSDC".into(),
+                ]
             }
             WasmL1Runtime::MultiversX => {
                 vec!["EGLD".into(), "USDC".into(), "USDT".into(), "WEGLD".into()]
@@ -278,9 +285,9 @@ impl X3VmAdapter for WasmL1Adapter {
             latest_block: self.latest_round,
             finalized_block: self.latest_round,
             block_delay_ms: match self.runtime {
-                WasmL1Runtime::InternetComputer => 2_000,    // ~2s rounds
-                WasmL1Runtime::MultiversX => 6_000,          // ~6s blocks
-                WasmL1Runtime::Archway => 7_000,             // ~7s blocks
+                WasmL1Runtime::InternetComputer => 2_000, // ~2s rounds
+                WasmL1Runtime::MultiversX => 6_000,       // ~6s blocks
+                WasmL1Runtime::Archway => 7_000,          // ~7s blocks
             },
             finality_delay_ms: match self.runtime {
                 WasmL1Runtime::InternetComputer => 4_000,
@@ -549,7 +556,8 @@ mod tests {
 
     #[test]
     fn test_stateful_claim_succeeds() {
-        let adapter = StatefulWasmL1Adapter::new("icp-mainnet".into(), WasmL1Runtime::InternetComputer);
+        let adapter =
+            StatefulWasmL1Adapter::new("icp-mainnet".into(), WasmL1Runtime::InternetComputer);
         let intent = test_intent();
         let preimage: [u8; 32] = [1u8; 32];
 
@@ -562,14 +570,16 @@ mod tests {
 
     #[test]
     fn test_stateful_refund_succeeds() {
-        let adapter = StatefulWasmL1Adapter::new("icp-mainnet".into(), WasmL1Runtime::InternetComputer);
+        let adapter =
+            StatefulWasmL1Adapter::new("icp-mainnet".into(), WasmL1Runtime::InternetComputer);
         assert!(adapter.refund(1).is_ok());
         assert!(adapter.refund(1).is_ok());
     }
 
     #[test]
     fn test_stateful_claim_after_refund_succeeds() {
-        let adapter = StatefulWasmL1Adapter::new("icp-mainnet".into(), WasmL1Runtime::InternetComputer);
+        let adapter =
+            StatefulWasmL1Adapter::new("icp-mainnet".into(), WasmL1Runtime::InternetComputer);
         let preimage: [u8; 32] = [1u8; 32];
         assert!(adapter.refund(1).is_ok());
         assert!(adapter.claim(1, preimage).is_ok());

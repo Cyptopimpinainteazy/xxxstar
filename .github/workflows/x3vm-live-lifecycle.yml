@@ -1,0 +1,88 @@
+name: x3vm-live-lifecycle
+
+on:
+  # No standalone `push` trigger: `production-gate.yml` calls this workflow as
+  # `native-x3vm-live` on every push and gates on it, so a standalone push run
+  # executed the same lifecycles a second time on the same runner. `workflow_dispatch`
+  # keeps it runnable on demand.
+  # No `pull_request` trigger: this workflow requests ubuntu-latest for PR events
+  # and this account's hosted minutes are locked, so a PR run produced a ~2s,
+  # step-less failure. PR callers get the same lifecycles from
+  # `scripts/local-ci.sh --cross` on the author's machine.
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  live-x3vm-lifecycle:
+    name: real local-node X3VM lifecycles
+    # Keep the cargo target dir outside the checkout so it survives
+    # `actions/checkout`'s clean and is reused across runs and commits. Without
+    # this every run rebuilt the whole runtime (20-30 minutes) even when only
+    # test code had changed.
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../x3-cargo-target
+      # Two self-hosted runners share this 32-core machine, and cargo defaults to
+      # one job per core — measured load hit 54-67, i.e. heavy thrashing. Capping
+      # per-job parallelism lets both runners make progress instead of contending.
+      CARGO_BUILD_JOBS: "12"
+    # This repo is public and pull_request can come from a fork, so keep PR runs
+    # on ubuntu-latest. Push (master), manual dispatch and workflow_call run on
+    # the x3 self-hosted runner, which is the only runner that can execute here
+    # (GitHub-hosted jobs are blocked by an account-level billing lock). Do not
+    # remove this split without re-reviewing the self-hosted-runner-on-public-repo
+    # RCE risk.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "Linux", "X64", "x3"]') }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          # The self-hosted runner already has this toolchain and no usable sudo;
+          # install only what is actually missing and fail loudly otherwise.
+          missing=""
+          command -v protoc >/dev/null 2>&1 || missing="$missing protobuf-compiler"
+          command -v clang  >/dev/null 2>&1 || missing="$missing clang"
+          command -v cmake  >/dev/null 2>&1 || missing="$missing cmake"
+          if [ -z "$missing" ]; then
+            echo "system dependencies already present: $(protoc --version | head -1)"
+          elif sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            # shellcheck disable=SC2086
+            sudo apt-get install -y $missing
+          else
+            echo "::error::missing system dependencies ($missing) and sudo is unavailable on this runner"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none, wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: x3vm-live-lifecycle
+
+      - name: Run live lock finalized claim lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_live_lifecycle \
+            real_local_node_lock_finalized_claim_lifecycle \
+            -- --ignored --nocapture
+
+      - name: Run live timeout finalized refund lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_live_lifecycle \
+            real_local_node_timeout_reaches_finalized_refund_state \
+            -- --ignored --nocapture
+
+
+      - name: Run live early-refund fail-closed lifecycle
+        run: |
+          env -u SKIP_WASM_BUILD cargo test -p x3-chain-node \
+            --test x3vm_live_lifecycle \
+            real_local_node_refund_before_timeout_fails_closed \
+            -- --ignored --nocapture

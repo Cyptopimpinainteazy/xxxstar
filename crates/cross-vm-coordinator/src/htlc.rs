@@ -98,10 +98,10 @@ impl ZeroizingSigner {
     pub fn new(key: [u8; 32]) -> Self {
         Self { inner: key }
     }
+}
 
-    /// Returns a reference to the underlying key bytes.
-    /// Use with caution - prefer not exposing this directly.
-    pub fn as_ref(&self) -> &[u8; 32] {
+impl AsRef<[u8; 32]> for ZeroizingSigner {
+    fn as_ref(&self) -> &[u8; 32] {
         &self.inner
     }
 }

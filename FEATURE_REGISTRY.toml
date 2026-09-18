@@ -10,35 +10,53 @@ mode = "LIVE_TESTNET"
 crate_or_service = "pallets/x3-atomic-kernel"
 tauri_app = "AtomicLock"
 # CRITICAL-TOK-1 (2026-09-06 independent audit,
-# audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/): all 9 names
+# audit-artifacts/mainnet-readiness/2026-09-06-fbd4613b-claude/): the 9 names
 # previously listed here (canonical_supply_invariant_holds,
 # represented_total_equals_canonical_supply, pending_supply_returns_to_zero,
 # invariant_break_triggers_economic_halt, halt_blocks_new_mint,
 # halt_blocks_new_transfer, halt_blocks_new_swap, halt_allows_refund,
 # halt_allows_recovery) did not exist anywhere in this pallet, or under any
-# name, in the repository. The pallet's real EconomicHalt guard
-# (pallets/x3-atomic-kernel/src/lib.rs, `ensure!(!T::EconomicHalt::is_halted(), ...)`
-# inside `submit_atomic_bundle`) is real code but has zero dedicated test
-# coverage today. scripts/check-readiness-consistency.sh now verifies every
-# required_tests entry against real `fn` names so this cannot recur silently.
-required_tests = []
+# name, in the repository, and were removed.
+#
+# 2026-09-18: coverage now exists for the guard the pallet actually has
+# (`ensure!(!T::EconomicHalt::is_halted(), Error::EconomicHaltActive)` inside
+# `submit_atomic_bundle`). The mock's halt provider is switchable
+# (`SwitchableEconomicHalt` + `economy_open()`), so `halt_blocks_*` style names
+# are deliberately NOT claimed here — the pallet has exactly one halt guard and
+# the two names below are the tests that exercise it, including the
+# recovery-must-stay-open and no-funds-trapped properties.
+# scripts/check-readiness-consistency.sh verifies every required_tests entry
+# against real `fn` names so a fabricated list cannot recur silently.
+required_tests = [
+  "economic_halt_blocks_bundle_submission",
+  "economic_halt_does_not_trap_pending_bundle_funds",
+  "rollback_execution_failed_charges_only_the_ten_percent_penalty",
+  "rollback_access_set_violation_charges_only_the_ten_percent_penalty",
+  "rollback_deadline_exceeded_slashes_the_whole_bond_once",
+  "rollback_rejects_callers_who_are_not_authorised_for_the_reason",
+  "rollback_deadline_exceeded_before_the_deadline_is_rejected",
+  "economic_halt_does_not_block_inflight_bundle_assignment"
+]
 proof_report = "reports/six_route_invariants.md"
-readiness_score = 40
+readiness_score = 50
 blockers = [
-  "required_tests for the EconomicHalt invariant (mint/transfer/swap-blocking, refund/recovery-allowing) are not yet written — see CRITICAL-TOK-1; write real tests in pallets/x3-atomic-kernel/src/tests.rs before restoring a higher score",
-  "Economic halt path is tested but has never been triggered in a multi-validator network"
+  "Economic halt path now has dedicated single-node coverage (halt blocks new bundle submission with no state mutation; rollback/recovery stays open while halted and releases the whole bond) but has never been triggered in a multi-validator network",
+  "Bond accounting on rollback was fixed on 2026-09-18 and now has invariant coverage for every reason: `Currency::slash` spends free balance before reserved balance, so slashing before unreserving charged the penalty twice and permanently reserved the remainder (reproduced pre-fix: `DeadlineExceeded` trapped the whole 10,000,000 bond, `ExecutionFailed` trapped the 1,000,000 penalty). Each reason now asserts reserved == 0, the exact submitter loss, unchanged issuance and a matching `BondSlashed` event. Still outstanding: an independent audit of this change, and exercising the halt and rollback paths on a multi-validator network"
 ]
 dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics"]
 
 [triforge_runtime]
 mode = "GUARDED_TESTNET"
-crate_or_service = "pallets/evolution-core"
+crate_or_service = "runtime"
 tauri_app = "LaunchGate"
-required_tests = ["runtime_upgrade_rehearsal"]
+required_tests = ["runtime_upgrade_rehearsal", "runtime_upgrade_rehearsal_storage_versions", "runtime_upgrade_rehearsal_migrations_advance_behind_versions"]
 proof_report = "reports/mainnet_readiness_report.md"
-readiness_score = 65
+readiness_score = 80
 blockers = [
-  "No automated migration-dry-run across all 6 construct_runtime! variants"
+  "Migration dry-run is automated for all six runtime variants and passing against real genesis state: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, seeding each variant's actual genesis through frame_support::genesis_builder_helper (the plain functions behind the sp_api GenesisBuilder runtime API), then executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block",
+  "Storage-version alignment is checked as of runtime_upgrade_rehearsal_storage_versions: after the upgrade hooks run, every pallet in the all-variant intersection that declares an in-code storage version must have the same version on chain (21 pallets in the full variant; the test also fails if fewer than 5 are inspected, and runtime_upgrade_rehearsal_storage_version_check_has_teeth proves the check reports a deliberately wrong version)",
+  "The migration run-path is rehearsed too (runtime_upgrade_rehearsal_migrations_advance_behind_versions): each of the four pallets whose migration struct is wired into `Migrations` (AtlasKernel, Treasury, AgentMemory, AgentAccounts) is rolled back to storage version 0 (the rollback is asserted before the hooks run, so the test cannot pass vacuously), the upgrade hooks then run, and every pallet must end at the version the code declares — a migration dropped from the tuple or no longer matching its pallet's declared version fails here",
+  "Remaining gap: the rehearsal starts from *this* runtime's genesis, not from a previous runtime's exported state, so cross-version migration of historical state is still unverified — the try-runtime CLI that would do that is absent from the pinned Polkadot SDK"
 ]
 dangerous_paths = ["runtime", "chain-specs", "validator keys"]
 
@@ -65,9 +83,9 @@ dangerous_paths = ["pallets/x3-cross-vm-router", "bridge code", "message routing
 
 [atomic_gateway]
 mode = "GUARDED_TESTNET"
-crate_or_service = "crates/x3-gateway"
+crate_or_service = "pallets/x3-cross-vm-router"
 tauri_app = "Gateway"
-required_tests = ["audit_gate_enabled", "revoke_disables_gateway"]
+required_tests = ["enabling_external_bridges_requires_documented_audit_gate", "revoking_bridge_audit_gate_disables_external_bridges"]
 proof_report = "reports/btc_gateway_report.md"
 readiness_score = 65
 blockers = [
@@ -95,12 +113,13 @@ dangerous_paths = ["btc mainnet", "withdrawal broadcast", "signer quorum"]
 mode = "GUARDED_TESTNET"
 crate_or_service = "pallets/x3-dex"
 tauri_app = "AXEForge"
-required_tests = ["axe_create_pool", "axe_swap", "axe_fee_accounting"]
+required_tests = ["create_pool_works", "swap_works", "test_amm_calculations"]
 proof_report = "reports/testnet_readiness_report.md"
 readiness_score = 75
 blockers = [
   "DEX uses EconomicHalt runtime governance; no compile-time feature gate removal needed",
-  "DEX does not implement concentrated liquidity or limit orders (not in scope for testnet)"
+  "DEX does not implement concentrated liquidity or limit orders (not in scope for testnet)",
+  "Fee accounting is asserted through test_amm_calculations only; there is no dedicated fee-split test yet"
 ]
 dangerous_paths = ["dex accounting", "swap routing"]
 
@@ -108,7 +127,7 @@ dangerous_paths = ["dex accounting", "swap routing"]
 mode = "GUARDED_TESTNET"
 crate_or_service = "pallets/x3-token-factory"
 tauri_app = "Forge"
-required_tests = ["forge_create_token_guarded", "forge_requires_sentinel_score"]
+required_tests = ["test_01_create_fixed_supply_token_emits_event", "test_sentinel_frozen_mint_authority_blocks_mint"]
 proof_report = "reports/testnet_readiness_report.md"
 readiness_score = 75
 blockers = [
@@ -119,9 +138,9 @@ dangerous_paths = ["tokenomics", "mint authority"]
 
 [atomic_lock]
 mode = "LIVE_TESTNET"
-crate_or_service = "pallets/x3-atomic-kernel"
+crate_or_service = "pallets/x3-lp-locker"
 tauri_app = "AtomicLock"
-required_tests = ["lock_liquidity", "unlock_after_schedule", "early_unlock_rejected"]
+required_tests = ["lock_lp_creates_lock", "unlock_lp_removes_lock_after_expiry", "unlock_lp_rejects_before_expiry"]
 proof_report = "reports/testnet_readiness_report.md"
 readiness_score = 68
 blockers = [
@@ -145,12 +164,13 @@ dangerous_paths = ["freeze authority", "upgradeability"]
 mode = "LIVE_TESTNET"
 crate_or_service = "crates/x3-bench"
 tauri_app = "Reactor"
-required_tests = ["benchmark_job_submits", "benchmark_result_publishes"]
+required_tests = ["create_and_compare_reports", "test_compile_optimized"]
 proof_report = "reports/reactor_benchmark_report.md"
 readiness_score = 40
 blockers = [
   "Benchmark infrastructure not in CI critical path",
-  "GPU benchmark path depends on optional sidecar"
+  "GPU benchmark path depends on optional sidecar",
+  "No test covers a benchmark job submit/publish path: the previously cited benchmark_job_submits / benchmark_result_publishes never existed anywhere in the repository. The crate's real tests cover report comparison and the compile pipeline only."
 ]
 dangerous_paths = ["gpu benchmark", "concurrency"]
 
@@ -158,13 +178,14 @@ dangerous_paths = ["gpu benchmark", "concurrency"]
 mode = "GUARDED_TESTNET"
 crate_or_service = "apps/tauri-os"
 tauri_app = "AtomicConsole"
-required_tests = ["dead_buttons_report", "tauri_wiring_report"]
+required_tests = []
 proof_report = "reports/tauri_e2e_report.md"
 readiness_score = 15
 blockers = [
   "Desktop UI only — not part of blockchain runtime",
   "Dead buttons imply incomplete wiring",
-  "No CI gate; E2E report is manual"
+  "No CI gate; E2E report is manual",
+  "No automated test exists under apps/tauri-os: the previously cited dead_buttons_report / tauri_wiring_report were never test functions, they were report artifacts"
 ]
 dangerous_paths = ["dead buttons", "Tauri wiring"]
 
@@ -228,6 +249,51 @@ blockers = [
   "Biometric template and recovery logic have no security review"
 ]
 dangerous_paths = ["minter_authority", "biometric_templates", "recovery_logic"]
+
+[trading_core_v1]
+mode = "GUARDED_TESTNET"
+crate_or_service = "x3-lang"
+tauri_app = "N/A"
+required_tests = [
+  "gas_ceiling_exceeded_rejects_even_though_profit_and_debts_are_fine",
+  "swap_across_declared_chains_is_rejected",
+  "solvent_invariant_catches_hidden_cost_in_an_asset_the_trade_never_touches",
+  "slippage_beyond_policy_ceiling_is_rejected",
+  "oracle_firewall_fails_closed_when_required_but_host_reports_no_sources",
+  "simulate_never_commits_even_when_every_guard_passes",
+  "cumulative_loss_ceiling_trips_only_once_prior_trades_are_summed_in",
+  "replay_ledger_rejects_the_identical_receipt_presented_twice",
+  "cli_receipt_verify_rejects_tampered_receipt",
+  "bridge_against_a_host_with_no_bridging_support_fails_closed"
+]
+proof_report = "reports/trading_core_v1_report.md"
+readiness_score = 70
+blockers = [
+  "x3c audit's RiskScorer does not recognize trading-core-v1's AST shape (Item::AtomicTrade/Item::TradeRiskPolicy) — its risk score output is meaningless for these programs today; treat as unscored, not as safe (flagged in PR #216, still open)",
+  "No multi-validator or live-network execution of a trading-core-v1 program has been performed — all 131 passing tests are single-process compiler/VM/CLI-level"
+]
+dangerous_paths = ["solvency invariant", "oracle firewall", "replay ledger", "gas ceiling enforcement", "receipt signing"]
+
+[atomic_trade_engine]
+mode = "GUARDED_TESTNET"
+crate_or_service = "pallets/atomic-trade-engine"
+tauri_app = "N/A"
+required_tests = [
+  "execute_triple_vm_batch_via_kernel_comit_v2_works",
+  "kernel_comit_failure_is_rolled_back_but_batch_is_marked_failed",
+  "execute_fails_with_slippage_exceeded",
+  "create_batch_fails_with_expired_deadline",
+  "create_batch_fails_with_invalid_nonce",
+  "concurrent_batches_per_account",
+  "sync_pool_price_writes_oracle_observation"
+]
+proof_report = "reports/trading_core_v1_report.md"
+readiness_score = 65
+blockers = [
+  "No multi-validator or live-network run — 48 passing tests are all mock-runtime unit tests",
+  "Pre-execution risk scoring for trades that originate as trading-core-v1 programs depends on x3c audit's RiskScorer, which is currently blind to that AST shape — see [trading_core_v1]"
+]
+dangerous_paths = ["kernel_comit settlement rollback", "AMM adapter registration", "cross-VM leg execution (EVM/SVM/X3)"]
 
 # ── Addendum 2026-09-11: two new entries added for real, previously-untracked
 # work verified this session (2026-09-08 commits a03a7a267, 4b6520c53,

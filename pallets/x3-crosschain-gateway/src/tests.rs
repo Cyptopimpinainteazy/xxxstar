@@ -5,6 +5,45 @@ use crate::{
 };
 use frame_support::{assert_noop, assert_ok};
 
+// ── SVM validator-set helpers ──────────────────────────────────────────────
+
+/// Authorized-validator list for `set_svm_validators` (32-byte Ed25519 keys).
+fn validator_keys(
+    keys: &[&ed25519_dalek::SigningKey],
+) -> frame_support::BoundedVec<[u8; 32], crate::MaxSvmValidators> {
+    frame_support::BoundedVec::try_from(
+        keys.iter()
+            .map(|key| key.verifying_key().to_bytes())
+            .collect::<Vec<_>>(),
+    )
+    .expect("test validator set fits the bound")
+}
+
+/// Builds a `SOLANA_FINALIZED_FORMAT_V1` payload signed by `keys` over
+/// `BLAKE2b-256(slot_le || blockhash)` — the message the relayer signs.
+fn solana_payload_v1(
+    slot: u64,
+    blockhash: [u8; 32],
+    keys: &[&ed25519_dalek::SigningKey],
+) -> frame_support::BoundedVec<u8, frame_support::traits::ConstU32<4096>> {
+    use ed25519_dalek::Signer;
+
+    let message = x3_verification_router::solana_attestation_message(slot, &blockhash);
+    let mut payload = vec![x3_verification_router::SOLANA_FINALIZED_FORMAT_V1];
+    payload.extend_from_slice(&slot.to_le_bytes());
+    payload.extend_from_slice(&blockhash);
+    payload.extend_from_slice(&(keys.len() as u32).to_le_bytes());
+    for key in keys {
+        payload.extend_from_slice(&key.verifying_key().to_bytes());
+        payload.extend_from_slice(&key.sign(&message).to_bytes());
+    }
+    frame_support::BoundedVec::try_from(payload).expect("payload fits the proof bound")
+}
+
+fn signing_key(seed: u8) -> ed25519_dalek::SigningKey {
+    ed25519_dalek::SigningKey::from_bytes(&[seed; 32])
+}
+
 fn expected_withdrawal_id(amount: u128) -> [u8; 32] {
     // Must mirror the pallet's derive_withdrawal_id exactly: it
     // mixes x3_asset_id, recipient bytes, amount, and the current
@@ -562,8 +601,18 @@ fn deposit_proof_validator_quorum_works() {
 #[test]
 fn deposit_proof_solana_verifier_works() {
     new_test_ext().execute_with(|| {
+        // The Solana verifier performs real Ed25519 verification in every
+        // feature configuration (only the EVM/quorum stubs have a test hook), so
+        // this plumbing test supplies an authorized key and a real attestation.
+        let a = signing_key(1);
         register_asset(ExternalChainId::SolanaDevnet, "0xSOLTOKEN", [10u8; 32]);
         enable_route_for(solana_route());
+        assert_ok!(X3CrosschainGateway::set_svm_validators(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            validator_keys(&[&a]),
+            1,
+        ));
 
         assert_ok!(X3CrosschainGateway::submit_deposit_proof(
             RuntimeOrigin::signed(1),
@@ -574,7 +623,7 @@ fn deposit_proof_solana_verifier_works() {
                 ExternalChainId::SolanaDevnet,
                 solana_asset(),
                 1,
-                valid_proof_payload(),
+                solana_payload_v1(100, [7u8; 32], &[&a]),
             ),
         ));
 
@@ -1134,6 +1183,184 @@ fn enable_route_non_governance_fails() {
         assert_noop!(
             X3CrosschainGateway::enable_route(RuntimeOrigin::signed(1), route()),
             sp_runtime::DispatchError::BadOrigin
+        );
+    });
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// SVM validator set (governance) and real Solana attestation verification
+// ═════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn set_svm_validators_requires_governance() {
+    new_test_ext().execute_with(|| {
+        let a = signing_key(1);
+
+        assert_noop!(
+            X3CrosschainGateway::set_svm_validators(
+                RuntimeOrigin::signed(1),
+                ExternalChainId::SolanaDevnet,
+                validator_keys(&[&a]),
+                1,
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+
+        assert_ok!(X3CrosschainGateway::set_svm_validators(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            validator_keys(&[&a]),
+            1,
+        ));
+        assert_eq!(
+            crate::SvmValidatorSets::<Test>::get(ExternalChainId::SolanaDevnet)
+                .expect("set stored")
+                .threshold,
+            1
+        );
+    });
+}
+
+#[test]
+fn set_svm_validators_rejects_degenerate_sets() {
+    new_test_ext().execute_with(|| {
+        let (a, b) = (signing_key(1), signing_key(2));
+
+        // Empty set.
+        assert_noop!(
+            X3CrosschainGateway::set_svm_validators(
+                RuntimeOrigin::root(),
+                ExternalChainId::SolanaDevnet,
+                validator_keys(&[]),
+                1,
+            ),
+            Error::<Test>::EmptySvmValidatorSet
+        );
+
+        // Zero threshold, and a threshold larger than the set.
+        for threshold in [0u32, 3] {
+            assert_noop!(
+                X3CrosschainGateway::set_svm_validators(
+                    RuntimeOrigin::root(),
+                    ExternalChainId::SolanaDevnet,
+                    validator_keys(&[&a, &b]),
+                    threshold,
+                ),
+                Error::<Test>::InvalidSvmThreshold
+            );
+        }
+
+        // A repeated key could occupy two threshold slots.
+        assert_noop!(
+            X3CrosschainGateway::set_svm_validators(
+                RuntimeOrigin::root(),
+                ExternalChainId::SolanaDevnet,
+                validator_keys(&[&a, &a]),
+                2,
+            ),
+            Error::<Test>::DuplicateSvmValidator
+        );
+    });
+}
+
+#[test]
+fn solana_deposit_requires_authorized_attestations() {
+    new_test_ext().execute_with(|| {
+        let (a, b, rogue) = (signing_key(1), signing_key(2), signing_key(9));
+        register_asset(ExternalChainId::SolanaDevnet, "0xSOLTOKEN", [10u8; 32]);
+        enable_route_for(solana_route());
+        assert_ok!(X3CrosschainGateway::set_svm_validators(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            validator_keys(&[&a, &b]),
+            2,
+        ));
+
+        // One authorized signature is short of the 2-validator threshold.
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [3u8; 32],
+                deposit_proof_with(
+                    [1u8; 32],
+                    100,
+                    ExternalChainId::SolanaDevnet,
+                    solana_asset(),
+                    1,
+                    solana_payload_v1(100, [7u8; 32], &[&a]),
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+
+        // An unauthorized key cannot contribute, even beside an authorized one.
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [3u8; 32],
+                deposit_proof_with(
+                    [2u8; 32],
+                    100,
+                    ExternalChainId::SolanaDevnet,
+                    solana_asset(),
+                    2,
+                    solana_payload_v1(100, [7u8; 32], &[&a, &rogue]),
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+
+        // Two authorized attestations satisfy the threshold: the deposit is
+        // verified and credited.
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [3u8; 32],
+            deposit_proof_with(
+                [4u8; 32],
+                100,
+                ExternalChainId::SolanaDevnet,
+                solana_asset(),
+                3,
+                solana_payload_v1(100, [7u8; 32], &[&a, &b]),
+            ),
+        ));
+        assert_eq!(Pallet::<Test>::external_locked([10u8; 32]), 100);
+    });
+}
+
+#[test]
+fn clearing_svm_validators_fails_closed() {
+    new_test_ext().execute_with(|| {
+        let (a, b) = (signing_key(1), signing_key(2));
+        register_asset(ExternalChainId::SolanaDevnet, "0xSOLTOKEN", [10u8; 32]);
+        enable_route_for(solana_route());
+        assert_ok!(X3CrosschainGateway::set_svm_validators(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            validator_keys(&[&a, &b]),
+            2,
+        ));
+        assert_ok!(X3CrosschainGateway::clear_svm_validators(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+        ));
+        assert!(crate::SvmValidatorSets::<Test>::get(ExternalChainId::SolanaDevnet).is_none());
+
+        // Same valid proof as the happy path, but there is no authorized set.
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [3u8; 32],
+                deposit_proof_with(
+                    [5u8; 32],
+                    100,
+                    ExternalChainId::SolanaDevnet,
+                    solana_asset(),
+                    4,
+                    solana_payload_v1(100, [7u8; 32], &[&a, &b]),
+                ),
+            ),
+            Error::<Test>::VerificationFailed
         );
     });
 }

@@ -1,63 +1,60 @@
 {
-  "repo_commit_hash": "da0301a477a521d32297b988677029abce88c35a",
+  "repo_commit_hash": "f640300f403f5b772ed6b5eb3c779df57efe2e08",
   "command_run": "x3-proof verify x3.asset_kernel.supply_conservation",
-  "artifact_hash": "92a478871a9131b995633cadec960f6f5f2497680db058f3dcf401bb81ea5e4f",
+  "artifact_hash": "dfd29469767e4df7f9a0e7e78f803fe99119e64b721979f68bba1852481f3cc5",
   "policy_hash": "a9560e648e6673ee0512a7122dd3518720b654814ce0f4e8d8327dc18379237a",
   "relevant_files": [
-    "pallets/x3-kernel/src/replay_tests.rs",
-    "pallets/x3-kernel/src/packet_integration_tests.rs",
-    "pallets/x3-kernel/src/tests.rs",
     "pallets/x3-kernel/src/tests/property_tests.rs",
-    "pallets/x3-kernel/src/chaos_tests.rs"
+    "pallets/x3-kernel/src/chaos_tests.rs",
+    "pallets/x3-kernel/src/tests.rs",
+    "pallets/x3-kernel/src/replay_tests.rs",
+    "pallets/x3-kernel/src/test_helpers.rs",
+    "pallets/x3-kernel/src/packet_integration_tests.rs"
   ],
-  "timestamp": "2026-05-06T12:38:47.253309858Z",
+  "timestamp": "2026-09-11T18:15:51.279777001Z",
   "result": {
     "claim_id": "x3.asset_kernel.supply_conservation",
     "claim": "Asset kernel maintains canonical supply invariant across all operations",
-    "status": "failed",
+    "status": "verified",
     "proof_level": "P2",
     "edge_case_level": "E1",
     "hack_level": "H0",
     "operator_level": "I1",
     "degraded_level": "D1",
     "files_inspected": [
-      "pallets/x3-kernel/src/replay_tests.rs",
-      "pallets/x3-kernel/src/packet_integration_tests.rs",
-      "pallets/x3-kernel/src/tests.rs",
       "pallets/x3-kernel/src/tests/property_tests.rs",
-      "pallets/x3-kernel/src/chaos_tests.rs"
+      "pallets/x3-kernel/src/chaos_tests.rs",
+      "pallets/x3-kernel/src/tests.rs",
+      "pallets/x3-kernel/src/replay_tests.rs",
+      "pallets/x3-kernel/src/test_helpers.rs",
+      "pallets/x3-kernel/src/packet_integration_tests.rs"
     ],
     "commands_run": [
       "cargo test --package pallet-x3-kernel canonical_supply"
     ],
     "passed_checks": [
       "canonical_supply test found",
-      "Found 5 test files",
-      "Found 25 executable invariant assertions",
-      "Supply monitoring evidence in 11 files"
+      "Found 6 test files",
+      "canonical_supply tests PASSED (2 cases, 0 failed)",
+      "Found 27 executable invariant assertions",
+      "Supply monitoring evidence in 13 files"
     ],
-    "failed_checks": [
-      "canonical_supply tests FAILED (0 passed, 0 failed)"
-    ],
+    "failed_checks": [],
     "missing_proofs": [],
-    "blockers": [
-      "canonical_supply tests failing"
-    ],
-    "score": 0.0,
+    "blockers": [],
+    "score": 1.0,
     "evidence": {
-      "canonical_supply_test": "found",
-      "test_cases_passed": "0",
-      "test_result": "FAILED",
+      "invariants_declared": "27",
       "test_cases_failed": "0",
+      "test_cases_passed": "2",
       "supply_monitor": "found",
-      "invariants_declared": "25",
-      "test_files": "5"
+      "test_files": "6",
+      "test_result": "PASSED",
+      "canonical_supply_test": "found"
     },
-    "timestamp": "2026-05-06T12:38:47.244372690Z",
-    "duration_ms": 6687
+    "timestamp": "2026-09-11T18:15:51.254749162Z",
+    "duration_ms": 111152
   },
-  "limitations": [
-    "canonical_supply tests failing"
-  ],
-  "binding_hash": "5656399d18d4f3e0e3899ea5067fda96799761e2a18b34fbc287b7f0d2accc4e"
+  "limitations": [],
+  "binding_hash": "fa8eb8b4d47684c98d6716e52da747ccc9289a0d707e18526b2e2b554cd7512a"
 }

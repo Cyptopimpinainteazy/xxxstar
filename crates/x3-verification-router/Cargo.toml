@@ -19,6 +19,13 @@ scale-info = { version = "2.5", default-features = false, features = ["derive"] 
 serde = { version = "1.0", default-features = false, optional = true, features = ["derive"] }
 # SHA-256 for Bitcoin SPV proof verification
 sha2 = { workspace = true }
+# BLAKE2b-256 is the message hash the SVM validators sign (slot || blockhash);
+# `default-features = false` keeps it out of the blake2/std path that would leak
+# into wasm32v1-none builds (see the workspace comment about the expander).
+blake2 = { version = "0.10", default-features = false }
+# Ed25519 verification for Solana validator attestations. `no_std`-compatible:
+# verification needs no allocator and no RNG.
+ed25519-dalek = { version = "2.1", default-features = false }
 # Bitcoin vault types: threshold/multisig config + UTXO helpers used by the
 # Bitcoin SPV verifier path. Promotes `x3-bitcoin-vault` from a workspace
 # island to a real compiled consumer of production verification flow.
@@ -31,4 +38,4 @@ production = []
 test-verifier = []
 
 [dev-dependencies]
-hex-literal = "0.4"
+hex-literal = "1.1"

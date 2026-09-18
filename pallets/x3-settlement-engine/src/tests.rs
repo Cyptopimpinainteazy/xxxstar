@@ -295,6 +295,7 @@ fn atomic_lock_released_on_finalize() {
         }
 
         // Claim settlement: taker claims (marks leg 0 as claimed)
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -621,6 +622,7 @@ fn settlement_lifecycle_evm_to_evm() {
         ));
 
         // 4. Claim settlement: both parties reveal secret and claim
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -712,6 +714,7 @@ fn settlement_lifecycle_evm_to_solana() {
         ));
 
         // 4. Claim settlement
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1077,6 +1080,7 @@ fn settlement_state_transitions() {
         assert!(matches!(state4, IntentState::ExecutingExternal));
 
         // Claim first leg
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1439,6 +1443,7 @@ fn multiple_parallel_settlements_independent() {
             ));
 
             // Claim settlement
+            submit_canonical_claim_proof_set(*intent_id);
             assert_ok!(Pallet::<Test>::claim_settlement(
                 RuntimeOrigin::signed(BOB),
                 *intent_id,
@@ -1528,6 +1533,7 @@ fn settlement_with_maximum_boundary_amounts() {
             proof,
         ));
 
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1609,6 +1615,7 @@ fn settlement_with_minimum_boundary_amounts() {
             proof,
         ));
 
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1701,6 +1708,7 @@ fn all_intent_state_transitions_valid() {
         assert!(matches!(state, IntentState::ExecutingExternal));
 
         // Transition: ExecutingExternal -> Claiming
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1787,6 +1795,7 @@ fn atomic_lock_all_phase_transitions() {
         ));
 
         // Claim settlements
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(taker),
             intent_id,
@@ -1981,6 +1990,7 @@ fn settlement_between_three_different_chains_complex() {
         ));
 
         // Claim settlements in reverse order (test order independence)
+        submit_canonical_claim_proof_set(intent_id);
         assert_ok!(Pallet::<Test>::claim_settlement(
             RuntimeOrigin::signed(maker),
             intent_id,
@@ -2812,4 +2822,151 @@ fn adaptor_swap_real_full_lifecycle() {
         );
         assert!(replay.is_err(), "replay of final sig must be rejected");
     });
+}
+
+#[test]
+fn local_claims_do_not_finalize_without_cross_domain_proof_set() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        let maker = ALICE;
+        let taker = BOB;
+        let secret = H256::from([0x5au8; 32]);
+        let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
+
+        assert_ok!(Pallet::<Test>::create_intent(
+            RuntimeOrigin::signed(maker),
+            taker,
+            AssetSpec {
+                chain: ExternalChainId::Ethereum,
+                token: TokenId::Native,
+                amount: 1_000,
+            },
+            AssetSpec {
+                chain: ExternalChainId::Solana,
+                token: TokenId::Native,
+                amount: 500,
+            },
+            secret_hash,
+            Some(3_600),
+        ));
+
+        let intent_id = SettlementIntents::<Test>::iter()
+            .find(|(_, intent)| intent.maker == maker && intent.secret_hash == secret_hash)
+            .map(|(id, _)| id)
+            .expect("intent exists");
+
+        assert_ok!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(taker),
+            intent_id,
+            0,
+            ExternalChainId::Ethereum,
+            1_000,
+            vec![],
+        ));
+        assert_ok!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(maker),
+            intent_id,
+            1,
+            ExternalChainId::Solana,
+            500,
+            vec![],
+        ));
+
+        // Intentionally do NOT submit legacy SettlementProof fixtures or a
+        // CrossDomainProofSet. Local claims must therefore be insufficient to
+        // enter the terminal Finalized state.
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(taker),
+            intent_id,
+            secret,
+        ));
+        assert_ok!(Pallet::<Test>::claim_settlement(
+            RuntimeOrigin::signed(maker),
+            intent_id,
+            secret,
+        ));
+
+        let intent = SettlementIntents::<Test>::get(intent_id).expect("intent exists");
+        assert_eq!(intent.legs_claimed, intent.legs_total);
+        assert!(matches!(
+            crate::IntentStates::<Test>::get(intent_id),
+            IntentState::Claiming
+        ));
+    });
+}
+
+/// Build and submit a canonical cross-domain proof set that covers every
+/// escrowed leg of `intent_id` with a Claim bundle.
+///
+/// The settlement gate requires canonical proof sets for terminal states, so
+/// the historical lifecycle tests must present one instead of relying on local
+/// claims alone.
+fn submit_canonical_claim_proof_set(intent_id: H256) {
+    use x3_atomic_swap::{
+        CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType,
+    };
+
+    let runtime_intent_id = intent_id.to_fixed_bytes();
+    let intent = SettlementIntents::<Test>::get(intent_id).expect("intent exists");
+
+    let mut bundles: Vec<CrossDomainProofBundle> = Vec::new();
+    for leg_idx in 0..intent.legs_total {
+        let escrow = crate::EscrowStates::<Test>::get(intent_id, leg_idx).expect("escrow leg");
+        let (chain_id, vm_type): (String, VmType) = match escrow.chain {
+            ExternalChainId::Ethereum => ("ethereum-mainnet".into(), VmType::Evm),
+            ExternalChainId::Solana => ("solana-mainnet".into(), VmType::Svm),
+            ExternalChainId::Bitcoin => ("bitcoin-mainnet".into(), VmType::BitcoinScript),
+            ExternalChainId::X3Native => ("x3-native".into(), VmType::X3Vm),
+            other => (format!("{other:?}").to_lowercase(), VmType::Evm),
+        };
+        if bundles
+            .iter()
+            .any(|existing| existing.chain_id == chain_id && existing.vm_type == vm_type)
+        {
+            continue;
+        }
+
+        let tx_id: String = format!("0xcanonical{leg_idx}");
+        let block_hash: String = format!("0xcanonicalblock{leg_idx}");
+        let block_number = 1 + leg_idx as u64;
+        let mut bundle = CrossDomainProofBundle {
+            version: CrossDomainProofBundle::VERSION,
+            intent_id: 1,
+            runtime_intent_id,
+            intent_hash: [0x11u8; 32],
+            chain_id: chain_id.clone(),
+            vm_type,
+            operation: CrossDomainOperation::Claim,
+            tx_id: tx_id.clone(),
+            block_number,
+            block_hash: block_hash.clone(),
+            execution_evidence: vec![1, 2, 3],
+            finality: FinalityProof {
+                chain_id,
+                vm_type,
+                tx_id,
+                block_number,
+                block_hash,
+                confirmations: 12,
+                finalized: true,
+                finality_source: "canonical-test".into(),
+                safe_to_reveal_secret: true,
+            },
+            proof_hash: [0u8; 32],
+        };
+        bundle.proof_hash = bundle.compute_hash().expect("canonical bundle hash");
+        bundles.push(bundle);
+    }
+
+    let proof_set = CrossDomainProofSet {
+        intent_id: 1,
+        runtime_intent_id,
+        intent_hash: [0x11u8; 32],
+        bundles,
+    };
+    assert_ok!(Pallet::<Test>::submit_cross_domain_proof_set(
+        RuntimeOrigin::signed(ALICE),
+        intent_id,
+        proof_set,
+    ));
 }

@@ -71,10 +71,8 @@ use pallet_collective;
 use pallet_cross_chain_validator;
 #[cfg(feature = "frontier")]
 use pallet_ethereum;
-use pallet_evolution_core;
 use pallet_governance;
 use pallet_grandpa;
-use pallet_meme_overlord;
 use pallet_offences;
 use pallet_preimage;
 use pallet_scheduler;
@@ -82,7 +80,6 @@ use pallet_session;
 #[cfg(feature = "dev")]
 use pallet_sudo;
 use pallet_svm_runtime;
-use pallet_swarm;
 use pallet_timestamp;
 #[allow(deprecated)]
 use pallet_transaction_payment::CurrencyAdapter;
@@ -92,12 +89,9 @@ use pallet_x3_agent_law;
 use pallet_x3_agent_registry;
 use pallet_x3_asset_registry;
 use pallet_x3_atomic_kernel;
-use pallet_x3_auction;
-use pallet_x3_compute_market;
 use pallet_x3_cross_vm_router;
 use pallet_x3_crosschain_gateway;
 use pallet_x3_custody;
-use pallet_x3_dapp_hub;
 use pallet_x3_invariants;
 use pallet_x3_inventory;
 use pallet_x3_jury_anchor;
@@ -122,8 +116,6 @@ use x3_accounting_events::{AccountingEvent, AccountingSpine};
 use x3_security_events::{SecurityEvent, SecurityEventHook};
 
 use scale_info::TypeInfo;
-// IXL instruction-set and IBC-style packet standard — available to all runtime consumers.
-use frame_support::dispatch::DispatchResult;
 use sp_api::impl_runtime_apis;
 use sp_consensus_grandpa::{EquivocationProof, KEY_TYPE};
 use sp_core::{OpaqueMetadata, H256, U256};
@@ -140,7 +132,6 @@ use sp_session::{GetSessionNumber, GetValidatorCount, MembershipProof};
 use sp_staking::offence::{OffenceReportSystem, ReportOffence};
 use sp_std::prelude::*;
 use x3_asset_kernel_types::DomainId;
-use x3_dex::TokenId as DexTokenId;
 
 #[cfg(feature = "frontier")]
 mod precompiles;
@@ -2642,11 +2633,11 @@ impl pallet_x3_sequencer::Config for Runtime {
 // These wire the fraud-proof pallet's `SchedulerCommitmentQuery` and
 // `ProposerQuery` traits to the sequencer and consensus pallets respectively.
 
-use crate::fraud_proofs::types::{ProposerQuery, SchedulerCommitmentQuery};
+use crate::fraud_proofs::types::ProposerQuery;
 
 /// Reads the scheduler commitment from the sequencer pallet's per-block storage.
 #[cfg(not(feature = "mainnet-rc1"))]
-impl SchedulerCommitmentQuery for Runtime {
+impl crate::fraud_proofs::types::SchedulerCommitmentQuery for Runtime {
     fn get_scheduler_commitment(block_number: u32) -> Option<sp_core::H256> {
         pallet_x3_sequencer::SchedulerCommitment::<Runtime>::get(block_number)
     }
@@ -3016,11 +3007,11 @@ impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
         let fee_bps = 30u32;
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
-            DexTokenId {
+            x3_dex::TokenId {
                 chain_id: 0,
                 asset_id: token_a as u128,
             },
-            DexTokenId {
+            x3_dex::TokenId {
                 chain_id: 0,
                 asset_id: token_b as u128,
             },
@@ -3043,7 +3034,7 @@ impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLo
         pool_id: u64,
         lp_amount: u128,
         unlock_at_block: BlockNumber,
-    ) -> DispatchResult {
+    ) -> frame_support::dispatch::DispatchResult {
         pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
             frame_system::RawOrigin::Signed(owner.clone()).into(),
             pool_id,
@@ -3203,10 +3194,17 @@ impl GetSessionNumber for SessionHandler {
 // sp_session::SessionKeys trait implementation for session key generation/decoding
 
 #[cfg(feature = "runtime-benchmarks")]
+#[allow(unused_imports)] // define_benchmarks! consumes these pallet aliases as macro metadata.
 mod benches {
+    // These aliases are consumed by define_benchmarks! token expansion; rustc
+    // does not observe the generated use-site when linting this module.
+    #[allow(unused_imports)]
     use pallet_cross_chain_validator::Pallet as CrossChainValidator;
+    #[allow(unused_imports)]
     use pallet_x3_atomic_kernel::Pallet as X3AtomicKernel;
+    #[allow(unused_imports)]
     use pallet_x3_settlement_engine::Pallet as X3SettlementEngine;
+    #[allow(unused_imports)]
     use pallet_x3_slash::Pallet as X3Slash;
 
     frame_benchmarking::define_benchmarks!(
@@ -4925,6 +4923,324 @@ mod native_supply_contract_tests {
             assert_eq!(
                 pallet_balances::Pallet::<Runtime>::free_balance(&user),
                 user_seed
+            );
+        });
+    }
+}
+
+// ── Runtime upgrade rehearsal ───────────────────────────────────────────────
+//
+// FEATURE_REGISTRY's `triforge_runtime` entry records that there is no automated
+// migration dry-run across the runtime's `construct_runtime!` variants, and the
+// standalone `try-runtime` CLI is not available in the pinned Polkadot SDK. This
+// module runs the dry-run in-process instead: it executes the same
+// `OnRuntimeUpgrade` hooks an upgrade would (the pallets' hooks plus the
+// `Migrations` tuple wired into `Executive`), for whichever variant the active
+// feature set selects, and asserts the work fits inside a block.
+//
+// `scripts/check-runtime-variants.sh` runs it once per variant.
+#[cfg(all(test, feature = "std"))]
+mod runtime_upgrade_rehearsal {
+    use super::{AllPalletsWithSystem, Migrations, Runtime};
+    use frame_support::traits::OnRuntimeUpgrade;
+    use frame_support::weights::Weight;
+
+    fn fresh_externalities() -> sp_io::TestExternalities {
+        // Seed the variant's real genesis state, so the upgrade hooks run against
+        // populated pallet storage — the situation a real upgrade faces — rather
+        // than empty storage.
+        //
+        // `sp_genesis_builder::GenesisBuilder` is declared inside
+        // `sp_api::decl_runtime_apis!`, so it is a *runtime API* (its impl carries
+        // the block type) and cannot be called directly from a test. These are the
+        // plain helper functions that API delegates to, generic over the generated
+        // `RuntimeGenesisConfig`.
+        use frame_support::genesis_builder_helper::{build_state, get_preset};
+        let json = get_preset::<crate::RuntimeGenesisConfig>(&None, |_| None)
+            .expect("runtime must expose a default genesis preset");
+        let mut ext = sp_io::TestExternalities::default();
+        ext.execute_with(|| {
+            build_state::<crate::RuntimeGenesisConfig>(json)
+                .expect("genesis state must build for this runtime variant");
+            frame_system::Pallet::<Runtime>::set_block_number(1);
+        });
+        ext
+    }
+
+    /// An upgrade must run its migrations without panicking and without needing
+    /// more weight than a block provides — an upgrade that cannot fit would leave
+    /// the chain unable to produce the block that applies it.
+    #[test]
+    fn runtime_upgrade_rehearsal() {
+        let mut ext = fresh_externalities();
+        let (pallets, migrations): (Weight, Weight) = ext.execute_with(|| {
+            (
+                // Exactly what `Executive::on_runtime_upgrade` runs.
+                <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade(),
+                <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade(),
+            )
+        });
+        let weight = pallets.saturating_add(migrations);
+
+        let max_block = <Runtime as frame_system::Config>::BlockWeights::get().max_block;
+        assert!(
+            weight.ref_time() <= max_block.ref_time(),
+            "runtime upgrade needs {} ref_time but a block only allows {}",
+            weight.ref_time(),
+            max_block.ref_time()
+        );
+    }
+
+    /// Every pallet that declares an in-code storage version must end the upgrade
+    /// with the same version on chain. A pallet left behind here is the classic
+    /// silent mainnet upgrade bug: reads keep working against a schema the code no
+    /// longer expects until someone notices the corruption. This is the check the
+    /// absent `try-runtime` CLI would have performed.
+    ///
+    /// The pallet list is the intersection of all five `construct_runtime!`
+    /// variants (`runtime/build.rs`/this module is compiled once per variant), so
+    /// `scripts/check-runtime-variants.sh` exercises it for every variant. Pallets
+    /// that declare no storage version at all are skipped by construction.
+    #[test]
+    fn runtime_upgrade_rehearsal_storage_versions() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{
+            GetStorageVersion, NoStorageVersionSet, PalletInfoAccess, StorageVersion,
+        };
+
+        /// In-code version as a number, or `None` when the pallet declares none.
+        trait DeclaredVersion {
+            fn declared(&self) -> Option<u16>;
+        }
+        impl DeclaredVersion for StorageVersion {
+            fn declared(&self) -> Option<u16> {
+                u16::decode(&mut &self.encode()[..]).ok()
+            }
+        }
+        impl DeclaredVersion for NoStorageVersionSet {
+            fn declared(&self) -> Option<u16> {
+                None
+            }
+        }
+
+        fn aligned<P>() -> Option<(u16, u16)>
+        where
+            P: GetStorageVersion + PalletInfoAccess,
+            P::InCodeStorageVersion: DeclaredVersion,
+        {
+            let declared = P::in_code_storage_version().declared()?;
+            let on_chain = u16::decode(&mut &StorageVersion::get::<P>().encode()[..]).ok()?;
+            Some((on_chain, declared))
+        }
+
+        /// Collects `(pallet, on-chain, in-code)` for every pallet in the list that
+        /// declares an in-code storage version.
+        fn collect() -> Vec<(&'static str, u16, u16)> {
+            let mut found = Vec::new();
+            macro_rules! collect {
+                ($($pallet:ty),* $(,)?) => {
+                    $(
+                        if let Some((on_chain, declared)) = aligned::<$pallet>() {
+                            found.push((stringify!($pallet), on_chain, declared));
+                        }
+                    )*
+                };
+            }
+            collect!(
+                crate::System,
+                crate::Timestamp,
+                crate::Aura,
+                crate::Grandpa,
+                crate::Session,
+                crate::Historical,
+                crate::Offences,
+                crate::Balances,
+                crate::TransactionPayment,
+                crate::Scheduler,
+                crate::Preimage,
+                crate::AtlasKernel,
+                crate::X3Invariants,
+                crate::X3AgentLaw,
+                crate::X3Coin,
+                crate::AtomicTradeEngine,
+                crate::Council,
+                crate::Governance,
+                crate::Treasury,
+                crate::AgentAccounts,
+                crate::AgentMemory,
+                crate::X3Verifier,
+                crate::X3DomainRegistry,
+                crate::X3AssetRegistry,
+                crate::X3SupplyLedger,
+                crate::X3CrossVmRouter,
+                crate::X3CrosschainGateway,
+                crate::X3TokenFactory,
+                crate::X3AccountRegistry,
+                crate::CrossChainValidator,
+                crate::X3SettlementEngine,
+                crate::FraudProofs,
+                crate::X3AtomicKernel,
+                crate::X3Slash,
+                crate::X3WalletPallet,
+                crate::X3Inventory,
+                crate::X3Reservation,
+                crate::X3Solvency,
+                crate::X3Rebalance,
+                crate::X3Partner,
+                crate::X3TreasuryPolicy,
+                crate::X3Custody,
+                crate::X3Reconciliation,
+                crate::X3Wrapped,
+                crate::SvmRuntime,
+                crate::X3JuryAnchor,
+                crate::X3LpLocker,
+                crate::X3Sentinel,
+            );
+            found
+        }
+
+        let mut ext = fresh_externalities();
+        let checked = ext.execute_with(|| {
+            <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade();
+            <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade();
+
+            let versions = collect();
+            let mismatched: Vec<_> = versions
+                .iter()
+                .filter(|(_, on_chain, declared)| on_chain != declared)
+                .collect();
+            println!(
+                "storage-version alignment: {} pallet(s) declare a version, {} aligned",
+                versions.len(),
+                versions.len() - mismatched.len()
+            );
+            assert!(
+                mismatched.is_empty(),
+                "on-chain storage version differs from the in-code version after the upgrade \
+                 hooks ran — a migration is missing or is not wired into `Migrations`: {mismatched:?}"
+            );
+            // Guard against the check quietly covering nothing: this list is fixed
+            // and the runtime has far more than this many versioned pallets, so a
+            // drop below the floor means the coverage regressed, not the runtime.
+            assert!(
+                versions.len() >= 5,
+                "only {} pallet(s) were inspected — the coverage list has regressed",
+                versions.len()
+            );
+            versions.len()
+        });
+        assert!(checked >= 5);
+    }
+
+    /// The alignment check above only proves the *end* state is consistent. This
+    /// proves the migrations actually run: every pallet whose migration struct is
+    /// wired into `Migrations` is first rolled back to an older on-chain version
+    /// (0), then the upgrade hooks run, and the pallet must end at the version the
+    /// code declares. A migration that silently stops matching its pallet (or is
+    /// dropped from the tuple) fails here — which is the failure mode `try-runtime`
+    /// would have reported on a real upgrade.
+    ///
+    /// The four pallets are exactly the structs registered in `Migrations`, so this
+    /// covers every migration this runtime ships.
+    #[test]
+    fn runtime_upgrade_rehearsal_migrations_advance_behind_versions() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{GetStorageVersion, StorageVersion};
+
+        macro_rules! rehearse {
+            ($($pallet:ty),* $(,)?) => {{
+                // Simulate an older on-chain state: every migrated pallet is behind.
+                $(
+                    StorageVersion::new(0).put::<$pallet>();
+                )*
+                // Prove the rollback took effect, so the assertions below cannot
+                // pass just because the pallet was already at the right version.
+                $(
+                    assert_eq!(
+                        u16::decode(&mut &StorageVersion::get::<$pallet>().encode()[..])
+                            .expect("on-chain storage version must decode"),
+                        0,
+                        concat!(stringify!($pallet), ": rollback to storage version 0 did not take effect")
+                    );
+                )*
+                <AllPalletsWithSystem as OnRuntimeUpgrade>::on_runtime_upgrade();
+                <Migrations as OnRuntimeUpgrade>::on_runtime_upgrade();
+                let mut report: Vec<(&'static str, u16, u16)> = Vec::new();
+                $(
+                    let declared = u16::decode(
+                        &mut &<$pallet as GetStorageVersion>::in_code_storage_version()
+                            .encode()[..],
+                    )
+                    .expect("declared storage version must decode");
+                    let after =
+                        u16::decode(&mut &StorageVersion::get::<$pallet>().encode()[..])
+                            .expect("on-chain storage version must decode");
+                    report.push((stringify!($pallet), after, declared));
+                )*
+                report
+            }};
+        }
+
+        let mut ext = fresh_externalities();
+        let report = ext.execute_with(|| {
+            rehearse!(
+                crate::AtlasKernel,
+                crate::Treasury,
+                crate::AgentMemory,
+                crate::AgentAccounts
+            )
+        });
+
+        assert_eq!(
+            report.len(),
+            4,
+            "the migration rehearsal must cover every migration wired into `Migrations`"
+        );
+        for (pallet, after, declared) in &report {
+            assert!(
+                *declared >= 1,
+                "{pallet} declares storage version {declared}; a migrated pallet must declare at \
+                 least 1 for this rehearsal to mean anything"
+            );
+            assert_eq!(
+                after, declared,
+                "{pallet} was rolled back to storage version 0 and the upgrade hooks left it at \
+                 {after} instead of {declared} — its migration did not run, or no longer matches \
+                 the pallet's declared version"
+            );
+        }
+        println!("migration rehearsal: {report:?} (rolled back to 0, upgraded back)");
+    }
+
+    /// Proof that the alignment check above can actually fail: a deliberately wrong
+    /// on-chain version must be reported. Without this, a future refactor could
+    /// turn the check into a no-op and every run would still be green.
+    #[test]
+    fn runtime_upgrade_rehearsal_storage_version_check_has_teeth() {
+        use codec::{Decode, Encode};
+        use frame_support::traits::{GetStorageVersion, StorageVersion};
+
+        // A pallet that declares `#[pallet::storage_version(STORAGE_VERSION)]`.
+        type Subject = crate::X3AtomicKernel;
+
+        let mut ext = fresh_externalities();
+        ext.execute_with(|| {
+            let declared = u16::decode(&mut &Subject::in_code_storage_version().encode()[..])
+                .expect("X3AtomicKernel must declare a storage version for this proof");
+            let on_chain = u16::decode(&mut &StorageVersion::get::<Subject>().encode()[..])
+                .expect("on-chain storage version must decode");
+            assert_eq!(
+                on_chain, declared,
+                "precondition: the rehearsal must start aligned for the subject pallet"
+            );
+
+            // Corrupt it the way a missing migration would.
+            StorageVersion::new(declared.wrapping_add(1)).put::<Subject>();
+            let after = u16::decode(&mut &StorageVersion::get::<Subject>().encode()[..])
+                .expect("on-chain storage version must decode");
+            assert_ne!(
+                after, declared,
+                "the alignment check would not have noticed a wrong on-chain version"
             );
         });
     }

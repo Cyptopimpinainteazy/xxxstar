@@ -3,32 +3,89 @@
 //! This mock provides a complete FRAME runtime for testing the full bundle
 //! lifecycle: submit → assign → finalize → rollback.
 
-#![cfg(test)]
-
 use crate as pallet_x3_atomic_kernel;
 use frame_support::{
     construct_runtime, derive_impl, parameter_types,
-    traits::{ConstU32, ConstU64, EnsureOrigin},
+    traits::{ConstU32, EnsureOrigin},
 };
 use frame_system as system;
 use sp_core::H256;
 use sp_io::TestExternalities;
 use sp_runtime::{
-    testing::UintAuthorityId,
-    traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
-    BuildStorage, MultiSignature, Perbill,
+    traits::{BlakeTwo256, IdentityLookup},
+    BuildStorage,
 };
-use x3_asset_kernel_types::traits::NoEconomicHalt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, MutexGuard};
+use x3_asset_kernel_types::traits::EconomicHaltInspect;
 
 pub type AccountId = u64;
 pub type BlockNumber = u64;
 pub type Balance = u128;
 
+#[allow(dead_code)]
 pub const ALICE: AccountId = 1;
+#[allow(dead_code)]
 pub const BOB: AccountId = 2;
 pub const CHARLIE: AccountId = 3;
+#[allow(dead_code)]
 pub const INITIAL_BALANCE: Balance = 1_000_000_000_000;
 pub const MIN_BOND: Balance = 10_000_000;
+
+// ── Switchable economic halt ───────────────────────────────────────────────
+//
+// `NoEconomicHalt` can never halt, which left the halt guard inside
+// `submit_atomic_bundle` with no way to observe it. This provider lets a test
+// flip the flag; the guard serialises halt tests and always clears the flag on
+// drop so tests running in parallel cannot observe it.
+
+pub struct SwitchableEconomicHalt;
+
+static ECONOMIC_HALTED: AtomicBool = AtomicBool::new(false);
+static HALT_LOCK: Mutex<()> = Mutex::new(());
+
+impl EconomicHaltInspect for SwitchableEconomicHalt {
+    fn is_halted() -> bool {
+        ECONOMIC_HALTED.load(Ordering::SeqCst)
+    }
+}
+
+/// Holds the halt lock with the economy open; flip it with [`EconomicHaltGuard::halt`].
+///
+/// Holding the lock for the whole test keeps halt tests from racing each other,
+/// and the flag is cleared on drop even if the test panics.
+#[allow(dead_code)]
+pub fn economy_open() -> EconomicHaltGuard {
+    let lock = HALT_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+    EconomicHaltGuard { _lock: lock }
+}
+
+#[allow(dead_code)]
+pub struct EconomicHaltGuard {
+    _lock: MutexGuard<'static, ()>,
+}
+
+#[allow(dead_code)]
+impl EconomicHaltGuard {
+    /// Halt new economic operations, as governance would.
+    pub fn halt(&self) {
+        ECONOMIC_HALTED.store(true, Ordering::SeqCst);
+    }
+
+    /// Lift the halt.
+    pub fn resume(&self) {
+        ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+    }
+}
+
+impl Drop for EconomicHaltGuard {
+    fn drop(&mut self) {
+        ECONOMIC_HALTED.store(false, Ordering::SeqCst);
+    }
+}
 
 parameter_types! {
     pub const BlockHashCount: BlockNumber = 250;
@@ -169,7 +226,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
     type MinBond = MinBond;
     type MaxLegsPerBundle = MaxLegsPerBundle;
     type BundleDeadlineBlocks = BundleDeadlineBlocks;
-    type EconomicHalt = NoEconomicHalt;
+    type EconomicHalt = SwitchableEconomicHalt;
     type X3LangOrigin = RootOrSignedAccount;
     type SettlementOrigin = SettlementOnlyOrigin;
     type VmReverter = crate::vm_revert::NoopVmReverter;
@@ -177,6 +234,7 @@ impl pallet_x3_atomic_kernel::Config for Test {
 
 // ── Test Externalities Builder ────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct ExtBuilder {
     balances: Vec<(AccountId, Balance)>,
 }
@@ -189,17 +247,12 @@ impl Default for ExtBuilder {
                 (BOB, INITIAL_BALANCE),
                 (CHARLIE, INITIAL_BALANCE),
             ],
-        dev_accounts: None,
         }
     }
 }
 
+#[allow(dead_code)]
 impl ExtBuilder {
-    pub fn balances(mut self, balances: Vec<(AccountId, Balance)>) -> Self {
-        self.balances = balances;
-        self
-    }
-
     pub fn build(self) -> TestExternalities {
         let mut storage = frame_system::GenesisConfig::<Test>::default()
             .build_storage()
@@ -207,6 +260,7 @@ impl ExtBuilder {
 
         pallet_balances::GenesisConfig::<Test> {
             balances: self.balances,
+            dev_accounts: None,
         }
         .assimilate_storage(&mut storage)
         .expect("Failed to assimilate balances storage");
@@ -218,33 +272,7 @@ impl ExtBuilder {
 }
 
 /// Convenience function to create a test environment with default balances.
+#[allow(dead_code)]
 pub fn new_test_ext() -> TestExternalities {
     ExtBuilder::default().build()
-}
-
-/// Advance the current block number and trigger on_initialize/on_finalize hooks.
-pub fn run_to_block(n: BlockNumber) {
-    while System::block_number() < n {
-        AtomicKernel::on_finalize(System::block_number());
-        System::on_finalize(System::block_number());
-        System::set_block_number(System::block_number() + 1);
-        System::on_initialize(System::block_number());
-        AtomicKernel::on_initialize(System::block_number());
-    }
-}
-
-/// Helper to create a test leg with default values.
-pub fn test_leg(vm_type: crate::proof::VmType) -> crate::proof::BundleLeg {
-    crate::proof::BundleLeg {
-        vm_type,
-        token_in: H256::repeat_byte(0x01),
-        token_out: H256::repeat_byte(0x02),
-        amount_in: 1_000_000,
-        min_amount_out: 900_000,
-        deadline: 10_000,
-        access: crate::proof::DeclaredAccess {
-            reads: Default::default(),
-            writes: Default::default(),
-        },
-    }
 }

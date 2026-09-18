@@ -7,6 +7,8 @@
 //! addresses, [`claim`] would call the claim function, and [`refund`] would trigger
 //! the refund path after timeout. Finality requires L1 settlement proof for full
 //! finality on StarkNet.
+use alloc::format;
+use alloc::vec;
 
 use crate::adapter::{
     AdapterReadinessScore, AssetId, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof,

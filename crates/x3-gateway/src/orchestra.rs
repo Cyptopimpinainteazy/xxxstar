@@ -18,8 +18,10 @@
 use crate::db::{self, ApprovalCase, Database, EvidenceBundle, OrchestraIntent, VoteWindow};
 use crate::error::{GatewayError, Result};
 use std::sync::Arc;
+use x3_orchestra_control_plane::types::{
+    IntentKind, NewIntent, NewVoteWindow, RiskClass, VoteChoice,
+};
 use x3_orchestra_control_plane::{ControlPlaneClient, VoteTally};
-use x3_orchestra_control_plane::types::{IntentKind, NewIntent, NewVoteWindow, RiskClass, VoteChoice};
 
 /// A possibly-present handle to the remote control-plane as stored on state
 /// (`Option<Arc<...>>`). We deref on use.
@@ -108,20 +110,16 @@ pub async fn create_approval_case(
     match deref(client) {
         Some(cp) => {
             let remote = cp
-                .create_approval_case(
-                    &x3_orchestra_control_plane::NewApprovalCase {
-                        intent_id: request.intent_id,
-                        review_kind: request.review_kind,
-                        requested_by: request.requested_by,
-                        summary: request.summary,
-                        metadata: request.metadata,
-                    },
-                )
+                .create_approval_case(&x3_orchestra_control_plane::NewApprovalCase {
+                    intent_id: request.intent_id,
+                    review_kind: request.review_kind,
+                    requested_by: request.requested_by,
+                    summary: request.summary,
+                    metadata: request.metadata,
+                })
                 .await
                 .map_err(cp_err)?;
-            Ok(db
-                .upsert_approval_case_from_control_plane(&remote)
-                .await?)
+            Ok(db.upsert_approval_case_from_control_plane(&remote).await?)
         }
         None => Ok(db.create_approval_case(request).await?),
     }
@@ -144,9 +142,7 @@ pub async fn create_vote_window(
                 })
                 .await
                 .map_err(cp_err)?;
-            Ok(db
-                .upsert_vote_window_from_control_plane(&remote)
-                .await?)
+            Ok(db.upsert_vote_window_from_control_plane(&remote).await?)
         }
         None => Ok(db.create_vote_window(request).await?),
     }
@@ -173,9 +169,7 @@ pub async fn create_vote_receipt(
                 )
                 .await
                 .map_err(cp_err)?;
-            Ok(db
-                .upsert_vote_receipt_from_control_plane(&remote)
-                .await?)
+            Ok(db.upsert_vote_receipt_from_control_plane(&remote).await?)
         }
         None => Ok(db.create_vote_receipt(window_id, request).await?),
     }

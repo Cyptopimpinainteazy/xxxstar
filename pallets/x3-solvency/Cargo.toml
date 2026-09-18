@@ -2,6 +2,7 @@
 name = "pallet-x3-solvency"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 authors = ["X3 Chain"]
 description = "X3 solvency engine: pre-quote, pre-reservation, pre-submission gates, post-submission tracking, and snapshot registry"
 

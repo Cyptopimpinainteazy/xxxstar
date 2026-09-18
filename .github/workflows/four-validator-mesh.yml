@@ -8,12 +8,18 @@ on:
 jobs:
   drill:
     name: four-validator finality and recovery drill
-    runs-on: ubuntu-latest
+    # No pull_request trigger (workflow_dispatch + weekly schedule only), so
+    # this real build-and-drill workload is safe to run on the x3
+    # self-hosted runner with no untrusted-code exposure.
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
+        # x3star1 already has protobuf-compiler/clang/cmake and has no
+        # passwordless sudo, so this only runs on GitHub-hosted.
+        if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y protobuf-compiler clang cmake

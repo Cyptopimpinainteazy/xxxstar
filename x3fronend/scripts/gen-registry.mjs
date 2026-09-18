@@ -2,7 +2,7 @@
 // Generates data/registry.json directly from the repo's FEATURE_REGISTRY.toml
 // so the site's status numbers can never drift from the file CI actually
 // validates (scripts/check-readiness-consistency.sh checks the same source).
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
@@ -35,6 +35,7 @@ const out = {
   features: features.sort((a, b) => b.readiness_score - a.readiness_score),
 };
 
+mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify(out, null, 2) + "\n");
 console.log(
   `[gen-registry] wrote ${features.length} features, avg readiness ${out.averageReadiness}% -> data/registry.json`

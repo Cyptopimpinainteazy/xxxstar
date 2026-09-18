@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
+"""Reject weakened, skipped, or stubbed-out tests before they land.
+
+Default (no arguments) scopes the scan to the *staged* files, which is what the
+pre-commit hook wants. `--base <ref>` scopes it to everything this branch adds
+or modifies relative to that ref, which is what a CI job on a PR wants - there
+is nothing staged in a fresh checkout, so a scan that only looks at the index
+would pass vacuously there.
+"""
+
+import argparse
 import pathlib
 import re
 import subprocess
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 IGNORE = {".git", "target", "node_modules", ".venv", "vendor", "vendov", "3d", "ChatGPT_files", "protoc_bin", "logs"}
@@ -31,13 +42,28 @@ def git_lines(args):
     return [line for line in result.stdout.splitlines() if line]
 
 
-def candidate_files():
-    names = set(git_lines(["diff", "--cached", "--name-only", "--diff-filter=ACMRT"]))
+def ref_exists(ref: str) -> bool:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def candidate_files(base: str | None = None):
+    names = set()
+    if base:
+        names.update(git_lines(["diff", "--name-only", "--diff-filter=ACMRT", f"{base}...HEAD"]))
+        names.update(git_lines(["diff", "--name-only", "--diff-filter=ACMRT"]))
+    else:
+        names.update(git_lines(["diff", "--cached", "--name-only", "--diff-filter=ACMRT"]))
     return [ROOT / name for name in sorted(names)]
 
-def scan():
+def scan(base: str | None = None):
     issues = []
-    for p in candidate_files():
+    for p in candidate_files(base):
         if not p.is_file() or "test" not in p.name.lower() or p.suffix.lower() not in TEST_EXT:
             continue
         rel = p.relative_to(ROOT).as_posix()
@@ -59,7 +85,20 @@ def scan():
     return issues
 
 if __name__ == "__main__":
-    found = scan()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--base",
+        help="scan everything this branch changes relative to this ref "
+        "(e.g. origin/master) instead of the staged files",
+    )
+    args = parser.parse_args()
+
+    if args.base and not ref_exists(args.base):
+        # A silently empty diff would make this gate pass for the wrong reason.
+        print(f"[test_cheat_guard] base ref not found: {args.base}", file=sys.stderr)
+        raise SystemExit(2)
+
+    found = scan(args.base)
     if found:
         print("[test_cheat_guard] blocked")
         print("\n".join(found[:200]))

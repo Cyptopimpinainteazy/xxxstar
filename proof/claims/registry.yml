@@ -267,7 +267,7 @@ claims:
     statement: "A fresh developer can deploy and test a first X3 app with measured time-to-first-value"
     criticality: S1
     tags: [onboarding, ux, developer]
-    status: VERIFIED
+    status: PARTIAL
     evidence_required:
       - onboarding_flow_test
       - time_to_first_deploy_metric
@@ -283,7 +283,7 @@ claims:
     statement: "Every funding ask maps to a milestone, deliverable, budget, and proof receipt"
     criticality: S1
     tags: [funding, governance, transparency]
-    status: VERIFIED
+    status: UNVERIFIED
     evidence_required:
       - funding_milestone_mapping
       - receipt_coverage_report
@@ -298,7 +298,7 @@ claims:
     statement: "New generations must beat prior generations without S0/S1 regressions"
     criticality: S1
     tags: [evolution, quality, regression]
-    status: VERIFIED
+    status: UNVERIFIED
     evidence_required:
       - fitness_comparison_test
       - regression_detection_test

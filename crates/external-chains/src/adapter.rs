@@ -343,7 +343,13 @@ pub struct LogEntry {
     pub data: Vec<u8>,
 }
 
-/// Mock adapter for testing
+/// Test double for the adapter trait: fabricates blocks, balances and transfers
+/// and **accepts every proof** (`verify_message_proof` returns `Ok(true)`).
+///
+/// Deliberately not compiled unless the `mock-adapters` feature is enabled (or
+/// this crate is built for tests). Reachable from a production build it would be
+/// an accept-any-proof path — `docs/reports/SECURITY_BLOCKERS.md`, finding 2.
+#[cfg(any(test, feature = "mock-adapters"))]
 pub struct MockChainAdapter {
     chain_type: ChainType,
     config: ChainConfig,
@@ -351,6 +357,7 @@ pub struct MockChainAdapter {
     block_number: u64,
 }
 
+#[cfg(any(test, feature = "mock-adapters"))]
 impl MockChainAdapter {
     pub fn new(chain_type: ChainType) -> Self {
         Self {
@@ -362,6 +369,7 @@ impl MockChainAdapter {
     }
 }
 
+#[cfg(any(test, feature = "mock-adapters"))]
 #[async_trait::async_trait]
 impl ChainAdapter for MockChainAdapter {
     fn chain_type(&self) -> ChainType {

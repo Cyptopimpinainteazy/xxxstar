@@ -33,13 +33,11 @@
 //! invoke(&ix, &[htlc_account, payer, initializer, system_program])?;
 //! ```
 
+use alloc::{vec, vec::Vec};
 use solana_program::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
-
-use crate::state::HTLC_ACCOUNT_SEED;
-
 /// Build a CPI instruction to create an HTLC.
 ///
 /// This is a thin wrapper around [`Instruction`] construction. The caller
@@ -51,7 +49,7 @@ use crate::state::HTLC_ACCOUNT_SEED;
 /// - `program_id` — The HTLC program ID.
 /// - `htlc_account` — The PDA address of the HTLC (seeds: ["htlc", swap_id]).
 /// - `payer` — Account funding the rent for the HTLC account.
-/// - `initializer` — The party locking funds (must be a signer).
+/// - `initializer` — The party locking funds (must be a writable signer).
 /// - `system_program` — System program ID.
 /// - `swap_id` — Unique 32-byte swap identifier.
 /// - `claimant` — Pubkey authorized to claim.
@@ -64,6 +62,7 @@ use crate::state::HTLC_ACCOUNT_SEED;
 /// ### Returns
 ///
 /// An [`Instruction`] ready for `invoke` or `invoke_signed`.
+#[allow(clippy::too_many_arguments)]
 pub fn create_htlc(
     program_id: &Pubkey,
     htlc_account: &Pubkey,
@@ -93,7 +92,7 @@ pub fn create_htlc(
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
             AccountMeta::new(*payer, true),
-            AccountMeta::new_readonly(*initializer, true),
+            AccountMeta::new(*initializer, true),
             AccountMeta::new_readonly(*system_program, false),
         ],
         data,
@@ -106,7 +105,7 @@ pub fn create_htlc(
 ///
 /// - `program_id` — The HTLC program ID.
 /// - `htlc_account` — The PDA address of the HTLC.
-/// - `claimant` — The authorized claimant (must be a signer).
+/// - `claimant` — The authorized claimant and payout account (must be a writable signer).
 /// - `preimage` — The preimage bytes (1–255 bytes).
 ///
 /// ### Returns
@@ -128,7 +127,7 @@ pub fn claim_htlc(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*claimant, true),
+            AccountMeta::new(*claimant, true),
         ],
         data,
     }
@@ -140,7 +139,7 @@ pub fn claim_htlc(
 ///
 /// - `program_id` — The HTLC program ID.
 /// - `htlc_account` — The PDA address of the HTLC.
-/// - `refund_authority` — The refund authority (must be a signer).
+/// - `refund_authority` — The refund authority and payout account (must be a writable signer).
 ///
 /// ### Returns
 ///
@@ -154,7 +153,7 @@ pub fn refund_htlc(
         program_id: *program_id,
         accounts: vec![
             AccountMeta::new(*htlc_account, false),
-            AccountMeta::new_readonly(*refund_authority, true),
+            AccountMeta::new(*refund_authority, true),
         ],
         data: vec![2u8], // instruction tag: RefundHtlc
     }
@@ -168,9 +167,6 @@ pub fn refund_htlc(
 /// ```
 ///
 /// Returns `(pda_address, bump_seed)`.
-pub fn derive_htlc_pda(
-    program_id: &Pubkey,
-    swap_id: &[u8; 32],
-) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[HTLC_ACCOUNT_SEED, swap_id], program_id)
+pub fn derive_htlc_pda(program_id: &Pubkey, swap_id: &[u8; 32]) -> (Pubkey, u8) {
+    crate::state::derive_htlc_pda(program_id, swap_id)
 }

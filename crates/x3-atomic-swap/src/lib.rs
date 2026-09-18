@@ -30,6 +30,8 @@
 //! - Scoreboard: cannot reach 100 with missing proof or tx hash
 //! - Timeout: expired swaps become REFUNDABLE/REFUNDED, never FAILED_SILENTLY
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 extern crate alloc;
 
 pub mod adapter;
@@ -52,11 +54,13 @@ pub mod move_vm_htlc;
 pub mod near_htlc;
 pub mod plutus_htlc;
 pub mod polkadot_ink_htlc;
+pub mod proof_bundle;
 pub mod registry;
 pub mod relayer;
 pub mod rpc_client;
 pub mod rpc_quorum;
 pub mod scoreboard;
+pub mod secret_release;
 pub mod slashing;
 pub mod solana_watcher;
 pub mod soroban_htlc;
@@ -82,6 +86,30 @@ pub use evm_live::LiveEvmExecutor;
 
 #[cfg(feature = "std")]
 pub mod btc_live;
+
+#[cfg(feature = "std")]
+pub mod x3vm_live;
+
+#[cfg(feature = "std")]
+pub use x3vm_live::{LiveX3VmAdapter, X3VmLiveTransport};
+
+#[cfg(feature = "std")]
+mod x3vm_node;
+
+#[cfg(feature = "std")]
+pub mod x3vm_native;
+
+#[cfg(feature = "std")]
+pub mod x3vm_proof_store;
+
+#[cfg(feature = "std")]
+pub use x3vm_native::NativeX3NodeTransport;
+
+#[cfg(feature = "std")]
+pub use x3vm_proof_store::PersistentX3ProofLedger;
+
+#[cfg(feature = "std")]
+pub use x3vm_node::{X3ExtrinsicSigner, X3FinalizedInclusionProof, X3NodeTransportConfig};
 
 pub use adapter::{
     AdapterReadinessScore, ChainHealth, ChainId, ClaimProof, FeeEstimate, FinalityProof, LockProof,
@@ -132,6 +160,7 @@ pub use plutus_htlc::{
     StatefulPlutusAdapter,
 };
 pub use polkadot_ink_htlc::{InkHtlcAdapter, InkHtlcContract, InkNetwork, StatefulInkAdapter};
+pub use proof_bundle::{CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet};
 pub use registry::{RelayerModel, RelayerRegistry, SolverModel, SolverRegistry};
 pub use relayer::{scan_for_alerts, Relayer, RelayerObservation, RelayerState, WatcherAlert};
 pub use rpc_client::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, RpcClient, RpcClientConfig};
@@ -139,6 +168,9 @@ pub use rpc_quorum::{
     ConsensusResult, ConsolidatedQuorum, RpcProvider, RpcQuorumOracle, RpcVote, SimpleRpcQuorum,
 };
 pub use scoreboard::{AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SwapScoreboard};
+pub use secret_release::{
+    SecretReleaseEvidence, SecretReleaseFirewall, SecretReleasePermit, SecretReleaseRequirement,
+};
 pub use slashing::{
     SlashCaseStatus, SlashReason, SlashRecord, SlashSummary, SlashableActor, SlashingEngine,
 };
@@ -155,5 +187,8 @@ pub use ton_htlc::{StatefulTonAdapter, TonContract, TonHtlcAdapter, TonLockData,
 pub use wasm_l1_htlc::{
     StatefulWasmL1Adapter, WasmL1Adapter, WasmL1Contract, WasmL1LockState, WasmL1Runtime,
 };
-pub use x3vm_htlc::{StatefulX3VmAdapter, X3VmAdapterImpl};
+pub use x3vm_htlc::{
+    InternalX3Lock, StatefulX3VmAdapter, X3VmAdapterImpl, X3VmRecoverySnapshot,
+    X3VM_RECOVERY_SNAPSHOT_VERSION,
+};
 pub use zkvm_htlc::{ZkProofRecord, ZkProofType, ZkVmAdapter, ZkVmTarget};

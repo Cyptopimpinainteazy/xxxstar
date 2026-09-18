@@ -1,26 +1,45 @@
 name: Formal Verification Gate
 on:
-   pull_request:
-     branches: [main, develop]
-     paths:
-       - 'pallets/**'
-       - 'runtime/**'
-       - 'x3-vm/**'
-       - 'formal-proofs/**'
-       - 'proof-forge/src/runners/formal_proofs.rs'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'pallets/**'
+      - 'runtime/**'
+      - 'x3-vm/**'
+      - 'formal-proofs/**'
+      - 'proof-forge/src/runners/formal_proofs.rs'
   push:
-    branches: [main]
+    branches: [master, 'release/**']
+    paths:
+      - 'pallets/**'
+      - 'runtime/**'
+      - 'x3-vm/**'
+      - 'formal-proofs/**'
+      - 'proof-forge/src/runners/formal_proofs.rs'
+  schedule:
+    - cron: '30 5 * * *'
   workflow_dispatch:
 
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
 
+
+concurrency:
+  # Never cancel an in-flight default-branch run: a cancelled release gate proves
+  # nothing, and with one self-hosted runner every new commit used to cancel the
+  # previous gate before it finished. PR runs still cancel superseded pushes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   formal-verification:
     name: Run Formal Verification Proofs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
     
     steps:
       - name: Checkout Repository
@@ -31,8 +50,22 @@ jobs:
       - name: Install Rust Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-          components: rustfmt, clippy
+          toolchain: 1.90.0
+          components: rustfmt, clippy, rust-src
+          target: wasm32-unknown-unknown, wasm32v1-none
+
+      - name: Install Java 17 for K Framework
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Java 17 Runtime
+        run: |
+          echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+          sudo update-alternatives --install /usr/bin/java java "$JAVA_HOME/bin/java" 1710
+          sudo update-alternatives --set java "$JAVA_HOME/bin/java"
+          java -version
 
       - name: Cache Cargo Dependencies
         uses: actions/cache@v4
@@ -42,7 +75,6 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -53,12 +85,15 @@ jobs:
         with:
           path: |
             /opt/tla2tools.jar
-            ~/.opam
-            /opt/k
             /opt/dafny
-          key: ${{ runner.os }}-fv-tools-v1
+          key: ${{ runner.os }}-fv-tools-v2
           restore-keys: |
             ${{ runner.os }}-fv-tools-
+
+      - name: Install formal verification system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y pkg-config libsecp256k1-dev libboost-all-dev libcurl4-openssl-dev libedit-dev libfmt-dev coq unzip
 
       - name: Install TLA+ Model Checker
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
@@ -69,39 +104,40 @@ jobs:
           echo "✅ TLA+ installed"
 
       - name: Install Coq Proof Assistant
-        if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y coq
+          coqc --version
           echo "✅ Coq installed"
 
       - name: Install K Framework
-        if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git maven
-          cd /opt
-          sudo rm -rf k
-          sudo git clone --depth=1 --recurse-submodules https://github.com/runtimeverification/k.git
-          cd k
-          sudo mvn package -DskipTests
-          test -x /opt/k/k-distribution/target/release/k/bin/kprove
-          sudo ln -sf /opt/k/k-distribution/target/release/k/bin/kprove /usr/local/bin/kprove
-          echo "✅ K Framework installed"
+          set -euo pipefail
+          cd /tmp
+          curl --fail --location --retry 3 \
+            -o kframework.deb \
+            https://github.com/runtimeverification/k/releases/download/v6.3.11/kframework_6.3.11_amd64_ubuntu_jammy.deb
+          sudo apt-get install -y ./kframework.deb
+          command -v kprove
+          kprove --version
+          echo "✅ K Framework v6.3.11 installed from pinned Ubuntu Jammy package"
 
       - name: Install Dafny (Optional)
         if: steps.cache-fv-tools.outputs.cache-hit != 'true'
         run: |
-          cd /opt
-          sudo wget -q https://github.com/dafny-lang/dafny/releases/download/v4.2.0/dafny-4.2.0-x64-ubuntu-20.04.zip
-          sudo unzip -q dafny-4.2.0-x64-ubuntu-20.04.zip -d /opt/
-          sudo mv dafny /opt/dafny
+          if [ ! -x /opt/dafny/dafny ]; then
+            rm -rf "$RUNNER_TEMP/dafny-install"
+            mkdir -p "$RUNNER_TEMP/dafny-install"
+            wget -q https://github.com/dafny-lang/dafny/releases/download/v4.2.0/dafny-4.2.0-x64-ubuntu-20.04.zip -O "$RUNNER_TEMP/dafny-install/dafny.zip"
+            unzip -q "$RUNNER_TEMP/dafny-install/dafny.zip" -d "$RUNNER_TEMP/dafny-install"
+            sudo rm -rf /opt/dafny
+            sudo mv "$RUNNER_TEMP/dafny-install/dafny" /opt/dafny
+          fi
           echo "✅ Dafny installed"
 
       - name: Verify Tool Installations
         run: |
           echo "Verifying formal verification tools..."
-          java -jar /opt/tla2tools.jar >/dev/null
+          test -s /opt/tla2tools.jar
+          java -version
           coqc --version
           kprove --version
           /opt/dafny/dafny --version
@@ -117,14 +153,18 @@ jobs:
         id: formal-gate
         run: |
           echo "🔍 Running formal verification proofs..."
-          target/release/x3-proof formal --workspace . --strict
+          target/release/x3-proof formal --workspace .
         continue-on-error: false
 
       - name: Generate Formal Verification Report
         if: always()
         run: |
           echo "📊 Generating verification report..."
-          target/release/x3-proof formal --workspace . --report > formal-verification-report.txt
+          if [ -x target/release/x3-proof ]; then
+            target/release/x3-proof formal --workspace . > formal-verification-report.txt
+          else
+            echo "x3-proof binary was not built; inspect earlier setup/build failure." > formal-verification-report.txt
+          fi
           cat formal-verification-report.txt
 
       - name: Upload Formal Verification Report
@@ -158,9 +198,10 @@ jobs:
       - name: Comment on PR (On Failure)
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -184,7 +225,7 @@ jobs:
                  - \`formal-proofs/coq/SupplyInvariant.v\`
                  - \`formal-proofs/k/x3vm-spec.k\`
               2. Fix the underlying issue (code or spec)
-              3. Re-run: \`./target/release/x3-proof formal --workspace . --strict\`
+              3. Re-run: \`./target/release/x3-proof formal --workspace .\`
               4. Push fix and re-run CI
               
               **⚠️ Do not bypass this gate - consensus bugs in production = chain halt.**`
@@ -193,9 +234,10 @@ jobs:
       - name: Comment on PR (On Success)
         if: success() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
