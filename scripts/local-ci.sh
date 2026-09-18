@@ -381,7 +381,20 @@ run_gate() {
   local gate_log="$LOG_DIR/local-ci-$STAMP-$slug.log"
   local start end rc status
   start=$(date +%s)
-  env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" bash -c "$cmd" >"$gate_log" 2>&1
+  # WASM_BUILD_WORKSPACE_HINT: substrate-wasm-builder looks for the workspace
+  # Cargo.lock by walking up from the *target* directory. When this run redirects
+  # CARGO_TARGET_DIR outside the workspace (a dedicated dir, e.g. to dodge
+  # artifacts another toolchain left in a shared target/), that walk finds
+  # nothing, so the nested wasm build silently re-resolves its whole dependency
+  # graph and then dies on `crypto-common`:
+  #   cargo:warning=Could not find `Cargo.lock` for .../runtime/Cargo.toml
+  #   error[E0463]: can't find crate for `std` ... wasm32v1-none
+  # Pointing the hint at the workspace makes the redirected run behave exactly
+  # like the default one. Both `clippy runtime rc1` and `clippy workspace` go
+  # green on a redirected target dir with this set (see docs/local-ci.md).
+  env CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}" \
+      WASM_BUILD_WORKSPACE_HINT="$ROOT" \
+      bash -c "$cmd" >"$gate_log" 2>&1
   rc=$?
   end=$(date +%s)
   status=PASS
