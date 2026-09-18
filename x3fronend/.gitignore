@@ -1,0 +1,7 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+# Generated from FEATURE_REGISTRY.toml at build time — never hand-edit,
+# never commit a stale snapshot. Run `npm run gen:registry` to regenerate.
+data/registry.json

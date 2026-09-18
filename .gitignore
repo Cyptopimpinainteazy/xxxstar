@@ -19,6 +19,12 @@ node_modules/
 *.log
 tests/wallet-integration/coverage/
 
+# Assembled static site output (scripts/build-site.sh) — always regenerated,
+# never a source of truth. Serve locally with: cd site && python3 -m http.server 8080
+/site/
+apps/wallet/out/
+apps/dex/out/
+
 # Misc
 .DS_Store
 .env
