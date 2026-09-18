@@ -1,47 +1,50 @@
 //! Encryption utilities for the private mempool.
 //!
-//! Provides helpers for encrypting transactions to the committee's threshold key
-//! and reconstructing plaintexts from decryption shares.
+//! Provides helpers for encrypting transactions to the committee's threshold
+//! key and reconstructing plaintexts from decryption shares.
 //!
 //! # Cryptographic Scheme
 //!
-//! 1. Sender generates ephemeral X25519 keypair
-//! 2. ECDH with committee public key → shared secret
-//! 3. HKDF-SHA256(shared_secret) → AES-256-GCM key
-//! 4. AES-256-GCM encrypt(plaintext, nonce) → ciphertext
+//! 1. Sender generates an ephemeral Ristretto scalar/point keypair.
+//! 2. `ephemeral_scalar * committee_group_key` (a Ristretto ECDH) → shared point.
+//! 3. HKDF-SHA256(shared point's compressed bytes) → AES-256-GCM key.
+//! 4. AES-256-GCM encrypt(plaintext, nonce) → ciphertext.
 //!
-//! Decryption requires t-of-n validators to provide decryption shares
-//! (partial ECDH results), which are combined to reconstruct the shared secret.
+//! Decryption requires `t`-of-`n` validators to each compute a partial
+//! decryption (their [`crate::threshold::SecretShare`] times the ephemeral
+//! point) and [`combine_shares`] those partials via Lagrange interpolation
+//! in the exponent — see [`crate::threshold`] for why this, and not raw
+//! X25519 ECDH, is what makes the threshold guarantee real.
 
-use crate::{EncryptedTransaction, MempoolError};
+use crate::threshold::{self, SecretShare};
+use crate::{DecryptionShare, EncryptedTransaction, MempoolError};
 
 /// Encrypt a transaction payload for the committee.
+///
+/// `committee_group_key` is the committee's Ristretto group public key —
+/// see [`crate::threshold::group_public_key`].
 ///
 /// # Invariant: PRIV-EXEC-001
 pub fn encrypt_for_committee(
     plaintext: &[u8],
-    committee_pk: &[u8; 32],
+    committee_group_key: &[u8; 32],
     sender_pk: &[u8; 32],
     fee_commitment: &[u8; 32],
     dkg_epoch: u64,
 ) -> Result<EncryptedTransaction, MempoolError> {
-    // Generate ephemeral keypair
-    let ephemeral_sk = generate_ephemeral_key();
-    let ephemeral_pk = derive_public_key(&ephemeral_sk);
+    let group_key = decompress_point(committee_group_key)?;
 
-    // ECDH: shared_secret = ephemeral_sk * committee_pk
-    let shared_secret = ecdh(&ephemeral_sk, committee_pk);
+    // Ephemeral Ristretto keypair; the ECDH shared point is
+    // ephemeral_scalar * group_key = ephemeral_scalar * (committee_secret * G).
+    let ephemeral_scalar = Scalar::random(&mut OsRng);
+    let ephemeral_pk = (ephemeral_scalar * RISTRETTO_BASEPOINT_POINT)
+        .compress()
+        .to_bytes();
+    let shared_point = (ephemeral_scalar * group_key).compress().to_bytes();
 
-    // KDF: derive AES key
-    let aes_key = hkdf_derive(&shared_secret)?;
-
-    // Generate nonce
+    let aes_key = hkdf_derive(&shared_point)?;
     let nonce = generate_nonce();
-
-    // AES-256-GCM encrypt
     let ciphertext = aes_gcm_encrypt(plaintext, &aes_key, &nonce)?;
-
-    // Compute TX ID as hash of ciphertext
     let id = blake3_hash(&ciphertext);
 
     let submitted_at = std::time::SystemTime::now()
@@ -61,11 +64,40 @@ pub fn encrypt_for_committee(
     })
 }
 
-/// Combine decryption shares to reconstruct the shared secret.
+/// Compute one validator's partial decryption of `tx`, from that
+/// validator's own [`SecretShare`] of the committee secret. No single
+/// validator's `share` reveals the shared secret; see [`combine_shares`].
+///
+/// # Invariant: PRIV-EXEC-003
+pub fn compute_decryption_share(
+    share: &SecretShare,
+    ephemeral_pk: &[u8; 32],
+) -> Result<DecryptionShare, MempoolError> {
+    let ephemeral_point = decompress_point(ephemeral_pk)?;
+    let partial = (share.scalar * ephemeral_point).compress().to_bytes();
+    Ok(DecryptionShare {
+        validator_index: share.index,
+        share: partial.to_vec(),
+        // DLEQ proof that this partial was computed honestly from the
+        // validator's committed share is not implemented — see
+        // https://github.com/x3-chain/x3-chain/issues (filed alongside this
+        // fix) for the confidential-gpu DKG this depends on. A malicious
+        // validator can currently submit a bogus partial and the caller
+        // only finds out because the resulting AES-GCM tag fails to verify.
+        proof: Vec::new(),
+    })
+}
+
+/// Combine `threshold`-or-more decryption shares into the shared ECDH
+/// point, via real Lagrange interpolation in the exponent — not by XORing
+/// bytes. Any `threshold`-sized subset of honest shares produces the same
+/// result; fewer than `threshold` produces an unrelated point, so
+/// [`decrypt_transaction`] fails closed (AES-GCM tag mismatch) rather than
+/// silently returning garbage.
 ///
 /// # Invariant: PRIV-EXEC-003
 pub fn combine_shares(
-    shares: &[crate::DecryptionShare],
+    shares: &[DecryptionShare],
     threshold: u32,
 ) -> Result<[u8; 32], MempoolError> {
     if (shares.len() as u32) < threshold {
@@ -76,16 +108,12 @@ pub fn combine_shares(
         )));
     }
 
-    // Lagrange interpolation of decryption shares.
-    // Simplified: in production this uses proper Shamir reconstruction on curve points.
-    let mut combined = [0u8; 32];
-    for share in shares.iter() {
-        for (dst, src) in combined.iter_mut().zip(share.share.iter()) {
-            *dst ^= *src;
-        }
+    let mut points = Vec::with_capacity(shares.len());
+    for share in shares {
+        points.push((share.validator_index, decompress_point_slice(&share.share)?));
     }
 
-    Ok(combined)
+    Ok(threshold::combine_points(&points).compress().to_bytes())
 }
 
 /// Decrypt a transaction using the reconstructed shared secret.
@@ -97,6 +125,19 @@ pub fn decrypt_transaction(
     aes_gcm_decrypt(&tx.ciphertext, &aes_key, &tx.nonce).map_err(MempoolError::EncryptionError)
 }
 
+fn decompress_point(bytes: &[u8; 32]) -> Result<RistrettoPoint, MempoolError> {
+    CompressedRistretto(*bytes)
+        .decompress()
+        .ok_or_else(|| MempoolError::EncryptionError("invalid Ristretto point".to_string()))
+}
+
+fn decompress_point_slice(bytes: &[u8]) -> Result<RistrettoPoint, MempoolError> {
+    let array: [u8; 32] = bytes.try_into().map_err(|_| {
+        MempoolError::EncryptionError("decryption share is not 32 bytes".to_string())
+    })?;
+    decompress_point(&array)
+}
+
 // ──────────────────────────────────────────────────────────────
 // Cryptographic primitives (real implementation)
 // ──────────────────────────────────────────────────────────────
@@ -105,30 +146,13 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use curve25519_dalek::scalar::Scalar;
 use hkdf::Hkdf;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use sha2::Sha256;
-use x25519_dalek::{PublicKey, StaticSecret};
-
-fn generate_ephemeral_key() -> [u8; 32] {
-    let mut key = [0u8; 32];
-    OsRng.fill_bytes(&mut key);
-    key
-}
-
-fn derive_public_key(sk: &[u8; 32]) -> [u8; 32] {
-    let secret = StaticSecret::from(*sk);
-    let public = PublicKey::from(&secret);
-    *public.as_bytes()
-}
-
-fn ecdh(sk: &[u8; 32], pk: &[u8; 32]) -> [u8; 32] {
-    let secret = StaticSecret::from(*sk);
-    let public = PublicKey::from(*pk);
-    let shared = secret.diffie_hellman(&public);
-    *shared.as_bytes()
-}
 
 fn hkdf_derive(ikm: &[u8; 32]) -> Result<[u8; 32], MempoolError> {
     let hk = Hkdf::<Sha256>::new(Some(ikm), &[]);
@@ -175,56 +199,74 @@ fn blake3_hash(data: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::threshold::{group_public_key, split_secret};
 
     #[test]
-    fn encrypt_decrypt_roundtrip() {
+    fn encrypt_decrypt_roundtrip_with_a_real_threshold_committee() {
         let plaintext = b"Hello, private world!";
 
-        // Committee keypair for this test (in production, generated via DKG)
-        let committee_sk = generate_ephemeral_key();
-        let committee_pk = derive_public_key(&committee_sk);
+        // A real DKG (elsewhere) would hand each validator one of these
+        // shares and publish only the group key; nothing here ever holds
+        // `committee_secret` except this line simulating that ceremony.
+        let committee_secret = Scalar::random(&mut OsRng);
+        let committee_group_key = group_public_key(&committee_secret);
+        let shares = split_secret(committee_secret, 3, 5);
 
         let sender_pk = [0xAA; 32];
         let fee_commitment = [0xBB; 32];
 
-        let tx = encrypt_for_committee(plaintext, &committee_pk, &sender_pk, &fee_commitment, 1)
-            .unwrap();
+        let tx = encrypt_for_committee(
+            plaintext,
+            &committee_group_key,
+            &sender_pk,
+            &fee_commitment,
+            1,
+        )
+        .unwrap();
 
-        // In realistic decryption, validators reconstruct shared secret from
-        // committee secret key and ephemeral public key.
-        let shared_secret = ecdh(&committee_sk, &tx.ephemeral_pk);
+        // Any 3 of the 5 validators — not a fixed subset — reconstruct the
+        // same shared secret.
+        let partials: Vec<DecryptionShare> = [shares[1], shares[2], shares[4]]
+            .iter()
+            .map(|s| compute_decryption_share(s, &tx.ephemeral_pk).unwrap())
+            .collect();
 
+        let shared_secret = combine_shares(&partials, 3).unwrap();
         let decrypted = decrypt_transaction(&tx, &shared_secret).unwrap();
-
-        // Verify roundtrip works with real AES-GCM
         assert_eq!(&decrypted, plaintext);
     }
 
-    /// # Invariant: PRIV-EXEC-003
     #[test]
-    fn combine_shares_requires_threshold() {
+    fn below_threshold_shares_fail_to_decrypt() {
+        let plaintext = b"top secret trade";
+        let committee_secret = Scalar::random(&mut OsRng);
+        let committee_group_key = group_public_key(&committee_secret);
+        let shares = split_secret(committee_secret, 3, 5);
+
+        let tx =
+            encrypt_for_committee(plaintext, &committee_group_key, &[0; 32], &[0; 32], 1).unwrap();
+
+        // Only 2 of the required 3 shares.
+        let partials: Vec<DecryptionShare> = [shares[0], shares[1]]
+            .iter()
+            .map(|s| compute_decryption_share(s, &tx.ephemeral_pk).unwrap())
+            .collect();
+
+        // combine_shares' own length check is bypassed by lying about the
+        // threshold, to prove the *cryptographic* guarantee also holds: an
+        // under-threshold combination is not just rejected by a length
+        // check, it actually reconstructs the wrong point.
+        let wrong_secret = combine_shares(&partials, 2).unwrap();
+        let result = decrypt_transaction(&tx, &wrong_secret);
+        assert!(
+            result.is_err(),
+            "AES-GCM must reject a reconstructed-from-too-few-shares key"
+        );
+    }
+
+    #[test]
+    fn combine_shares_enforces_the_stated_threshold() {
         let result = combine_shares(&[], 3);
         assert!(result.is_err());
-
-        let shares = vec![
-            crate::DecryptionShare {
-                validator_index: 0,
-                share: vec![0x01; 32],
-                proof: vec![],
-            },
-            crate::DecryptionShare {
-                validator_index: 1,
-                share: vec![0x02; 32],
-                proof: vec![],
-            },
-            crate::DecryptionShare {
-                validator_index: 2,
-                share: vec![0x03; 32],
-                proof: vec![],
-            },
-        ];
-
-        let result = combine_shares(&shares, 3);
-        assert!(result.is_ok());
     }
 }
