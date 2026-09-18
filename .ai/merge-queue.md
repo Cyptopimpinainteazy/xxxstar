@@ -3,14 +3,27 @@
 **Question this answers:** of the ~191 branches on `origin`, which ones still hold
 work that is not on `master`, and in what order should they land?
 
-**How the buckets were computed** (all three are needed; each one alone lies):
+**How the buckets were computed** (all four are needed; each one alone lies):
+
+Commands below use `origin/<b>` throughout — these are remote branch names, and
+`<b>` alone only resolves if a same-named local branch happens to exist (true in
+the working tree this census was run from, not guaranteed in a fresh clone).
+Run `git fetch origin` first.
 
 | Signal | Command | What it proves |
 | --- | --- | --- |
-| In master | `git merge-base --is-ancestor <b> origin/master` | the tip is literally in master's history |
-| Nothing to land | `git cherry origin/master <b>` → every commit prefixed `-` | each commit's *patch* is already in master (covers squash/cherry-pick/rebase landings). Merging such a branch is **not** a no-op — its tree can be *older* than master's, so it reverts work |
-| Content delta | `git diff --shortstat origin/master...<b>` | how much content the branch still adds |
-| Real merge | `git merge --no-commit --no-ff <b>` in a scratch worktree | which files actually conflict |
+| In master | `git merge-base --is-ancestor origin/<b> origin/master` | the tip is literally in master's history |
+| Nothing to land | `git cherry origin/master origin/<b>` → every commit prefixed `-` | each commit's *patch* is already in master (covers squash/cherry-pick/rebase landings). Merging such a branch is **not** a no-op — its tree can be *older* than master's, so it reverts work |
+| Content delta | `git diff --shortstat origin/master...origin/<b>` | how much content the branch still adds |
+| Real merge | `git merge --no-commit --no-ff origin/<b>` in a scratch worktree | which files actually conflict |
+
+**Precondition:** all of this assumes a full-history clone. In a shallow clone,
+`git merge-base` returns empty when the shared history simply wasn't fetched,
+not only when history is genuinely unrelated — the same empty result this
+census reads as "archival, safe to delete" (see the 12-branch bucket below).
+Run `git fetch --unshallow` (or check `git rev-parse --is-shallow-repository`
+is `false`) before trusting an empty merge-base enough to delete a branch on
+its strength.
 
 ## Census
 
@@ -42,6 +55,11 @@ work that is not on `master`, and in what order should they land?
 `pending` = commits whose patch is not in master (`git cherry` `+`).
 `conflict` = files that conflict in a real merge against current `master`.
 
+The table below lists 34 rows for context, not 28: 3 are marked "landed in
+batch 6" (already merged since this census was taken) and 3 are marked "no
+merge base" (they belong to the 12-branch archival bucket above, not this
+queue). 34 − 3 − 3 = 28, the branches that actually still need a disposition.
+
 | Branch | pending | conflict files | disposition |
 | --- | --- | --- | --- |
 | `agents/setup-instructions-request` | 1 | — (clean) | landed in batch 6 |
@@ -49,7 +67,7 @@ work that is not on `master`, and in what order should they land?
 | `test/cross-domain-recovery-matrix-20260911` | 10 | `.github/workflows/mainnet-readiness.yml` | landed in batch 6, workflow hunk resolved in master's favour |
 | `fix/svm-htlc-native-custody` | 33 | 169 files | same work as the `-master` branch plus a much older base; salvage the SVM custody commits onto master rather than merging |
 | `fix/production-gate-prerequisites` | 32 | 163 files | predates the local-CI-of-record work; most of it is superseded — diff the 33 commits against `scripts/local-ci.sh` before merging |
-| `wip/prompts-to-skills-20260918`, `wip/consolidation-20260917/pasted-text-processing`, `agents/pasted-text-processing`, `pr132-work` | 33–34 each | 86–90 files | one work item mirrored on four branches (115 conflicts each on current master) — pick the newest, rebase, land once |
+| `wip/prompts-to-skills-20260918`, `wip/consolidation-20260917/pasted-text-processing`, `agents/pasted-text-processing`, `pr132-work` | 33–34 each | 86–90 files | one work item mirrored on four branches — pick the newest, rebase, land once |
 | `ci/master-lineage-gates-20260908` | 31 | 47 files | superseded by the local CI of record |
 | `docs/grant-readiness-truth-20260908` | 31 | no merge base | archival; lift the document if it is still wanted |
 | `wip/consolidation-20260917/recovered-usb-clone` | 149 | no merge base | salvage review only |
