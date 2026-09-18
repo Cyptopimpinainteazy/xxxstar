@@ -8993,7 +8993,7 @@ version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9eda9dcf4f2a99787827661f312ac3219292549c2ee992bf9a6248ffb066bf7"
 dependencies = [
- "nalgebra",
+ "nalgebra 0.33.3",
 ]
 
 [[package]]
@@ -9856,6 +9856,23 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
+version = "0.32.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5c17de023a86f59ed79891b2e5d5a94c705dbe904a5b5c9c952ea6221b03e4"
+dependencies = [
+ "approx",
+ "matrixmultiply",
+ "nalgebra-macros",
+ "num-complex 0.4.6",
+ "num-rational 0.4.2",
+ "num-traits",
+ "serde",
+ "simba 0.8.1",
+ "typenum",
+]
+
+[[package]]
+name = "nalgebra"
 version = "0.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d43ddcacf343185dfd6de2ee786d9e8b1c2301622afab66b6c73baf9882abfd"
@@ -9865,8 +9882,19 @@ dependencies = [
  "num-complex 0.4.6",
  "num-rational 0.4.2",
  "num-traits",
- "simba",
+ "simba 0.9.1",
  "typenum",
+]
+
+[[package]]
+name = "nalgebra-macros"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "254a5372af8fc138e36684761d3c0cdb758a4410e938babcff1c860ce14ddbfc"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -9899,6 +9927,20 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
+]
+
+[[package]]
+name = "ndarray"
+version = "0.15.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adb12d4e967ec485a5f71c6311fe28158e9d6f4bc4a447b474184d0f91a8fa32"
+dependencies = [
+ "matrixmultiply",
+ "num-complex 0.4.6",
+ "num-integer",
+ "num-traits",
+ "rawpointer",
+ "serde",
 ]
 
 [[package]]
@@ -10172,6 +10214,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
 dependencies = [
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -13124,6 +13167,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "private-mempool"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "blake3",
+ "chrono",
+ "ed25519-dalek 2.2.0",
+ "hkdf",
+ "parking_lot 0.12.5",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "uuid",
+ "x25519-dalek 2.0.1",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13619,6 +13688,36 @@ dependencies = [
  "thiserror 1.0.69",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "quantum-swarm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "approx",
+ "async-trait",
+ "blake3",
+ "chrono",
+ "criterion",
+ "futures 0.3.34",
+ "nalgebra 0.32.6",
+ "ndarray",
+ "num-complex 0.4.6",
+ "petgraph 0.6.5",
+ "proptest",
+ "rand 0.8.8",
+ "rand_chacha 0.3.1",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "tracing-subscriber 0.3.23",
+ "uuid",
 ]
 
 [[package]]
@@ -16539,6 +16638,19 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "simba"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "061507c94fc6ab4ba1c9a0305018408e312e17c041eb63bef8aa726fa33aceae"
+dependencies = [
+ "approx",
+ "num-complex 0.4.6",
+ "num-traits",
+ "paste",
+ "wide",
 ]
 
 [[package]]
@@ -22139,7 +22251,9 @@ checksum = "8f72a05e828585856dacd553fba484c242c46e391fb0e58917c942ee9202915c"
 dependencies = [
  "futures-util",
  "log",
+ "native-tls",
  "tokio",
+ "tokio-native-tls",
  "tungstenite 0.29.0",
 ]
 
@@ -22725,6 +22839,7 @@ dependencies = [
  "http 1.5.0",
  "httparse",
  "log",
+ "native-tls",
  "rand 0.9.5",
  "sha1 0.10.7",
  "thiserror 2.0.20",
@@ -24941,6 +25056,36 @@ name = "x3-circuit-breaker"
 version = "0.1.0"
 
 [[package]]
+name = "x3-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "colored",
+ "dirs",
+ "futures 0.3.34",
+ "glob",
+ "handlebars 5.1.2",
+ "hex",
+ "indicatif 0.17.11",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+ "tracing-subscriber 0.3.23",
+ "walkdir",
+ "x3-compiler",
+ "x3-opt",
+ "x3-orchestrator",
+ "x3-parser",
+ "x3-sdk",
+ "x3-vm",
+]
+
+[[package]]
 name = "x3-common"
 version = "0.1.0"
 dependencies = [
@@ -24974,6 +25119,18 @@ dependencies = [
  "x3-parser",
  "x3-typeck",
  "x3-verifier",
+]
+
+[[package]]
+name = "x3-constitution"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "x3-proof",
 ]
 
 [[package]]
@@ -25493,6 +25650,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "x3-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "x3-packet-schema"
 version = "0.1.0"
 dependencies = [
@@ -25667,6 +25836,29 @@ dependencies = [
  "x3-chain-runtime",
  "x3-metrics-tracker",
  "x3-staking-analytics",
+]
+
+[[package]]
+name = "x3-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake2 0.10.6",
+ "futures 0.3.34",
+ "hex",
+ "parity-scale-codec",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sp-core 39.0.0",
+ "sp-runtime 45.0.0",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tokio-tungstenite 0.29.0",
+ "tracing",
+ "url 2.5.8",
+ "x3-packet-schema",
 ]
 
 [[package]]

@@ -209,6 +209,12 @@ members = [
     # the workspace pulled them in either — their tests never ran anywhere.
     "crates/external-chains",
     "crates/cross-chain-position-manager",
+    # Burn-down batch 1 (issue #274): crates that were in neither `members` nor
+    # `exclude`, so nothing compiled or tested them.
+    "crates/quantum-swarm",
+    "crates/x3-constitution",
+    "crates/private-mempool",
+    "crates/x3-cli",
 ]
 default-members = ["node"]
 resolver = "2"

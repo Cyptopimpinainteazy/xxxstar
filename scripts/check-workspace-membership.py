@@ -21,7 +21,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
+import subprocess
 import sys
 import tomllib
 
@@ -36,6 +38,40 @@ def workspace_lists() -> tuple[set[str], set[str]]:
     members = {entry.rstrip("/") for entry in workspace.get("members", [])}
     exclude = {entry.rstrip("/") for entry in workspace.get("exclude", [])}
     return members, exclude
+
+
+def actual_members() -> set[str]:
+    """Workspace members as cargo sees them, including path-dependency members.
+
+    A crate that is a path dependency of a member is a member itself even though
+    it never appears in `workspace.members`. That is how `x3-evolution` and
+    `custody-service` joined during the 2026-09-18 burn-down, and reading only
+    the manifest arrays would have missed it.
+    """
+    try:
+        result = subprocess.run(
+            ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    if result.returncode != 0:
+        return set()
+    try:
+        doc = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return set()
+    paths: set[str] = set()
+    for package in doc.get("packages", []):
+        manifest = pathlib.Path(package["manifest_path"]).parent
+        try:
+            paths.add(manifest.relative_to(ROOT).as_posix())
+        except ValueError:
+            continue
+    return paths
 
 
 def candidate_manifests() -> list[pathlib.Path]:
@@ -86,7 +122,13 @@ def main() -> int:
     parser.add_argument("--update", action="store_true", help="rewrite the baseline")
     args = parser.parse_args()
 
-    members, exclude = workspace_lists()
+    listed_members, exclude = workspace_lists()
+    resolved_members = actual_members()
+    if resolved_members:
+        members = resolved_members
+    else:
+        print("workspace membership check: cargo metadata unavailable; using the members array")
+        members = listed_members
     in_limbo: dict[str, str] = {}
     for manifest in candidate_manifests():
         try:
