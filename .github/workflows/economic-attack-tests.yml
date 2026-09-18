@@ -1,28 +1,8 @@
 name: Economic Attack Gate
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - 'proof-forge/**'
-      - 'pallets/x3-dex/**'
-      - 'pallets/x3-settlement-engine/**'
-      - 'pallets/x3-atomic-kernel/**'
-      - 'runtime/**'
-      - 'economics/**'
-  push:
-    branches: [master, 'release/**']
-    paths:
-      - 'proof-forge/**'
-      - 'pallets/x3-dex/**'
-      - 'pallets/x3-settlement-engine/**'
-      - 'pallets/x3-atomic-kernel/**'
-      - 'runtime/**'
-      - 'economics/**'
-  schedule:
-    - cron: '0 6 * * *'
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -38,7 +18,7 @@ concurrency:
 jobs:
   economic-gate:
     name: Economic Attack Gate (S0)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

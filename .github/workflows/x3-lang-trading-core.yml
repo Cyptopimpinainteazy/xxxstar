@@ -1,28 +1,15 @@
 name: X3 Lang Trading Core
 
 on:
-  pull_request:
-    branches:
-      - master
-      - codex/x3-trading-core-v1-hardening
-    paths:
-      - "x3-lang/**"
-      - ".github/workflows/x3-lang-trading-core.yml"
-  push:
-    branches:
-      - master
-      - codex/x3-trading-core-v1-hardening
-    paths:
-      - "x3-lang/**"
-      - ".github/workflows/x3-lang-trading-core.yml"
-
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
+  workflow_dispatch:
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   x3-lang-trading-core:
     name: x3-lang trading core gate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 45
     steps:
       - name: Checkout

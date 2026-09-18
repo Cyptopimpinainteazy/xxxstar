@@ -1,13 +1,11 @@
 name: Security Dashboard
 
 on:
-  schedule:
-    - cron: '0 11 * * 1'  # Weekly on Monday at 11 AM UTC
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
   workflow_dispatch:
-
 jobs:
   security-scan:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - uses: actions/checkout@v4
 

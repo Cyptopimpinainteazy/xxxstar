@@ -1,15 +1,11 @@
 name: valkey-coordinator
 
 on:
-  pull_request:
-    paths:
-      - "crates/cross-vm-coordinator/**"
-      - ".github/workflows/valkey-coordinator.yml"
+  # Automatic GitHub Actions are disabled; local pre-push CI is the gate of record.
   workflow_dispatch:
-
 jobs:
   live-valkey:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     services:
       valkey:
         image: valkey/valkey:8.1.10-alpine

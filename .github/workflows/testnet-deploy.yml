@@ -36,7 +36,7 @@ env:
 jobs:
   # ── Gate 1: Build + Test ──────────────────────────────────────────────────
   substrate-build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -54,7 +54,7 @@ jobs:
           path: target/release/x3-chain-node
 
   foundry-gateway:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     defaults:
       run:
         working-directory: X3-contracts/evm
@@ -71,7 +71,7 @@ jobs:
 
   # ── Gate 2: Chain spec generation + dev-key scan ─────────────────────────
   spec-generation:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: [substrate-build]
     steps:
       - uses: actions/checkout@v4
@@ -114,7 +114,7 @@ jobs:
 
   # ── Gate 3: Readiness report regeneration ────────────────────────────────
   readiness-check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: [substrate-build]
     steps:
       - uses: actions/checkout@v4
@@ -136,7 +136,7 @@ jobs:
 
   # ── Gate 4: Deploy to staging (protected environment) ────────────────────
   deploy-staging:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: [substrate-build, foundry-gateway, spec-generation, readiness-check]
     environment:
       name: testnet
@@ -168,7 +168,7 @@ jobs:
 
   # ── Gate 5a: Deploy EVM Verifier (bridge-enabled only) ───────────────────
   deploy-evm-verifier:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: [deploy-staging]
     if: ${{ github.event.inputs.deploy_bridge == 'true' }}
     environment:
@@ -212,7 +212,7 @@ jobs:
 
   # ── Gate 5b: EVM Gateway Deploy (bridge-enabled only, after verifier) ────
   deploy-evm-contracts:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: [deploy-staging, deploy-evm-verifier]
     if: ${{ github.event.inputs.deploy_bridge == 'true' }}
     environment:

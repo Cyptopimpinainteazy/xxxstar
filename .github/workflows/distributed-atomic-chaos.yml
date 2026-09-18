@@ -1,15 +1,11 @@
 name: distributed-atomic-chaos
 
 on:
-  pull_request:
-    paths:
-      - "crates/cross-vm-coordinator/**"
-      - ".github/workflows/distributed-atomic-chaos.yml"
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 jobs:
   chaos:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 30
 
     services:

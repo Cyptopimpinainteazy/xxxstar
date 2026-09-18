@@ -176,51 +176,29 @@ the run and the summary prints `SKIPPED BY REQUEST: <slug>`. Do not reach for
 
 ## Workflow wiring reality
 
-`scripts/check_ci_workflow_refs.py` is a gate, not a report: it fails when a
-workflow invokes a script, in-repo action or make target that is not in the
-tree, and when a self-hosted workflow is wired to a branch that never fires.
-`--parity` prints the full picture, which as of this writing is:
+GitHub Actions is now deliberately a **manual orchestration layer**. Automatic
+hosted `pull_request` / `push` CI was removed because those jobs terminate
+before running a step on this account and therefore prove nothing.
 
-* 42 workflows parsed;
-* 11 run on self-hosted runners and can execute here;
-* 30 are hosted-only and cannot produce a verdict on this account;
-* every workflow reference resolves, and every workflow trigger can fire.
+The local verification path is:
 
-That asymmetry is the reason this file exists: a green hosted check means
-nothing, and the only trustworthy signal is a gate that ran on this machine.
+1. `.githooks/pre-push`;
+2. `scripts/local-ci.sh --pre-push`;
+3. the self-hosted `x3` runners for explicitly dispatched heavy/release/live jobs.
 
-### Workflows that auto-run but cannot execute
+Linux workflows that are useful on demand target
+`[self-hosted, Linux, X64, x3]`. Cross-platform workflows that genuinely need
+GitHub/macOS runners (for example desktop packaging / CodeQL matrices) remain
+manual fallbacks and never auto-run.
 
-`scripts/check_ci_workflow_refs.py --parity` also exposes the sharper version of
-the problem: workflows that still fire on `push`/`pull_request` while requesting
-only GitHub-hosted runners. Each of those produces a step-less failure
-(`runner_name: ""`, `"steps": []`, ~2s) on every push, which is how `master` ends
-up looking permanently red and why a real failure is easy to miss.
+True duplicates of the local gate suite and the temporary queue-drain workflow
+were removed. Specialized security, release, deployment, benchmark, formal,
+GPU, and live-chain workflows remain available by manual dispatch.
 
-The five workflows on the merge/release path were fixed by removing the triggers
-that cannot run (not by moving untrusted PR code onto the runner — see the
-security note in `rust-clippy.yml`):
+### Security rule for self-hosted runners
 
-| workflow | now triggers on |
-| --- | --- |
-| `rust-clippy.yml` | `push`, `workflow_dispatch` |
-| `production-gate.yml` | `push`, `workflow_dispatch` |
-| `x3vm-live-lifecycle.yml` | `workflow_call`, `workflow_dispatch` |
-| `x3vm-evm-live-lifecycle.yml` | `workflow_call`, `workflow_dispatch` |
-| `x3vm-svm-live-lifecycle.yml` | `workflow_call`, `workflow_dispatch` |
+Do not add an automatic `pull_request` trigger to a workflow that executes on
+a self-hosted runner. A public PR can modify scripts and project code; executing
+untrusted PR code on infrastructure that holds caches, credentials, validator
+state, or network access is not an acceptable trade for a green check.
 
-26 other workflows still auto-run on hosted-only runners (the security scanners
-`semgrep`, `trivy`, `osv-scan`, `codeql`; `formal-verification`,
-`economic-attack-tests`, `proof-gates`, `release-hardening`,
-`frame-benchmarking`, `zombienet-integration`, `x3-desktop-ci`, the
-transparency/dashboard deploys, and others). They cannot be silently deleted -
-they are security and release tooling - so they need one of three decisions:
-
-1. route them to the self-hosted runner where the tooling exists (adds load and
-   requires the tool to be installed on the runner);
-2. make them `workflow_dispatch`-only with a comment, so they stay runnable the
-   moment hosted minutes exist again without polluting every push;
-3. delete the ones that duplicate a gate the local CI already runs.
-
-Until one of those is chosen, treat any red check from those workflows as
-"could not run", not "failed".

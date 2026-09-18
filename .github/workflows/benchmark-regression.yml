@@ -1,36 +1,8 @@
 name: X3 Benchmark Regression Gate
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - 'benches/**'
-      - 'crates/x3-atomic-swap/**'
-      - 'crates/x3-dex/**'
-      - 'crates/x3-bridge-adapters/**'
-      - 'crates/x3-vm/**'
-      - 'crates/x3-rpc/**'
-      - 'pallets/**/src/**'
-      - 'runtime/src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-  push:
-    branches: [master, 'release/**']
-    paths:
-      - 'benches/**'
-      - 'crates/x3-atomic-swap/**'
-      - 'crates/x3-dex/**'
-      - 'crates/x3-bridge-adapters/**'
-      - 'crates/x3-vm/**'
-      - 'crates/x3-rpc/**'
-      - 'pallets/**/src/**'
-      - 'runtime/src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-  schedule:
-    - cron: '0 4 * * *'
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 permissions:
   contents: read
   checks: write
@@ -47,7 +19,7 @@ concurrency:
 jobs:
   criterion-benchmarks:
     name: Criterion Microbenchmarks
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +97,7 @@ jobs:
 
   pallet-weight-check:
     name: Pallet Weight Consistency Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4

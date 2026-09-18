@@ -1,19 +1,11 @@
 name: markdown-autodocs
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "FEATURE_REGISTRY.toml"
-      - "TESTNET_FEATURE_FLAGS.toml"
-      - "apps/dex/package.json"
-      - "**.md"
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 jobs:
   markdown-autodocs:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     permissions:
       contents: write
     steps:

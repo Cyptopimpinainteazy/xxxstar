@@ -1,20 +1,8 @@
 name: Deploy Dashboard to GitHub Pages
 
 on:
-  # Trigger on completion of proof-gates workflow
-  workflow_run:
-    workflows: ["ProofForge Gates - Automated Proof Verification"]
-    types: [completed]
-  
-  # Manual trigger
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-  
-  # Also trigger on push to main
-  push:
-    branches:
-      - main
-      - sprint-0/foundation/kernel-audit
-
 permissions:
   contents: read
   pages: write
@@ -26,7 +14,7 @@ concurrency:
 
 jobs:
   generate-dashboard:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     
     steps:
       - name: 📦 Checkout code
@@ -75,7 +63,7 @@ jobs:
           echo "Auto-refresh available in: ${{ steps.deployment.outputs.page_url }}/index.html"
 
   notify-deployment:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     needs: generate-dashboard
     if: always()
     

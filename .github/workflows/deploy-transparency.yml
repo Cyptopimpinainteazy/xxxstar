@@ -1,15 +1,8 @@
 name: Deploy Transparency Portal
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - apps/x3-transparency/**
-      - scripts/transparency/**
-      - audit-artifacts/mainnet-readiness/live/**
-      - .github/workflows/deploy-transparency.yml
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
@@ -24,7 +17,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}/transparency/
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

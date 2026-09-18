@@ -11,12 +11,8 @@
 name: release-hardening
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
@@ -33,7 +29,7 @@ jobs:
   # ── CodeQL — semantic analysis for Rust, JavaScript, Python ──────────────
   codeql:
     name: CodeQL analysis
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 60
     permissions:
       actions: read
@@ -71,7 +67,7 @@ jobs:
   # ── Semgrep — fast PR guardrails for Rust/TS/Python/Shell ────────────────
   semgrep:
     name: Semgrep SAST
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 15
     container:
       image: semgrep/semgrep:latest
@@ -129,7 +125,7 @@ jobs:
   # ── SBOM + attestation hardening (complements release-provenance.yml) ──
   sbom-hardening:
     name: SBOM generation + supply-chain attestation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 30
     permissions:
       contents: read

@@ -3,8 +3,16 @@ updates:
   - package-ecosystem: cargo
     directory: "/"
     schedule:
-      interval: daily
-    open-pull-requests-limit: 20
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      cargo-nonmajor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
       - security
@@ -12,8 +20,16 @@ updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
-      interval: daily
-    open-pull-requests-limit: 20
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-nonmajor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
       - security
@@ -21,8 +37,16 @@ updates:
   - package-ecosystem: pip
     directory: "/"
     schedule:
-      interval: daily
-    open-pull-requests-limit: 10
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      pip-nonmajor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
       - security
@@ -31,7 +55,15 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions-nonmajor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
       - security

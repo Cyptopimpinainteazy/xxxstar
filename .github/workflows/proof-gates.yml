@@ -1,47 +1,8 @@
 name: ProofForge Gates - Automated Proof Verification
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - 'proof-forge/**'
-      - 'formal-proofs/**'
-      - 'scripts/proof/**'
-      - 'launch-gates/**'
-      - 'pallets/x3-atomic-kernel/**'
-      - 'pallets/x3-cross-vm-router/**'
-      - 'pallets/x3-settlement-engine/**'
-      - 'crates/x3-atomic-swap/**'
-      - 'runtime/**'
-  push:
-    branches: [master, 'release/**']
-    paths:
-      - 'proof-forge/**'
-      - 'formal-proofs/**'
-      - 'scripts/proof/**'
-      - 'launch-gates/**'
-      - 'pallets/x3-atomic-kernel/**'
-      - 'pallets/x3-cross-vm-router/**'
-      - 'pallets/x3-settlement-engine/**'
-      - 'crates/x3-atomic-swap/**'
-      - 'runtime/**'
-  schedule:
-    - cron: '0 2 * * *'
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-    inputs:
-      gate_type:
-        description: 'Gate to run: pre-commit, s0, s1, testnet, mainnet, all'
-        type: choice
-        options:
-          - all
-          - pre-commit
-          - s0
-          - s1
-          - testnet
-          - mainnet
-        required: true
-        default: 'all'
-
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -57,7 +18,7 @@ concurrency:
 jobs:
   pre-commit-gate:
     name: Pre-Commit Gate - Claim Scanning
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 45
     if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'pre-commit' || github.event.inputs.gate_type == 's0' || github.event.inputs.gate_type == 's1')
     steps:
@@ -149,7 +110,7 @@ jobs:
 
   s0-security-gate:
     name: S0 Security Gate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 45
     permissions:
       contents: read
@@ -194,7 +155,7 @@ jobs:
 
   s1-security-gate:
     name: S1 Security Gate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 25
     if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 's1')
     needs: pre-commit-gate
@@ -231,7 +192,7 @@ jobs:
 
   testnet-gate:
     name: Testnet Readiness Gate (≥0.85)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 20
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'testnet'
     steps:
@@ -267,7 +228,7 @@ jobs:
 
   mainnet-gate:
     name: Mainnet Readiness Gate (≥0.95)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 25
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.gate_type == 'all' || github.event.inputs.gate_type == 'mainnet'))
     steps:
@@ -327,7 +288,7 @@ jobs:
 
   daily-proof-run:
     name: Daily Proof Verification Run
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 30
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.gate_type == 'all')
     steps:
@@ -368,7 +329,7 @@ jobs:
 
   publish-dashboard:
     name: Publish Dashboard to GitHub Pages
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 20
     if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'push')
     needs: [pre-commit-gate, s0-security-gate, s1-security-gate, testnet-gate]
@@ -479,7 +440,7 @@ jobs:
 
   workflow-summary:
     name: Workflow Summary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 10
     if: always()
     needs: [pre-commit-gate, s0-security-gate, s1-security-gate, testnet-gate]

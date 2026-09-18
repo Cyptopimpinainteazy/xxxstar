@@ -12,28 +12,8 @@
 name: x3 frame-benchmarking
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - "pallets/**"
-      - "runtime/**"
-      - "node/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "patches/**"
-  push:
-    branches: [master, 'release/**']
-    paths:
-      - "pallets/**"
-      - "runtime/**"
-      - "node/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "patches/**"
-  schedule:
-    - cron: '30 4 * * *'
+  # GitHub-hosted CI is disabled for this repo; run manually on the local x3 runner.
   workflow_dispatch:
-
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
@@ -50,7 +30,7 @@ concurrency:
 jobs:
   benchmark:
     name: FRAME benchmark + weight regression check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
