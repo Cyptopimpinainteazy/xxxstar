@@ -5,12 +5,10 @@ on:
   # `native-x3vm-live` on every push and gates on it, so a standalone push run
   # executed the same lifecycles a second time on the same runner. `workflow_dispatch`
   # keeps it runnable on demand.
-  pull_request:
-    paths:
-      - "crates/x3-atomic-swap/**"
-      - "node/**"
-      - "pallets/x3-settlement-engine/**"
-      - ".github/workflows/x3vm-live-lifecycle.yml"
+  # No `pull_request` trigger: this workflow requests ubuntu-latest for PR events
+  # and this account's hosted minutes are locked, so a PR run produced a ~2s,
+  # step-less failure. PR callers get the same lifecycles from
+  # `scripts/local-ci.sh --cross` on the author's machine.
   workflow_dispatch:
   workflow_call:
 

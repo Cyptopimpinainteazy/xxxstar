@@ -8,14 +8,10 @@ on:
   # No standalone `push` trigger — `production-gate.yml` calls this as `evm-live`
   # on every push and gates on it, so a push run here duplicated both jobs on the
   # same runner. `workflow_dispatch` keeps it runnable on demand.
-  pull_request:
-    branches: [master, finish/x3vm-live-transport]
-    paths:
-      - "X3-contracts/evm/**"
-      - "crates/x3-atomic-swap/**"
-      - "node/**"
-      - "pallets/x3-settlement-engine/**"
-      - ".github/workflows/x3vm-evm-live-lifecycle.yml"
+  # No `pull_request` trigger: PR events requested ubuntu-latest, and this
+  # account's hosted minutes are locked (step-less ~2s failures). PR-time EVM
+  # lifecycle coverage comes from `scripts/local-ci.sh --live` on the author's
+  # machine, which runs the same X3-contracts/evm/test-live-lifecycle.sh.
   workflow_dispatch:
   workflow_call:
 
