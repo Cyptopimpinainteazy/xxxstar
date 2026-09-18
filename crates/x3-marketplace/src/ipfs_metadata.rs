@@ -2,10 +2,10 @@
 //!
 //! Manages IPFS pinning for plugin metadata and documentation
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::Result;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// IPFS pin record
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,7 +69,7 @@ impl IPFSManager {
         self.pins.insert(key.clone(), pin);
         self.by_plugin
             .entry(plugin_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(key.clone());
 
         Ok(key)
@@ -120,7 +120,11 @@ impl IPFSManager {
 
     /// Get accessible pins
     pub fn accessible_pins(&self) -> Vec<IPFSPin> {
-        self.pins.values().filter(|p| p.accessible).cloned().collect()
+        self.pins
+            .values()
+            .filter(|p| p.accessible)
+            .cloned()
+            .collect()
     }
 
     /// Total pinned size

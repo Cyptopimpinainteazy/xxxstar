@@ -21,10 +21,8 @@ pallet-x3-governance
 swarm-media
 voice-to-x3
 x3-chain-onboarding
-x3-dns-server
 x3-indexer
 x3-lsp
-x3-marketplace
 x3-mobile-sdk
 x3-pq
 x3-sidecar

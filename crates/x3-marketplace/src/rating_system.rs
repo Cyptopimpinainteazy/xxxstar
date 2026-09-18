@@ -2,10 +2,10 @@
 //!
 //! Manages user reviews, ratings, and aggregated scoring for plugins
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::Result;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// User review
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,13 +67,12 @@ impl RatingStats {
         if self.total_reviews == 0 {
             return 0.0;
         }
-        
-        let weighted_sum = 
-            self.rating_distribution[0] as f64 * 1.0 +
-            self.rating_distribution[1] as f64 * 2.0 +
-            self.rating_distribution[2] as f64 * 3.0 +
-            self.rating_distribution[3] as f64 * 4.0 +
-            self.rating_distribution[4] as f64 * 5.0;
+
+        let weighted_sum = self.rating_distribution[0] as f64 * 1.0
+            + self.rating_distribution[1] as f64 * 2.0
+            + self.rating_distribution[2] as f64 * 3.0
+            + self.rating_distribution[3] as f64 * 4.0
+            + self.rating_distribution[4] as f64 * 5.0;
 
         (weighted_sum / (self.total_reviews as f64 * 5.0)) * 100.0
     }
@@ -123,7 +122,7 @@ impl RatingSystem {
         content: String,
         verified_user: bool,
     ) -> Result<String> {
-        if rating < 1 || rating > 5 {
+        if !(1..=5).contains(&rating) {
             return Err(crate::MarketplaceError::InvalidRating(
                 "Rating must be 1-5".to_string(),
             ));
@@ -149,11 +148,11 @@ impl RatingSystem {
         self.reviews.insert(review_id.clone(), review);
         self.by_plugin
             .entry(plugin_id.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(review_id.clone());
         self.by_reviewer
             .entry(reviewer.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(review_id.clone());
 
         Ok(review_id)
@@ -558,7 +557,7 @@ mod tests {
         };
 
         let score = stats.quality_score();
-        assert!(score >= 70.0 && score <= 95.0);
+        assert!((70.0..=95.0).contains(&score));
     }
 
     #[test]

@@ -2,15 +2,15 @@
 //!
 //! Manages publisher revenue, marketplace fees, and payment distribution
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::Result;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Fee split configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeeSplit {
-    pub publisher_percentage: f64, // typically 80%
+    pub publisher_percentage: f64,   // typically 80%
     pub marketplace_percentage: f64, // typically 20%
 }
 
@@ -23,9 +23,9 @@ impl FeeSplit {
     }
 
     pub fn validate(&self) -> bool {
-        (self.publisher_percentage + self.marketplace_percentage - 100.0).abs() < 0.01 &&
-        self.publisher_percentage > 0.0 &&
-        self.marketplace_percentage > 0.0
+        (self.publisher_percentage + self.marketplace_percentage - 100.0).abs() < 0.01
+            && self.publisher_percentage > 0.0
+            && self.marketplace_percentage > 0.0
     }
 }
 
@@ -173,7 +173,10 @@ impl FeeDistribution {
             .insert(distribution_id.clone(), distribution);
 
         // Update balances
-        *self.publisher_balances.entry(publisher.to_string()).or_insert(0) += publisher_share;
+        *self
+            .publisher_balances
+            .entry(publisher.to_string())
+            .or_insert(0) += publisher_share;
         self.marketplace_balance += marketplace_share;
 
         // Record in fee pool
@@ -195,8 +198,7 @@ impl FeeDistribution {
 
     /// Claim earnings for publisher
     pub fn claim_earnings(&mut self, publisher: &str) -> u128 {
-        let amount = self.publisher_balances.remove(publisher).unwrap_or(0);
-        amount
+        self.publisher_balances.remove(publisher).unwrap_or(0)
     }
 
     /// Get payment distribution
@@ -252,11 +254,8 @@ impl FeeDistribution {
     /// Cumulative statistics
     pub fn statistics(&self) -> DistributionStats {
         let total_distributed: u128 = self.distributions.values().map(|d| d.total_amount).sum();
-        let total_publisher_earned: u128 = self
-            .distributions
-            .values()
-            .map(|d| d.publisher_share)
-            .sum();
+        let total_publisher_earned: u128 =
+            self.distributions.values().map(|d| d.publisher_share).sum();
 
         let publishers: std::collections::HashSet<_> =
             self.distributions.values().map(|d| &d.publisher).collect();
