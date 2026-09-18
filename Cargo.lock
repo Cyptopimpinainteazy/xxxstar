@@ -4072,7 +4072,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.5",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -8068,7 +8068,7 @@ dependencies = [
  "quote",
  "regex",
  "syn 2.0.119",
- "toml 0.5.11",
+ "toml 1.1.5+spec-1.1.0",
  "trybuild",
  "walkdir",
 ]
@@ -8921,7 +8921,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml 1.1.5+spec-1.1.0",
  "walkdir",
 ]
 
@@ -25996,7 +25996,7 @@ dependencies = [
  "sp-std",
  "tempfile",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml 1.1.5+spec-1.1.0",
 ]
 
 [[package]]
@@ -26455,7 +26455,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
- "toml 0.8.23",
+ "toml 1.1.5+spec-1.1.0",
  "tracing",
  "tracing-subscriber 0.3.23",
  "walkdir",
@@ -26951,7 +26951,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
- "toml 0.8.23",
+ "toml 1.1.5+spec-1.1.0",
  "tower-http 0.4.4",
  "tracing",
  "tracing-subscriber 0.3.23",
@@ -27241,7 +27241,7 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
- "toml 0.8.23",
+ "toml 1.1.5+spec-1.1.0",
  "ureq",
 ]
 
