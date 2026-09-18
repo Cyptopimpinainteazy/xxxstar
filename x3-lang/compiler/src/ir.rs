@@ -381,6 +381,56 @@ pub enum CostKind {
     MevLeakage,
 }
 
+impl CostKind {
+    /// Every cost kind understood by economic policy version 1, in a fixed
+    /// order so callers can iterate deterministically.
+    pub const ALL: [CostKind; 9] = [
+        CostKind::Gas,
+        CostKind::LiquidityFee,
+        CostKind::FlashLiquidityFee,
+        CostKind::SolverInfrastructureFee,
+        CostKind::ProofFee,
+        CostKind::CrossDomainFee,
+        CostKind::Slippage,
+        CostKind::PriceImpact,
+        CostKind::MevLeakage,
+    ];
+
+    /// Canonical, stable name for this cost kind.
+    ///
+    /// Hosts report committed costs as `CommittedCost { kind: String }`, and
+    /// receipts persist those reports. Before this mapping existed the wire
+    /// string was never compared against anything, so a policy's
+    /// `allowed_cost_kinds` allowlist could not be enforced: any string a
+    /// host sent was accepted, and receipts stored the placeholder
+    /// `"committed"` instead of the real category. This is the single
+    /// source of truth for both directions.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CostKind::Gas => "gas",
+            CostKind::LiquidityFee => "liquidity_fee",
+            CostKind::FlashLiquidityFee => "flash_liquidity_fee",
+            CostKind::SolverInfrastructureFee => "solver_infrastructure_fee",
+            CostKind::ProofFee => "proof_fee",
+            CostKind::CrossDomainFee => "cross_domain_fee",
+            CostKind::Slippage => "slippage",
+            CostKind::PriceImpact => "price_impact",
+            CostKind::MevLeakage => "mev_leakage",
+        }
+    }
+
+    /// Parse a host- or receipt-reported cost kind.
+    ///
+    /// Returns `None` for anything unrecognized. Callers in the execution and
+    /// verification paths must treat `None` as a hard failure rather than a
+    /// default: an unclassifiable cost cannot be checked against a policy
+    /// allowlist, and silently accepting it would let a host bypass the
+    /// allowlist by inventing a category.
+    pub fn from_str(name: &str) -> Option<CostKind> {
+        CostKind::ALL.into_iter().find(|kind| kind.as_str() == name)
+    }
+}
+
 /// Reference to a literal base-unit amount or a prior trading binding.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ValueRef {
@@ -405,10 +455,21 @@ pub struct CompiledTradingPolicy {
     /// Legacy migration field. It must agree with `submission_profile`.
     pub require_private_submission: bool,
     pub minimum_net_profit: Option<u128>,
-    pub max_total_cost: u128,
-    pub max_price_impact_bps: u16,
-    pub max_mev_leakage_bps: u16,
-    pub quote_freshness_blocks: u64,
+    /// Maximum age, in blocks, of the venue quote a swap is allowed to have
+    /// been taken at. `None` means no freshness requirement — the same opt-in
+    /// shape as `max_oracle_deviation_bps`.
+    ///
+    /// Three sibling ceilings were removed here rather than left unenforced:
+    /// `max_total_cost` (a bare amount with no denomination asset, hardcoded to
+    /// `max_gas`, so it duplicated the gas ceiling and could mean nothing
+    /// else), and `max_price_impact_bps` / `max_mev_leakage_bps` (both
+    /// hardcoded to `max_slippage_bps`; the host boundary carries no
+    /// price-impact or MEV-leakage evidence, so enforcing them would have
+    /// required inventing host fields and comparing fabricated numbers). No
+    /// source program could set any of the three, and nothing enforced them —
+    /// they were read only by `EconomicPolicy::validate_not_weaker_than`,
+    /// which compared each one against a copy of itself.
+    pub quote_freshness_blocks: Option<u64>,
     pub submission_profile: SubmissionProfile,
     pub state_binding: StateBindingMode,
     pub allowed_cost_kinds: BTreeSet<CostKind>,

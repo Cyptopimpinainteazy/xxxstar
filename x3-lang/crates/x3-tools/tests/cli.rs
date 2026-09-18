@@ -70,10 +70,7 @@ fn trading_receipt_json(tamper: bool) -> String {
                 deadline_blocks: 10,
                 require_private_submission: false,
                 minimum_net_profit: None,
-                max_total_cost: 1_000_000,
-                max_price_impact_bps: 30,
-                max_mev_leakage_bps: 30,
-                quote_freshness_blocks: 10,
+                quote_freshness_blocks: Some(10),
                 submission_profile: SubmissionProfile::Public,
                 state_binding: StateBindingMode::Exact,
                 allowed_cost_kinds: BTreeSet::from([
@@ -305,6 +302,7 @@ const GOOD_SOURCE: &str = r#"intent arb_solana_eth {
     route {
         swap uniswap ethereum.USDC -> ethereum.ETH amount 1000 min_output 777
     }
+    require slippage <= 50
     timeout 30s refund ethereum.USDC to sender
     on_fail rollback
 }
@@ -767,5 +765,106 @@ fn cli_audit_recognizes_trading_core_v1_declarations() {
     assert!(
         !stdout.contains("no vm declaration found") && !stdout.contains("no solver market found"),
         "must not demand cross-chain bridge infrastructure from a single-chain atomic trade: {stdout}"
+    );
+}
+
+/// A Trading Core v1 program the verifier accepts with **no** warnings: it
+/// declares no intent endpoints and no bridge, so neither the invariant rules
+/// nor the proof-requirement pass has anything to say about it.
+const CLEAN_SOURCE: &str = r#"asset USDC = evm.ethereum.0xA0b8 {
+    decimals: 6
+}
+
+asset WETH = evm.ethereum.0xC02a {
+    decimals: 18
+}
+
+asset ETH = evm.ethereum.0x0000000000000000000000000000000000000000 {
+    decimals: 18
+}
+
+risk policy MainnetArb {
+    max_slippage: 30 bps
+    max_gas: 0.02 ETH
+    max_flash_fee: 10 bps
+    deadline: 2 blocks
+    require_private_submission: false
+}
+
+atomic trade CrossDexArb using MainnetArb {
+    borrow 1_000_000 USDC from aave_v3 as debt
+
+    let weth = swap debt.amount USDC -> WETH
+        via uniswap_v3
+        min_out 410 WETH
+
+    let returned = swap weth WETH -> USDC
+        via sushiswap
+        min_out 1_002_000 USDC
+
+    repay debt
+
+    require net_profit >= 1_000 USDC
+    require all_debts_repaid
+    emit receipt
+}
+"#;
+
+#[test]
+fn cli_check_reports_warnings_instead_of_dropping_them() {
+    // Regression: the verifier collected warnings and `cmd_check` discarded
+    // them, so a program with an unfulfilled proof requirement reported a
+    // clean bill of health. The warning list must now reach the caller.
+    let src = write_fixture("cli_warn.x3", GOOD_SOURCE);
+    let out = std::env::temp_dir().join("cli_warn.json");
+    let status = x3c()
+        .arg("check")
+        .arg(&src)
+        .arg("--out")
+        .arg(&out)
+        .status()
+        .expect("x3c check");
+    assert!(status.success(), "warnings alone must not fail a check: {status:?}");
+
+    let body = std::fs::read_to_string(&out).expect("check output read");
+    let parsed: serde_json::Value = serde_json::from_str(&body).expect("check output must be JSON");
+    let warnings = parsed
+        .get("warnings")
+        .and_then(|value| value.as_array())
+        .expect("check output must carry a warnings array");
+    assert!(
+        !warnings.is_empty(),
+        "GOOD_SOURCE trips the proof/invariant passes, so its warnings must be reported; got {body}"
+    );
+}
+
+#[test]
+fn cli_deny_warnings_fails_a_program_that_only_warns() {
+    let src = write_fixture("cli_warn_deny.x3", GOOD_SOURCE);
+    let status = x3c()
+        .arg("--deny-warnings")
+        .arg("check")
+        .arg(&src)
+        .status()
+        .expect("x3c check --deny-warnings");
+    assert!(
+        !status.success(),
+        "--deny-warnings must fail a program that produces warnings: {status:?}"
+    );
+}
+
+#[test]
+fn cli_deny_warnings_passes_a_program_with_no_warnings() {
+    // Non-vacuous: the flag must not simply fail everything.
+    let src = write_fixture("cli_clean_deny.x3", CLEAN_SOURCE);
+    let status = x3c()
+        .arg("--deny-warnings")
+        .arg("check")
+        .arg(&src)
+        .status()
+        .expect("x3c check --deny-warnings");
+    assert!(
+        status.success(),
+        "a warning-free program must pass --deny-warnings: {status:?}"
     );
 }

@@ -11,7 +11,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use x3_lang_compiler::ir::{AssetKey, CompiledTradingPolicy, InvariantKind, TradingOperation, ValueRef};
+use x3_lang_compiler::ir::{AssetKey, CompiledTradingPolicy, CostKind, InvariantKind, TradingOperation, ValueRef};
 
 /// Whether a capability manifest represents deterministic fixtures or a real
 /// production integration.
@@ -98,6 +98,14 @@ pub struct QuoteResult {
     /// cross-check data — which is only a problem if the policy actually
     /// requires the check; see `enforce_oracle_firewall`.
     pub sources: Vec<PriceSource>,
+    /// The block the quote was taken at, as reported by the host. Required, not
+    /// optional: a policy that declares `quote_freshness` cannot enforce a
+    /// ceiling without it, and a host that cannot say when its price was valid
+    /// has no business satisfying a policy that bounds quote age. The VM
+    /// measures age against the caller-supplied
+    /// `TradeExecutionContext::current_block`; the caller is responsible for
+    /// tying that block to the clock of the quote's own chain.
+    pub quote_block: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -283,6 +291,14 @@ pub enum TradingExecError {
         ceiling_bps: u16,
         actual_bps: u128,
     },
+    /// The venue quote the trade was about to be priced from is older than the
+    /// compiled `quote_freshness` ceiling allows. Trading against a stale price
+    /// is how a "profitable" route settles at a loss, so this fails closed
+    /// before the swap is attempted rather than after.
+    QuoteStale {
+        age_blocks: u64,
+        ceiling_blocks: u64,
+    },
     OpenDebtAtCommit(String),
     NetProfitBelowFloor {
         minimum: u128,
@@ -308,6 +324,21 @@ pub enum TradingExecError {
         asset: AssetKey,
         ceiling: u128,
         projected_loss: u128,
+    },
+    /// A host (or a receipt) reported a cost category that is not one of the
+    /// known `CostKind` values. Fail closed: an unclassifiable cost cannot be
+    /// checked against the policy's `allowed_cost_kinds` allowlist, so
+    /// accepting it would let a host escape that allowlist by inventing a
+    /// category name.
+    UnknownCostKind(String),
+    /// A cost was committed in a category the compiled policy's
+    /// `allowed_cost_kinds` allowlist does not permit. Enforced for both
+    /// host-reported execution costs and the fees the VM itself accrues for
+    /// borrow/swap/bridge/repay legs, so a venue cannot bypass the allowlist
+    /// by folding an unlisted cost into a leg fee.
+    CostKindNotAllowed {
+        kind: CostKind,
+        asset: AssetKey,
     },
 }
 
@@ -370,6 +401,13 @@ impl fmt::Display for TradingExecError {
                 f,
                 "price source '{source}' deviates {actual_bps} bps from the primary quote, exceeding the compiled ceiling {ceiling_bps} bps"
             ),
+            Self::QuoteStale {
+                age_blocks,
+                ceiling_blocks,
+            } => write!(
+                f,
+                "venue quote is {age_blocks} blocks old, exceeding the compiled quote_freshness ceiling of {ceiling_blocks} blocks"
+            ),
             Self::OpenDebtAtCommit(debt) => write!(f, "debt '{debt}' is still open at commit"),
             Self::NetProfitBelowFloor { minimum, actual } => {
                 write!(f, "realized net profit {actual} is below floor {minimum}")
@@ -397,6 +435,16 @@ impl fmt::Display for TradingExecError {
                 "committing this trade would bring cumulative {} losses to {projected_loss}, exceeding the compiled max_cumulative_loss ceiling {ceiling}",
                 asset.symbol
             ),
+            Self::UnknownCostKind(kind) => write!(
+                f,
+                "host reported an unknown cost kind '{kind}' that no compiled policy can classify or bound"
+            ),
+            Self::CostKindNotAllowed { kind, asset } => write!(
+                f,
+                "cost kind '{}' is not permitted by the compiled policy's allowed_cost_kinds allowlist (charged in {})",
+                kind.as_str(),
+                asset.symbol
+            ),
         }
     }
 }
@@ -418,7 +466,16 @@ pub struct TradingState {
     pub closed_debts: BTreeSet<String>,
     pub closed_debt_records: BTreeMap<String, DebtRecord>,
     pub bindings: BTreeMap<String, AssetKey>,
+    /// Per-asset rollup of every committed cost, used for the `max_gas`
+    /// ceiling. Lossy by design: it cannot say which category a cost was.
     pub costs: BTreeMap<AssetKey, u128>,
+    /// Append-ordered ledger of every committed cost with its category
+    /// preserved. This is what receipts carry, so an independent verifier can
+    /// check each cost against the policy's `allowed_cost_kinds` allowlist.
+    /// Before this existed, receipts wrote the placeholder
+    /// `kind: "committed"` for every cost, which made `allowed_cost_kinds`
+    /// structurally unverifiable after the fact.
+    pub cost_ledger: Vec<CommittedCost>,
     pub net_deltas: BTreeMap<AssetKey, i128>,
     pub receipt_emitted: bool,
     pub committed: bool,
@@ -565,7 +622,7 @@ impl TradingVm {
         &mut self,
         operations: &[TradingOperation],
         host: &mut dyn TradingHost,
-        _context: TradeExecutionContext,
+        context: TradeExecutionContext,
     ) -> Result<TradeExecution, TradingExecError> {
         let mut saw_commit = false;
         for operation in operations {
@@ -597,7 +654,9 @@ impl TradingVm {
                     }
                     self.check_fee_bps(result.principal, result.fee, self.compiled_policy().max_flash_fee_bps)?;
                     self.credit(asset, result.principal)?;
-                    self.accrue_cost(asset, result.fee)?;
+                    // Borrowing is debt financing, so its fee is a
+                    // flash-liquidity cost, not a venue swap fee.
+                    self.accrue_cost(asset, result.fee, CostKind::FlashLiquidityFee)?;
                     self.trading_state.open_debts.insert(
                         debt_id.clone(),
                         DebtRecord {
@@ -647,6 +706,10 @@ impl TradingVm {
                             input: input_units,
                         })
                         .map_err(TradingExecError::HostRejected)?;
+                    // Checked before `swap()`, not after: a stale price must
+                    // abort the leg before the host is asked to move value, so
+                    // there is no host-side side effect to unwind.
+                    self.enforce_quote_freshness(&quote, context.current_block)?;
                     let result = host
                         .swap(SwapRequest {
                             venue: venue.clone(),
@@ -678,7 +741,7 @@ impl TradingVm {
                     }
                     self.debit(from, result.input)?;
                     self.credit(to, result.output)?;
-                    self.accrue_cost(&result.fee_asset, result.fee)?;
+                    self.accrue_cost(&result.fee_asset, result.fee, CostKind::LiquidityFee)?;
                     self.trading_state.bindings.insert(binding.clone(), to.clone());
                 }
                 TradingOperation::Bridge {
@@ -735,7 +798,9 @@ impl TradingVm {
                     }
                     self.debit(from, result.input)?;
                     self.credit(to, result.output)?;
-                    self.accrue_cost(&result.fee_asset, result.fee)?;
+                    // A bridge leg's fee is a cross-domain cost: the trade
+                    // paid a different domain to move value.
+                    self.accrue_cost(&result.fee_asset, result.fee, CostKind::CrossDomainFee)?;
                 }
                 TradingOperation::CloseDebt { debt_id } => {
                     let record = self
@@ -771,7 +836,9 @@ impl TradingVm {
                         )));
                     }
                     self.debit(&record.asset, paid)?;
-                    self.accrue_cost(&record.asset, result.fee)?;
+                    // Closing a debt is the other half of the same
+                    // financing instrument opened above.
+                    self.accrue_cost(&record.asset, result.fee, CostKind::FlashLiquidityFee)?;
                     self.trading_state.open_debts.remove(debt_id);
                     self.trading_state.closed_debts.insert(debt_id.clone());
                     self.trading_state.closed_debt_records.insert(
@@ -959,9 +1026,15 @@ impl TradingVm {
     fn accrue_host_execution_costs(&mut self, host: &dyn TradingHost) -> Result<(), TradingExecError> {
         let costs = host.execution_costs().map_err(TradingExecError::HostRejected)?;
         for cost in costs {
+            // Classify before accruing. An unparseable category used to be
+            // silently discarded along with the rest of the report's
+            // structure; now it is a hard failure, because a cost the policy
+            // cannot classify is a cost the policy cannot bound.
+            let kind =
+                CostKind::from_str(&cost.kind).ok_or_else(|| TradingExecError::UnknownCostKind(cost.kind.clone()))?;
             let already = self.trading_state.costs.get(&cost.asset).copied().unwrap_or(0);
             if cost.amount > already {
-                self.accrue_cost(&cost.asset, cost.amount - already)?;
+                self.accrue_cost(&cost.asset, cost.amount - already, kind)?;
             }
         }
         self.enforce_gas_ceiling()
@@ -1038,6 +1111,31 @@ impl TradingVm {
         Ok(())
     }
 
+    /// Reject a venue quote older than the compiled `quote_freshness` ceiling.
+    ///
+    /// Age is measured against the caller-supplied `current_block`. A quote
+    /// whose block is *ahead* of `current_block` saturates to age 0 rather than
+    /// being rejected: a trade's policy chain and a destination-chain venue do
+    /// not share a block clock, so a quote block above the policy chain's
+    /// current block is an ordinary cross-chain reading, not evidence of
+    /// staleness.
+    ///
+    /// A policy that does not declare `quote_freshness` imposes no bound, so
+    /// this is a no-op for it.
+    fn enforce_quote_freshness(&self, quote: &QuoteResult, current_block: u64) -> Result<(), TradingExecError> {
+        let Some(ceiling_blocks) = self.compiled_policy().quote_freshness_blocks else {
+            return Ok(());
+        };
+        let age_blocks = current_block.saturating_sub(quote.quote_block);
+        if age_blocks > ceiling_blocks {
+            return Err(TradingExecError::QuoteStale {
+                age_blocks,
+                ceiling_blocks,
+            });
+        }
+        Ok(())
+    }
+
     /// Cross-check the primary quote against every independent source the
     /// host reported. Deviation is measured both directions — a source
     /// quoting *higher* than the primary is just as much a disagreement
@@ -1090,13 +1188,35 @@ impl TradingVm {
         Ok(())
     }
 
-    fn accrue_cost(&mut self, asset: &AssetKey, amount: u128) -> Result<(), TradingExecError> {
+    /// Commit `amount` of `asset` as a cost of category `kind`.
+    ///
+    /// The category is validated against the compiled policy's
+    /// `allowed_cost_kinds` allowlist *before* any accounting state is
+    /// touched, so a rejected cost leaves balances and net deltas exactly as
+    /// they were. A zero amount is not a cost and is skipped: failing a trade
+    /// because a host reported a zero-amount category the policy happens not
+    /// to list would be noise, not safety.
+    fn accrue_cost(&mut self, asset: &AssetKey, amount: u128, kind: CostKind) -> Result<(), TradingExecError> {
+        if amount == 0 {
+            return Ok(());
+        }
+        if !self.compiled_policy().allowed_cost_kinds.contains(&kind) {
+            return Err(TradingExecError::CostKindNotAllowed {
+                kind,
+                asset: asset.clone(),
+            });
+        }
         let entry = self.trading_state.costs.entry(asset.clone()).or_insert(0);
         *entry = entry.checked_add(amount).ok_or(TradingExecError::AccountingOverflow)?;
         let delta = self.trading_state.net_deltas.entry(asset.clone()).or_insert(0);
         *delta = delta
             .checked_sub(i128::try_from(amount).map_err(|_| TradingExecError::AccountingOverflow)?)
             .ok_or(TradingExecError::AccountingOverflow)?;
+        self.trading_state.cost_ledger.push(CommittedCost {
+            asset: asset.clone(),
+            amount,
+            kind: kind.as_str().to_string(),
+        });
         Ok(())
     }
 
@@ -1414,6 +1534,18 @@ pub fn verify_receipt_economics(receipt: &TradeReceipt) -> Result<(), ReceiptErr
     }
 
     for cost in &receipt.costs {
+        // A cost the policy cannot classify is a cost the policy cannot
+        // bound, so an unknown category is a replay failure rather than a
+        // value to be carried through the totals.
+        let kind = CostKind::from_str(&cost.kind).ok_or_else(|| {
+            ReceiptError::EconomicReplayMismatch(format!("receipt reports unknown cost kind '{}'", cost.kind))
+        })?;
+        if !compiled_policy.allowed_cost_kinds.contains(&kind) {
+            return Err(ReceiptError::EconomicReplayMismatch(format!(
+                "receipt reports cost kind '{}', which the compiled policy's allowed_cost_kinds allowlist does not permit",
+                kind.as_str()
+            )));
+        }
         let entry = deltas.entry(cost.asset.clone()).or_insert(0);
         *entry = entry
             .checked_add(
@@ -1558,15 +1690,11 @@ pub fn build_receipt(
     settlement_asset: Option<&AssetKey>,
     outcome: TradeOutcome,
 ) -> Result<TradeReceipt, ReceiptError> {
-    let costs = state
-        .costs
-        .iter()
-        .map(|(asset, amount)| CommittedCost {
-            asset: asset.clone(),
-            amount: *amount,
-            kind: "committed".to_string(),
-        })
-        .collect();
+    // The ledger, not the per-asset rollup: the rollup cannot say which
+    // category each cost belonged to, and an independent verifier needs that
+    // category to check the cost against the policy's
+    // `allowed_cost_kinds` allowlist.
+    let costs = state.cost_ledger.clone();
     let mut debts: Vec<DebtReceipt> = state
         .closed_debt_records
         .iter()

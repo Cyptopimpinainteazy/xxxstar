@@ -45,6 +45,10 @@ struct FixtureHost {
     /// something to check set this explicitly.
     oracle_sources: Vec<PriceSource>,
     borrow_fee: u128,
+    /// Fee `swap()` reports, denominated in the swap's `to` asset. Defaults
+    /// to zero so existing tests are unaffected; tests that check how a venue
+    /// fee is classified set this explicitly.
+    swap_fee: u128,
     commitment: [u8; 32],
     execution_cost: u128,
     /// Asset the fixture-reported execution cost is denominated in.
@@ -52,6 +56,16 @@ struct FixtureHost {
     /// tests can point it at an asset the trade never otherwise credits
     /// or debits, to prove costs there are still caught.
     execution_cost_asset: Option<AssetKey>,
+    /// Cost category `execution_costs()` reports. Real hosts declare a
+    /// `CostKind`; tests point this at an unknown or unlisted category to
+    /// prove the policy allowlist is actually consulted.
+    execution_cost_kind: String,
+    /// Block `quote()` reports its price as having been taken at. Defaults to
+    /// 0 so a test only sees a staleness failure when it asks for one.
+    quote_block: u64,
+    /// How many times `swap()` was actually invoked. Lets a test prove a guard
+    /// aborted the leg *before* the host was asked to move value.
+    swap_calls: usize,
     /// Output amount `bridge()` reports received on the destination chain.
     /// Defaults to matching the request's input exactly (a neutral, no-fee
     /// transfer), matching how `swap_output`/`quote_output` default to
@@ -78,9 +92,13 @@ impl FixtureHost {
             quote_output: None,
             oracle_sources: Vec::new(),
             borrow_fee: 0,
+            swap_fee: 0,
             commitment: COMMITMENT,
             execution_cost: 0,
             execution_cost_asset: None,
+            execution_cost_kind: "gas".to_string(),
+            quote_block: 0,
+            swap_calls: 0,
             bridge_output: None,
             bridge_fee: 0,
             bridge_fee_asset: None,
@@ -125,16 +143,18 @@ impl TradingHost for FixtureHost {
         Ok(QuoteResult {
             expected_output: self.quote_output.unwrap_or(self.swap_output),
             sources: self.oracle_sources.clone(),
+            quote_block: self.quote_block,
         })
     }
 
     fn swap(&mut self, request: SwapRequest) -> Result<SwapResult, HostError> {
+        self.swap_calls += 1;
         Ok(SwapResult {
             from: request.from,
             to: request.to.clone(),
             input: request.input,
             output: self.swap_output,
-            fee: 0,
+            fee: self.swap_fee,
             fee_asset: request.to,
             state_commitment: self.commitment,
         })
@@ -157,7 +177,7 @@ impl TradingHost for FixtureHost {
         Ok(vec![CommittedCost {
             asset: self.execution_cost_asset.clone().unwrap_or_else(|| asset("USDC")),
             amount: self.execution_cost,
-            kind: "gas".to_string(),
+            kind: self.execution_cost_kind.clone(),
         }])
     }
 
@@ -190,16 +210,15 @@ fn ops() -> Vec<TradingOperation> {
                 deadline_blocks: 10,
                 require_private_submission: false,
                 minimum_net_profit: None,
-                max_total_cost: 1_000_000,
-                max_price_impact_bps: 30,
-                max_mev_leakage_bps: 30,
-                quote_freshness_blocks: 10,
+                quote_freshness_blocks: Some(10),
                 submission_profile: SubmissionProfile::Public,
                 state_binding: StateBindingMode::Exact,
                 allowed_cost_kinds: BTreeSet::from([
                     CostKind::Gas,
                     CostKind::LiquidityFee,
                     CostKind::FlashLiquidityFee,
+                    CostKind::ProofFee,
+                    CostKind::CrossDomainFee,
                     CostKind::Slippage,
                     CostKind::PriceImpact,
                     CostKind::MevLeakage,
@@ -680,16 +699,15 @@ fn gas_ceiling_within_policy_still_commits() {
                 deadline_blocks: 10,
                 require_private_submission: false,
                 minimum_net_profit: None,
-                max_total_cost: 1_000_000,
-                max_price_impact_bps: 30,
-                max_mev_leakage_bps: 30,
-                quote_freshness_blocks: 10,
+                quote_freshness_blocks: Some(10),
                 submission_profile: SubmissionProfile::Public,
                 state_binding: StateBindingMode::Exact,
                 allowed_cost_kinds: BTreeSet::from([
                     CostKind::Gas,
                     CostKind::LiquidityFee,
                     CostKind::FlashLiquidityFee,
+                    CostKind::ProofFee,
+                    CostKind::CrossDomainFee,
                     CostKind::Slippage,
                     CostKind::PriceImpact,
                     CostKind::MevLeakage,
@@ -758,16 +776,15 @@ fn gas_ceiling_is_enforced_at_commit_even_with_no_other_guard_operations() {
                 deadline_blocks: 10,
                 require_private_submission: false,
                 minimum_net_profit: None,
-                max_total_cost: 1_000_000,
-                max_price_impact_bps: 30,
-                max_mev_leakage_bps: 30,
-                quote_freshness_blocks: 10,
+                quote_freshness_blocks: Some(10),
                 submission_profile: SubmissionProfile::Public,
                 state_binding: StateBindingMode::Exact,
                 allowed_cost_kinds: BTreeSet::from([
                     CostKind::Gas,
                     CostKind::LiquidityFee,
                     CostKind::FlashLiquidityFee,
+                    CostKind::ProofFee,
+                    CostKind::CrossDomainFee,
                     CostKind::Slippage,
                     CostKind::PriceImpact,
                     CostKind::MevLeakage,
@@ -972,16 +989,15 @@ fn minimal_loss_trade(ceiling: Option<u128>) -> Vec<TradingOperation> {
                 deadline_blocks: 10,
                 require_private_submission: false,
                 minimum_net_profit: None,
-                max_total_cost: u128::MAX,
-                max_price_impact_bps: 30,
-                max_mev_leakage_bps: 30,
-                quote_freshness_blocks: 10,
+                quote_freshness_blocks: Some(10),
                 submission_profile: SubmissionProfile::Public,
                 state_binding: StateBindingMode::Exact,
                 allowed_cost_kinds: BTreeSet::from([
                     CostKind::Gas,
                     CostKind::LiquidityFee,
                     CostKind::FlashLiquidityFee,
+                    CostKind::ProofFee,
+                    CostKind::CrossDomainFee,
                     CostKind::Slippage,
                     CostKind::PriceImpact,
                     CostKind::MevLeakage,
@@ -1235,6 +1251,7 @@ impl TradingHost for HostWithoutBridgeSupport {
         Ok(QuoteResult {
             expected_output: 2_000_000,
             sources: Vec::new(),
+            quote_block: 0,
         })
     }
     fn swap(&mut self, request: SwapRequest) -> Result<SwapResult, HostError> {
@@ -1278,4 +1295,284 @@ fn bridge_against_a_host_with_no_bridging_support_fails_closed() {
             message: "this host does not implement cross-chain bridging".to_string(),
         })
     );
+}
+
+/// Rewrite the compiled policy's cost-kind allowlist in an existing op
+/// sequence, so a test can narrow the policy without restating the whole
+/// `CompiledTradingPolicy` literal.
+fn with_allowed_cost_kinds(mut operations: Vec<TradingOperation>, kinds: &[CostKind]) -> Vec<TradingOperation> {
+    match operations.first_mut() {
+        Some(TradingOperation::BeginAtomicTrade { policy, .. }) => {
+            policy.allowed_cost_kinds = kinds.iter().copied().collect();
+        }
+        other => panic!("expected BeginAtomicTrade first, got {other:?}"),
+    }
+    operations
+}
+
+#[test]
+fn host_reported_unknown_cost_kind_is_rejected() {
+    // Before cost kinds were classified, `CommittedCost.kind` was never read:
+    // a host could invent any category and the cost was accepted as an
+    // unclassifiable number. A category no policy can bound must fail closed.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.execution_cost = 5;
+    host.execution_cost_kind = "totally_made_up".to_string();
+    let before = vm.trading_state.clone();
+
+    let err = vm
+        .execute_atomic(&ops(), &mut host, context(ExecutionMode::Development))
+        .expect_err("an unclassifiable cost category must be rejected");
+
+    assert_eq!(
+        err,
+        x3_lang_vm::trading::TradingExecError::UnknownCostKind("totally_made_up".to_string())
+    );
+    assert_eq!(vm.trading_state, before, "a rejected cost must leave state untouched");
+    assert!(host.rolled_back);
+}
+
+#[test]
+fn host_reported_cost_kind_outside_the_allowlist_is_rejected() {
+    // `solver_infrastructure_fee` is a real `CostKind` but is deliberately
+    // absent from the default compiled allowlist: no v1 trade body charges
+    // one. A host reporting it must be refused rather than paid.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.execution_cost = 5;
+    host.execution_cost_kind = "solver_infrastructure_fee".to_string();
+    let before = vm.trading_state.clone();
+
+    let err = vm
+        .execute_atomic(&ops(), &mut host, context(ExecutionMode::Development))
+        .expect_err("a cost category outside the allowlist must be rejected");
+
+    assert_eq!(
+        err,
+        x3_lang_vm::trading::TradingExecError::CostKindNotAllowed {
+            kind: CostKind::SolverInfrastructureFee,
+            asset: asset("USDC"),
+        }
+    );
+    assert_eq!(vm.trading_state, before);
+    assert!(host.rolled_back);
+}
+
+#[test]
+fn allowed_cost_kind_inside_a_narrowed_allowlist_still_commits() {
+    // The allowlist must not reject everything: a category the policy does
+    // list has to be payable, or the restriction is just an outage.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.swap_output = 2_000_100; // headroom so the 5-unit cost clears the profit floor
+    host.execution_cost = 5;
+    host.execution_cost_kind = "gas".to_string();
+
+    let operations = with_allowed_cost_kinds(ops(), &[CostKind::Gas]);
+    let execution = vm
+        .execute_atomic(&operations, &mut host, context(ExecutionMode::Development))
+        .expect("a listed cost category must remain payable");
+
+    assert!(execution.committed_state.committed);
+    assert_eq!(
+        execution.committed_state.cost_ledger,
+        vec![CommittedCost {
+            asset: asset("USDC"),
+            amount: 5,
+            kind: "gas".to_string(),
+        }]
+    );
+}
+
+#[test]
+fn venue_swap_fee_is_classified_as_a_liquidity_fee() {
+    // The VM's own fee accruals have to be classified too, otherwise a venue
+    // could bypass the allowlist by folding an unlisted cost into a leg fee.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.swap_output = 2_000_100;
+    host.swap_fee = 7;
+
+    let execution = vm
+        .execute_atomic(&ops(), &mut host, context(ExecutionMode::Development))
+        .expect("a classified venue fee within the allowlist must commit");
+
+    let ledger = &execution.committed_state.cost_ledger;
+    assert!(
+        ledger
+            .iter()
+            .any(|cost| cost.asset == asset("USDC") && cost.kind == "liquidity_fee"),
+        "the venue fee must be preserved as a liquidity fee, got {ledger:?}"
+    );
+    assert!(
+        ledger.iter().all(|cost| cost.kind != "committed"),
+        "receipts must not carry the placeholder cost kind any more"
+    );
+}
+
+#[test]
+fn venue_swap_fee_in_a_disallowed_category_is_rejected() {
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.swap_fee = 7;
+
+    // A policy that permits only gas cannot be charged a venue fee.
+    let operations = with_allowed_cost_kinds(ops(), &[CostKind::Gas]);
+    let err = vm
+        .execute_atomic(&operations, &mut host, context(ExecutionMode::Development))
+        .expect_err("a venue fee in an unlisted category must be rejected");
+
+    assert_eq!(
+        err,
+        x3_lang_vm::trading::TradingExecError::CostKindNotAllowed {
+            kind: CostKind::LiquidityFee,
+            asset: asset("WETH"),
+        }
+    );
+    assert!(host.rolled_back);
+}
+
+#[test]
+fn bridge_fee_is_classified_as_a_cross_domain_fee() {
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.bridge_fee = 5;
+    // Denominate the fee in the source asset so the profit guard, which
+    // checks the bridged-to asset, is unaffected and this test isolates the
+    // classification.
+    host.bridge_fee_asset = Some(asset("USDC"));
+
+    let execution = vm
+        .execute_atomic(&bridge_ops(), &mut host, context(ExecutionMode::Development))
+        .expect("a cross-domain fee within the default allowlist must commit");
+
+    let ledger = &execution.committed_state.cost_ledger;
+    assert!(
+        ledger
+            .iter()
+            .any(|cost| cost.asset == asset("USDC") && cost.amount == 5 && cost.kind == "cross_domain_fee"),
+        "the bridge fee must be preserved as a cross-domain fee, got {ledger:?}"
+    );
+}
+
+#[test]
+fn bridge_fee_in_a_disallowed_category_is_rejected() {
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.bridge_fee = 5;
+    host.bridge_fee_asset = Some(asset("USDC"));
+
+    // A trade that may not pay cross-domain costs cannot bridge for a fee,
+    // even though the bridge itself is otherwise well-formed.
+    let operations = with_allowed_cost_kinds(bridge_ops(), &[CostKind::Gas, CostKind::LiquidityFee]);
+    let err = vm
+        .execute_atomic(&operations, &mut host, context(ExecutionMode::Development))
+        .expect_err("a bridge fee in an unlisted category must be rejected");
+
+    assert_eq!(
+        err,
+        x3_lang_vm::trading::TradingExecError::CostKindNotAllowed {
+            kind: CostKind::CrossDomainFee,
+            asset: asset("USDC"),
+        }
+    );
+    assert!(host.rolled_back);
+}
+
+/// Set the compiled policy's quote-freshness ceiling in an existing op
+/// sequence.
+fn with_quote_freshness(mut operations: Vec<TradingOperation>, ceiling: Option<u64>) -> Vec<TradingOperation> {
+    match operations.first_mut() {
+        Some(TradingOperation::BeginAtomicTrade { policy, .. }) => {
+            policy.quote_freshness_blocks = ceiling;
+        }
+        other => panic!("expected BeginAtomicTrade first, got {other:?}"),
+    }
+    operations
+}
+
+/// Execution context at `block`. `ops()` declares `deadline_blocks: 10`, so
+/// these tests stay at or below that or they would trip the deadline guard
+/// instead of the one under test.
+fn context_at(block: u64) -> TradeExecutionContext {
+    TradeExecutionContext {
+        mode: ExecutionMode::Development,
+        current_block: block,
+    }
+}
+
+#[test]
+fn fresh_quote_within_the_ceiling_commits() {
+    // quote_block 0, current_block 5 -> age 5, ceiling 10.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    let operations = with_quote_freshness(ops(), Some(10));
+    let execution = vm
+        .execute_atomic(&operations, &mut host, context_at(5))
+        .expect("a quote inside the freshness ceiling must commit");
+    assert!(execution.committed_state.committed);
+}
+
+#[test]
+fn stale_quote_is_rejected() {
+    // quote_block 0, current_block 5 -> age 5, ceiling 2.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    let operations = with_quote_freshness(ops(), Some(2));
+    let before = vm.trading_state.clone();
+
+    let err = vm
+        .execute_atomic(&operations, &mut host, context_at(5))
+        .expect_err("a quote older than the ceiling must be rejected");
+
+    assert_eq!(
+        err,
+        x3_lang_vm::trading::TradingExecError::QuoteStale {
+            age_blocks: 5,
+            ceiling_blocks: 2,
+        }
+    );
+    assert_eq!(vm.trading_state, before);
+    assert!(host.rolled_back);
+}
+
+#[test]
+fn stale_quote_aborts_before_the_host_is_asked_to_swap() {
+    // The guard runs before `host.swap()`, so a stale price cannot cause a
+    // host-side value movement that would then have to be unwound.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    let operations = with_quote_freshness(ops(), Some(2));
+
+    let _ = vm.execute_atomic(&operations, &mut host, context_at(5));
+
+    assert_eq!(
+        host.swap_calls, 0,
+        "the stale quote must be rejected before any swap reaches the host"
+    );
+}
+
+#[test]
+fn a_policy_without_a_quote_freshness_ceiling_does_not_check_age() {
+    // The same block/quote pairing that is stale under `Some(2)` above, but
+    // with no declared ceiling: freshness is opt-in, so this commits.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    let operations = with_quote_freshness(ops(), None);
+    vm.execute_atomic(&operations, &mut host, context_at(5))
+        .expect("with no declared ceiling, quote age is not a failure");
+}
+
+#[test]
+fn a_quote_from_a_higher_block_is_not_treated_as_stale() {
+    // A destination-chain venue's block clock is not the policy chain's, so a
+    // quote block above `current_block` is an ordinary cross-chain reading
+    // rather than evidence of staleness.
+    let mut vm = TradingVm::new();
+    let mut host = FixtureHost::new();
+    host.quote_block = 500;
+    let operations = with_quote_freshness(ops(), Some(2));
+    vm.execute_atomic(&operations, &mut host, context_at(5))
+        .expect("a quote block ahead of current_block must not read as stale");
 }

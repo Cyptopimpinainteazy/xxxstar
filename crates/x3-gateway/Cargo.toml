@@ -74,7 +74,7 @@ hex = "0.4"
 
 [dev-dependencies]
 hyper = { version = "1", features = ["client", "http1"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 tokio-test = "0.4"
 tower = { version = "0.5", features = ["util"] }
 proptest = "1.4"
