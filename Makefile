@@ -5,6 +5,7 @@
 local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-list\
  local-ci-all local-ci-prepush local-ci-dry-run\
  local-ci-deep srtool-install\
+ batch-runner\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
 # Local CI — the gates that actually execute on this machine. Hosted CI for this
@@ -56,6 +57,12 @@ srtool-install:
 	@cargo install --locked --git https://github.com/chevdor/srtool-cli \
 		--rev 0485b5507a0b63cf7699376f15d9cb5c849bbcd0 srtool-cli
 	@command -v srtool && srtool --version
+
+# Batch up to five branches into one integration branch, verify the union
+# locally, then dispatch the runner once for all of them:
+#   make batch-runner ARGS="--branches a,b,c,d,e --deep"
+batch-runner:
+	@bash scripts/batch-runner.sh $(ARGS)
 
 guard:
 	@python3 scripts/agent_guard.py

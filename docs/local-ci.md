@@ -118,6 +118,26 @@ is the intended safety net.
 
 ## The pre-push hook
 
+### Batching: five changes, one runner slot
+
+Each push to master queues ~5 heavy jobs on the two runners, so a change waits
+behind everything ahead of it. `scripts/batch-runner.sh` (or
+`make batch-runner ARGS="--branches a,b,c,d,e"`) builds the same coverage for one
+queue slot:
+
+1. creates `batch/<utc-stamp>` off `origin/master` in a scratch worktree under
+   `/tmp` (it never touches master);
+2. merges up to five branches into it, aborting with the offending branch name
+   on conflict;
+3. runs the local gate set on that union (`--deep` adds `cargo test --workspace`);
+4. pushes the batch branch and dispatches `production-gate.yml` on it, so the
+   self-hosted runner executes the full release gate for every change at once.
+
+`--dry-run` stops after the merges, `--no-dispatch` stops after the local gates,
+`--ready` takes the branches of the open PRs, `--keep` leaves the worktree for
+inspection. The batch branch is never merged automatically — review its runner
+verdict and merge whichever branches it proves.
+
 `.githooks/pre-push` delegates to `scripts/local-ci.sh --pre-push`:
 
 1. the fast gate set above, always;

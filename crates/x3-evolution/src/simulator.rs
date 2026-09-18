@@ -657,15 +657,11 @@ mod tests {
 
         let data = generate_synthetic_data("ETH", 100, 2000.0, 0.02);
 
-        // An empty strategy simulates end to end and holds.
-        let empty = Chromosome::from_bytecode(Vec::new()).expect("empty chromosome");
-        let result = simulator
-            .simulate(&empty, &data)
-            .expect("an empty strategy must simulate");
-        assert!(result.ticks_processed > 0);
-        assert!(result.portfolio.trades.is_empty());
-
-        // Any real strategy is refused, not silently treated as a hold.
+        // Every constructible chromosome carries non-empty bytecode —
+        // `Chromosome::from_bytecode` rejects empty input, so the `Hold` branch in
+        // `execute_strategy` is unreachable from here — and the interpreter for
+        // that bytecode is not implemented. The simulator must refuse rather than
+        // fabricate a result.
         let bytecode = vec![0x20, 128, 128, 0x00];
         let chromosome = Chromosome::from_bytecode(bytecode).expect("chromosome");
         let err = simulator
