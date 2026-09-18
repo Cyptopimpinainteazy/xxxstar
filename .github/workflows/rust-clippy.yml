@@ -3,8 +3,12 @@ name: Rust Clippy
 on:
   push:
     branches: [ "main", "master", "develop" ]
-  pull_request:
-    branches: [ "main", "master" ]
+  # No `pull_request` trigger. PR runs were routed to ubuntu-latest (see the job
+  # comment below), and this account's hosted minutes are locked: every PR run
+  # finished in ~2s with `"steps": []` and `runner_name: ""`, i.e. a guaranteed
+  # red check that proved nothing. The split is *not* being reversed - untrusted
+  # PR code still never executes on the self-hosted runner. PR-time lint is
+  # covered on the author's machine by scripts/local-ci.sh (pre-push hook).
   workflow_dispatch:
 
 

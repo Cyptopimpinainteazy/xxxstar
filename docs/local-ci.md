@@ -136,3 +136,39 @@ tree, and when a self-hosted workflow is wired to a branch that never fires.
 
 That asymmetry is the reason this file exists: a green hosted check means
 nothing, and the only trustworthy signal is a gate that ran on this machine.
+
+### Workflows that auto-run but cannot execute
+
+`scripts/check_ci_workflow_refs.py --parity` also exposes the sharper version of
+the problem: workflows that still fire on `push`/`pull_request` while requesting
+only GitHub-hosted runners. Each of those produces a step-less failure
+(`runner_name: ""`, `"steps": []`, ~2s) on every push, which is how `master` ends
+up looking permanently red and why a real failure is easy to miss.
+
+The five workflows on the merge/release path were fixed by removing the triggers
+that cannot run (not by moving untrusted PR code onto the runner — see the
+security note in `rust-clippy.yml`):
+
+| workflow | now triggers on |
+| --- | --- |
+| `rust-clippy.yml` | `push`, `workflow_dispatch` |
+| `production-gate.yml` | `push`, `workflow_dispatch` |
+| `x3vm-live-lifecycle.yml` | `workflow_call`, `workflow_dispatch` |
+| `x3vm-evm-live-lifecycle.yml` | `workflow_call`, `workflow_dispatch` |
+| `x3vm-svm-live-lifecycle.yml` | `workflow_call`, `workflow_dispatch` |
+
+26 other workflows still auto-run on hosted-only runners (the security scanners
+`semgrep`, `trivy`, `osv-scan`, `codeql`; `formal-verification`,
+`economic-attack-tests`, `proof-gates`, `release-hardening`,
+`frame-benchmarking`, `zombienet-integration`, `x3-desktop-ci`, the
+transparency/dashboard deploys, and others). They cannot be silently deleted -
+they are security and release tooling - so they need one of three decisions:
+
+1. route them to the self-hosted runner where the tooling exists (adds load and
+   requires the tool to be installed on the runner);
+2. make them `workflow_dispatch`-only with a comment, so they stay runnable the
+   moment hosted minutes exist again without polluting every push;
+3. delete the ones that duplicate a gate the local CI already runs.
+
+Until one of those is chosen, treat any red check from those workflows as
+"could not run", not "failed".

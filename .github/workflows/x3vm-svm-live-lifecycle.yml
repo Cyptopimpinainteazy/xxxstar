@@ -12,14 +12,10 @@ name: x3vm-svm-live-lifecycle
 on:
   # No standalone `push` trigger — `production-gate.yml` calls this as `svm-live`
   # on every push and gates on it; a push run here duplicated the 17-step job.
-  pull_request:
-    branches: [master, finish/x3vm-live-transport]
-    paths:
-      - "programs/svm/**"
-      - "crates/x3-atomic-swap/**"
-      - "node/**"
-      - "pallets/x3-settlement-engine/**"
-      - ".github/workflows/x3vm-svm-live-lifecycle.yml"
+  # No `pull_request` trigger: PR events requested ubuntu-latest, and this
+  # account's hosted minutes are locked (step-less ~2s failures). PR-time SVM
+  # lifecycle coverage comes from `scripts/local-ci.sh --live` on the author's
+  # machine, which runs the same programs/svm/x3_atomic_swap/test-live-lifecycle.sh.
   workflow_dispatch:
   workflow_call:
 
