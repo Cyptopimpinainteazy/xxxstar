@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_evm_only_comit() {
-        let comit = ComitBuilder::evm(&[0x60, 0x80, 0x60, 0x40])
+        let comit = ComitBuilder::evm([0x60, 0x80, 0x60, 0x40])
             .with_nonce(1)
             .with_fee(1_000_000)
             .build()
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_svm_only_comit() {
-        let comit = ComitBuilder::svm(&[0x01, 0x02, 0x03])
+        let comit = ComitBuilder::svm([0x01, 0x02, 0x03])
             .with_nonce(2)
             .with_fee(500_000)
             .build()
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn test_dual_vm_comit() {
-        let comit = ComitBuilder::dual(&[0xaa, 0xbb], &[0xcc, 0xdd])
+        let comit = ComitBuilder::dual([0xaa, 0xbb], [0xcc, 0xdd])
             .with_nonce(3)
             .with_fee(2_000_000)
             .build()
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_auto_fee() {
-        let comit = ComitBuilder::evm(&[0u8; 100])
+        let comit = ComitBuilder::evm([0u8; 100])
             .with_nonce(1)
             .with_auto_fee()
             .build()
@@ -408,18 +408,16 @@ mod tests {
     #[test]
     fn test_payload_size_validation() {
         // EVM payload too large
-        let result = ComitBuilder::evm(&[0u8; MAX_EVM_PAYLOAD_SIZE + 1])
+        let result = ComitBuilder::evm([0u8; MAX_EVM_PAYLOAD_SIZE + 1])
             .with_fee(1000)
             .build();
         assert!(result.is_err());
 
         // Combined payload too large (add 1 byte to make it over the limit)
-        let result = ComitBuilder::dual(
-            &[0u8; MAX_EVM_PAYLOAD_SIZE],
-            &[0u8; MAX_SVM_PAYLOAD_SIZE + 1],
-        )
-        .with_fee(1000)
-        .build();
+        let result =
+            ComitBuilder::dual([0u8; MAX_EVM_PAYLOAD_SIZE], [0u8; MAX_SVM_PAYLOAD_SIZE + 1])
+                .with_fee(1000)
+                .build();
         assert!(result.is_err());
     }
 
@@ -431,8 +429,8 @@ mod tests {
 
     #[test]
     fn test_convenience_functions() {
-        let _evm = evm_comit(&[0x00]).with_fee(1000).build().unwrap();
-        let _svm = svm_comit(&[0x00]).with_fee(1000).build().unwrap();
-        let _dual = dual_comit(&[0x00], &[0x01]).with_fee(1000).build().unwrap();
+        let _evm = evm_comit([0x00]).with_fee(1000).build().unwrap();
+        let _svm = svm_comit([0x00]).with_fee(1000).build().unwrap();
+        let _dual = dual_comit([0x00], [0x01]).with_fee(1000).build().unwrap();
     }
 }

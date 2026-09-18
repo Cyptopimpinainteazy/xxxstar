@@ -123,9 +123,7 @@ pub fn bs58_encode(data: &[u8]) -> String {
     }
 
     // Add leading '1's for leading zeros
-    for _ in 0..leading_zeros {
-        result.push(b'1');
-    }
+    result.resize(result.len() + leading_zeros, b'1');
 
     result.reverse();
     String::from_utf8(result).unwrap_or_default()

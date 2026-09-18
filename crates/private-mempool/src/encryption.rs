@@ -79,11 +79,10 @@ pub fn combine_shares(
     // Lagrange interpolation of decryption shares.
     // Simplified: in production this uses proper Shamir reconstruction on curve points.
     let mut combined = [0u8; 32];
-    for (i, share) in shares.iter().enumerate() {
-        for j in 0..32.min(share.share.len()) {
-            combined[j] ^= share.share[j];
+    for share in shares.iter() {
+        for (dst, src) in combined.iter_mut().zip(share.share.iter()) {
+            *dst ^= *src;
         }
-        let _ = i; // Lagrange coefficients needed in production
     }
 
     Ok(combined)
@@ -95,8 +94,7 @@ pub fn decrypt_transaction(
     shared_secret: &[u8; 32],
 ) -> Result<Vec<u8>, MempoolError> {
     let aes_key = hkdf_derive(shared_secret)?;
-    aes_gcm_decrypt(&tx.ciphertext, &aes_key, &tx.nonce)
-        .map_err(|e| MempoolError::EncryptionError(e))
+    aes_gcm_decrypt(&tx.ciphertext, &aes_key, &tx.nonce).map_err(MempoolError::EncryptionError)
 }
 
 // ──────────────────────────────────────────────────────────────

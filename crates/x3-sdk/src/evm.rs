@@ -390,8 +390,8 @@ mod tests {
     #[test]
     fn test_abi_decode_address() {
         let mut encoded = vec![0u8; 32];
-        for i in 12..32 {
-            encoded[i] = 0xab;
+        for byte in encoded.iter_mut().skip(12) {
+            *byte = 0xab;
         }
 
         let decoded = abi_decode_address(&encoded).unwrap();
