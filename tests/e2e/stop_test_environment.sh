@@ -93,4 +93,5 @@ REMAINING_CONTAINERS=$(docker ps -a --filter "name=x3" -q | wc -l)
 if [ "$REMAINING_CONTAINERS" -eq 0 ]; then
     log_success "All X3 test containers cleaned up successfully"
 else
-    log_warning "$REMAINING_CONTAINERS X3 containers still exist. Manual cleanup may
+    log_warning "$REMAINING_CONTAINERS X3 containers still exist. Manual cleanup may be required: docker rm -f \$(docker ps -aq --filter name=x3)"
+fi

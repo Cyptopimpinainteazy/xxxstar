@@ -3,12 +3,15 @@
  test-x3-wallet test-atomic-gateway test-x3-readiness test-x3-lang-vm\
  test-runtime-upgrade test-all-pallets fmt lint\
  local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-list\
+ local-ci-all local-ci-prepush local-ci-dry-run\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
 # Local CI — the gates that actually execute on this machine. Hosted CI for this
 # repository is blocked by an account billing lock, so this (and the self-hosted
 # runner) is where the gate suite runs. See scripts/local-ci.sh for what each
-# target runs, and .ai/runlogs/ for per-gate logs.
+# target runs, and .ai/runlogs/ for per-gate logs + local-ci-<ts>-summary.json.
+# Gates run in parallel (--jobs, default 3) with CARGO_BUILD_JOBS capped so two
+# concurrent gate processes cannot thrash a 32-core host.
 local-ci:
 	@bash scripts/local-ci.sh
 
@@ -26,6 +29,19 @@ local-ci-variants:
 
 local-ci-list:
 	@bash scripts/local-ci.sh --list
+
+# Everything (live + cross-domain + release + variants). This is the release bar.
+local-ci-all:
+	@bash scripts/local-ci.sh --all
+
+# Exactly what the pre-push hook runs: fast gates plus the gates the outgoing
+# diff implies, plus release/variant gates when the default branch is the target.
+local-ci-prepush:
+	@bash scripts/local-ci.sh --pre-push
+
+# Show what would run without running it.
+local-ci-dry-run:
+	@bash scripts/local-ci.sh --dry-run
 
 guard:
 	@python3 scripts/agent_guard.py

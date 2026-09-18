@@ -64,7 +64,8 @@ assert_contains() {
 assert_equals() {
     local actual="$1"
     local expected="$2"
-    local msg="${3:-Values don't match}"
+    local msg="${3:-}"
+    [ -n "$msg" ] || msg="Values don't match"
     
     if [ "$actual" = "$expected" ]; then
         return 0
