@@ -1,4 +1,7 @@
-use std::{env, fs, path::PathBuf};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 /// The feature set that decides which `construct_runtime!` variant is compiled,
 /// and therefore which pallets exist in `RuntimeGenesisConfig`. A cached runtime
@@ -27,7 +30,7 @@ fn enabled_features_key() -> String {
 }
 
 /// Sidecar next to the built blob recording the feature set it was built with.
-fn sidecar_path(wasm: &PathBuf) -> PathBuf {
+fn sidecar_path(wasm: &Path) -> PathBuf {
     let mut name = wasm
         .file_name()
         .map(|n| n.to_os_string())
@@ -36,11 +39,11 @@ fn sidecar_path(wasm: &PathBuf) -> PathBuf {
     wasm.with_file_name(name)
 }
 
-fn write_variant_sidecar(wasm: &PathBuf, key: &str) {
+fn write_variant_sidecar(wasm: &Path, key: &str) {
     let _ = fs::write(sidecar_path(wasm), format!("{key}\n"));
 }
 
-fn cached_variant_matches(wasm: &PathBuf, key: &str) -> Result<(), String> {
+fn cached_variant_matches(wasm: &Path, key: &str) -> Result<(), String> {
     let sidecar = sidecar_path(wasm);
     let recorded = fs::read_to_string(&sidecar).map_err(|_| {
         format!(
@@ -86,7 +89,7 @@ fn cached_runtime_wasm_path() -> Option<PathBuf> {
     cached.is_file().then_some(cached)
 }
 
-fn write_cached_wasm_binary(cached: &PathBuf) {
+fn write_cached_wasm_binary(cached: &Path) {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR must be set by cargo");
     let copied_wasm = PathBuf::from(&out_dir).join("x3_chain_runtime.wasm");
     fs::copy(cached, &copied_wasm).expect("failed to copy cached runtime WASM");
