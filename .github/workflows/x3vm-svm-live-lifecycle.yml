@@ -10,14 +10,8 @@ name: x3vm-svm-live-lifecycle
 # programs/svm/x3_atomic_swap/test-live-lifecycle.sh for the test itself.
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "programs/svm/**"
-      - "crates/x3-atomic-swap/**"
-      - "node/**"
-      - "pallets/x3-settlement-engine/**"
-      - ".github/workflows/x3vm-svm-live-lifecycle.yml"
+  # No standalone `push` trigger — `production-gate.yml` calls this as `svm-live`
+  # on every push and gates on it; a push run here duplicated the 17-step job.
   pull_request:
     branches: [master, finish/x3vm-live-transport]
     paths:

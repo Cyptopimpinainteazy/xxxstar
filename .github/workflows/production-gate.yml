@@ -4,6 +4,18 @@ on:
   pull_request:
   push:
     branches: [ main, master, develop ]
+    # The release gate fires on every commit, and each run costs ~5 heavy jobs on
+    # the shared runner. Documentation- and evidence-only changes cannot alter the
+    # build, chain spec, migrations or secrets it checks, so they do not need to
+    # queue a 90-minute gate behind the live-lifecycle jobs.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".ai/**"
+      - "reports/**"
+      - "audit-artifacts/**"
+      - "memory/**"
+      - "stakeholder_comms/**"
   # The release gate must be runnable on demand — e.g. to re-verify a commit
   # after a billing/runner outage without pushing a no-op commit. It previously
   # had no dispatch trigger, so `gh workflow run production-gate.yml` returned

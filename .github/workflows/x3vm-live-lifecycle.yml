@@ -1,13 +1,10 @@
 name: x3vm-live-lifecycle
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "crates/x3-atomic-swap/**"
-      - "node/**"
-      - "pallets/x3-settlement-engine/**"
-      - ".github/workflows/x3vm-live-lifecycle.yml"
+  # No standalone `push` trigger: `production-gate.yml` calls this workflow as
+  # `native-x3vm-live` on every push and gates on it, so a standalone push run
+  # executed the same lifecycles a second time on the same runner. `workflow_dispatch`
+  # keeps it runnable on demand.
   pull_request:
     paths:
       - "crates/x3-atomic-swap/**"
