@@ -36,4 +36,4 @@ serde_json = { workspace = true }
 [dev-dependencies]
 blake2 = "0.10"
 invariant-macros = { path = "../../crates/invariant-macros" }
-jsonschema = "0.18"
+jsonschema = "0.56"
