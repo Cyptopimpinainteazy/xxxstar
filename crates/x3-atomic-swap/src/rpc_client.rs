@@ -5,9 +5,12 @@
 //! [`SwapError::RpcError`] indicating that the `std` feature is required.
 use alloc::format;
 use alloc::vec;
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 use alloc::string::ToString;
+#[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
 
 use crate::error::SwapError;

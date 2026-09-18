@@ -14,6 +14,7 @@
 //! ## Offences
 //!
 //! See [`SlashReason`] for all supported reasons.
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 
 use crate::error::SwapError;

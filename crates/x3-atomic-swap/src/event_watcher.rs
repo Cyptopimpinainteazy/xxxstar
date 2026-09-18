@@ -15,8 +15,11 @@
 //! - Refunded: `Refunded(uint64,address)`
 use alloc::format;
 use alloc::vec;
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
 
 use crate::error::SwapError;

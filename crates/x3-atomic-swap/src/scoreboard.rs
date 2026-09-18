@@ -21,8 +21,11 @@
 //! A completed refund path also earns full claim/refund points (10).
 //! The scoreboard cannot reach 100 if any proof step is missing its
 //! corresponding transaction hash.
+#[cfg(not(feature = "std"))]
 use alloc::collections::BTreeSet;
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};

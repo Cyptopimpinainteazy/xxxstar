@@ -11,7 +11,9 @@
 //! - **Claim instruction**: verifies preimage, transfers tokens
 //! - **Refund instruction**: returns tokens to refund authority after timeout
 //! - **Event/log output**: relayers watch via log data
+#[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};

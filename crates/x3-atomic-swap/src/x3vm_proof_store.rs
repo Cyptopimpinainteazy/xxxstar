@@ -1,5 +1,6 @@
 //! Durable proof-ledger persistence for finalized native X3VM lifecycle evidence.
 use alloc::format;
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 
 use crate::adapter::{ClaimProof, LockProof, RefundProof};

@@ -4,6 +4,7 @@
 //! that decides whether the coordinator is allowed to reveal it. Individual
 //! adapter finality flags are necessary but never sufficient on their own.
 use alloc::format;
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 
 use crate::adapter::{ChainId, FinalityProof, LockProof, VmType};

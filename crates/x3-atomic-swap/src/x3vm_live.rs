@@ -106,10 +106,6 @@ impl<T: X3VmLiveTransport> LiveX3VmAdapter<T> {
         &self.escrow_address
     }
 
-    pub(crate) fn transport(&self) -> &T {
-        &self.transport
-    }
-
     /// Claim a live X3 settlement only with a firewall-issued secret-release permit.
     ///
     /// The permit type has no public constructor and its fields are private, so
