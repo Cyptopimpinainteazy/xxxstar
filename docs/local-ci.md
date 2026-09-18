@@ -24,6 +24,7 @@ scripts/local-ci.sh --live          # + EVM/SVM contract lifecycles (anvil, sola
 scripts/local-ci.sh --cross         # + X3-native and cross-domain lifecycles
 scripts/local-ci.sh --variants      # + runtime migration dry-run, all six variants
 scripts/local-ci.sh --release       # + make mainnet-check
+scripts/local-ci.sh --deep          # + cargo test --workspace (slow, broadest signal)
 scripts/local-ci.sh --all           # everything (the release bar)
 scripts/local-ci.sh --list          # show the gate list, run nothing
 scripts/local-ci.sh --pre-push      # what the hook runs
@@ -31,7 +32,12 @@ scripts/local-ci.sh --pre-push      # what the hook runs
 
 Equivalent make targets: `make local-ci`, `local-ci-live`, `local-ci-cross`,
 `local-ci-variants`, `local-ci-release`, `local-ci-all`, `local-ci-prepush`,
-`local-ci-list`, `local-ci-dry-run`.
+`local-ci-list`, `local-ci-dry-run`, `local-ci-deep`.
+
+`--deep` adds `env -u SKIP_WASM_BUILD cargo test --workspace` — the broadest
+automated check the repository has (all test targets in all workspace members;
+5,068 tests across 358 binaries as of 2026-09-18). It is slow, so it is opt-in
+and `--all`/`make local-ci-deep` include it for release-candidate runs.
 
 ### Scheduling and scoping
 
@@ -70,6 +76,21 @@ The `--live`, `--cross`, `--release` and `--variants` groups add the gates that
 need a real chain, a full release build, or six runtime compilations.
 
 ## Results
+
+### Preconditions
+
+`--release` (`make mainnet-check`) needs `srtool` on PATH for its
+reproducible-build section, and the box has lost that binary more than once
+(something rewrites `~/.cargo/bin`). Re-install the pinned revision — the same
+one the self-hosted gate job uses — with:
+
+```bash
+make srtool-install     # cargo install --locked --git …/srtool-cli --rev 0485b5507a… srtool-cli
+```
+
+Every other gate is self-contained. The run prints `srtool=MISSING` in its
+prereq line when the binary is absent, so a `--release` failure is never
+ambiguous.
 
 Each run writes:
 
