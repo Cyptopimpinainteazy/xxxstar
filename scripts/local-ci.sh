@@ -138,6 +138,14 @@ GATES_FAST=(
   # this gate is deterministic and offline. If the cache is ever cold the gate
   # still fails loudly rather than passing quietly.
   "test cross-vm-coordinator:cargo test --offline --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
+  # Two configurations of the proof-verification router, because the `--deep`
+  # workspace build unifies `test-verifier` through the gateway pallet's
+  # dev-dependency and would therefore never exercise the fail-closed posture.
+  # Default features = production posture: every strategy without a real
+  # verifier must refuse the proof.
+  "test verification router:cargo test -p x3-verification-router"
+  # The opt-in permissive path that the plumbing tests use.
+  "test verification router test-verifier:cargo test -p x3-verification-router --features test-verifier"
 )
 
 # Gates that boot real chains (anvil / solana-test-validator / x3 dev node).
@@ -350,7 +358,9 @@ run_gate() {
   end=$(date +%s)
   status=PASS
   if [ "$rc" -ne 0 ]; then
-    if grep -qE 'Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency' "$gate_log"; then
+    # Missing network, or a `--offline` gate whose cargo cache went cold (this box
+    # has lost parts of ~/.cargo more than once — see docs/local-ci.md).
+    if grep -qE "Could not resolve host|failed to resolve address|network failure seems to have happened|spurious network error|failed to get .* as a dependency|you're using offline mode" "$gate_log"; then
       status=BLOCKED
     else
       status=FAIL
@@ -432,7 +442,8 @@ if [ "$BLOCKED_COUNT" -gt 0 ]; then
   echo "$BLOCKED_COUNT gate(s) reported BLOCKED: the environment could not fetch"
   echo "dependencies, so those gates did not execute and verified nothing. Re-run"
   echo "with network access (or pre-fetch the dependency) before treating this as"
-  echo "coverage."
+  echo "coverage. A gate that runs with --offline warms up with:"
+  echo "  cargo fetch --locked --manifest-path crates/cross-vm-coordinator/Cargo.toml"
 fi
 
 {

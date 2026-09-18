@@ -673,23 +673,15 @@ impl RelayerSafetyPipeline {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
 
-        let mut attestations = AttestationSet::new(proof_id);
-        let attestation = Attestation {
-            validator: ValidatorId("relayer-main".to_string()),
-            statement_hash: proof_id,
-            signature: vec![1],
-            weight: 100,
-        };
-        if let Err(err) = attestations.add_attestation(attestation) {
-            return self.raise_dispute(
-                proof_id,
-                proof.finalized_block,
-                format!("attestation_rejected: {err:?}"),
-            );
-        }
-
-        let quorum_met = attestations.has_quorum(67);
-        if let Err(reason) = self.evaluate_risk(quorum_met, recent_failures) {
+        // The EVM proof type carries no validator attestations: its verification
+        // is the receipt proof routed above (`EvmReceiptProof` -> light client /
+        // merkle-patricia verification), which returned `Ok` or we would have
+        // disputed already. This used to fabricate an attestation here
+        // (`ValidatorId("relayer-main")`, a one-byte signature, weight 100 >= a
+        // hardcoded 67) so the "quorum" check always passed — a fake proof in
+        // security code that hid an unmet requirement from the risk gate.
+        let verification_requirement_met = true;
+        if let Err(reason) = self.evaluate_risk(verification_requirement_met, recent_failures) {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
         }
 
@@ -724,9 +716,12 @@ impl RelayerSafetyPipeline {
         }
 
         let mut attestations = AttestationSet::new(proof_id);
-        for (idx, signature) in proof.validator_signatures.iter().enumerate() {
+        for signature in proof.validator_signatures.iter() {
             let attestation = Attestation {
-                validator: ValidatorId(format!("svm-validator-{idx}")),
+                // Identity is the validator's public key, not its position in the
+                // vector: keying on the index let a proof repeat one validator's
+                // signature N times and still satisfy an N-of-M quorum.
+                validator: ValidatorId(hex::encode(signature.validator_pubkey)),
                 statement_hash: proof_id,
                 signature: {
                     let mut combined = Vec::with_capacity(96);
@@ -1183,6 +1178,36 @@ mod tests {
             .evaluate_svm_proof(&proof, 0)
             .expect_err("insufficient signatures should fail quorum");
         assert!(err.contains("attestation_quorum_not_met"));
+        assert!(err.contains("dispute_status=Accepted"));
+    }
+
+    /// Regression: the quorum used to key each attestation on its *position* in
+    /// the vector, so one validator's signature repeated N times satisfied an
+    /// N-of-M requirement. Identity is now the validator public key, and the
+    /// repeated signer is rejected before it can be counted.
+    #[test]
+    fn safety_pipeline_rejects_repeated_svm_signer() {
+        let config = test_config();
+        let pipeline = RelayerSafetyPipeline::new(&config);
+        let signer = ValidatorSignature {
+            validator_pubkey: [7u8; 32],
+            signature: [8u8; 64],
+        };
+        let proof = SvmProof {
+            source_domain: 200,
+            slot: 42,
+            blockhash: [8u8; 32],
+            validator_signatures: vec![signer.clone(), signer],
+            required_signatures: 2,
+        };
+
+        let err = pipeline
+            .evaluate_svm_proof(&proof, 0)
+            .expect_err("one validator cannot supply both quorum signatures");
+        assert!(
+            err.contains("DuplicateValidator"),
+            "expected a duplicate-signer rejection, got: {err}"
+        );
         assert!(err.contains("dispute_status=Accepted"));
     }
 }
