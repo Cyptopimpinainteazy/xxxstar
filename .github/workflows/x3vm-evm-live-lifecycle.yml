@@ -83,8 +83,25 @@ jobs:
           set -euo pipefail
           FORGE_STD_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/forge-std']['tag']['name'])")"
           OZ_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/openzeppelin-contracts']['tag']['name'])")"
-          forge install "foundry-rs/forge-std@${FORGE_STD_TAG}" --no-commit
-          forge install "OpenZeppelin/openzeppelin-contracts@${OZ_TAG}" --no-commit
+          # `forge install` refuses to run when the target or .gitmodules already
+          # has changes. The self-hosted runner reuses one workspace across jobs,
+          # so the sibling job's install leaves lib/ and .gitmodules dirty and the
+          # second job dies with "cannot safely install dependency". Clone the
+          # exact pins from foundry.lock instead: idempotent, and it never touches
+          # .gitmodules.
+          ensure_pinned() {
+            local path="$1" url="$2" tag="$3"
+            if [ ! -d "$path/.git" ]; then
+              git clone --quiet --depth 1 --branch "$tag" "$url" "$path"
+            elif [ "$(git -C "$path" describe --tags --exact-match 2>/dev/null || echo none)" != "$tag" ]; then
+              git -C "$path" fetch --quiet --depth 1 origin "refs/tags/${tag}:refs/tags/${tag}"
+              git -C "$path" checkout --quiet "$tag"
+            else
+              echo "$path already pinned to $tag"
+            fi
+          }
+          ensure_pinned lib/forge-std https://github.com/foundry-rs/forge-std "$FORGE_STD_TAG"
+          ensure_pinned lib/openzeppelin-contracts https://github.com/OpenZeppelin/openzeppelin-contracts "$OZ_TAG"
 
       - name: Build x3-evm-broadcast
         run: cargo build --release -p x3-atomic-swap --features std --bin x3-evm-broadcast
@@ -132,8 +149,21 @@ jobs:
           set -euo pipefail
           FORGE_STD_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/forge-std']['tag']['name'])")"
           OZ_TAG="$(python3 -c "import json; print(json.load(open('foundry.lock'))['lib/openzeppelin-contracts']['tag']['name'])")"
-          forge install "foundry-rs/forge-std@${FORGE_STD_TAG}" --no-commit
-          forge install "OpenZeppelin/openzeppelin-contracts@${OZ_TAG}" --no-commit
+          # See the note in the sibling job: clone the pins instead of running
+          # `forge install`, which fails on the runner's reused (dirty) workspace.
+          ensure_pinned() {
+            local path="$1" url="$2" tag="$3"
+            if [ ! -d "$path/.git" ]; then
+              git clone --quiet --depth 1 --branch "$tag" "$url" "$path"
+            elif [ "$(git -C "$path" describe --tags --exact-match 2>/dev/null || echo none)" != "$tag" ]; then
+              git -C "$path" fetch --quiet --depth 1 origin "refs/tags/${tag}:refs/tags/${tag}"
+              git -C "$path" checkout --quiet "$tag"
+            else
+              echo "$path already pinned to $tag"
+            fi
+          }
+          ensure_pinned lib/forge-std https://github.com/foundry-rs/forge-std "$FORGE_STD_TAG"
+          ensure_pinned lib/openzeppelin-contracts https://github.com/OpenZeppelin/openzeppelin-contracts "$OZ_TAG"
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
