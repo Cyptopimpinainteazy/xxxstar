@@ -9836,6 +9836,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.16.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1dc47f592c06f33f8e3aea9591776ec7c9f9e4124778ff8a3c3b87159f7e593"
+dependencies = [
+ "hashbrown 0.16.1",
+]
+
+[[package]]
 name = "lru-cache"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12616,7 +12625,7 @@ dependencies = [
  "pallet-x3-kernel",
  "parity-scale-codec",
  "proptest",
- "rand 0.8.8",
+ "rand 0.10.2",
  "ripemd",
  "scale-info",
  "secp256k1 0.28.2",
@@ -12809,7 +12818,7 @@ dependencies = [
  "pallet-x3-agent-law",
  "pallet-x3-invariants",
  "parity-scale-codec",
- "rand 0.8.8",
+ "rand 0.10.2",
  "rayon",
  "sc-block-builder",
  "sc-client-api",
@@ -14018,7 +14027,7 @@ dependencies = [
  "ed25519-dalek 2.2.0",
  "hkdf",
  "parking_lot 0.12.5",
- "rand 0.8.8",
+ "rand 0.10.2",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -14519,7 +14528,7 @@ dependencies = [
  "criterion",
  "hex",
  "log",
- "rand 0.8.8",
+ "rand 0.10.2",
  "serde",
  "serde_json",
  "sha3",
@@ -14545,7 +14554,7 @@ dependencies = [
  "num-complex 0.4.6",
  "petgraph 0.6.5",
  "proptest",
- "rand 0.8.8",
+ "rand 0.10.2",
  "rand_chacha 0.3.1",
  "reqwest 0.12.28",
  "serde",
@@ -25903,7 +25912,7 @@ dependencies = [
  "hex",
  "k256",
  "parity-scale-codec",
- "rand 0.8.8",
+ "rand 0.10.2",
  "rlp 0.5.2",
  "scale-info",
  "serde",
@@ -26761,7 +26770,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.5",
  "prometheus 0.14.0",
- "rand 0.8.8",
+ "rand 0.10.2",
  "reqwest 0.12.28",
  "secp256k1 0.28.2",
  "serde",
@@ -26794,7 +26803,7 @@ dependencies = [
  "bytes",
  "chrono",
  "futures 0.3.34",
- "lru 0.12.5",
+ "lru 0.16.3",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
@@ -27078,7 +27087,7 @@ dependencies = [
  "hex",
  "log",
  "parity-scale-codec",
- "rand 0.8.8",
+ "rand 0.10.2",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -27277,12 +27286,12 @@ dependencies = [
  "bytes",
  "chrono",
  "futures 0.3.34",
- "lru 0.12.5",
+ "lru 0.16.3",
  "mockall 0.12.1",
  "multihash 0.18.1",
  "parking_lot 0.12.5",
  "prometheus 0.13.4",
- "rand 0.8.8",
+ "rand 0.10.2",
  "serde",
  "serde_json",
  "sha2 0.10.9",
