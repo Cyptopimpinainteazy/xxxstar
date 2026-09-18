@@ -49,12 +49,13 @@ dangerous_paths = ["runtime", "pallets/x3-atomic-kernel", "genesis", "tokenomics
 mode = "GUARDED_TESTNET"
 crate_or_service = "runtime"
 tauri_app = "LaunchGate"
-required_tests = ["runtime_upgrade_rehearsal", "runtime_upgrade_rehearsal_storage_versions"]
+required_tests = ["runtime_upgrade_rehearsal", "runtime_upgrade_rehearsal_storage_versions", "runtime_upgrade_rehearsal_migrations_advance_behind_versions"]
 proof_report = "reports/mainnet_readiness_report.md"
 readiness_score = 80
 blockers = [
   "Migration dry-run is automated for all six runtime variants and passing against real genesis state: scripts/check-runtime-variants.sh runs runtime_upgrade_rehearsal per feature set, seeding each variant's actual genesis through frame_support::genesis_builder_helper (the plain functions behind the sp_api GenesisBuilder runtime API), then executing the same OnRuntimeUpgrade hooks an upgrade would (AllPalletsWithSystem + the Migrations tuple) and asserting the work fits inside a block",
   "Storage-version alignment is checked as of runtime_upgrade_rehearsal_storage_versions: after the upgrade hooks run, every pallet in the all-variant intersection that declares an in-code storage version must have the same version on chain (21 pallets in the full variant; the test also fails if fewer than 5 are inspected, and runtime_upgrade_rehearsal_storage_version_check_has_teeth proves the check reports a deliberately wrong version)",
+  "The migration run-path is rehearsed too (runtime_upgrade_rehearsal_migrations_advance_behind_versions): each of the four pallets whose migration struct is wired into `Migrations` (AtlasKernel, Treasury, AgentMemory, AgentAccounts) is rolled back to storage version 0 (the rollback is asserted before the hooks run, so the test cannot pass vacuously), the upgrade hooks then run, and every pallet must end at the version the code declares — a migration dropped from the tuple or no longer matching its pallet's declared version fails here",
   "Remaining gap: the rehearsal starts from *this* runtime's genesis, not from a previous runtime's exported state, so cross-version migration of historical state is still unverified — the try-runtime CLI that would do that is absent from the pinned Polkadot SDK"
 ]
 dangerous_paths = ["runtime", "chain-specs", "validator keys"]
