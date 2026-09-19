@@ -60,6 +60,14 @@ batch 6" (already merged since this census was taken) and 3 are marked "no
 merge base" (they belong to the 12-branch archival bucket above, not this
 queue). 34 − 3 − 3 = 28, the branches that actually still need a disposition.
 
+**Update (2026-09-18, post-census):** `fix/master-trading-core-compile-break`
+was verified archival (see its row) — `git cherry`/conflict-file signals alone
+made it look like real work, but the code converged independently, not by
+patch-equivalence, so the automated signals didn't catch it. The true "real"
+count is 27, not 28; the other 27 rows have not been individually re-verified
+this way, so treat "real" as provisional per-row, not just per-count, until
+each one gets the same direct-file-check treatment before merging.
+
 | Branch | pending | conflict files | disposition |
 | --- | --- | --- | --- |
 | `agents/setup-instructions-request` | 1 | — (clean) | landed in batch 6 |
@@ -73,7 +81,7 @@ queue). 34 − 3 − 3 = 28, the branches that actually still need a disposition
 | `wip/consolidation-20260917/recovered-usb-clone` | 149 | no merge base | salvage review only |
 | `archive/pr126-pre-master-rewrite-20260909` | 66 | no merge base | archival |
 | `your-task-branch` (14), `t5/fix-annotations-20260522-1458` (13), `pr-181-check` (12) | 12–14 | real | May/September snapshots; triage individually |
-| `fix/master-trading-core-compile-break` | 4 | 20 files | real: trading-core compile break |
+| `fix/master-trading-core-compile-break` | 4 | 20 files | archival — verified 2026-09-18: every function/struct/test this branch adds (including exact test names) already exists on master verbatim, landed independently via #133/#212/#216/#223. The `git cherry`/`conflict-files` signals alone made this look like real unlanded work; a direct file check (not a triple-dot diff against the branch's own stale base) showed 100% overlap. Same pattern as `fix/private-mempool-real-shamir-threshold` (PR #288) above — do not merge, it would revert to an older tree shape |
 | `finish/x3vm-live-transport-fix` | 4 | 16 files | real, but `finish/x3vm-live-transport` already landed |
 | `feat/x3vm-durable-recovery-20260911` | 4 | 2 files | newer versions of the same files landed — verify before merging |
 | `feat/secret-release-firewall-20260911` | 3 | `crates/x3-atomic-swap/src/secret_release.rs` | superseded by `feat/live-secret-release-firewall-20260911` (in master) |
@@ -99,8 +107,8 @@ a merge.
 
 1. Any branch that merges clean today (batch 6 shape: `agents/setup-instructions-request`,
    `fix/svm-htlc-native-custody-master`, `test/cross-domain-recovery-matrix-20260911`).
-2. `fix/master-trading-core-compile-break` — compile break, blocks everything that
-   touches trading-core.
+2. ~~`fix/master-trading-core-compile-break`~~ — verified archival, not real
+   unlanded work (see Queue table). Delete rather than merge.
 3. The `pasted-text-processing` family — pick one branch, rebase, land.
 4. `fix/svm-htlc-native-custody` — salvage the custody commits (its `-master`
    sibling already carries the same work with a newer base).
