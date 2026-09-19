@@ -25,29 +25,41 @@ the permissions the image's `builder` user needs — see that script).
 | rustc in image | 1.93.0 |
 | source | `master` @ the commit this file was added on |
 
-## Result: two independent builds, identical output
+## Result: reproducible at a given revision
 
 The second run was a from-scratch rebuild (`runtime/target/srtool` removed
 first), so this is not one artifact reported twice.
 
-**Compact (`x3_chain_runtime.compact.wasm`, 8,419,266 bytes)**
+The hashes below describe revision `c4b3a1621`. They are **not** a fixed
+property of the project: any runtime-affecting change produces different WASM,
+which is why `docs/reports/runtime-wasm-hashes.json` names the revision it was
+recorded at, and why `scripts/mainnet_release_gate.py` **rebuilds and compares**
+rather than trusting the file. Cutting a release means rebuilding from the
+revision being released, confirming two builds of *that* revision agree, and
+updating the record in the same change.
+
+The first pair of builds (compact `0x78feb683…`) was taken at an earlier
+revision and is kept here only as the record of how this was established; the
+current values are the `0xb1f0348c…` pair.
+
+**Compact (`x3_chain_runtime.compact.wasm`, 8,419,783 bytes)**
 
 ```
 Version          : x3-chain-11 (x3-chain-1.tx1.au1)
 Metadata         : V14
-setCode          : 0x78feb68360e5766aad0915f22c4b4ee049988c4c03bf248b53c910ba5ee397b9
-authorizeUpgrade : 0x417006727b7dcff0d550c03d70bdd5b6420e02bda6393a5b8632ef87c62631af
-IPFS             : Qma824b7PSzHTJ83aTQANLviuMonDCHk6C8ffLCkdtCQW9
-BLAKE2_256       : 0xe58ded03cecee9687e4f53e5771a7eb8decb6513b595a1ddd0b234adf9a538d3
+setCode          : 0xb1f0348cbe38d893a6ed3aafccf46c9be882fbeb6065d84693f58f0945c90ce3
+authorizeUpgrade : 0x9dff843475473cc9cffce4baea61279a2490ef4a7cd82188e07dea38d24d16c6
+IPFS             : QmSoEEz3vrqZmnYGL8M9Rsr2r2BYV7EcHd79ABxWCzpmHE
+BLAKE2_256       : 0x154d73b853bcbbe2cf1802cd5bd2b818b5200c42e1ae6d8db3faad8429cae37d
 ```
 
-**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,441,379 bytes, 82.88%)**
+**Compressed (`x3_chain_runtime.compact.compressed.wasm`, 1,443,099 bytes)**
 
 ```
-setCode          : 0xf4b7e11a6c397c8dfff25521958bc22df9c50739fa5e8ae109a8197da981998d
-authorizeUpgrade : 0xc0eba551e55ff52682aea5ad992110c8c5f16e76ff5f4e141609b2e8d4bb255b
-IPFS             : QmRnPZQ4Nvj52RtcHERgd96MPbpjYQ8c6VBkW3Ld9ZwhHP
-BLAKE2_256       : 0xa252dd56da9d0db00549efc01e524dabc7351427d1738c794283a7ec5a67699f
+setCode          : 0xa3de51b578473f55cadcfc80d559c60aa14f45e447330ecb74b44cec3d42849c
+authorizeUpgrade : 0xfe31159a26fd644df98b697c0f6405e3aa8e49805357f3cab1d35dded67ed9bd
+IPFS             : QmXraoEUG4u6qbW5b3TnDMTNPuimfLEkaMqxnkEgEpQBUz
+BLAKE2_256       : 0xf3726b93445966095ddbee28d277b18db1aa0d44c98dc04f148fa29a3d3dd27c
 ```
 
 Both runs produced these values byte for byte. The compressed artifact is the
@@ -58,12 +70,14 @@ one whose `setCode`/`BLAKE2_256` a release would attest to.
 * **Does:** the runtime source in this revision builds deterministically inside
   that image — nothing in the workspace's build scripts injects a timestamp,
   path or machine-specific value into the WASM.
-* **Does not:** prove the hash matches what an *audited* release commits to, and
-  it is not yet wired into the release gate. `python3 scripts/mainnet_release_gate.py`
-  stage 6 checks that srtool is *installed*; it does not rebuild and compare.
-  Promoting this to a per-release gate step (≈10 minutes per run) would close
-  that gap, and the two tags `1.93.0` and `1.93.0-0.18.4` are the same digest,
-  so it can pin exactly what the hosted production-gate workflow uses.
+* **Does:** the release gate enforces it. Stage 6b of
+  `scripts/mainnet_release_gate.py` runs this build and compares every value
+  against `docs/reports/runtime-wasm-hashes.json`, so `make mainnet-check` fails
+  if the runtime no longer builds to the recorded bytes. It adds about ten
+  minutes to that gate; that is the price of the claim.
+* **Does not:** prove the hash is the one an *audited* release commits to.
+  Updating the record is part of cutting a release, and an audit is a separate
+  step.
 * Toolchain note: the image must be able to build this dependency graph. Both
   `1.75.0` (the previous pin) and `1.88.0` refuse with
   `enum-ordinalize@4.4.2 requires rustc 1.89`.
