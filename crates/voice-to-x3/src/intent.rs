@@ -99,10 +99,8 @@ impl IntentParser {
 
         for pattern in &self.patterns {
             let score = pattern.score(&input_lower);
-            if score > 0.5 {
-                if best_match.is_none() || score > best_match.unwrap().1 {
-                    best_match = Some((pattern.contract_type, score));
-                }
+            if score > MATCH_THRESHOLD && best_match.is_none_or(|(_, best)| score > best) {
+                best_match = Some((pattern.contract_type, score));
             }
         }
 
@@ -113,9 +111,11 @@ impl IntentParser {
         // Extract parameters
         let params = self.extract_params(&input_lower, contract_type);
 
-        // Extract name
+        // Extract the name from the *original* text: `input_lower` has already
+        // destroyed the casing, so "called MyToken" came back as "Mytoken" and
+        // the generated contract no longer contained the name the user wrote.
         let name = self
-            .extract_name(&input_lower)
+            .extract_name(input)
             .unwrap_or_else(|| format!("My{:?}", contract_type));
 
         Ok(Intent {
@@ -222,8 +222,11 @@ impl IntentParser {
 
     /// Extract contract name from input
     fn extract_name(&self, input: &str) -> Option<String> {
-        // Look for patterns like "called X", "named X", "X token"
-        let patterns = ["called ", "named ", "name "];
+        // Look for patterns like "called X", "named X", "X token".
+        // Matched case-insensitively so it works on sentences that start with
+        // "Called X"; the returned name keeps the casing from the input, and
+        // `to_pascal_case` only fixes word boundaries.
+        let patterns = ["called ", "named ", "name ", "Called ", "Named ", "Name "];
 
         for pattern in patterns {
             if let Some(pos) = input.find(pattern) {
@@ -342,21 +345,46 @@ struct IntentPattern {
 
 impl IntentPattern {
     /// Score how well input matches this pattern
+    ///
+    /// The previous version divided the number of matched keywords by the
+    /// pattern's *total* keyword list, so a pattern with many synonyms needed
+    /// several of them in one sentence: `Token` lists five keywords, and
+    /// "Create a token called MyToken" scored 1/5 = 0.2 against a 0.5
+    /// threshold — no natural phrasing could ever name a contract type.
+    /// Confidence now depends on how much was matched, not on how many synonyms
+    /// the pattern happens to list.
     fn score(&self, input: &str) -> f64 {
-        let mut matches = 0;
-        for keyword in &self.keywords {
-            if input.contains(keyword) {
-                matches += 1;
-            }
-        }
-
-        if matches == 0 {
+        let matched: Vec<&str> = self
+            .keywords
+            .iter()
+            .filter(|keyword| input.contains(*keyword))
+            .copied()
+            .collect();
+        if matched.is_empty() {
             return 0.0;
         }
 
-        (matches as f64 / self.keywords.len() as f64) * self.weight
+        // A long phrase ("liquidity pool", "governance") is stronger evidence
+        // than a short word ("coin"), and every extra distinct keyword is
+        // stronger still.
+        let longest = matched
+            .iter()
+            .map(|keyword| keyword.chars().count())
+            .max()
+            .unwrap_or(0) as f64;
+        let base = (longest / STRONG_KEYWORD_CHARS).min(1.0);
+        let extra = EXTRA_KEYWORD_BONUS * matched.len().saturating_sub(1) as f64;
+        (self.weight * (base + extra)).min(1.0)
     }
 }
+
+/// A keyword at least this long is strong evidence on its own ("collectible",
+/// "governance", "fungible").
+const STRONG_KEYWORD_CHARS: f64 = 8.0;
+/// Each additional distinct keyword beyond the first adds this much confidence.
+const EXTRA_KEYWORD_BONUS: f64 = 0.25;
+/// Minimum confidence for a pattern to name the contract type.
+const MATCH_THRESHOLD: f64 = 0.5;
 
 /// Convert string to PascalCase
 fn to_pascal_case(s: &str) -> String {

@@ -19,7 +19,6 @@
 //! - **Configurable Schedule**: User-defined sleep/work hours
 //! - **Resource Limits**: Never exceeds configured GPU/CPU usage
 
-#![allow(dead_code)]
 #![allow(unused_variables)]
 
 pub mod config;
@@ -324,9 +323,13 @@ mod tests {
 
     #[test]
     fn test_schedule_check() {
-        let mut config = DreamConfig::default();
-        config.schedule_start = 23;
-        config.schedule_end = 7;
+        // `field_reassign_with_default` wants the struct built in one
+        // expression rather than mutating a `Default::default()`.
+        let config = DreamConfig {
+            schedule_start: 23,
+            schedule_end: 7,
+            ..Default::default()
+        };
 
         let miner = DreamMiner::with_config(config);
         // Test would depend on current time
