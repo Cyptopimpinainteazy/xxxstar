@@ -166,14 +166,23 @@ impl EvmBlockHeader {
         if item_count < 15 {
             return Err(EvmReceiptError::BadHeader);
         }
+        // The header's field order, per the yellow paper: parentHash(0),
+        // sha3Uncles(1), beneficiary(2), stateRoot(3), transactionsRoot(4),
+        // receiptsRoot(5), logsBloom(6), difficulty(7), number(8), gasLimit(9),
+        // gasUsed(10), timestamp(11), extraData(12), mixHash(13), nonce(14), then
+        // the fork additions (baseFeePerGas, withdrawalsRoot, blobGasUsed, …).
+        //
+        // These reads used to be 1/2/3/4 for state root, receipts root, bloom and
+        // difficulty — the *abbreviated* field list this function's doc comment
+        // carried, not the header's real layout. `receipts_root` was therefore the
+        // `beneficiary` address, so the receipts-trie walk `validate` performs
+        // could never match a genuine header: the verifier rejected every real
+        // proof, and no test noticed because none of them got past decoding
+        // (TICKET-064).
         let parent_hash: Vec<u8> = s.at(0)?.as_val()?;
-        let state_root: Vec<u8> = s.at(1)?.as_val()?;
-        let receipts_root: Vec<u8> = s.at(2)?.as_val()?;
-        let logs_bloom: Vec<u8> = s.at(3)?.as_val()?;
-        // EIP-1186: parent, state, receipts, bloom, difficulty, number,
-        // gas_limit, gas_used, timestamp, extra, mix, nonce, base_fee,
-        // withdrawals_root, blob_gas_used.
-        let _difficulty: Vec<u8> = s.at(4)?.as_val()?;
+        let state_root: Vec<u8> = s.at(3)?.as_val()?;
+        let receipts_root: Vec<u8> = s.at(5)?.as_val()?;
+        let logs_bloom: Vec<u8> = s.at(6)?.as_val()?;
         let number_bytes: Vec<u8> = s.at(8)?.as_val()?;
         let timestamp_bytes: Vec<u8> = s.at(11)?.as_val()?;
         Ok(Self {
@@ -507,6 +516,15 @@ impl Nibbles {
 pub struct DecodedProof {
     pub header: EvmBlockHeader,
     pub receipt: EvmReceipt,
+    /// The receipt's RLP bytes, as the wire format carried them.
+    ///
+    /// Kept because the inclusion walk compares the leaf's stored value against
+    /// the receipt: `EvmReceipt` is the decoded form and re-encoding it is not the
+    /// same string. The walk was given `None` for the value, and every successful
+    /// path in `verify_merkle_patricia_proof` ends in
+    /// `Some(stored_value) == value` — `Some(_) == None` is false — so the
+    /// verifier rejected every proof it was ever handed (TICKET-064).
+    pub receipt_rlp: Vec<u8>,
     pub receipt_index: Vec<u8>,
     pub proof: Vec<u8>,
     pub expected_amount: u128,
@@ -536,10 +554,11 @@ impl DecodedProof {
         let receipt_index = take_section(&mut s)?;
         let proof = take_section(&mut s)?;
         let header = EvmBlockHeader::decode(&header)?;
-        let receipt = EvmReceipt::decode(&receipt)?;
+        let receipt_decoded = EvmReceipt::decode(&receipt)?;
         Ok(Self {
             header,
-            receipt,
+            receipt_rlp: receipt,
+            receipt: receipt_decoded,
             receipt_index,
             proof,
             expected_amount,
@@ -589,11 +608,16 @@ impl DecodedProof {
                 got: 0,
             });
         }
-        // Receipts-trie key: rlp(receipt_index).
-        let mut key_stream = rlp::RlpStream::new_list(1);
-        key_stream.append(&self.receipt_index.as_slice());
-        let key_buf = key_stream.out().to_vec();
-        verify_merkle_patricia_proof(&self.header.receipts_root, &key_buf, None, &self.proof)?;
+        // Receipts-trie key: rlp(receipt_index), from the index bytes the wire
+        // format carries. One key builder, so the verifier cannot drift from the
+        // convention `receipt_trie_key` states (TICKET-064).
+        let key_buf = rlp_index_key(self.receipt_index.as_slice());
+        verify_merkle_patricia_proof(
+            &self.header.receipts_root,
+            &key_buf,
+            Some(&self.receipt_rlp),
+            &self.proof,
+        )?;
         Ok(())
     }
 }
@@ -624,9 +648,17 @@ fn bytes32(b: &[u8]) -> Result<[u8; 32], EvmReceiptError> {
 }
 
 fn decode_u64(b: &[u8]) -> u64 {
+    // Big-endian and *right*-aligned: RLP trims a value's leading zeros, so a
+    // short value's bytes belong at the end of the word rather than at the front.
+    // Copying them to the front read the header field `100` as
+    // `0x6400000000000000`, which made every real header's `number` and
+    // `timestamp` absurd — and the confirmations check
+    // (`current_block_number - number`) then saturated to zero, so every genuine
+    // proof was rejected as insufficiently confirmed. No test noticed because none
+    // of them reached this code with a decodable header (TICKET-064).
     let mut buf = [0u8; 8];
     let len = b.len().min(8);
-    buf[..len].copy_from_slice(&b[..len]);
+    buf[8 - len..].copy_from_slice(&b[b.len() - len..]);
     u64::from_be_bytes(buf)
 }
 
@@ -640,12 +672,42 @@ pub fn enc_section(buf: &mut alloc::vec::Vec<u8>, data: &[u8]) {
     buf.extend_from_slice(data);
 }
 
-/// Build the receipt-trie key for a given receipt index.
-/// The receipts trie key is `rlp(receipt_index)` as a single-element list.
+/// The receipts-trie key for a receipt index, from its big-endian bytes.
+///
+/// The key is `rlp(index)` — the RLP encoding of the *integer*: index 0 is the
+/// single byte `0x80`, index 1 is `0x01`, index 128 is `0x81 0x80`. This function
+/// used to wrap the index in a list (`rlp([index])`, `0xc1 0x80` for zero), which
+/// builds the path of a *different* key: the verifier below then computed a
+/// nibble path no standard prover produces, so it could not accept a genuine
+/// receipt proof — and its own tests could not notice, because they built their
+/// proofs with this same helper. Two facts in the repository say which convention
+/// is right: the doc comment on `DecodedProof::receipt_index` ("the receipt-trie
+/// key is `rlp(index)`"), and `x3-lang/vm/src/bridge.rs`, whose verifier and whose
+/// fixture use the raw encoding (their key for index 1 is the single byte `0x01`)
+/// — the two implementations disagreed, and this is the one that was wrong
+/// (TICKET-064).
+pub fn rlp_index_key(index_be_bytes: &[u8]) -> alloc::vec::Vec<u8> {
+    let significant = index_be_bytes
+        .iter()
+        .position(|byte| *byte != 0)
+        .map(|first| &index_be_bytes[first..])
+        .unwrap_or(&[]);
+    match significant {
+        // `rlp(0)` is the empty string's encoding, `0x80`.
+        [] => alloc::vec![0x80],
+        // A single byte below `0x80` is its own encoding.
+        [single] if *single < 0x80 => alloc::vec![*single],
+        bytes => {
+            let mut out = alloc::vec![0x80 + bytes.len() as u8];
+            out.extend_from_slice(bytes);
+            out
+        }
+    }
+}
+
+/// Build the receipt-trie key for a given receipt index (`rlp(index)`).
 pub fn receipt_trie_key(receipt_index: u64) -> alloc::vec::Vec<u8> {
-    let mut stream = rlp::RlpStream::new_list(1);
-    stream.append(&receipt_index);
-    stream.out().to_vec()
+    rlp_index_key(&receipt_index.to_be_bytes())
 }
 
 /// Encode a complete proof payload in the wire format expected by
@@ -789,6 +851,201 @@ mod tests {
     fn enc_section(buf: &mut Vec<u8>, data: &[u8]) {
         buf.extend_from_slice(&(data.len() as u32).to_be_bytes());
         buf.extend_from_slice(data);
+    }
+
+    // ── Proof builders ─────────────────────────────────────────────────────
+    //
+    // The positive test below builds a receipts-trie proof from the *standard*
+    // convention rather than from `receipt_trie_key`: a key of `rlp(index)` and a
+    // leaf node of `rlp([compact_leaf_path(nibbles(key)), receipt_rlp])`. A test
+    // that used the helper on both sides would agree with the helper's bug, which
+    // is how the list-wrapped key survived (TICKET-064).
+
+    fn rlp_bytes(bytes: &[u8]) -> Vec<u8> {
+        let mut stream = rlp::RlpStream::new();
+        stream.append(&bytes.to_vec());
+        stream.out().to_vec()
+    }
+
+    fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
+        let mut stream = rlp::RlpStream::new_list(items.len());
+        for item in items {
+            stream.append_raw(item, 1);
+        }
+        stream.out().to_vec()
+    }
+
+    /// Hex-prefix encoding of a leaf path (yellow paper appendix C).
+    fn compact_leaf_path(key: &[u8]) -> Vec<u8> {
+        let mut nibbles = Vec::with_capacity(key.len() * 2);
+        for byte in key {
+            nibbles.push(byte >> 4);
+            nibbles.push(byte & 0x0F);
+        }
+        let mut out = Vec::new();
+        if nibbles.len() % 2 == 0 {
+            out.push(0x20 | (nibbles.len() / 2) as u8);
+            for pair in nibbles.chunks(2) {
+                out.push((pair[0] << 4) | pair[1]);
+            }
+        } else {
+            out.push(0x30 | (nibbles.len() / 2) as u8);
+            out.push(nibbles[0] << 4 | nibbles[1]);
+            for pair in nibbles[2..].chunks(2) {
+                out.push((pair[0] << 4) | pair[1]);
+            }
+        }
+        out
+    }
+
+    const TRANSFER_AMOUNT: u128 = 42;
+
+    fn deposit_log(address: [u8; 20]) -> Vec<u8> {
+        // topics[0] is the selector the verifier expects, data is the amount in
+        // the low 16 bytes — `DecodedProof::validate`'s shape.
+        let mut data = [0u8; 32];
+        data[16..].copy_from_slice(&TRANSFER_AMOUNT.to_be_bytes());
+        rlp_list(&[
+            rlp_bytes(&address),
+            rlp_list(&[rlp_bytes(&deposit_locked_selector())]),
+            rlp_bytes(&data),
+        ])
+    }
+
+    fn receipt_with_one_log(address: [u8; 20]) -> Vec<u8> {
+        // Post-Byzantium status form: [status, cumulative_gas_used, logs].
+        rlp_list(&[
+            rlp_bytes(&[0x01]),
+            rlp_bytes(&[0x00]),
+            rlp_list(&[deposit_log(address)]),
+        ])
+    }
+
+    /// A 15-field EIP-1186 header whose `receipts_root` is the one given.
+    fn header_with_receipts_root(receipts_root: [u8; 32], number: u64) -> Vec<u8> {
+        let zero32 = [0u8; 32];
+        let mut number_bytes = Vec::new();
+        number_bytes.extend_from_slice(&number.to_be_bytes());
+        while number_bytes.len() > 1 && number_bytes[0] == 0 {
+            number_bytes.remove(0);
+        }
+        // The standard order: receiptsRoot is index 5, and the decoder reads that
+        // index — a header built per the abbreviated list would verify for the
+        // wrong reason (TICKET-064).
+        rlp_list(&[
+            rlp_bytes(&zero32),        // 0  parentHash
+            rlp_bytes(&zero32),        // 1  sha3Uncles
+            rlp_bytes(&zero32),        // 2  beneficiary
+            rlp_bytes(&zero32),        // 3  stateRoot
+            rlp_bytes(&zero32),        // 4  transactionsRoot
+            rlp_bytes(&receipts_root), // 5  receiptsRoot
+            rlp_bytes(&[0u8; 256]),    // 6  logsBloom
+            rlp_bytes(&[0x01]),        // 7  difficulty
+            rlp_bytes(&number_bytes),  // 8  number
+            rlp_bytes(&[0x01]),        // 9  gasLimit
+            rlp_bytes(&[0x00]),        // 10 gasUsed
+            rlp_bytes(&[0x01]),        // 11 timestamp
+            rlp_bytes(&[]),            // 12 extraData
+            rlp_bytes(&zero32),        // 13 mixHash
+            rlp_bytes(&[0u8; 8]),      // 14 nonce
+        ])
+    }
+
+    /// A one-leaf receipts trie at `key`, and the proof that binds `receipt_rlp`
+    /// to it, both built from the standard encoding.
+    fn single_leaf_trie(key: &[u8], receipt_rlp: &[u8]) -> ([u8; 32], Vec<u8>) {
+        let leaf = rlp_list(&[rlp_bytes(&compact_leaf_path(key)), rlp_bytes(receipt_rlp)]);
+        let root = keccak256_bytes(&leaf);
+        let proof = rlp_list(&[rlp_bytes(&leaf)]);
+        (root, proof)
+    }
+
+    fn envelope_for(
+        header_rlp: &[u8],
+        receipt_rlp: &[u8],
+        receipt_index: &[u8],
+        proof: &[u8],
+        recipient: [u8; 20],
+        current_block_number: u64,
+    ) -> ProofEnvelope {
+        ProofEnvelope {
+            proof_id: [0u8; 32],
+            strategy: VerificationStrategy::EvmReceiptProof,
+            source_chain: ChainKind::Evm { chain_id: 1 },
+            destination_chain: ChainKind::X3,
+            payload: encode_proof_payload(
+                current_block_number,
+                12,
+                header_rlp,
+                receipt_rlp,
+                receipt_index,
+                proof,
+            ),
+            expected_asset_id: [0u8; 32],
+            expected_amount: TRANSFER_AMOUNT,
+            expected_sender: Vec::new(),
+            expected_recipient: recipient.to_vec(),
+        }
+    }
+
+    #[test]
+    fn the_receipt_trie_key_is_the_rlp_of_the_index() {
+        // The convention two places in this repository state: `DecodedProof`'s own
+        // doc ("the receipt-trie key is `rlp(index)`") and the x3-lang VM's bridge
+        // fixture (key `0x01` for index 1). The helper used to wrap the index in a
+        // list, which is a different key and a different nibble path (TICKET-064).
+        assert_eq!(receipt_trie_key(0), vec![0x80]);
+        assert_eq!(receipt_trie_key(1), vec![0x01]);
+        assert_eq!(receipt_trie_key(0x7f), vec![0x7f]);
+        assert_eq!(receipt_trie_key(0x80), vec![0x81, 0x80]);
+        assert_eq!(receipt_trie_key(0x0100), vec![0x82, 0x01, 0x00]);
+        // Leading zeros in the index bytes do not change the key: the wire format
+        // says "big-endian bytes", not "fixed width".
+        assert_eq!(rlp_index_key(&[0x00, 0x00, 0x01]), vec![0x01]);
+        assert_eq!(rlp_index_key(&[]), vec![0x80]);
+    }
+
+    #[test]
+    fn a_proof_built_with_the_standard_key_verifies() {
+        // The verifier's first positive case: every path through
+        // `ProductionEvmReceiptVerifier::verify` was an assertion that it *fails*
+        // (short payload, wrong chain, undecodable receipt), so the merkle walk and
+        // the key convention had no test that could notice either being wrong.
+        let recipient = [0x11u8; 20];
+        let receipt = receipt_with_one_log(recipient);
+        let key = receipt_trie_key(1);
+        assert_eq!(key, vec![0x01], "index 1's key is the single byte 0x01");
+        let (receipts_root, proof) = single_leaf_trie(&key, &receipt);
+        let header = header_with_receipts_root(receipts_root, 100);
+
+        let envelope = envelope_for(&header, &receipt, &[0x01], &proof, recipient, 120);
+        let outcome = ProductionEvmReceiptVerifier::new(12)
+            .verify(&envelope)
+            .expect("a receipt in the trie whose root the header carries must verify");
+        assert!(outcome.accepted, "{outcome:?}");
+    }
+
+    #[test]
+    fn a_tampered_trie_node_does_not_verify() {
+        // The same proof with one byte changed: the node no longer hashes to the
+        // header's receipts root, so the walk must refuse rather than continue.
+        let recipient = [0x11u8; 20];
+        let receipt = receipt_with_one_log(recipient);
+        let key = receipt_trie_key(1);
+        let (receipts_root, proof) = single_leaf_trie(&key, &receipt);
+        let header = header_with_receipts_root(receipts_root, 100);
+
+        let mut tampered = proof.clone();
+        // Flip a byte inside the leaf payload rather than in the list framing.
+        let last = tampered.len() - 2;
+        tampered[last] ^= 0xFF;
+
+        let envelope = envelope_for(&header, &receipt, &[0x01], &tampered, recipient, 120);
+        let result = ProductionEvmReceiptVerifier::new(12).verify(&envelope);
+        assert!(
+            result.is_err(),
+            "a node that does not hash to the root must not verify: {result:?}"
+        );
     }
 
     #[test]
