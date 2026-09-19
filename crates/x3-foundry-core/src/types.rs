@@ -189,8 +189,20 @@ pub struct SecurityReport {
     pub simulation_receipt: Option<SimulationResult>,
     pub auditor_signature: String,
     pub static_analysis_score: u8,
-    pub fuzz_score: u8,
-    pub test_coverage_pct: f64,
+    /// Fuzzing score, or `None` when nothing ran one.
+    ///
+    /// This crate does not execute a fuzz campaign, so the honest value is
+    /// `None`. It used to be fabricated (`contracts × 100` iterations with
+    /// "2 failures", and a score derived from line count) and defaulted to a
+    /// perfect **100** on an empty report.
+    #[serde(default)]
+    pub fuzz_score: Option<u8>,
+    /// Measured test coverage, or `None` when nothing measured it.
+    ///
+    /// The previous implementation computed this from the share of lines
+    /// starting with `//` — i.e. it reported comment density as coverage.
+    #[serde(default)]
+    pub test_coverage_pct: Option<f64>,
     pub loc_analyzed: u64,
     pub audited_at: DateTime<Utc>,
 }
@@ -208,8 +220,9 @@ impl SecurityReport {
             simulation_receipt: None,
             auditor_signature: String::new(),
             static_analysis_score: 100,
-            fuzz_score: 100,
-            test_coverage_pct: 0.0,
+            // Not measured (see the field docs): never a fabricated score.
+            fuzz_score: None,
+            test_coverage_pct: None,
             loc_analyzed: 0,
             audited_at: Utc::now(),
         }
