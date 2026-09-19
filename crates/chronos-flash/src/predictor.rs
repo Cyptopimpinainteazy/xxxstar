@@ -435,19 +435,15 @@ impl SwarmPredictor {
         &self,
         inputs: Vec<PredictionInput>,
     ) -> ChronosResult<Vec<(PredictionInput, f64)>> {
-        // In production, this would:
-        // 1. Partition inputs across available GPUs
-        // 2. Run inference in parallel
-        // 3. Aggregate results
-
-        let results: Vec<(PredictionInput, f64)> = inputs
-            .into_iter()
-            .map(|input| {
-                let confidence = 0.85; // Simulated prediction
-                (input, confidence)
-            })
-            .collect();
-
-        Ok(results)
+        // There is no GPU-swarm inference client behind this. It used to return
+        // `0.85` for every input ("Simulated prediction"), which is
+        // indistinguishable from a real model output at the call site — a
+        // strategy would act on a constant. Partitioning inputs across GPUs,
+        // running inference and aggregating the results is the actual feature.
+        let _ = inputs;
+        Err(ChronosError::PredictionFailed(
+            "distributed prediction is not implemented: no GPU-swarm inference client is wired up"
+                .to_string(),
+        ))
     }
 }

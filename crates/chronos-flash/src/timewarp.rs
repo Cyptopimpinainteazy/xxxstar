@@ -134,10 +134,7 @@ impl TimeWarpEngine {
             actual_output = result.output;
         }
 
-        // Calculate time advantage
-        // Negative means we executed BEFORE the user's original transaction
         let latency_ms = start_time.elapsed().as_millis() as u64;
-        let time_advantage = self.calculate_time_advantage(bundle).await;
 
         let result = ExecutionResult {
             route_id: bundle.route.id,
@@ -146,7 +143,10 @@ impl TimeWarpEngine {
             gas_used: total_gas_used,
             tx_hashes,
             latency_ms,
-            time_advantage_ms: time_advantage,
+            // Not measured: needs the intent-detection timestamp, our execution
+            // timestamp and the user's mined timestamp (this used to be a
+            // hardcoded `-200`).
+            time_advantage_ms: None,
             executed_at: now,
         };
 
@@ -263,22 +263,13 @@ impl TimeWarpEngine {
 
     /// Get current block number
     async fn get_block_number(&self, chain_id: ChainId) -> ChronosResult<u64> {
-        // Would call eth_blockNumber
-        Ok(0)
-    }
-
-    /// Calculate time advantage over user's original submission
-    async fn calculate_time_advantage(&self, bundle: &PreSignedBundle) -> i64 {
-        // Compare our execution time vs when user's tx would have been mined
-        // Negative value = we executed BEFORE user submitted
-
-        // In production:
-        // 1. Track when intent was detected in mempool
-        // 2. Track when our bundle was executed
-        // 3. Track when user's tx was mined (if at all)
-        // time_advantage = our_execution_time - user_tx_mined_time
-
-        -200 // 200ms time advantage (executed 200ms before user)
+        // Used to answer `Ok(0)` ("Would call eth_blockNumber"): a block number
+        // of zero is not a placeholder a caller can detect, and time-warp
+        // checkpoints keyed off it would all collapse onto block 0.
+        let _ = chain_id;
+        Err(ChronosError::TimeWarpFailed(
+            "block number requires an RPC client, which is not wired up".to_string(),
+        ))
     }
 
     /// Cleanup old checkpoints
@@ -357,18 +348,20 @@ impl FlashbotsSubmitter {
 
     /// Submit bundle to Flashbots relay
     pub async fn submit_bundle(&self, bundle: &PreSignedBundle) -> ChronosResult<Hash> {
-        // In production:
-        // 1. Encode bundle as JSON-RPC request
-        // 2. Sign with searcher key
-        // 3. Submit to Flashbots relay
-        // 4. Wait for inclusion or retry
-
-        Ok([0u8; 32])
+        // Used to return `[0u8; 32]` as the bundle hash without contacting the
+        // relay, so "submitted" bundles shared one hash and nothing was sent.
+        let _ = bundle;
+        Err(ChronosError::TimeWarpFailed(
+            "flashbots submission is not implemented: no relay client is wired up".to_string(),
+        ))
     }
 
     /// Get bundle status
     pub async fn get_bundle_status(&self, bundle_hash: Hash) -> ChronosResult<BundleStatus> {
-        Ok(BundleStatus::Pending)
+        let _ = bundle_hash;
+        Err(ChronosError::TimeWarpFailed(
+            "flashbots bundle status is not implemented: no relay client is wired up".to_string(),
+        ))
     }
 }
 
