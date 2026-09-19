@@ -47,12 +47,13 @@ impl PolicyEngine {
             }
 
             PolicyRule::ReputationMinimum(min_rep) => {
-                // Get agent reputation from x3-invariants registry
-                // For now, assume all agents pass (will be linked in formal spec)
-                if context.reputation_score >= *min_rep {
-                    PolicyResult::Pass
-                } else {
-                    PolicyResult::Fail(ViolationType::ReputationBelowMinimum)
+                // A minimum that cannot be evaluated must not pass. The context
+                // used to carry a hardcoded `100` ("assume all agents pass"), so
+                // this rule was decorative for every agent.
+                match context.reputation_score {
+                    Some(score) if score >= *min_rep => PolicyResult::Pass,
+                    Some(_) => PolicyResult::Fail(ViolationType::ReputationBelowMinimum),
+                    None => PolicyResult::Fail(ViolationType::ReputationUnknown),
                 }
             }
 
@@ -65,8 +66,11 @@ impl PolicyEngine {
             }
 
             PolicyRule::NoCollusionWith(blacklist) => {
-                // Check if agent is trying to coordinate with blacklisted peers
-                if context.related_agents.iter().any(|a| blacklist.contains(a)) {
+                // Same shape: the caller passed an always-empty relation list, so
+                // "not blacklisted" was indistinguishable from "we have no idea".
+                if !context.relations_known {
+                    PolicyResult::Fail(ViolationType::CollusionCheckUnavailable)
+                } else if context.related_agents.iter().any(|a| blacklist.contains(a)) {
                     PolicyResult::Fail(ViolationType::CollusionAttempted)
                 } else {
                     PolicyResult::Pass
@@ -104,8 +108,8 @@ impl PolicyEngine {
 /// Policy evaluation context
 /// Passed to `evaluate_policies` to provide all relevant state
 pub struct PolicyContext<T: Config> {
-    /// Agent's current reputation score
-    pub reputation_score: u64,
+    /// Agent's current reputation score, or `None` when no registry is wired.
+    pub reputation_score: Option<u64>,
     /// Number of tasks scheduled by agent this block
     pub tasks_this_block: u32,
     /// Number of extrinsics from agent this epoch
@@ -114,6 +118,11 @@ pub struct PolicyContext<T: Config> {
     pub requested_capability: Option<Vec<u8>>,
     /// Related agent accounts
     pub related_agents: Vec<T::AccountId>,
+    /// Whether `related_agents` reflects a real relation set.
+    ///
+    /// `false` means "unknown", which a collusion policy must treat as a
+    /// failure rather than as "no relations".
+    pub relations_known: bool,
     /// Current block number
     pub current_block: frame_system::pallet_prelude::BlockNumberFor<T>,
     /// Block number of last agent activity
@@ -123,6 +132,7 @@ pub struct PolicyContext<T: Config> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock::Test;
 
     #[test]
     fn test_reputation_minimum() {
@@ -130,5 +140,66 @@ mod tests {
         let rule: PolicyRule<u64> = PolicyRule::ReputationMinimum(min_rep);
 
         assert!(matches!(rule, PolicyRule::ReputationMinimum(100)));
+    }
+
+    fn context(
+        reputation_score: Option<u64>,
+        related_agents: Vec<u64>,
+        relations_known: bool,
+    ) -> PolicyContext<Test> {
+        PolicyContext {
+            reputation_score,
+            tasks_this_block: 0,
+            extrinsics_this_epoch: 0,
+            requested_capability: None,
+            related_agents,
+            relations_known,
+            current_block: 1,
+            last_activity_block: 0,
+        }
+    }
+
+    /// A minimum that cannot be evaluated must not pass: the context used to
+    /// carry a hardcoded `100`, so this rule never fired for any agent.
+    #[test]
+    fn unknown_reputation_does_not_satisfy_a_minimum() {
+        let rule: PolicyRule<u64> = PolicyRule::ReputationMinimum(100);
+        let unknown = context(None, vec![], false);
+        let result = PolicyEngine::evaluate_rule::<Test>(&rule, &1u64, &unknown);
+        assert!(
+            matches!(result, PolicyResult::Fail(ViolationType::ReputationUnknown)),
+            "unknown reputation must fail closed, got {result:?}"
+        );
+
+        // A measured score still evaluates normally.
+        let measured = context(Some(99), vec![], false);
+        assert!(matches!(
+            PolicyEngine::evaluate_rule::<Test>(&rule, &1u64, &measured),
+            PolicyResult::Fail(ViolationType::ReputationBelowMinimum)
+        ));
+        let good = context(Some(100), vec![], false);
+        assert!(PolicyEngine::evaluate_rule::<Test>(&rule, &1u64, &good).is_pass());
+    }
+
+    /// `NoCollusionWith` was evaluated against an always-empty relation list, so
+    /// "no known relations" was indistinguishable from "clean".
+    #[test]
+    fn unknown_relations_do_not_satisfy_a_collusion_policy() {
+        let rule: PolicyRule<u64> = PolicyRule::NoCollusionWith(vec![2, 3]);
+
+        let unknown = context(Some(100), vec![], false);
+        assert!(matches!(
+            PolicyEngine::evaluate_rule::<Test>(&rule, &1u64, &unknown),
+            PolicyResult::Fail(ViolationType::CollusionCheckUnavailable)
+        ));
+
+        let clean = context(Some(100), vec![9], true);
+        assert!(PolicyEngine::evaluate_rule::<Test>(&rule, &1u64, &clean).is_pass());
+
+        let colluding = context(Some(100), vec![2], true);
+        assert!(matches!(
+            PolicyEngine::evaluate_rule::<Test>(&rule, &1u64, &colluding),
+            PolicyResult::Fail(ViolationType::CollusionAttempted)
+        ));
     }
 }

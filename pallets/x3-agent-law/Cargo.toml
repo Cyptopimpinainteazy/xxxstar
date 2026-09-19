@@ -19,6 +19,7 @@ log = { version = "0.4", default-features = false }
 [dev-dependencies]
 sp-io = { workspace = true }
 sp-keystore = { workspace = true }
+pallet-balances = { workspace = true, features = ["std"] }
 
 [features]
 default = ["std"]

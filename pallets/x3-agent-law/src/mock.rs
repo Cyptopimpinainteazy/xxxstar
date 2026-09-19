@@ -1,43 +1,52 @@
+//! Mock runtime for the agent-law pallet tests.
+//!
+//! Rewritten against the current polkadot-sdk: the previous version still used
+//! `frame_system::Config`'s pre-2022 `Index`/`BlockNumber`/`Header` associated
+//! types and `sp_runtime::testing::Header`, so it could not compile at all —
+//! which is why the tests that depend on it had never run.
+
 use crate as pallet_x3_agent_law;
-use frame_support::{construct_runtime, parameter_types, traits::ConstU32};
-use frame_system as system;
-use sp_core::H256;
+use frame_support::{
+    derive_impl, parameter_types,
+    traits::{ConstU128, ConstU32, ConstU64},
+};
+use frame_system::EnsureRoot;
 use sp_runtime::{
-    testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
+    BuildStorage,
 };
 
-type BlockNumber = u32;
-type AccountId = u64;
+type Block = frame_system::mocking::MockBlock<Test>;
 
-parameter_types! {
-    pub const BlockHashCount: BlockNumber = 250;
-    pub const MaximumBlockWeight: frame_support::weights::Weight = frame_support::weights::Weight::from_parts(2_000_000_000_000, 0);
-    pub const MaximumBlockLength: u32 = 5 * 1024 * 1024;
-    pub const AvailableBlockRatio: sp_runtime::Perbill = sp_runtime::Perbill::from_percent(75);
-}
+frame_support::construct_runtime!(
+    pub enum Test {
+        System: frame_system,
+        Balances: pallet_balances,
+        AgentLaw: pallet_x3_agent_law,
+    }
+);
 
-impl system::Config for Test {
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
+impl frame_system::Config for Test {
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
     type RuntimeCall = RuntimeCall;
-    type Index = u64;
-    type BlockNumber = BlockNumber;
-    type Hash = H256;
+    type Nonce = u64;
+    type Hash = sp_core::H256;
     type Hashing = BlakeTwo256;
-    type AccountId = AccountId;
+    type AccountId = u64;
     type Lookup = IdentityLookup<Self::AccountId>;
-    type Header = Header;
+    type Block = Block;
     type RuntimeEvent = RuntimeEvent;
-    type BlockHashCount = BlockHashCount;
+    type BlockHashCount = ConstU64<250>;
     type Version = ();
     type PalletInfo = PalletInfo;
+    type AccountData = pallet_balances::AccountData<u128>;
     type OnNewAccount = ();
     type OnKilledAccount = ();
-    type AccountData = pallet_balances::AccountData<u128>;
     type SystemWeightInfo = ();
     type SS58Prefix = ();
     type OnSetCode = ();
@@ -45,56 +54,49 @@ impl system::Config for Test {
 }
 
 impl pallet_balances::Config for Test {
-    type MaxLocks = ();
-    type MaxReserves = ();
-    type ReserveIdentifier = ();
+    type MaxLocks = ConstU32<50>;
+    type MaxReserves = ConstU32<50>;
+    type ReserveIdentifier = [u8; 8];
     type Balance = u128;
-    type DustRemoval = ();
     type RuntimeEvent = RuntimeEvent;
-    type ExistentialDeposit = ();
-    type AccountStore = system::Pallet<Test>;
-    type WeightInfo = pallet_balances::weights::SubstrateWeight<Test>;
+    type DustRemoval = ();
+    type ExistentialDeposit = ConstU128<1>;
+    type AccountStore = System;
+    type WeightInfo = ();
+    type FreezeIdentifier = ();
+    type MaxFreezes = ConstU32<0>;
+    type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = RuntimeFreezeReason;
+    type DoneSlashHandler = ();
 }
 
 parameter_types! {
     pub const ReputationThreshold: u64 = 100;
     pub const MaxTasksPerBlock: u32 = 50;
-    pub const CheckpointGracePeriod: BlockNumber = 14400;
-    pub const RateLimitEpochLength: BlockNumber = 14400; // 24 hours @ 6s blocks
+    pub const CheckpointGracePeriod: u32 = 14400;
+    // 24 hours at 6s blocks
+    pub const RateLimitEpochLength: u32 = 14400;
     pub const RateLimitMaxExtrinsicsPerEpoch: u32 = 1000;
 }
 
 impl pallet_x3_agent_law::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
-    type Currency = pallet_balances::Pallet<Self>;
+    type Currency = Balances;
+    type GovernanceOrigin = EnsureRoot<u64>;
     type ReputationThreshold = ReputationThreshold;
     type MaxTasksPerBlock = MaxTasksPerBlock;
     type CheckpointGracePeriod = CheckpointGracePeriod;
     type RateLimitEpochLength = RateLimitEpochLength;
     type RateLimitMaxExtrinsicsPerEpoch = RateLimitMaxExtrinsicsPerEpoch;
-    type WeightInfo = pallet_x3_agent_law::weights::();
+    type WeightInfo = ();
 }
-
-construct_runtime!(
-    pub enum Test where
-        Block = system::mocking::MockBlock<Test>,
-        NodeBlock = system::mocking::MockBlock<Test>,
-        UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>,
-    {
-        System: system,
-        Balances: pallet_balances,
-        AgentLaw: pallet_x3_agent_law,
-    }
-);
 
 pub struct ExtBuilder;
 
 impl ExtBuilder {
     pub fn build() -> sp_io::TestExternalities {
-        let storage = system::GenesisConfig::default()
-            .build_storage::<Test>()
-            .unwrap();
+        let storage = frame_system::GenesisConfig::<Test>::default()
+            .build_storage()
+            .expect("mock genesis storage builds");
 
         sp_io::TestExternalities::new(storage)
     }
