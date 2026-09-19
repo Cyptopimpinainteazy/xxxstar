@@ -18,7 +18,11 @@ describe('FoundryRevenueRouter', () => {
       const stats = await client.getRevenueStats(project.id);
       
       expect(stats.platform_fee_bps).toBe(200); // 2%
-      expect(stats.creator_share_bps).toBe(9700); // 97%
+      // 96.5%: creator absorbs the default RevenueConfig's optional legs
+      // (ai_agent + maintenance + referral, 0.5% each) rather than them
+      // being carved out of the platform's cut. See x3-foundry-core's
+      // derive_creator_fee_bps (issue #110 item 7 follow-up).
+      expect(stats.creator_share_bps).toBe(9650); // 96.5%
       expect(stats.treasury_split.protocol_treasury).toBe(40);
       expect(stats.treasury_split.gpu_swarm).toBe(20);
       expect(stats.treasury_split.dev_vault).toBe(15);
@@ -32,7 +36,7 @@ describe('FoundryRevenueRouter', () => {
       await client.generateDapp(project.id, 'Test dApp');
       
       const revenue = 10000; // 10,000 USDC
-      const creatorShare = revenue * 0.97; // 97%
+      const creatorShare = revenue * 0.965; // 96.5% (default RevenueConfig)
       
       const stats = await client.getRevenueStats(project.id);
       expect(stats.creator_earnings).toBeGreaterThanOrEqual(0);

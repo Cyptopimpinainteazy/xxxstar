@@ -41,10 +41,20 @@ Charge platform share on:
 
 ## RevenueConfig Structure
 
+The creator absorbs the optional legs: `creator_fee_bps` is the remainder
+after `platform_fee_bps` and any active optional fees, not a fixed
+guarantee. The true ceiling (zero optional legs active) is 98% for the 2%
+default platform fee — "97%" was never a structurally guaranteed number,
+just an approximation. The default config has all three optional legs
+active (0.5% each), so the creator's actual share is 96.5% (9650 bps) by
+default.
+
 ```rust
 struct RevenueConfig {
     platform_fee_bps: u16,        // default 200 = 2%
-    creator_fee_bps: u16,         // default 9700 = 97%
+    creator_fee_bps: u16,         // derived: 10000 - platform - ai_agent - maintenance - referral
+                                   // (9650 = 96.5% with the default optional legs all active;
+                                   // up to 9800 = 98% if none are)
     ai_agent_fee_bps: u16,        // optional 50 = 0.5%
     maintenance_fee_bps: u16,     // optional 50 = 0.5%
     referral_fee_bps: u16,        // optional 50 = 0.5%
@@ -86,7 +96,11 @@ Incoming dApp platform fees are routed through `FoundryRevenueRouter` and split:
 
 ## Creator Earnings
 
-Creators receive 97% of dApp revenue (default). Earnings are:
+Creators receive whatever remains after the platform fee and any active
+optional fees (96.5% under the default `RevenueConfig`, which has all
+three optional legs active — see "RevenueConfig Structure" above). "97%"
+elsewhere in this doc is a rounded illustrative figure, not the literal
+default. Earnings are:
 1. Tracked on-chain per creator address
 2. Withdrawable via pull-over-push pattern
 3. Never locked or subject to vesting

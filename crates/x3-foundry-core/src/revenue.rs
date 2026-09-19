@@ -1,4 +1,5 @@
 use crate::error::FoundryError;
+use crate::types::derive_creator_fee_bps;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -8,6 +9,12 @@ use tracing::info;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeeConfig {
     pub platform_fee_bps: u16,
+    /// The creator's share, in basis points — the remainder after
+    /// `platform_fee_bps` and the optional legs (see
+    /// [`crate::types::derive_creator_fee_bps`]). `record_revenue` below
+    /// computes the actual payout as its own runtime remainder
+    /// independently of this field, so keep it in sync or it becomes
+    /// misleading metadata.
     pub creator_fee_bps: u16,
     pub ai_agent_fee_bps: Option<u16>,
     pub maintenance_fee_bps: Option<u16>,
@@ -17,12 +24,21 @@ pub struct FeeConfig {
 
 impl Default for FeeConfig {
     fn default() -> Self {
+        let platform_fee_bps = 200;
+        let ai_agent_fee_bps = Some(50);
+        let maintenance_fee_bps = Some(50);
+        let referral_fee_bps = Some(50);
         Self {
-            platform_fee_bps: 200,
-            creator_fee_bps: 9700,
-            ai_agent_fee_bps: Some(50),
-            maintenance_fee_bps: Some(50),
-            referral_fee_bps: Some(50),
+            platform_fee_bps,
+            creator_fee_bps: derive_creator_fee_bps(
+                platform_fee_bps,
+                ai_agent_fee_bps,
+                maintenance_fee_bps,
+                referral_fee_bps,
+            ),
+            ai_agent_fee_bps,
+            maintenance_fee_bps,
+            referral_fee_bps,
             fee_token: "X3".to_string(),
         }
     }
@@ -412,5 +428,40 @@ mod tests {
         let summary = tracker.get_app_revenue_summary("app-1");
         assert_eq!(summary.total_volume, 5000);
         assert_eq!(summary.transaction_count, 1);
+    }
+
+    #[test]
+    fn test_default_fee_config_sums_to_10000() {
+        // The stored `creator_fee_bps` is metadata, not what actually gets
+        // paid out (see `record_revenue`, which computes the creator's
+        // share as its own runtime remainder). This asserts the two stay in
+        // sync for the default config (issue #110 item 7 follow-up: they
+        // previously didn't — the stored default claimed 97% while the
+        // runtime remainder was actually 96.5%).
+        let config = FeeConfig::default();
+        let total = config.platform_fee_bps as u32
+            + config.creator_fee_bps as u32
+            + config.ai_agent_fee_bps.unwrap_or(0) as u32
+            + config.maintenance_fee_bps.unwrap_or(0) as u32
+            + config.referral_fee_bps.unwrap_or(0) as u32;
+        assert_eq!(total, 10_000);
+    }
+
+    #[test]
+    fn test_record_revenue_legs_sum_to_amount_exactly() {
+        // The creator's payout is derived as amount - other_fees, so this
+        // holds by construction, but assert it explicitly as a regression
+        // guard: no future change to `record_revenue` should let rounding
+        // or a reordered computation leak value or fabricate it.
+        let mut tracker = RevenueTracker::default();
+        let record = tracker
+            .record_revenue("app-1", "0xCreator", "x3-mainnet", 123_457, "X3", "0xtx")
+            .unwrap();
+        let total = record.platform_fee
+            + record.creator_revenue
+            + record.ai_agent_fee
+            + record.maintenance_fee
+            + record.referral_fee;
+        assert_eq!(total, record.amount);
     }
 }

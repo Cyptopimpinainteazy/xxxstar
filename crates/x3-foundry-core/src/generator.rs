@@ -1,6 +1,6 @@
 use crate::error::FoundryError;
 use crate::templates::{Template, TemplateRegistry};
-use crate::types::{DAppType, FeeMode, PricingTier, RevenueConfig};
+use crate::types::{derive_creator_fee_bps, DAppType, FeeMode, PricingTier, RevenueConfig};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -539,28 +539,42 @@ impl TokenomicsAgent {
         })
     }
     fn design_revenue_config(&self, cw: &str, dt: &DAppType) -> RevenueConfig {
-        let (pf, cf) = match dt {
-            DAppType::TokenLaunchpad => (300, 9600),
-            DAppType::NFTMarketplace => (250, 9650),
-            DAppType::StakingPool => (200, 9700),
-            DAppType::SubscriptionApp => (150, 9750),
-            DAppType::EscrowApp => (100, 9800),
-            DAppType::AiImageSaaS => (500, 9300),
-            DAppType::TradingBotVault => (300, 9500),
-            DAppType::YieldOptimizer => (200, 9700),
-            DAppType::CrossChainPayout => (150, 9750),
-            DAppType::DomainRegistry => (250, 9600),
-            DAppType::PredictionMarket => (300, 9500),
-            DAppType::AffiliateApp => (200, 9700),
-            DAppType::DataMarketplace => (250, 9600),
-            DAppType::Custom(_) => (200, 9700),
+        // Per-type platform fee (product decision: higher-cost/higher-risk
+        // dApp types carry a higher platform cut). The creator's share is
+        // *derived* as the remainder after platform + the fixed optional
+        // legs below, never hand-picked — see `derive_creator_fee_bps` for
+        // why (issue #110 item 7 follow-up: a hand-picked creator figure
+        // silently drifted out of sync with the actual runtime remainder).
+        let pf: u16 = match dt {
+            DAppType::TokenLaunchpad => 300,
+            DAppType::NFTMarketplace => 250,
+            DAppType::StakingPool => 200,
+            DAppType::SubscriptionApp => 150,
+            DAppType::EscrowApp => 100,
+            DAppType::AiImageSaaS => 500,
+            DAppType::TradingBotVault => 300,
+            DAppType::YieldOptimizer => 200,
+            DAppType::CrossChainPayout => 150,
+            DAppType::DomainRegistry => 250,
+            DAppType::PredictionMarket => 300,
+            DAppType::AffiliateApp => 200,
+            DAppType::DataMarketplace => 250,
+            DAppType::Custom(_) => 200,
         };
+        let ai_agent_fee_bps = Some(50);
+        let maintenance_fee_bps = Some(50);
+        let referral_fee_bps = Some(50);
         RevenueConfig {
             platform_fee_bps: pf,
-            creator_fee_bps: cf,
-            ai_agent_fee_bps: Some(50),
-            maintenance_fee_bps: Some(50),
-            referral_fee_bps: Some(50),
+            creator_fee_bps: derive_creator_fee_bps(
+                pf,
+                ai_agent_fee_bps,
+                maintenance_fee_bps,
+                referral_fee_bps,
+            ),
+            ai_agent_fee_bps,
+            maintenance_fee_bps,
+            referral_fee_bps,
             treasury_wallet: "0xTreasury".into(),
             creator_wallet: cw.into(),
             maintenance_wallet: "0xMaintenance".into(),
