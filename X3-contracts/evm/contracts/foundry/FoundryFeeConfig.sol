@@ -24,8 +24,13 @@ contract FoundryFeeConfig is Ownable {
     /// @notice Maximum basis points (100%)
     uint256 public constant MAX_BPS = 10000;
 
-    /// @notice Default platform minimum fee in basis points (2.5%)
-    uint256 public constant DEFAULT_MIN_PLATFORM_FEE_BPS = 250;
+    /// @notice Default platform minimum fee in basis points (0.5%)
+    /// @dev Matches the governance-tunable "Platform min fee" default in
+    ///      docs/X3_FOUNDRY_GOVERNANCE.md (50 bps, range 10-500 bps). Must
+    ///      stay at or below the documented default dApp platform fee (2%,
+    ///      200 bps — see docs/X3_FOUNDRY_REVENUE_MODEL.md) or the default
+    ///      fee itself would be rejected by `_validateFeeConfig`.
+    uint256 public constant DEFAULT_MIN_PLATFORM_FEE_BPS = 50;
 
     // ── State ────────────────────────────────────────────────────────────────
 

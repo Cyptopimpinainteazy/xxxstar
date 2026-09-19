@@ -115,7 +115,7 @@ export enum ProjectStatus {
 export interface RevenueConfig {
   /** The fee mode determining distribution logic */
   feeMode: FeeMode;
-  /** Platform fee percentage (basis points, e.g. 250 = 2.5%) */
+  /** Platform fee percentage (basis points, e.g. 200 = 2%, the documented default) */
   platformFeeBps: number;
   /** Creator revenue share percentage (basis points) */
   creatorShareBps: number;

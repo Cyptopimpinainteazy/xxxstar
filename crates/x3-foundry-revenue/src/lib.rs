@@ -11,17 +11,21 @@ use std::collections::HashMap;
 /// Maximum basis points (100%).
 pub const MAX_BASIS_POINTS: u64 = 10_000;
 
-/// Default platform fee in basis points (5%).
-pub const DEFAULT_PLATFORM_FEE_BPS: u64 = 500;
+/// Default platform fee in basis points (2%).
+///
+/// Matches the default dApp platform fee documented in
+/// docs/X3_FOUNDRY_REVENUE_MODEL.md and docs/X3_FOUNDRY_DEVELOPER_GUIDE.md
+/// (issue #110 item 7: reconcile fee defaults across docs/contracts/Rust).
+pub const DEFAULT_PLATFORM_FEE_BPS: u64 = 200;
 
-/// Default creator fee in basis points (85%).
-pub const DEFAULT_CREATOR_FEE_BPS: u64 = 8_500;
+/// Default creator fee in basis points (97%).
+pub const DEFAULT_CREATOR_FEE_BPS: u64 = 9_700;
 
-/// Default referral fee in basis points (5%).
-pub const DEFAULT_REFERRAL_FEE_BPS: u64 = 500;
+/// Default referral fee in basis points (0.5%).
+pub const DEFAULT_REFERRAL_FEE_BPS: u64 = 50;
 
-/// Default treasury fee in basis points (5%).
-pub const DEFAULT_TREASURY_FEE_BPS: u64 = 500;
+/// Default treasury fee in basis points (0.5%).
+pub const DEFAULT_TREASURY_FEE_BPS: u64 = 50;
 
 /// Minimum fee in basis points (0.1%).
 pub const MIN_FEE_BPS: u64 = 10;
@@ -347,7 +351,7 @@ impl FeeValidator {
     /// Validate a complete fee configuration.
     ///
     /// A `FeeConfig` may legitimately concentrate a large share on one leg
-    /// (the documented default gives the creator 85%; `FeeConfig::new` and
+    /// (the documented default gives the creator 97%; `FeeConfig::new` and
     /// `test_custom_config` also permit a >50% creator) and is validated by
     /// its own sum-to-10000 rule (`FeeConfig::validate`). Accordingly this
     /// enforces the same contract as `FeeConfig::new`: each leg within the
@@ -460,7 +464,7 @@ mod tests {
         // A FeeConfig is invalid when its legs do not sum to 10000 bps (the
         // same rule `FeeConfig::new` / `validate_fee_config` enforce). A split
         // that concentrates >=50% on a single leg is otherwise permitted so a
-        // creator-dominant fee model (documented default 85%) stays valid.
+        // creator-dominant fee model (documented default 97%) stays valid.
         let bad_split = FeeConfig::new(6000, 3000, 500, 100); // = 9600 bps
         assert!(bad_split.is_err());
 
@@ -479,7 +483,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_platform_share(&amount).unwrap();
-        assert_eq!(share, dec!(50)); // 5% of 1000
+        assert_eq!(share, dec!(20)); // 2% of 1000
     }
 
     #[test]
@@ -487,7 +491,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_creator_share(&amount).unwrap();
-        assert_eq!(share, dec!(850)); // 85% of 1000
+        assert_eq!(share, dec!(970)); // 97% of 1000
     }
 
     #[test]
@@ -495,7 +499,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_referral_share(&amount).unwrap();
-        assert_eq!(share, dec!(50)); // 5% of 1000
+        assert_eq!(share, dec!(5)); // 0.5% of 1000
     }
 
     #[test]
@@ -503,7 +507,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000);
         let share = calc.calculate_treasury_share(&amount).unwrap();
-        assert_eq!(share, dec!(50)); // 5% of 1000
+        assert_eq!(share, dec!(5)); // 0.5% of 1000
     }
 
     #[test]
@@ -511,10 +515,10 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(10000);
         let shares = calc.calculate_all_shares(&amount).unwrap();
-        assert_eq!(shares.platform, dec!(500));
-        assert_eq!(shares.creator, dec!(8500));
-        assert_eq!(shares.referral, dec!(500));
-        assert_eq!(shares.treasury, dec!(500));
+        assert_eq!(shares.platform, dec!(200));
+        assert_eq!(shares.creator, dec!(9700));
+        assert_eq!(shares.referral, dec!(50));
+        assert_eq!(shares.treasury, dec!(50));
     }
 
     #[test]
@@ -541,8 +545,8 @@ mod tests {
         assert_eq!(report.dapp_id, "dapp-1");
         assert_eq!(report.total_revenue, dec!(5000));
         assert_eq!(report.transaction_count, 10);
-        assert_eq!(report.platform_share, dec!(250));
-        assert_eq!(report.creator_share, dec!(4250));
+        assert_eq!(report.platform_share, dec!(100));
+        assert_eq!(report.creator_share, dec!(4850));
     }
 
     #[test]
@@ -569,7 +573,7 @@ mod tests {
         let calc = RevenueCalculator::new();
         let amount = dec!(1000000000000);
         let share = calc.calculate_platform_share(&amount).unwrap();
-        assert_eq!(share, dec!(50000000000));
+        assert_eq!(share, dec!(20000000000));
     }
 
     #[test]
