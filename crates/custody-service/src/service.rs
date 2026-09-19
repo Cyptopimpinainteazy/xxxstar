@@ -208,16 +208,36 @@ impl CustodyService for CustodyServiceImpl {
         // Validate policy
         self.check_policy(&command)?;
 
-        // Check if authorized
-        let is_authorized = self
-            .auth_decisions
-            .read()
-            .values()
-            .any(|d| d.approved && d.request_id == operation_id);
+        // An operation is authorized when an approved decision exists for a
+        // request whose *command* names it. Two things were wrong here:
+        //
+        // 1. the lookup compared the decision's `request_id` with the operation
+        //    id, but `authorize_operation` stores requests under `request_id`
+        //    while the operation is identified by `command.operation_id`, so an
+        //    authorized operation never matched its own decision;
+        // 2. the `&& tier != Operational` escape meant the Operational tier
+        //    needed no decision at all — a caller could execute a vault transfer
+        //    by labelling the command `Operational` and never calling
+        //    `authorize_operation`.
+        //
+        // Auto-approval for the Operational tier still exists; it produces a
+        // decision record, and that record is now required.
+        // Scoped so the lock guards are released before the first `.await`
+        // below: holding them would make this future non-`Send`.
+        let is_authorized = {
+            let requests = self.auth_requests.read();
+            let decisions = self.auth_decisions.read();
+            decisions.values().any(|decision| {
+                decision.approved
+                    && requests
+                        .get(&decision.request_id)
+                        .is_some_and(|request| request.command.operation_id == operation_id)
+            })
+        };
 
-        if !is_authorized && command.required_tier != AuthorizationTier::Operational {
+        if !is_authorized {
             return Err(CustodyError::AuthorizationFailed(format!(
-                "Operation {} requires authorization",
+                "Operation {} has no approved authorization",
                 operation_id
             )));
         }
@@ -488,6 +508,20 @@ mod tests {
         assert!(decision.approved);
     }
 
+    /// Build an authorization request for a command (the Operational tier is
+    /// auto-approved, but it still has to be requested and recorded).
+    fn auth_request_for(cmd: &VaultOperationCommand, request_id: &str) -> AuthorizationRequest {
+        AuthorizationRequest {
+            request_id: request_id.to_string(),
+            command: cmd.clone(),
+            required_tier: cmd.required_tier,
+            requestor: "test-user".to_string(),
+            reason: "test authorization".to_string(),
+            created_at_ms: Utc::now().timestamp_millis() as u64,
+            expires_at_ms: Utc::now().timestamp_millis() as u64 + 3_600_000,
+        }
+    }
+
     #[tokio::test]
     async fn test_execute_transfer() {
         let service = CustodyServiceImpl::new().await.unwrap();
@@ -515,9 +549,54 @@ mod tests {
             initiated_at_ms: Utc::now().timestamp_millis() as u64,
         };
 
+        // Authorization is a precondition now: the Operational tier is
+        // auto-approved, but the approval still has to be requested and
+        // recorded. This test used to execute straight away.
+        service
+            .authorize_operation(auth_request_for(&cmd, "auth-op-1"))
+            .await
+            .unwrap();
+
         let response = service.execute_operation(cmd).await.unwrap();
         assert_eq!(response.status, OperationStatus::Succeeded);
         assert_eq!(response.vault_balance_after, Some(9000));
+    }
+
+    /// An operation labelled with the tier that used to be exempt from
+    /// authorization must not execute without an approved decision.
+    #[tokio::test]
+    async fn executing_without_authorization_is_refused() {
+        let service = CustodyServiceImpl::new().await.unwrap();
+        service
+            .init_vault(
+                "vault-3".to_string(),
+                "USDC".to_string(),
+                10_000,
+                VaultStatus::Active,
+            )
+            .unwrap();
+
+        let cmd = VaultOperationCommand {
+            operation_id: "op-unauthorized".to_string(),
+            operation_type: VaultOperationType::Transfer,
+            source_vault_id: "vault-3".to_string(),
+            destination: "0xdead".to_string(),
+            asset: "USDC".to_string(),
+            amount: 1000,
+            chain_id: 1,
+            // The tier that used to be exempt from authorization entirely.
+            required_tier: AuthorizationTier::Operational,
+            policy_rule_ids: vec![],
+            route_id: None,
+            metadata: BTreeMap::new(),
+            initiated_at_ms: Utc::now().timestamp_millis() as u64,
+        };
+
+        let err = service.execute_operation(cmd).await.unwrap_err();
+        assert!(
+            matches!(err, CustodyError::AuthorizationFailed(_)),
+            "expected an authorization failure, got {err:?}"
+        );
     }
 
     #[tokio::test]
@@ -546,6 +625,13 @@ mod tests {
             metadata: BTreeMap::new(),
             initiated_at_ms: Utc::now().timestamp_millis() as u64,
         };
+
+        // Authorized, but the vault cannot cover it: the failure below must be
+        // the balance, not the authorization.
+        service
+            .authorize_operation(auth_request_for(&cmd, "auth-op-fail"))
+            .await
+            .unwrap();
 
         let response = service.execute_operation(cmd).await.unwrap();
         assert_eq!(response.status, OperationStatus::Failed);
