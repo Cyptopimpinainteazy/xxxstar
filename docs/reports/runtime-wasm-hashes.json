@@ -1,0 +1,27 @@
+{
+  "_comment": "Recorded output of a reproducible build of the X3 runtime at recorded_revision. scripts/mainnet_release_gate.py rebuilds the runtime inside the same image and fails if any value here differs (or if this file is missing). The values describe one revision: any runtime-affecting change produces a new hash, so a release updates this file with a build taken from the revision it is releasing — after confirming two builds of that revision agree.",
+  "image": "paritytech/srtool:1.93.0-0.18.4",
+  "image_digest": "sha256:8638a668bd6d29111dc01953fbead6eb08c062e1cc62d3047a245a52b6edb3bf",
+  "srtool": "0.18.4",
+  "rustc": "1.93.0",
+  "recorded_at": "2026-09-19",
+  "recorded_revision": "c4b3a1621",
+  "runtime_version": "x3-chain-11 (x3-chain-1.tx1.au1)",
+  "metadata": "V14",
+  "runtimes": {
+    "compact": {
+      "size": 8419783,
+      "set_code": "0xb1f0348cbe38d893a6ed3aafccf46c9be882fbeb6065d84693f58f0945c90ce3",
+      "authorize_upgrade": "0x9dff843475473cc9cffce4baea61279a2490ef4a7cd82188e07dea38d24d16c6",
+      "ipfs": "QmSoEEz3vrqZmnYGL8M9Rsr2r2BYV7EcHd79ABxWCzpmHE",
+      "blake2_256": "0x154d73b853bcbbe2cf1802cd5bd2b818b5200c42e1ae6d8db3faad8429cae37d"
+    },
+    "compressed": {
+      "size": 1443099,
+      "set_code": "0xa3de51b578473f55cadcfc80d559c60aa14f45e447330ecb74b44cec3d42849c",
+      "authorize_upgrade": "0xfe31159a26fd644df98b697c0f6405e3aa8e49805357f3cab1d35dded67ed9bd",
+      "ipfs": "QmXraoEUG4u6qbW5b3TnDMTNPuimfLEkaMqxnkEgEpQBUz",
+      "blake2_256": "0xf3726b93445966095ddbee28d277b18db1aa0d44c98dc04f148fa29a3d3dd27c"
+    }
+  }
+}

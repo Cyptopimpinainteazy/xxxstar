@@ -18,6 +18,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
@@ -255,6 +256,140 @@ def check_reproducible_build_prereqs() -> None:
         ok("no SKIP_WASM_BUILD override detected")
 
 
+# ── 6b. The runtime hash, rebuilt and compared ───────────────────────────────
+
+# The recorded output of a reproducible build. It is not documentation: the gate
+# rebuilds the runtime inside the same image and fails when any value differs.
+REPRODUCIBLE_RECORD = "docs/reports/runtime-wasm-hashes.json"
+
+
+def _srtool_values(output: str) -> dict[str, dict[str, str]]:
+    """Pull the per-runtime hash block out of srtool's output.
+
+    srtool prints one block per artifact, introduced by `== Compact` /
+    `== Compressed`:
+
+        == Compressed
+         Version          : x3-chain-11 (…)
+         Metadata         : V14
+         Size             : 1.37 MB (1441379 bytes)
+         setCode          : 0xf4b7…
+         authorizeUpgrade : 0xc0eb…
+         IPFS             : QmRn…
+         BLAKE2_256       : 0xa252…
+    """
+    wanted = {
+        "size": "Size",
+        "set_code": "setCode",
+        "authorize_upgrade": "authorizeUpgrade",
+        "ipfs": "IPFS",
+        "blake2_256": "BLAKE2_256",
+    }
+    found: dict[str, dict[str, str]] = {}
+    current: str | None = None
+    for raw in output.splitlines():
+        line = raw.strip()
+        if line.startswith("== "):
+            label = line[3:].strip().lower()
+            current = label if label in ("compact", "compressed") else None
+            if current:
+                found.setdefault(current, {})
+            continue
+        if current is None or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        for field, label in wanted.items():
+            if key != label:
+                continue
+            if field == "size":
+                # `1.37 MB (1441379 bytes)` → `1441379`
+                inner = re.search(r"\((\d+) bytes\)", value)
+                found[current][field] = inner.group(1) if inner else value
+            else:
+                found[current][field] = value
+    return found
+
+
+def check_reproducible_build() -> None:
+    """Rebuild the runtime in the pinned image and compare against the record.
+
+    Stage 6 only proves srtool is *installed*, which verifies nothing about this
+    source tree: a build script that injects a timestamp, a path or a host value
+    would still pass it. This stage is the actual claim — same source, same
+    image, same bytes — and it is why `make mainnet-check` takes about ten
+    minutes longer than it used to.
+    """
+    print("\n── 6b. Runtime hash, rebuilt and compared ──")
+
+    record_path = ROOT / REPRODUCIBLE_RECORD
+    if not record_path.exists():
+        fail(f"{REPRODUCIBLE_RECORD} is missing — there is nothing to compare against")
+        return
+    try:
+        record = json.loads(record_path.read_text())
+    except (json.JSONDecodeError, ValueError) as exc:
+        fail(f"{REPRODUCIBLE_RECORD} is not valid JSON: {exc}")
+        return
+
+    expected_runtimes = record.get("runtimes", {})
+    if not expected_runtimes:
+        fail(f"{REPRODUCIBLE_RECORD} records no runtime hashes")
+        return
+
+    # A missing toolchain is already reported by stage 6; do not add a second
+    # failure for the same cause.
+    if not (shutil.which("srtool") or (pathlib.Path.home() / ".cargo" / "bin" / "srtool").exists()):
+        print("  (skipped: srtool is not installed — stage 6 already failed)")
+        return
+    if shutil.which("docker") is None:
+        print("  (skipped: docker is not available — stage 6 already failed)")
+        return
+
+    image = record.get("image", "the pinned image")
+    print(f"  rebuilding the runtime in {image} (this takes ~10 minutes)…")
+    result = run(["bash", str(ROOT / "scripts" / "run-srtool.sh"), "build"])
+    if result.returncode != 0:
+        fail("the reproducible build itself failed (see scripts/run-srtool.sh output)")
+        for line in (result.stdout + result.stderr).splitlines()[-15:]:
+            print(f"    {line}")
+        return
+
+    actual = _srtool_values(result.stdout + result.stderr)
+    if not actual:
+        fail("could not read any hash block out of the srtool output")
+        return
+
+    for runtime, expected in sorted(expected_runtimes.items()):
+        got = actual.get(runtime)
+        if got is None:
+            fail(f"{runtime}: the rebuild produced no {runtime} artifact")
+            continue
+        mismatched = [
+            f"{field}: expected {value}, rebuilt {got.get(field)}"
+            for field, value in sorted(expected.items())
+            if str(got.get(field)) != str(value)
+        ]
+        if mismatched:
+            print(
+                "    a hash changed. Two possibilities: the runtime source changed since"
+            )
+            print(
+                "    docs/reports/runtime-wasm-hashes.json was recorded (rebuild again to"
+            )
+            print(
+                "    confirm two builds of *this* revision agree, then update the record),"
+            )
+            print(
+                "    or the build is not reproducible (stop the release and investigate)."
+            )
+            for line in mismatched:
+                fail(f"{runtime}: {line}")
+        else:
+            ok(f"{runtime}: rebuilt {got.get('blake2_256')} — matches the record")
+
+
 # ── 7. Forbidden secrets ─────────────────────────────────────────────────────
 
 def has_forbidden_secrets() -> bool:
@@ -296,6 +431,7 @@ def main() -> int:
     check_test_suites()
     check_runtime_upgrade_rehearsal()
     check_reproducible_build_prereqs()
+    check_reproducible_build()
     has_forbidden_secrets()
 
     print(f"\n{'═' * 60}")
