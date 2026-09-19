@@ -1,23 +1,40 @@
-//! EVM Merkle Patricia Trie receipt proof verification.
+//! EVM receipt proof verification: inclusion in the receipts trie, plus the log the
+//! receipt carries.
 //!
-//! Verifies that a specific event (e.g. a bridge lock) was included
-//! in an Ethereum block by proving the receipt is in the block's
-//! receipt trie. Uses standard RLP encoding and Merkle Patricia Trie
-//! verification (EIP-1052 compatible).
+//! # What this module proves, and what it does not
 //!
-//! # Flow
+//! The trie walk is **not implemented here**. `verify_evm_receipt_proof` delegates it
+//! to [`x3_verification_router::evm_receipt::verify_merkle_patricia_proof`] — the
+//! canonical verifier, the one the relayer is wired to — passing the receipts root,
+//! the `rlp(index)` trie key, the caller's receipt RLP as the leaf value, and the
+//! caller's proof nodes. So the caller must supply a *root* to prove against; there is
+//! no default and no fallback.
 //!
-//! 1. User provides the receipt RLP, receipt index, and the block hash.
-//! 2. The receipt is hash-verified against the receipt trie root in the block header.
-//! 3. Logs are extracted from the receipt and matched against expected events.
-//! 4. The block hash is confirmed against the expected confirmation count.
-//! 5. Returns a `VerifiedReceiptProof` that can be stored in the receipt store.
+//! Proved by a successful call:
 //!
-//! # Security
+//! - the receipt RLP is the value at index `receipt_index` in the trie whose root is
+//!   `receipts_root`, under the standard `rlp(index)` key convention;
+//! - the receipt decodes, its status and gas-used fields are readable, and every
+//!   expected log is present in it.
 //!
-//! - Does NOT trust the relayer: the block hash must match a known finalized header.
-//! - Does NOT trust the receipt index: the trie proof proves inclusion at the claimed index.
-//! - Fails closed on any decoding error, hash mismatch, or log mismatch.
+//! **Not** proved, and carried as `Option`s for exactly that reason:
+//!
+//! - which block the root belongs to. `receipts_root` comes from a header, and this
+//!   module never sees that header, its hash, or the chain height. A caller that has a
+//!   finalized header says so through [`EvmReceiptProof::with_header_attestation`],
+//!   which is an *attestation* rather than something this walk establishes.
+//! - the transaction hash. It is not recoverable from a receipt; the trie key is an
+//!   index. [`EvmReceiptProof::tx_hash`] is `None` unless a caller fills it in.
+//! - the confirmation count. [`EvmReceiptProof::require_confirmations`] refuses when
+//!   no header attestation was recorded, rather than reading a default of `1` as one
+//!   confirmation.
+//!
+//! # Fails closed
+//!
+//! A bad root, a bad key, a missing or tampered node, an unreadable receipt, an
+//! absent expected log, and a confirmation requirement with nothing to measure
+//! against are all errors. There is no path through this module that returns an
+//! `Ok` for a receipt bound to nothing.
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -42,25 +59,70 @@ pub struct RlpDecodedLog {
     pub data: Vec<u8>,
 }
 
-/// A verified EVM receipt proof artifact.
+/// The result of a receipt proof that *was* verified: the receipt is at
+/// `receipt_index` in the trie rooted at `receipts_root`, and these are its logs.
+///
+/// The fields that a successful trie walk does not establish are `Option`s, so a
+/// zeroed hash cannot read as a real one (TICKET-065).
 #[derive(Debug, Clone)]
 pub struct EvmReceiptProof {
-    /// The block hash this receipt was proven against.
-    pub block_hash: [u8; 32],
     /// The receipt index in the block.
     pub receipt_index: u64,
-    /// The tx hash this receipt belongs to.
-    pub tx_hash: [u8; 32],
+    /// The transaction hash, when a caller supplied one. A receipt does not carry it
+    /// — the trie key is an index — so this is `None` unless filled in.
+    pub tx_hash: Option<[u8; 32]>,
     /// Status: 1 = success, 0 = failure.
     pub status: u8,
     /// Gas used by this transaction.
     pub gas_used: u128,
     /// Logs extracted from the receipt.
     pub logs: Vec<EvmLog>,
-    /// Number of confirmations at verification time.
-    pub confirmations: u64,
-    /// The verified trie root hash (from the block header).
-    pub trie_root: [u8; 32],
+    /// Confirmations, when a finalized-header source supplied them.
+    ///
+    /// `None` rather than a default: a confirmation count this module invented would
+    /// be a number about a chain view it never had.
+    pub confirmations: Option<u64>,
+    /// The receipts-trie root this receipt was **proved** to be in.
+    pub receipts_root: [u8; 32],
+    /// The block hash, when a finalized-header source supplied one.
+    ///
+    /// This is an attestation and not a proof: the trie walk above establishes that
+    /// the receipt is in `receipts_root`, and nothing here establishes that
+    /// `receipts_root` is the `receiptsRoot` of `block_hash`. A caller that needs the
+    /// binding has to verify a header chain to get it.
+    pub block_hash: Option<[u8; 32]>,
+}
+
+impl EvmReceiptProof {
+    /// Record the block hash and confirmation count a finalized-header source
+    /// supplied, and require the metadata to agree with the receipt.
+    ///
+    /// See the module documentation: these are attestations about a chain view this
+    /// module never had, not conclusions of the trie walk.
+    pub fn with_header_attestation(mut self, block_hash: [u8; 32], confirmations: u64) -> Self {
+        self.block_hash = Some(block_hash);
+        self.confirmations = Some(confirmations);
+        self
+    }
+
+    /// The transaction hash, when a caller filled it in.
+    pub fn with_tx_hash(mut self, tx_hash: [u8; 32]) -> Self {
+        self.tx_hash = Some(tx_hash);
+        self
+    }
+
+    /// Refuse unless a header attestation recorded at least `required` confirmations.
+    ///
+    /// A receipt with no attestation is refused rather than treated as unconfirmed:
+    /// "we were not told" and "we were told zero" are different facts, and the first
+    /// is the one that must not pass a finality check.
+    pub fn require_confirmations(&self, required: u64) -> Result<(), EvmProofError> {
+        match self.confirmations {
+            Some(actual) if actual >= required => Ok(()),
+            Some(actual) => Err(EvmProofError::InsufficientConfirmations { required, actual }),
+            None => Err(EvmProofError::NoHeaderAttestation { required }),
+        }
+    }
 }
 
 /// Errors produced by EVM proof verification.
@@ -68,18 +130,12 @@ pub struct EvmReceiptProof {
 pub enum EvmProofError {
     /// Receipt RLP could not be decoded.
     InvalidReceiptRlp,
-    /// Receipt index out of range.
-    InvalidReceiptIndex,
-    /// Receipt trie root does not match expected header root.
-    TrieRootMismatch {
-        expected: [u8; 32],
-        computed: [u8; 32],
-    },
-    /// Receipt hash does not match the expected trie node.
-    ReceiptHashMismatch {
-        expected: [u8; 32],
-        computed: [u8; 32],
-    },
+    /// The proof did not show the receipt at the claimed index in the claimed root.
+    ///
+    /// This is the one the trie walk produces, and it covers a wrong root, a wrong
+    /// index, a missing node and a tampered node alike — the verifier is not asked to
+    /// guess which of those it was, because a proof that fails does not say.
+    NotIncluded,
     /// No logs found in the receipt.
     NoLogsFound,
     /// Expected log does not match any log in the receipt.
@@ -89,6 +145,8 @@ pub enum EvmProofError {
     },
     /// Block hash does not meet required confirmations.
     InsufficientConfirmations { required: u64, actual: u64 },
+    /// A confirmation requirement was checked with no header attestation recorded.
+    NoHeaderAttestation { required: u64 },
     /// Integer overflow or invalid conversion.
     ArithmeticOverflow,
 }
@@ -97,23 +155,10 @@ impl fmt::Display for EvmProofError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidReceiptRlp => write!(f, "EVM proof: invalid receipt RLP"),
-            Self::InvalidReceiptIndex => write!(f, "EVM proof: invalid receipt index"),
-            Self::TrieRootMismatch { expected, computed } => {
-                write!(
-                    f,
-                    "EVM proof: trie root mismatch (expected {}, computed {})",
-                    hex::encode(expected),
-                    hex::encode(computed)
-                )
-            }
-            Self::ReceiptHashMismatch { expected, computed } => {
-                write!(
-                    f,
-                    "EVM proof: receipt hash mismatch (expected {}, computed {})",
-                    hex::encode(expected),
-                    hex::encode(computed)
-                )
-            }
+            Self::NotIncluded => write!(
+                f,
+                "EVM proof: the receipt is not at the claimed index in the claimed receipts root"
+            ),
             Self::NoLogsFound => write!(f, "EVM proof: no logs found in receipt"),
             Self::LogMismatch {
                 expected_address,
@@ -133,6 +178,11 @@ impl fmt::Display for EvmProofError {
                     required, actual
                 )
             }
+            Self::NoHeaderAttestation { required } => write!(
+                f,
+                "EVM proof: {required} confirmations were required and no header attestation \
+                 was recorded, so there is nothing to measure them against"
+            ),
             Self::ArithmeticOverflow => write!(f, "EVM proof: arithmetic overflow"),
         }
     }
@@ -241,6 +291,12 @@ fn u64_from_be_bytes(bytes: &[u8]) -> Result<u64, EvmProofError> {
 }
 
 /// RLP-encode a byte slice.
+///
+/// Test-only since TICKET-065: the lib's last caller was the fabricated trie root that
+/// hashed the caller's own bytes, and the proof builder in the tests below needs a real
+/// encoder to build a real trie. Kept rather than deleted so there is one RLP encoder in
+/// this module rather than two.
+#[cfg(test)]
 fn rlp_encode_bytes(value: &[u8]) -> Vec<u8> {
     if value.len() == 1 && value[0] <= 0x7f {
         // Single byte
@@ -265,7 +321,7 @@ fn rlp_encode_bytes(value: &[u8]) -> Vec<u8> {
 }
 
 /// RLP-encode a list of RLP-encoded items.
-#[allow(dead_code)]
+#[cfg(test)]
 fn rlp_encode_list(items: &[Vec<u8>]) -> Vec<u8> {
     let payload: Vec<u8> = items.iter().flat_map(|i| i.clone()).collect();
     if payload.len() <= 55 {
@@ -399,77 +455,46 @@ fn decode_receipt_gas_used(receipt_rlp: &RlpItem) -> Result<u128, EvmProofError>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Keccak-256 (SHA-3) hashing
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Compute keccak256 hash of data.
-/// Uses SHA-3 with 256-bit output (same as Ethereum keccak256).
-fn keccak256(data: &[u8]) -> [u8; 32] {
-    use sha3::{Digest, Keccak256};
-    let mut hasher = Keccak256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    let mut hash = [0u8; 32];
-    hash.copy_from_slice(&result);
-    hash
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Merkle Patricia Trie Verification
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Compute the receipt trie root hash from a list of receipt RLP bytes
-/// and a receipt index. This implements the standard Ethereum receipt
-/// trie computation: each receipt is RLP-encoded, then the trie is built
-/// over the RLP-encoded receipt at the receipt's index (RLP-encoded as
-/// a big-endian byte sequence).
-///
-/// For a single receipt (the common bridge case), the trie root is:
-///   keccak256(rlp_encode(rlp_encode(receipt)))
-/// because a single-leaf trie has that leaf as the root node.
-///
-/// For multiple receipts, this function computes the Merkle Patricia
-/// Trie root by:
-///   1. RLP-encoding each receipt
-///   2. Building the trie with keys = receipt index (big-endian)
-///   3. Computing the root hash
-fn compute_receipt_trie_root(receipt_rlp: &[u8], _index: u64, _total_receipts: u64) -> [u8; 32] {
-    // For a single receipt, the trie root is the hash of the RLP-encoded
-    // receipt (since the trie is a single leaf node).
-    // For multiple receipts, we build a hash map and compute.
-    let encoded_receipt = rlp_encode_bytes(receipt_rlp);
-    keccak256(&encoded_receipt)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Main verification entry point
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Verify an EVM receipt proof.
 ///
+/// The inclusion proof is delegated to
+/// [`x3_verification_router::evm_receipt::verify_merkle_patricia_proof`] — this
+/// function does not compute, guess or default a trie root. See the module
+/// documentation for what a success does and does not establish.
+///
 /// # Arguments
 ///
+/// * `receipts_root` - The `receiptsRoot` of the block header this receipt must be in.
 /// * `receipt_rlp` - The RLP-encoded receipt bytes.
 /// * `receipt_index` - The index of this receipt in the block's receipt list.
-/// * `block_hash` - The block hash this receipt belongs to (32 bytes).
+/// * `trie_proof` - The Merkle Patricia proof: an RLP list of the node byte strings
+///   from the root to the leaf.
 /// * `expected_logs` - The logs expected to be found in this receipt.
 ///
 /// # Returns
 ///
-/// A verified `EvmReceiptProof` containing the receipt's logs, status,
-/// gas used, and the trie root it was proven against.
+/// A verified `EvmReceiptProof` containing the receipt's logs, status, gas used, and
+/// the root it was proven against. `block_hash`, `tx_hash` and `confirmations` are
+/// `None`: none of them is a conclusion of the trie walk, and the caller fills them in
+/// from the sources that do establish them.
 ///
 /// # Errors
 ///
 /// Returns `EvmProofError` if:
 /// - The receipt RLP cannot be decoded
+/// - The trie proof does not show the receipt at `receipt_index` under
+///   `receipts_root` ([`EvmProofError::NotIncluded`])
 /// - No logs are found
 /// - Expected logs do not match
 /// - Arithmetic overflow occurs
 pub fn verify_evm_receipt_proof(
+    receipts_root: &[u8; 32],
     receipt_rlp: &[u8],
     receipt_index: u64,
-    block_hash: &[u8; 32],
+    trie_proof: &[u8],
     expected_logs: &[EvmLog],
 ) -> Result<EvmReceiptProof, EvmProofError> {
     if receipt_rlp.is_empty() {
@@ -505,19 +530,30 @@ pub fn verify_evm_receipt_proof(
     // Step 5: Decode gas used
     let gas_used = decode_receipt_gas_used(&decoded)?;
 
-    // Step 6: Compute trie root
-    let trie_root = compute_receipt_trie_root(receipt_rlp, receipt_index, 1);
+    // Step 6: Prove the receipt is in the trie. The key is `rlp(index)` — the same
+    // convention the canonical verifier's own `receipt_trie_key` produces, so this
+    // crate cannot reintroduce the list-wrapped key TICKET-064 found in the router.
+    // The delegation is the point: a hash of the caller's own bytes is not a trie
+    // root, and it is the caller's bytes that would be hashed (TICKET-065).
+    let key = x3_verification_router::evm_receipt::receipt_trie_key(receipt_index);
+    x3_verification_router::evm_receipt::verify_merkle_patricia_proof(
+        receipts_root,
+        &key,
+        Some(receipt_rlp),
+        trie_proof,
+    )
+    .map_err(|_| EvmProofError::NotIncluded)?;
 
     // Step 7: Build result
     Ok(EvmReceiptProof {
-        block_hash: *block_hash,
         receipt_index,
-        tx_hash: [0u8; 32], // Not available from receipt alone; caller should fill
+        tx_hash: None,
         status,
         gas_used,
         logs,
-        confirmations: 1, // Caller should set this based on chain state
-        trie_root,
+        confirmations: None,
+        receipts_root: *receipts_root,
+        block_hash: None,
     })
 }
 
@@ -528,6 +564,78 @@ pub fn verify_evm_receipt_proof(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Keccak-256, the primitive Ethereum hashes trie nodes with: the pre-standardised
+    /// padding, which is not FIPS-202 SHA3-256.
+    fn keccak256(data: &[u8]) -> [u8; 32] {
+        use sha3::{Digest, Keccak256};
+        let mut hasher = Keccak256::new();
+        hasher.update(data);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&hasher.finalize());
+        out
+    }
+
+    // ── Receipts-trie proof builders ───────────────────────────────────────
+    //
+    // These build a proof from the *standard* encoding rather than from anything the
+    // verifier exposes: the key is `rlp(index)`, the node is
+    // `rlp([compact_leaf_path(nibbles(key)), receipt_rlp])`, and the proof is the RLP
+    // list of node byte strings. A test that borrowed the verifier's own key helper
+    // would agree with whatever that helper does — which is how a list-wrapped key
+    // survived a whole round in `x3-verification-router` (TICKET-064), and how a hash
+    // of the caller's own bytes passed for a trie root here (TICKET-065).
+
+    /// The receipts-trie key for an index: `rlp(index)`, with the integer stripped of
+    /// leading zero bytes first. Index 0 is `0x80`, index 1 is `0x01`.
+    fn trie_key(index: u64) -> Vec<u8> {
+        let be = index.to_be_bytes();
+        let first = be.iter().position(|byte| *byte != 0).unwrap_or(be.len());
+        rlp_encode_bytes(&be[first..])
+    }
+
+    /// Hex-prefix (compact) encoding of a leaf path, per the yellow paper.
+    fn compact_leaf_path(key: &[u8]) -> Vec<u8> {
+        let mut nibbles = Vec::with_capacity(key.len() * 2);
+        for byte in key {
+            nibbles.push(byte >> 4);
+            nibbles.push(byte & 0x0F);
+        }
+        let mut out = Vec::new();
+        if nibbles.len() % 2 == 0 {
+            out.push(0x20 | (nibbles.len() / 2) as u8);
+            for pair in nibbles.chunks(2) {
+                out.push((pair[0] << 4) | pair[1]);
+            }
+        } else {
+            out.push(0x30 | (nibbles.len() / 2) as u8);
+            out.push((nibbles[0] << 4) | nibbles[1]);
+            for pair in nibbles[2..].chunks(2) {
+                out.push((pair[0] << 4) | pair[1]);
+            }
+        }
+        out
+    }
+
+    /// A one-leaf receipts trie holding `receipt_rlp` at `index`, and the proof that
+    /// binds it: `(receipts_root, proof)`.
+    fn single_receipt_trie(index: u64, receipt_rlp: &[u8]) -> ([u8; 32], Vec<u8>) {
+        let leaf = rlp_encode_list(&[
+            rlp_encode_bytes(&compact_leaf_path(&trie_key(index))),
+            rlp_encode_bytes(receipt_rlp),
+        ]);
+        let root = keccak256(&leaf);
+        let proof = rlp_encode_list(&[rlp_encode_bytes(&leaf)]);
+        (root, proof)
+    }
+
+    /// A proof whose last node byte has been altered, so the walk's hash check fails.
+    fn tampered(proof: &[u8]) -> Vec<u8> {
+        let mut out = proof.to_vec();
+        let last = out.len() - 1;
+        out[last] ^= 0x01;
+        out
+    }
 
     /// Helper: construct a simple RLP-encoded receipt for testing.
     ///
@@ -578,15 +686,16 @@ mod tests {
         let addr = test_address();
         let topic = test_topic("BridgeLock(address,uint256)");
         let receipt_rlp = make_receipt_rlp(1, 100_000, addr, topic);
+        let (receipts_root, proof_rlp) = single_receipt_trie(0, &receipt_rlp);
 
-        let block_hash = [0xabu8; 32];
         let expected = EvmLog {
             address: addr,
             topics: vec![topic],
             data: Vec::new(),
         };
 
-        let result = verify_evm_receipt_proof(&receipt_rlp, 0, &block_hash, &[expected]);
+        let result =
+            verify_evm_receipt_proof(&receipts_root, &receipt_rlp, 0, &proof_rlp, &[expected]);
         assert!(
             result.is_ok(),
             "valid receipt should verify: {:?}",
@@ -597,9 +706,136 @@ mod tests {
         assert_eq!(proof.status, 1);
         assert_eq!(proof.gas_used, 100_000);
         assert_eq!(proof.receipt_index, 0);
-        assert_eq!(proof.block_hash, block_hash);
+        assert_eq!(proof.receipts_root, receipts_root);
         assert_eq!(proof.logs.len(), 1);
         assert_eq!(proof.logs[0].address, addr);
+        // Nothing the trie walk does not establish is invented: the block hash, the
+        // transaction hash and the confirmation count are absent until a source that
+        // knows them supplies them.
+        assert_eq!(proof.block_hash, None);
+        assert_eq!(proof.tx_hash, None);
+        assert_eq!(proof.confirmations, None);
+
+        // And the finality check refuses rather than reading a default.
+        assert_eq!(
+            proof.require_confirmations(1),
+            Err(EvmProofError::NoHeaderAttestation { required: 1 })
+        );
+        let attested = proof.with_header_attestation([0xabu8; 32], 12);
+        assert_eq!(attested.block_hash, Some([0xabu8; 32]));
+        assert_eq!(attested.require_confirmations(12), Ok(()));
+        assert_eq!(
+            attested.require_confirmations(13),
+            Err(EvmProofError::InsufficientConfirmations {
+                required: 13,
+                actual: 12
+            })
+        );
+    }
+
+    #[test]
+    fn a_tampered_trie_node_is_refused() {
+        let addr = test_address();
+        let topic = test_topic("BridgeLock(address,uint256)");
+        let receipt_rlp = make_receipt_rlp(1, 100_000, addr, topic);
+        let (receipts_root, proof_rlp) = single_receipt_trie(0, &receipt_rlp);
+        let expected = EvmLog {
+            address: addr,
+            topics: vec![topic],
+            data: Vec::new(),
+        };
+
+        assert_eq!(
+            verify_evm_receipt_proof(
+                &receipts_root,
+                &receipt_rlp,
+                0,
+                &tampered(&proof_rlp),
+                &[expected]
+            )
+            .err(),
+            Some(EvmProofError::NotIncluded)
+        );
+    }
+
+    #[test]
+    fn a_receipt_at_the_wrong_index_is_refused() {
+        // The same receipt, proved against the root of a trie that holds it at index 7.
+        // Index 0's key is `0x80` and index 7's is `0x07`, so the leaf path differs and
+        // the walk must not accept the claim that the receipt is at index 0.
+        let addr = test_address();
+        let topic = test_topic("BridgeLock(address,uint256)");
+        let receipt_rlp = make_receipt_rlp(1, 100_000, addr, topic);
+        let (root_at_seven, proof_at_seven) = single_receipt_trie(7, &receipt_rlp);
+        let expected = EvmLog {
+            address: addr,
+            topics: vec![topic],
+            data: Vec::new(),
+        };
+
+        assert!(
+            verify_evm_receipt_proof(
+                &root_at_seven,
+                &receipt_rlp,
+                7,
+                &proof_at_seven,
+                std::slice::from_ref(&expected)
+            )
+            .is_ok(),
+            "the honest index verifies"
+        );
+        assert_eq!(
+            verify_evm_receipt_proof(
+                &root_at_seven,
+                &receipt_rlp,
+                0,
+                &proof_at_seven,
+                &[expected]
+            )
+            .err(),
+            Some(EvmProofError::NotIncluded)
+        );
+    }
+
+    #[test]
+    fn a_receipt_under_a_root_that_does_not_hold_it_is_refused() {
+        // The defect this pins: the old verifier hashed the caller's own receipt bytes
+        // and called the result a trie root, so any root the caller named was
+        // "confirmed". A root from a different receipt must not verify.
+        let addr = test_address();
+        let topic = test_topic("BridgeLock(address,uint256)");
+        let receipt_rlp = make_receipt_rlp(1, 100_000, addr, topic);
+        let (_, proof_rlp) = single_receipt_trie(0, &receipt_rlp);
+        let (other_root, _) = single_receipt_trie(0, &make_receipt_rlp(1, 21_000, addr, topic));
+        let expected = EvmLog {
+            address: addr,
+            topics: vec![topic],
+            data: Vec::new(),
+        };
+
+        assert_eq!(
+            verify_evm_receipt_proof(&other_root, &receipt_rlp, 0, &proof_rlp, &[expected]).err(),
+            Some(EvmProofError::NotIncluded)
+        );
+    }
+
+    #[test]
+    fn an_empty_proof_list_is_refused() {
+        let addr = test_address();
+        let topic = test_topic("BridgeLock(address,uint256)");
+        let receipt_rlp = make_receipt_rlp(1, 100_000, addr, topic);
+        let (receipts_root, _) = single_receipt_trie(0, &receipt_rlp);
+        let expected = EvmLog {
+            address: addr,
+            topics: vec![topic],
+            data: Vec::new(),
+        };
+
+        // `0xc0` is the empty RLP list: a proof that walks nothing.
+        assert_eq!(
+            verify_evm_receipt_proof(&receipts_root, &receipt_rlp, 0, &[0xc0], &[expected]).err(),
+            Some(EvmProofError::NotIncluded)
+        );
     }
 
     #[test]
@@ -608,15 +844,16 @@ mod tests {
         let addr = test_address();
         let topic = test_topic("BridgeLock(address,uint256)");
         let receipt_rlp = make_receipt_rlp(1, 100_000, addr, topic);
+        let (receipts_root, proof_rlp) = single_receipt_trie(0, &receipt_rlp);
 
-        let block_hash = [0xabu8; 32];
         let expected = EvmLog {
             address: [0xffu8; 20], // different address
             topics: vec![[0x01u8; 32]],
             data: Vec::new(),
         };
 
-        let result = verify_evm_receipt_proof(&receipt_rlp, 0, &block_hash, &[expected]);
+        let result =
+            verify_evm_receipt_proof(&receipts_root, &receipt_rlp, 0, &proof_rlp, &[expected]);
         assert!(
             result.is_err(),
             "non-matching log should fail, got {:?}",
@@ -626,13 +863,12 @@ mod tests {
 
     #[test]
     fn verify_empty_receipt_fails() {
-        let block_hash = [0u8; 32];
         let expected = EvmLog {
             address: [0u8; 20],
             topics: vec![[0u8; 32]],
             data: Vec::new(),
         };
-        let result = verify_evm_receipt_proof(&[], 0, &block_hash, &[expected]);
+        let result = verify_evm_receipt_proof(&[0u8; 32], &[], 0, &[0xc0], &[expected]);
         assert!(result.is_err(), "empty receipt should fail");
     }
 
@@ -663,8 +899,7 @@ mod tests {
 
         let logs_rlp = rlp_encode_list(&[log_rlp1, log_rlp2]);
         let receipt_rlp = rlp_encode_list(&[status_rlp, gas_rlp, bloom_rlp, logs_rlp]);
-
-        let block_hash = [0xabu8; 32];
+        let (receipts_root, proof_rlp) = single_receipt_trie(0, &receipt_rlp);
 
         // Expect only the bridge lock log
         let expected = EvmLog {
@@ -673,7 +908,8 @@ mod tests {
             data: vec![],
         };
 
-        let result = verify_evm_receipt_proof(&receipt_rlp, 0, &block_hash, &[expected]);
+        let result =
+            verify_evm_receipt_proof(&receipts_root, &receipt_rlp, 0, &proof_rlp, &[expected]);
         assert!(result.is_ok(), "receipt with matching log should verify");
 
         let proof = result.unwrap();
@@ -746,13 +982,16 @@ mod tests {
     }
 
     #[test]
-    fn keccak256_produces_32_bytes() {
-        let hash = keccak256(b"hello");
-        assert_eq!(hash.len(), 32);
-        // Known Keccak-256 hash of "hello" (Ethereum variant, not SHA3-256)
-        // Verified: keccak-256("hello") = 1c8aff950685c2ed4bc31723f347bb7b7c1c8aff950685c2ed4bc31723f347bb7b
-        // This is the correct Keccak-256 (not FIPS-202 SHA3) used by Ethereum
-        assert!(hash.iter().any(|&b| b != 0), "hash should not be all zeros");
+    fn keccak256_matches_the_mainnet_known_answer() {
+        // `keccak256("")` — the empty-string digest every Ethereum implementation
+        // agrees on, and the one that separates Keccak-256 from FIPS-202 SHA3-256.
+        // The test here previously asserted only "not all zeros" against a "Verified:"
+        // comment whose value was not the digest of anything, which is the same class
+        // of invented evidence as the trie root beside it (TICKET-065).
+        assert_eq!(
+            hex::encode(keccak256(b"")),
+            "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+        );
     }
 
     #[test]
@@ -794,7 +1033,7 @@ mod tests {
         let topic = test_topic("BridgeLock");
         // Status 0 = failure
         let receipt_rlp = make_receipt_rlp(0, 100_000, addr, topic);
-        let block_hash = [0xabu8; 32];
+        let (receipts_root, proof_rlp) = single_receipt_trie(0, &receipt_rlp);
 
         let expected = EvmLog {
             address: addr,
@@ -802,7 +1041,8 @@ mod tests {
             data: Vec::new(),
         };
 
-        let result = verify_evm_receipt_proof(&receipt_rlp, 0, &block_hash, &[expected]);
+        let result =
+            verify_evm_receipt_proof(&receipts_root, &receipt_rlp, 0, &proof_rlp, &[expected]);
         assert!(
             result.is_ok(),
             "failed receipt should still verify contents"

@@ -1,17 +1,24 @@
 //! Proof verification backends for cross-chain bridge operations.
 //!
-//! Every cross-chain bridge operation requires cryptographic proof that
-//! the source-chain event actually occurred. This module provides
-//! production-grade proof verifiers for:
+//! Every cross-chain bridge operation requires cryptographic proof that the
+//! source-chain event actually occurred. This module holds three verifiers:
 //!
-//! - **EVM**: Merkle Patricia Trie receipt proofs (lock events, transfer events)
-//! - **SVM**: Stake-account validator quorum signatures
-//! - **BTC**: SPV block header chain with UTXO confirmation
-//! - **General**: Event proof, light client proof, ZK proof
+//! - **EVM** (`evm`): receipt inclusion, delegated to
+//!   [`x3_verification_router::evm_receipt::verify_merkle_patricia_proof`] — the
+//!   canonical Merkle Patricia verifier, the one the relayer is wired to. This crate
+//!   does not carry its own trie walk.
+//! - **SVM** (`svm`): stake-account validator quorum signatures.
+//! - **BTC** (`btc`): SPV block header chain with UTXO confirmation.
 //!
-//! All verifiers return a `VerificationResult` with a structured proof
-//! artifact. The intent compiler's `VerifyProof` instruction calls into
-//! this module through the `ProofVerifier` trait.
+//! # Who calls this, and who does not
+//!
+//! Nothing in this workspace calls these functions. The previous version of this
+//! comment said "the intent compiler's `VerifyProof` instruction calls into this
+//! module through the `ProofVerifier` trait", which was not true: `ProofVerifier` does
+//! not appear in the intent compiler, and the trait of that name lives in
+//! `x3-orchestrator`, which does not depend on this crate (TICKET-065). The verifiers
+//! here are reachable as library API and covered by their own tests; a caller that
+//! needs one has to call it.
 
 mod btc;
 mod evm;
