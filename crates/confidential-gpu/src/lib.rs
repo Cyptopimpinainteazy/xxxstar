@@ -311,12 +311,23 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "simulated-attestation")]
     fn runtime_lifecycle() {
         let mut runtime = ConfidentialGpuRuntime::new(ConfidentialGpuConfig::default());
         assert_eq!(runtime.status(), RuntimeStatus::Uninitialized);
 
         runtime.initialize().unwrap();
         assert_eq!(runtime.status(), RuntimeStatus::WaitingForDkg);
+    }
+
+    /// Without a real attestation backend, `initialize()` must fail closed
+    /// rather than let the runtime silently reach a "waiting" state on a
+    /// fabricated attestation.
+    #[test]
+    #[cfg(not(feature = "simulated-attestation"))]
+    fn runtime_initialize_fails_closed_without_attestation_backend() {
+        let mut runtime = ConfidentialGpuRuntime::new(ConfidentialGpuConfig::default());
+        assert!(runtime.initialize().is_err());
     }
 
     #[test]
