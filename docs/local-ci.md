@@ -23,6 +23,7 @@ scripts/local-ci.sh                 # fast gate set (default)
 scripts/local-ci.sh --live          # + EVM/SVM contract lifecycles (anvil, solana-test-validator)
 scripts/local-ci.sh --cross         # + X3-native and cross-domain lifecycles
 scripts/local-ci.sh --variants      # + runtime migration dry-run, all six variants
+scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
 scripts/local-ci.sh --release       # + make mainnet-check
 scripts/local-ci.sh --deep          # + cargo test --workspace (slow, broadest signal)
 scripts/local-ci.sh --all           # everything (the release bar)
@@ -31,8 +32,17 @@ scripts/local-ci.sh --pre-push      # what the hook runs
 ```
 
 Equivalent make targets: `make local-ci`, `local-ci-live`, `local-ci-cross`,
-`local-ci-variants`, `local-ci-release`, `local-ci-all`, `local-ci-prepush`,
-`local-ci-list`, `local-ci-dry-run`, `local-ci-deep`.
+`local-ci-variants`, `local-ci-loom`, `local-ci-release`, `local-ci-all`,
+`local-ci-prepush`, `local-ci-list`, `local-ci-dry-run`, `local-ci-deep`.
+
+`--loom` adds `bash scripts/run-loom-tests.sh`, which runs
+`tests/loom-concurrency` the way its header documents:
+`RUSTFLAGS="--cfg loom" cargo +nightly-2026-05-01 test --release` from that
+directory. The crate is outside the workspace on purpose — it is `#![cfg(loom)]`
+end to end, so without the flag it compiles to an empty crate, and as a member
+it would be a crate of trivially-passing emptiness. Loom needs a nightly (it
+depends on `generator`); on a box without the pinned toolchain the gate reports
+**BLOCKED**, not PASS. Override the toolchain with `X3_LOOM_TOOLCHAIN`.
 
 `--deep` adds `env -u SKIP_WASM_BUILD cargo test --workspace` — the broadest
 automated check the repository has (all test targets in all workspace members;
@@ -72,8 +82,9 @@ a sequential run.
 | `clippy workspace`, `clippy runtime rc1`, `clippy node rc1` | the three lint configurations, `-D warnings` |
 | `test x3-lang`, `test atomic-kernel`, `test atomic-swap std`, `test settlement-engine`, `test node`, `test cross-vm-coordinator` | the unit suites that gate landing |
 
-The `--live`, `--cross`, `--release` and `--variants` groups add the gates that
-need a real chain, a full release build, or six runtime compilations.
+The `--live`, `--cross`, `--release`, `--variants` and `--loom` groups add the
+gates that need a real chain, a full release build, six runtime compilations, or
+a pinned nightly toolchain.
 
 ## Results
 
@@ -269,4 +280,3 @@ Do not add an automatic `pull_request` trigger to a workflow that executes on
 a self-hosted runner. A public PR can modify scripts and project code; executing
 untrusted PR code on infrastructure that holds caches, credentials, validator
 state, or network access is not an acceptable trade for a green check.
-

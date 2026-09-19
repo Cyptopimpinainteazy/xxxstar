@@ -28,6 +28,15 @@ exclude = [
     # dylint libraries need a nightly toolchain (`#![feature(rustc_private)]`);
     # it is excluded until a nightly is available for its own gate.
     "crates/dylint-determinism",
+    # `tests/loom-concurrency` is `#![cfg(loom)]` end to end: without
+    # `RUSTFLAGS="--cfg loom"` on a nightly toolchain (loom needs `generator`)
+    # the whole crate compiles to nothing, so as a workspace member it would be
+    # a crate of trivially-passing emptiness. Excluded, with the opt-in
+    # `--loom` gate in scripts/local-ci.sh running it the way its header
+    # documents; on a box without the nightly that gate reports BLOCKED rather
+    # than green. This was the last entry in
+    # `.ai/workspace-membership-baseline.txt`.
+    "tests/loom-concurrency",
     # `pallets/x3-governance` is a superseded duplicate of the two governance
     # pallets the runtime actually runs — `pallets/governance`
     # (`pallet-governance`, wired in `construct_runtime!`) and
@@ -285,6 +294,10 @@ members = [
     "crates/orchestra",
     # Burn-down batch 13 (issue #274).
     "pallets/pallet-x3-control",
+    # Burn-down batch 14 (issue #274).
+    "crates/x3-pq",
+    # Burn-down batch 15 (issue #274).
+    "crates/x3-mobile-sdk",
 ]
 default-members = ["node"]
 resolver = "2"

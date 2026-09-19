@@ -7,6 +7,3 @@
 # plus its own gate. `scripts/check-workspace-membership.py` fails when a
 # crate appears in neither list, or when a fixed entry stays here.
 
-loom-concurrency
-x3-mobile-sdk
-x3-pq
