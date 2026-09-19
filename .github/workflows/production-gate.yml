@@ -64,6 +64,8 @@ jobs:
         run: make guard
       - name: Test (core + pallets)
         run: make test-all-pallets
+      - name: Test (foundry crates)
+        run: make test-foundry
       - name: Build validated release node
         run: cargo build --release -p x3-chain-node --features mainnet-rc1
       - name: Build reproducible runtime with srtool
